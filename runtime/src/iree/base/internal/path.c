@@ -12,9 +12,13 @@
 static iree_status_t iree_string_view_dup(iree_string_view_t value,
                                           iree_allocator_t allocator,
                                           char** out_buffer) {
+  iree_host_size_t alloc_size = 0;
+  if (!iree_host_size_checked_add(value.size, 1, &alloc_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "string length overflow");
+  }
   char* buffer = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, value.size + 1, (void**)&buffer));
+      iree_allocator_malloc(allocator, alloc_size, (void**)&buffer));
   memcpy(buffer, value.data, value.size);
   buffer[value.size] = 0;  // NUL
   *out_buffer = buffer;
@@ -26,10 +30,15 @@ static iree_status_t iree_string_view_cat(iree_string_view_t lhs,
                                           iree_allocator_t allocator,
                                           char** out_buffer) {
   // Allocate storage buffer with NUL character.
-  iree_host_size_t total_length = lhs.size + rhs.size;
+  iree_host_size_t total_length = 0;
+  iree_host_size_t alloc_size = 0;
+  if (!iree_host_size_checked_add(lhs.size, rhs.size, &total_length) ||
+      !iree_host_size_checked_add(total_length, 1, &alloc_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "string length overflow");
+  }
   char* buffer = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_length + 1, (void**)&buffer));
+      iree_allocator_malloc(allocator, alloc_size, (void**)&buffer));
 
   // Copy both parts.
   memcpy(buffer, lhs.data, lhs.size);
@@ -48,14 +57,30 @@ static iree_status_t iree_string_view_join(iree_host_size_t part_count,
   // Compute total output size in characters.
   iree_host_size_t total_length = 0;
   for (iree_host_size_t i = 0; i < part_count; ++i) {
-    total_length += parts[i].size;
+    if (!iree_host_size_checked_add(total_length, parts[i].size,
+                                    &total_length)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "join length overflow");
+    }
   }
-  total_length += part_count > 0 ? separator.size * (part_count - 1) : 0;
+  if (part_count > 0) {
+    iree_host_size_t separator_total = 0;
+    if (!iree_host_size_checked_mul(separator.size, part_count - 1,
+                                    &separator_total) ||
+        !iree_host_size_checked_add(total_length, separator_total,
+                                    &total_length)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "join length overflow");
+    }
+  }
 
   // Allocate storage buffer with NUL character.
+  iree_host_size_t alloc_size = 0;
+  if (!iree_host_size_checked_add(total_length, 1, &alloc_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "allocation size overflow");
+  }
   char* buffer = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_length + 1, (void**)&buffer));
+      iree_allocator_malloc(allocator, alloc_size, (void**)&buffer));
 
   // Append each part and a separator between each.
   char* p = buffer;

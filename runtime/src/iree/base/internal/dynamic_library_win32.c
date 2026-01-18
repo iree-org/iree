@@ -165,9 +165,23 @@ static iree_status_t iree_dynamic_library_create(
     iree_dynamic_library_t** out_library) {
   *out_library = NULL;
 
+  iree_host_size_t identifier_storage_size = 0;
+  iree_host_size_t module_path_storage_size = 0;
+  if (!iree_host_size_checked_add(identifier.size, 1,
+                                  &identifier_storage_size) ||
+      !iree_host_size_checked_add(module_path.size, 1,
+                                  &module_path_storage_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "path length overflow");
+  }
+  iree_host_size_t total_size = 0;
+  iree_host_size_t identifier_offset = 0;
+  iree_host_size_t module_path_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_dynamic_library_t), &total_size,
+      IREE_STRUCT_FIELD(identifier_storage_size, char, &identifier_offset),
+      IREE_STRUCT_FIELD(module_path_storage_size, char, &module_path_offset)));
+
   iree_dynamic_library_t* library = NULL;
-  iree_host_size_t total_size =
-      sizeof(*library) + (identifier.size + 1) + (module_path.size + 1);
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, total_size, (void**)&library));
   memset(library, 0, total_size);
@@ -175,11 +189,11 @@ static iree_status_t iree_dynamic_library_create(
   library->allocator = allocator;
   library->module = module;
 
-  library->identifier = (char*)library + sizeof(*library);
+  library->identifier = (char*)library + identifier_offset;
   memcpy(library->identifier, identifier.data, identifier.size);
   library->identifier[identifier.size] = 0;  // NUL
 
-  library->module_path = library->identifier + (identifier.size + 1);
+  library->module_path = (char*)library + module_path_offset;
   memcpy(library->module_path, module_path.data, module_path.size);
   library->module_path[module_path.size] = 0;  // NUL
 

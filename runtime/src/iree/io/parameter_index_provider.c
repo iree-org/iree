@@ -46,9 +46,9 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_index_provider_create(
                            IREE_IO_PARAMETER_OP_BATCH_MAX_CONCURRENCY));
 
   iree_io_parameter_index_provider_t* provider = NULL;
-  iree_host_size_t total_size = sizeof(*provider) + scope.size;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&provider));
+      z0, iree_allocator_malloc_with_trailing(host_allocator, sizeof(*provider),
+                                              scope.size, (void**)&provider));
   iree_atomic_ref_count_init(&provider->base.ref_count);
   provider->base.vtable = &iree_io_parameter_index_provider_vtable;
   provider->host_allocator = host_allocator;

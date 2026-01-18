@@ -116,34 +116,16 @@ IREE_API_EXPORT void iree_hal_file_cache_trim(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_hal_file_cache_reserve_unsafe(
-    iree_hal_file_cache_t* file_cache, iree_host_size_t new_capacity) {
-  IREE_ASSERT_ARGUMENT(file_cache);
-  if (new_capacity < file_cache->entry_capacity) return iree_ok_status();
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_capacity);
-
-  iree_hal_file_cache_entry_t** new_entries = file_cache->entries;
-  iree_status_t status = iree_allocator_realloc(
-      file_cache->host_allocator, new_capacity * sizeof(file_cache->entries[0]),
-      (void**)&new_entries);
-  if (iree_status_is_ok(status)) {
-    file_cache->entry_capacity = new_capacity;
-    file_cache->entries = new_entries;
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 static iree_status_t iree_hal_file_cache_insert_unsafe(
     iree_hal_file_cache_t* file_cache, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
     iree_io_file_handle_t* handle, iree_hal_file_t* file) {
   // Ensure there's space to grow the cache table.
   if (file_cache->entry_count == file_cache->entry_capacity) {
-    IREE_RETURN_IF_ERROR(iree_hal_file_cache_reserve_unsafe(
-        file_cache, iree_max(16u, file_cache->entry_capacity * 2)));
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        file_cache->host_allocator, /*min_capacity=*/16,
+        sizeof(file_cache->entries[0]), &file_cache->entry_capacity,
+        (void**)&file_cache->entries));
   }
 
   // Allocate the cache entry and retain all resources.

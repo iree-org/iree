@@ -55,48 +55,47 @@ iree_status_t iree_hal_task_driver_create(
   // - queue_executors[]
   // - identifier string
   iree_hal_task_driver_t* driver = NULL;
-  iree_host_size_t struct_size =
-      sizeof(*driver) + loader_count * sizeof(*driver->loaders);
-  iree_host_size_t queue_executors_offset = struct_size;
-  struct_size += queue_count * sizeof(driver->queue_executors[0]);
-  iree_host_size_t identifier_offset = struct_size;
-  struct_size += identifier.size;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, struct_size, (void**)&driver);
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_task_driver_vtable,
-                                 &driver->resource);
-    driver->host_allocator = host_allocator;
-    driver->device_allocator = device_allocator;
-    iree_hal_allocator_retain(device_allocator);
+  iree_host_size_t total_size = 0;
+  iree_host_size_t queue_executors_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(*driver), &total_size,
+              IREE_STRUCT_FIELD_ALIGNED(loader_count,
+                                        iree_hal_executable_loader_t*, 1, NULL),
+              IREE_STRUCT_FIELD_ALIGNED(queue_count, iree_task_executor_t*, 1,
+                                        &queue_executors_offset),
+              IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
+                                        &identifier_offset)));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&driver));
+  iree_hal_resource_initialize(&iree_hal_task_driver_vtable, &driver->resource);
+  driver->host_allocator = host_allocator;
+  driver->device_allocator = device_allocator;
+  iree_hal_allocator_retain(device_allocator);
 
-    iree_string_view_append_to_buffer(identifier, &driver->identifier,
-                                      (char*)driver + identifier_offset);
-    memcpy(&driver->default_params, default_params,
-           sizeof(driver->default_params));
+  iree_string_view_append_to_buffer(identifier, &driver->identifier,
+                                    (char*)driver + identifier_offset);
+  memcpy(&driver->default_params, default_params,
+         sizeof(driver->default_params));
 
-    driver->queue_count = queue_count;
-    driver->queue_executors =
-        (iree_task_executor_t**)((uint8_t*)driver + queue_executors_offset);
-    for (iree_host_size_t i = 0; i < driver->queue_count; ++i) {
-      driver->queue_executors[i] = queue_executors[i];
-      iree_task_executor_retain(driver->queue_executors[i]);
-    }
-
-    driver->loader_count = loader_count;
-    for (iree_host_size_t i = 0; i < driver->loader_count; ++i) {
-      driver->loaders[i] = loaders[i];
-      iree_hal_executable_loader_retain(driver->loaders[i]);
-    }
+  driver->queue_count = queue_count;
+  driver->queue_executors =
+      (iree_task_executor_t**)((uint8_t*)driver + queue_executors_offset);
+  for (iree_host_size_t i = 0; i < driver->queue_count; ++i) {
+    driver->queue_executors[i] = queue_executors[i];
+    iree_task_executor_retain(driver->queue_executors[i]);
   }
 
-  if (iree_status_is_ok(status)) {
-    *out_driver = (iree_hal_driver_t*)driver;
-  } else {
-    iree_hal_driver_release((iree_hal_driver_t*)driver);
+  driver->loader_count = loader_count;
+  for (iree_host_size_t i = 0; i < driver->loader_count; ++i) {
+    driver->loaders[i] = loaders[i];
+    iree_hal_executable_loader_retain(driver->loaders[i]);
   }
+
+  *out_driver = (iree_hal_driver_t*)driver;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_task_driver_destroy(iree_hal_driver_t* base_driver) {

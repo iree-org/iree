@@ -64,16 +64,13 @@ static iree_status_t iree_tokenizer_bpe_parse_merge_array_visitor(
   }
 
   if (unescaped_length > parent->unescape_capacity) {
-    iree_host_size_t new_capacity = parent->unescape_capacity * 2;
-    if (new_capacity < unescaped_length) new_capacity = unescaped_length;
-    if (new_capacity < 256) new_capacity = 256;
-    status = iree_allocator_realloc(parent->allocator, new_capacity,
-                                    (void**)&parent->unescape_buffer);
+    status = iree_allocator_grow_array(
+        parent->allocator, iree_max(256, unescaped_length), /*element_size=*/1,
+        &parent->unescape_capacity, (void**)&parent->unescape_buffer);
     if (!iree_status_is_ok(status)) {
       parent->status = status;
       return iree_status_from_code(IREE_STATUS_CANCELLED);
     }
-    parent->unescape_capacity = new_capacity;
   }
 
   status =
@@ -155,13 +152,9 @@ static iree_status_t iree_tokenizer_bpe_parse_merge_string(
   }
 
   if (unescaped_length > ctx->unescape_capacity) {
-    iree_host_size_t new_capacity = ctx->unescape_capacity * 2;
-    if (new_capacity < unescaped_length) new_capacity = unescaped_length;
-    if (new_capacity < 256) new_capacity = 256;
-    status = iree_allocator_realloc(ctx->allocator, new_capacity,
-                                    (void**)&ctx->unescape_buffer);
-    IREE_RETURN_IF_ERROR(status);
-    ctx->unescape_capacity = new_capacity;
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        ctx->allocator, iree_max(256, unescaped_length), /*element_size=*/1,
+        &ctx->unescape_capacity, (void**)&ctx->unescape_buffer));
   }
 
   status = iree_json_unescape_string(value, ctx->unescape_capacity,

@@ -37,10 +37,14 @@ iree_status_t iree_event_pool_allocate(iree_host_size_t available_capacity,
   *out_event_pool = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Calculate allocation size with overflow checking. available_list is a FAM
+  // accessed via event_pool->available_list[].
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(iree_event_pool_t), &total_size,
+              IREE_STRUCT_FIELD_FAM(available_capacity, iree_event_t)));
   iree_event_pool_t* event_pool = NULL;
-  iree_host_size_t total_size =
-      sizeof(*event_pool) +
-      available_capacity * sizeof(event_pool->available_list[0]);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, total_size, (void**)&event_pool));

@@ -67,14 +67,17 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read_stdin(
   IREE_IO_SET_BINARY_MODE(stdin);
 
   iree_host_size_t capacity = 4096;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t data_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_io_file_contents_t), &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(capacity, uint8_t,
+                                IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT,
+                                &data_offset)));
   iree_io_file_contents_t* contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      host_allocator,
-      sizeof(*contents) + IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT + capacity,
-      (void**)&contents));
-  contents->buffer.data =
-      (void*)iree_host_align((uintptr_t)contents + sizeof(*contents),
-                             IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT);
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, total_size, (void**)&contents));
+  contents->buffer.data = (void*)((uint8_t*)contents + data_offset);
 
   iree_host_size_t size = 0;
   for (int c = getchar(); c != EOF; c = getchar()) {
@@ -84,12 +87,18 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read_stdin(
       uintptr_t old_offset =
           (uintptr_t)contents->buffer.data - (uintptr_t)contents;
       iree_host_size_t new_capacity = capacity * 2;
+      iree_host_size_t new_total_size = 0;
+      iree_host_size_t new_data_offset = 0;
+      iree_status_t status = IREE_STRUCT_LAYOUT(
+          sizeof(iree_io_file_contents_t), &new_total_size,
+          IREE_STRUCT_FIELD_ALIGNED(new_capacity, uint8_t,
+                                    IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT,
+                                    &new_data_offset));
       iree_io_file_contents_t* new_contents = contents;
-      iree_status_t status = iree_allocator_realloc(
-          host_allocator,
-          sizeof(*new_contents) + IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT +
-              new_capacity,
-          (void**)&new_contents);
+      if (iree_status_is_ok(status)) {
+        status = iree_allocator_realloc(host_allocator, new_total_size,
+                                        (void**)&new_contents);
+      }
       if (!iree_status_is_ok(status)) {
         iree_allocator_free(host_allocator, contents);
         IREE_TRACE_ZONE_END(z0);
@@ -97,9 +106,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read_stdin(
       }
       contents = new_contents;
       uint8_t* old_data = (uint8_t*)new_contents + old_offset;
-      uint8_t* new_data = (uint8_t*)iree_host_align(
-          (uintptr_t)new_contents + sizeof(*new_contents),
-          IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT);
+      uint8_t* new_data = (uint8_t*)new_contents + new_data_offset;
       if (new_data != old_data) {
         // Alignment changed; move the data with safety for overlapping.
         memmove(new_data, old_data, size);
@@ -233,20 +240,24 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read(
   // Allocate the file contents struct and its embedded buffer data.
   // We compute total size with alignment padding and allocate +1 bytes to force
   // a trailing \0 in case this is used as a cstring.
+  iree_host_size_t file_total_size = 0;
+  iree_host_size_t file_data_offset = 0;
   iree_io_file_contents_t* contents = NULL;
   if (iree_status_is_ok(status)) {
-    const iree_host_size_t total_size = sizeof(*contents) +
-                                        IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT +
-                                        file_size + /*NUL*/ 1;
-    status =
-        iree_allocator_malloc(host_allocator, total_size, (void**)&contents);
+    status = IREE_STRUCT_LAYOUT(
+        sizeof(iree_io_file_contents_t), &file_total_size,
+        IREE_STRUCT_FIELD_ALIGNED(file_size + /*NUL*/ 1, uint8_t,
+                                  IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT,
+                                  &file_data_offset));
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, file_total_size,
+                                   (void**)&contents);
   }
   if (iree_status_is_ok(status)) {
     contents->allocator = host_allocator;
     contents->buffer = iree_make_byte_span(
-        (void*)iree_host_align((uintptr_t)contents + sizeof(*contents),
-                               IREE_IO_FILE_CONTENTS_BASE_ALIGNMENT),
-        file_size);
+        (void*)((uint8_t*)contents + file_data_offset), file_size);
 
     // Add trailing NUL to make the contents C-string compatible.
     contents->buffer.data[file_size] = 0;  // NUL

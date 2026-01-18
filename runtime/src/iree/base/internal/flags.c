@@ -163,10 +163,9 @@ iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
     IREE_TRACE_ZONE_BEGIN_NAMED(z_outline,
                                 "iree_flag_string_list_parse_outline");
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z_outline,
-        iree_allocator_malloc(iree_flags_leaky_allocator(),
-                              sizeof(iree_string_view_t) * new_capacity,
-                              (void**)&values));
+        z_outline, iree_allocator_malloc_array(
+                       iree_flags_leaky_allocator(), new_capacity,
+                       sizeof(iree_string_view_t), (void**)&values));
     values[0] = flag->inline_value;
     flag->capacity = new_capacity;
     flag->values = values;
@@ -177,14 +176,13 @@ iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
     flag->values[flag->count++] = value;
   } else {  // external storage full
     // Growing external storage list.
+    iree_host_size_t min_capacity = 4;
     IREE_TRACE_ZONE_BEGIN_NAMED(z_grow, "iree_flag_string_list_parse_grow");
-    iree_host_size_t new_capacity = iree_max(4, flag->capacity * 2);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z_grow,
-        iree_allocator_realloc(iree_flags_leaky_allocator(),
-                               sizeof(iree_string_view_t) * new_capacity,
-                               (void**)&flag->values));
-    flag->capacity = new_capacity;
+        iree_allocator_grow_array(iree_flags_leaky_allocator(), min_capacity,
+                                  sizeof(iree_string_view_t), &flag->capacity,
+                                  (void**)&flag->values));
     flag->values[flag->count++] = value;
     IREE_TRACE_ZONE_END(z_grow);
   }

@@ -69,17 +69,20 @@ static iree_status_t iree_hal_semaphore_list_clone(
     return iree_ok_status();
   }
 
-  iree_host_size_t semaphores_size =
-      source_list->count * sizeof(out_target_list->semaphores[0]);
-  iree_host_size_t payload_values_size =
-      source_list->count * sizeof(out_target_list->payload_values[0]);
-  iree_host_size_t total_size = semaphores_size + payload_values_size;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t payload_values_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      0, &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(source_list->count, iree_hal_semaphore_t*, 1,
+                                NULL),
+      IREE_STRUCT_FIELD_ALIGNED(source_list->count, uint64_t, 1,
+                                &payload_values_offset)));
   uint8_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(arena, total_size, (void**)&buffer));
 
   out_target_list->count = source_list->count;
   out_target_list->semaphores = (iree_hal_semaphore_t**)buffer;
-  out_target_list->payload_values = (uint64_t*)(buffer + semaphores_size);
+  out_target_list->payload_values = (uint64_t*)(buffer + payload_values_offset);
 
   for (iree_host_size_t i = 0; i < source_list->count; ++i) {
     iree_hal_semaphore_t* semaphore = source_list->semaphores[i];
@@ -302,9 +305,13 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
       (iree_hal_task_submission_batch_t*)user_data;
 
   iree_hal_task_queue_issue_cmd_t* cmd = NULL;
-  iree_host_size_t binding_table_elements_size =
-      batch->binding_table.count * sizeof(*batch->binding_table.bindings);
-  iree_host_size_t total_cmd_size = sizeof(*cmd) + binding_table_elements_size;
+  iree_host_size_t total_cmd_size = 0;
+  if (!iree_host_size_checked_mul_add(sizeof(*cmd), batch->binding_table.count,
+                                      sizeof(*batch->binding_table.bindings),
+                                      &total_cmd_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "binding table allocation size overflow");
+  }
   IREE_RETURN_IF_ERROR(
       iree_arena_allocate(arena, total_cmd_size, (void**)&cmd));
   iree_task_call_initialize(
@@ -321,7 +328,7 @@ static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
   // Binding tables are optional and we only need this extra work if there were
   // any non-empty binding tables provided during submission.
   iree_status_t status = iree_ok_status();
-  if (binding_table_elements_size > 0) {
+  if (batch->binding_table.count > 0) {
     // Copy over binding tables and all of their contents.
     iree_hal_buffer_binding_t* binding_element_ptr =
         (iree_hal_buffer_binding_t*)((uint8_t*)cmd + sizeof(*cmd));

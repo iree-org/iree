@@ -134,18 +134,17 @@ static iree_status_t iree_io_stream_list_append_entry(
 
   // Grow if needed.
   if (list->count + 1 > list->capacity) {
-    iree_host_size_t new_capacity = iree_max(list->capacity * 2, 16);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_realloc(list->host_allocator,
-                                   new_capacity * sizeof(*list->entries[0]),
-                                   (void**)&list->entries));
-    list->capacity = new_capacity;
+        z0,
+        iree_allocator_grow_array(list->host_allocator,
+                                  /*min_capacity=*/16, sizeof(list->entries[0]),
+                                  &list->capacity, (void**)&list->entries));
   }
 
   // Allocate the entry and its string storage.
   iree_io_stream_list_entry_t* entry = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      list->host_allocator, sizeof(*entry) + path.size, (void**)&entry);
+  iree_status_t status = iree_allocator_malloc_with_trailing(
+      list->host_allocator, sizeof(*entry), path.size, (void**)&entry);
   if (iree_status_is_ok(status)) {
     entry->path.data = (const char*)entry + sizeof(*entry);
     entry->path.size = path.size;

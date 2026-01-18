@@ -92,6 +92,17 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    allocator_test
+  SRCS
+    "allocator_test.cc"
+  DEPS
+    ::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     bitfield_test
   SRCS
     "bitfield_test.cc"
