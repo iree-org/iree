@@ -390,7 +390,7 @@ public:
 
 private:
   const std::optional<ExprHoistingOptions::RegisterDialectsFn>
-      registerDependentDialectsFn;
+      registerDependentDialectsFn = std::nullopt;
 };
 
 } // namespace
