@@ -344,7 +344,8 @@ The key points include:
    ask other project members to review it."
 2. "Contributors are expected to be transparent and label contributions that
    contain substantial amounts of tool-generated content." This can be done with
-   the `Assisted-by: tool-name` trailer in PR descriptions.
+   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
+   trailer in PR descriptions.
 3. "To ensure sufficient self review and understanding of the work, it is
    strongly recommended that contributors write PR descriptions themselves (if
    needed, using tools for translation or copy-editing)." This also extends to
