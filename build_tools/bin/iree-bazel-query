@@ -12,7 +12,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-query"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
@@ -71,7 +71,7 @@ QUERY=""
 BAZEL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -89,14 +89,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         *)
-            if [[ -z "$QUERY" ]]; then
-                QUERY="$1"
+            if [[ -z "${QUERY}" ]]; then
+                QUERY="${1}"
             else
-                BAZEL_ARGS+=("$1")
+                BAZEL_ARGS+=("${1}")
             fi
             shift
             ;;
@@ -104,7 +104,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Query is required.
-if [[ -z "$QUERY" ]]; then
+if [[ -z "${QUERY}" ]]; then
     iree_error "Query expression is required"
     echo ""
     show_help
@@ -117,7 +117,7 @@ iree_setup_worktree
 # Build the command with default configs (affects select() in build graph).
 iree_bazel_build_default_configs
 BAZEL_BIN=$(iree_get_bazel_command)
-CMD=("$BAZEL_BIN" query "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "$QUERY" "${BAZEL_ARGS[@]}")
+CMD=("${BAZEL_BIN}" query "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${QUERY}" "${BAZEL_ARGS[@]}")
 
 # Execute or show.
 if iree_is_verbose || iree_is_dry_run; then
@@ -128,5 +128,5 @@ if iree_is_dry_run; then
     exit 0
 fi
 
-iree_info "Querying: $QUERY"
+iree_info "Querying: ${QUERY}"
 exec "${CMD[@]}"

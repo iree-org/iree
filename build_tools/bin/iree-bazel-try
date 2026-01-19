@@ -13,7 +13,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-try"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
@@ -261,18 +261,18 @@ MAX_CACHE_SLOTS=8
 # This allows multiple runs with same deps config to share the cached BUILD.bazel.
 # Args: source_files array (via nameref), extra_deps array, copts array, linkopts array, language
 compute_cache_hash() {
-    local -n _source_files=$1
-    local -n _extra_deps=$2
-    local -n _copts=$3
-    local -n _linkopts=$4
+    local -n _source_files=${1}
+    local -n _extra_deps=${2}
+    local -n _copts=${3}
+    local -n _linkopts=${4}
     local _language=${5:-c}
     {
         # Hash language (determines file extension and compilation mode).
-        printf 'language:%s\n' "$_language"
+        printf 'language:%s\n' "${_language}"
         # Hash #include directives (determines inferred deps).
         printf 'includes:\n'
         for src in "${_source_files[@]}"; do
-            grep -h '#include\s*"[^"]*"' "$src" 2>/dev/null | \
+            grep -h '#include\s*"[^"]*"' "${src}" 2>/dev/null | \
                 sed 's/.*#include\s*"\([^"]*\)".*/\1/' | \
                 grep -E '^(iree/|llvm/|mlir/)'
         done | sort -u
@@ -290,52 +290,22 @@ compute_cache_hash() {
 # Ensure cache doesn't exceed MAX_CACHE_SLOTS by evicting oldest slots.
 # Uses mtime for LRU ordering (we touch slots on use).
 enforce_cache_limit() {
-    local cache_dir="$1"
-    if [[ ! -d "$cache_dir" ]]; then
+    local cache_dir="${1}"
+    if [[ ! -d "${cache_dir}" ]]; then
         return
     fi
     local slot_count
-    slot_count=$(find "$cache_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-    if [[ "$slot_count" -gt "$MAX_CACHE_SLOTS" ]]; then
+    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    if [[ "${slot_count}" -gt "${MAX_CACHE_SLOTS}" ]]; then
         local excess=$((slot_count - MAX_CACHE_SLOTS))
-        iree_debug "Cache has $slot_count slots, evicting $excess oldest"
+        iree_debug "Cache has ${slot_count} slots, evicting ${excess} oldest"
         # Find oldest directories by mtime and remove them.
-        find "$cache_dir" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | \
-            sort -n | head -n "$excess" | cut -d' ' -f2- | \
+        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | \
+            sort -n | head -n "${excess}" | cut -d' ' -f2- | \
             while read -r old_slot; do
-                rm -rf "$old_slot"
-                iree_debug "Evicted cache slot: $old_slot"
+                rm -rf "${old_slot}"
+                iree_debug "Evicted cache slot: ${old_slot}"
             done
-    fi
-}
-
-# Ensure .iree-bazel-try is in .git/info/exclude (local exclude, not .gitignore).
-ensure_ignores() {
-    local worktree="$1"
-
-    # Find the git directory (handles worktrees where .git is a file pointing elsewhere).
-    local git_dir
-    if [[ -f "$worktree/.git" ]]; then
-        # Worktree: .git is a file containing "gitdir: /path/to/git/dir"
-        git_dir=$(sed 's/^gitdir: //' "$worktree/.git")
-    else
-        git_dir="$worktree/.git"
-    fi
-
-    local exclude_file="$git_dir/info/exclude"
-
-    # Create info directory if needed.
-    mkdir -p "$(dirname "$exclude_file")"
-
-    # Add to exclude if not present.
-    if [[ -f "$exclude_file" ]]; then
-        if ! grep -q '^\.iree-bazel-try/$' "$exclude_file" 2>/dev/null; then
-            echo '.iree-bazel-try/' >> "$exclude_file"
-            iree_debug "Added .iree-bazel-try/ to $exclude_file"
-        fi
-    else
-        echo '.iree-bazel-try/' > "$exclude_file"
-        iree_debug "Created $exclude_file with .iree-bazel-try/"
     fi
 }
 
@@ -344,7 +314,8 @@ ensure_ignores() {
 # Outputs one dep per line.
 infer_deps_from_sources() {
     local -a sources=("$@")
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
     local -a runtime_patterns=()
     local -a compiler_patterns=()
     local -a llvm_files=()
@@ -352,7 +323,7 @@ infer_deps_from_sources() {
 
     # Collect all headers from all source files.
     for src in "${sources[@]}"; do
-        if [[ ! -f "$src" ]]; then
+        if [[ ! -f "${src}" ]]; then
             continue
         fi
 
@@ -361,7 +332,7 @@ infer_deps_from_sources() {
             local dir_path="${header%/*}"
             local filename="${header##*/}"
 
-            case "$header" in
+            case "${header}" in
                 iree/compiler/*)
                     # Pattern: iree/compiler/Foo/Bar:file.h (use path for specificity).
                     compiler_patterns+=("${dir_path}:${filename}")
@@ -372,14 +343,14 @@ infer_deps_from_sources() {
                     ;;
                 llvm/*)
                     # LLVM uses different structure, just use filename.
-                    llvm_files+=("$filename")
+                    llvm_files+=("${filename}")
                     ;;
                 mlir/*)
                     # MLIR uses different structure, just use filename.
-                    mlir_files+=("$filename")
+                    mlir_files+=("${filename}")
                     ;;
             esac
-        done < <(grep -h '#include\s*"[^"]*"' "$src" 2>/dev/null | \
+        done < <(grep -h '#include\s*"[^"]*"' "${src}" 2>/dev/null | \
                  sed 's/.*#include\s*"\([^"]*\)".*/\1/' | \
                  grep -E '^(iree/|llvm/|mlir/)')
     done
@@ -392,8 +363,8 @@ infer_deps_from_sources() {
         local pattern
         pattern=$(printf '%s\n' "${runtime_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
-            [[ -n "$dep" ]] && all_deps+=("$dep")
-        done < <("$BAZEL_BIN" query "attr(hdrs, '(${pattern})', //runtime/src/iree/...)" 2>/dev/null)
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //runtime/src/iree/...)" 2>/dev/null)
     fi
 
     if [[ ${#compiler_patterns[@]} -gt 0 ]]; then
@@ -401,8 +372,8 @@ infer_deps_from_sources() {
         local pattern
         pattern=$(printf '%s\n' "${compiler_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
-            [[ -n "$dep" ]] && all_deps+=("$dep")
-        done < <("$BAZEL_BIN" query "attr(hdrs, '(${pattern})', //compiler/src/iree/compiler/...)" 2>/dev/null)
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //compiler/src/iree/compiler/...)" 2>/dev/null)
     fi
 
     if [[ ${#llvm_files[@]} -gt 0 ]]; then
@@ -410,8 +381,8 @@ infer_deps_from_sources() {
         local pattern
         pattern=$(printf '%s\n' "${llvm_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
-            [[ -n "$dep" ]] && all_deps+=("$dep")
-        done < <("$BAZEL_BIN" query "attr(hdrs, '(${pattern})', @llvm-project//llvm/...)" 2>/dev/null)
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//llvm/...)" 2>/dev/null)
     fi
 
     if [[ ${#mlir_files[@]} -gt 0 ]]; then
@@ -419,8 +390,8 @@ infer_deps_from_sources() {
         local pattern
         pattern=$(printf '%s\n' "${mlir_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
-            [[ -n "$dep" ]] && all_deps+=("$dep")
-        done < <("$BAZEL_BIN" query "attr(hdrs, '(${pattern})', @llvm-project//mlir/...)" 2>/dev/null)
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//mlir/...)" 2>/dev/null)
     fi
 
     # Output unique deps.
@@ -430,16 +401,16 @@ infer_deps_from_sources() {
 # Try to find a dep for a missing symbol using bazel query.
 # This is called when build fails.
 find_dep_for_symbol() {
-    local symbol="$1"
-    local worktree="$2"
+    local symbol="${1}"
+    local worktree="${2}"
 
     # Search for the symbol in IREE runtime sources.
     local matches
-    matches=$(grep -rl "^[^/]*\b${symbol}\b" "$worktree/runtime/src/iree/" 2>/dev/null | head -5)
+    matches=$(grep -rl "^[^/]*\b${symbol}\b" "${worktree}/runtime/src/iree/" 2>/dev/null | head -5)
 
-    for match in $matches; do
+    for match in ${matches}; do
         # Convert file path to bazel package.
-        local rel_path="${match#$worktree/}"
+        local rel_path="${match#${worktree}/}"
         local dir_path="${rel_path%/*}"
         echo "//${dir_path}"
         return 0
@@ -451,38 +422,38 @@ find_dep_for_symbol() {
 # Parse build errors and suggest missing deps.
 # Returns deps to add, one per line.
 parse_build_errors() {
-    local log_file="$1"
-    local worktree="$2"
+    local log_file="${1}"
+    local worktree="${2}"
     local -A suggested_deps
 
     # Look for undefined reference errors.
     while IFS= read -r symbol; do
-        if [[ -n "$symbol" ]]; then
+        if [[ -n "${symbol}" ]]; then
             local dep
-            if dep=$(find_dep_for_symbol "$symbol" "$worktree" 2>/dev/null); then
-                if [[ -z "${suggested_deps[$dep]:-}" ]]; then
-                    suggested_deps[$dep]=1
-                    echo "$dep"
+            if dep=$(find_dep_for_symbol "${symbol}" "${worktree}" 2>/dev/null); then
+                if [[ -z "${suggested_deps[${dep}]:-}" ]]; then
+                    suggested_deps[${dep}]=1
+                    echo "${dep}"
                 fi
             fi
         fi
-    done < <(grep -o "undefined reference to \`[^']*'" "$log_file" 2>/dev/null | \
+    done < <(grep -o "undefined reference to \`[^']*'" "${log_file}" 2>/dev/null | \
              sed "s/undefined reference to \`\\([^']*\\)'/\\1/")
 
     # Look for missing header errors.
     while IFS= read -r header; do
-        if [[ "$header" == iree/* ]]; then
+        if [[ "${header}" == iree/* ]]; then
             local package="${header%/*}"
             # Simplify to top-level package.
             local component="${package#iree/}"
             component="${component%%/*}"
-            local dep="//runtime/src/iree/$component"
-            if [[ -z "${suggested_deps[$dep]:-}" ]]; then
-                suggested_deps[$dep]=1
-                echo "$dep"
+            local dep="//runtime/src/iree/${component}"
+            if [[ -z "${suggested_deps[${dep}]:-}" ]]; then
+                suggested_deps[${dep}]=1
+                echo "${dep}"
             fi
         fi
-    done < <(grep -o "fatal error: '[^']*' file not found" "$log_file" 2>/dev/null | \
+    done < <(grep -o "fatal error: '[^']*' file not found" "${log_file}" 2>/dev/null | \
              sed "s/fatal error: '\\([^']*\\)' file not found/\\1/")
 }
 
@@ -505,13 +476,13 @@ declare -a PROGRAM_ARGS=()
 # Parse arguments.
 PARSING_PROGRAM_ARGS=0
 while [[ $# -gt 0 ]]; do
-    if [[ "$PARSING_PROGRAM_ARGS" == "1" ]]; then
-        PROGRAM_ARGS+=("$1")
+    if [[ "${PARSING_PROGRAM_ARGS}" == "1" ]]; then
+        PROGRAM_ARGS+=("${1}")
         shift
         continue
     fi
 
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -541,7 +512,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --retry)
-            MAX_RETRIES="$2"
+            MAX_RETRIES="${2}"
             shift 2
             ;;
         --retry=*)
@@ -549,7 +520,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -o|--output)
-            OUTPUT_PATH="$2"
+            OUTPUT_PATH="${2}"
             shift 2
             ;;
         --output=*)
@@ -557,7 +528,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -x)
-            LANGUAGE="$2"
+            LANGUAGE="${2}"
             shift 2
             ;;
         -e|--execute)
@@ -569,7 +540,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --dep)
-            EXTRA_DEPS+=("$2")
+            EXTRA_DEPS+=("${2}")
             shift 2
             ;;
         --dep=*)
@@ -577,7 +548,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --copt)
-            COPTS+=("$2")
+            COPTS+=("${2}")
             shift 2
             ;;
         --copt=*)
@@ -585,7 +556,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --linkopt)
-            LINKOPTS+=("$2")
+            LINKOPTS+=("${2}")
             shift 2
             ;;
         --linkopt=*)
@@ -593,7 +564,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --config=*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         --)
@@ -601,12 +572,12 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            iree_error "Unknown option: $1"
+            iree_error "Unknown option: ${1}"
             echo "Use --help for usage information."
             exit 1
             ;;
         *)
-            SOURCE_FILES+=("$1")
+            SOURCE_FILES+=("${1}")
             shift
             ;;
     esac
@@ -614,7 +585,7 @@ done
 
 # Find worktree root.
 iree_require_worktree
-cd "$IREE_BAZEL_WORKTREE_DIR"
+cd "${IREE_BAZEL_WORKTREE_DIR}"
 iree_ensure_configured
 
 # Prepend default configs to bazel args.
@@ -623,7 +594,7 @@ BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
 
 # Determine input source.
 HAS_STDIN=0
-if [[ -z "$INLINE_CODE" ]] && [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
+if [[ -z "${INLINE_CODE}" ]] && [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
     # Check if stdin has data.
     if [[ -t 0 ]]; then
         iree_error "No input provided. Specify files, use -e, or pipe to stdin."
@@ -633,19 +604,18 @@ if [[ -z "$INLINE_CODE" ]] && [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
     HAS_STDIN=1
 fi
 
-# Set up base directory and ensure it's git-ignored.
-TRY_BASE="$IREE_BAZEL_WORKTREE_DIR/.iree-bazel-try"
-CACHE_DIR="$TRY_BASE/cache"
-STAGING_DIR="$TRY_BASE/staging_$$"
-ensure_ignores "$IREE_BAZEL_WORKTREE_DIR"
+# Set up base directory (ignored via .gitignore).
+TRY_BASE="${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+CACHE_DIR="${TRY_BASE}/cache"
+STAGING_DIR="${TRY_BASE}/staging_$$"
 
 # Create staging directory for source files (needed for deps inference).
-mkdir -p "$STAGING_DIR"
+mkdir -p "${STAGING_DIR}"
 
 # Cleanup staging on exit (cache slots are kept).
 cleanup_staging() {
-    if [[ -n "$STAGING_DIR" ]] && [[ -d "$STAGING_DIR" ]]; then
-        rm -rf "$STAGING_DIR"
+    if [[ -n "${STAGING_DIR}" ]] && [[ -d "${STAGING_DIR}" ]]; then
+        rm -rf "${STAGING_DIR}"
     fi
 }
 trap cleanup_staging EXIT
@@ -656,15 +626,15 @@ declare -a STAGED_SOURCE_PATHS=()
 
 # Read stdin into variable if needed (so we can scan it for auto-detection).
 STDIN_CONTENT=""
-if [[ "$HAS_STDIN" == "1" ]]; then
+if [[ "${HAS_STDIN}" == "1" ]]; then
     STDIN_CONTENT=$(cat)
 fi
 
 # Auto-detect C++ from includes if language not explicitly set.
 # C++-only headers: llvm/, mlir/, iree/compiler/, iree/testing/, gtest/, gmock/, benchmark/
 ALL_CODE="${INLINE_CODE}${STDIN_CONTENT}"
-if [[ -z "$LANGUAGE" ]]; then
-    if echo "$ALL_CODE" | grep -qE '#include\s*[<"](llvm/|mlir/|iree/compiler/|iree/testing/|gtest/|gmock/|benchmark/)'; then
+if [[ -z "${LANGUAGE}" ]]; then
+    if echo "${ALL_CODE}" | grep -qE '#include\s*[<"](llvm/|mlir/|iree/compiler/|iree/testing/|gtest/|gmock/|benchmark/)'; then
         LANGUAGE="c++"
         iree_debug "Auto-detected C++ from includes"
     else
@@ -674,51 +644,51 @@ fi
 
 
 # Handle inline code.
-if [[ -n "$INLINE_CODE" ]]; then
-    if [[ "$LANGUAGE" == "c++" ]]; then
-        INLINE_FILE="$STAGING_DIR/inline.cc"
+if [[ -n "${INLINE_CODE}" ]]; then
+    if [[ "${LANGUAGE}" == "c++" ]]; then
+        INLINE_FILE="${STAGING_DIR}/inline.cc"
     else
-        INLINE_FILE="$STAGING_DIR/inline.c"
+        INLINE_FILE="${STAGING_DIR}/inline.c"
     fi
-    printf '%s' "$INLINE_CODE" > "$INLINE_FILE"
-    BUILD_SRCS+=("$(basename "$INLINE_FILE")")
-    STAGED_SOURCE_PATHS+=("$INLINE_FILE")
-    iree_debug "Wrote inline code to $INLINE_FILE"
+    printf '%s' "${INLINE_CODE}" > "${INLINE_FILE}"
+    BUILD_SRCS+=("$(basename "${INLINE_FILE}")")
+    STAGED_SOURCE_PATHS+=("${INLINE_FILE}")
+    iree_debug "Wrote inline code to ${INLINE_FILE}"
 fi
 
 # Handle stdin.
-if [[ -n "$STDIN_CONTENT" ]]; then
-    if [[ "$LANGUAGE" == "c++" ]]; then
-        STDIN_FILE="$STAGING_DIR/stdin.cc"
+if [[ -n "${STDIN_CONTENT}" ]]; then
+    if [[ "${LANGUAGE}" == "c++" ]]; then
+        STDIN_FILE="${STAGING_DIR}/stdin.cc"
     else
-        STDIN_FILE="$STAGING_DIR/stdin.c"
+        STDIN_FILE="${STAGING_DIR}/stdin.c"
     fi
-    printf '%s' "$STDIN_CONTENT" > "$STDIN_FILE"
-    BUILD_SRCS+=("$(basename "$STDIN_FILE")")
-    STAGED_SOURCE_PATHS+=("$STDIN_FILE")
-    iree_debug "Wrote stdin to $STDIN_FILE"
+    printf '%s' "${STDIN_CONTENT}" > "${STDIN_FILE}"
+    BUILD_SRCS+=("$(basename "${STDIN_FILE}")")
+    STAGED_SOURCE_PATHS+=("${STDIN_FILE}")
+    iree_debug "Wrote stdin to ${STDIN_FILE}"
 fi
 
 # Handle source files.
 for src in "${SOURCE_FILES[@]}"; do
-    if [[ ! -f "$src" ]]; then
-        iree_error "Source file not found: $src"
+    if [[ ! -f "${src}" ]]; then
+        iree_error "Source file not found: ${src}"
         exit 1
     fi
     # Copy to staging dir.
-    cp "$src" "$STAGING_DIR/"
-    BUILD_SRCS+=("$(basename "$src")")
-    STAGED_SOURCE_PATHS+=("$STAGING_DIR/$(basename "$src")")
-    iree_debug "Staged $src"
+    cp "${src}" "${STAGING_DIR}/"
+    BUILD_SRCS+=("$(basename "${src}")")
+    STAGED_SOURCE_PATHS+=("${STAGING_DIR}/$(basename "${src}")")
+    iree_debug "Staged ${src}"
 done
 
 # Determine if this is C++.
 IS_CPP=0
-if [[ "$LANGUAGE" == "c++" ]]; then
+if [[ "${LANGUAGE}" == "c++" ]]; then
     IS_CPP=1
 else
     for src in "${BUILD_SRCS[@]}"; do
-        case "$src" in
+        case "${src}" in
             *.cc|*.cpp|*.cxx|*.C)
                 IS_CPP=1
                 break
@@ -730,40 +700,40 @@ fi
 # Compute cache hash BEFORE deps inference.
 # Hash is based on #includes + explicit deps + build options + language (NOT source content).
 # This allows runs with same deps config to share BUILD.bazel analysis cache.
-CACHE_HASH=$(compute_cache_hash STAGED_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "$LANGUAGE")
-SLOT_DIR="$CACHE_DIR/$CACHE_HASH"
-LOCK_FILE="$CACHE_DIR/$CACHE_HASH.lock"
+CACHE_HASH=$(compute_cache_hash STAGED_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "${LANGUAGE}")
+SLOT_DIR="${CACHE_DIR}/${CACHE_HASH}"
+LOCK_FILE="${CACHE_DIR}/${CACHE_HASH}.lock"
 
 # Ensure cache directory exists.
-mkdir -p "$CACHE_DIR"
+mkdir -p "${CACHE_DIR}"
 
 # Acquire exclusive lock on this slot to prevent parallel runs from clobbering.
 # Lock is released automatically when the script exits.
-exec 9>"$LOCK_FILE"
+exec 9>"${LOCK_FILE}"
 if ! flock -w 60 9; then
-    iree_error "Timeout waiting for lock on cache slot $CACHE_HASH"
+    iree_error "Timeout waiting for lock on cache slot ${CACHE_HASH}"
     exit 1
 fi
-iree_debug "Acquired lock on slot $CACHE_HASH"
+iree_debug "Acquired lock on slot ${CACHE_HASH}"
 
 # Check cache AFTER acquiring lock (another process may have created it while we waited).
 CACHE_HIT=0
-if [[ -d "$SLOT_DIR" ]] && [[ -f "$SLOT_DIR/BUILD.bazel" ]]; then
+if [[ -d "${SLOT_DIR}" ]] && [[ -f "${SLOT_DIR}/BUILD.bazel" ]]; then
     CACHE_HIT=1
-    iree_debug "Cache hit: reusing slot $CACHE_HASH (skipping deps inference)"
+    iree_debug "Cache hit: reusing slot ${CACHE_HASH} (skipping deps inference)"
 fi
 
 # Only infer deps on cache miss.
 declare -A DEPS_MAP=()
 declare -a DEPS=()
 
-if [[ "$CACHE_HIT" == "0" ]]; then
+if [[ "${CACHE_HIT}" == "0" ]]; then
     # Infer deps from source files (expensive bazel query).
     declare -a INFERRED_DEPS=()
-    if [[ "$INFER_DEPS" == "1" ]]; then
+    if [[ "${INFER_DEPS}" == "1" ]]; then
         while IFS= read -r dep; do
-            if [[ -n "$dep" ]]; then
-                INFERRED_DEPS+=("$dep")
+            if [[ -n "${dep}" ]]; then
+                INFERRED_DEPS+=("${dep}")
             fi
         done < <(infer_deps_from_sources "${STAGED_SOURCE_PATHS[@]}")
 
@@ -774,16 +744,16 @@ if [[ "$CACHE_HIT" == "0" ]]; then
 
     # Build deps list (inferred + explicit, deduplicated).
     for dep in "${INFERRED_DEPS[@]}"; do
-        if [[ -z "${DEPS_MAP[$dep]:-}" ]]; then
-            DEPS_MAP[$dep]=1
-            DEPS+=("$dep")
+        if [[ -z "${DEPS_MAP[${dep}]:-}" ]]; then
+            DEPS_MAP[${dep}]=1
+            DEPS+=("${dep}")
         fi
     done
 
     for dep in "${EXTRA_DEPS[@]}"; do
-        if [[ -z "${DEPS_MAP[$dep]:-}" ]]; then
-            DEPS_MAP[$dep]=1
-            DEPS+=("$dep")
+        if [[ -z "${DEPS_MAP[${dep}]:-}" ]]; then
+            DEPS_MAP[${dep}]=1
+            DEPS+=("${dep}")
         fi
     done
 
@@ -795,7 +765,7 @@ fi
 
 # Function to generate BUILD.bazel file.
 generate_build_file() {
-    local build_file="$1"
+    local build_file="${1}"
     shift
     local -a deps=("$@")
 
@@ -808,29 +778,29 @@ generate_build_file() {
         printf '    srcs = ['
         local first=1
         for src in "${BUILD_SRCS[@]}"; do
-            if [[ "$first" == "1" ]]; then
+            if [[ "${first}" == "1" ]]; then
                 first=0
             else
                 printf ', '
             fi
-            printf '"%s"' "$src"
+            printf '"%s"' "${src}"
         done
         printf '],\n'
         printf '    deps = [\n'
         for dep in "${deps[@]}"; do
-            printf '        "%s",\n' "$dep"
+            printf '        "%s",\n' "${dep}"
         done
         printf '    ],\n'
         if [[ ${#COPTS[@]} -gt 0 ]]; then
             printf '    copts = ['
             first=1
             for opt in "${COPTS[@]}"; do
-                if [[ "$first" == "1" ]]; then
+                if [[ "${first}" == "1" ]]; then
                     first=0
                 else
                     printf ', '
                 fi
-                printf '"%s"' "$opt"
+                printf '"%s"' "${opt}"
             done
             printf '],\n'
         fi
@@ -838,68 +808,69 @@ generate_build_file() {
             printf '    linkopts = ['
             first=1
             for opt in "${LINKOPTS[@]}"; do
-                if [[ "$first" == "1" ]]; then
+                if [[ "${first}" == "1" ]]; then
                     first=0
                 else
                     printf ', '
                 fi
-                printf '"%s"' "$opt"
+                printf '"%s"' "${opt}"
             done
             printf '],\n'
         fi
         echo ')'
-    } > "$build_file"
+    } > "${build_file}"
 }
 
 # Set up cache slot.
-if [[ "$CACHE_HIT" == "0" ]]; then
-    iree_debug "Cache miss: creating slot $CACHE_HASH"
-    mkdir -p "$SLOT_DIR"
+if [[ "${CACHE_HIT}" == "0" ]]; then
+    iree_debug "Cache miss: creating slot ${CACHE_HASH}"
+    mkdir -p "${SLOT_DIR}"
 
     # Generate BUILD.bazel for new slot.
-    BUILD_FILE="$SLOT_DIR/BUILD.bazel"
-    generate_build_file "$BUILD_FILE" "${DEPS[@]}"
+    BUILD_FILE="${SLOT_DIR}/BUILD.bazel"
+    generate_build_file "${BUILD_FILE}" "${DEPS[@]}"
 
     iree_debug "Generated BUILD.bazel:"
-    if [[ "$IREE_BAZEL_VERBOSE" == "1" ]]; then
-        cat "$BUILD_FILE" | sed 's/^/    /' >&2
+    if [[ "${IREE_BAZEL_VERBOSE}" == "1" ]]; then
+        cat "${BUILD_FILE}" | sed 's/^/    /' >&2
     fi
 fi
 
 # Copy source files from staging to cache slot.
 for staged_file in "${STAGED_SOURCE_PATHS[@]}"; do
-    cp "$staged_file" "$SLOT_DIR/"
+    cp "${staged_file}" "${SLOT_DIR}/"
 done
 
 # Touch the slot directory to update mtime for LRU tracking.
-touch "$SLOT_DIR"
+touch "${SLOT_DIR}"
 
 # Enforce cache size limit (evict old slots if needed).
-enforce_cache_limit "$CACHE_DIR"
+enforce_cache_limit "${CACHE_DIR}"
 
-if [[ "$KEEP_TEMP" == "1" ]]; then
-    iree_info "Cache slot: $SLOT_DIR"
+if [[ "${KEEP_TEMP}" == "1" ]]; then
+    iree_info "Cache slot: ${SLOT_DIR}"
 fi
 
 # Build the target with retry logic.
-TARGET="//.iree-bazel-try/cache/$CACHE_HASH:snippet"
-BUILD_LOG="$SLOT_DIR/build.log"
+TARGET="//.iree-bazel-try/cache/${CACHE_HASH}:snippet"
+BUILD_LOG="${SLOT_DIR}/build.log"
 
 do_build() {
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
     if iree_is_verbose; then
         # Verbose mode: show everything, also save to log for retry logic.
-        "$BAZEL_BIN" build "$TARGET" "${BAZEL_ARGS[@]}" 2>&1 | tee "$BUILD_LOG"
+        "${BAZEL_BIN}" build "${TARGET}" "${BAZEL_ARGS[@]}" 2>&1 | tee "${BUILD_LOG}"
         return "${PIPESTATUS[0]}"
     else
         # Quiet mode: capture output, only show on failure.
         # Force colors since we'll display to terminal on failure.
-        if "$BAZEL_BIN" build --color=yes "$TARGET" "${BAZEL_ARGS[@]}" >"$BUILD_LOG" 2>&1; then
+        if "${BAZEL_BIN}" build --color=yes "${TARGET}" "${BAZEL_ARGS[@]}" >"${BUILD_LOG}" 2>&1; then
             return 0
         else
             local exit_code=$?
-            cat "$BUILD_LOG" >&2
-            return $exit_code
+            cat "${BUILD_LOG}" >&2
+            return ${exit_code}
         fi
     fi
 }
@@ -908,74 +879,74 @@ build_with_retry() {
     local attempt=1
     local current_deps=("${DEPS[@]}")
 
-    while [[ $attempt -le $MAX_RETRIES ]]; do
-        iree_debug "Build attempt $attempt/$MAX_RETRIES"
+    while [[ ${attempt} -le ${MAX_RETRIES} ]]; do
+        iree_debug "Build attempt ${attempt}/${MAX_RETRIES}"
 
         if do_build; then
             return 0
         fi
 
         # Build failed - try to find missing deps.
-        if [[ "$INFER_DEPS" == "0" ]]; then
+        if [[ "${INFER_DEPS}" == "0" ]]; then
             # User disabled inference, don't retry.
             return 1
         fi
 
         local new_deps_found=0
         while IFS= read -r new_dep; do
-            if [[ -n "$new_dep" ]] && [[ -z "${DEPS_MAP[$new_dep]:-}" ]]; then
-                iree_warn "Adding inferred dep: $new_dep"
-                DEPS_MAP[$new_dep]=1
-                current_deps+=("$new_dep")
+            if [[ -n "${new_dep}" ]] && [[ -z "${DEPS_MAP[${new_dep}]:-}" ]]; then
+                iree_warn "Adding inferred dep: ${new_dep}"
+                DEPS_MAP[${new_dep}]=1
+                current_deps+=("${new_dep}")
                 new_deps_found=1
             fi
-        done < <(parse_build_errors "$BUILD_LOG" "$IREE_BAZEL_WORKTREE_DIR")
+        done < <(parse_build_errors "${BUILD_LOG}" "${IREE_BAZEL_WORKTREE_DIR}")
 
-        if [[ "$new_deps_found" == "0" ]]; then
+        if [[ "${new_deps_found}" == "0" ]]; then
             # No new deps to try, give up.
             iree_error "Build failed and no additional deps could be inferred"
             return 1
         fi
 
         # Regenerate BUILD file with new deps.
-        generate_build_file "$BUILD_FILE" "${current_deps[@]}"
+        generate_build_file "${BUILD_FILE}" "${current_deps[@]}"
         iree_debug "Regenerated BUILD.bazel with new deps"
 
         attempt=$((attempt + 1))
     done
 
-    iree_error "Build failed after $MAX_RETRIES attempts"
+    iree_error "Build failed after ${MAX_RETRIES} attempts"
     return 1
 }
 
-if [[ "$COMPILE_ONLY" == "1" ]] || [[ -n "$OUTPUT_PATH" ]]; then
+if [[ "${COMPILE_ONLY}" == "1" ]] || [[ -n "${OUTPUT_PATH}" ]]; then
     # Dry run: show what would be built and exit.
-    if [[ "$DRY_RUN" == "1" ]]; then
-        iree_info "Command: bazel build $TARGET ${BAZEL_ARGS[*]}"
+    if [[ "${DRY_RUN}" == "1" ]]; then
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]}"
         iree_info "Deps: ${DEPS[*]}"
         exit 0
     fi
 
-    iree_debug "Building $TARGET..."
+    iree_debug "Building ${TARGET}..."
 
     if ! build_with_retry; then
         exit 1
     fi
 
     # Copy output if requested.
-    if [[ -n "$OUTPUT_PATH" ]]; then
-        BINARY_PATH="$IREE_BAZEL_WORKTREE_DIR/bazel-bin/.iree-bazel-try/cache/$CACHE_HASH/snippet"
-        if [[ -f "$BINARY_PATH" ]]; then
-            cp "$BINARY_PATH" "$OUTPUT_PATH"
-            chmod +x "$OUTPUT_PATH"
-            iree_info "Binary saved to: $OUTPUT_PATH"
+    if [[ -n "${OUTPUT_PATH}" ]]; then
+        BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
+        if [[ -f "${BINARY_PATH}" ]]; then
+            cp "${BINARY_PATH}" "${OUTPUT_PATH}"
+            chmod +x "${OUTPUT_PATH}"
+            iree_info "Binary saved to: ${OUTPUT_PATH}"
         else
-            iree_error "Could not find built binary at $BINARY_PATH"
+            iree_error "Could not find built binary at ${BINARY_PATH}"
             exit 1
         fi
     fi
 
-    if [[ "$COMPILE_ONLY" == "1" ]]; then
+    if [[ "${COMPILE_ONLY}" == "1" ]]; then
         iree_debug "Build successful"
         exit 0
     fi
@@ -983,18 +954,18 @@ fi
 
 # Run the target.
 # Dry run: show what would be run and exit.
-if [[ "$DRY_RUN" == "1" ]]; then
+if [[ "${DRY_RUN}" == "1" ]]; then
     if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
-        iree_info "Command: bazel build $TARGET ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
     else
-        iree_info "Command: bazel build $TARGET ${BAZEL_ARGS[*]} && <binary>"
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary>"
     fi
     iree_info "Deps: ${DEPS[*]}"
-    iree_info "Run directory: $IREE_BAZEL_ORIG_CWD"
+    iree_info "Run directory: ${IREE_BAZEL_ORIG_CWD}"
     exit 0
 fi
 
-iree_debug "Running $TARGET..."
+iree_debug "Running ${TARGET}..."
 
 # Build first (using retry logic).
 if ! build_with_retry; then
@@ -1004,14 +975,14 @@ fi
 # Get the binary path and run from original directory.
 # We know the exact structure since we generate the BUILD file, so we can
 # compute the path directly instead of calling bazel cquery (saves ~500ms).
-BINARY_PATH="$IREE_BAZEL_WORKTREE_DIR/bazel-bin/.iree-bazel-try/cache/$CACHE_HASH/snippet"
-if [[ ! -x "$BINARY_PATH" ]]; then
-    iree_error "Could not find built binary at $BINARY_PATH"
+BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
+if [[ ! -x "${BINARY_PATH}" ]]; then
+    iree_error "Could not find built binary at ${BINARY_PATH}"
     exit 1
 fi
 
-iree_debug "Binary: $BINARY_PATH"
-iree_debug "Running from: $IREE_BAZEL_ORIG_CWD"
+iree_debug "Binary: ${BINARY_PATH}"
+iree_debug "Running from: ${IREE_BAZEL_ORIG_CWD}"
 
-cd "$IREE_BAZEL_ORIG_CWD"
-exec "$BINARY_PATH" "${PROGRAM_ARGS[@]}"
+cd "${IREE_BAZEL_ORIG_CWD}"
+exec "${BINARY_PATH}" "${PROGRAM_ARGS[@]}"

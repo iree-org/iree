@@ -12,7 +12,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-run"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
@@ -82,13 +82,13 @@ PROGRAM_ARGS=()
 PARSING_PROGRAM_ARGS=0
 
 while [[ $# -gt 0 ]]; do
-    if [[ "$PARSING_PROGRAM_ARGS" == "1" ]]; then
-        PROGRAM_ARGS+=("$1")
+    if [[ "${PARSING_PROGRAM_ARGS}" == "1" ]]; then
+        PROGRAM_ARGS+=("${1}")
         shift
         continue
     fi
 
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -114,14 +114,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         *)
-            if [[ -z "$TARGET" ]]; then
-                TARGET="$1"
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
             else
-                BAZEL_ARGS+=("$1")
+                BAZEL_ARGS+=("${1}")
             fi
             shift
             ;;
@@ -129,7 +129,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Target is required for run.
-if [[ -z "$TARGET" ]]; then
+if [[ -z "${TARGET}" ]]; then
     iree_error "Target is required for bazel run"
     echo ""
     show_help
@@ -145,43 +145,43 @@ BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
 
 # Dry run: show what would be run and exit.
 if iree_is_verbose || iree_is_dry_run; then
-    if [[ "$WATCH_MODE" == "1" ]]; then
-        BAZEL_BIN=$(iree_get_bazel_command "$WATCH_MODE")
+    if [[ "${WATCH_MODE}" == "1" ]]; then
+        BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
         if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
-            iree_info "Command: $BAZEL_BIN run --run_under=\"cd $IREE_BAZEL_ORIG_CWD && \" ${BAZEL_ARGS[*]} $TARGET -- ${PROGRAM_ARGS[*]}"
+            iree_info "Command: ${BAZEL_BIN} run --run_under=\"cd ${IREE_BAZEL_ORIG_CWD} && \" ${BAZEL_ARGS[*]} ${TARGET} -- ${PROGRAM_ARGS[*]}"
         else
-            iree_info "Command: $BAZEL_BIN run --run_under=\"cd $IREE_BAZEL_ORIG_CWD && \" ${BAZEL_ARGS[*]} $TARGET"
+            iree_info "Command: ${BAZEL_BIN} run --run_under=\"cd ${IREE_BAZEL_ORIG_CWD} && \" ${BAZEL_ARGS[*]} ${TARGET}"
         fi
     else
         if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
-            iree_info "Command: bazel build $TARGET ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
+            iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
         else
-            iree_info "Command: bazel build $TARGET ${BAZEL_ARGS[*]} && <binary>"
+            iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary>"
         fi
     fi
-    iree_info "Run directory: $IREE_BAZEL_ORIG_CWD"
+    iree_info "Run directory: ${IREE_BAZEL_ORIG_CWD}"
 fi
 
 if iree_is_dry_run; then
     exit 0
 fi
 
-iree_debug "Running $TARGET"
+iree_debug "Running ${TARGET}"
 
-if [[ "$WATCH_MODE" == "1" ]]; then
+if [[ "${WATCH_MODE}" == "1" ]]; then
     # Watch mode: use ibazel run with --run_under to match our cwd behavior.
     # NOTE: This holds the Bazel server lock while the binary runs, but that's
     # acceptable for a dedicated watch shell. ibazel needs to control the process
     # lifecycle to restart it on changes.
-    BAZEL_BIN=$(iree_get_bazel_command "$WATCH_MODE")
-    CMD=("$BAZEL_BIN" run --run_under="cd $IREE_BAZEL_ORIG_CWD && " "${BAZEL_ARGS[@]}" "$TARGET")
+    BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+    CMD=("${BAZEL_BIN}" run --run_under="cd ${IREE_BAZEL_ORIG_CWD} && " "${BAZEL_ARGS[@]}" "${TARGET}")
     if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
         CMD+=(-- "${PROGRAM_ARGS[@]}")
     fi
-    iree_info "Watch mode: running from $IREE_BAZEL_ORIG_CWD"
+    iree_info "Watch mode: running from ${IREE_BAZEL_ORIG_CWD}"
     exec "${CMD[@]}"
 else
     # Normal mode: build and execute from original working directory.
     # This releases the Bazel server lock before execution, allowing parallel builds.
-    iree_bazel_build_and_exec "$TARGET" "$IREE_BAZEL_ORIG_CWD" "${BAZEL_ARGS[@]}" -- "${PROGRAM_ARGS[@]}"
+    iree_bazel_build_and_exec "${TARGET}" "${IREE_BAZEL_ORIG_CWD}" "${BAZEL_ARGS[@]}" -- "${PROGRAM_ARGS[@]}"
 fi

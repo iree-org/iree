@@ -12,15 +12,15 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-fuzz"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
 eval "set -- $(iree_expand_combined_flags "$@")"
 
 # Fuzz-specific globals.
-FUZZ_CACHE_DIR="${IREE_FUZZ_CACHE:-$HOME/.cache/iree-fuzz-cache}"
-FUZZ_CORPUS_DIR="${IREE_FUZZ_CORPUS:-$HOME/.cache/iree-fuzz-corpus}"
+FUZZ_CACHE_DIR="${IREE_FUZZ_CACHE:-${HOME}/.cache/iree-fuzz-cache}"
+FUZZ_CORPUS_DIR="${IREE_FUZZ_CORPUS:-${HOME}/.cache/iree-fuzz-corpus}"
 FUZZ_MINIMIZE=0
 FUZZ_DICT_ONLY=0
 FUZZ_MIN_USES=10       # Minimum usage count for dict entries
@@ -81,45 +81,46 @@ EOF
 
 # Extract target name from bazel label (e.g., "//foo/bar:baz" -> "baz")
 get_target_name() {
-    local target="$1"
+    local target="${1}"
     echo "${target##*:}"
 }
 
 # Get the repo-relative directory for a target (e.g., "runtime/src/iree/base").
 # Uses bazel query to find source file location.
 get_target_relative_dir() {
-    local target="$1"
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local target="${1}"
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
 
     # Query for source files of this target.
     local src_location
-    src_location=$("$BAZEL_BIN" query "labels(srcs, $target)" --output=location 2>/dev/null | head -1)
+    src_location=$("${BAZEL_BIN}" query "labels(srcs, ${target})" --output=location 2>/dev/null | head -1)
 
-    if [[ -n "$src_location" ]]; then
+    if [[ -n "${src_location}" ]]; then
         # Extract directory from "path/to/file.cc:1:1" and make it relative.
         local src_file="${src_location%%:*}"
         local src_dir
-        src_dir=$(dirname "$src_file")
+        src_dir=$(dirname "${src_file}")
 
         # Make path relative to worktree root.
-        echo "${src_dir#$IREE_BAZEL_WORKTREE_DIR/}"
+        echo "${src_dir#${IREE_BAZEL_WORKTREE_DIR}/}"
     fi
 }
 
 # Get the dict file path for a target in the fuzz-corpus directory.
 # Returns path even if file doesn't exist yet (for creation).
 find_dict_file() {
-    local target="$1"
+    local target="${1}"
     local target_name
-    target_name=$(get_target_name "$target")
+    target_name=$(get_target_name "${target}")
 
     local relative_dir
-    relative_dir=$(get_target_relative_dir "$target")
+    relative_dir=$(get_target_relative_dir "${target}")
 
-    if [[ -n "$relative_dir" ]]; then
-        local dict_dir="$FUZZ_CORPUS_DIR/$relative_dir"
-        mkdir -p "$dict_dir"
-        echo "$dict_dir/${target_name}.dict"
+    if [[ -n "${relative_dir}" ]]; then
+        local dict_dir="${FUZZ_CORPUS_DIR}/${relative_dir}"
+        mkdir -p "${dict_dir}"
+        echo "${dict_dir}/${target_name}.dict"
     fi
 }
 
@@ -127,76 +128,76 @@ find_dict_file() {
 # Filters to entries with usage count >= threshold.
 # Converts octal escapes (\NNN) to hex escapes (\xNN) for libFuzzer compatibility.
 parse_dict_entries() {
-    local output_file="$1"
-    local min_uses="$2"
+    local output_file="${1}"
+    local min_uses="${2}"
 
     # Extract lines between "Recommended dictionary" and "End of recommended"
     # Format: "\NNN\NNN" # Uses: NNN (libFuzzer outputs octal, but only parses hex)
-    sed -n '/^###### Recommended dictionary/,/^###### End of recommended/p' "$output_file" \
+    sed -n '/^###### Recommended dictionary/,/^###### End of recommended/p' "${output_file}" \
         | grep -E '^"' \
         | while IFS= read -r line; do
             # Extract usage count
             local uses
-            uses=$(echo "$line" | grep -oE 'Uses: [0-9]+' | grep -oE '[0-9]+')
-            if [[ -n "$uses" ]] && [[ "$uses" -ge "$min_uses" ]]; then
+            uses=$(echo "${line}" | grep -oE 'Uses: [0-9]+' | grep -oE '[0-9]+')
+            if [[ -n "${uses}" ]] && [[ "${uses}" -ge "${min_uses}" ]]; then
                 # Output just the string part (before #), converting octal to hex.
                 # \NNN (octal) -> \xNN (hex)
-                echo "$line" | sed 's/ *#.*//' | perl -pe 's/\\([0-7]{3})/sprintf("\\x%02x", oct($1))/ge'
+                echo "${line}" | sed 's/ *#.*//' | perl -pe 's/\\([0-7]{3})/sprintf("\\x%02x", oct($1))/ge'
             fi
         done
 }
 
 # Merge new dict entries into dict file (creates file if needed).
 merge_dict_entries() {
-    local dict_file="$1"
-    local new_entries="$2"
+    local dict_file="${1}"
+    local new_entries="${2}"
     local temp_file
     local valid_entries
 
-    if [[ -z "$new_entries" ]]; then
+    if [[ -z "${new_entries}" ]]; then
         iree_debug "No new dictionary entries to add"
         return 0
     fi
 
     temp_file=$(mktemp)
     valid_entries=$(mktemp)
-    trap "rm -f '$temp_file' '$valid_entries'" RETURN
+    trap "rm -f '${temp_file}' '${valid_entries}'" RETURN
 
     # Filter new entries to only valid ones (start with " and end with ").
     # Use printf to avoid bash escape interpretation.
-    printf '%s\n' "$new_entries" | while IFS= read -r entry; do
+    printf '%s\n' "${new_entries}" | while IFS= read -r entry; do
         # Validate: must start with " and end with "
-        if [[ "$entry" =~ ^\".*\"$ ]]; then
-            printf '%s\n' "$entry"
+        if [[ "${entry}" =~ ^\".*\"$ ]]; then
+            printf '%s\n' "${entry}"
         else
-            iree_debug "Skipping malformed dict entry: $entry"
+            iree_debug "Skipping malformed dict entry: ${entry}"
         fi
-    done > "$valid_entries"
+    done > "${valid_entries}"
 
-    if [[ ! -s "$valid_entries" ]]; then
+    if [[ ! -s "${valid_entries}" ]]; then
         iree_debug "No valid dictionary entries to add"
         return 0
     fi
 
     # Combine existing entries (if any) with new entries, sort, dedupe.
     {
-        grep -E '^"' "$dict_file" 2>/dev/null || true
-        cat "$valid_entries"
-    } | sort -u > "$temp_file"
+        grep -E '^"' "${dict_file}" 2>/dev/null || true
+        cat "${valid_entries}"
+    } | sort -u > "${temp_file}"
 
     local old_count new_count added_count
-    old_count=$(grep -cE '^"' "$dict_file" 2>/dev/null || echo 0)
-    new_count=$(wc -l < "$temp_file")
+    old_count=$(grep -cE '^"' "${dict_file}" 2>/dev/null || echo 0)
+    new_count=$(wc -l < "${temp_file}")
     added_count=$((new_count - old_count))
 
-    if [[ "$added_count" -gt 0 ]]; then
+    if [[ "${added_count}" -gt 0 ]]; then
         # Preserve comments from original file (if exists), then add sorted entries.
         {
-            grep -E '^#|^$' "$dict_file" 2>/dev/null || true
-            cat "$temp_file"
+            grep -E '^#|^$' "${dict_file}" 2>/dev/null || true
+            cat "${temp_file}"
         } > "${dict_file}.new"
-        mv "${dict_file}.new" "$dict_file"
-        iree_info "Added $added_count new dictionary entries to $dict_file"
+        mv "${dict_file}.new" "${dict_file}"
+        iree_info "Added ${added_count} new dictionary entries to ${dict_file}"
     else
         iree_debug "No new unique dictionary entries"
     fi
@@ -204,29 +205,29 @@ merge_dict_entries() {
 
 # Run corpus minimization using set_cover_merge.
 minimize_corpus() {
-    local binary="$1"
-    local corpus_dir="$2"
+    local binary="${1}"
+    local corpus_dir="${2}"
 
     local corpus_count
-    corpus_count=$(ls -1 "$corpus_dir" 2>/dev/null | wc -l)
+    corpus_count=$(ls -1 "${corpus_dir}" 2>/dev/null | wc -l)
 
-    if [[ "$corpus_count" -eq 0 ]]; then
+    if [[ "${corpus_count}" -eq 0 ]]; then
         iree_debug "Corpus is empty, nothing to minimize"
         return 0
     fi
 
-    iree_info "Minimizing corpus ($corpus_count files)..."
+    iree_info "Minimizing corpus (${corpus_count} files)..."
 
     local temp_corpus
     temp_corpus=$(mktemp -d)
-    trap "rm -rf '$temp_corpus'" RETURN
+    trap "rm -rf '${temp_corpus}'" RETURN
 
-    if "$binary" -set_cover_merge=1 "$temp_corpus" "$corpus_dir" 2>/dev/null; then
+    if "${binary}" -set_cover_merge=1 "${temp_corpus}" "${corpus_dir}" 2>/dev/null; then
         local new_count
-        new_count=$(ls -1 "$temp_corpus" | wc -l)
-        rm -rf "$corpus_dir"/*
-        mv "$temp_corpus"/* "$corpus_dir"/ 2>/dev/null || true
-        iree_info "Corpus minimized: $corpus_count -> $new_count files"
+        new_count=$(ls -1 "${temp_corpus}" | wc -l)
+        rm -rf "${corpus_dir}"/*
+        mv "${temp_corpus}"/* "${corpus_dir}"/ 2>/dev/null || true
+        iree_info "Corpus minimized: ${corpus_count} -> ${new_count} files"
     else
         iree_warn "Corpus minimization failed"
     fi
@@ -239,13 +240,13 @@ FUZZER_ARGS=()
 PARSING_FUZZER_ARGS=0
 
 while [[ $# -gt 0 ]]; do
-    if [[ "$PARSING_FUZZER_ARGS" == "1" ]]; then
-        FUZZER_ARGS+=("$1")
+    if [[ "${PARSING_FUZZER_ARGS}" == "1" ]]; then
+        FUZZER_ARGS+=("${1}")
         shift
         continue
     fi
 
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -275,14 +276,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         *)
-            if [[ -z "$TARGET" ]]; then
-                TARGET="$1"
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
             else
-                BAZEL_ARGS+=("$1")
+                BAZEL_ARGS+=("${1}")
             fi
             shift
             ;;
@@ -290,7 +291,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Target is required.
-if [[ -z "$TARGET" ]]; then
+if [[ -z "${TARGET}" ]]; then
     iree_error "Target is required"
     echo ""
     show_help
@@ -301,38 +302,38 @@ fi
 iree_setup_worktree
 
 # Extract target info for directory structure.
-TARGET_NAME=$(get_target_name "$TARGET")
-TARGET_RELATIVE_DIR=$(get_target_relative_dir "$TARGET")
+TARGET_NAME=$(get_target_name "${TARGET}")
+TARGET_RELATIVE_DIR=$(get_target_relative_dir "${TARGET}")
 
 # Set up corpus and artifact directories with repo-relative paths.
 # Structure: ~/.cache/iree-fuzz-cache/<relative-path>/<target>/corpus/
 #            ~/.cache/iree-fuzz-cache/<relative-path>/<target>/artifacts/
-if [[ -n "$TARGET_RELATIVE_DIR" ]]; then
-    FUZZ_TARGET_DIR="$FUZZ_CACHE_DIR/$TARGET_RELATIVE_DIR/$TARGET_NAME"
+if [[ -n "${TARGET_RELATIVE_DIR}" ]]; then
+    FUZZ_TARGET_DIR="${FUZZ_CACHE_DIR}/${TARGET_RELATIVE_DIR}/${TARGET_NAME}"
 else
     # Fallback if we can't determine relative path.
-    FUZZ_TARGET_DIR="$FUZZ_CACHE_DIR/$TARGET_NAME"
+    FUZZ_TARGET_DIR="${FUZZ_CACHE_DIR}/${TARGET_NAME}"
 fi
-CORPUS_DIR="$FUZZ_TARGET_DIR/corpus"
-ARTIFACT_DIR="$FUZZ_TARGET_DIR/artifacts"
+CORPUS_DIR="${FUZZ_TARGET_DIR}/corpus"
+ARTIFACT_DIR="${FUZZ_TARGET_DIR}/artifacts"
 
 # Find dictionary file.
-DICT_FILE=$(find_dict_file "$TARGET")
+DICT_FILE=$(find_dict_file "${TARGET}")
 
 # Set up bazel args with fuzzer config.
 iree_bazel_build_default_configs
 BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "--config=fuzzer" "${BAZEL_ARGS[@]}")
 
 # Create corpus and artifact directories.
-mkdir -p "$CORPUS_DIR" "$ARTIFACT_DIR"
+mkdir -p "${CORPUS_DIR}" "${ARTIFACT_DIR}"
 
 # Verbose/dry-run output.
 if iree_is_verbose || iree_is_dry_run; then
-    iree_info "Target: $TARGET"
-    iree_info "Corpus: $CORPUS_DIR"
-    iree_info "Artifacts: $ARTIFACT_DIR"
-    if [[ -n "$DICT_FILE" ]]; then
-        iree_info "Dict: $DICT_FILE"
+    iree_info "Target: ${TARGET}"
+    iree_info "Corpus: ${CORPUS_DIR}"
+    iree_info "Artifacts: ${ARTIFACT_DIR}"
+    if [[ -n "${DICT_FILE}" ]]; then
+        iree_info "Dict: ${DICT_FILE}"
     fi
     iree_info "Bazel args: ${BAZEL_ARGS[*]}"
     iree_info "Fuzzer args: ${FUZZER_ARGS[*]:-<none>}"
@@ -343,65 +344,65 @@ if iree_is_dry_run; then
 fi
 
 # Build the target.
-iree_debug "Building $TARGET..."
-if ! iree_bazel_build_quiet "$TARGET" "${BAZEL_ARGS[@]}"; then
+iree_debug "Building ${TARGET}..."
+if ! iree_bazel_build_quiet "${TARGET}" "${BAZEL_ARGS[@]}"; then
     exit $?
 fi
 
 # Get the binary path.
-BINARY_PATH=$(iree_bazel_get_binary_path "$TARGET" "${BAZEL_ARGS[@]}")
-if [[ -z "$BINARY_PATH" ]] || [[ ! -x "$BINARY_PATH" ]]; then
-    iree_error "Could not find built binary for $TARGET"
+BINARY_PATH=$(iree_bazel_get_binary_path "${TARGET}" "${BAZEL_ARGS[@]}")
+if [[ -z "${BINARY_PATH}" ]] || [[ ! -x "${BINARY_PATH}" ]]; then
+    iree_error "Could not find built binary for ${TARGET}"
     exit 1
 fi
 
-iree_debug "Binary: $BINARY_PATH"
+iree_debug "Binary: ${BINARY_PATH}"
 
 # Minimize corpus if requested or if corpus is too large.
-CORPUS_COUNT=$(ls -1 "$CORPUS_DIR" 2>/dev/null | wc -l)
-if [[ "$FUZZ_MINIMIZE" == "1" ]]; then
-    minimize_corpus "$BINARY_PATH" "$CORPUS_DIR"
-elif [[ "$CORPUS_COUNT" -gt "$FUZZ_AUTO_MINIMIZE" ]]; then
-    iree_info "Corpus has $CORPUS_COUNT files (threshold: $FUZZ_AUTO_MINIMIZE), auto-minimizing..."
-    minimize_corpus "$BINARY_PATH" "$CORPUS_DIR"
+CORPUS_COUNT=$(ls -1 "${CORPUS_DIR}" 2>/dev/null | wc -l)
+if [[ "${FUZZ_MINIMIZE}" == "1" ]]; then
+    minimize_corpus "${BINARY_PATH}" "${CORPUS_DIR}"
+elif [[ "${CORPUS_COUNT}" -gt "${FUZZ_AUTO_MINIMIZE}" ]]; then
+    iree_info "Corpus has ${CORPUS_COUNT} files (threshold: ${FUZZ_AUTO_MINIMIZE}), auto-minimizing..."
+    minimize_corpus "${BINARY_PATH}" "${CORPUS_DIR}"
 fi
 
 # Dict-only mode: just run briefly to generate dictionary recommendations.
-if [[ "$FUZZ_DICT_ONLY" == "1" ]]; then
-    if [[ -z "$DICT_FILE" ]]; then
-        iree_error "No .dict file found for $TARGET"
+if [[ "${FUZZ_DICT_ONLY}" == "1" ]]; then
+    if [[ -z "${DICT_FILE}" ]]; then
+        iree_error "No .dict file found for ${TARGET}"
         exit 1
     fi
 
     iree_info "Running corpus to extract dictionary entries..."
     OUTPUT_FILE=$(mktemp)
-    trap "rm -f '$OUTPUT_FILE'" EXIT
+    trap "rm -f '${OUTPUT_FILE}'" EXIT
 
     # Run with existing corpus, short time limit.
-    "$BINARY_PATH" "$CORPUS_DIR" -max_total_time=5 2>&1 | tee "$OUTPUT_FILE"
+    "${BINARY_PATH}" "${CORPUS_DIR}" -max_total_time=5 2>&1 | tee "${OUTPUT_FILE}"
 
     # Extract and merge dictionary entries.
-    NEW_ENTRIES=$(parse_dict_entries "$OUTPUT_FILE" "$FUZZ_MIN_USES")
-    merge_dict_entries "$DICT_FILE" "$NEW_ENTRIES"
+    NEW_ENTRIES=$(parse_dict_entries "${OUTPUT_FILE}" "${FUZZ_MIN_USES}")
+    merge_dict_entries "${DICT_FILE}" "${NEW_ENTRIES}"
     exit 0
 fi
 
 # Set up log directory for this instance (temp, cleaned on success).
-FUZZ_LOG_DIR="/tmp/iree-bazel-fuzz/$TARGET_NAME/$$"
-mkdir -p "$FUZZ_LOG_DIR"
+FUZZ_LOG_DIR="/tmp/iree-bazel-fuzz/${TARGET_NAME}/$$"
+mkdir -p "${FUZZ_LOG_DIR}"
 
 # Build fuzzer command.
-FUZZ_CMD=("$BINARY_PATH" "$CORPUS_DIR")
+FUZZ_CMD=("${BINARY_PATH}" "${CORPUS_DIR}")
 
 # Redirect artifacts to persistent location, logs to temp.
-FUZZ_CMD+=("-artifact_prefix=$ARTIFACT_DIR/")
+FUZZ_CMD+=("-artifact_prefix=${ARTIFACT_DIR}/")
 
 # Add dictionary if it exists.
-if [[ -n "$DICT_FILE" ]] && [[ -f "$DICT_FILE" ]]; then
-    FUZZ_CMD+=("-dict=$DICT_FILE")
-    iree_info "Using dictionary: $DICT_FILE"
-elif [[ -n "$DICT_FILE" ]]; then
-    iree_debug "Dictionary will be created at: $DICT_FILE"
+if [[ -n "${DICT_FILE}" ]] && [[ -f "${DICT_FILE}" ]]; then
+    FUZZ_CMD+=("-dict=${DICT_FILE}")
+    iree_info "Using dictionary: ${DICT_FILE}"
+elif [[ -n "${DICT_FILE}" ]]; then
+    iree_debug "Dictionary will be created at: ${DICT_FILE}"
 fi
 
 # Add per-input timeout if not specified but max_total_time is.
@@ -409,19 +410,19 @@ fi
 HAS_TIMEOUT=0
 MAX_TOTAL_TIME=0
 for arg in "${FUZZER_ARGS[@]}"; do
-    if [[ "$arg" =~ ^-timeout= ]]; then
+    if [[ "${arg}" =~ ^-timeout= ]]; then
         HAS_TIMEOUT=1
-    elif [[ "$arg" =~ ^-max_total_time=([0-9]+) ]]; then
+    elif [[ "${arg}" =~ ^-max_total_time=([0-9]+) ]]; then
         MAX_TOTAL_TIME="${BASH_REMATCH[1]}"
     fi
 done
-if [[ "$HAS_TIMEOUT" -eq 0 ]] && [[ "$MAX_TOTAL_TIME" -gt 0 ]]; then
+if [[ "${HAS_TIMEOUT}" -eq 0 ]] && [[ "${MAX_TOTAL_TIME}" -gt 0 ]]; then
     # Default timeout to 2x max_total_time (minimum 5 seconds).
     DEFAULT_TIMEOUT=$((MAX_TOTAL_TIME * 2))
-    if [[ "$DEFAULT_TIMEOUT" -lt 5 ]]; then
+    if [[ "${DEFAULT_TIMEOUT}" -lt 5 ]]; then
         DEFAULT_TIMEOUT=5
     fi
-    FUZZ_CMD+=("-timeout=$DEFAULT_TIMEOUT")
+    FUZZ_CMD+=("-timeout=${DEFAULT_TIMEOUT}")
     iree_debug "Auto-setting timeout=${DEFAULT_TIMEOUT}s (2x max_total_time)"
 fi
 
@@ -434,74 +435,74 @@ cleanup() {
     local exit_code=$?
 
     # Prevent running twice (INT then EXIT).
-    if [[ "$CLEANUP_DONE" -eq 1 ]]; then
-        exit $exit_code
+    if [[ "${CLEANUP_DONE}" -eq 1 ]]; then
+        exit ${exit_code}
     fi
     CLEANUP_DONE=1
     trap - EXIT INT TERM
 
     # Extract dictionary from log files using grep to find exact section.
-    if [[ -n "$DICT_FILE" ]] && [[ -d "$FUZZ_LOG_DIR" ]]; then
+    if [[ -n "${DICT_FILE}" ]] && [[ -d "${FUZZ_LOG_DIR}" ]]; then
         # Use grep -A to get lines after the dictionary marker.
         # The dictionary section ends with "End of recommended", so we stop there.
         local dict_output
-        dict_output=$(grep -h -A 1000 '^###### Recommended dictionary' "$FUZZ_LOG_DIR"/*.log 2>/dev/null \
+        dict_output=$(grep -h -A 1000 '^###### Recommended dictionary' "${FUZZ_LOG_DIR}"/*.log 2>/dev/null \
             | sed '/^###### End of recommended/q' \
             | grep -E '^"' || true)
-        if [[ -n "$dict_output" ]]; then
-            NEW_ENTRIES=$(echo "$dict_output" \
+        if [[ -n "${dict_output}" ]]; then
+            NEW_ENTRIES=$(echo "${dict_output}" \
                 | while IFS= read -r line; do
                     local uses
-                    uses=$(echo "$line" | grep -oE 'Uses: [0-9]+' | grep -oE '[0-9]+')
-                    if [[ -n "$uses" ]] && [[ "$uses" -ge "$FUZZ_MIN_USES" ]]; then
-                        echo "$line" | sed 's/ *#.*//' | perl -pe 's/\\([0-7]{3})/sprintf("\\x%02x", oct($1))/ge'
+                    uses=$(echo "${line}" | grep -oE 'Uses: [0-9]+' | grep -oE '[0-9]+')
+                    if [[ -n "${uses}" ]] && [[ "${uses}" -ge "${FUZZ_MIN_USES}" ]]; then
+                        echo "${line}" | sed 's/ *#.*//' | perl -pe 's/\\([0-7]{3})/sprintf("\\x%02x", oct($1))/ge'
                     fi
                 done)
-            merge_dict_entries "$DICT_FILE" "$NEW_ENTRIES"
+            merge_dict_entries "${DICT_FILE}" "${NEW_ENTRIES}"
         fi
     fi
 
     # Report corpus size.
     local corpus_count
-    corpus_count=$(ls -1 "$CORPUS_DIR" 2>/dev/null | wc -l)
-    iree_info "Corpus: $corpus_count files in $CORPUS_DIR"
+    corpus_count=$(ls -1 "${CORPUS_DIR}" 2>/dev/null | wc -l)
+    iree_info "Corpus: ${corpus_count} files in ${CORPUS_DIR}"
 
     # Check for crash/leak/timeout artifacts in persistent location.
     local artifact_count
-    artifact_count=$(ls -1 "$ARTIFACT_DIR" 2>/dev/null | wc -l)
-    if [[ "$artifact_count" -gt 0 ]]; then
-        iree_warn "Artifacts ($artifact_count files): $ARTIFACT_DIR"
-        ls -1 "$ARTIFACT_DIR" | head -5 | while read -r artifact; do
-            echo "  $artifact"
+    artifact_count=$(ls -1 "${ARTIFACT_DIR}" 2>/dev/null | wc -l)
+    if [[ "${artifact_count}" -gt 0 ]]; then
+        iree_warn "Artifacts (${artifact_count} files): ${ARTIFACT_DIR}"
+        ls -1 "${ARTIFACT_DIR}" | head -5 | while read -r artifact; do
+            echo "  ${artifact}"
         done
-        if [[ "$artifact_count" -gt 5 ]]; then
+        if [[ "${artifact_count}" -gt 5 ]]; then
             echo "  ... and $((artifact_count - 5)) more"
         fi
     fi
 
     # Clean up log directory on success, keep on failure for debugging.
-    if [[ "$exit_code" -eq 0 ]]; then
-        rm -rf "$FUZZ_LOG_DIR"
+    if [[ "${exit_code}" -eq 0 ]]; then
+        rm -rf "${FUZZ_LOG_DIR}"
     else
         # Show error messages from logs on failure.
-        if [[ "$exit_code" -ne 0 ]]; then
+        if [[ "${exit_code}" -ne 0 ]]; then
             local errors
-            errors=$(grep -h -E '(ERROR|FATAL|ASAN|SUMMARY:|ParseDictionaryFile:)' "$FUZZ_LOG_DIR"/*.log 2>/dev/null | head -20 || true)
-            if [[ -n "$errors" ]]; then
+            errors=$(grep -h -E '(ERROR|FATAL|ASAN|SUMMARY:|ParseDictionaryFile:)' "${FUZZ_LOG_DIR}"/*.log 2>/dev/null | head -20 || true)
+            if [[ -n "${errors}" ]]; then
                 iree_error "Fuzzer failed:"
-                echo "$errors" >&2
+                echo "${errors}" >&2
             fi
         fi
-        iree_info "Logs and artifacts: $FUZZ_LOG_DIR"
+        iree_info "Logs and artifacts: ${FUZZ_LOG_DIR}"
     fi
 
-    exit $exit_code
+    exit ${exit_code}
 }
 trap cleanup EXIT INT TERM
 
 # Run the fuzzer from log directory so fuzz-N.log files go there.
 # Output goes to log files only - we just show status.
 iree_info "Starting fuzzer (Ctrl+C to stop)..."
-iree_info "Logs: $FUZZ_LOG_DIR"
-cd "$FUZZ_LOG_DIR"
+iree_info "Logs: ${FUZZ_LOG_DIR}"
+cd "${FUZZ_LOG_DIR}"
 "${FUZZ_CMD[@]}" > main.log 2>&1

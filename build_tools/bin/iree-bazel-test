@@ -12,7 +12,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-test"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
@@ -90,7 +90,7 @@ TARGET=""
 BAZEL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -112,14 +112,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         *)
-            if [[ -z "$TARGET" ]]; then
-                TARGET="$1"
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
             else
-                BAZEL_ARGS+=("$1")
+                BAZEL_ARGS+=("${1}")
             fi
             shift
             ;;
@@ -130,7 +130,7 @@ done
 iree_setup_worktree
 
 # Target is required.
-if [[ -z "$TARGET" ]]; then
+if [[ -z "${TARGET}" ]]; then
     iree_error "Target is required for bazel test"
     echo ""
     echo "Examples:"
@@ -149,10 +149,10 @@ BUILD_FILTERS=""
 
 # Build the command with default configs before user args.
 iree_bazel_build_default_configs
-BAZEL_BIN=$(iree_get_bazel_command "$WATCH_MODE")
-CMD=("$BAZEL_BIN" test "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" --keep_going "$TARGET"
-    --test_tag_filters="$TAG_FILTERS"
-    --build_tag_filters="$BUILD_FILTERS"
+BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+CMD=("${BAZEL_BIN}" test "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" --keep_going "${TARGET}"
+    --test_tag_filters="${TAG_FILTERS}"
+    --build_tag_filters="${BUILD_FILTERS}"
     "${BAZEL_ARGS[@]}")
 
 # Execute or show.
@@ -164,6 +164,6 @@ if iree_is_dry_run; then
     exit 0
 fi
 
-iree_info "Testing $TARGET"
-iree_info "Tag filters: $TAG_FILTERS"
+iree_info "Testing ${TARGET}"
+iree_info "Tag filters: ${TAG_FILTERS}"
 exec "${CMD[@]}"

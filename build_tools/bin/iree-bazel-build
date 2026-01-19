@@ -12,7 +12,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-build"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
@@ -90,7 +90,7 @@ TARGET=""
 BAZEL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
+    case "${1}" in
         -h|--help)
             show_help
             exit 0
@@ -116,14 +116,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -*)
-            BAZEL_ARGS+=("$1")
+            BAZEL_ARGS+=("${1}")
             shift
             ;;
         *)
-            if [[ -z "$TARGET" ]]; then
-                TARGET="$1"
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
             else
-                BAZEL_ARGS+=("$1")
+                BAZEL_ARGS+=("${1}")
             fi
             shift
             ;;
@@ -134,7 +134,7 @@ done
 iree_setup_worktree
 
 # Target is required.
-if [[ -z "$TARGET" ]]; then
+if [[ -z "${TARGET}" ]]; then
     iree_error "Target is required for bazel build"
     echo ""
     echo "Examples:"
@@ -147,12 +147,12 @@ fi
 
 # Build the command with default configs before user args.
 iree_bazel_build_default_configs
-BAZEL_BIN=$(iree_get_bazel_command "$WATCH_MODE")
-CMD=("$BAZEL_BIN" build "${IREE_BAZEL_DEFAULT_CONFIGS[@]}")
-if [[ "$KEEP_GOING" == "1" ]]; then
+BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+CMD=("${BAZEL_BIN}" build "${IREE_BAZEL_DEFAULT_CONFIGS[@]}")
+if [[ "${KEEP_GOING}" == "1" ]]; then
     CMD+=(--keep_going)
 fi
-CMD+=("$TARGET" "${BAZEL_ARGS[@]}")
+CMD+=("${TARGET}" "${BAZEL_ARGS[@]}")
 
 # Execute or show.
 if iree_is_verbose || iree_is_dry_run; then
@@ -163,5 +163,5 @@ if iree_is_dry_run; then
     exit 0
 fi
 
-iree_info "Building $TARGET"
+iree_info "Building ${TARGET}"
 exec "${CMD[@]}"

@@ -70,8 +70,8 @@ def cmake_bool_is_true(value):
 
 
 def get_hal_driver_defaults():
-    """Get HAL driver defaults matching CMake logic (CMakeLists.txt:275-318)."""
-    defaults_enabled = True  # IREE_HAL_DRIVER_DEFAULTS
+    """Get HAL driver defaults matching CMake option(IREE_HAL_DRIVER_*) definitions."""
+    defaults_enabled = True  # Matches IREE_HAL_DRIVER_DEFAULTS in CMakeLists.txt
 
     return {
         "AMDGPU": False,

@@ -10,7 +10,7 @@ set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/iree-bazel-lib"
+source "${SCRIPT_DIR}/iree-bazel-lib"
 iree_bazel_init "iree-bazel-configure"
 
 show_help() {
@@ -77,16 +77,16 @@ esac
 
 # Set up worktree (configure doesn't call iree_ensure_configured - it IS the configure).
 iree_require_worktree
-cd "$IREE_BAZEL_WORKTREE_DIR"
+cd "${IREE_BAZEL_WORKTREE_DIR}"
 
-iree_info "Configuring IREE for Bazel in $IREE_BAZEL_WORKTREE_DIR..."
+iree_info "Configuring IREE for Bazel in ${IREE_BAZEL_WORKTREE_DIR}..."
 
 # Run platform detection.
 if [[ -f "configure_bazel.py" ]]; then
     iree_info "Running configure_bazel.py..."
     python3 configure_bazel.py
 else
-    iree_error "configure_bazel.py not found in $IREE_BAZEL_WORKTREE_DIR"
+    iree_error "configure_bazel.py not found in ${IREE_BAZEL_WORKTREE_DIR}"
     exit 1
 fi
 
@@ -96,13 +96,13 @@ if [[ ! -f "user.bazelrc" ]]; then
 
     # Platform-specific cache directory defaults.
     if [[ -n "${IREE_BAZEL_CACHE_DIR:-}" ]]; then
-        CACHE_DIR="$IREE_BAZEL_CACHE_DIR"
-    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+        CACHE_DIR="${IREE_BAZEL_CACHE_DIR}"
+    elif [[ "${OSTYPE}" == "msys" || "${OSTYPE}" == "cygwin" || "${OSTYPE}" == "win32" ]]; then
         # Windows: Use shorter path to avoid 260 character limit.
         CACHE_DIR="c:/bazelcache"
     else
         # Unix: Use XDG cache directory.
-        CACHE_DIR="$HOME/.cache/bazel-iree"
+        CACHE_DIR="${HOME}/.cache/bazel-iree"
     fi
 
     cat > user.bazelrc << EOF
@@ -110,7 +110,12 @@ if [[ ! -f "user.bazelrc" ]]; then
 # This file is not version-controlled.
 
 # Disk cache for faster rebuilds (override with IREE_BAZEL_CACHE_DIR).
-build --disk_cache=$CACHE_DIR
+build --disk_cache=${CACHE_DIR}
+
+# Garbage collect disk cache to prevent unbounded growth.
+# Max size 50GB, GC runs when Bazel is idle for 5s.
+build --experimental_disk_cache_gc_max_size=50G
+build --experimental_disk_cache_gc_idle_delay=5s
 
 # Debug config: no optimizations, with assertions.
 build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never

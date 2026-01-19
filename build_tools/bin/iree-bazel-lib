@@ -28,23 +28,23 @@ _IREE_BAZEL_TOOL_NAME=""
 
 # Print info message with tool name prefix (to stderr, never pollutes stdout).
 iree_info() {
-    printf "${_IREE_BAZEL_COLOR_GREEN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+    printf "${_IREE_BAZEL_COLOR_GREEN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "${1}" >&2
 }
 
 # Print warning message with tool name prefix (to stderr).
 iree_warn() {
-    printf "${_IREE_BAZEL_COLOR_YELLOW}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+    printf "${_IREE_BAZEL_COLOR_YELLOW}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "${1}" >&2
 }
 
 # Print error message with tool name prefix to stderr.
 iree_error() {
-    printf "${_IREE_BAZEL_COLOR_RED}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+    printf "${_IREE_BAZEL_COLOR_RED}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "${1}" >&2
 }
 
 # Print debug message (only if IREE_BAZEL_VERBOSE is set).
 iree_debug() {
     [[ "${IREE_BAZEL_VERBOSE:-0}" == "1" ]] && \
-        printf "${_IREE_BAZEL_COLOR_CYAN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "$1" >&2
+        printf "${_IREE_BAZEL_COLOR_CYAN}[${_IREE_BAZEL_TOOL_NAME}]${_IREE_BAZEL_COLOR_NC} %s\n" "${1}" >&2
     return 0
 }
 
@@ -99,13 +99,13 @@ EOF
 # Find the IREE worktree root (directory with .git and .bazelversion).
 # Outputs the path to stdout, returns 1 if not found.
 iree_find_worktree_root() {
-    local directory="${1:-$PWD}"
-    while [[ "$directory" != "/" ]]; do
-        if [[ -e "$directory/.git" ]] && [[ -f "$directory/.bazelversion" ]]; then
-            echo "$directory"
+    local directory="${1:-${PWD}}"
+    while [[ "${directory}" != "/" ]]; do
+        if [[ -e "${directory}/.git" ]] && [[ -f "${directory}/.bazelversion" ]]; then
+            echo "${directory}"
             return 0
         fi
-        directory=$(dirname "$directory")
+        directory=$(dirname "${directory}")
     done
     return 1
 }
@@ -114,7 +114,7 @@ iree_find_worktree_root() {
 # Sets IREE_BAZEL_WORKTREE_DIR on success.
 iree_require_worktree() {
     IREE_BAZEL_WORKTREE_DIR=$(iree_find_worktree_root)
-    if [[ -z "$IREE_BAZEL_WORKTREE_DIR" ]]; then
+    if [[ -z "${IREE_BAZEL_WORKTREE_DIR}" ]]; then
         iree_error "Not in an IREE worktree (no .bazelversion found)"
         iree_error "Must be in a directory with .git and .bazelversion files"
         exit 1
@@ -154,8 +154,8 @@ iree_ensure_configured() {
 #   - IREE_BAZEL_DRY_RUN (default 0)
 #   - IREE_BAZEL_VERBOSE (default 0)
 iree_bazel_init() {
-    _IREE_BAZEL_TOOL_NAME="$1"
-    IREE_BAZEL_ORIG_CWD="$PWD"
+    _IREE_BAZEL_TOOL_NAME="${1}"
+    IREE_BAZEL_ORIG_CWD="${PWD}"
     IREE_BAZEL_DRY_RUN="${IREE_BAZEL_DRY_RUN:-0}"
     IREE_BAZEL_VERBOSE="${IREE_BAZEL_VERBOSE:-0}"
 }
@@ -165,18 +165,18 @@ iree_bazel_init() {
 # Must be called after parsing args (so --help can work outside worktree).
 iree_setup_worktree() {
     iree_require_worktree
-    cd "$IREE_BAZEL_WORKTREE_DIR"
+    cd "${IREE_BAZEL_WORKTREE_DIR}"
     iree_ensure_configured
 }
 
 # Check if dry-run mode is enabled.
 iree_is_dry_run() {
-    [[ "$IREE_BAZEL_DRY_RUN" == "1" ]]
+    [[ "${IREE_BAZEL_DRY_RUN}" == "1" ]]
 }
 
 # Check if verbose mode is enabled.
 iree_is_verbose() {
-    [[ "$IREE_BAZEL_VERBOSE" == "1" ]]
+    [[ "${IREE_BAZEL_VERBOSE}" == "1" ]]
 }
 
 # Get the bazel command to use (bazel or ibazel for watch mode).
@@ -184,7 +184,7 @@ iree_is_verbose() {
 iree_get_bazel_command() {
     local watch_mode="${1:-0}"
 
-    if [[ "$watch_mode" == "1" ]]; then
+    if [[ "${watch_mode}" == "1" ]]; then
         if ! command -v ibazel >/dev/null 2>&1; then
             iree_error "ibazel not found. Install with: go install github.com/bazelbuild/bazel-watcher/cmd/ibazel@latest"
             exit 1
@@ -213,16 +213,16 @@ iree_get_bazel_command() {
 iree_expand_combined_flags() {
     local result=()
     while [[ $# -gt 0 ]]; do
-        local arg="$1"
+        local arg="${1}"
         shift
         # Match single dash followed by 2+ lowercase letters (no '=' or other chars).
-        if [[ "$arg" =~ ^-([a-z]{2,})$ ]]; then
+        if [[ "${arg}" =~ ^-([a-z]{2,})$ ]]; then
             local flags="${BASH_REMATCH[1]}"
             for (( i=0; i<${#flags}; i++ )); do
-                result+=("-${flags:$i:1}")
+                result+=("-${flags:${i}:1}")
             done
         else
-            result+=("$arg")
+            result+=("${arg}")
         fi
     done
     # Print quoted args suitable for eval.
@@ -284,15 +284,16 @@ iree_bazel_build_default_configs() {
 #   $2... - Bazel args (configs, etc.) - MUST match the build args
 # Outputs: Absolute path to built binary
 iree_bazel_get_binary_path() {
-    local target="$1"
+    local target="${1}"
     shift
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
     local relative_path
     # Pass all bazel args to cquery so it uses the same configuration as build.
-    relative_path=$("$BAZEL_BIN" cquery --output=files "$target" "$@" 2>/dev/null)
+    relative_path=$("${BAZEL_BIN}" cquery --output=files "${target}" "$@" 2>/dev/null)
     # Convert to absolute path (bazel returns paths relative to workspace).
-    if [[ -n "$relative_path" ]]; then
-        echo "$PWD/$relative_path"
+    if [[ -n "${relative_path}" ]]; then
+        echo "${PWD}/${relative_path}"
     fi
 }
 
@@ -306,11 +307,11 @@ iree_bazel_get_binary_path() {
 #   After finding "--" in args, remaining args go to the program
 #
 # Example:
-#   iree_bazel_build_and_exec "//tools:iree-compile" "$IREE_BAZEL_ORIG_CWD" \
+#   iree_bazel_build_and_exec "//tools:iree-compile" "${IREE_BAZEL_ORIG_CWD}" \
 #       --config=debug -- input.mlir -o output.vmfb
 iree_bazel_build_and_exec() {
-    local target="$1"
-    local run_cwd="$2"
+    local target="${1}"
+    local run_cwd="${2}"
     shift 2
 
     local -a bazel_args=()
@@ -319,12 +320,12 @@ iree_bazel_build_and_exec() {
 
     # Split args into bazel args and program args.
     while [[ $# -gt 0 ]]; do
-        if [[ "$parsing_program_args" == "1" ]]; then
-            program_args+=("$1")
-        elif [[ "$1" == "--" ]]; then
+        if [[ "${parsing_program_args}" == "1" ]]; then
+            program_args+=("${1}")
+        elif [[ "${1}" == "--" ]]; then
             parsing_program_args=1
         else
-            bazel_args+=("$1")
+            bazel_args+=("${1}")
         fi
         shift
     done
@@ -333,24 +334,24 @@ iree_bazel_build_and_exec() {
     iree_debug "Program args: ${program_args[*]:-<none>}"
 
     # Build the target quietly (no output on success).
-    if ! iree_bazel_build_quiet "$target" "${bazel_args[@]}"; then
+    if ! iree_bazel_build_quiet "${target}" "${bazel_args[@]}"; then
         return $?
     fi
 
     # Get the binary path (pass same args so cquery uses same configuration).
     local binary_path
-    binary_path=$(iree_bazel_get_binary_path "$target" "${bazel_args[@]}")
-    if [[ -z "$binary_path" ]] || [[ ! -x "$binary_path" ]]; then
-        iree_error "Could not find built binary for $target"
+    binary_path=$(iree_bazel_get_binary_path "${target}" "${bazel_args[@]}")
+    if [[ -z "${binary_path}" ]] || [[ ! -x "${binary_path}" ]]; then
+        iree_error "Could not find built binary for ${target}"
         return 1
     fi
 
-    iree_debug "Binary: $binary_path"
-    iree_debug "Running from: $run_cwd"
+    iree_debug "Binary: ${binary_path}"
+    iree_debug "Running from: ${run_cwd}"
 
     # Run from original directory.
-    cd "$run_cwd"
-    exec "$binary_path" "${program_args[@]}"
+    cd "${run_cwd}"
+    exec "${binary_path}" "${program_args[@]}"
 }
 
 # Build a bazel target only (no execution).
@@ -363,19 +364,20 @@ iree_bazel_build_and_exec() {
 # Example:
 #   binary_path=$(iree_bazel_build_only "//tools:iree-compile" --config=debug)
 iree_bazel_build_only() {
-    local target="$1"
+    local target="${1}"
     shift
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
     local -a bazel_args=("$@")
 
-    iree_debug "Building $target..."
+    iree_debug "Building ${target}..."
 
-    if ! "$BAZEL_BIN" build "$target" "${bazel_args[@]}"; then
+    if ! "${BAZEL_BIN}" build "${target}" "${bazel_args[@]}"; then
         return $?
     fi
 
     # Pass same args so cquery uses same configuration.
-    iree_bazel_get_binary_path "$target" "${bazel_args[@]}"
+    iree_bazel_get_binary_path "${target}" "${bazel_args[@]}"
 }
 
 # Build a bazel target quietly - no output on success, full output on failure.
@@ -387,15 +389,16 @@ iree_bazel_build_only() {
 #
 # Returns: exit code from bazel build
 iree_bazel_build_quiet() {
-    local target="$1"
+    local target="${1}"
     shift
-    local BAZEL_BIN=$(iree_get_bazel_command)
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
 
-    iree_debug "Building $target..."
+    iree_debug "Building ${target}..."
 
     if iree_is_verbose; then
         # Verbose mode: show everything.
-        "$BAZEL_BIN" build "$target" "$@"
+        "${BAZEL_BIN}" build "${target}" "$@"
         return $?
     fi
 
@@ -403,14 +406,14 @@ iree_bazel_build_quiet() {
     # Force colors since we'll display to terminal on failure.
     local log_file
     log_file=$(mktemp)
-    trap "rm -f '$log_file'" RETURN
+    trap "rm -f '${log_file}'" RETURN
 
-    if "$BAZEL_BIN" build --color=yes "$target" "$@" >"$log_file" 2>&1; then
+    if "${BAZEL_BIN}" build --color=yes "${target}" "$@" >"${log_file}" 2>&1; then
         return 0
     else
         local exit_code=$?
         # Build failed - show the captured output.
-        cat "$log_file" >&2
-        return $exit_code
+        cat "${log_file}" >&2
+        return ${exit_code}
     fi
 }
