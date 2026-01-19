@@ -108,9 +108,8 @@ public:
     Type f32Scalar = rewriter.getF32Type();
     i32Type =
         vecType ? VectorType::get(vecType.getShape(), i32Scalar) : i32Scalar;
-    smallIntType = vecType
-                       ? VectorType::get(vecType.getShape(), smallIntScalar)
-                       : smallIntScalar;
+    smallIntType = vecType ? VectorType::get(vecType.getShape(), smallIntScalar)
+                           : smallIntScalar;
     f32Type =
         vecType ? VectorType::get(vecType.getShape(), f32Scalar) : f32Scalar;
 
