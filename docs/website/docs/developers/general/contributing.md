@@ -353,7 +353,7 @@ The key points include:
 
 We extend the LLVM policy with an exception for bot-authored contributions
 (e.g., updating dependencies, fixing build script, etc.); bot account may create
-Pull Requests as long as the bot maintainers ensure they are first inline and
+Pull Requests as long as the bot maintainers ensure they are first in line and
 primarily responsible for reviewing those contributions.
 
 ## Tips for contributors
