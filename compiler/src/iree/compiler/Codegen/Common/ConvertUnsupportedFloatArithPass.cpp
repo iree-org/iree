@@ -39,13 +39,16 @@ namespace {
 template <typename T>
 using hasContextGet = decltype(T::get(std::declval<MLIRContext *>()));
 
-/// Helpers to append types to a vector if they are f8 types.
+/// Helpers to append types to a vector if they are small float types (fp4/fp8).
 template <typename T>
 static void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
   if constexpr (llvm::is_detected<hasContextGet, T>::value) {
     Type t = T::get(ctx);
-    if (isa<FloatType>(t) && t.getIntOrFloatBitWidth() == 8) {
-      types.push_back(t);
+    if (isa<FloatType>(t)) {
+      unsigned bitWidth = t.getIntOrFloatBitWidth();
+      if (bitWidth == 4 || bitWidth == 8) {
+        types.push_back(t);
+      }
     }
   }
 }
@@ -72,7 +75,7 @@ static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
 //   - Zero: exp=0, mantissa=0 (signed zero if format supports it)
 //   - Denormal: exp=0, mantissa!=0, value = mantissa * 2^(1-bias-mantissa_bits)
 //   - Inf: exp=max, mantissa=0 (IEEE types only)
-//   - NaN: exp=max, mantissa!=0 (IEEE), or special encoding (FNUZ: 0x80)
+//   - NaN: exp=max, mantissa!=0 (IEEE), or sign bit only (FNUZ)
 
 // F32 format constants (IEEE 754 binary32).
 constexpr int kF32MantBits = 23;
@@ -85,27 +88,29 @@ struct F32Fields {
   Value mantissa;  // Mantissa (23 bits, no implicit leading 1).
 };
 
-/// Helper class for emulating small float (e.g., fp8) conversions to/from f32
-/// using integer bit manipulation. Handles both scalar and vector types.
+/// Helper class for emulating small float (e.g., fp4, fp8) conversions to/from
+/// f32 using integer bit manipulation. Handles both scalar and vector types.
 ///
 /// Takes a small float type (scalar or vector), queries its semantics via
 /// APFloat, and provides methods that return Value constants for the format
 /// parameters.
 class FloatEmulationHelper {
 public:
-  FloatEmulationHelper(RewriterBase &rewriter, Location loc,
-                       Type smallFloatType)
-      : rewriter(rewriter), loc(loc),
-        vecType(dyn_cast<VectorType>(smallFloatType)),
-        sem(cast<FloatType>(getElementTypeOrSelf(smallFloatType))
-                .getFloatSemantics()) {
-    // Setup scalar and vector types for i32, i8, f32.
+  /// Constructor for use with small float types (fp4, fp8).
+  /// The smallFloatBitWidth parameter determines the packed integer type.
+  FloatEmulationHelper(RewriterBase &rewriter, Location loc, Type type,
+                       unsigned smallFloatBitWidth)
+      : rewriter(rewriter), loc(loc), vecType(dyn_cast<VectorType>(type)),
+        sem(cast<FloatType>(getElementTypeOrSelf(type)).getFloatSemantics()) {
+    // Setup scalar and vector types for i32, small int (i4/i8), f32.
     Type i32Scalar = rewriter.getI32Type();
-    Type i8Scalar = rewriter.getI8Type();
+    Type smallIntScalar = rewriter.getIntegerType(smallFloatBitWidth);
     Type f32Scalar = rewriter.getF32Type();
     i32Type =
         vecType ? VectorType::get(vecType.getShape(), i32Scalar) : i32Scalar;
-    i8Type = vecType ? VectorType::get(vecType.getShape(), i8Scalar) : i8Scalar;
+    smallIntType = vecType
+                       ? VectorType::get(vecType.getShape(), smallIntScalar)
+                       : smallIntScalar;
     f32Type =
         vecType ? VectorType::get(vecType.getShape(), f32Scalar) : f32Scalar;
 
@@ -119,7 +124,9 @@ public:
     smallHasInf = llvm::APFloat::semanticsHasInf(sem);
     smallHasNan = llvm::APFloat::semanticsHasNaN(sem);
 
-    // Check for FNUZ types where NaN is encoded as negative zero (0x80).
+    // Check for FNUZ types where NaN is encoded as sign bit only
+    // (e.g., 0x80 for fp8, 0x8 for fp4). These types have no negative zero
+    // and no infinity.
     llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
     smallHasNegZero = negZero.isZero() && negZero.isNegative();
     smallNanIsNegZero = !smallHasNegZero && !smallHasInf && smallHasNan;
@@ -203,7 +210,7 @@ public:
   /// Returns the NaN encoding for the small float type.
   Value getNaNEncodingConst() {
     if (smallNanIsNegZero) {
-      // FNUZ types: NaN = 0x80 (sign bit set, all else zero).
+      // FNUZ types: NaN = sign bit only (e.g., 0x80 for fp8, 0x8 for fp4).
       return getSmallSignMaskConst();
     }
     // IEEE and FN types: NaN = all exp bits + some mantissa bits.
@@ -304,7 +311,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   Type getI32Type() const { return i32Type; }
-  Type getI8Type() const { return i8Type; }
+  Type getSmallIntType() const { return smallIntType; }
   Type getF32Type() const { return f32Type; }
 
 private:
@@ -315,7 +322,7 @@ private:
 
   // Derived types for scalar/vector operations.
   Type i32Type;
-  Type i8Type;
+  Type smallIntType;
   Type f32Type;
 
   // Small float format parameters (derived from semantics).
@@ -332,27 +339,29 @@ private:
 // TruncF to small float emulation pattern
 //===----------------------------------------------------------------------===//
 
-/// Emulates arith.truncf from f32 to fp8 using integer bit manipulation.
-/// This implementation follows IREE's runtime/src/iree/base/internal/math.h
+/// Emulates arith.truncf from f32 to small floats (fp4, fp8) using integer bit
+/// manipulation. This implementation follows IREE's
+/// runtime/src/iree/base/internal/math.h
 /// (specifically iree_math_truncate_f32_to_bits_rounding_to_nearest_even).
 ///
 /// Features:
 ///   - Round-to-nearest-even (IEEE 754 default rounding mode).
 ///   - Proper denormal/subnormal generation for underflow cases.
-///   - Correct handling of all fp8 format variants (IEEE, FN, FNUZ).
+///   - Correct handling of all format variants (IEEE, FN, FNUZ).
 ///
-/// The conversion handles three categories of fp8 formats:
+/// Supported format categories:
 ///
 /// 1. FNUZ types (f8E5M2FNUZ, f8E4M3FNUZ): No Inf, no negative zero.
 ///    - NaN is encoded as 0x80 (sign=1, exp=0, mantissa=0).
 ///    - Overflow produces NaN; zero is always positive.
 ///
-/// 2. IEEE-like types (f8E5M2): Has Inf and negative zero.
+/// 2. IEEE types (f8E5M2): Has Inf and negative zero.
 ///    - Standard IEEE-like encoding with Inf at max exponent.
 ///
-/// 3. FN types (f8E4M3FN): No Inf, but has negative zero.
+/// 3. FN types (f8E4M3FN, f4E2M1FN): No Inf, but may have negative zero.
 ///    - Max exponent values are valid finite numbers (except NaN encoding).
-struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
+///    - f4E2M1FN has no NaN and no negative zero.
+struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::TruncFOp op,
@@ -361,14 +370,14 @@ struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
     Type resultElemType = getElementTypeOrSelf(resultType);
     Type inputElemType = getElementTypeOrSelf(op.getIn().getType());
 
-    // TODO(#23105): handle other fp types, e.g., fp4.
+    unsigned resultBitWidth = resultElemType.getIntOrFloatBitWidth();
     if (!isa<Float32Type>(inputElemType) ||
-        resultElemType.getIntOrFloatBitWidth() != 8) {
+        (resultBitWidth != 4 && resultBitWidth != 8)) {
       return failure();
     }
 
     Location loc = op.getLoc();
-    FloatEmulationHelper helper(rewriter, loc, resultType);
+    FloatEmulationHelper helper(rewriter, loc, resultType, resultBitWidth);
 
     // Get constants from helper.
     Value c0 = helper.createI32Const(0);
@@ -511,15 +520,17 @@ struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
     Value result = arith::SelectOp::create(rewriter, loc, isUnderflow,
                                            subnormalResult, normalResult);
 
-    // F32 subnormals (exp=0) become zero in fp8 (much smaller than fp8 min).
+    // F32 subnormals (exp=0) become zero in small floats (much smaller than
+    // min).
     Value zeroResult = helper.isNanEncodedAsNegZero() ? c0 : dstSign;
     result = arith::SelectOp::create(rewriter, loc, srcExpIsZero, zeroResult,
                                      result);
 
-    // FNUZ: Negative zero (0x80) must become positive zero (0x00).
-    // CRITICAL: This must happen BEFORE NaN/Inf/overflow handling.
-    // For FNUZ types, 0x80 is the NaN encoding, not negative zero.
-    // If we did this after, we would incorrectly convert NaN to zero.
+    // FNUZ: Negative zero (sign bit only, e.g., 0x80 for fp8, 0x8 for fp4)
+    // must become positive zero. CRITICAL: This must happen BEFORE
+    // NaN/Inf/overflow handling. For FNUZ types, the sign-bit-only pattern
+    // is the NaN encoding, not negative zero. If we did this after, we would
+    // incorrectly convert NaN to zero.
     if (helper.isNanEncodedAsNegZero()) {
       Value resultIsNegZero = arith::CmpIOp::create(
           rewriter, loc, arith::CmpIPredicate::eq, result, cDstSignMask);
@@ -550,8 +561,9 @@ struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
     result =
         arith::SelectOp::create(rewriter, loc, srcIsNan, nanResult, result);
 
-    // Truncate to i8 and bitcast to fp8.
-    result = arith::TruncIOp::create(rewriter, loc, helper.getI8Type(), result);
+    // Truncate to small int type and bitcast to small float.
+    result = arith::TruncIOp::create(rewriter, loc, helper.getSmallIntType(),
+                                     result);
     result = arith::BitcastOp::create(rewriter, loc, resultType, result);
     rewriter.replaceOp(op, result);
     return success();
@@ -562,8 +574,9 @@ struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
 // ExtF from small float emulation pattern
 //===----------------------------------------------------------------------===//
 
-/// Emulates arith.extf from fp8 to f32 using integer bit manipulation.
-/// This implementation follows IREE's runtime/src/iree/base/internal/math.h
+/// Emulates arith.extf from small floats (fp4, fp8) to f32 using integer bit
+/// manipulation. This implementation follows IREE's
+/// runtime/src/iree/base/internal/math.h
 /// (specifically iree_math_make_f32_from_bits).
 ///
 /// For normal values: adjust exponent bias and shift mantissa.
@@ -572,7 +585,7 @@ struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
 ///   value = mantissa * 2^(1 - bias - mantissa_bits)
 /// We implement this using uitofp + mulf with a precomputed scale factor,
 /// which is simpler and more general than enumerating all possible values.
-struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
+struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::ExtFOp op,
@@ -582,14 +595,14 @@ struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
     Type resultElemType = getElementTypeOrSelf(resultType);
     Type inputElemType = getElementTypeOrSelf(inputType);
 
-    // TODO(#23105): handle other fp types, e.g., fp4.
-    if (inputElemType.getIntOrFloatBitWidth() != 8 ||
+    unsigned inputBitWidth = inputElemType.getIntOrFloatBitWidth();
+    if ((inputBitWidth != 4 && inputBitWidth != 8) ||
         !isa<Float32Type>(resultElemType)) {
       return failure();
     }
 
     Location loc = op.getLoc();
-    FloatEmulationHelper helper(rewriter, loc, inputType);
+    FloatEmulationHelper helper(rewriter, loc, inputType, inputBitWidth);
 
     // Get constants from helper.
     Value c0 = helper.createI32Const(0);
@@ -600,11 +613,11 @@ struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
     Value cF32Inf = helper.getF32InfConst();
     Value cF32MantBits = helper.getF32MantBitsConst();
 
-    // Bitcast fp8 to i8, extend to i32, and extract fields.
-    Value i8Val =
-        arith::BitcastOp::create(rewriter, loc, helper.getI8Type(), op.getIn());
+    // Bitcast small float to small int, extend to i32, and extract fields.
+    Value smallIntVal = arith::BitcastOp::create(
+        rewriter, loc, helper.getSmallIntType(), op.getIn());
     Value i32Val =
-        arith::ExtUIOp::create(rewriter, loc, helper.getI32Type(), i8Val);
+        arith::ExtUIOp::create(rewriter, loc, helper.getI32Type(), smallIntVal);
 
     // Extract fields from small float.
     Value cSrcMantBits = helper.getSmallMantBitsConst();
@@ -632,8 +645,13 @@ struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
     // Detect special values based on format type.
     Value isNaN;
     Value isInf; // Only used for IEEE types (hasInf=true).
-    if (helper.isNanEncodedAsNegZero()) {
-      // FNUZ: NaN = 0x80 (sign=1, exp=0, mantissa=0), no Inf.
+    if (!helper.hasNan()) {
+      // Types without NaN (e.g., f4E2M1FN): isNaN is always false.
+      // We use a constant false comparison that will be optimized away.
+      isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ne, c0,
+                                    c0);
+    } else if (helper.isNanEncodedAsNegZero()) {
+      // FNUZ: NaN = sign bit only (sign=1, exp=0, mantissa=0), no Inf.
       Value cFNUZNaN = helper.getNaNEncodingConst();
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cFNUZNaN);
@@ -645,7 +663,7 @@ struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
       isNaN = arith::AndIOp::create(rewriter, loc, expIsMax, mantIsNonZero);
       isInf = arith::AndIOp::create(rewriter, loc, expIsMax, mantIsZero);
     } else {
-      // FN types: NaN only at specific encoding, no Inf.
+      // FN types with NaN: NaN only at specific encoding, no Inf.
       Value cNaNEncoding = helper.getNaNEncodingConst();
       isNaN = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq,
                                     i32Val, cNaNEncoding);
@@ -701,7 +719,8 @@ struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
     }
 
     // NaN: always canonical quiet NaN (sign bit ignored).
-    // Must be last to take precedence over zero for FNUZ (where 0x80 is NaN).
+    // Must be last to take precedence over zero for FNUZ (where sign bit is
+    // NaN).
     result = arith::SelectOp::create(rewriter, loc, isNaN, cF32NaN, result);
 
     // Bitcast to f32.
@@ -724,8 +743,8 @@ struct ConvertUnsupportedFloatArithPass final
 static void populateCPUSourceAndTargetType(MLIRContext *ctx, Operation *op,
                                            SmallVectorImpl<Type> &sourceTypes,
                                            Type &targetType) {
-  // For CPU backend, we emulate all the fp8 types to fp32. This supports any
-  // future new fp8 types automatically.
+  // For CPU backend, we emulate all small float types (fp4, fp8) to fp32. This
+  // supports any future new small float types automatically.
   appendTypesIf<
 #define GET_TYPEDEF_LIST
 #include "mlir/IR/BuiltinTypes.cpp.inc"
@@ -817,11 +836,11 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   }
 
   // For CPU, emulate extf/truncf to/from small float types using integer ops.
-  // This is needed because LLVM doesn't support fpext/fptrunc for fp8 types;
-  // the fp8 types eventually get lowered to i8 in LLVM IR.
+  // This is needed because LLVM doesn't support fpext/fptrunc for fp4/fp8
+  // types; these types eventually get lowered to small integers in LLVM IR.
   if (isCPU) {
     RewritePatternSet emulationPatterns(context);
-    emulationPatterns.add<TruncFToFP8, ExtFFromFP8>(context);
+    emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(context);
     walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
   }
 }
