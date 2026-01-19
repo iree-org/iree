@@ -2071,7 +2071,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
     // that will need to be loaded over the entire matmul. Note that each matrix
     // (LHS, RHS) is traversed a number of times equal to the number of tiles
     // of the opposite (RHS, LHS) matrix.
-    return numTilesN * M + numTilesM * N;
+    return numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
   };
 
   int64_t selectedTileM = 1;
