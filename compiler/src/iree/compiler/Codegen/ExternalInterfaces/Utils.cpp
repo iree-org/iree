@@ -48,15 +48,15 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       size = 16;
     }
 
-    // Do not create additional operations in the first place if the padding is
-    // not needed.
-    if (size == 1 && getVscaleValue() == 1) {
-      continue;
-    }
     // Host-side code does not support vscale ops yet - so we cannot create the
     // runtime SSA value properly as of now. #21317
     if (scalable) {
-      size *= getVscaleValue();
+      size *= getUserVscaleValue();
+    }
+    // Do not create additional operations in the first place if the padding is
+    // not needed.
+    if (size == 1) {
+      continue;
     }
 
     if (type.isDynamicDim(dim)) {

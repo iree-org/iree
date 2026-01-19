@@ -22,7 +22,7 @@ namespace mlir::iree_compiler {
 // to be used for codegen and is meant to circumvent the current limitation on
 // host-side querying of this value at runtime. This is temporary until #21317
 // is resolved.
-unsigned getVscaleValue();
+unsigned getUserVscaleValue();
 
 // If the given operation is a `vector.vscale`, generates the constant value for
 // it, maps the original op in bvm and adds the operation to the vector of

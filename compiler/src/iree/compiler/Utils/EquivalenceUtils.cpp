@@ -32,7 +32,7 @@ static llvm::cl::opt<int> clVscaleFromUser(
         "backend."),
     llvm::cl::init(-1));
 
-unsigned getVscaleValue() {
+unsigned getUserVscaleValue() {
   assert(clVscaleFromUser >= 1 && "Currently, vscale needs to be specified by "
                                   "the user for host-side code!");
   return clVscaleFromUser;
@@ -42,8 +42,8 @@ void mapVscaleOpToConstant(Operation &op, OpBuilder &builder, IRMapping &bvm,
                            SmallVector<Operation *> &vscaleOps) {
   if (isa<vector::VectorScaleOp>(op)) {
     vscaleOps.push_back(&op);
-    auto newCstVscaleOp =
-        arith::ConstantIndexOp::create(builder, op.getLoc(), getVscaleValue());
+    auto newCstVscaleOp = arith::ConstantIndexOp::create(builder, op.getLoc(),
+                                                         getUserVscaleValue());
     bvm.map(op.getResult(0), newCstVscaleOp->getResult(0));
   }
 }
