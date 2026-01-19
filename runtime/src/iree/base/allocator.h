@@ -295,10 +295,10 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
   { (count_expr), sizeof(type), (align), (out_offset_ptr) }
 
 // Field descriptor for a flexible array member (FAM). FAMs are accessed via
-// the struct member (e.g., foo->bar[]) so no offset is needed, and they start
-// immediately after sizeof(struct) with no alignment padding.
+// the struct member (e.g., foo->bar[]) so no offset is needed. The alignment
+// ensures the FAM starts at an address suitable for its element type.
 #define IREE_STRUCT_FIELD_FAM(count_expr, type) \
-  { (count_expr), sizeof(type), 0, NULL }
+  { (count_expr), sizeof(type), iree_alignof(type), NULL }
 
 // Calculates struct layout using inline field descriptors.
 // C++ version uses a lambda to create a local array (compound literals are a

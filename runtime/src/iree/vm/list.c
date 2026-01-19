@@ -399,8 +399,8 @@ static void iree_vm_list_copy_to_variant_list(iree_vm_list_t* src_list,
         if (iree_vm_type_def_is_ref(dst_storage[i].type)) {
           iree_vm_ref_release(&dst_storage[i].ref);
         }
-        dst_storage->type = iree_vm_make_ref_type_def(ref->type);
-        dst_storage->ref = *ref;
+        dst_storage[i].type = iree_vm_make_ref_type_def(ref->type);
+        dst_storage[i].ref = *ref;
       }
       break;
     }

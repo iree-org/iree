@@ -182,7 +182,7 @@ void iree_wait_set_free(iree_wait_set_t* set) {
 }
 
 bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
-  return set->handle_count != 0;
+  return set->handle_count == 0;
 }
 
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,

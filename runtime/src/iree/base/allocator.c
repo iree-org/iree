@@ -371,10 +371,11 @@ IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
   uint8_t* new_data = (uint8_t*)aligned_ptr;
   if (old_data != new_data) {
     // Alignment at offset changed; copy data to the new aligned offset.
-    // NOTE: this is copying up to the *new* byte length, as we don't store the
-    // old length and don't know how much to copy. Since we've already
-    // reallocated we know this will always be in-bounds, but it's inefficient.
-    // NOTE: memmove instead of memcpy as the regions may overlap.
+    // We copy up to the *new* byte_length since we don't track the old size.
+    // When growing, this may copy uninitialized bytes from the expanded region
+    // which is safe (memory is allocated) but inefficient. Callers should
+    // initialize any expanded region after reallocation.
+    // memmove instead of memcpy as the regions may overlap.
     memmove(new_data, old_data, byte_length);
   }
 

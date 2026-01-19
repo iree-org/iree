@@ -453,4 +453,129 @@ TEST(StructLayout, ThreeFields) {
   EXPECT_EQ(total, sizeof(TestHeader) + 10 + 40 + 120);
 }
 
+//===----------------------------------------------------------------------===//
+// iree_allocator_malloc_aligned tests
+//===----------------------------------------------------------------------===//
+
+TEST(AllocatorAligned, MallocBasic) {
+  void* ptr = nullptr;
+  IREE_EXPECT_OK(
+      iree_allocator_malloc_aligned(iree_allocator_system(), 128, 64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  // Verify alignment.
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % 64, 0u);
+  // Verify memory is zeroed.
+  for (int i = 0; i < 128; ++i) {
+    EXPECT_EQ(static_cast<uint8_t*>(ptr)[i], 0);
+  }
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, MallocLargeAlignment) {
+  void* ptr = nullptr;
+  // Test with 4096-byte (page) alignment.
+  IREE_EXPECT_OK(iree_allocator_malloc_aligned(iree_allocator_system(), 256,
+                                               4096, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % 4096, 0u);
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, MallocWithOffset) {
+  // Allocate with an offset so that a specific byte is aligned.
+  void* ptr = nullptr;
+  iree_host_size_t offset = 32;
+  IREE_EXPECT_OK(iree_allocator_malloc_aligned(iree_allocator_system(), 256, 64,
+                                               offset, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  // The byte at 'offset' from ptr should be 64-byte aligned.
+  EXPECT_EQ((reinterpret_cast<uintptr_t>(ptr) + offset) % 64, 0u);
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, ReallocGrow) {
+  void* ptr = nullptr;
+  IREE_EXPECT_OK(
+      iree_allocator_malloc_aligned(iree_allocator_system(), 64, 64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+
+  // Write pattern to verify data preservation.
+  for (int i = 0; i < 64; ++i) {
+    static_cast<uint8_t*>(ptr)[i] = static_cast<uint8_t>(i);
+  }
+
+  // Grow the allocation.
+  IREE_EXPECT_OK(iree_allocator_realloc_aligned(iree_allocator_system(), 256,
+                                                64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % 64, 0u);
+
+  // Verify original data preserved.
+  for (int i = 0; i < 64; ++i) {
+    EXPECT_EQ(static_cast<uint8_t*>(ptr)[i], static_cast<uint8_t>(i));
+  }
+
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, ReallocShrink) {
+  void* ptr = nullptr;
+  IREE_EXPECT_OK(
+      iree_allocator_malloc_aligned(iree_allocator_system(), 256, 64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+
+  // Write pattern.
+  for (int i = 0; i < 64; ++i) {
+    static_cast<uint8_t*>(ptr)[i] = static_cast<uint8_t>(i);
+  }
+
+  // Shrink the allocation.
+  IREE_EXPECT_OK(
+      iree_allocator_realloc_aligned(iree_allocator_system(), 64, 64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % 64, 0u);
+
+  // Verify data preserved in the retained region.
+  for (int i = 0; i < 64; ++i) {
+    EXPECT_EQ(static_cast<uint8_t*>(ptr)[i], static_cast<uint8_t>(i));
+  }
+
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, ReallocFromNull) {
+  void* ptr = nullptr;
+  // Realloc with NULL acts like malloc.
+  IREE_EXPECT_OK(iree_allocator_realloc_aligned(iree_allocator_system(), 128,
+                                                64, 0, &ptr));
+  ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % 64, 0u);
+  iree_allocator_free_aligned(iree_allocator_system(), ptr);
+}
+
+TEST(AllocatorAligned, InvalidAlignment) {
+  void* ptr = nullptr;
+  // Non-power-of-two alignment should fail.
+  EXPECT_THAT(Status(iree_allocator_malloc_aligned(iree_allocator_system(), 128,
+                                                   63, 0, &ptr)),
+              StatusIs(StatusCode::kInvalidArgument));
+}
+
+TEST(AllocatorAligned, ZeroSize) {
+  void* ptr = nullptr;
+  // Zero-size allocation should fail.
+  EXPECT_THAT(Status(iree_allocator_malloc_aligned(iree_allocator_system(), 0,
+                                                   64, 0, &ptr)),
+              StatusIs(StatusCode::kInvalidArgument));
+}
+
+TEST(AllocatorAligned, OverflowCheck) {
+  void* ptr = nullptr;
+  // Request a size that would overflow when adding alignment padding.
+  EXPECT_THAT(
+      Status(iree_allocator_malloc_aligned(
+          iree_allocator_system(), IREE_HOST_SIZE_MAX - 10, 64, 0, &ptr)),
+      StatusIs(StatusCode::kOutOfRange));
+}
+
 }  // namespace
