@@ -190,15 +190,34 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   SmallVector<BlockArgument> newBindingArgs;
   auto bindingType = IREE::Stream::BindingType::get(funcOp.getContext());
   auto offsetType = IndexType::get(funcOp.getContext());
-  for (auto &binding : bindings) {
+  for (auto binding : llvm::enumerate(bindings)) {
     SmallVector<Location> locs;
-    for (unsigned oldIdx : binding.correlationMap.set_bits()) {
+    for (unsigned oldIdx : binding.value().correlationMap.set_bits()) {
       locs.push_back(oldBindingArgs[oldIdx].getLoc());
     }
     auto loc = FusedLoc::get(funcOp.getContext(), locs);
     auto bindingArg =
         entryBlock.insertArgument(newBindingArgs.size(), bindingType, loc);
     newBindingArgs.push_back(bindingArg);
+
+    // Store correlation information as an attribute on the binding argument.
+    // This tells us which other bindings are in the same correlation group
+    // (i.e., point to the same resource but with different offsets, so they
+    // don't alias each other).
+    SmallVector<Attribute> correlatedIndices;
+    for (auto otherBinding : llvm::enumerate(bindings)) {
+      if (binding.index() != otherBinding.index() &&
+          binding.value().correlationMap ==
+              otherBinding.value().correlationMap) {
+        correlatedIndices.push_back(
+            IntegerAttr::get(IntegerType::get(funcOp.getContext(), 32),
+                            otherBinding.index()));
+      }
+    }
+    if (!correlatedIndices.empty()) {
+      funcOp.setArgAttr(bindingArg.getArgNumber(), "stream.binding_correlation",
+                       ArrayAttr::get(funcOp.getContext(), correlatedIndices));
+    }
   }
 
   // Replace uses of the old args with the new args and update the ranges.

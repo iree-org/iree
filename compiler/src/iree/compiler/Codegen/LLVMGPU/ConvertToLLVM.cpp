@@ -341,11 +341,50 @@ public:
 
     // Set argument attributes.
     Attribute unit = rewriter.getUnitAttr();
+    
+    // Build a map from HAL binding index to correlation group.
+    // This allows us to determine which bindings are in the same correlation
+    // group (i.e., point to the same resource but with different offsets).
+    DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
+    for (auto subspan : subspans) {
+      int64_t binding = subspan.getBinding().getSExtValue();
+      // Try to read correlation information from the original function.
+      // Note: This assumes the correlation attribute was preserved through
+      // Stream → HAL conversion. If not, we'll need to preserve it explicitly.
+      if (auto correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+              binding, "stream.binding_correlation")) {
+        SmallVector<int64_t> correlatedBindings;
+        for (auto attr : correlationAttr) {
+          if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+            correlatedBindings.push_back(intAttr.getInt());
+          }
+        }
+        if (!correlatedBindings.empty()) {
+          bindingCorrelationMap[binding] = std::move(correlatedBindings);
+        }
+      }
+    }
+    
     for (auto [idx, info] : llvm::enumerate(bindingsInfo)) {
       // As a convention with HAL all the kernel argument pointers are 16Bytes
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
+      
+      // Check if this binding has correlation information.
+      // If it does, we know it doesn't alias with bindings in the same
+      // correlation group (they point to the same resource but different offsets).
+      // However, we still set noalias on all bindings as a conservative default,
+      // since LLVM's alias analysis can use this information.
+      auto it = bindingCorrelationMap.find(idx);
+      if (it != bindingCorrelationMap.end() && !it->second.empty()) {
+        // This binding is in a correlation group. The bindings in the same
+        // group don't alias each other (different offsets), but we still
+        // mark them all as noalias for LLVM's benefit.
+        // TODO: In the future, we could use alias.scope metadata to be more
+        // precise about which bindings don't alias with each other.
+      }
+      
       // It is safe to set the noalias attribute as it is guaranteed that the
       // ranges within bindings won't alias.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
