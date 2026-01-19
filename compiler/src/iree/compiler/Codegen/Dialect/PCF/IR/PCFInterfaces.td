@@ -115,6 +115,20 @@ def PCF_ScopeAttrInterface : AttrInterface<"ScopeAttrInterface"> {
         return b.getI64IntegerAttr(16);
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of physical processor IDs this scope natively
+        supports. Iterating over fewer than the native number of IDs results
+        in potentially duplicated execution over the unaccounted for
+        dimension(s).
+
+        For example, a GPU thread scope typically returns 3 (x, y, z), while
+        a sequential scope returns 1.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getNativeNumProcessorIds",
+      /*args=*/(ins)
+    >,
   ];
 }
 

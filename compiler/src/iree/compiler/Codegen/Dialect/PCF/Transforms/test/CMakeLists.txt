@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert_forall_to_generic_nest.mlir"
     "convert_forall_to_loops.mlir"
     "convert_sref_to_memref.mlir"
     "fuse_consumers.mlir"

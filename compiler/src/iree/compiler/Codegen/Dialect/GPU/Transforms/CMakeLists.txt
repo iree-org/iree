@@ -53,6 +53,7 @@ iree_cc_library(
     "ExpandUndistributedInnerTiles.cpp"
     "LowerIREEGPUOps.cpp"
     "Passes.cpp"
+    "TestConvertForallToGenericNestGPU.cpp"
     "Transforms.cpp"
     "UnrollToIntrinsics.cpp"
     "VectorizeIREEGPUOps.cpp"
@@ -84,6 +85,8 @@ iree_cc_library(
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::PCF::IR
+    iree::compiler::Codegen::Dialect::PCF::Transforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
