@@ -442,3 +442,40 @@ func.func @batch_matvec_f16_f32() {
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]{{\]}},
 //  CHECK-SAME:                 thread = [0, 0, 1, 8],
 //  CHECK-SAME:                 workgroup = [4, 1, 0, 0]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(d0, d1, d2, d3) -> (d3, d1 * 2, d2 * 2)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+func.func @strided_reduction_no_expand_dims() {
+  %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) :
+!iree_tensor_ext.dispatch.tensor<readonly:tensor<1152x28x28xi8>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) :
+!iree_tensor_ext.dispatch.tensor<writeonly:tensor<1152x14x14xi32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1152, 28, 28], strides = [1, 1, 1] :
+!iree_tensor_ext.dispatch.tensor<readonly:tensor<1152x28x28xi8>> -> tensor<1152x28x28xi8>
+  %3 = tensor.empty() : tensor<1152x14x14xi32>
+  %4 = linalg.fill ins(%c0_i32 : i32) outs(%3 : tensor<1152x14x14xi32>) -> tensor<1152x14x14xi32>
+  %5 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+  } ins(%2 : tensor<1152x28x28xi8>) outs(%4 : tensor<1152x14x14xi32>) {
+  ^bb0(%in: i8, %out: i32):
+    %6 = arith.extsi %in : i8 to i32
+    %7 = arith.addi %out, %6 : i32
+    linalg.yield %7 : i32
+  } -> tensor<1152x14x14xi32>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0, 0], sizes = [1152, 14, 14], strides = [1, 1, 1] : tensor<1152x14x14xi32> ->
+!iree_tensor_ext.dispatch.tensor<writeonly:tensor<1152x14x14xi32>>
+  return
+}
+
+// CHECK-LABEL: func.func @strided_reduction_no_expand_dims()
+// CHECK:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-NOT:   expand_dims
