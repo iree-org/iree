@@ -917,6 +917,28 @@ func.func @arg_compare_explicit_index_wrong_comparator_args_count(
 
 // -----
 
+func.func @arg_compare_invalid_explicit_index_with_base(
+    %input_val: tensor<2x4xf32>,
+    %input_idx: tensor<2x4xi32>,
+    %out_val: tensor<2xf32>,
+    %out_idx: tensor<2xi32>,
+    %base: index
+) -> (tensor<2xf32>, tensor<2xi32>) {
+  // expected-error@+1 {{index_base must not be used with explicit indices}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val, %input_idx : tensor<2x4xf32>, tensor<2x4xi32>)
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>)
+    index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
+}
+
+// -----
+
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk

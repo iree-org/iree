@@ -1298,6 +1298,11 @@ LogicalResult ArgCompareOp::verify() {
              << "Input index type: " << inputIndexElemType
              << ", output index type: " << outputIndexElemType;
     }
+
+    if (getIndexBase()) {
+      return op->emitOpError(
+          "index_base must not be used with explicit indices");
+    }
   }
 
   Type outputValueElemType = outputValueType.getElementType();
