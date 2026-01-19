@@ -370,3 +370,71 @@ util.func public @test_expand_prop_through_concat_mixed_dynamic_static_args(%arg
 //       CHECK: %[[AFF:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 100)>()[%dim]
 //       CHECK: tensor.expand_shape {{.*}}output_shape [1, 4, %[[AFF]], 2, 5, 10, 100] : tensor<4x?x100xf32> into tensor<1x4x?x2x5x10x100xf32>
 //       CHECK: tensor.concat dim(2) {{.*}}: (tensor<1x4x1x2x5x10x100xf32>, tensor<1x4x?x2x5x10x100xf32>) -> tensor<1x4x?x2x5x10x100xf32>
+
+// -----
+
+// Check that unit-dim expand_shape doesn't bubble through multi-operand generic ops to prevent asymmetric tensor ranks.
+util.func public @prevent_unit_dim_expansion_backward_case(%arg0: tensor<16x48x32x5x96xf32>, %arg1: tensor<16x48x32x5x96xf32>) -> tensor<5x96x96x1x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<5x96x96xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<5x96x96xf32>) -> tensor<5x96x96xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d0, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d0, d1)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%arg0, %arg1 : tensor<16x48x32x5x96xf32>, tensor<16x48x32x5x96xf32>)
+      outs(%1 : tensor<5x96x96xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.mulf %in, %in_0 : f32
+      %5 = arith.addf %4, %out : f32
+      linalg.yield %5 : f32
+    } -> tensor<5x96x96xf32>
+  %expanded = tensor.expand_shape %2 [[0], [1], [2, 3, 4]] output_shape [5, 96, 96, 1, 1] : tensor<5x96x96xf32> into tensor<5x96x96x1x1xf32>
+  util.return %expanded : tensor<5x96x96x1x1xf32>
+}
+// CHECK-LABEL: func public @prevent_unit_dim_expansion_backward_case
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%arg0, %arg1 : tensor<16x48x32x5x96xf32>, tensor<16x48x32x5x96xf32>)
+//  CHECK-SAME:       outs(%{{.*}} : tensor<5x96x96xf32>)
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[GENERIC]]
+//  CHECK-SAME:       output_shape [5, 96, 96, 1, 1]
+//       CHECK:   util.return %[[EXPAND]]
+
+// -----
+
+// Check that unit-dim expand_shape doesn't bubble when it would cause asymmetric ranks in downstream multi-operand generic ops.
+util.func public @prevent_unit_dim_expansion_forward_case(%arg0: tensor<5x96x96xf32>, %arg1: tensor<5x96x96xf32>) -> (tensor<5x96x96x1x1xf32>, tensor<5x96x96xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<5x96x96xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<5x96x96xf32>) outs(%0 : tensor<5x96x96xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %3 = arith.addf %in, %cst : f32
+      linalg.yield %3 : f32
+    } -> tensor<5x96x96xf32>
+  %expanded = tensor.expand_shape %1 [[0], [1], [2, 3, 4]] output_shape [5, 96, 96, 1, 1] : tensor<5x96x96xf32> into tensor<5x96x96x1x1xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%1, %arg1 : tensor<5x96x96xf32>, tensor<5x96x96xf32>)
+      outs(%0 : tensor<5x96x96xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %3 = arith.addf %in, %in_1 : f32
+      linalg.yield %3 : f32
+    } -> tensor<5x96x96xf32>
+  util.return %expanded, %2 : tensor<5x96x96x1x1xf32>, tensor<5x96x96xf32>
+}
+// CHECK-LABEL: func public @prevent_unit_dim_expansion_forward_case
+//       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%arg0 : tensor<5x96x96xf32>)
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[GENERIC0]]
+//  CHECK-SAME:       output_shape [5, 96, 96, 1, 1]
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[GENERIC0]], %arg1 : tensor<5x96x96xf32>, tensor<5x96x96xf32>)
+//       CHECK:   util.return %[[EXPAND]], %[[GENERIC1]]

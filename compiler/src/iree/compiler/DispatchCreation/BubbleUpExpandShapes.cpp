@@ -423,6 +423,53 @@ static bool canCauseReshapingLoopByExpansion(Operation *producer,
          !llvm::hasSingleElement(producer->getUses());
 }
 
+/// Check if bubbling up a unit-dim expand_shape would create asymmetric
+/// tensor ranks in multi-operand generic operations. Returns true if
+/// asymmetry would be created (and thus bubbling should be blocked).
+static bool wouldCreateAsymmetricRanks(Operation *producer, Operation *consumer,
+                                       OpOperand *fusedOperand,
+                                       int64_t expandedRank) {
+  // Helper to check if any operand (except the fused one) has a different rank.
+  auto hasOperandWithDifferentRank = [&](linalg::GenericOp genericOp) {
+    for (Value operand : genericOp.getDpsInputs()) {
+      if (operand == fusedOperand->get()) {
+        continue;
+      }
+      auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+      if (operandType && operandType.getRank() != expandedRank) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check if producer is a multi-operand generic, verify that
+  // its operands would not have mismatched ranks after expansion.
+  if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
+    if (producerGenericOp.getNumDpsInputs() > 1 &&
+        hasOperandWithDifferentRank(producerGenericOp)) {
+      return true;
+    }
+  }
+
+  // Examine other users of the producer to detect if any
+  // multi-operand generics would have operands with mismatched ranks.
+  for (Operation *user : producer->getUsers()) {
+    if (user == consumer) {
+      continue;
+    }
+    auto genericOp = dyn_cast<linalg::GenericOp>(user);
+    if (!genericOp || genericOp.getNumDpsInputs() <= 1) {
+      continue;
+    }
+    if (hasOperandWithDifferentRank(genericOp)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void BubbleUpExpandShapesPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
@@ -450,6 +497,20 @@ void BubbleUpExpandShapesPass::runOnOperation() {
                 })) {
           return false;
         }
+
+        // Prevent unit-dim expand_shape from bubbling when it would create
+        // asymmetric tensor ranks in multi-operand generic ops.
+        if (auto expandOp = dyn_cast<tensor::ExpandShapeOp>(consumer)) {
+          if (isExpandingUnitDims(expandOp.getReassociationIndices(),
+                                  expandOp.getResultType().getShape())) {
+            int64_t expandedRank = expandOp.getResultType().getRank();
+            if (wouldCreateAsymmetricRanks(producer, consumer, fusedOperand,
+                                           expandedRank)) {
+              return false;
+            }
+          }
+        }
+
         if (auto collapseOp = dyn_cast<tensor::CollapseShapeOp>(producer);
             collapseOp &&
             isExpandingUnitDims(collapseOp.getReassociationIndices(),
