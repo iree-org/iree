@@ -169,7 +169,7 @@ BAZEL_TEST_CMD+=(
   --test_tag_filters="${TEST_TAG_FILTERS?}"
   --keep_going
   --test_output=errors
-  --config=generic_clang
+  --config=generic_clang_ci
 )
 
 "${BAZEL_STARTUP_CMD[@]}" query //... | \

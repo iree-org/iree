@@ -33,6 +33,7 @@ Testing/
 # Bazel artifacts
 **/bazel-*
 MODULE.bazel.lock
+.iree-bazel-try/
 
 # Executables
 *.exe
