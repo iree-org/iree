@@ -115,6 +115,9 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/onnx_ops/requirements.txt
       - name: Run ONNX ops test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/onnx_ops/ \
@@ -204,6 +207,9 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/onnx_models/requirements.txt
       - name: Run ONNX models test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/onnx_models/ \

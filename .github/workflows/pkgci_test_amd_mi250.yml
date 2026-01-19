@@ -66,4 +66,6 @@ jobs:
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}

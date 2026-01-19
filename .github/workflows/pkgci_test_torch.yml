@@ -84,6 +84,9 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Run Torch ops test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/torch_ops/ \
@@ -157,6 +160,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Torch Model tests
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest \
