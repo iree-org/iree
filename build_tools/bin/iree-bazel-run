@@ -1,0 +1,187 @@
+#!/bin/bash
+# Run IREE executables with Bazel.
+#
+# Usage: iree-bazel-run [options] <target> [bazel-args...] [-- program-args...]
+#
+# Examples:
+#   iree-bazel-run //tools:iree-compile -- --help
+#   iree-bazel-run //runtime/src/iree/tokenizer:tokenizer_test
+#   iree-bazel-run --config=debug //tools:iree-opt -- input.mlir
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-run"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-run - Run IREE executables with Bazel
+
+USAGE
+    iree-bazel-run [options] <target> [bazel-args...] [-- program-args...]
+
+OPTIONS
+    -n, --dry_run    Show the bazel command without executing
+    -v, --verbose    Show the bazel command before executing
+    -w, --watch      Watch mode: rebuild and restart on file changes
+    -h, --help       Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+
+ARGUMENTS
+    target         Bazel executable target (required)
+    bazel-args     Arguments passed to bazel build (before --)
+    program-args   Arguments passed to the executable (after --)
+
+EXAMPLES
+    iree-bazel-run //tools:iree-compile -- --help
+    iree-bazel-run //tools:iree-opt -- input.mlir -o output.mlir
+    iree-bazel-run //runtime/src/iree/tokenizer:tokenizer_test
+    iree-bazel-run --config=debug //tools:iree-compile -- model.mlir
+    iree-bazel-run -w //tools:iree-opt -- input.mlir  # Watch and restart on changes
+    iree-bazel-run -nv //tools:iree-compile -- --help   # Show command only
+
+WORKING DIRECTORY
+    Unlike raw "bazel run", this tool runs the binary from your current
+    working directory, so relative paths in arguments work as expected.
+
+WATCH MODE
+    Watch mode (-w) uses ibazel and holds the Bazel server lock while the
+    binary runs. This is necessary for ibazel to control the process lifecycle
+    and restart on changes. Normal mode releases the lock after building.
+
+COMMON TARGETS
+    //tools:iree-compile         Main compiler
+    //tools:iree-opt             MLIR optimization tool
+    //tools:iree-run-module      Execute compiled modules
+    //tools:iree-benchmark-module  Performance benchmarking
+
+CONFIGURATIONS
+    --config=localdev        Local dev optimizations (disk cache, skymeld)
+    --config=debug           No optimizations, assertions enabled
+    --config=asserts         Optimized with assertions
+    --config=asan            Address Sanitizer
+    --config=msan            Memory Sanitizer
+    --config=tsan            Thread Sanitizer
+
+SEE ALSO
+    iree-bazel-build, iree-bazel-test, iree-bazel-query
+EOF
+}
+
+# Parse arguments.
+WATCH_MODE=0
+TARGET=""
+BAZEL_ARGS=()
+PROGRAM_ARGS=()
+PARSING_PROGRAM_ARGS=0
+
+while [[ $# -gt 0 ]]; do
+    if [[ "${PARSING_PROGRAM_ARGS}" == "1" ]]; then
+        PROGRAM_ARGS+=("${1}")
+        shift
+        continue
+    fi
+
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            IREE_BAZEL_DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -w|--watch)
+            WATCH_MODE=1
+            shift
+            ;;
+        --)
+            PARSING_PROGRAM_ARGS=1
+            shift
+            ;;
+        -*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        *)
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
+            else
+                BAZEL_ARGS+=("${1}")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Target is required for run.
+if [[ -z "${TARGET}" ]]; then
+    iree_error "Target is required for bazel run"
+    echo ""
+    show_help
+    exit 1
+fi
+
+# Set up worktree (after arg parsing so --help works anywhere).
+iree_setup_worktree
+
+# Prepend default configs to bazel args.
+iree_bazel_build_default_configs
+BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
+
+# Dry run: show what would be run and exit.
+if iree_is_verbose || iree_is_dry_run; then
+    if [[ "${WATCH_MODE}" == "1" ]]; then
+        BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+        if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
+            iree_info "Command: ${BAZEL_BIN} run --run_under=\"cd ${IREE_BAZEL_ORIG_CWD} && \" ${BAZEL_ARGS[*]} ${TARGET} -- ${PROGRAM_ARGS[*]}"
+        else
+            iree_info "Command: ${BAZEL_BIN} run --run_under=\"cd ${IREE_BAZEL_ORIG_CWD} && \" ${BAZEL_ARGS[*]} ${TARGET}"
+        fi
+    else
+        if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
+            iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
+        else
+            iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary>"
+        fi
+    fi
+    iree_info "Run directory: ${IREE_BAZEL_ORIG_CWD}"
+fi
+
+if iree_is_dry_run; then
+    exit 0
+fi
+
+iree_debug "Running ${TARGET}"
+
+if [[ "${WATCH_MODE}" == "1" ]]; then
+    # Watch mode: use ibazel run with --run_under to match our cwd behavior.
+    # NOTE: This holds the Bazel server lock while the binary runs, but that's
+    # acceptable for a dedicated watch shell. ibazel needs to control the process
+    # lifecycle to restart it on changes.
+    BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+    CMD=("${BAZEL_BIN}" run --run_under="cd ${IREE_BAZEL_ORIG_CWD} && " "${BAZEL_ARGS[@]}" "${TARGET}")
+    if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
+        CMD+=(-- "${PROGRAM_ARGS[@]}")
+    fi
+    iree_info "Watch mode: running from ${IREE_BAZEL_ORIG_CWD}"
+    exec "${CMD[@]}"
+else
+    # Normal mode: build and execute from original working directory.
+    # This releases the Bazel server lock before execution, allowing parallel builds.
+    iree_bazel_build_and_exec "${TARGET}" "${IREE_BAZEL_ORIG_CWD}" "${BAZEL_ARGS[@]}" -- "${PROGRAM_ARGS[@]}"
+fi

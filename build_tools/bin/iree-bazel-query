@@ -1,0 +1,132 @@
+#!/bin/bash
+# Query IREE build graph with Bazel.
+#
+# Usage: iree-bazel-query [options] <query> [bazel-args...]
+#
+# Examples:
+#   iree-bazel-query 'deps(//tools:iree-compile)'
+#   iree-bazel-query 'rdeps(//..., //runtime/src/iree/base:base)'
+#   iree-bazel-query 'kind(cc_library, //runtime/...)'
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-query"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-query - Query IREE build graph with Bazel
+
+USAGE
+    iree-bazel-query [options] <query> [bazel-args...]
+
+OPTIONS
+    -n, --dry_run    Show the bazel command without executing
+    -v, --verbose    Show the bazel command before executing
+    -h, --help       Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+
+ARGUMENTS
+    query          Bazel query expression (required)
+    bazel-args     Additional arguments passed to bazel query
+
+EXAMPLES
+    iree-bazel-query //tools:iree-compile           # Show target
+    iree-bazel-query '//tools/...'                  # List all tools
+    iree-bazel-query 'deps(//tools:iree-compile)'   # Show dependencies
+    iree-bazel-query 'rdeps(//..., //runtime/src/iree/base:base)'
+    iree-bazel-query 'kind(cc_library, //runtime/...)'
+    iree-bazel-query 'somepath(//tools:iree-compile, //runtime/src/iree/vm:vm)'
+    iree-bazel-query -n 'deps(//tools:iree-compile)'  # Show command only
+
+COMMON QUERY FUNCTIONS
+    deps(target)           All dependencies of target
+    rdeps(universe, target) Reverse dependencies within universe
+    kind(rule, pattern)    Targets of specific rule type
+    somepath(from, to)     Path between two targets
+    allpaths(from, to)     All paths between targets
+    attr(name, pattern, targets)  Targets with matching attribute
+
+OUTPUT OPTIONS
+    --output=label         Target labels only (default)
+    --output=package       Package names only
+    --output=build         BUILD file contents
+    --output=graph         Graphviz DOT format
+    --noimplicit_deps      Exclude implicit dependencies
+
+SEE ALSO
+    iree-bazel-build, iree-bazel-test, iree-bazel-run
+    https://bazel.build/query/guide
+EOF
+}
+
+# Parse arguments.
+QUERY=""
+BAZEL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            IREE_BAZEL_DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        *)
+            if [[ -z "${QUERY}" ]]; then
+                QUERY="${1}"
+            else
+                BAZEL_ARGS+=("${1}")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Query is required.
+if [[ -z "${QUERY}" ]]; then
+    iree_error "Query expression is required"
+    echo ""
+    show_help
+    exit 1
+fi
+
+# Set up worktree (after arg parsing so --help works anywhere).
+iree_setup_worktree
+
+# Build the command with default configs (affects select() in build graph).
+iree_bazel_build_default_configs
+BAZEL_BIN=$(iree_get_bazel_command)
+CMD=("${BAZEL_BIN}" query "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${QUERY}" "${BAZEL_ARGS[@]}")
+
+# Execute or show.
+if iree_is_verbose || iree_is_dry_run; then
+    iree_info "Command: ${CMD[*]}"
+fi
+
+if iree_is_dry_run; then
+    exit 0
+fi
+
+iree_info "Querying: ${QUERY}"
+exec "${CMD[@]}"
