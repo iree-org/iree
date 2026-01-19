@@ -6,6 +6,8 @@
 
 #include "iree/hal/buffer_transfer.h"
 
+#include "iree/hal/detail.h"
+
 //===----------------------------------------------------------------------===//
 // Transfer utilities
 //===----------------------------------------------------------------------===//
@@ -547,6 +549,58 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_unmap_range(
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(device);
   iree_allocator_free(host_allocator, emulation_state);
 
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// Raw device address transfers
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_h2d_raw(
+    iree_hal_device_t* device, const void* source, uint64_t target_device_ptr,
+    iree_device_size_t data_length, iree_timeout_t timeout) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(source);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  const iree_hal_device_vtable_t* vtable =
+      (const iree_hal_device_vtable_t*)((const iree_hal_resource_t*)device)
+          ->vtable;
+  if (!vtable->transfer_h2d_raw) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "device does not support raw device address transfers");
+  }
+
+  iree_status_t status = vtable->transfer_h2d_raw(device, source,
+                                                   target_device_ptr,
+                                                   data_length, timeout);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2h_raw(
+    iree_hal_device_t* device, uint64_t source_device_ptr, void* target,
+    iree_device_size_t data_length, iree_timeout_t timeout) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(target);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  const iree_hal_device_vtable_t* vtable =
+      (const iree_hal_device_vtable_t*)((const iree_hal_resource_t*)device)
+          ->vtable;
+  if (!vtable->transfer_d2h_raw) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "device does not support raw device address transfers");
+  }
+
+  iree_status_t status = vtable->transfer_d2h_raw(device, source_device_ptr,
+                                                   target, data_length,
+                                                   timeout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

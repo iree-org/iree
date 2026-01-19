@@ -974,6 +974,61 @@ static iree_status_t iree_hal_hip_native_executable_lookup_export_by_name(
                           "reflection not implemented");
 }
 
+static iree_status_t iree_hal_hip_native_executable_lookup_global(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, uint64_t* out_device_address,
+    iree_device_size_t* out_size) {
+  iree_hal_hip_native_executable_t* executable =
+      iree_hal_hip_native_executable_cast(base_executable);
+
+  *out_device_address = 0;
+  if (out_size) *out_size = 0;
+
+  int device_ordinal = 0;
+  if (queue_affinity) {
+    device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
+  }
+  if (device_ordinal >= (int)executable->num_devices) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "affinity for non-existent device was provided.");
+  }
+
+  const iree_hal_hip_native_executable_per_device_data_t* data =
+      executable->per_device_data[device_ordinal];
+
+  // Create a null-terminated copy of the name.
+  char name_cstr[1024];
+  if (name.size >= sizeof(name_cstr)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "global name too long: %.*s", (int)name.size,
+                            name.data);
+  }
+  memcpy(name_cstr, name.data, name.size);
+  name_cstr[name.size] = '\0';
+
+  // Try to find the global in each module.
+  for (iree_host_size_t i = 0; i < data->module_count; ++i) {
+    hipModule_t module = data->modules[i];
+
+    hipDeviceptr_t device_ptr = 0;
+    size_t size = 0;
+    hipError_t result =
+        executable->symbols->hipModuleGetGlobal(&device_ptr, &size, module,
+                                                 name_cstr);
+    if (result == hipSuccess) {
+      *out_device_address = (uint64_t)device_ptr;
+      if (out_size) *out_size = size;
+      return iree_ok_status();
+    }
+    // If not found in this module, continue to the next one.
+    // hipErrorNotFound means the symbol wasn't in this module.
+  }
+
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "global variable '%.*s' not found in executable",
+                          (int)name.size, name.data);
+}
+
 static const iree_hal_executable_vtable_t
     iree_hal_hip_native_executable_vtable = {
         .destroy = iree_hal_hip_native_executable_destroy,
@@ -982,4 +1037,5 @@ static const iree_hal_executable_vtable_t
         .export_parameters = iree_hal_hip_native_executable_export_parameters,
         .lookup_export_by_name =
             iree_hal_hip_native_executable_lookup_export_by_name,
+        .lookup_global = iree_hal_hip_native_executable_lookup_global,
 };
