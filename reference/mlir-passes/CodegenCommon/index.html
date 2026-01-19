@@ -7675,7 +7675,22 @@ side effects are contained within a workgroup distributed loop.</p>
 <h3 id="-iree-convert-bf16-arith-to-f32"><code>-iree-convert-bf16-arith-to-f32</code><a class="headerlink" href="#-iree-convert-bf16-arith-to-f32" title="Permanent link">link</a></h3>
 <p><em>Convert bf16 arithmetic operations to f32</em></p>
 <h3 id="-iree-convert-unsupported-float-arith"><code>-iree-convert-unsupported-float-arith</code><a class="headerlink" href="#-iree-convert-unsupported-float-arith" title="Permanent link">link</a></h3>
-<p><em>Convert arith operations on unsupported(source types) float types to the target type. Populates the source and target based on the target architecture.</em></p>
+<p><em>Emulate arith operations on unsupported float types (e.g., fp8).</em></p>
+<p>Emulates floating-point operations on types not natively supported by the
+target backend. The pass:</p>
+<ol>
+<li>
+<p>Wraps unsupported float operations with extf/truncf pairs to perform
+   arithmetic in a supported type (e.g., f32).</p>
+</li>
+<li>
+<p>For CPU targets, emulates extf/truncf operations themselves using integer
+   bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.</p>
+</li>
+</ol>
+<p>The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
+IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
+NaN, Inf, and special encodings (FNUZ types).</p>
 <h3 id="-iree-eliminate-empty-tensors"><code>-iree-eliminate-empty-tensors</code><a class="headerlink" href="#-iree-eliminate-empty-tensors" title="Permanent link">link</a></h3>
 <p><em>Eliminate tensor.empty ops to avoid buffer allocations</em></p>
 <h3 id="-iree-loop-invariant-code-motion"><code>-iree-loop-invariant-code-motion</code><a class="headerlink" href="#-iree-loop-invariant-code-motion" title="Permanent link">link</a></h3>
