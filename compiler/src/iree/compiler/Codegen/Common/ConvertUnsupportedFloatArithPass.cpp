@@ -24,7 +24,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-convert-unsupported-float-arith"
 
@@ -352,7 +352,7 @@ private:
 ///
 /// 3. FN types (f8E4M3FN): No Inf, but has negative zero.
 ///    - Max exponent values are valid finite numbers (except NaN encoding).
-struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
+struct TruncFToFP8 final : OpRewritePattern<arith::TruncFOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::TruncFOp op,
@@ -572,7 +572,7 @@ struct TruncFToFP8 final : public OpRewritePattern<arith::TruncFOp> {
 ///   value = mantissa * 2^(1 - bias - mantissa_bits)
 /// We implement this using uitofp + mulf with a precomputed scale factor,
 /// which is simpler and more general than enumerating all possible values.
-struct ExtFFromFP8 final : public OpRewritePattern<arith::ExtFOp> {
+struct ExtFFromFP8 final : OpRewritePattern<arith::ExtFOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(arith::ExtFOp op,
@@ -822,9 +822,7 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   if (isCPU) {
     RewritePatternSet emulationPatterns(context);
     emulationPatterns.add<TruncFToFP8, ExtFFromFP8>(context);
-    if (failed(applyPatternsGreedily(funcOp, std::move(emulationPatterns)))) {
-      return signalPassFailure();
-    }
+    walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
   }
 }
 

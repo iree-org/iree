@@ -304,13 +304,16 @@ func.func @truncf_fnuz_nan_handling_e4m3(%arg0 : f32) -> f8E4M3FNUZ attributes
 // CHECK-LABEL: func.func @extf_fnuz_nan_handling
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E5M2FNUZ) -> f32
 //
-// 0x80 (128) = FNUZ NaN encoding.
 // 0x7FC00000 (2143289344) = canonical f32 quiet NaN.
-// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
 // CHECK-DAG:     %[[F32_NAN:.*]] = arith.constant 2143289344 : i32
+//
+// ExtF emulation: bitcast fp8 -> i8, extend to i32.
 // CHECK:         %[[BITCAST:.*]] = arith.bitcast %[[ARG0]] : f8E5M2FNUZ to i8
 // CHECK:         %[[EXT:.*]] = arith.extui %[[BITCAST]] : i8 to i32
+//
+// 0x80 (128) = FNUZ NaN encoding.
 // isNan = (inputBits == 0x80)
+// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : i32
 // CHECK:         %[[IS_NAN:.*]] = arith.cmpi eq, %[[EXT]], %[[C128]] : i32
 //
 // If input is FNUZ NaN (0x80), output canonical f32 NaN (0x7FC00000).
