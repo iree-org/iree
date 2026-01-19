@@ -1553,6 +1553,13 @@ ArgCompareOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.push_back(inputSlice->getResult(0));
   slices.push_back(inputSlice);
 
+  if (hasExplicitIndexInput()) {
+    Operation *inputIndexSlice =
+        getSlice(builder, loc, getInputIndex(), offsets, sizes, strides);
+    tiledOperands.push_back(inputIndexSlice->getResult(0));
+    slices.push_back(inputIndexSlice);
+  }
+
   SmallVector<OpFoldResult> outputOffsets, outputSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
                                    outputSizes))) {
@@ -1646,18 +1653,30 @@ LogicalResult ArgCompareOp::generateScalarImplementation(OpBuilder &b,
   Value cmpResult = regionMap.lookup(srcBlock.getTerminator()->getOperand(0));
   Value selectedValue = arith::SelectOp::create(b, loc, cmpResult,
                                                 candidateValue, bestValueSoFar);
-  Value indexOffset = ivs[reductionDim];
-  if (getIndexBase()) {
-    indexOffset = arith::AddIOp::create(b, loc, getIndexBase(), indexOffset);
-  }
-  Value castedIndex = indexOffset;
-  if (castedIndex.getType() != bestIndexSoFar.getType()) {
-    castedIndex = arith::IndexCastOp::create(b, loc, bestIndexSoFar.getType(),
-                                             castedIndex);
+
+  Value candidateIndex;
+  if (hasExplicitIndexInput()) {
+    // Explicit-index mode: load from input.
+    // The verifier ensures input and output index types match, so no cast
+    // needed.
+    candidateIndex = memref::LoadOp::create(b, loc, getInputIndex(), ivs);
+  } else {
+    // Implicit-index mode: compute from induction variable.
+    Value indexOffset = ivs[reductionDim];
+    if (getIndexBase()) {
+      indexOffset = arith::AddIOp::create(b, loc, getIndexBase(), indexOffset);
+    }
+    candidateIndex = indexOffset;
+
+    // Cast if induction variable type doesn't match output index type.
+    if (candidateIndex.getType() != bestIndexSoFar.getType()) {
+      candidateIndex = arith::IndexCastOp::create(
+          b, loc, bestIndexSoFar.getType(), candidateIndex);
+    }
   }
 
-  Value selectedIndex =
-      arith::SelectOp::create(b, loc, cmpResult, castedIndex, bestIndexSoFar);
+  Value selectedIndex = arith::SelectOp::create(b, loc, cmpResult,
+                                                candidateIndex, bestIndexSoFar);
   memref::StoreOp::create(b, loc, selectedValue, outputValue(),
                           parallelIndices);
   memref::StoreOp::create(b, loc, selectedIndex, outputIndex(),
