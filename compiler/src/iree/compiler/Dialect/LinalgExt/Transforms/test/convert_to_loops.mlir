@@ -897,6 +897,135 @@ func.func @arg_compare_reduce_dim0(
 
 // -----
 
+func.func @arg_compare_explicit_index_memref(
+    %input_values: memref<2x10xf32>,
+    %input_indices: memref<2x10xi32>,
+    %out_values: memref<2xf32>,
+    %out_indices: memref<2xi32>
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_values, %input_indices : memref<2x10xf32>, memref<2x10xi32>)
+    outs(%out_values, %out_indices : memref<2xf32>, memref<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @arg_compare_explicit_index_memref
+// CHECK-SAME: %[[INPUT_VAL:.+]]: memref<2x10xf32>
+// CHECK-SAME: %[[INPUT_IDX:.+]]: memref<2x10xi32>
+// CHECK-SAME: %[[OUTVAL:.+]]: memref<2xf32>
+// CHECK-SAME: %[[OUTIDX:.+]]: memref<2xi32>
+
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C10:.+]] = arith.constant 10 : index
+
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C10]] step %[[C1]] {
+// CHECK:     %[[V0:.+]] = memref.load %[[OUTVAL]][%[[I]]] : memref<2xf32>
+// CHECK:     %[[I0:.+]] = memref.load %[[OUTIDX]][%[[I]]] : memref<2xi32>
+// CHECK:     %[[V1:.+]] = memref.load %[[INPUT_VAL]][%[[I]], %[[J]]] : memref<2x10xf32>
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[V1]], %[[V0]] : f32
+// CHECK:     %[[VAL_SEL:.+]] = arith.select %[[CMP]], %[[V1]], %[[V0]] : f32
+// CHECK:     %[[I1:.+]] = memref.load %[[INPUT_IDX]][%[[I]], %[[J]]] : memref<2x10xi32>
+// CHECK:     %[[IDX_SEL:.+]] = arith.select %[[CMP]], %[[I1]], %[[I0]] : i32
+// CHECK:     memref.store %[[VAL_SEL]], %[[OUTVAL]][%[[I]]] : memref<2xf32>
+// CHECK:     memref.store %[[IDX_SEL]], %[[OUTIDX]][%[[I]]] : memref<2xi32>
+
+// -----
+
+func.func @arg_compare_explicit_index_memref_dynamic(
+    %input_values: memref<?x?xf32>,
+    %input_indices: memref<?x?xi32>,
+    %out_values: memref<?xf32>,
+    %out_indices: memref<?xi32>
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_values, %input_indices : memref<?x?xf32>, memref<?x?xi32>)
+    outs(%out_values, %out_indices : memref<?xf32>, memref<?xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @arg_compare_explicit_index_memref_dynamic
+// CHECK-SAME: %[[INPUT_VAL:.+]]: memref<?x?xf32>
+// CHECK-SAME: %[[INPUT_IDX:.+]]: memref<?x?xi32>
+// CHECK-SAME: %[[OUTVAL:.+]]: memref<?xf32>
+// CHECK-SAME: %[[OUTIDX:.+]]: memref<?xi32>
+
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[DIM0:.+]] = memref.dim %[[INPUT_VAL]], %[[C0]] : memref<?x?xf32>
+// CHECK-DAG: %[[DIM1:.+]] = memref.dim %[[INPUT_VAL]], %[[C1]] : memref<?x?xf32>
+
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[DIM0]] step %[[C1]] {
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[DIM1]] step %[[C1]] {
+// CHECK:     %[[V0:.+]] = memref.load %[[OUTVAL]][%[[I]]] : memref<?xf32>
+// CHECK:     %[[I0:.+]] = memref.load %[[OUTIDX]][%[[I]]] : memref<?xi32>
+// CHECK:     %[[V1:.+]] = memref.load %[[INPUT_VAL]][%[[I]], %[[J]]] : memref<?x?xf32>
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[V1]], %[[V0]] : f32
+// CHECK:     %[[VAL_SEL:.+]] = arith.select %[[CMP]], %[[V1]], %[[V0]] : f32
+// CHECK:     %[[I1:.+]] = memref.load %[[INPUT_IDX]][%[[I]], %[[J]]] : memref<?x?xi32>
+// CHECK:     %[[IDX_SEL:.+]] = arith.select %[[CMP]], %[[I1]], %[[I0]] : i32
+// CHECK:     memref.store %[[VAL_SEL]], %[[OUTVAL]][%[[I]]] : memref<?xf32>
+// CHECK:     memref.store %[[IDX_SEL]], %[[OUTIDX]][%[[I]]] : memref<?xi32>
+
+// -----
+
+func.func @arg_compare_explicit_index_with_base_memref(
+    %input_values: memref<2x10xf32>,
+    %input_indices: memref<2x10xi32>,
+    %out_values: memref<2xf32>,
+    %out_indices: memref<2xi32>,
+    %base: index
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_values, %input_indices : memref<2x10xf32>, memref<2x10xi32>)
+    outs(%out_values, %out_indices : memref<2xf32>, memref<2xi32>)
+    index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @arg_compare_explicit_index_with_base_memref
+// CHECK-SAME: %[[INPUT_VAL:.+]]: memref<2x10xf32>
+// CHECK-SAME: %[[INPUT_IDX:.+]]: memref<2x10xi32>
+// CHECK-SAME: %[[OUTVAL:.+]]: memref<2xf32>
+// CHECK-SAME: %[[OUTIDX:.+]]: memref<2xi32>
+// CHECK-SAME: %[[BASE:.+]]: index
+
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C10:.+]] = arith.constant 10 : index
+
+// CHECK: scf.for %[[I:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK:   scf.for %[[J:.+]] = %[[C0]] to %[[C10]] step %[[C1]] {
+// CHECK:     %[[V0:.+]] = memref.load %[[OUTVAL]][%[[I]]] : memref<2xf32>
+// CHECK:     %[[I0:.+]] = memref.load %[[OUTIDX]][%[[I]]] : memref<2xi32>
+// CHECK:     %[[V1:.+]] = memref.load %[[INPUT_VAL]][%[[I]], %[[J]]] : memref<2x10xf32>
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[V1]], %[[V0]] : f32
+// CHECK:     %[[VAL_SEL:.+]] = arith.select %[[CMP]], %[[V1]], %[[V0]] : f32
+// CHECK:     %[[I1:.+]] = memref.load %[[INPUT_IDX]][%[[I]], %[[J]]] : memref<2x10xi32>
+// CHECK:     %[[IDX_SEL:.+]] = arith.select %[[CMP]], %[[I1]], %[[I0]] : i32
+// CHECK:     memref.store %[[VAL_SEL]], %[[OUTVAL]][%[[I]]] : memref<2xf32>
+// CHECK:     memref.store %[[IDX_SEL]], %[[OUTIDX]][%[[I]]] : memref<2xi32>
+
+// -----
+
 func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {
   iree_linalg_ext.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)
   return
