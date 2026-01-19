@@ -450,6 +450,44 @@ util.func private @IntermediateTransferElision(%source: !stream.resource<constan
 
 // -----
 
+// CHECK-LABEL: @FoldAsyncCastSameType
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
+util.func private @FoldAsyncCastSameType(%source: !stream.resource<external>, %size: index) -> !stream.resource<external> {
+  // A cast where source and result types match should fold away.
+  // CHECK-NOT: stream.async.cast
+  %cast = stream.async.cast %source : !stream.resource<external>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[SOURCE]]
+  util.return %cast : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncCastChain
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
+util.func private @FoldAsyncCastChain(%source: !stream.resource<external>, %size: index) -> !stream.resource<external> {
+  // A chain of casts that returns to the original type should fold away.
+  // CHECK-NOT: stream.async.cast
+  %cast0 = stream.async.cast %source : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %cast1 = stream.async.cast %cast0 : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[SOURCE]]
+  util.return %cast1 : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @CollapseAsyncCastChain
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
+util.func private @CollapseAsyncCastChain(%source: !stream.resource<external>, %size: index) -> !stream.resource<transient> {
+  // A chain of casts with different types should collapse into one.
+  %cast0 = stream.async.cast %source : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[CAST:.+]] = stream.async.cast %[[SOURCE]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+  %cast1 = stream.async.cast %cast0 : !stream.resource<*>{%size} -> !stream.resource<transient>{%size}
+  // CHECK: util.return %[[CAST]]
+  util.return %cast1 : !stream.resource<transient>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncLoadBitcast
 util.func private @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index

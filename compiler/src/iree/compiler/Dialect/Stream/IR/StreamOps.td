@@ -2430,6 +2430,73 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   let hasFolder = 1;
 }
 
+def Stream_AsyncCastOp : Stream_PureOp<"async.cast", [
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{Casts a resource to a different lifetime within async phase.}];
+  let description = [{
+    Asserts that a resource has a specific lifetime. This is an async-phase
+    operation that participates in scheduling. It must be resolved by
+    RefineUsage before leaving the async phase.
+
+    If RefineUsage cannot make the source type match the target type by
+    backward propagation, it converts this to a proper transfer operation.
+    If this op survives past the async phase, it indicates a bug in RefineUsage.
+
+    The source and result share the same underlying storage (tied operation).
+
+    Example:
+    ```mlir
+    // Assert resource must resolve to external lifetime.
+    %1 = stream.async.cast %0 : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+    ```
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:` type($source) `{` $source_size `}`
+    `->` type($result) `{` $result_size `}`
+    attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "Value":$size,
+      "IREE::Stream::AffinityAttr":$affinity
+    ), [{
+      build($_builder, $_state, resultType, source, size, size, affinity);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
   Stream_AsyncPhaseOp,
   Util_SizeAwareOp,
