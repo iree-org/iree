@@ -5621,12 +5621,26 @@ also supports permuting the tiled loops.</p>
 <p>The <code>arg_compare</code> op performs a reduction over a given dimension of a tensor,
 returning both the selected value and its corresponding index. The selection
 logic is defined by a user-specified comparator region.</p>
-<p>The comparator region receives two candidate values and returns a single <code>i1</code>
-result indicating whether the first argument should be preferred over the second.</p>
-<p>This region defines the sorting rule, e.g., "greater than" for argmax or
-"less than" for argmin. It allows for generalization beyond simple argmax-style
+<p>The operation supports two modes:</p>
+<ol>
+<li>
+<p>Implicit-index mode (single input): Computes (value, index) pairs from scratch.
+   Indices are implicitly computed from the reduction dimension's iteration index
+   (using linalg.index on the reduction dimension). The comparator
+   region receives two candidate values and returns a single <code>i1</code> result indicating
+   whether the first argument should be preferred.</p>
+</li>
+<li>
+<p>Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
+   Indices are explicitly provided as input. The comparator region receives
+   two candidate values and returns <code>i1</code> to select the preferred value.
+   This mode is used to combine results from split-reduction operations.</p>
+</li>
+</ol>
+<p>The comparator region defines the sorting rule, e.g., "greater than" for argmax or
+"less than" for argmin, allowing for generalization beyond simple argmax-style
 behavior.</p>
-<p>Example (argmax over dim 1):
+<p>Example (implicit-index mode - argmax over dim 1):
 <div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
@@ -5639,7 +5653,7 @@ iree_linalg_ext.arg_compare
   iree_linalg_ext.yield %cmp : i1
 }
 </code></pre></div></p>
-<p>Example with index_base = 5 (i.e., indices start counting from 5):
+<p>Example (implicit-index mode with index_base = 5):
 <div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
@@ -5649,6 +5663,20 @@ iree_linalg_ext.arg_compare
   ins(%input : memref&lt;2x10xf32&gt;)
   outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;)
   index_base(%base : index) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_linalg_ext.yield %cmp : i1
+}
+</code></pre></div></p>
+<p>Example (explicit-index mode - combining partial results):
+<div class="highlight"><pre><span></span><code>%partial_vals = memref&lt;2x4xf32&gt;
+%partial_idxs = memref&lt;2x4xi32&gt;
+%out_val = memref&lt;2xf32&gt;
+%out_idx = memref&lt;2xi32&gt;
+iree_linalg_ext.arg_compare
+  dimension(1)
+  ins(%partial_vals, %partial_idxs : memref&lt;2x4xf32&gt;, memref&lt;2x4xi32&gt;)
+  outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;) {
 ^bb0(%a: f32, %b: f32):
   %cmp = arith.cmpf ogt, %a, %b : f32
   iree_linalg_ext.yield %cmp : i1
