@@ -339,6 +339,7 @@ and require all AI-assisted contributions (Pull Requests, issues, design
 proposals) to be reviewed and understood by the author(s).
 
 The key points include:
+
 1. "Contributors must read and review all LLM-generated code or text before they
    ask other project members to review it."
 2. "Contributors are expected to be transparent and label contributions that
