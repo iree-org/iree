@@ -1881,6 +1881,10 @@ calculateWorkgroupCountFromRegion(Location loc, Block *body, Value device,
   for (unsigned argNum : llvm::seq<unsigned>(0, numArgs)) {
     bvm.map(body->getArgument(/*device*/ 1 + argNum), workload[argNum]);
   }
+  // Currently, we cannot evaluate `vector.vscale` ops at host-side. Therefore,
+  // we map these values to the user-specified constants here at compile-time.
+  // TODO(#21317): Remove this mapping once we can properly query these values
+  // at host-side.
   SmallVector<Operation *> vscaleOps;
   for (Operation &op : body->without_terminator()) {
     mapVscaleOpToConstant(op, builder, bvm, vscaleOps);

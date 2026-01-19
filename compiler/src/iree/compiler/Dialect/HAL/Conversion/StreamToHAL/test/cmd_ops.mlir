@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --iree-experimental-vscale-value=1 %s | FileCheck %s
 
 // Today all memory control operations are ignored and we're just left with
 // the normal sequential execution barriers.
