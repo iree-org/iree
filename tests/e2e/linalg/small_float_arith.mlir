@@ -341,3 +341,65 @@ func.func @round_to_nearest_even_denormal_f8E4M3FN() {
   check.expect_eq_const(%result_i8, dense<[1, 2, 2, 2, 3, 4]> : tensor<6xi8>) : tensor<6xi8>
   return
 }
+
+//===----------------------------------------------------------------------===//
+// f4E2M1FN (4-bit float) tests.
+// Format: 1 sign + 2 exp + 1 mantissa, bias = 1
+// Properties: No NaN, No Inf, No negative zero
+// Value range:
+//   Max value = (1 + 0.5) * 2^(3-1) = 6.0
+//   Min normal = 1.0 * 2^(1-1) = 1.0
+//   Denormal: value = mantissa * 2^(1-1-1) = mantissa * 0.5
+//             0x01 → 0.5
+//
+// Key differences from fp8:
+//   - Overflow saturates to max (6.0) instead of producing NaN/Inf
+//   - Different denormal range (0.5 instead of ~1e-5)
+//===----------------------------------------------------------------------===//
+
+// Test f4E2M1FN arithmetic with positive, negative values and overflow saturation.
+// Unlike fp8 types with NaN, overflow saturates to max finite value (±6.0).
+// f4E2M1FN bit patterns:
+//   Positive: 0.0=0x0, 0.5=0x1, 1.0=0x2, 1.5=0x3, 2.0=0x4, 3.0=0x5, 4.0=0x6, 6.0=0x7
+//   Negative: -0.5=0x9, -1.0=0xA, -1.5=0xB, -2.0=0xC, -3.0=0xD, -4.0=0xE, -6.0=0xF
+func.func @add_f4E2M1FN() {
+  // Input: [0.0, 1.0, 2.0, 4.0, -1.0, -2.0, -4.0, 0.5]
+  // Bit patterns: [0x0, 0x2, 0x4, 0x6, 0xA, 0xC, 0xE, 0x1]
+  // Packed i8: [0x20, 0x64, 0xCA, 0x1E]
+  %input_i8 = util.unfoldable_constant dense<[0x20, 0x64, 0xCA, 0x1E]> : tensor<4xi8>
+  %input_f4 = flow.tensor.bitcast %input_i8 : tensor<4xi8> -> tensor<8xf4E2M1FN>
+  %init = tensor.empty() : tensor<8xf4E2M1FN>
+  %add = linalg.add
+    ins(%input_f4, %input_f4 : tensor<8xf4E2M1FN>, tensor<8xf4E2M1FN>)
+    outs(%init : tensor<8xf4E2M1FN>) -> tensor<8xf4E2M1FN>
+  // Expected after doubling:
+  //   0+0=0, 1+1=2, 2+2=4, 4+4=8→6.0(sat), -1+-1=-2, -2+-2=-4, -4+-4=-8→-6.0(sat), 0.5+0.5=1
+  // Bit patterns: [0x0, 0x4, 0x6, 0x7, 0xC, 0xE, 0xF, 0x2]
+  // Packed i8: [0x40, 0x76, 0xEC, 0x2F]
+  %result_i8 = flow.tensor.bitcast %add : tensor<8xf4E2M1FN> -> tensor<4xi8>
+  check.expect_eq_const(%result_i8, dense<[0x40, 0x76, 0xEC, 0x2F]> : tensor<4xi8>) : tensor<4xi8>
+  return
+}
+
+// Test f4E2M1FN denormal and underflow handling.
+// f4E2M1FN has only one denormal value: mantissa=1 → 0.5 (bit pattern 0x01)
+// Values smaller than 0.25 underflow to zero.
+func.func @denormal_f4E2M1FN() {
+  // ExtF: f4 denormal 0x01 → f32 0.5, also test 0x00 → 0.0
+  // Input: [0.5, 0.0, 0.5, 0.0] = [0x1, 0x0, 0x1, 0x0]
+  // Packed i8: [0x01, 0x01]
+  %input_i8 = util.unfoldable_constant dense<[0x01, 0x01]> : tensor<2xi8>
+  %input_f4 = flow.tensor.bitcast %input_i8 : tensor<2xi8> -> tensor<4xf4E2M1FN>
+  %extended = arith.extf %input_f4 : tensor<4xf4E2M1FN> to tensor<4xf32>
+  check.expect_almost_eq_const(%extended, dense<[0.5, 0.0, 0.5, 0.0]> : tensor<4xf32>) : tensor<4xf32>
+
+  // TruncF: Test denormal (0.5) and underflow (0.1 → 0)
+  // Values: [0.5, 0.1, 0.5, 0.1] - 0.1 is smaller than min denormal (0.25) so underflows to 0
+  %small_f32 = util.unfoldable_constant dense<[0.5, 0.1, 0.5, 0.1]> : tensor<4xf32>
+  %truncated = arith.truncf %small_f32 : tensor<4xf32> to tensor<4xf4E2M1FN>
+  // Expected: [0.5→0x1, 0.1→0x0, 0.5→0x1, 0.1→0x0]
+  // Packed i8: [0x01, 0x01]
+  %result_i8 = flow.tensor.bitcast %truncated : tensor<4xf4E2M1FN> -> tensor<2xi8>
+  check.expect_eq_const(%result_i8, dense<[0x01, 0x01]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}

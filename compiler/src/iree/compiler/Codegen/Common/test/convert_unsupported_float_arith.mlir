@@ -323,3 +323,35 @@ func.func @extf_fnuz_nan_handling(%arg0 : f8E5M2FNUZ) -> f32 attributes
     %0 = arith.extf %arg0 : f8E5M2FNUZ to f32
     return %0 : f32
 }
+
+// -----
+
+// Test CPU target with f4E2M1FN - both extf and truncf should be emulated.
+// This fp4 type has no NaN and no infinity. The key difference from fp8 is
+// using i4 instead of i8 for the packed integer type.
+//
+// CHECK-LABEL: func.func @expand_cpu_target_f4e2m1fn
+// CHECK-SAME:    (%[[ARG0:.*]]: f4E2M1FN) -> f4E2M1FN
+//
+// ExtF emulation: fp4 -> i4 -> i32 -> extract fields -> pack f32 -> bitcast
+// CHECK:         %[[BITCAST_IN:.*]] = arith.bitcast %[[ARG0]] : f4E2M1FN to i4
+// CHECK:         %[[EXT_I32:.*]] = arith.extui %[[BITCAST_IN]] : i4 to i32
+// CHECK:         arith.shrui
+// CHECK:         arith.andi
+// CHECK:         arith.bitcast %{{.*}} : i32 to f32
+//
+// Negf on f32
+// CHECK:         %[[NEG:.*]] = arith.negf %{{.*}} : f32
+//
+// TruncF emulation: f32 -> bitcast i32 -> extract fields -> pack i4 -> bitcast fp4
+// CHECK:         arith.bitcast %[[NEG]] : f32 to i32
+// CHECK:         arith.shrui
+// CHECK:         arith.andi
+// CHECK:         arith.trunci %{{.*}} : i32 to i4
+// CHECK:         %[[RESULT:.*]] = arith.bitcast %{{.*}} : i4 to f4E2M1FN
+// CHECK:         return %[[RESULT]] : f4E2M1FN
+func.func @expand_cpu_target_f4e2m1fn(%arg0 : f4E2M1FN) -> f4E2M1FN attributes
+{ hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>}{
+    %0 = arith.negf %arg0 : f4E2M1FN
+    return %0 : f4E2M1FN
+}
