@@ -30,7 +30,10 @@ extern "C" {
 // This enables just-in-time selection as a command buffer could be made
 // available to some set of queues when recorded and then AND'ed with an actual
 // set of queues to execute on during submission.
+#ifndef IREE_HAL_QUEUE_AFFINITY_T_DEFINED
+#define IREE_HAL_QUEUE_AFFINITY_T_DEFINED
 typedef uint64_t iree_hal_queue_affinity_t;
+#endif  // IREE_HAL_QUEUE_AFFINITY_T_DEFINED
 
 // Specifies that any queue may be selected.
 #define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))

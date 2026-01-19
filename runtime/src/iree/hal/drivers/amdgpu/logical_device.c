@@ -1094,6 +1094,21 @@ static iree_status_t iree_hal_amdgpu_logical_device_profiling_end(
   return status;
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_transfer_h2d_raw(
+    iree_hal_device_t* base_device, const void* source,
+    uint64_t target_device_ptr, iree_device_size_t data_length,
+    iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "raw device address transfers not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_transfer_d2h_raw(
+    iree_hal_device_t* base_device, uint64_t source_device_ptr, void* target,
+    iree_device_size_t data_length, iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "raw device address transfers not implemented");
+}
+
 static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .destroy = iree_hal_amdgpu_logical_device_destroy,
     .id = iree_hal_amdgpu_logical_device_id,
@@ -1127,4 +1142,6 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .profiling_begin = iree_hal_amdgpu_logical_device_profiling_begin,
     .profiling_flush = iree_hal_amdgpu_logical_device_profiling_flush,
     .profiling_end = iree_hal_amdgpu_logical_device_profiling_end,
+    .transfer_h2d_raw = iree_hal_amdgpu_logical_device_transfer_h2d_raw,
+    .transfer_d2h_raw = iree_hal_amdgpu_logical_device_transfer_d2h_raw,
 };

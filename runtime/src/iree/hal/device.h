@@ -854,6 +854,20 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_device_profiling_options_t* options);
   iree_status_t(IREE_API_PTR* profiling_flush)(iree_hal_device_t* device);
   iree_status_t(IREE_API_PTR* profiling_end)(iree_hal_device_t* device);
+
+  // Optional: transfers data to/from raw device addresses.
+  // Used for global symbols in loaded modules.
+  // May be NULL if the device doesn't support raw transfers.
+  iree_status_t(IREE_API_PTR* transfer_h2d_raw)(iree_hal_device_t* device,
+                                                 const void* source,
+                                                 uint64_t target_device_ptr,
+                                                 iree_device_size_t data_length,
+                                                 iree_timeout_t timeout);
+  iree_status_t(IREE_API_PTR* transfer_d2h_raw)(iree_hal_device_t* device,
+                                                 uint64_t source_device_ptr,
+                                                 void* target,
+                                                 iree_device_size_t data_length,
+                                                 iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

@@ -58,3 +58,30 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_export_by_name(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_hal_executable_lookup_global(
+    iree_hal_executable_t* executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, uint64_t* out_device_address,
+    iree_device_size_t* out_size) {
+  IREE_ASSERT_ARGUMENT(executable);
+  IREE_ASSERT_ARGUMENT(out_device_address);
+  *out_device_address = 0;
+  if (out_size) *out_size = 0;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Check if the vtable has the lookup_global method.
+  const iree_hal_executable_vtable_t* vtable =
+      (const iree_hal_executable_vtable_t*)((const iree_hal_resource_t*)
+                                                executable)
+          ->vtable;
+  if (!vtable->lookup_global) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "executable does not support global symbol lookup");
+  }
+
+  iree_status_t status = vtable->lookup_global(executable, name, queue_affinity,
+                                               out_device_address, out_size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}

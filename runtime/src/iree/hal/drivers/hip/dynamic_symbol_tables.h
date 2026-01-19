@@ -107,6 +107,8 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipMemsetD32Async, void *, int, size_t,
                                hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleGetFunction, hipFunction_t *,
                                hipModule_t, const char *)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleGetGlobal, hipDeviceptr_t *, size_t *,
+                               hipModule_t, const char *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLaunchKernel, hipFunction_t,
                                unsigned int, unsigned int, unsigned int,
                                unsigned int, unsigned int, unsigned int,
