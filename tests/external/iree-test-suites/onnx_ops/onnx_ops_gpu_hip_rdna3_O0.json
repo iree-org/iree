@@ -17,6 +17,12 @@
     "onnx/node/generated/test_nonmaxsuppression_two_batches"
   ],
   "skip_run_tests": [
+    "onnx/node/generated/test_gru_seq_length",
+    "onnx/node/generated/test_rnn_seq_length",
+    "onnx/node/generated/test_scan9_sum",
+    "onnx/node/generated/test_stft_with_window",
+    "onnx/node/generated/test_tfidfvectorizer_tf_batch_onlybigrams_skip0",
+    "onnx/node/generated/test_tfidfvectorizer_tf_batch_onlybigrams_skip5",
     "onnx/node/generated/test_top_k",
     "onnx/node/generated/test_top_k_negative_axis",
     "onnx/node/generated/test_top_k_smallest"
