@@ -220,7 +220,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
         // Same correlation group: same resource, different offsets (noalias).
         correlatedIndices.push_back(builder.getI32IntegerAttr(otherIdx));
       } else {
-        // Different correlation groups: different resources (noalias)
+        // Different correlation groups: different resources (noalias).
         noaliasIndices.push_back(builder.getI32IntegerAttr(otherIdx));
       }
     }
