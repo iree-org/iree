@@ -177,7 +177,7 @@ struct FoldBlockArgumentsPattern
         continue;
       }
       auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
-      if (blockSources.size() == 0) {
+      if (blockSources.empty()) {
         continue;
       }
 
@@ -308,7 +308,7 @@ struct ElideBranchOperandsPattern
         continue;
       }
       auto blockSources = llvm::ArrayRef(blockSourceMap[&block]);
-      if (blockSources.size() == 0) {
+      if (blockSources.empty()) {
         continue;
       }
 

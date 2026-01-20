@@ -366,7 +366,7 @@ unrollSharedMemoryLoops(mlir::FunctionOpInterface funcOp,
                         const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
   SmallVector<scf::ForOp> forOpsToUnroll;
   funcOp.walk([&](scf::ForOp forOp) {
-    if (!loopsToIgnore.count(forOp)) {
+    if (!loopsToIgnore.contains(forOp)) {
       forOpsToUnroll.push_back(forOp);
     }
   });
