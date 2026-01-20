@@ -49,6 +49,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -756,6 +757,14 @@ struct CPUEncodingResolverMaterializerAttr final
     if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
       return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
                                             convertedOperands);
+    }
+    // Scaled contraction (MX matmul) is not yet supported on CPU, so we drop
+    // the encoding and clone the op as-is.
+    if (IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
+      int64_t numInputs = linalgOp.getNumDpsInputs();
+      return dropEncodingAndCloneOp(b, linalgOp,
+                                    convertedOperands.take_front(numInputs),
+                                    convertedOperands.drop_front(numInputs));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       return lowerContractionOpWithEncoding(
