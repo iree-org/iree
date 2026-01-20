@@ -187,6 +187,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   // Insert new binding args before the old ones (because that's easier).
   // Since we need to do live replacement of the old arg values we can't
   // erase them yet.
+  Builder builder(funcOp.getContext());
   SmallVector<BlockArgument> newBindingArgs;
   auto bindingType = IREE::Stream::BindingType::get(funcOp.getContext());
   auto offsetType = IndexType::get(funcOp.getContext());
@@ -217,12 +218,10 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
 
       if (binding.correlationMap == otherBinding.correlationMap) {
         // Same correlation group: same resource, different offsets (noalias)
-        correlatedIndices.push_back(IntegerAttr::get(
-            IntegerType::get(funcOp.getContext(), 32), otherIdx));
+        correlatedIndices.push_back(builder.getI32IntegerAttr(otherIdx));
       } else {
         // Different correlation groups: different resources (noalias)
-        noaliasIndices.push_back(IntegerAttr::get(
-            IntegerType::get(funcOp.getContext(), 32), otherIdx));
+        noaliasIndices.push_back(builder.getI32IntegerAttr(otherIdx));
       }
     }
     if (!correlatedIndices.empty()) {
