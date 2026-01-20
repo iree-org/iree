@@ -29,6 +29,7 @@ namespace {
 struct TorchOptions {
   bool strictSymbolicShapes = true;
   bool decompose = true;
+  bool externalizeTransients = false;
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("Torch Input");
     binder.opt<bool>(
@@ -38,6 +39,13 @@ struct TorchOptions {
     binder.opt<bool>("iree-torch-decompose-complex-ops", decompose,
                      llvm::cl::cat(category),
                      llvm::cl::desc("Decompose complex torch operations."));
+    binder.opt<bool>(
+        "iree-externalize-transients", externalizeTransients,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "If enabled, this option will append an external hal buffer to "
+            "program inputs. This buffer will be used for storing transient "
+            "memory and must be provided by the user."));
   }
 };
 
@@ -87,6 +95,7 @@ struct TorchSession
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       torchOptions.decompose = options.decompose;
+      torchOptions.externalizeTransients = options.externalizeTransients;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       return true;
     }
