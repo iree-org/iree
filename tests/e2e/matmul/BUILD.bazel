@@ -329,6 +329,32 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ]
 )]
 
+# LLVMCPU, MX (MXFP4) matmul with data-tiling. Optimized MX support is not
+# implemented for CPU, so encodings are dropped and it effectively runs through
+# the non-data-tiling path. This ensures the compiler path works and provides a
+# reference for other backends.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_mxfp4_f32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f4E2M1FN",
+        "--acc_type=f32",
+        "--mx_scale_type=f8E8M0FNU",
+        "--mx_block_size=32",
+        "--shapes=easy_large_static",
+        "--transpose_rhs",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["generic"],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 ###########################################################################
 ##
 ## VMVX backend
