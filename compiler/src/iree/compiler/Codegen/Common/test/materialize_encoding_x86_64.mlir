@@ -1430,3 +1430,58 @@ func.func @generic_with_0d_tensor(
 //  CHECK-SAME:     ins(%[[INPUT]], %[[INPUT_0D]]
 //  CHECK-SAME:     outs(%[[FILL]]
 //       CHECK:   return %[[GENERIC]]
+
+// -----
+
+// Scaled contraction (MX matmul) is not yet supported on CPU, so we drop the
+// encoding and clone the op as-is.
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+#encoding_a = #iree_encoding.encoding<operand_index = 0 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map0, #map1, #map2, #map3, #map4], iteration_sizes = [256, 512, 128, 32]>
+#encoding_b = #iree_encoding.encoding<operand_index = 1 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map0, #map1, #map2, #map3, #map4], iteration_sizes = [256, 512, 128, 32]>
+#encoding_a_scales = #iree_encoding.encoding<operand_index = 2 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map0, #map1, #map2, #map3, #map4], iteration_sizes = [256, 512, 128, 32]>
+#encoding_b_scales = #iree_encoding.encoding<operand_index = 3 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map0, #map1, #map2, #map3, #map4], iteration_sizes = [256, 512, 128, 32]>
+#encoding_c = #iree_encoding.encoding<operand_index = 4 : index, op_type = scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#map0, #map1, #map2, #map3, #map4], iteration_sizes = [256, 512, 128, 32]>
+func.func @scaled_matmul_f4E2M1FN_f8E8M0FNU_f32(
+    %a: tensor<256x128x32xf4E2M1FN, #encoding_a>,
+    %b: tensor<512x128x32xf4E2M1FN, #encoding_b>,
+    %a_scales: tensor<256x128xf8E8M0FNU, #encoding_a_scales>,
+    %b_scales: tensor<512x128xf8E8M0FNU, #encoding_b_scales>,
+    %c: tensor<256x512xf32, #encoding_c>) -> tensor<256x512xf32, #encoding_c> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.generic {
+      indexing_maps = [#map0, #map1, #map2, #map3, #map4],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+      ins(%a, %b, %a_scales, %b_scales : tensor<256x128x32xf4E2M1FN, #encoding_a>, tensor<512x128x32xf4E2M1FN, #encoding_b>, tensor<256x128xf8E8M0FNU, #encoding_a_scales>, tensor<512x128xf8E8M0FNU, #encoding_b_scales>)
+      outs(%c : tensor<256x512xf32, #encoding_c>) {
+  ^bb0(%in_a: f4E2M1FN, %in_b: f4E2M1FN, %in_a_scale: f8E8M0FNU, %in_b_scale: f8E8M0FNU, %out: f32):
+    %1 = arith.scaling_extf %in_a, %in_a_scale : f4E2M1FN, f8E8M0FNU to f32
+    %2 = arith.scaling_extf %in_b, %in_b_scale : f4E2M1FN, f8E8M0FNU to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<256x512xf32, #encoding_c>
+  return %0 : tensor<256x512xf32, #encoding_c>
+}
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-DAG: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-DAG: #[[$MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+// CHECK-LABEL: func.func @scaled_matmul_f4E2M1FN_f8E8M0FNU_f32(
+//  CHECK-SAME:   %[[A:[a-zA-Z0-9]+]]: tensor<256x128x32xf4E2M1FN>,
+//  CHECK-SAME:   %[[B:[a-zA-Z0-9]+]]: tensor<512x128x32xf4E2M1FN>,
+//  CHECK-SAME:   %[[A_SCALES:[a-zA-Z0-9]+]]: tensor<256x128xf8E8M0FNU>,
+//  CHECK-SAME:   %[[B_SCALES:[a-zA-Z0-9]+]]: tensor<512x128xf8E8M0FNU>,
+//  CHECK-SAME:   %[[C:[a-zA-Z0-9]+]]: tensor<256x512xf32>)
+//  CHECK-SAME:   -> tensor<256x512xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]]
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+//  CHECK-SAME:       ins(%[[A]], %[[B]], %[[A_SCALES]], %[[B_SCALES]] : tensor<256x128x32xf4E2M1FN>, tensor<512x128x32xf4E2M1FN>, tensor<256x128xf8E8M0FNU>, tensor<512x128xf8E8M0FNU>)
+//  CHECK-SAME:       outs(%[[C]] : tensor<256x512xf32>)
