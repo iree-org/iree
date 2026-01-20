@@ -2518,7 +2518,7 @@ private:
       return success();
     }
 
-    auto ctx = builder.getContext();
+    MLIRContext *ctx = builder.getContext();
 
     auto arguments =
         emitc::MemberOp::create(builder, loc,
@@ -3018,8 +3018,8 @@ class CallYieldableOpConversion
       return op.emitError() << "callee must be an import for yieldable call";
     }
 
-    auto ctx = op->getContext();
-    auto loc = op.getLoc();
+    MLIRContext *ctx = op->getContext();
+    Location loc = op.getLoc();
 
     auto moduleOp =
         importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
@@ -3174,8 +3174,8 @@ class CallVariadicYieldableOpConversion
       return op.emitError() << "callee must be an import for yieldable call";
     }
 
-    auto ctx = op->getContext();
-    auto loc = op.getLoc();
+    MLIRContext *ctx = op->getContext();
+    Location loc = op.getLoc();
 
     auto moduleOp =
         importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
