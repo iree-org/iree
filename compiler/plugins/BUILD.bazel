@@ -39,7 +39,8 @@ iree_compiler_plugins(
         # Input plugins
         "input_stablehlo": "//compiler/plugins/input/StableHLO:registration",
         "input_tosa": "//compiler/plugins/input/TOSA:registration",
-        "input_torch": "//compiler/plugins/input/Torch:registration",
+        # TODO(#xxxx): Enable when torch-mlir Bazel changes land upstream.
+        # "input_torch": "//compiler/plugins/input/Torch:registration",
         # Target plugins
         "hal_target_cuda": "//compiler/plugins/target/CUDA",
         "hal_target_llvm_cpu": "//compiler/plugins/target/LLVMCPU",

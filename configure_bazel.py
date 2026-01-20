@@ -150,14 +150,13 @@ def get_plugin_defaults():
     cuda_available = detect_cuda_toolkit()
     rocm_available = detect_rocm_toolkit()
     stablehlo_available = detect_submodule("third_party/stablehlo")
-    torch_mlir_available = detect_submodule("third_party/torch-mlir")
     is_darwin = platform.system() == "Darwin"
 
     return {
         # Input plugins (require submodules)
         "input_stablehlo": (True, "IREE_INPUT_STABLEHLO", stablehlo_available),
         "input_tosa": (True, "IREE_INPUT_TOSA", True),  # Part of MLIR, no submodule
-        "input_torch": (False, "IREE_INPUT_TORCH", torch_mlir_available),
+        # TODO: Enable input_torch when torch-mlir Bazel changes land upstream.
         # Target plugins
         "hal_target_cuda": (False, "IREE_TARGET_BACKEND_CUDA", cuda_available),
         "hal_target_llvm_cpu": (True, "IREE_TARGET_BACKEND_LLVM_CPU", True),
@@ -269,10 +268,11 @@ def write_iree_plugin_options(bazelrc):
     # Always emit the flag, even for empty list, so Bazel doesn't fall back to defaults.
     print(f'build --iree_compiler_plugins={",".join(enabled_plugins)}', file=bazelrc)
 
+    # TODO: Enable when torch-mlir Bazel changes land upstream.
     # If torch is enabled, set IREE_INPUT_TORCH for the repository rule.
     # This uses --repo_env (visible to repository rules) not --action_env.
-    if "input_torch" in enabled_plugins:
-        print("common --repo_env=IREE_INPUT_TORCH=ON", file=bazelrc)
+    # if "input_torch" in enabled_plugins:
+    #     print("common --repo_env=IREE_INPUT_TORCH=ON", file=bazelrc)
 
 
 def write_iree_hal_driver_options(bazelrc):

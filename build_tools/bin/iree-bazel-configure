@@ -58,7 +58,6 @@ ENVIRONMENT VARIABLES
       - ROCm: requires ROCM_PATH/ROCM_ROOT/ROCM_HOME or hipcc in PATH
       - Metal: requires macOS
       - StableHLO: requires third_party/stablehlo submodule
-      - Torch: requires third_party/torch-mlir submodule
 
 EXAMPLES
     # Configure with defaults (all buildable plugins)
@@ -70,8 +69,8 @@ EXAMPLES
     # Enable multiple runtime drivers
     IREE_HAL_DRIVER_CUDA=ON IREE_HAL_DRIVER_VULKAN=ON iree-bazel-configure
 
-    # Exclude torch plugin (faster builds)
-    IREE_COMPILER_PLUGINS="all,-input_torch" iree-bazel-configure
+    # Exclude sample plugins
+    IREE_COMPILER_PLUGINS="all,-example,-simple_io_sample" iree-bazel-configure
 
     # Only specific plugins
     IREE_COMPILER_PLUGINS="hal_target_llvm_cpu,hal_target_vulkan_spirv" iree-bazel-configure
