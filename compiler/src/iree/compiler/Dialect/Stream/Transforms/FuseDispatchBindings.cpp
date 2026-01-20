@@ -211,8 +211,9 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
     SmallVector<Attribute> correlatedIndices;
     SmallVector<Attribute> noaliasIndices;
     for (auto otherBinding : llvm::enumerate(bindings)) {
-      if (binding.index() == otherBinding.index())
+      if (binding.index() == otherBinding.index()) {
         continue;
+      }
       
       if (binding.value().correlationMap ==
           otherBinding.value().correlationMap) {
