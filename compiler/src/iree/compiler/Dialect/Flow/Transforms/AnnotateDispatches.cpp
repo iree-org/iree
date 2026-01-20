@@ -115,12 +115,6 @@ static int64_t estimateLinalgExtOpCost(Operation *op) {
   return cost;
 }
 
-// Estimates the evaluation cost of a Linalg::Softmax op using a heuristic cost
-// model similar to LinalgExt ops.
-static int64_t estimateLinalgSoftmaxOpCost(Operation *op) {
-  return estimateLinalgExtOpCost(op);
-}
-
 // Returns a string like "512xDx128" representing loop ranges.
 static std::string loopRangesToString(ArrayRef<int64_t> loopRanges) {
   std::string outputString;
@@ -399,18 +393,8 @@ static std::string summarizeDispatchRegion(Region &region) {
       tileableOps.push_back(op);
     }
     TypeSwitch<Operation *>(op)
-        .Case<linalg::SoftmaxOp>([&](auto op) {
-          int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
-          updateIfBetter(estimatedCost, op);
-        })
-        .Case<IREE::LinalgExt::AttentionOp>([&](auto op) {
-          // Attention like ops are always the most important ops in a dispatch.
-          updateIfBetter(kMaxCost, op);
-        })
-        .Case<IREE::LinalgExt::OnlineAttentionOp>([&](auto op) {
-          // Attention like ops are always the most important ops in a dispatch.
-          updateIfBetter(kMaxCost, op);
-        })
+        .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+            [&](auto op) { updateIfBetter(kMaxCost, op); })
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
           updateIfBetter(estimatedCost, op);
@@ -422,7 +406,7 @@ static std::string summarizeDispatchRegion(Region &region) {
           int64_t estimatedCost = kMinEstimatedCost + 1;
           updateIfBetter(estimatedCost, op);
         })
-        .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
+        .Case<IREE::LinalgExt::LinalgExtOp, linalg::SoftmaxOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
           updateIfBetter(estimatedCost, op);
         })
@@ -451,8 +435,12 @@ static std::string summarizeDispatchRegion(Region &region) {
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
-      .Case<linalg::SoftmaxOp>(
-          [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
+      .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          [&](auto op) {
+            auto opName = getOpNameWithoutDialectName(op);
+            bestSummary =
+                opName + "_" + loopRangesToString(op.getStaticLoopRanges());
+          })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
       .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
@@ -478,7 +466,7 @@ static std::string summarizeDispatchRegion(Region &region) {
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary = opName + "_" + index + "_" + loopRangesToString(shape);
       })
-      .Case<IREE::LinalgExt::LinalgExtOp>(
+      .Case<IREE::LinalgExt::LinalgExtOp, linalg::SoftmaxOp>(
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Default([&](Operation *op) {
         // No summarization implemented, default to the op's name.
