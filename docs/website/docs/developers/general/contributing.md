@@ -350,7 +350,7 @@ The key points include:
    strongly recommended that contributors write PR descriptions themselves (if
    needed, using tools for translation or copy-editing)." This also extends to
    code documentation, issue descriptions, and design proposals.
- 4. "Contributors are responsible for ensuring that they have the right to
+4. "Contributors are responsible for ensuring that they have the right to
    contribute code under the terms of our license, [...]. Using AI tools to
    regenerate copyrighted material does not remove the copyright, and
    contributors are responsible for ensuring that such material does not appear
