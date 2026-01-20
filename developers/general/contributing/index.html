@@ -3280,6 +3280,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ai-tool-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      AI tool use
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5105,6 +5114,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#ai-tool-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      AI tool use
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5520,6 +5538,32 @@ these naming guidelines:</p>
 </table>
 <p>Branches that do not meet these guidelines may be deleted, especially if
 they <a href="https://github.com/iree-org/iree/branches/stale">appear to be stale</a>.</p>
+<h3 id="ai-tool-use"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 0 1 16 0v5.25a.75.75 0 0 1-1.5 0V8a6.5 6.5 0 1 0-13 0v5.25a.75.75 0 0 1-1.5 0Zm3-1.25C3 5.784 3.784 5 4.75 5h6.5c.966 0 1.75.784 1.75 1.75v1.5A1.75 1.75 0 0 1 11.25 10h-6.5A1.75 1.75 0 0 1 3 8.25Zm1.47-.53a.75.75 0 0 0 0 1.06l1.5 1.5a.75.75 0 0 0 1.06 0L8 7.81l.97.97a.75.75 0 0 0 1.06 0l1.5-1.5a.749.749 0 0 0-.326-1.275.75.75 0 0 0-.734.215l-.97.97-.97-.97a.75.75 0 0 0-1.06 0l-.97.97-.97-.97a.75.75 0 0 0-1.06 0m1.03 6.03a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75"/></svg></span> AI tool use<a class="headerlink" href="#ai-tool-use" title="Permanent link">link</a></h3>
+<p>We adopt the <a href="https://llvm.org/docs/AIToolPolicy.html">LLVM AI Tool Use Policy</a>
+and require all AI-assisted contributions (Pull Requests, issues, design
+proposals) to be reviewed and understood by the author(s).</p>
+<p>The key points include:</p>
+<ol>
+<li>"Contributors must read and review all LLM-generated code or text before they
+   ask other project members to review it."</li>
+<li>"Contributors are expected to be transparent and label contributions that
+   contain substantial amounts of tool-generated content." This can be done with
+   the <code>Assisted-by: tool-name</code> or the <code>Co-authored-by: tool-name tool@email</code>
+   trailer in PR descriptions.</li>
+<li>"To ensure sufficient self review and understanding of the work, it is
+   strongly recommended that contributors write PR descriptions themselves (if
+   needed, using tools for translation or copy-editing)." This also extends to
+   code documentation, issue descriptions, and design proposals.</li>
+<li>"Contributors are responsible for ensuring that they have the right to
+   contribute code under the terms of our license, [...]. Using AI tools to
+   regenerate copyrighted material does not remove the copyright, and
+   contributors are responsible for ensuring that such material does not appear
+   in their contributions."</li>
+</ol>
+<p>We extend the LLVM policy with an exception for AI bot-authored contributions
+(e.g., updating dependencies, fixing build script, etc.); bot account may create
+Pull Requests as long as the bot maintainers ensure they are first in line and
+primarily responsible for reviewing those contributions.</p>
 <h2 id="tips-for-contributors">Tips for contributors<a class="headerlink" href="#tips-for-contributors" title="Permanent link">link</a></h2>
 <h3 id="tool-recommendations">Tool recommendations<a class="headerlink" href="#tool-recommendations" title="Permanent link">link</a></h3>
 <table>
