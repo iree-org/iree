@@ -807,7 +807,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
         auto updateTy = cast<ShapedType>(update.getType());
         llvm::SmallVector<int64_t> newShape;
         newShape.reserve(updateTy.getRank());
-        for (long i : updatePerm) {
+        for (int64_t i : updatePerm) {
           newShape.push_back(updateTy.getDimSize(i));
         }
         update = mlir::stablehlo::TransposeOp::create(
