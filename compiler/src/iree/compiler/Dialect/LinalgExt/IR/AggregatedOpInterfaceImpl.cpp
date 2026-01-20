@@ -281,9 +281,9 @@ static Value computeSubAndExp(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Operation *weight = useExp2 ? math::Exp2Op::create(b, loc, diff)
-                                    : math::ExpOp::create(b, loc, diff);
-        linalg::YieldOp::create(b, loc, weight->getResult(0));
+        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
+                               : math::ExpOp::create(b, loc, diff).getResult();
+        linalg::YieldOp::create(b, loc, weight);
       });
   return genericOp.getResult(0);
 }
