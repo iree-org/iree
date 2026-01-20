@@ -32,8 +32,15 @@ struct DecomposeAttentionPass final
 void DecomposeAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
+
   getOperation().walk([&](OnlineAttentionOp onlineAtt) {
     rewriter.setInsertionPoint(onlineAtt);
+
+    NamedAttrList decompositionConfig(onlineAtt.getDecompositionConfigAttr());
+    decompositionConfig.set("use_exp2", rewriter.getBoolAttr(useExp2));
+    onlineAtt.setDecompositionConfigAttr(
+        decompositionConfig.getDictionary(context));
+
     FailureOr<SmallVector<Value>> results =
         onlineAtt.decomposeOperation(rewriter);
     if (failed(results)) {

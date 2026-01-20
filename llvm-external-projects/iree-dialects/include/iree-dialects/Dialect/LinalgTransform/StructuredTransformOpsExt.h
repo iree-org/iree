@@ -39,8 +39,9 @@ auto unpackRegisteredMatchCallback(ImplicitLocOpBuilder &b,
       matchedTypes, callbackName, std::forward<decltype(args)>(args)...);
   assert(matchOp->getNumResults() == N && "Unexpected number of results");
   std::array<Value, N> a;
-  for (int64_t i = 0; i < N; ++i)
+  for (int64_t i = 0; i < N; ++i) {
     a[i] = matchOp->getResult(i);
+  }
   return std::tuple_cat(a);
 }
 

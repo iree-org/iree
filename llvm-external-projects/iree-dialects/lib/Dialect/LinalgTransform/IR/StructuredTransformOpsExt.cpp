@@ -63,11 +63,13 @@ static LogicalResult nestedInFunc(PatternRewriter &rewriter,
   Attribute attr = pdlValues[1].cast<Attribute>();
 
   auto func = operation->getParentOfType<mlir::FunctionOpInterface>();
-  if (!func)
+  if (!func) {
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
+  }
   auto functionSymbol = dyn_cast<SymbolRefAttr>(attr);
-  if (!functionSymbol)
+  if (!functionSymbol) {
     return rewriter.notifyMatchFailure(operation, "not a function identifier");
+  }
   return success(functionSymbol.getLeafReference() == func.getName());
 }
 
@@ -86,13 +88,17 @@ haveIdenticalBodiesImpl(linalg::LinalgOp linalgOp,
   unsigned idx = 0;
   WalkResult res = genericLinalgModelOp.getBlock()->walk([&](Operation *op) {
     Operation *linalgSubOp = linalgBodyOps[idx++];
-    if (op->getName() != linalgSubOp->getName())
+    if (op->getName() != linalgSubOp->getName()) {
       return WalkResult::interrupt();
-    if (op->getAttrs() != linalgSubOp->getAttrs())
+    }
+    if (op->getAttrs() != linalgSubOp->getAttrs()) {
       return WalkResult::interrupt();
-    for (auto it : llvm::zip(op->getOperands(), linalgSubOp->getOperands()))
-      if (std::get<0>(it) != bvm.lookupOrNull(std::get<1>(it)))
+    }
+    for (auto it : llvm::zip(op->getOperands(), linalgSubOp->getOperands())) {
+      if (std::get<0>(it) != bvm.lookupOrNull(std::get<1>(it))) {
         return WalkResult::interrupt();
+      }
+    }
     bvm.map(linalgSubOp->getResults(), op->getResults());
     return WalkResult::advance();
   });
@@ -104,8 +110,9 @@ haveIdenticalBodiesImpl(linalg::LinalgOp linalgOp,
 static LogicalResult haveEquivalentBodies(linalg::LinalgOp linalgOp,
                                           linalg::LinalgOp genericLinalgModelOp,
                                           PatternRewriter &rewriter) {
-  if (succeeded(haveIdenticalBodiesImpl(linalgOp, genericLinalgModelOp)))
+  if (succeeded(haveIdenticalBodiesImpl(linalgOp, genericLinalgModelOp))) {
     return success();
+  }
   // TODO: haveEquivalentBodiesImpl, see e.g.
   // https://gist.github.com/nicolasvasilache/39e89e18c46e02335c16db6ec20a07e3
   return failure();
@@ -131,8 +138,9 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
         llvm::any_of(llvm::zip(opOutputs, modelOutputs), notEqualFn) ||
         linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
         linalgOp.getIteratorTypesArray() !=
-            linalgModelOp.getIteratorTypesArray())
+            linalgModelOp.getIteratorTypesArray()) {
       return failure();
+    }
   }
 
   // Build the block and go perform a body comparison.
@@ -175,13 +183,15 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
   auto modelOpNameAttr = dyn_cast<StringAttr>(attribute);
-  if (!modelOpNameAttr)
+  if (!modelOpNameAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   auto modelOpName = modelOpNameAttr.strref();
 
   // 1. If op has name `modelOpName`, the match is trivial.
-  if (operation->getName().getStringRef() == modelOpName)
+  if (operation->getName().getStringRef() == modelOpName) {
     return success();
+  }
 
   // 2. Linalg vs Linalg.
   // Create op from `modelOpName`.
@@ -193,8 +203,9 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
   auto g1 = llvm::scope_exit([&]() { rewriter.eraseOp(modelOp); });
   linalg::LinalgOp linalgOp = dyn_cast<linalg::LinalgOp>(operation);
   linalg::LinalgOp linalgModelOp = dyn_cast<linalg::LinalgOp>(modelOp);
-  if (linalgOp && linalgModelOp)
+  if (linalgOp && linalgModelOp) {
     return isEquivalentToOpImpl(rewriter, linalgOp, linalgModelOp);
+  }
 
   // 3. TBD
   return failure();
@@ -216,32 +227,38 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
   auto dict = dyn_cast<DictionaryAttr>(attribute);
-  if (!dict)
+  if (!dict) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
-  if (!dimAttr)
+  if (!dimAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   dim = dimAttr.getInt();
 
   int64_t divisor;
   auto divisorAttr = dict.getAs<IntegerAttr>("divisor");
-  if (!divisorAttr)
+  if (!divisorAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   divisor = divisorAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
-  if (!operandNumberAttr)
+  if (!operandNumberAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
-  if (static_cast<int64_t>(operands.size()) > operandNumber)
+  if (static_cast<int64_t>(operands.size()) > operandNumber) {
     shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
-  if (!shapedType || shapedType.getRank() <= dim)
+  }
+  if (!shapedType || shapedType.getRank() <= dim) {
     return failure();
+  }
   return success(divisor == 0 || (shapedType.getShape()[dim] > 0 &&
                                   shapedType.getShape()[dim] % divisor == 0));
 }
@@ -260,24 +277,28 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter,
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
   auto dict = dyn_cast<DictionaryAttr>(attribute);
-  if (!dict)
+  if (!dict) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
-  if (!dimAttr)
+  if (!dimAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   dim = dimAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
-  if (!operandNumberAttr)
+  if (!operandNumberAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
-  if (static_cast<int64_t>(operands.size()) > operandNumber)
+  if (static_cast<int64_t>(operands.size()) > operandNumber) {
     shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
+  }
   return success(shapedType && !shapedType.isDynamicDim(dim));
 }
 
@@ -295,24 +316,28 @@ static LogicalResult isDimDynamic(PatternRewriter &rewriter,
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
   auto dict = dyn_cast<DictionaryAttr>(attribute);
-  if (!dict)
+  if (!dict) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
-  if (!dimAttr)
+  if (!dimAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   dim = dimAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
-  if (!operandNumberAttr)
+  if (!operandNumberAttr) {
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
+  }
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
-  if (static_cast<int64_t>(operands.size()) > operandNumber)
+  if (static_cast<int64_t>(operands.size()) > operandNumber) {
     shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
+  }
   return success(shapedType && shapedType.isDynamicDim(dim));
 }
 
@@ -359,15 +384,17 @@ void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
 
   SmallVector<Diagnostic> diags;
   diag.takeDiagnostics(diags);
-  if (!status.succeeded())
+  if (!status.succeeded()) {
     status.takeDiagnostics(diags);
+  }
   status = DiagnosedSilenceableFailure::silenceableFailure(std::move(diags));
 
   status = emitSilenceableFailure(
       getTransformOp(), "!!! tracking listener failed to find replacement op");
   status.attachNote(op->getLoc()) << "replaced op";
-  for (Value v : values)
+  for (Value v : values) {
     status.attachNote(v.getLoc()) << "replacement value";
+  }
 }
 
 //===---------------------------------------------------------------------===//
@@ -389,8 +416,9 @@ DiagnosedSilenceableFailure transform_ext::MatchCallbackOp::apply(
   };
 
   auto *registry = state.getExtension<transform_ext::MatchCallbacksRegistry>();
-  if (!registry)
+  if (!registry) {
     return errorOut() << "match registry not available";
+  }
 
   const transform_ext::MatchCallbacksRegistry::MatchCallbackFn *callback =
       registry->get(getCallbackName());
@@ -404,8 +432,9 @@ DiagnosedSilenceableFailure transform_ext::MatchCallbackOp::apply(
       (*callback)(result, getLoc(), state, getInputs());
   if (!status.succeeded()) {
     setEmptyResults();
-    if (status.isDefiniteFailure())
+    if (status.isDefiniteFailure()) {
       return status;
+    }
     if (getFailurePropagationMode() ==
         mlir::transform::FailurePropagationMode::Propagate) {
       return emitSilenceableError() << "failed to match";
@@ -457,8 +486,9 @@ testMatchCallbackCallback(transform_ext::MatchCallbackResult &res, Location loc,
       res.addPayloadGroup(state.getPayloadOps(handle));
     }
   }
-  if (hadFailures)
+  if (hadFailures) {
     return emitSilenceableFailure(loc) << "failed to match";
+  }
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -481,16 +511,18 @@ static DiagnosedSilenceableFailure testRepeatedMatcherUseCallback(
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     second.resetCapture();
-    if (!matchPattern(op, second))
+    if (!matchPattern(op, second)) {
       return WalkResult::advance();
+    }
 
     res.addPayloadGroup({first.getCaptured()});
     res.addPayloadGroup({second.getCaptured()});
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -514,16 +546,18 @@ testValueMatcherCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     second.resetCapture();
-    if (!matchPattern(op, second))
+    if (!matchPattern(op, second)) {
       return WalkResult::advance();
+    }
 
     res.addPayloadGroup({first.getCaptured()});
     res.addPayloadGroup({second.getCaptured()});
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -549,8 +583,9 @@ static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     opMatcher.resetCapture();
-    if (!matchPattern(op, opMatcher))
+    if (!matchPattern(op, opMatcher)) {
       return WalkResult::advance();
+    }
 
     op->emitRemark() << "rank: " << rank;
     std::string message;
@@ -563,8 +598,9 @@ static DiagnosedSilenceableFailure testShapedValueMatcherCallback(
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -607,18 +643,21 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
+    if (!matchPattern(op, *pattern)) {
       return WalkResult::advance();
+    }
 
     // TODO: notify properly.
     LLVM_DEBUG({
       DBGS() << "fill:\n";
-      if (fill->getCaptured())
+      if (fill->getCaptured()) {
         DBGS() << fill->getCaptured() << "\n";
+      }
       DBGS() << "pattern: " << pattern->getCaptured() << "\n";
       DBGS() << "trailing:\n";
-      if (trailing->getCaptured())
+      if (trailing->getCaptured()) {
         DBGS() << trailing->getCaptured() << "\n";
+      }
     });
 
     res.addPotentiallyEmptyPayloadGroup(fill->getCaptured());
@@ -627,8 +666,9 @@ convolutionCallback(transform_ext::MatchCallbackResult &res, Location loc,
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -668,19 +708,22 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
+    if (!matchPattern(op, *pattern)) {
       return WalkResult::advance();
+    }
 
     // TODO: notify properly.
     LLVM_DEBUG({
       DBGS() << "leading:\n";
-      if (leading->getCaptured())
+      if (leading->getCaptured()) {
         DBGS() << leading->getCaptured() << "\n";
+      }
       DBGS() << "fill: " << fill->getCaptured() << "\n";
       DBGS() << "pattern: " << pattern->getCaptured() << "\n";
       DBGS() << "trailing:\n";
-      if (trailing->getCaptured())
+      if (trailing->getCaptured()) {
         DBGS() << trailing->getCaptured() << "\n";
+      }
     });
 
     res.addPotentiallyEmptyPayloadGroup(leading->getCaptured());
@@ -690,8 +733,9 @@ reductionCallback(transform_ext::MatchCallbackResult &res, Location loc,
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -730,18 +774,21 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
+    if (!matchPattern(op, *pattern)) {
       return WalkResult::advance();
+    }
 
     // TODO: notify properly.
     LLVM_DEBUG({
       DBGS() << "fill:\n";
-      if (fill->getCaptured())
+      if (fill->getCaptured()) {
         DBGS() << fill->getCaptured() << "\n";
+      }
       DBGS() << "pattern: " << pattern->getCaptured() << "\n";
       DBGS() << "trailing:\n";
-      if (trailing->getCaptured())
+      if (trailing->getCaptured()) {
         DBGS() << trailing->getCaptured() << "\n";
+      }
     });
 
     res.addPayloadGroup({fill->getCaptured()});
@@ -750,8 +797,9 @@ matmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -788,8 +836,9 @@ batchMatmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
+    if (!matchPattern(op, *pattern)) {
       return WalkResult::advance();
+    }
 
     // TODO: notify properly
     LLVM_DEBUG({
@@ -802,8 +851,9 @@ batchMatmulCallback(transform_ext::MatchCallbackResult &res, Location loc,
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match batch matmul";
 }
 
@@ -836,22 +886,25 @@ padCallback(transform_ext::MatchCallbackResult &res, Location loc,
 
   WalkResult walkResult = root->walk([&](Operation *op) {
     pattern->resetCapture();
-    if (!matchPattern(op, *pattern))
+    if (!matchPattern(op, *pattern)) {
       return WalkResult::advance();
+    }
 
     // TODO: notify properly.
     LLVM_DEBUG({
       DBGS() << "pad:\n";
-      if (pattern->getCaptured())
+      if (pattern->getCaptured()) {
         DBGS() << pattern->getCaptured() << "\n";
+      }
     });
 
     res.addPayloadGroup({pattern->getCaptured()});
     return WalkResult::interrupt();
   });
 
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return DiagnosedSilenceableFailure::success();
+  }
   return emitSilenceableFailure(loc) << "failed to match";
 }
 
@@ -901,8 +954,9 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
   bool found = false;
   for (Value handle : getInputs()) {
     auto payloads = state.getPayloadOps(handle);
-    if (payloads.empty())
+    if (payloads.empty()) {
       continue;
+    }
     if (!found) {
       results.set(cast<OpResult>(getFirst()), payloads);
       found = true;
@@ -911,8 +965,9 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
     }
   }
 
-  if (!found)
+  if (!found) {
     results.set(cast<OpResult>(getFirst()), {});
+  }
   results.set(cast<OpResult>(getRest()), concatenated);
   return DiagnosedSilenceableFailure::success();
 }

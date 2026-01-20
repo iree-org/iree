@@ -553,7 +553,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
 
   // iree_hal_executable_export_table_v0_t::ptrs
   SmallVector<llvm::Constant *> exportPtrValues;
-  for (auto dispatch : exports) {
+  for (const Dispatch &dispatch : exports) {
     exportPtrValues.push_back(dispatch.func);
   }
   llvm::Constant *exportPtrs = createArrayConstant(
@@ -562,7 +562,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   // iree_hal_executable_export_table_v0_t::attrs
   // Always populate the attrs table as it contains required dispatch metadata.
   SmallVector<llvm::Constant *> exportAttrValues;
-  for (auto dispatch : exports) {
+  for (const Dispatch &dispatch : exports) {
     exportAttrValues.push_back(llvm::ConstantStruct::get(
         dispatchAttrsType,
         {
@@ -605,7 +605,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   llvm::Constant *exportNames = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportNameValues;
-    for (auto dispatch : exports) {
+    for (const Dispatch &dispatch : exports) {
       exportNameValues.push_back(createStringConstant(dispatch.name, module));
     }
     exportNames = createArrayConstant(libraryName + "_names", ptrType,
@@ -618,7 +618,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
       exports, [](auto &dispatch) { return !dispatch.tag.empty(); });
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS && hasAnyTags) {
     SmallVector<llvm::Constant *> exportTagValues;
-    for (auto dispatch : exports) {
+    for (const Dispatch &dispatch : exports) {
       exportTagValues.push_back(
           createStringConstantOrNull(dispatch.tag, module));
     }
@@ -731,10 +731,10 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   llvm::Constant *exportStageLocations = llvm::Constant::getNullValue(ptrType);
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
     SmallVector<llvm::Constant *> exportStageTableValues;
-    for (auto dispatch : exports) {
+    for (const Dispatch &dispatch : exports) {
       SmallVector<llvm::Constant *> exportStageNameValues;
       SmallVector<llvm::Constant *> exportSourceLocationValues;
-      for (auto &stageLocation : dispatch.stageLocations) {
+      for (const SourceLocation &stageLocation : dispatch.stageLocations) {
         exportStageNameValues.push_back(
             createStringConstant(stageLocation.stage, module));
         exportSourceLocationValues.push_back(llvm::ConstantStruct::get(

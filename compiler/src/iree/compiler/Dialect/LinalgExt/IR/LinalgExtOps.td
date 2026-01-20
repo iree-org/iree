@@ -752,14 +752,24 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     returning both the selected value and its corresponding index. The selection
     logic is defined by a user-specified comparator region.
 
-    The comparator region receives two candidate values and returns a single `i1`
-    result indicating whether the first argument should be preferred over the second.
+    The operation supports two modes:
 
-    This region defines the sorting rule, e.g., "greater than" for argmax or
-    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    1. Implicit-index mode (single input): Computes (value, index) pairs from scratch.
+       Indices are implicitly computed from the reduction dimension's iteration index
+       (using linalg.index on the reduction dimension). The comparator
+       region receives two candidate values and returns a single `i1` result indicating
+       whether the first argument should be preferred.
+
+    2. Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
+       Indices are explicitly provided as input. The comparator region receives
+       two candidate values and returns `i1` to select the preferred value.
+       This mode is used to combine results from split-reduction operations.
+
+    The comparator region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin, allowing for generalization beyond simple argmax-style
     behavior.
 
-    Example (argmax over dim 1):
+    Example (implicit-index mode - argmax over dim 1):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -774,7 +784,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     }
     ```
 
-    Example with index_base = 5 (i.e., indices start counting from 5):
+    Example (implicit-index mode with index_base = 5):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -785,6 +795,22 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       ins(%input : memref<2x10xf32>)
       outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
       index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    Example (explicit-index mode - combining partial results):
+    ```mlir
+    %partial_vals = memref<2x4xf32>
+    %partial_idxs = memref<2x4xi32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : memref<2x4xf32>, memref<2x4xi32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
       iree_linalg_ext.yield %cmp : i1
@@ -820,6 +846,20 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       return getDpsInputOperand(0)->get();
     }
 
+    // Returns true when the operation is in explicit-index mode, which occurs
+    // when a second input operand provides pre-computed indices.
+    bool hasExplicitIndexInput() {
+      return getInputs().size() == 2;
+    }
+
+    // Returns the index input operand, or nullptr if not in explicit-index mode.
+    Value getInputIndex() {
+      if (!hasExplicitIndexInput()){
+        return nullptr;
+      }
+      return getDpsInputOperand(1)->get();
+    }
+
     Value outputValue() {
       return getDpsInitOperand(0)->get();
     }
@@ -838,6 +878,28 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 
     ShapedType getOutputIndexType() {
       return cast<ShapedType>(outputIndex().getType());
+    }
+
+    // Returns the ShapedType of the index input, or nullptr if not in
+    // explicit-index mode.
+    ShapedType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<ShapedType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    // Returns the element type of the index input, or nullptr if not in
+    // explicit-index mode.
+    Type getInputIndexElementType() {
+      if (ShapedType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getOutputIndexElementType() {
+      return getOutputIndexType().getElementType();
     }
 
     int64_t getInputRank() {
@@ -1007,6 +1069,16 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     it over the entire softmax reduction dimension by:
       x, _, sum : results
       x = (1 / sum) * x
+
+    Decomposition Configuration:
+    The `decomposition_config` attribute is a DictionaryAttr that controls how
+    this operation is decomposed into lower-level operations. It supports:
+      - "qk_attrs": DictionaryAttr - Attributes to attach to the Q@K matmul
+        operation after decomposition (e.g., lowering_config, attention markers)
+      - "pv_attrs": DictionaryAttr - Attributes to attach to the P@V matmul
+        operation after decomposition
+      - "use_exp2": BoolAttr - If true, uses exp2 with log2(e) scaling instead
+        of exp. (Gives better perf on some hardware, but trades off accuracy)
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1091,6 +1163,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    // Flag to control whether to use exp2 (with log2(e) scaling) or exp.
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 
   let hasCanonicalizer = 1;

@@ -282,7 +282,7 @@ class MaterializeRefDiscardsPass
 
         SmallVector<Value> dyingRefs;
         for (Value ref : allRefs) {
-          if (escapingRefs.count(ref)) {
+          if (escapingRefs.contains(ref)) {
             continue;
           }
 
@@ -357,7 +357,7 @@ class MaterializeRefDiscardsPass
           }
 
           // Skip escaping refs.
-          if (escapingRefs.count(value)) {
+          if (escapingRefs.contains(value)) {
             continue;
           }
 

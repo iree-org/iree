@@ -104,6 +104,7 @@ iree_lit_test_suite(
     "reductions.mlir"
     "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
+    "remove_index_hints.mlir"
     "remove_single_iteration_loop.mlir"
     "repeated_matcher_use.mlir"
     "replace_slow_min_max_ops.mlir"

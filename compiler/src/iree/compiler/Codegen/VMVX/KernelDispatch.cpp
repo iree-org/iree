@@ -28,7 +28,7 @@ getDefaultDistributionTileSizes(TilingInterface op) {
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
   for (auto dim : llvm::seq<int64_t>(0, distTileSizes.size())) {
-    if (!partitionedLoopsSet.count(dim)) {
+    if (!partitionedLoopsSet.contains(dim)) {
       distTileSizes[dim] = 0;
     }
   }

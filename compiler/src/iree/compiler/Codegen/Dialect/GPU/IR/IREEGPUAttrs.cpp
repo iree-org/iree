@@ -7,10 +7,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Utils/EncodingUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
@@ -782,6 +784,59 @@ MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
   return failure();
 }
 
+/// Creates index_hint ops wrapping delinearized lane ID values.
+/// The `delinearizedLaneId` values come from delinearizing the lane ID using
+/// `basis`, with the innermost/fastest-varying dimension last.
+///
+/// Non-final indices get lane_constant hints (uniform across lane groups).
+/// The final index gets lane_increment hint (increments within lane group).
+/// The group size is derived from the innermost basis element.
+/// Indices with a unit basis are ignored, and given a lane_constant hint.
+static SmallVector<Value>
+createTransposeLoadIndexHint(OpBuilder &builder, Location loc,
+                             ValueRange delinearizedLaneId,
+                             ArrayRef<int64_t> basis) {
+  // Need at least 2 dimensions for transpose load pattern.
+  if (delinearizedLaneId.size() < 2) {
+    return SmallVector<Value>(delinearizedLaneId.begin(),
+                              delinearizedLaneId.end());
+  }
+
+  // Find the index of the innermost non-unit (> 1) basis element.
+  // This determines which result gets the lane-increment hint.
+  // Size-1 dimensions produce constant 0 outputs regardless of lane ID,
+  // so they don't contribute to the meaningful group structure.
+  int64_t groupSize = 1;
+  size_t incrementResultIdx = delinearizedLaneId.size() - 1;
+  // The delinearized indices could have N or N + 1 results, and the basis
+  // elements are aligned with the last N results, so iterate backwards
+  // together.
+  for (size_t i = 1; i <= basis.size(); ++i) {
+    groupSize = basis[basis.size() - i];
+    incrementResultIdx = delinearizedLaneId.size() - i;
+    if (groupSize > 1) {
+      break;
+    }
+  }
+
+  auto laneConstantAttr =
+      IREE::GPU::LaneConstantAttr::get(builder.getContext(), groupSize);
+  auto laneIncrementAttr = IREE::GPU::LaneIncrementAttr::get(
+      builder.getContext(), groupSize, /*step=*/1);
+
+  SmallVector<Value> results;
+  for (auto [i, value] : llvm::enumerate(delinearizedLaneId)) {
+    // The result corresponding to innermost non-unit basis gets lane-increment;
+    // all other results get lane-constant hints.
+    Attribute hint = (i == incrementResultIdx) ? Attribute(laneIncrementAttr)
+                                               : Attribute(laneConstantAttr);
+    auto hintOp = IREE::Codegen::IndexHintOp::create(builder, loc, value, hint);
+    results.push_back(hintOp.getResult());
+  }
+
+  return results;
+}
+
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
@@ -819,6 +874,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   auto splitLaneId = affine::AffineDelinearizeIndexOp::create(
       builder, loc, laneId, vtidBasis, /*hasOuterBound=*/false);
 
+  // Wrap delinearize results with index_hint ops for transpose load.
+  // The delinearize results are already in the correct order
+  // (innermost/fastest-varying dimension is last).
+  SmallVector<Value> hintedSplitLaneId = createTransposeLoadIndexHint(
+      builder, loc, splitLaneId.getResults(), vtidBasis);
+
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
@@ -830,7 +891,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // worsen the generated code quality.
   for (auto [splitResultIdx, element] :
        llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
-    Value vtid = splitLaneId.getResult(splitResultIdx);
+    Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
     if (element != 1) {
       vtid = affine::AffineLinearizeIndexOp::create(
@@ -2279,6 +2340,15 @@ bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
 Value PromoteWithCacheSwizzleAttr::promoteOperand(
     mlir::OpBuilder &builder, mlir::OpOperand &operand) const {
   return cacheSwizzlePromotionImpl(builder, operand, getCopyConfig());
+}
+
+//===----------------------------------------------------------------------===//
+// SwizzleOperandAttr
+//===----------------------------------------------------------------------===//
+
+Value SwizzleOperandAttr::promoteOperand(mlir::OpBuilder &builder,
+                                         mlir::OpOperand &operand) const {
+  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getSwizzle());
 }
 
 //===----------------------------------------------------------------------===//

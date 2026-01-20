@@ -1008,6 +1008,39 @@ func.func @arg_compare_with_base(
 
 // -----
 
+func.func @arg_compare_explicit_index(
+    %input_val : tensor<2x4xf32>,
+    %input_idx : tensor<2x4xi32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xi32>
+) -> (tensor<2xf32>, tensor<2xi32>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val, %input_idx : tensor<2x4xf32>, tensor<2x4xi32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
+}
+
+// CHECK-LABEL: func.func @arg_compare_explicit_index(
+// CHECK-SAME:   %[[INPUT_VAL:[a-zA-Z0-9_]+]]: tensor<2x4xf32>
+// CHECK-SAME:   %[[INPUT_IDX:[a-zA-Z0-9_]+]]: tensor<2x4xi32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xi32>
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT_VAL]], %[[INPUT_IDX]] : tensor<2x4xf32>, tensor<2x4xi32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xi32>)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<2xf32>, tensor<2xi32>
+
+// -----
+
 func.func @fft_tensor(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>)
     -> (tensor<1024xf32>, tensor<1024xf32>) {
   %cst1 = arith.constant 1 : index

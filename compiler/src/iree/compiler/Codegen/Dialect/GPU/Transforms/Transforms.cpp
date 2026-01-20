@@ -101,24 +101,44 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
     return failure();
   }
 
-  auto empty = forallOp.getDpsInits()[0].getDefiningOp<tensor::EmptyOp>();
+  // Skip swizzle hint ops.
+  Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
+  if (auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination)) {
+    destination = swizzleOp->getOperand(0).getDefiningOp();
+  }
+
   // Fail if the destination is not a `tensor.empty` op and cannot be trivially
   // converted to a `bufferization.alloc_tensor`.
+  auto empty = dyn_cast<tensor::EmptyOp>(destination);
   if (!empty) {
     return failure();
   }
 
   // Create a `bufferization.alloc_tensor` op with memory space
   // `#gpu.address_space<workgroup>`.
+  Location loc = empty->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(empty);
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   auto allocTensor = bufferization::AllocTensorOp::create(
-      rewriter, empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
+      rewriter, loc, cast<TensorType>(empty.getResult().getType()),
       empty.getDynamicSizes(),
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
+
+  // If the original `tensor.empty` has a swizzle hint, apply it to the new
+  // allocation. Note that if there is a swizzle hint, it will be the only user
+  // of the `tensor.empty` op.
+  if (auto swizzleHintOp =
+          dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
+    assert(empty->hasOneUse() &&
+           "a tensor.empty op with a swizzle hint applied, should have the "
+           "swizzle hint as its only user");
+    auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
+        rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
+    return newSwizzle.getResult();
+  }
   return allocTensor.getResult();
 }
 
@@ -465,9 +485,8 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
                              scf::ForallOp laneForallOp) {
   // Verify mappings.
   if (!warpForallOp.getMapping() ||
-      !llvm::all_of(*warpForallOp.getMapping(), [](Attribute mappingAttr) {
-        return isa<gpu::GPUWarpMappingAttr>(mappingAttr);
-      })) {
+      !llvm::all_of(*warpForallOp.getMapping(),
+                    llvm::IsaPred<gpu::GPUWarpMappingAttr>)) {
     return rewriter.notifyMatchFailure(warpForallOp, "not a warp forall op");
   }
   if (!laneForallOp.getMapping() || laneForallOp.getMapping()->size() != 1 ||
@@ -2068,6 +2087,109 @@ struct LowerValueBarrierPattern
 
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerValueBarrierPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// SwizzleHintOp Fold Patterns
+//===----------------------------------------------------------------------===//
+
+// The following patterns are adapted from the populateFoldTensorEmptyPatterns
+// in upstream llvm-project. The main change is to add support for folding with
+// swizzle_hint ops from IREE. Once swizzle_hint ops are more widely used and
+// proven stable, we could consider upstreaming this extension.
+
+namespace {
+struct FoldSwizzleHintOpWithExtractSliceOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    // Check for swizzle_hint op source.
+    auto swizzleHintOp =
+        sliceOp.getSource().getDefiningOp<IREE::Codegen::SwizzleHintOp>();
+    if (!swizzleHintOp) {
+      return failure();
+    }
+
+    // Check for tensor.empty source.
+    auto emptyOp = swizzleHintOp.getOperand().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return failure();
+    }
+
+    // Check for single use.
+    if (!emptyOp->hasOneUse()) {
+      return failure();
+    }
+
+    // Create new tensor.empty op. tensor.extract_slice may be rank-reducing;
+    // its dynamic sizes must be preserved as well as its result type.
+    Location loc = sliceOp.getLoc();
+    auto sliceType = cast<RankedTensorType>(sliceOp.getType());
+    auto tensorType =
+        RankedTensorType::get(sliceType.getShape(), sliceType.getElementType(),
+                              sliceType.getEncoding());
+    auto newEmptyOp =
+        tensor::EmptyOp::create(rewriter, loc, tensorType, sliceOp.getSizes());
+    rewriter.replaceOpWithNewOp<IREE::Codegen::SwizzleHintOp>(
+        sliceOp, newEmptyOp, swizzleHintOp.getSwizzle());
+    return success();
+  }
+};
+
+template <typename ReshapeOp>
+struct FoldSwizzleHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
+  using OpRewritePattern<ReshapeOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(ReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    auto swizzleHintOp =
+        reshapeOp.getSrc()
+            .template getDefiningOp<IREE::Codegen::SwizzleHintOp>();
+    if (!swizzleHintOp) {
+      return failure();
+    }
+    auto emptyOp =
+        swizzleHintOp.getOperand().template getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) {
+      return failure();
+    }
+
+    // Check for single use.
+    if (!emptyOp->hasOneUse()) {
+      return failure();
+    }
+
+    // Reify result shape.
+    Location loc = reshapeOp.getLoc();
+    ReifiedRankedShapedTypeDims resultShapes;
+    if (failed(reifyResultShapes(rewriter, reshapeOp, resultShapes)) ||
+        !llvm::hasSingleElement(resultShapes)) {
+      return failure();
+    }
+
+    // Create new tensor.empty op.
+    Value emptyTensor =
+        tensor::EmptyOp::create(rewriter, loc, resultShapes[0],
+                                reshapeOp.getResultType().getElementType(),
+                                reshapeOp.getResultType().getEncoding());
+    Value newSwizzleHintOp = IREE::Codegen::SwizzleHintOp::create(
+        rewriter, loc, emptyTensor, swizzleHintOp.getSwizzle());
+    if (newSwizzleHintOp.getType() != reshapeOp.getResultType()) {
+      rewriter.replaceOpWithNewOp<tensor::CastOp>(
+          reshapeOp, reshapeOp.getResultType(), newSwizzleHintOp);
+    } else {
+      rewriter.replaceOp(reshapeOp, newSwizzleHintOp);
+    }
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldSwizzleHintOpPatterns(RewritePatternSet &patterns) {
+  patterns.add<FoldSwizzleHintOpWithReshapeOp<tensor::ExpandShapeOp>,
+               FoldSwizzleHintOpWithReshapeOp<tensor::CollapseShapeOp>,
+               FoldSwizzleHintOpWithExtractSliceOp>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

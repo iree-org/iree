@@ -282,21 +282,31 @@ static iree_status_t iree_hal_executable_calculate_fatelf_size(
   const iree_fatelf_header_t* header =
       (const iree_fatelf_header_t*)executable_data.data;
 
-  // Calculate the size needed for header and records.
-  uint64_t max_offset =
-      sizeof(*header) + header->record_count * sizeof(iree_fatelf_record_t);
+  // Calculate the size needed for header and records with overflow checking.
+  iree_host_size_t max_offset = 0;
+  if (!iree_host_size_checked_mul_add(sizeof(*header), header->record_count,
+                                      sizeof(iree_fatelf_record_t),
+                                      &max_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "FatELF record table size overflow");
+  }
 
   // Check each record to find the maximum extent.
   const iree_fatelf_record_t* records =
       (const iree_fatelf_record_t*)((const uint8_t*)header + sizeof(*header));
   for (uint8_t i = 0; i < header->record_count; ++i) {
-    const uint64_t record_end = records[i].offset + records[i].size;
+    iree_host_size_t record_end = 0;
+    if (!iree_host_size_checked_add(records[i].offset, records[i].size,
+                                    &record_end)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "FatELF record extent overflow");
+    }
     if (record_end > max_offset) {
       max_offset = record_end;  // bump extent
     }
   }
 
-  *out_size = (iree_host_size_t)max_offset;
+  *out_size = max_offset;
   return iree_ok_status();
 }
 

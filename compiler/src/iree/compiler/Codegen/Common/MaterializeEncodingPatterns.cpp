@@ -300,11 +300,12 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
   if (srcType.getEncoding()) {
     value = IREE::Encoding::UnsetEncodingOp::create(
         rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims,
-        /*encodingDims=*/ValueRange{});
+        /*encoding_dims=*/ValueRange{});
   }
   if (destType.getEncoding()) {
     value = IREE::Encoding::SetEncodingOp::create(
-        rewriter, src.getLoc(), destType, value, /*encodingDims=*/ValueRange{});
+        rewriter, src.getLoc(), destType, value,
+        /*encoding_dims=*/ValueRange{});
   }
   return value;
 }
@@ -734,7 +735,7 @@ void populateMaterializeEncodingPatterns(
         return resultType == typeConverter.convertType(resultType);
       });
   target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp returnOp) {
-    return !llvm::any_of(returnOp.getOperandTypes(),
+    return llvm::none_of(returnOp.getOperandTypes(),
                          isRankedTensorTypeWithEncoding);
   });
 

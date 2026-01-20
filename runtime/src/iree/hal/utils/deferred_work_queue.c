@@ -698,34 +698,58 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Embed captured tables in the action allocation.
-  iree_hal_deferred_work_queue_action_t* action = NULL;
-  const iree_host_size_t wait_semaphore_list_size =
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
-  const iree_host_size_t signal_semaphore_list_size =
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
-      signal_semaphore_list.count *
-          sizeof(*signal_semaphore_list.payload_values);
-  const iree_host_size_t command_buffers_size =
-      command_buffer_count * sizeof(*action->payload.execution.command_buffers);
-  iree_host_size_t binding_tables_size = 0;
-  iree_host_size_t binding_table_elements_size = 0;
+  // Pre-compute total binding element count for overflow-checked layout.
+  iree_host_size_t binding_elements_count = 0;
   if (binding_tables) {
-    binding_tables_size = command_buffer_count * sizeof(*binding_tables);
     for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
-      binding_table_elements_size +=
-          binding_tables[i].count * sizeof(*binding_tables[i].bindings);
+      if (!iree_host_size_checked_add(binding_elements_count,
+                                      binding_tables[i].count,
+                                      &binding_elements_count)) {
+        IREE_TRACE_ZONE_END(z0);
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "binding element count overflow");
+      }
     }
   }
-  const iree_host_size_t payload_size =
-      command_buffers_size + binding_tables_size + binding_table_elements_size;
-  const iree_host_size_t total_action_size =
-      sizeof(*action) + wait_semaphore_list_size + signal_semaphore_list_size +
-      payload_size;
+
+  // Calculate layout with overflow checking. Using alignment 1 preserves the
+  // original packed layout.
+  iree_host_size_t total_action_size = 0;
+  iree_host_size_t wait_semaphores_offset = 0;
+  iree_host_size_t wait_payloads_offset = 0;
+  iree_host_size_t signal_semaphores_offset = 0;
+  iree_host_size_t signal_payloads_offset = 0;
+  iree_host_size_t command_buffers_offset = 0;
+  iree_host_size_t binding_tables_offset = 0;
+  iree_host_size_t binding_elements_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(iree_hal_deferred_work_queue_action_t), &total_action_size,
+              IREE_STRUCT_FIELD_ALIGNED(wait_semaphore_list.count,
+                                        iree_hal_semaphore_t*, 1,
+                                        &wait_semaphores_offset),
+              IREE_STRUCT_FIELD_ALIGNED(wait_semaphore_list.count, uint64_t, 1,
+                                        &wait_payloads_offset),
+              IREE_STRUCT_FIELD_ALIGNED(signal_semaphore_list.count,
+                                        iree_hal_semaphore_t*, 1,
+                                        &signal_semaphores_offset),
+              IREE_STRUCT_FIELD_ALIGNED(signal_semaphore_list.count, uint64_t,
+                                        1, &signal_payloads_offset),
+              IREE_STRUCT_FIELD_ALIGNED(command_buffer_count,
+                                        iree_hal_command_buffer_t*, 1,
+                                        &command_buffers_offset),
+              IREE_STRUCT_FIELD_ALIGNED(
+                  binding_tables ? command_buffer_count : 0,
+                  iree_hal_buffer_binding_table_t, 1, &binding_tables_offset),
+              IREE_STRUCT_FIELD_ALIGNED(binding_elements_count,
+                                        iree_hal_buffer_binding_t, 1,
+                                        &binding_elements_offset)));
+
+  iree_hal_deferred_work_queue_action_t* action = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(actions->host_allocator, total_action_size,
                                 (void**)&action));
-  uint8_t* action_ptr = (uint8_t*)action + sizeof(*action);
+  uint8_t* action_base = (uint8_t*)action;
 
   action->owning_actions = actions;
   action->device_interface = actions->device_interface;
@@ -740,41 +764,38 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
 
   // Copy wait list for later access.
   action->wait_semaphore_list.count = wait_semaphore_list.count;
-  action->wait_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  action->wait_semaphore_list.semaphores =
+      (iree_hal_semaphore_t**)(action_base + wait_semaphores_offset);
   memcpy(action->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
          wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
   action->wait_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + wait_semaphore_list.count *
-                                   sizeof(*wait_semaphore_list.semaphores));
+      (uint64_t*)(action_base + wait_payloads_offset);
   memcpy(
       action->wait_semaphore_list.payload_values,
       wait_semaphore_list.payload_values,
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
-  action_ptr += wait_semaphore_list_size;
 
   // Copy signal list for later access.
   action->signal_semaphore_list.count = signal_semaphore_list.count;
-  action->signal_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  action->signal_semaphore_list.semaphores =
+      (iree_hal_semaphore_t**)(action_base + signal_semaphores_offset);
   memcpy(
       action->signal_semaphore_list.semaphores,
       signal_semaphore_list.semaphores,
       signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
   action->signal_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + signal_semaphore_list.count *
-                                   sizeof(*signal_semaphore_list.semaphores));
+      (uint64_t*)(action_base + signal_payloads_offset);
   memcpy(action->signal_semaphore_list.payload_values,
          signal_semaphore_list.payload_values,
          signal_semaphore_list.count *
              sizeof(*signal_semaphore_list.payload_values));
-  action_ptr += signal_semaphore_list_size;
 
   // Copy the execution resources for later access.
   action->payload.execution.count = command_buffer_count;
   action->payload.execution.command_buffers =
-      (iree_hal_command_buffer_t**)action_ptr;
+      (iree_hal_command_buffer_t**)(action_base + command_buffers_offset);
   memcpy(action->payload.execution.command_buffers, command_buffers,
-         command_buffers_size);
-  action_ptr += command_buffers_size;
+         command_buffer_count * sizeof(iree_hal_command_buffer_t*));
 
   // Retain all command buffers and semaphores.
   iree_status_t status = iree_hal_resource_set_allocate(actions->block_pool,
@@ -795,12 +816,11 @@ iree_status_t iree_hal_deferred_work_queue_enqueue(
   }
 
   // Copy binding tables and retain all bindings.
-  if (iree_status_is_ok(status) && binding_table_elements_size > 0) {
+  if (iree_status_is_ok(status) && binding_elements_count > 0) {
     action->payload.execution.binding_tables =
-        (iree_hal_buffer_binding_table_t*)action_ptr;
-    action_ptr += binding_tables_size;
+        (iree_hal_buffer_binding_table_t*)(action_base + binding_tables_offset);
     iree_hal_buffer_binding_t* binding_element_ptr =
-        (iree_hal_buffer_binding_t*)action_ptr;
+        (iree_hal_buffer_binding_t*)(action_base + binding_elements_offset);
     for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
       iree_host_size_t element_count = binding_tables[i].count;
       iree_hal_buffer_binding_table_t* target_table =
@@ -860,22 +880,32 @@ static iree_status_t iree_hal_deferred_work_queue_enqueue_buffer_operation(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Embed captured tables in the action allocation.
+  // Calculate layout with overflow checking. Using alignment 1 preserves the
+  // original packed layout.
+  iree_host_size_t total_action_size = 0;
+  iree_host_size_t wait_semaphores_offset = 0;
+  iree_host_size_t wait_payloads_offset = 0;
+  iree_host_size_t signal_semaphores_offset = 0;
+  iree_host_size_t signal_payloads_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(iree_hal_deferred_work_queue_action_t), &total_action_size,
+              IREE_STRUCT_FIELD_ALIGNED(wait_semaphore_list.count,
+                                        iree_hal_semaphore_t*, 1,
+                                        &wait_semaphores_offset),
+              IREE_STRUCT_FIELD_ALIGNED(wait_semaphore_list.count, uint64_t, 1,
+                                        &wait_payloads_offset),
+              IREE_STRUCT_FIELD_ALIGNED(signal_semaphore_list.count,
+                                        iree_hal_semaphore_t*, 1,
+                                        &signal_semaphores_offset),
+              IREE_STRUCT_FIELD_ALIGNED(signal_semaphore_list.count, uint64_t,
+                                        1, &signal_payloads_offset)));
+
   iree_hal_deferred_work_queue_action_t* action = NULL;
-  const iree_host_size_t wait_semaphore_list_size =
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores) +
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
-  const iree_host_size_t signal_semaphore_list_size =
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores) +
-      signal_semaphore_list.count *
-          sizeof(*signal_semaphore_list.payload_values);
-
-  const iree_host_size_t total_action_size =
-      sizeof(*action) + wait_semaphore_list_size + signal_semaphore_list_size;
-
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(actions->host_allocator, total_action_size,
                                 (void**)&action));
-  uint8_t* action_ptr = (uint8_t*)action + sizeof(*action);
+  uint8_t* action_base = (uint8_t*)action;
 
   action->owning_actions = actions;
   action->device_interface = actions->device_interface;
@@ -890,33 +920,31 @@ static iree_status_t iree_hal_deferred_work_queue_enqueue_buffer_operation(
 
   // Copy wait list for later access.
   action->wait_semaphore_list.count = wait_semaphore_list.count;
-  action->wait_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  action->wait_semaphore_list.semaphores =
+      (iree_hal_semaphore_t**)(action_base + wait_semaphores_offset);
   memcpy(action->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
          wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
   action->wait_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + wait_semaphore_list.count *
-                                   sizeof(*wait_semaphore_list.semaphores));
+      (uint64_t*)(action_base + wait_payloads_offset);
   memcpy(
       action->wait_semaphore_list.payload_values,
       wait_semaphore_list.payload_values,
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
-  action_ptr += wait_semaphore_list_size;
 
   // Copy signal list for later access.
   action->signal_semaphore_list.count = signal_semaphore_list.count;
-  action->signal_semaphore_list.semaphores = (iree_hal_semaphore_t**)action_ptr;
+  action->signal_semaphore_list.semaphores =
+      (iree_hal_semaphore_t**)(action_base + signal_semaphores_offset);
   memcpy(
       action->signal_semaphore_list.semaphores,
       signal_semaphore_list.semaphores,
       signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
   action->signal_semaphore_list.payload_values =
-      (uint64_t*)(action_ptr + signal_semaphore_list.count *
-                                   sizeof(*signal_semaphore_list.semaphores));
+      (uint64_t*)(action_base + signal_payloads_offset);
   memcpy(action->signal_semaphore_list.payload_values,
          signal_semaphore_list.payload_values,
          signal_semaphore_list.count *
              sizeof(*signal_semaphore_list.payload_values));
-  action_ptr += signal_semaphore_list_size;
 
   // Copy the execution resources for later access.
   action->payload.alloc.buffer = buffer;

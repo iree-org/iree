@@ -47,24 +47,20 @@ iree_status_t iree_tokenizer_literals_add(
 
   // Grow entries array if needed.
   if (literals->count >= literals->capacity) {
-    iree_host_size_t new_capacity = literals->capacity * 2;
-    if (new_capacity < 16) new_capacity = 16;
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        literals->allocator, new_capacity * sizeof(iree_tokenizer_literal_t),
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        literals->allocator, /*min_capacity=*/16,
+        sizeof(iree_tokenizer_literal_t), &literals->capacity,
         (void**)&literals->entries));
-    literals->capacity = new_capacity;
   }
 
   // Grow string storage if needed.
   iree_host_size_t new_string_size =
       literals->string_storage_size + content.size;
   if (new_string_size > literals->string_storage_capacity) {
-    iree_host_size_t new_capacity = literals->string_storage_capacity * 2;
-    if (new_capacity < 256) new_capacity = 256;
-    if (new_capacity < new_string_size) new_capacity = new_string_size;
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        literals->allocator, new_capacity, (void**)&literals->string_storage));
-    literals->string_storage_capacity = new_capacity;
+    IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+        literals->allocator, iree_max(256, new_string_size),
+        /*element_size=*/1, &literals->string_storage_capacity,
+        (void**)&literals->string_storage));
 
     // Update all existing content pointers (they may have moved).
     char* base = literals->string_storage;

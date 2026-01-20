@@ -107,7 +107,7 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
     if (deadOps.empty()) {
       return failure();
     }
-    for (auto deadOp : deadOps) {
+    for (Operation *deadOp : deadOps) {
       rewriter.eraseOp(deadOp);
     }
     return success();

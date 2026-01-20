@@ -180,6 +180,11 @@ macro(iree_llvm_set_bundled_cmake_options)
   # that in IREE as a super-project.
   set(MLIR_DISABLE_CONFIGURE_PYTHON_DEV_PACKAGES ON CACHE BOOL "" FORCE)
 
+  # Enable reverse iteration over LLVM unordered maps/sets.
+  if(IREE_REVERSE_ITERATION)
+    set(LLVM_ENABLE_REVERSE_ITERATION ON CACHE BOOL "" FORCE)
+  endif()
+
   # If we are building clang/lld/etc, these will be the targets.
   # Otherwise, empty so scripts can detect unavailability.
   set(IREE_CLANG_TARGET)
@@ -252,6 +257,10 @@ macro(iree_llvm_set_bundled_cmake_options)
   endif()
   if(IREE_LLD_TARGET)
     list(APPEND LLVM_ENABLE_PROJECTS lld)
+  endif()
+
+  if(IREE_BUILD_CLANG_TOOLS_EXTRA)
+    list(APPEND LLVM_ENABLE_PROJECTS clang-tools-extra)
   endif()
 
   list(REMOVE_DUPLICATES LLVM_ENABLE_PROJECTS)

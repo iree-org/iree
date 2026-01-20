@@ -47,7 +47,12 @@ static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
 // return the aligned pointer. This lets us easily get the base pointer in free
 // to pass back to the system.
 static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
-  void* base_ptr = malloc(size + alignment + sizeof(uintptr_t));
+  iree_host_size_t alloc_size = 0;
+  if (!iree_host_size_checked_add(size, alignment, &alloc_size) ||
+      !iree_host_size_checked_add(alloc_size, sizeof(uintptr_t), &alloc_size)) {
+    return NULL;
+  }
+  void* base_ptr = malloc(alloc_size);
   if (!base_ptr) return NULL;
   uintptr_t* aligned_ptr = (uintptr_t*)iree_host_align(
       (uintptr_t)base_ptr + sizeof(uintptr_t), alignment);
@@ -431,9 +436,21 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_allocate_vf_impl(
   // Allocate storage with the additional room to store the formatted message.
   // This avoids additional allocations for the common case of a message coming
   // only from the original status error site.
-  size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
-  size_t storage_size = iree_host_align(
-      sizeof(iree_status_storage_t) + message_size, storage_alignment);
+  iree_host_size_t unaligned_size = 0;
+  iree_host_size_t message_offset = 0;
+  iree_status_t layout_status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_status_storage_t), &unaligned_size,
+      IREE_STRUCT_FIELD(message_size, char, &message_offset));
+  if (!iree_status_is_ok(layout_status)) {
+    iree_status_ignore(layout_status);
+    return iree_status_from_code(code);
+  }
+  iree_host_size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
+  iree_host_size_t storage_size = 0;
+  if (!iree_host_size_checked_align(unaligned_size, storage_alignment,
+                                    &storage_size)) {
+    return iree_status_from_code(code);
+  }
   iree_status_storage_t* storage = (iree_status_storage_t*)iree_aligned_alloc(
       storage_alignment, storage_size);
   if (IREE_UNLIKELY(!storage)) return iree_status_from_code(code);
@@ -446,7 +463,7 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_allocate_vf_impl(
 
   // vsnprintf directly into message buffer.
   storage->message.size = message_size - 1;
-  storage->message.data = (const char*)storage + sizeof(iree_status_storage_t);
+  storage->message.data = (const char*)storage + message_offset;
   int ret =
       vsnprintf((char*)storage->message.data, message_size, format, varargs_1);
   if (IREE_UNLIKELY(ret < 0)) {
@@ -617,10 +634,19 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_annotate_vf(
   // Allocate storage with the additional room to store the formatted message.
   // This avoids additional allocations for the common case of a message coming
   // only from the original status error site.
+  iree_host_size_t alloc_size = 0;
+  iree_host_size_t message_offset = 0;
+  iree_status_t layout_status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_status_payload_message_t), &alloc_size,
+      IREE_STRUCT_FIELD(message_size, char, &message_offset));
+  if (!iree_status_is_ok(layout_status)) {
+    iree_status_ignore(layout_status);
+    return base_status;
+  }
   iree_allocator_t allocator = iree_allocator_system();
   iree_status_payload_message_t* payload = NULL;
-  iree_status_ignore(iree_allocator_malloc(
-      allocator, sizeof(*payload) + message_size, (void**)&payload));
+  iree_status_ignore(
+      iree_allocator_malloc(allocator, alloc_size, (void**)&payload));
   if (IREE_UNLIKELY(!payload)) return base_status;
   memset(payload, 0, sizeof(*payload));
   payload->header.type = IREE_STATUS_PAYLOAD_TYPE_MESSAGE;
@@ -629,8 +655,7 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_annotate_vf(
 
   // vsnprintf directly into message buffer.
   payload->message.size = message_size - 1;
-  payload->message.data =
-      (const char*)payload + sizeof(iree_status_payload_message_t);
+  payload->message.data = (const char*)payload + message_offset;
   int ret = vsnprintf((char*)payload->message.data, payload->message.size + 1,
                       format, varargs_1);
   if (IREE_UNLIKELY(ret < 0)) {
@@ -810,9 +835,6 @@ iree_status_freeze(iree_status_t status) {
 
   // Compute the storage size for the status with additional room to store the
   // formatted message and source file location if present.
-  size_t unaligned_storage_size =
-      sizeof(iree_status_storage_t) + message_buffer_size;
-
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
   // Grab storage for the source file location.
   iree_status_storage_t* storage = iree_status_storage(status);
@@ -822,13 +844,35 @@ iree_status_freeze(iree_status_t status) {
     file = storage->file;
     line = storage->line;
   }
-  size_t file_storage_size = file ? strlen(file) + 1 : 0;
-  unaligned_storage_size += file_storage_size;
+  iree_host_size_t file_storage_size = file ? strlen(file) + 1 : 0;
 #endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
 
-  size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
-  size_t storage_size =
-      iree_host_align(unaligned_storage_size, storage_alignment);
+  iree_host_size_t unaligned_storage_size = 0;
+  iree_host_size_t message_offset = 0;
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  iree_host_size_t file_offset = 0;
+  iree_status_t layout_status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_status_storage_t), &unaligned_storage_size,
+      IREE_STRUCT_FIELD(message_buffer_size, char, &message_offset),
+      IREE_STRUCT_FIELD(file_storage_size, char, &file_offset));
+#else
+  iree_status_t layout_status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_status_storage_t), &unaligned_storage_size,
+      IREE_STRUCT_FIELD(message_buffer_size, char, &message_offset));
+#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
+  if (!iree_status_is_ok(layout_status)) {
+    iree_status_ignore(layout_status);
+    iree_status_free(status);
+    return iree_status_from_code(code);
+  }
+
+  iree_host_size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
+  iree_host_size_t storage_size = 0;
+  if (!iree_host_size_checked_align(unaligned_storage_size, storage_alignment,
+                                    &storage_size)) {
+    iree_status_free(status);
+    return iree_status_from_code(code);
+  }
   iree_status_storage_t* new_storage =
       (iree_status_storage_t*)iree_aligned_alloc(storage_alignment,
                                                  storage_size);
@@ -838,15 +882,14 @@ iree_status_freeze(iree_status_t status) {
   }
   memset(new_storage, 0, sizeof(*new_storage));
 
-  char* message_data = (char*)new_storage + sizeof(iree_status_storage_t);
+  char* message_data = (char*)new_storage + message_offset;
   size_t res_length;
   // Format the status message directly into the region allocated for it.
   bool ret =
       iree_status_format_message(status, message_buffer_size, message_data,
                                  &res_length, /*has_prefix=*/false);
   new_storage->message.size = message_buffer_size - 1;
-  new_storage->message.data =
-      (const char*)new_storage + sizeof(iree_status_storage_t);
+  new_storage->message.data = (const char*)new_storage + message_offset;
   iree_status_t new_status =
       (iree_status_t)((uintptr_t)new_storage | (code & IREE_STATUS_CODE_MASK));
 
@@ -859,8 +902,7 @@ iree_status_freeze(iree_status_t status) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
   if (file) {
     new_storage->file = storage->file;
-    char* storage_file = (char*)new_storage + sizeof(iree_status_storage_t) +
-                         message_buffer_size;
+    char* storage_file = (char*)new_storage + file_offset;
     // Copy the file into the storage allocated for it.
     memcpy(storage_file, file, file_storage_size);
     new_storage->file = (const char*)storage_file;

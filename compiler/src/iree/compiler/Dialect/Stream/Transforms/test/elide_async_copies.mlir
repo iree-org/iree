@@ -1202,3 +1202,164 @@ util.func private @updateNotElided_chainedDifferentRegion(%size: index)
   // CHECK: util.return %[[UPDATED2]]
   util.return %updated2 : !stream.resource<*>
 }
+
+// -----
+
+// Tests that an update followed by a copy to a DIFFERENT region preserves the
+// update. This pattern occurs in tensor.concat lowering where:
+//   1. An output buffer is allocated
+//   2. First concat operand is written via update to [0, N)
+//   3. Second concat operand is written via copy to [N, M)
+// The copy's result aliases the entire target buffer, so downstream reads of
+// regions [0, N) must see the update's data.
+
+// CHECK-LABEL: @updateNotElided_followedByCopyToDifferentRegion
+// CHECK-SAME: (%[[SIZE:.+]]: index, %[[SRC:.+]]: !stream.resource<*>)
+util.func private @updateNotElided_followedByCopyToDifferentRegion(
+    %size: index, %copy_src: !stream.resource<*>)
+    -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // Allocate output buffer.
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<*>{%size}
+  // Create data to update into first region.
+  // CHECK: %[[UPDATE_SRC:.+]] = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%[[C4]]}
+  %update_src = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes [0, 4). This must NOT be elided because the copy's result
+  // aliases the entire buffer and downstream operations may read [0, 4).
+  // CHECK: %[[UPDATED:.+]] = stream.async.update %[[UPDATE_SRC]], %[[ALLOCA]][%[[C0]] to %[[C4]]]
+  %updated = stream.async.update %update_src, %alloca[%c0 to %c4]
+      : !stream.resource<*>{%c4} -> %alloca as !stream.resource<*>{%size}
+  // Copy writes [4, 8) - different region than update. The copy result aliases
+  // the full [0, 8) buffer, so reads of [0, 4) from copy result must see
+  // the update's data.
+  // CHECK: %[[COPIED:.+]] = stream.async.copy %[[SRC]][%[[C0]] to %[[C4]]], %[[UPDATED]][%[[C4]] to %[[C8]]], %[[C4]]
+  %copied = stream.async.copy %copy_src[%c0 to %c4], %updated[%c4 to %c8], %c4
+      : !stream.resource<*>{%size} -> %updated as !stream.resource<*>{%size}
+  // CHECK: util.return %[[COPIED]]
+  util.return %copied : !stream.resource<*>
+}
+
+// -----
+
+// Tests that an update followed by a copy to the SAME region allows elision.
+// When the copy fully overwrites the update region, the update's data is never
+// observable and can be safely elided.
+
+// CHECK-LABEL: @updateElided_followedByCopyToSameRegion
+// CHECK-SAME: (%[[SIZE:.+]]: index, %[[SRC:.+]]: !stream.resource<*>)
+util.func private @updateElided_followedByCopyToSameRegion(
+    %size: index, %copy_src: !stream.resource<*>)
+    -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // Allocate output buffer.
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<*>{%size}
+  // Create data to update into first region.
+  %update_src = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes [0, 4). This CAN be elided because the copy writes to the
+  // exact same region, fully overwriting the update's data.
+  // CHECK-NOT: stream.async.update
+  %updated = stream.async.update %update_src, %alloca[%c0 to %c4]
+      : !stream.resource<*>{%c4} -> %alloca as !stream.resource<*>{%size}
+  // Copy writes [0, 4) - same region as update, fully overwrites.
+  // CHECK: %[[COPIED:.+]] = stream.async.copy %[[SRC]][%[[C0]] to %[[C4]]], %[[ALLOCA]][%[[C0]] to %[[C4]]], %[[C4]]
+  %copied = stream.async.copy %copy_src[%c0 to %c4], %updated[%c0 to %c4], %c4
+      : !stream.resource<*>{%size} -> %updated as !stream.resource<*>{%size}
+  // CHECK: util.return %[[COPIED]]
+  util.return %copied : !stream.resource<*>
+}
+
+// -----
+
+// Tests that an update followed by a tied dispatch preserves the update.
+// Unlike copy operations which are write-only to the target, dispatch
+// operations have read-write semantics (they read the tied operand before
+// writing). This means the dispatch would read the update's data, making
+// elision unsafe regardless of whether the regions match.
+
+stream.executable private @ex_dispatch {
+  stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @updateNotElided_followedByTiedDispatch
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+util.func private @updateNotElided_followedByTiedDispatch(
+    %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // Allocate output buffer.
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<*>{%size}
+  // Create data to update into first region.
+  // CHECK: %[[UPDATE_SRC:.+]] = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%[[C4]]}
+  %update_src = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes [0, 4). This must NOT be elided because the dispatch reads
+  // the tied operand (read-write semantics) before writing to it.
+  // CHECK: %[[UPDATED:.+]] = stream.async.update %[[UPDATE_SRC]], %[[ALLOCA]][%[[C0]] to %[[C4]]]
+  %updated = stream.async.update %update_src, %alloca[%c0 to %c4]
+      : !stream.resource<*>{%c4} -> %alloca as !stream.resource<*>{%size}
+  // Dispatch has read-write semantics on tied operand.
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @ex_dispatch::@dispatch[%c1](%[[UPDATED]][%[[C0]] to %[[C4]] for %[[C4]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[UPDATED]]{%[[SIZE]]}
+  %dispatch = stream.async.dispatch @ex_dispatch::@dispatch[%c1](%updated[%c0 to %c4 for %c4]) : (!stream.resource<*>{%size}) -> %updated{%size}
+  // CHECK: util.return %[[DISPATCH]]
+  util.return %dispatch : !stream.resource<*>
+}
+
+// -----
+
+// Missed optimization: Copy writes to [0, 16) which fully contains the update
+// region [4, 8), so the update could theoretically be elided. However, we
+// currently only check for exact range matches, not supersets. This is
+// conservative (safe) behavior - improving this would require integer range
+// analysis to prove containment.
+// CHECK-LABEL: @updateNotElided_copyWritesSupersetRegion
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+util.func private @updateNotElided_copyWritesSupersetRegion(
+    %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+  // Allocate output buffer.
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
+  %alloca = stream.async.alloca : !stream.resource<*>{%size}
+  // Create data to update into subregion [4, 8).
+  // CHECK: %[[UPDATE_SRC:.+]] = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%[[C4]]}
+  %update_src = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c4}
+  // Update writes to [4, 8). Not elided because copy writes superset [0, 16).
+  // CHECK: %[[UPDATED:.+]] = stream.async.update %[[UPDATE_SRC]], %[[ALLOCA]][%[[C4]] to %[[C8]]]
+  %updated = stream.async.update %update_src, %alloca[%c4 to %c8]
+      : !stream.resource<*>{%c4} -> %alloca as !stream.resource<*>{%size}
+  // Create source for copy that writes superset region [0, 16).
+  // CHECK: %[[COPY_SRC:.+]] = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%[[C16]]}
+  %copy_src = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c16}
+  // Copy writes [0, 16) which fully contains [4, 8) but we don't detect this.
+  // CHECK: %[[COPY:.+]] = stream.async.copy %[[COPY_SRC]][%[[C0]] to %[[C16]]], %[[UPDATED]][%[[C0]] to %[[C16]]], %[[C16]]
+  %copy = stream.async.copy %copy_src[%c0 to %c16], %updated[%c0 to %c16], %c16
+      : !stream.resource<*>{%c16} -> %updated as !stream.resource<*>{%size}
+  // CHECK: util.return %[[COPY]]
+  util.return %copy : !stream.resource<*>
+}

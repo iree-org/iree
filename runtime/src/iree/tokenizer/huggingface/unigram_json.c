@@ -62,16 +62,14 @@ static iree_status_t iree_tokenizer_unigram_entry_visitor(
 
     // Ensure buffer capacity.
     if (unescaped_length > parent->unescape_capacity) {
-      iree_host_size_t new_capacity = parent->unescape_capacity * 2;
-      if (new_capacity < unescaped_length) new_capacity = unescaped_length;
-      if (new_capacity < 256) new_capacity = 256;
-      status = iree_allocator_realloc(parent->allocator, new_capacity,
-                                      (void**)&parent->unescape_buffer);
+      status = iree_allocator_grow_array(
+          parent->allocator, iree_max(256, unescaped_length),
+          /*element_size=*/1, &parent->unescape_capacity,
+          (void**)&parent->unescape_buffer);
       if (!iree_status_is_ok(status)) {
         parent->status = status;
         return iree_status_from_code(IREE_STATUS_CANCELLED);
       }
-      parent->unescape_capacity = new_capacity;
     }
 
     status =
@@ -151,15 +149,13 @@ static iree_status_t iree_tokenizer_unigram_vocab_visitor(
   // Store score.
   if (ctx->current_index >= ctx->score_capacity) {
     // Grow scores array.
-    iree_host_size_t new_capacity = ctx->score_capacity * 2;
-    if (new_capacity < 1024) new_capacity = 1024;
-    status = iree_allocator_realloc(
-        ctx->allocator, new_capacity * sizeof(float), (void**)&ctx->scores);
+    status = iree_allocator_grow_array(ctx->allocator, /*min_capacity=*/1024,
+                                       sizeof(float), &ctx->score_capacity,
+                                       (void**)&ctx->scores);
     if (!iree_status_is_ok(status)) {
       ctx->status = status;
       return iree_status_from_code(IREE_STATUS_CANCELLED);
     }
-    ctx->score_capacity = new_capacity;
   }
   ctx->scores[ctx->current_index++] = entry_ctx.score;
 

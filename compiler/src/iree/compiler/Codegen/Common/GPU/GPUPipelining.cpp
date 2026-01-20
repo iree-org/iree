@@ -145,12 +145,12 @@ getPipelineStages(scf::ForOp forOp,
   // stage `maxDepth`. In order to have a correct scheduling even with back
   // edges we order stages in decreasing order.
   for (Operation &op : forOp.getBody()->getOperations()) {
-    if (!loadDep.count(&op) && !isa<scf::YieldOp>(op)) {
+    if (!loadDep.contains(&op) && !isa<scf::YieldOp>(op)) {
       ops.push_back(std::make_pair(&op, depth));
     }
   }
   for (Operation &op : forOp.getBody()->getOperations()) {
-    if (loadDep.count(&op)) {
+    if (loadDep.contains(&op)) {
       ops.push_back(std::make_pair(&op, 0));
     }
   }
@@ -347,7 +347,7 @@ struct MainLoopInfo {
   void vistMmaSyncOp(Operation *op, int kgroup) {
     // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
     // return.
-    if (seenMmaOps.count(op) || isa<scf::YieldOp>(op)) {
+    if (seenMmaOps.contains(op) || isa<scf::YieldOp>(op)) {
       return;
     }
 
@@ -474,7 +474,7 @@ struct MainLoopInfo {
             backwardSliceOfDependentOps(warpOperations[kgroup].lhsOperations,
                                         &op, forOp.getBody());
           }
-          if (warpOperations[kgroup].rhsOperations.count(&op)) {
+          if (warpOperations[kgroup].rhsOperations.contains(&op)) {
             backwardSliceOfDependentOps(warpOperations[kgroup].rhsOperations,
                                         &op, forOp.getBody());
           }
@@ -482,7 +482,7 @@ struct MainLoopInfo {
       }
       for (Operation &op : forOp.getBody()->getOperations()) {
         if (isa<nvgpu::MmaSyncOp>(&op)) {
-          if (warpOperations[kgroup].mmaOperations.count(&op)) {
+          if (warpOperations[kgroup].mmaOperations.contains(&op)) {
             backwardSliceOfDependentOps(warpOperations[kgroup].mmaOperations,
                                         &op, forOp.getBody());
           }
@@ -569,14 +569,14 @@ static void getNvidiaAmpereTensorCorePipeline(
     // Load the next kgroup into registers.
     for (Operation &op : forOp.getBody()->getOperations()) {
       if (mainloop.warpOperations[kgroup + 1].lhsOperations.count(&op) ||
-          mainloop.warpOperations[kgroup + 1].rhsOperations.count(&op)) {
+          mainloop.warpOperations[kgroup + 1].rhsOperations.contains(&op)) {
         ops.push_back(std::make_pair(&op, numStages - 1));
       }
     }
 
     // Issue mma.sync on previous loaded kgroup.
     for (Operation &op : forOp.getBody()->getOperations()) {
-      if (mainloop.warpOperations[kgroup].mmaOperations.count(&op)) {
+      if (mainloop.warpOperations[kgroup].mmaOperations.contains(&op)) {
         ops.push_back(std::make_pair(&op, numStages - 1));
       }
     }
@@ -590,7 +590,7 @@ static void getNvidiaAmpereTensorCorePipeline(
   // it at one place.
   // Schedule all cp.async and one cp.async.commit_group.
   for (Operation &op : forOp.getBody()->getOperations()) {
-    if (mainloop.copyGlobalToSharedOpDeps.count(&op)) {
+    if (mainloop.copyGlobalToSharedOpDeps.contains(&op)) {
       ops.push_back(std::make_pair(&op, 0 /*pipelineStage*/));
     }
   }
@@ -611,14 +611,14 @@ static void getNvidiaAmpereTensorCorePipeline(
   // into one stage ahead.
   for (Operation &op : forOp.getBody()->getOperations()) {
     if (mainloop.warpOperations[0].lhsOperations.count(&op) ||
-        mainloop.warpOperations[0].rhsOperations.count(&op)) {
+        mainloop.warpOperations[0].rhsOperations.contains(&op)) {
       ops.push_back(std::make_pair(&op, numStages - 2));
     }
   }
 
   // Issue mma.sync on for the last kgroup at the end of the mainloop.
   for (Operation &op : forOp.getBody()->getOperations()) {
-    if (mainloop.warpOperations[numKgroups - 1].mmaOperations.count(&op)) {
+    if (mainloop.warpOperations[numKgroups - 1].mmaOperations.contains(&op)) {
       ops.push_back(std::make_pair(&op, numStages - 1));
     }
   }

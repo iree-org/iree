@@ -1,0 +1,988 @@
+#!/bin/bash
+# Quickly compile and run C/C++ snippets against IREE runtime.
+#
+# Usage: iree-bazel-try [options] [files...] [-- program-args...]
+#
+# Examples:
+#   iree-bazel-try snippet.c
+#   echo 'int main() { return 0; }' | iree-bazel-try
+#   iree-bazel-try -e 'int main() { return 42; }' -c
+#   iree-bazel-try --dep //runtime/src/iree/vm test.c -- --help
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-try"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-try - Compile and run C/C++ snippets against IREE runtime
+
+Automatically infers dependencies from #include directives. Just write code
+with IREE headers and it figures out what deps are needed.
+
+USAGE
+    iree-bazel-try [options] [files...] [-- program-args...]
+
+OPTIONS
+    -n, --dry_run       Show the bazel command without executing
+    -v, --verbose       Show bazel commands, inferred deps, and temp paths
+    -h, --help          Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+
+INPUT (at least one required)
+    files...              C/C++ source files (multiple allowed)
+    -e, --execute=CODE    Inline code (repeatable, concatenated)
+    (stdin)               Reads from stdin if no files and no -e
+
+LANGUAGE
+    -x c                  Force C language (default for stdin)
+    -x c++                Force C++ language
+
+COMPILATION
+    --config=NAME         Bazel config (debug, asan, msan, tsan)
+    --copt=FLAG           Add compiler flag (repeatable)
+    --linkopt=FLAG        Add linker flag (repeatable)
+    --dep=LABEL           Add explicit Bazel dependency (repeatable)
+    --no_infer            Disable automatic dependency inference
+    --retry=N             Max build retries for dep fixing (default: 3)
+
+OUTPUT
+    -c, --compile_only  Compile but don't run (exit 0 on success)
+    -o, --output PATH   Copy binary to PATH after build
+
+DEBUG
+    --keep              Keep temp directory for inspection
+
+EXIT CODES
+    0                   Success (build/run completed)
+    1                   Build failed (compiler errors, missing deps)
+    N                   Program exit code (when running)
+
+===============================================================================
+QUICK EXPLORATION - Use C like you'd use Python
+===============================================================================
+
+The primary use case: quickly answer "what does this function do?" without
+writing BUILD files or hunting for dependencies.
+
+EXAMPLE: "What does iree_unicode_utf8_decode return for an emoji?"
+    $ iree-bazel-try -e '
+    #include "iree/base/internal/unicode.h"
+    #include <stdio.h>
+    int main() {
+      const char* emoji = "\xF0\x9F\x98\x80";  // U+1F600 grinning face
+      iree_string_view_t text = iree_make_cstring_view(emoji);
+      iree_host_size_t pos = 0;
+      uint32_t cp = iree_unicode_utf8_decode(text, &pos);
+      printf("Codepoint: U+%04X, bytes consumed: %zu\n", cp, pos);
+      return 0;
+    }'
+    Codepoint: U+1F600, bytes consumed: 4
+
+===============================================================================
+MORE EXAMPLES
+===============================================================================
+
+EXAMPLE: Minimal test (stdin)
+    $ echo 'int main() { return 0; }' | iree-bazel-try
+    (no output, exit code 0)
+
+EXAMPLE: Using IREE APIs (auto-infers deps)
+    $ iree-bazel-try -e '#include "iree/base/api.h"
+    #include <stdio.h>
+    int main() {
+      iree_status_t s = iree_ok_status();
+      printf("ok: %d\n", iree_status_is_ok(s));
+      return 0;
+    }'
+    ok: 1
+
+EXAMPLE: Compile-only mode
+    $ iree-bazel-try -c -e 'int main() { return 0; }'
+    (exit code 0)
+
+EXAMPLE: Pass arguments to program
+    $ iree-bazel-try -e '#include <stdio.h>
+    int main(int argc, char** argv) {
+      for (int i = 0; i < argc; i++) printf("%d: %s\n", i, argv[i]);
+      return 0;
+    }' -- --flag value
+    0: bazel-bin/.iree-bazel-try/.../snippet
+    1: --flag
+    2: value
+
+EXAMPLE: Multiple source files
+    $ echo 'int helper() { return 42; }' > helper.c
+    $ echo 'extern int helper(); int main() { return helper() - 42; }' > main.c
+    $ iree-bazel-try main.c helper.c
+    (exit code 0)
+
+EXAMPLE: C++ with custom flags (auto-detected from includes or use -x c++)
+    $ iree-bazel-try --copt=-std=c++17 -e '
+    #include <optional>
+    #include <stdio.h>
+    int main() {
+      std::optional<int> x = 42;
+      printf("%d\n", *x);
+      return 0;
+    }'
+    42
+
+EXAMPLE: Build with AddressSanitizer
+    $ iree-bazel-try --config=asan -e '
+    #include <stdlib.h>
+    int main() {
+      int* p = malloc(4);
+      free(p);
+      return *p;  // use-after-free
+    }'
+    ==ERROR: AddressSanitizer: heap-use-after-free...
+
+EXAMPLE: Verbose mode (shows deps and commands)
+    $ iree-bazel-try -v -c -e '#include "iree/hal/api.h"
+    int main() { return 0; }'
+    [iree-bazel-try] Inferred deps: //runtime/src/iree/hal
+    [iree-bazel-try] Building //.iree-bazel-try/...:snippet...
+
+===============================================================================
+MLIR TRANSFORM HARNESS - Quick compiler experiments
+===============================================================================
+
+For one-shot MLIR transforms without modifying the compiler. C++ auto-detected.
+
+EXAMPLE: Walk operations (analysis)
+    $ echo 'func.func @f() { return }' | iree-bazel-try -e '
+    #include "iree/compiler/Tools/MlirTransformHarness.h"
+    void xform(ModuleOp m) {
+      m.walk([](Operation *op) { llvm::outs() << op->getName() << "\n"; });
+    }
+    MLIR_TRANSFORM_MAIN_NO_PRINT(xform)
+    '
+    func.return
+    func.func
+    builtin.module
+
+EXAMPLE: Pattern rewrite (transform)
+    $ echo 'func.func @f(%a: i32) -> i32 {
+      %c0 = arith.constant 0 : i32
+      %r = arith.addi %a, %c0 : i32
+      return %r : i32
+    }' | iree-bazel-try -e '
+    #include "iree/compiler/Tools/MlirTransformHarness.h"
+    #include "mlir/Dialect/Arith/IR/Arith.h"
+    struct AddZero : OpRewritePattern<arith::AddIOp> {
+      using OpRewritePattern::OpRewritePattern;
+      LogicalResult matchAndRewrite(arith::AddIOp op, PatternRewriter &rw) const override {
+        if (auto c = op.getRhs().getDefiningOp<arith::ConstantIntOp>())
+          if (c.value() == 0) { rw.replaceOp(op, op.getLhs()); return success(); }
+        return failure();
+      }
+    };
+    MLIR_PATTERN_MAIN(AddZero)
+    '
+    (outputs transformed IR with addi removed)
+
+===============================================================================
+GTEST HARNESS - Quick runtime tests
+===============================================================================
+
+Run gtests without BUILD files. Includes status matchers. C++ auto-detected.
+
+EXAMPLE: Test with status matchers
+    $ iree-bazel-try -e '
+    #include "iree/testing/gtest_harness.h"
+    TEST(StatusTest, OkStatus) {
+      IREE_EXPECT_OK(iree_ok_status());
+      EXPECT_THAT(iree_ok_status(), IsOk());
+    }
+    TEST(StatusTest, ErrorStatus) {
+      EXPECT_THAT(iree_make_status(IREE_STATUS_INVALID_ARGUMENT),
+                  StatusIs(StatusCode::kInvalidArgument));
+    }
+    '
+
+===============================================================================
+GBENCHMARK HARNESS - Quick benchmarks
+===============================================================================
+
+Run Google Benchmark microbenchmarks. C++ auto-detected.
+
+EXAMPLE: Benchmark memory allocation
+    $ iree-bazel-try -e '
+    #include "iree/testing/gbenchmark_harness.h"
+    void BM_Alloc(benchmark::State& state) {
+      for (auto _ : state) {
+        void* p = NULL;
+        iree_allocator_malloc(iree_allocator_system(), 1024, &p);
+        DoNotOptimize(p);
+        iree_allocator_free(iree_allocator_system(), p);
+      }
+    }
+    BENCHMARK(BM_Alloc);
+    '
+
+===============================================================================
+AUTOMATIC DEPENDENCY INFERENCE
+===============================================================================
+
+The tool automatically scans source files for #include "iree/..." directives
+and infers the corresponding Bazel dependencies:
+
+    #include "iree/base/api.h"      -> //runtime/src/iree/base
+    #include "iree/hal/buffer.h"    -> //runtime/src/iree/hal
+    #include "iree/vm/module.h"     -> //runtime/src/iree/vm
+    #include "iree/io/file_handle.h" -> //runtime/src/iree/io
+
+If the build fails with missing symbols, the tool will attempt to find the
+correct dependency using bazel query and retry the build (up to --retry times).
+
+Use --no_infer to disable this and rely only on explicit --dep flags.
+
+AI AGENT INTEGRATION
+    --agent-md          Print a concise snippet for CLAUDE.md/AGENT.md files
+
+SEE ALSO
+    iree-bazel-build, iree-bazel-test, iree-bazel-run
+EOF
+}
+
+# Maximum number of cache slots to keep (LRU eviction beyond this).
+MAX_CACHE_SLOTS=8
+
+# Compute a hash for cache slot naming based on deps-affecting inputs.
+# Hash is based on #includes + explicit deps + build options + language (NOT source content).
+# This allows multiple runs with same deps config to share the cached BUILD.bazel.
+# Args: source_files array (via nameref), extra_deps array, copts array, linkopts array, language
+compute_cache_hash() {
+    local -n _source_files=${1}
+    local -n _extra_deps=${2}
+    local -n _copts=${3}
+    local -n _linkopts=${4}
+    local _language=${5:-c}
+    {
+        # Hash language (determines file extension and compilation mode).
+        printf 'language:%s\n' "${_language}"
+        # Hash #include directives (determines inferred deps).
+        printf 'includes:\n'
+        for src in "${_source_files[@]}"; do
+            grep -h '#include\s*"[^"]*"' "${src}" 2>/dev/null | \
+                sed 's/.*#include\s*"\([^"]*\)".*/\1/' | \
+                grep -E '^(iree/|llvm/|mlir/)'
+        done | sort -u
+        # Hash explicit deps (user-provided --dep flags).
+        printf 'extra_deps:\n'
+        printf '%s\n' "${_extra_deps[@]}" | sort -u
+        # Hash build options that affect BUILD.bazel.
+        printf 'copts:\n'
+        printf '%s\n' "${_copts[@]}" | sort -u
+        printf 'linkopts:\n'
+        printf '%s\n' "${_linkopts[@]}" | sort -u
+    } | md5sum | cut -c1-12
+}
+
+# Ensure cache doesn't exceed MAX_CACHE_SLOTS by evicting oldest slots.
+# Uses mtime for LRU ordering (we touch slots on use).
+enforce_cache_limit() {
+    local cache_dir="${1}"
+    if [[ ! -d "${cache_dir}" ]]; then
+        return
+    fi
+    local slot_count
+    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    if [[ "${slot_count}" -gt "${MAX_CACHE_SLOTS}" ]]; then
+        local excess=$((slot_count - MAX_CACHE_SLOTS))
+        iree_debug "Cache has ${slot_count} slots, evicting ${excess} oldest"
+        # Find oldest directories by mtime and remove them.
+        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | \
+            sort -n | head -n "${excess}" | cut -d' ' -f2- | \
+            while read -r old_slot; do
+                rm -rf "${old_slot}"
+                iree_debug "Evicted cache slot: ${old_slot}"
+            done
+    fi
+}
+
+# Infer Bazel deps from #include directives in source files.
+# Uses bazel query attr(hdrs, pattern) to find targets that export each header.
+# Outputs one dep per line.
+infer_deps_from_sources() {
+    local -a sources=("$@")
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
+    local -a runtime_patterns=()
+    local -a compiler_patterns=()
+    local -a llvm_files=()
+    local -a mlir_files=()
+
+    # Collect all headers from all source files.
+    for src in "${sources[@]}"; do
+        if [[ ! -f "${src}" ]]; then
+            continue
+        fi
+
+        # Extract all #include "..." directives.
+        while IFS= read -r header; do
+            local dir_path="${header%/*}"
+            local filename="${header##*/}"
+
+            case "${header}" in
+                iree/compiler/*)
+                    # Pattern: iree/compiler/Foo/Bar:file.h (use path for specificity).
+                    compiler_patterns+=("${dir_path}:${filename}")
+                    ;;
+                iree/*)
+                    # Pattern: iree/base:api.h or iree/base/internal:unicode.h.
+                    runtime_patterns+=("${dir_path}:${filename}")
+                    ;;
+                llvm/*)
+                    # LLVM uses different structure, just use filename.
+                    llvm_files+=("${filename}")
+                    ;;
+                mlir/*)
+                    # MLIR uses different structure, just use filename.
+                    mlir_files+=("${filename}")
+                    ;;
+            esac
+        done < <(grep -h '#include\s*"[^"]*"' "${src}" 2>/dev/null | \
+                 sed 's/.*#include\s*"\([^"]*\)".*/\1/' | \
+                 grep -E '^(iree/|llvm/|mlir/)')
+    done
+
+    # Query each category using attr(hdrs, pattern) - handles all package structures.
+    local -a all_deps=()
+
+    if [[ ${#runtime_patterns[@]} -gt 0 ]]; then
+        iree_debug "Querying deps for ${#runtime_patterns[@]} runtime headers..."
+        local pattern
+        pattern=$(printf '%s\n' "${runtime_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //runtime/src/iree/...)" 2>/dev/null)
+    fi
+
+    if [[ ${#compiler_patterns[@]} -gt 0 ]]; then
+        iree_debug "Querying deps for ${#compiler_patterns[@]} compiler headers..."
+        local pattern
+        pattern=$(printf '%s\n' "${compiler_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //compiler/src/iree/compiler/...)" 2>/dev/null)
+    fi
+
+    if [[ ${#llvm_files[@]} -gt 0 ]]; then
+        iree_debug "Querying deps for ${#llvm_files[@]} LLVM headers..."
+        local pattern
+        pattern=$(printf '%s\n' "${llvm_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//llvm/...)" 2>/dev/null)
+    fi
+
+    if [[ ${#mlir_files[@]} -gt 0 ]]; then
+        iree_debug "Querying deps for ${#mlir_files[@]} MLIR headers..."
+        local pattern
+        pattern=$(printf '%s\n' "${mlir_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
+        while IFS= read -r dep; do
+            [[ -n "${dep}" ]] && all_deps+=("${dep}")
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//mlir/...)" 2>/dev/null)
+    fi
+
+    # Output unique deps.
+    printf '%s\n' "${all_deps[@]}" | sort -u
+}
+
+# Try to find a dep for a missing symbol using bazel query.
+# This is called when build fails.
+find_dep_for_symbol() {
+    local symbol="${1}"
+    local worktree="${2}"
+
+    # Search for the symbol in IREE runtime sources.
+    local matches
+    matches=$(grep -rl "^[^/]*\b${symbol}\b" "${worktree}/runtime/src/iree/" 2>/dev/null | head -5)
+
+    for match in ${matches}; do
+        # Convert file path to bazel package.
+        local rel_path="${match#${worktree}/}"
+        local dir_path="${rel_path%/*}"
+        echo "//${dir_path}"
+        return 0
+    done
+
+    return 1
+}
+
+# Parse build errors and suggest missing deps.
+# Returns deps to add, one per line.
+parse_build_errors() {
+    local log_file="${1}"
+    local worktree="${2}"
+    local -A suggested_deps
+
+    # Look for undefined reference errors.
+    while IFS= read -r symbol; do
+        if [[ -n "${symbol}" ]]; then
+            local dep
+            if dep=$(find_dep_for_symbol "${symbol}" "${worktree}" 2>/dev/null); then
+                if [[ -z "${suggested_deps[${dep}]:-}" ]]; then
+                    suggested_deps[${dep}]=1
+                    echo "${dep}"
+                fi
+            fi
+        fi
+    done < <(grep -o "undefined reference to \`[^']*'" "${log_file}" 2>/dev/null | \
+             sed "s/undefined reference to \`\\([^']*\\)'/\\1/")
+
+    # Look for missing header errors.
+    while IFS= read -r header; do
+        if [[ "${header}" == iree/* ]]; then
+            local package="${header%/*}"
+            # Simplify to top-level package.
+            local component="${package#iree/}"
+            component="${component%%/*}"
+            local dep="//runtime/src/iree/${component}"
+            if [[ -z "${suggested_deps[${dep}]:-}" ]]; then
+                suggested_deps[${dep}]=1
+                echo "${dep}"
+            fi
+        fi
+    done < <(grep -o "fatal error: '[^']*' file not found" "${log_file}" 2>/dev/null | \
+             sed "s/fatal error: '\\([^']*\\)' file not found/\\1/")
+}
+
+# Main script.
+DRY_RUN=0
+COMPILE_ONLY=0
+KEEP_TEMP=0
+INFER_DEPS=1
+MAX_RETRIES=3
+OUTPUT_PATH=""
+LANGUAGE=""
+INLINE_CODE=""
+declare -a SOURCE_FILES=()
+declare -a EXTRA_DEPS=()
+declare -a COPTS=()
+declare -a LINKOPTS=()
+declare -a BAZEL_ARGS=()
+declare -a PROGRAM_ARGS=()
+
+# Parse arguments.
+PARSING_PROGRAM_ARGS=0
+while [[ $# -gt 0 ]]; do
+    if [[ "${PARSING_PROGRAM_ARGS}" == "1" ]]; then
+        PROGRAM_ARGS+=("${1}")
+        shift
+        continue
+    fi
+
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -c|--compile_only|--compile_only)
+            COMPILE_ONLY=1
+            shift
+            ;;
+        --keep)
+            KEEP_TEMP=1
+            shift
+            ;;
+        --no_infer|--no_infer)
+            INFER_DEPS=0
+            shift
+            ;;
+        --retry)
+            MAX_RETRIES="${2}"
+            shift 2
+            ;;
+        --retry=*)
+            MAX_RETRIES="${1#--retry=}"
+            shift
+            ;;
+        -o|--output)
+            OUTPUT_PATH="${2}"
+            shift 2
+            ;;
+        --output=*)
+            OUTPUT_PATH="${1#--output=}"
+            shift
+            ;;
+        -x)
+            LANGUAGE="${2}"
+            shift 2
+            ;;
+        -e|--execute)
+            INLINE_CODE="${INLINE_CODE}${2}"$'\n'
+            shift 2
+            ;;
+        --execute=*)
+            INLINE_CODE="${INLINE_CODE}${1#--execute=}"$'\n'
+            shift
+            ;;
+        --dep)
+            EXTRA_DEPS+=("${2}")
+            shift 2
+            ;;
+        --dep=*)
+            EXTRA_DEPS+=("${1#--dep=}")
+            shift
+            ;;
+        --copt)
+            COPTS+=("${2}")
+            shift 2
+            ;;
+        --copt=*)
+            COPTS+=("${1#--copt=}")
+            shift
+            ;;
+        --linkopt)
+            LINKOPTS+=("${2}")
+            shift 2
+            ;;
+        --linkopt=*)
+            LINKOPTS+=("${1#--linkopt=}")
+            shift
+            ;;
+        --config=*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        --)
+            PARSING_PROGRAM_ARGS=1
+            shift
+            ;;
+        -*)
+            iree_error "Unknown option: ${1}"
+            echo "Use --help for usage information."
+            exit 1
+            ;;
+        *)
+            SOURCE_FILES+=("${1}")
+            shift
+            ;;
+    esac
+done
+
+# Find worktree root.
+iree_require_worktree
+cd "${IREE_BAZEL_WORKTREE_DIR}"
+iree_ensure_configured
+
+# Prepend default configs to bazel args.
+iree_bazel_build_default_configs
+BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
+
+# Determine input source.
+HAS_STDIN=0
+if [[ -z "${INLINE_CODE}" ]] && [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
+    # Check if stdin has data.
+    if [[ -t 0 ]]; then
+        iree_error "No input provided. Specify files, use -e, or pipe to stdin."
+        echo "Use --help for usage information."
+        exit 1
+    fi
+    HAS_STDIN=1
+fi
+
+# Set up base directory (ignored via .gitignore).
+TRY_BASE="${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+CACHE_DIR="${TRY_BASE}/cache"
+STAGING_DIR="${TRY_BASE}/staging_$$"
+
+# Create staging directory for source files (needed for deps inference).
+mkdir -p "${STAGING_DIR}"
+
+# Cleanup staging on exit (cache slots are kept).
+cleanup_staging() {
+    if [[ -n "${STAGING_DIR}" ]] && [[ -d "${STAGING_DIR}" ]]; then
+        rm -rf "${STAGING_DIR}"
+    fi
+}
+trap cleanup_staging EXIT
+
+# Collect source files in staging directory.
+declare -a BUILD_SRCS=()
+declare -a STAGED_SOURCE_PATHS=()
+
+# Read stdin into variable if needed (so we can scan it for auto-detection).
+STDIN_CONTENT=""
+if [[ "${HAS_STDIN}" == "1" ]]; then
+    STDIN_CONTENT=$(cat)
+fi
+
+# Auto-detect C++ from includes if language not explicitly set.
+# C++-only headers: llvm/, mlir/, iree/compiler/, iree/testing/, gtest/, gmock/, benchmark/
+ALL_CODE="${INLINE_CODE}${STDIN_CONTENT}"
+if [[ -z "${LANGUAGE}" ]]; then
+    if echo "${ALL_CODE}" | grep -qE '#include\s*[<"](llvm/|mlir/|iree/compiler/|iree/testing/|gtest/|gmock/|benchmark/)'; then
+        LANGUAGE="c++"
+        iree_debug "Auto-detected C++ from includes"
+    else
+        LANGUAGE="c"
+    fi
+fi
+
+
+# Handle inline code.
+if [[ -n "${INLINE_CODE}" ]]; then
+    if [[ "${LANGUAGE}" == "c++" ]]; then
+        INLINE_FILE="${STAGING_DIR}/inline.cc"
+    else
+        INLINE_FILE="${STAGING_DIR}/inline.c"
+    fi
+    printf '%s' "${INLINE_CODE}" > "${INLINE_FILE}"
+    BUILD_SRCS+=("$(basename "${INLINE_FILE}")")
+    STAGED_SOURCE_PATHS+=("${INLINE_FILE}")
+    iree_debug "Wrote inline code to ${INLINE_FILE}"
+fi
+
+# Handle stdin.
+if [[ -n "${STDIN_CONTENT}" ]]; then
+    if [[ "${LANGUAGE}" == "c++" ]]; then
+        STDIN_FILE="${STAGING_DIR}/stdin.cc"
+    else
+        STDIN_FILE="${STAGING_DIR}/stdin.c"
+    fi
+    printf '%s' "${STDIN_CONTENT}" > "${STDIN_FILE}"
+    BUILD_SRCS+=("$(basename "${STDIN_FILE}")")
+    STAGED_SOURCE_PATHS+=("${STDIN_FILE}")
+    iree_debug "Wrote stdin to ${STDIN_FILE}"
+fi
+
+# Handle source files.
+for src in "${SOURCE_FILES[@]}"; do
+    if [[ ! -f "${src}" ]]; then
+        iree_error "Source file not found: ${src}"
+        exit 1
+    fi
+    # Copy to staging dir.
+    cp "${src}" "${STAGING_DIR}/"
+    BUILD_SRCS+=("$(basename "${src}")")
+    STAGED_SOURCE_PATHS+=("${STAGING_DIR}/$(basename "${src}")")
+    iree_debug "Staged ${src}"
+done
+
+# Determine if this is C++.
+IS_CPP=0
+if [[ "${LANGUAGE}" == "c++" ]]; then
+    IS_CPP=1
+else
+    for src in "${BUILD_SRCS[@]}"; do
+        case "${src}" in
+            *.cc|*.cpp|*.cxx|*.C)
+                IS_CPP=1
+                break
+                ;;
+        esac
+    done
+fi
+
+# Compute cache hash BEFORE deps inference.
+# Hash is based on #includes + explicit deps + build options + language (NOT source content).
+# This allows runs with same deps config to share BUILD.bazel analysis cache.
+CACHE_HASH=$(compute_cache_hash STAGED_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "${LANGUAGE}")
+SLOT_DIR="${CACHE_DIR}/${CACHE_HASH}"
+LOCK_FILE="${CACHE_DIR}/${CACHE_HASH}.lock"
+
+# Ensure cache directory exists.
+mkdir -p "${CACHE_DIR}"
+
+# Acquire exclusive lock on this slot to prevent parallel runs from clobbering.
+# Lock is released automatically when the script exits.
+exec 9>"${LOCK_FILE}"
+if ! flock -w 60 9; then
+    iree_error "Timeout waiting for lock on cache slot ${CACHE_HASH}"
+    exit 1
+fi
+iree_debug "Acquired lock on slot ${CACHE_HASH}"
+
+# Check cache AFTER acquiring lock (another process may have created it while we waited).
+CACHE_HIT=0
+if [[ -d "${SLOT_DIR}" ]] && [[ -f "${SLOT_DIR}/BUILD.bazel" ]]; then
+    CACHE_HIT=1
+    iree_debug "Cache hit: reusing slot ${CACHE_HASH} (skipping deps inference)"
+fi
+
+# Only infer deps on cache miss.
+declare -A DEPS_MAP=()
+declare -a DEPS=()
+
+if [[ "${CACHE_HIT}" == "0" ]]; then
+    # Infer deps from source files (expensive bazel query).
+    declare -a INFERRED_DEPS=()
+    if [[ "${INFER_DEPS}" == "1" ]]; then
+        while IFS= read -r dep; do
+            if [[ -n "${dep}" ]]; then
+                INFERRED_DEPS+=("${dep}")
+            fi
+        done < <(infer_deps_from_sources "${STAGED_SOURCE_PATHS[@]}")
+
+        if [[ ${#INFERRED_DEPS[@]} -gt 0 ]]; then
+            iree_debug "Inferred deps: ${INFERRED_DEPS[*]}"
+        fi
+    fi
+
+    # Build deps list (inferred + explicit, deduplicated).
+    for dep in "${INFERRED_DEPS[@]}"; do
+        if [[ -z "${DEPS_MAP[${dep}]:-}" ]]; then
+            DEPS_MAP[${dep}]=1
+            DEPS+=("${dep}")
+        fi
+    done
+
+    for dep in "${EXTRA_DEPS[@]}"; do
+        if [[ -z "${DEPS_MAP[${dep}]:-}" ]]; then
+            DEPS_MAP[${dep}]=1
+            DEPS+=("${dep}")
+        fi
+    done
+
+    # If no deps at all, add base as minimum.
+    if [[ ${#DEPS[@]} -eq 0 ]]; then
+        DEPS+=("//runtime/src/iree/base")
+    fi
+fi
+
+# Function to generate BUILD.bazel file.
+generate_build_file() {
+    local build_file="${1}"
+    shift
+    local -a deps=("$@")
+
+    {
+        echo '# Auto-generated by iree-bazel-try'
+        echo ''
+        echo 'cc_binary('
+        echo '    name = "snippet",'
+        echo '    testonly = True,'
+        printf '    srcs = ['
+        local first=1
+        for src in "${BUILD_SRCS[@]}"; do
+            if [[ "${first}" == "1" ]]; then
+                first=0
+            else
+                printf ', '
+            fi
+            printf '"%s"' "${src}"
+        done
+        printf '],\n'
+        printf '    deps = [\n'
+        for dep in "${deps[@]}"; do
+            printf '        "%s",\n' "${dep}"
+        done
+        printf '    ],\n'
+        if [[ ${#COPTS[@]} -gt 0 ]]; then
+            printf '    copts = ['
+            first=1
+            for opt in "${COPTS[@]}"; do
+                if [[ "${first}" == "1" ]]; then
+                    first=0
+                else
+                    printf ', '
+                fi
+                printf '"%s"' "${opt}"
+            done
+            printf '],\n'
+        fi
+        if [[ ${#LINKOPTS[@]} -gt 0 ]]; then
+            printf '    linkopts = ['
+            first=1
+            for opt in "${LINKOPTS[@]}"; do
+                if [[ "${first}" == "1" ]]; then
+                    first=0
+                else
+                    printf ', '
+                fi
+                printf '"%s"' "${opt}"
+            done
+            printf '],\n'
+        fi
+        echo ')'
+    } > "${build_file}"
+}
+
+# Set up cache slot.
+if [[ "${CACHE_HIT}" == "0" ]]; then
+    iree_debug "Cache miss: creating slot ${CACHE_HASH}"
+    mkdir -p "${SLOT_DIR}"
+
+    # Generate BUILD.bazel for new slot.
+    BUILD_FILE="${SLOT_DIR}/BUILD.bazel"
+    generate_build_file "${BUILD_FILE}" "${DEPS[@]}"
+
+    iree_debug "Generated BUILD.bazel:"
+    if [[ "${IREE_BAZEL_VERBOSE}" == "1" ]]; then
+        cat "${BUILD_FILE}" | sed 's/^/    /' >&2
+    fi
+fi
+
+# Copy source files from staging to cache slot.
+for staged_file in "${STAGED_SOURCE_PATHS[@]}"; do
+    cp "${staged_file}" "${SLOT_DIR}/"
+done
+
+# Touch the slot directory to update mtime for LRU tracking.
+touch "${SLOT_DIR}"
+
+# Enforce cache size limit (evict old slots if needed).
+enforce_cache_limit "${CACHE_DIR}"
+
+if [[ "${KEEP_TEMP}" == "1" ]]; then
+    iree_info "Cache slot: ${SLOT_DIR}"
+fi
+
+# Build the target with retry logic.
+TARGET="//.iree-bazel-try/cache/${CACHE_HASH}:snippet"
+BUILD_LOG="${SLOT_DIR}/build.log"
+
+do_build() {
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
+    if iree_is_verbose; then
+        # Verbose mode: show everything, also save to log for retry logic.
+        "${BAZEL_BIN}" build "${TARGET}" "${BAZEL_ARGS[@]}" 2>&1 | tee "${BUILD_LOG}"
+        return "${PIPESTATUS[0]}"
+    else
+        # Quiet mode: capture output, only show on failure.
+        # Force colors since we'll display to terminal on failure.
+        if "${BAZEL_BIN}" build --color=yes "${TARGET}" "${BAZEL_ARGS[@]}" >"${BUILD_LOG}" 2>&1; then
+            return 0
+        else
+            local exit_code=$?
+            cat "${BUILD_LOG}" >&2
+            return ${exit_code}
+        fi
+    fi
+}
+
+build_with_retry() {
+    local attempt=1
+    local current_deps=("${DEPS[@]}")
+
+    while [[ ${attempt} -le ${MAX_RETRIES} ]]; do
+        iree_debug "Build attempt ${attempt}/${MAX_RETRIES}"
+
+        if do_build; then
+            return 0
+        fi
+
+        # Build failed - try to find missing deps.
+        if [[ "${INFER_DEPS}" == "0" ]]; then
+            # User disabled inference, don't retry.
+            return 1
+        fi
+
+        local new_deps_found=0
+        while IFS= read -r new_dep; do
+            if [[ -n "${new_dep}" ]] && [[ -z "${DEPS_MAP[${new_dep}]:-}" ]]; then
+                iree_warn "Adding inferred dep: ${new_dep}"
+                DEPS_MAP[${new_dep}]=1
+                current_deps+=("${new_dep}")
+                new_deps_found=1
+            fi
+        done < <(parse_build_errors "${BUILD_LOG}" "${IREE_BAZEL_WORKTREE_DIR}")
+
+        if [[ "${new_deps_found}" == "0" ]]; then
+            # No new deps to try, give up.
+            iree_error "Build failed and no additional deps could be inferred"
+            return 1
+        fi
+
+        # Regenerate BUILD file with new deps.
+        generate_build_file "${BUILD_FILE}" "${current_deps[@]}"
+        iree_debug "Regenerated BUILD.bazel with new deps"
+
+        attempt=$((attempt + 1))
+    done
+
+    iree_error "Build failed after ${MAX_RETRIES} attempts"
+    return 1
+}
+
+if [[ "${COMPILE_ONLY}" == "1" ]] || [[ -n "${OUTPUT_PATH}" ]]; then
+    # Dry run: show what would be built and exit.
+    if [[ "${DRY_RUN}" == "1" ]]; then
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]}"
+        iree_info "Deps: ${DEPS[*]}"
+        exit 0
+    fi
+
+    iree_debug "Building ${TARGET}..."
+
+    if ! build_with_retry; then
+        exit 1
+    fi
+
+    # Copy output if requested.
+    if [[ -n "${OUTPUT_PATH}" ]]; then
+        BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
+        if [[ -f "${BINARY_PATH}" ]]; then
+            cp "${BINARY_PATH}" "${OUTPUT_PATH}"
+            chmod +x "${OUTPUT_PATH}"
+            iree_info "Binary saved to: ${OUTPUT_PATH}"
+        else
+            iree_error "Could not find built binary at ${BINARY_PATH}"
+            exit 1
+        fi
+    fi
+
+    if [[ "${COMPILE_ONLY}" == "1" ]]; then
+        iree_debug "Build successful"
+        exit 0
+    fi
+fi
+
+# Run the target.
+# Dry run: show what would be run and exit.
+if [[ "${DRY_RUN}" == "1" ]]; then
+    if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
+    else
+        iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary>"
+    fi
+    iree_info "Deps: ${DEPS[*]}"
+    iree_info "Run directory: ${IREE_BAZEL_ORIG_CWD}"
+    exit 0
+fi
+
+iree_debug "Running ${TARGET}..."
+
+# Build first (using retry logic).
+if ! build_with_retry; then
+    exit 1
+fi
+
+# Get the binary path and run from original directory.
+# We know the exact structure since we generate the BUILD file, so we can
+# compute the path directly instead of calling bazel cquery (saves ~500ms).
+BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
+if [[ ! -x "${BINARY_PATH}" ]]; then
+    iree_error "Could not find built binary at ${BINARY_PATH}"
+    exit 1
+fi
+
+iree_debug "Binary: ${BINARY_PATH}"
+iree_debug "Running from: ${IREE_BAZEL_ORIG_CWD}"
+
+cd "${IREE_BAZEL_ORIG_CWD}"
+exec "${BINARY_PATH}" "${PROGRAM_ARGS[@]}"

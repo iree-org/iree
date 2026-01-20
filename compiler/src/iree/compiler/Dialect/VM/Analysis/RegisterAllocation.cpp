@@ -169,7 +169,7 @@ sortBlocksInDominanceOrder(IREE::VM::FuncOp funcOp) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0) {
+    if (markedBlocks.contains(block)) {
       return;
     }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
@@ -732,7 +732,7 @@ struct FeedbackArcSet {
     llvm::SmallSetVector<NodeID, 8> unmarkedNodes = acyclicNodes;
     llvm::SmallSetVector<NodeID, 8> markedNodes;
     std::function<void(NodeID)> visit = [&](NodeID node) {
-      if (markedNodes.count(node) > 0) {
+      if (markedNodes.contains(node)) {
         return;
       }
       for (auto &edge : acyclicEdges) {

@@ -41,7 +41,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
       addressOfOps.push_back(addressOfOp);
     }
   });
-  if (addressOfOps.size() == 0) {
+  if (addressOfOps.empty()) {
     return;
   }
   OpBuilder builder(moduleOp);
@@ -408,7 +408,7 @@ struct ConvertIREEBindingSubspanOp final
 
     auto [strides, offset] = memrefType.getStridesAndOffset();
     if (memrefType.hasStaticShape() &&
-        !llvm::any_of(strides, ShapedType::isDynamic) &&
+        llvm::none_of(strides, ShapedType::isDynamic) &&
         ShapedType::isStatic(offset)) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);

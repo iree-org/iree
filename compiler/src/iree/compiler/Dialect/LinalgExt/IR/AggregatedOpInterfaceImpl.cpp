@@ -209,7 +209,7 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
 }
 
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
-                       AffineMap maskMap, Value qk, Value mask) {
+                       AffineMap maskMap, Value qk, Value mask, bool useExp2) {
 
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
@@ -245,9 +245,11 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
           // Scaling to compensate for base-2 softmax
-          Value log2e = arith::ConstantOp::create(
-              b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
-          maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          if (useExp2) {
+            Value log2e = arith::ConstantOp::create(
+                b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+            maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          }
         }
         // Finally, set the returned value to the qk element plus the mask
         // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
@@ -260,10 +262,10 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   return genericOp.getResult(0);
 }
 
-// Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
+// Compute output = exp2/exp(output - input) depending on useExp2 flag.
+static Value computeSubAndExp(OpBuilder &builder, Location loc,
+                              AffineMap inputMap, AffineMap outputMap,
+                              Value input, Value output, bool useExp2) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -279,7 +281,8 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = math::Exp2Op::create(b, loc, diff);
+        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
+                               : math::ExpOp::create(b, loc, diff).getResult();
         linalg::YieldOp::create(b, loc, weight);
       });
   return genericOp.getResult(0);
@@ -316,15 +319,18 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
                               std::optional<AffineMap> maskMap,
                               SmallVector<OpFoldResult> iterationDomain,
                               Type sElementType, Region &elementwiseRegion,
-                              DictionaryAttr qkAttrs, bool lowPrecision) {
+                              DictionaryAttr qkAttrs, bool lowPrecision,
+                              bool useExp2) {
   MLIRContext *ctx = b.getContext();
-  // Since we use exp2 for attention instead of the original exp, we have to
+  // If using exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
-  Value log2e = arith::ConstantOp::create(
-      b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = arith::MulFOp::create(b, loc, scale, log2e);
+  if (useExp2) {
+    Value log2e = arith::ConstantOp::create(
+        b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = arith::MulFOp::create(b, loc, scale, log2e);
+  }
 
   auto qETy = getElementTypeOrSelf(query.getType());
 
@@ -392,7 +398,7 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
 
   // S += mask
   if (mask != nullptr) {
-    s = applyMask(b, loc, sMap, *maskMap, s, mask.value());
+    s = applyMask(b, loc, sMap, *maskMap, s, mask.value(), useExp2);
   }
 
   return s;
@@ -436,9 +442,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(loc, b, query, key, getScale(), mask, qMap,
-                                    kMap, sMap, getMaskMap(), sizes, f32Type,
-                                    getRegion(), qkAttrs, lowPrecision);
+  Value s = computeQKAndElementwise(
+      loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
+      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true);
 
   // ---- Softmax ----
 
@@ -480,7 +486,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
   // P = exp2(S - max)
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, max, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, /*useExp2=*/true);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -530,9 +536,13 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   DictionaryAttr config = getDecompositionConfigAttr();
 
   DictionaryAttr qkAttrs, pvAttrs;
+  bool useExp2 = true;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr())) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -553,7 +563,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // ---- QK Matmul + elementwise math ----
   Value s = computeQKAndElementwise(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision);
+      sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -563,20 +573,21 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap maxMap = getMaxMap();
   Value newMax = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
 
-  // norm = exp2(oldMax - newMax)
+  // norm = exp2(oldMax - newMax) or exp(oldMax - newMax) depending on useExp2
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm =
+      computeSubAndExp(b, loc, maxMap, normMap, newMax, oldMax, useExp2);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap,
                                                          normMap, oldSum, norm);
 
-  // P = exp2(S - newMax)
+  // P = exp2(S - newMax) or exp(S - newMax) depending on useExp2
   // PMap = SMap
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, newMax, s, useExp2);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
@@ -1211,11 +1222,11 @@ FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
   Value currMax = reduce<arith::MaximumFOp>(
       rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
   // ex = e^{sValue - curr_max}
-  Value ex = computeSubAndExp2(rewriter, loc, prevMaxMap, normValMap, currMax,
-                               sValue->get());
+  Value ex = computeSubAndExp(rewriter, loc, prevMaxMap, normValMap, currMax,
+                              sValue->get(), /*useExp2=*/true);
   // norm = e^(prev_max - curr_max)
-  Value norm = computeSubAndExp2(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
-                                 prevMax->get());
+  Value norm = computeSubAndExp(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
+                                prevMax->get(), /*useExp2=*/true);
 
   SmallVector<Value> inputs = getDpsInputs();
   SmallVector<Value> normOuts(getNumDpsInits());

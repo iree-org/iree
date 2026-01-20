@@ -175,7 +175,7 @@ public:
                              int successorIndex) override {
     // Reserve space for the block offset. It will get fixed up when we are all
     // done and know all of the block offsets.
-    blockOffsetFixups_.push_back({targetBlock, bytecode_.size()});
+    blockOffsetFixups_.emplace_back(targetBlock, bytecode_.size());
     bytecode_.resize(bytecode_.size() + sizeof(int32_t));
 
     // Compute required remappings - we only need to emit them when the source
@@ -214,7 +214,7 @@ public:
   LogicalResult encodeBranchTarget(Block *targetBlock) override {
     // Reserve space for the block offset. It will get fixed up when we are all
     // done and know all of the block offsets.
-    blockOffsetFixups_.push_back({targetBlock, bytecode_.size()});
+    blockOffsetFixups_.emplace_back(targetBlock, bytecode_.size());
     bytecode_.resize(bytecode_.size() + sizeof(int32_t));
     return success();
   }

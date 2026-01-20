@@ -99,9 +99,21 @@ def ConvertBf16ToUInt16BuffersPass :
 def ConvertUnsupportedFloatArithPass
     : InterfacePass<"iree-convert-unsupported-float-arith",
                     "mlir::FunctionOpInterface"> {
-  let summary = "Convert arith operations on unsupported(source types) float "
-                "types to the target type. Populates the source and target "
-                "based on the target architecture.";
+  let summary = "Emulate arith operations on unsupported float types (e.g., fp8).";
+  let description = [{
+    Emulates floating-point operations on types not natively supported by the
+    target backend. The pass:
+
+    1. Wraps unsupported float operations with extf/truncf pairs to perform
+       arithmetic in a supported type (e.g., f32).
+
+    2. For CPU targets, emulates extf/truncf operations themselves using integer
+       bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.
+
+    The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
+    IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
+    NaN, Inf, and special encodings (FNUZ types).
+  }];
 }
 
 def ConvertToDestinationPassingStylePass :
@@ -496,6 +508,11 @@ def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "Modu
   }];
 }
 
+def FlattenSwizzleHintAllocsPass :
+    InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
+}
+
 def FoldAffineMinInDistributedLoopsPass :
   InterfacePass<"iree-codegen-fold-affinemin-in-distributed-loops", "mlir::FunctionOpInterface"> {
   let summary = "Fold `affine.min` ops in distributed loops";
@@ -879,6 +896,21 @@ def PropagateReshapesByExpansionPass :
 def RematerializeParallelOpsPass :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
+}
+
+def RemoveIndexHintsPass :
+    InterfacePass<"iree-codegen-remove-index-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Remove iree_codegen.index_hint operations";
+  let description = [{
+    This pass removes all iree_codegen.index_hint operations by replacing
+    them with their input values (pass-through semantics).
+
+    Index hints are used to convey optimization information to downstream
+    passes and should be cleaned up once that information has been consumed.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect"
+  ];
 }
 
 def RemoveSingleIterationLoopPass :

@@ -47,6 +47,11 @@ jobs:
             numprocesses: 1
             config-file: onnx_ops_gpu_hip_rdna3_O3.json
             runs-on: [Linux, X64, gfx1100]
+          # TODO(#23160): Fix the onnx ops test suite for gfx1201.
+          # - name: amdgpu_hip_rdna4_O3
+          #   numprocesses: 1
+          #   config-file: onnx_ops_gpu_hip_rdna4_O3.json
+          #   runs-on: [Linux, X64, gfx1201]
           - name: amdgpu_vulkan_O0
             numprocesses: 1
             config-file: onnx_ops_gpu_vulkan_O0.json
@@ -103,13 +108,16 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: dc50625f4ac9d561f52ced410b8470b8168ed8a1
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
           path: iree-test-suites
       - name: Install ONNX ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/onnx_ops/requirements.txt
       - name: Run ONNX ops test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/onnx_ops/ \
@@ -154,6 +162,9 @@ jobs:
           - name: amdgpu_hip_rdna3
             config-file: onnx_models_gpu_hip_rdna3.json
             runs-on: [Linux, X64, gfx1100, persistent-cache]
+          - name: amdgpu_hip_rdna4
+            config-file: onnx_models_gpu_hip_rdna4.json
+            runs-on: [Linux, X64, gfx1201, persistent-cache]
           - name: amdgpu_vulkan
             config-file: onnx_models_gpu_vulkan.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
@@ -189,13 +200,16 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: dc50625f4ac9d561f52ced410b8470b8168ed8a1
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
           path: iree-test-suites
       - name: Install ONNX models test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/onnx_models/requirements.txt
       - name: Run ONNX models test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/onnx_models/ \

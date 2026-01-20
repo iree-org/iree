@@ -171,7 +171,7 @@ void LiveIntervals::sortBlocksInDominanceOrder(IREE::VM::FuncOp funcOp) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0) {
+    if (markedBlocks.contains(block)) {
       return;
     }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {
@@ -205,7 +205,7 @@ void LiveIntervals::buildIntervals(ValueLiveness &liveness) {
   for (auto *block : blockOrder_) {
     // Process block arguments.
     for (auto blockArg : block->getArguments()) {
-      if (valueToInterval_.count(blockArg)) {
+      if (valueToInterval_.contains(blockArg)) {
         continue;
       }
 
@@ -233,7 +233,7 @@ void LiveIntervals::buildIntervals(ValueLiveness &liveness) {
       uint32_t opIndex = opToIndex_[&op];
 
       for (auto result : op.getResults()) {
-        if (valueToInterval_.count(result)) {
+        if (valueToInterval_.contains(result)) {
           continue;
         }
 

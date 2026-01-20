@@ -854,3 +854,52 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_attention_1024x64x1024x64
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>>,
+                         %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>>,
+                         %arg2: !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>>,
+                         %arg3: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x64xf32>>) {
+      %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>> -> tensor<1024x64xf32>
+      %1 = iree_tensor_ext.dispatch.tensor.load %arg1, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>> -> tensor<1024x64xf32>
+      %2 = iree_tensor_ext.dispatch.tensor.load %arg2, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>> -> tensor<1024x64xf32>
+      %3 = tensor.empty() : tensor<1024x64xf32>
+      %scale = arith.constant 1.0 : f32
+
+      %4 = iree_linalg_ext.attention {
+        indexing_maps = [
+          affine_map<(m, n, k2, k1) -> (m, k1)>,
+          affine_map<(m, n, k2, k1) -> (k2, k1)>,
+          affine_map<(m, n, k2, k1) -> (k2, n)>,
+          affine_map<(m, n, k2, k1) -> ()>,
+          affine_map<(m, n, k2, k1) -> (m, n)>
+        ]
+      }
+      ins(%0, %1, %2, %scale : tensor<1024x64xf32>, tensor<1024x64xf32>, tensor<1024x64xf32>, f32)
+      outs(%3 : tensor<1024x64xf32>) {
+      ^bb0(%score : f32):
+        iree_linalg_ext.yield %score : f32
+      } -> tensor<1024x64xf32>
+
+      %5 = linalg.generic {
+        indexing_maps = [
+          affine_map<(d0, d1) -> (d0, d1)>,
+          affine_map<(d0, d1) -> (d0, d1)>
+        ],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%4 : tensor<1024x64xf32>) outs(%3 : tensor<1024x64xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %6 = arith.mulf %in, %in : f32
+        linalg.yield %6 : f32
+      } -> tensor<1024x64xf32>
+
+      iree_tensor_ext.dispatch.tensor.store %5, %arg3, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : tensor<1024x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x64xf32>>
+      return
+    }
+  }
+}
