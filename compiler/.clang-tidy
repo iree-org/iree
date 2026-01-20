@@ -1,10 +1,12 @@
-HeaderFilterRegex: '(.*/llvm/include/llvm/.*)|(.*/mlir/include/mlir/.*)'
+HeaderFilterRegex: '.*'
+ExcludeHeaderFilterRegex: '.*/llvm/include/.*|.*/mlir/include/.*|.*/llvm-project/include/.*|.*\.inc$'
 Checks: >
   -*,
   clang-diagnostic-*,
   llvm-*,
-  -llvm-prefer-static-over-anonymous-namespace,
+  -llvm-header-guard,
   -llvm-include-order,
+  -llvm-prefer-static-over-anonymous-namespace,
   misc-*,
   -misc-const-correctness,
   -misc-include-cleaner,
@@ -15,6 +17,11 @@ Checks: >
   -misc-override-with-different-visibility,
   bugprone-*,
   -bugprone-assignment-in-if-condition,
+  -bugprone-derived-method-shadowing-base-method,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-crtp-constructor-accessibility,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
   -bugprone-unchecked-optional-access,
   modernize-use-bool-literals,
   modernize-loop-convert,
@@ -27,6 +34,7 @@ Checks: >
   modernize-use-override,
   modernize-use-using,
   performance-*,
+  -performance-enum-size,
   readability-avoid-const-params-in-decls,
   readability-const-return-type,
   readability-container-contains,
@@ -54,7 +62,7 @@ CheckOptions:
   - key:             readability-identifier-naming.MemberCase
     value:           camelBack
   - key:             readability-identifier-naming.MemberIgnoredRegexp
-    value:           '.*_|^ID$'
+    value:           '.*_|^[A-Z]+$'
   - key:             readability-identifier-naming.ParameterCase
     value:           camelBack
   - key:             readability-identifier-naming.UnionCase
@@ -62,9 +70,9 @@ CheckOptions:
   - key:             readability-identifier-naming.VariableCase
     value:           camelBack
   - key:             readability-identifier-naming.ParameterIgnoredRegexp
-    value:           'LevelOrType'
+    value:           'LevelOrType|^[A-Z]+$'
   - key:             readability-identifier-naming.VariableIgnoredRegexp
-    value:           'DebugType'
+    value:           'DebugType|^[A-Z][A-Z0-9_]*$'
   - key:             readability-redundant-member-init.IgnoreBaseInCopyConstructors
     value:           1
   - key:             modernize-use-default-member-init.UseAssignment
