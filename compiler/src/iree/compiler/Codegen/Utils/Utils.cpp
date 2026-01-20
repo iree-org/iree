@@ -2222,20 +2222,16 @@ std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
   SmallVector<int64_t> bounds = copyOp.getStaticLoopRanges();
   int64_t elementBitWidth = type.getElementTypeBitWidth();
   SmallVector<int64_t> tileSizes(bounds.size(), 1);
-  int64_t innerBound = bounds.back();
-  const int64_t preferredCopyNumElements =
-      kPreferredCopyNumBits / elementBitWidth;
-  if (ShapedType::isDynamic(innerBound) ||
-      innerBound >= preferredCopyNumElements) {
-    tileSizes[bounds.size() - 1] = preferredCopyNumElements;
-    return tileSizes;
-  }
+
   // Distribute the preferred number of elements being copied across multiple
-  // dimensions if possible.
-  int64_t remPreferredCopyNumElementsDiv = preferredCopyNumElements;
+  // dimensions if possible, starting from the innermost dimension.
+  int64_t remPreferredCopyNumElementsDiv =
+      kPreferredCopyNumBits / elementBitWidth;
   for (auto [i, b] : llvm::enumerate(llvm::reverse(bounds))) {
     size_t index = bounds.size() - i - 1;
-    if (remPreferredCopyNumElementsDiv < b) {
+    // If the bound is dynamic or larger than what we can distribute, use
+    // the remaining preferred elements and stop.
+    if (ShapedType::isDynamic(b) || remPreferredCopyNumElementsDiv < b) {
       tileSizes[index] = remPreferredCopyNumElementsDiv;
       break;
     }
