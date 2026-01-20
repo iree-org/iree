@@ -22,9 +22,7 @@ Checks: >
   modernize-raw-string-literal,
   modernize-use-equals-default,
   modernize-use-default-member-init,
-  modernize-use-emplace,
   modernize-min-max-use-initializer-list,
-  modernize-use-nodiscard,
   modernize-use-nullptr,
   modernize-use-override,
   modernize-use-using,
@@ -47,25 +45,27 @@ Checks: >
   readability-use-anyofallof
 
 CheckOptions:
-  - key:             readability-identifier-naming.MemberCase
-    value:           camelBack
-  - key:             readability-identifier-naming.ParameterCase
-    value:           camelBack
-  - key:             readability-identifier-naming.VariableCase
-    value:           camelBack
   - key:             readability-identifier-naming.ClassCase
     value:           CamelCase
   - key:             readability-identifier-naming.EnumCase
     value:           CamelCase
   - key:             readability-identifier-naming.FunctionCase
     value:           camelBack
+  - key:             readability-identifier-naming.MemberCase
+    value:           camelBack
+  - key:             readability-identifier-naming.MemberIgnoredRegexp
+    value:           '.*_|^ID$'
+  - key:             readability-identifier-naming.ParameterCase
+    value:           camelBack
   - key:             readability-identifier-naming.UnionCase
     value:           CamelCase
+  - key:             readability-identifier-naming.VariableCase
+    value:           camelBack
+  - key:             readability-identifier-naming.ParameterIgnoredRegexp
+    value:           'LevelOrType'
+  - key:             readability-identifier-naming.VariableIgnoredRegexp
+    value:           'DebugType'
   - key:             readability-redundant-member-init.IgnoreBaseInCopyConstructors
     value:           1
   - key:             modernize-use-default-member-init.UseAssignment
     value:           1
-  - key:             readability-identifier-naming.VariableIgnoredRegexp
-    value:           'DebugType'
-  - key:             readability-identifier-naming.ParameterIgnoredRegexp
-    value:           'LevelOrType'
