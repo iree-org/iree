@@ -974,7 +974,7 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
   while (!worklist.empty()) {
     Value outsideValue = worklist.pop_back_val();
     // Skip values that were already visited.
-    if (visited.count(outsideValue)) {
+    if (visited.contains(outsideValue)) {
       continue;
     }
     visited.insert(outsideValue);

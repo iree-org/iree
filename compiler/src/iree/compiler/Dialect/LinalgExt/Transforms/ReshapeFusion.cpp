@@ -318,7 +318,7 @@ CollapsingInfo::initialize(unsigned origNumLoops,
       if (dim >= origNumLoops) {
         return failure();
       }
-      if (processedDims.count(dim)) {
+      if (processedDims.contains(dim)) {
         return failure();
       }
       processedDims.insert(dim);
@@ -333,7 +333,7 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   // Add all the preserved dims of the original op as single
   // elements to `collapsedOpToOrigOpIterationDim`.
   for (auto dim : llvm::seq<int64_t>(0, origNumLoops)) {
-    if (processedDims.count(dim)) {
+    if (processedDims.contains(dim)) {
       continue;
     }
     collapsedOpToOrigOpIterationDim.emplace_back(ReassociationIndices{dim});

@@ -73,7 +73,7 @@ void collectTiledAndFusedOps(Operation *rootOp,
     for (OpOperand &operand : current->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
       if (!producer || !isa<TilingInterface>(producer) ||
-          result.count(producer)) {
+          result.contains(producer)) {
         continue;
       }
       worklist.push_back(producer);

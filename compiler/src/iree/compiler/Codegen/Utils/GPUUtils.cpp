@@ -122,7 +122,7 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // Verify that each dimension of the shape can be distributed on the
   // threads
   // For zero dim tensor, consider it's too small to access using all threads.
-  if (shape.size() == 0) {
+  if (shape.empty()) {
     return false;
   }
   int64_t threadsAvailable = threadCount;

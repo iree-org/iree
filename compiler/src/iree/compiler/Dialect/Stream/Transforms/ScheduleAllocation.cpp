@@ -406,7 +406,7 @@ struct AllocationScope {
   // All aliases of |resource| will also be mapped.
   void mapResourceRange(Value resource, ResourceRange resourceRange,
                         AsmState *asmState) {
-    if (resourceRangeMap.count(resource)) {
+    if (resourceRangeMap.contains(resource)) {
       return;
     }
 
@@ -472,7 +472,7 @@ struct AllocationScope {
 
   // Returns true if the given |resource| has a storage range mapped to it.
   bool hasResourceRange(Value resource) const {
-    return resourceRangeMap.count(resource) != 0;
+    return resourceRangeMap.contains(resource) != 0;
   }
 
   // Calls |callback| for |resource| and each value aliasing it.
