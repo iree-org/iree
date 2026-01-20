@@ -31,7 +31,7 @@ jobs:
           CXX: clang++-19
           # Enable reverse iteration of unordered LLVM containers. This helps
           # catch non-determinism bugs.
-          IREE_REVERSE_ITERATE: "ON"
+          IREE_REVERSE_ITERATION: "ON"
           SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
           SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
           SCCACHE_CACHE_ZSTD_LEVEL: 10
