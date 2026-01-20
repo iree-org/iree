@@ -55,11 +55,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build tests
-        run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
-      - name: Run GPU tests
         env:
           CC: clang
           CXX: clang++
+        run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
+      - name: Run GPU tests
+        env:
           CTEST_PARALLEL_LEVEL: 1
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
           IREE_AMD_RDNA3_TESTS_DISABLE: 0
