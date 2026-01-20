@@ -72,7 +72,7 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     // Otherwise, we need to create a new set_encoding op.
     auto setEncodingOp = IREE::Encoding::SetEncodingOp::create(
         builder, op->getLoc(), encodedOperandType, operand,
-        /*encodingDims=*/ValueRange{});
+        /*encoding_dims=*/ValueRange{});
     encodedOperands.push_back(setEncodingOp.getResult());
     result.generatedEncodingOps.push_back(setEncodingOp);
   }
@@ -101,7 +101,7 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     std::tie(std::ignore, resultDynamicDims) = decomposeMixedValues(mixedSizes);
     auto unsetEncodingOp = IREE::Encoding::UnsetEncodingOp::create(
         builder, op->getLoc(), originalResult.getType(), encodedResult,
-        resultDynamicDims, /*encodingDims=*/ValueRange{});
+        resultDynamicDims, /*encoding_dims=*/ValueRange{});
     result.generatedEncodingOps.push_back(unsetEncodingOp);
     result.replacements.push_back(unsetEncodingOp.getResult());
   }

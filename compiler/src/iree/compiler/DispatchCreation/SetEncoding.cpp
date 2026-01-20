@@ -250,7 +250,7 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
   Value newYieldedVal = map.lookup(operand);
   auto encodingOp = IREE::Encoding::SetEncodingOp::create(
       rewriter, returnOp->getLoc(), newResultType, newYieldedVal,
-      /*encodingDims=*/ValueRange{});
+      /*encoding_dims=*/ValueRange{});
   rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.setOperand(resultNumber, encodingOp); });
 
@@ -284,7 +284,7 @@ static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
       Type operandType = operand.get().getType();
       auto unsetEncodignOp = IREE::Encoding::UnsetEncodingOp::create(
           rewriter, op->getLoc(), operandType, paddedVal->paddedValue,
-          paddedVal->dynamicDims, /*encodingDims=*/ValueRange{});
+          paddedVal->dynamicDims, /*encoding_dims=*/ValueRange{});
       op->setOperand(operandNum, unsetEncodignOp.getResult());
     });
   }

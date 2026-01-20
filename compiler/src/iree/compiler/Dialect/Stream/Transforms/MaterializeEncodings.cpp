@@ -143,11 +143,11 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
     if (sourceType.getEncoding()) {
       value = IREE::Encoding::UnsetEncodingOp::create(
           builder, loc, sourceType.dropEncoding(), value, sourceDynamicDims,
-          /*encodingDims=*/ValueRange{});
+          /*encoding_dims=*/ValueRange{});
     }
     if (destinationType.getEncoding()) {
       value = IREE::Encoding::SetEncodingOp::create(
-          builder, loc, destinationType, value, /*encodingDims=*/ValueRange{});
+          builder, loc, destinationType, value, /*encoding_dims=*/ValueRange{});
     }
   }
 
