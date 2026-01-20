@@ -1069,6 +1069,16 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     it over the entire softmax reduction dimension by:
       x, _, sum : results
       x = (1 / sum) * x
+
+    Decomposition Configuration:
+    The `decomposition_config` attribute is a DictionaryAttr that controls how
+    this operation is decomposed into lower-level operations. It supports:
+      - "qk_attrs": DictionaryAttr - Attributes to attach to the Q@K matmul
+        operation after decomposition (e.g., lowering_config, attention markers)
+      - "pv_attrs": DictionaryAttr - Attributes to attach to the P@V matmul
+        operation after decomposition
+      - "use_exp2": BoolAttr - If true, uses exp2 with log2(e) scaling instead
+        of exp. (Gives better perf on some hardware, but trades off accuracy)
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1153,6 +1163,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    // Flag to control whether to use exp2 (with log2(e) scaling) or exp.
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 
   let hasCanonicalizer = 1;
