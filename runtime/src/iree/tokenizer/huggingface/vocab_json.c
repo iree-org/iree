@@ -116,16 +116,13 @@ static iree_status_t iree_tokenizer_parse_vocab_visitor(
   // Since unescaped_length <= escaped_length (escapes like \n shrink), we can
   // ensure the buffer fits the escaped size and unescape directly in one pass.
   if (key.size > context->unescape_capacity) {
-    iree_host_size_t new_capacity = context->unescape_capacity * 2;
-    if (new_capacity < key.size) new_capacity = key.size;
-    if (new_capacity < 256) new_capacity = 256;
-    status = iree_allocator_realloc(context->allocator, new_capacity,
-                                    (void**)&context->unescape_buffer);
+    status = iree_allocator_grow_array(
+        context->allocator, iree_max(256, key.size), /*element_size=*/1,
+        &context->unescape_capacity, (void**)&context->unescape_buffer);
     if (!iree_status_is_ok(status)) {
       context->status = status;
       return iree_status_from_code(IREE_STATUS_CANCELLED);
     }
-    context->unescape_capacity = new_capacity;
   }
 
   iree_host_size_t unescaped_length;

@@ -76,10 +76,15 @@ typedef iree_alignas(iree_max_align_t) struct iree_loop_run_ring_t {
   iree_loop_run_op_t ops[0];
 } iree_loop_run_ring_t;
 
-static iree_host_size_t iree_loop_run_ring_storage_size(
-    iree_loop_sync_options_t options) {
-  return sizeof(iree_loop_run_ring_t) +
-         options.max_queue_depth * sizeof(iree_loop_run_op_t);
+static iree_status_t iree_loop_run_ring_storage_size(
+    iree_loop_sync_options_t options, iree_host_size_t* out_size) {
+  if (!iree_host_size_checked_mul_add(sizeof(iree_loop_run_ring_t),
+                                      options.max_queue_depth,
+                                      sizeof(iree_loop_run_op_t), out_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "run ring storage size overflow");
+  }
+  return iree_ok_status();
 }
 
 static inline uint32_t iree_loop_run_ring_mask(
@@ -251,10 +256,15 @@ typedef iree_alignas(iree_max_align_t) struct iree_loop_wait_list_t {
   iree_loop_wait_op_t ops[0];
 } iree_loop_wait_list_t;
 
-static iree_host_size_t iree_loop_wait_list_storage_size(
-    iree_loop_sync_options_t options) {
-  return sizeof(iree_loop_wait_list_t) +
-         options.max_wait_count * sizeof(iree_loop_wait_op_t);
+static iree_status_t iree_loop_wait_list_storage_size(
+    iree_loop_sync_options_t options, iree_host_size_t* out_size) {
+  if (!iree_host_size_checked_mul_add(sizeof(iree_loop_wait_list_t),
+                                      options.max_wait_count,
+                                      sizeof(iree_loop_wait_op_t), out_size)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "wait list storage size overflow");
+  }
+  return iree_ok_status();
 }
 
 static bool iree_loop_wait_list_is_empty(iree_loop_wait_list_t* wait_list) {
@@ -797,14 +807,35 @@ IREE_API_EXPORT iree_status_t iree_loop_sync_allocate(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  const iree_host_size_t loop_sync_size =
-      iree_host_align(sizeof(iree_loop_sync_t), iree_max_align_t);
-  const iree_host_size_t run_ring_size = iree_host_align(
-      iree_loop_run_ring_storage_size(options), iree_max_align_t);
-  const iree_host_size_t wait_list_size = iree_host_align(
-      iree_loop_wait_list_storage_size(options), iree_max_align_t);
-  const iree_host_size_t total_storage_size =
-      loop_sync_size + run_ring_size + wait_list_size;
+  iree_host_size_t run_ring_storage = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_loop_run_ring_storage_size(options, &run_ring_storage));
+  iree_host_size_t wait_list_storage = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_loop_wait_list_storage_size(options, &wait_list_storage));
+
+  iree_host_size_t loop_sync_size = 0;
+  iree_host_size_t run_ring_size = 0;
+  iree_host_size_t wait_list_size = 0;
+  if (!iree_host_size_checked_align(sizeof(iree_loop_sync_t), iree_max_align_t,
+                                    &loop_sync_size) ||
+      !iree_host_size_checked_align(run_ring_storage, iree_max_align_t,
+                                    &run_ring_size) ||
+      !iree_host_size_checked_align(wait_list_storage, iree_max_align_t,
+                                    &wait_list_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "alignment overflow");
+  }
+
+  iree_host_size_t total_storage_size = 0;
+  if (!iree_host_size_checked_add(loop_sync_size, run_ring_size,
+                                  &total_storage_size) ||
+      !iree_host_size_checked_add(total_storage_size, wait_list_size,
+                                  &total_storage_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "total storage size overflow");
+  }
 
   uint8_t* storage = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

@@ -91,6 +91,13 @@ static inline bool iree_host_size_is_power_of_two(iree_host_size_t value) {
   return (value != 0) && ((value & (value - 1)) == 0);
 }
 
+// Returns true if |alignment| is valid for aligned allocation functions.
+// Valid alignments are either 0 (use default) or a power of two.
+static inline bool iree_host_size_is_valid_alignment(
+    iree_host_size_t alignment) {
+  return alignment == 0 || iree_host_size_is_power_of_two(alignment);
+}
+
 // Returns true if |value| matches the given minimum |alignment|.
 static inline bool iree_host_size_has_alignment(iree_host_size_t value,
                                                 iree_host_size_t alignment) {
@@ -107,6 +114,13 @@ static inline iree_device_size_t iree_device_align(
 // Returns true if |value| is a power-of-two.
 static inline bool iree_device_size_is_power_of_two(iree_device_size_t value) {
   return (value != 0) && ((value & (value - 1)) == 0);
+}
+
+// Returns true if |alignment| is valid for aligned allocation functions.
+// Valid alignments are either 0 (use default) or a power of two.
+static inline bool iree_device_size_is_valid_alignment(
+    iree_device_size_t alignment) {
+  return alignment == 0 || iree_device_size_is_power_of_two(alignment);
 }
 
 // Returns true if |value| matches the given minimum |alignment|.

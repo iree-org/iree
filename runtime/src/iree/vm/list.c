@@ -293,12 +293,16 @@ iree_vm_list_reserve(iree_vm_list_t* list, iree_host_size_t minimum_capacity) {
     return iree_ok_status();
   }
   iree_host_size_t old_capacity = list->capacity;
-  iree_host_size_t new_capacity = iree_host_align(minimum_capacity, 64);
-  IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-      list->allocator, new_capacity * list->element_size, &list->storage));
+  iree_host_size_t aligned_capacity = 0;
+  if (!iree_host_size_checked_align(minimum_capacity, 64, &aligned_capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "capacity overflow");
+  }
+  IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
+      list->allocator, aligned_capacity, list->element_size, &list->capacity,
+      (void**)&list->storage));
+  // Zero-initialize newly allocated elements.
   memset((void*)((uintptr_t)list->storage + old_capacity * list->element_size),
-         0, (new_capacity - old_capacity) * list->element_size);
-  list->capacity = new_capacity;
+         0, (list->capacity - old_capacity) * list->element_size);
   return iree_ok_status();
 }
 
@@ -317,9 +321,8 @@ IREE_API_EXPORT iree_status_t iree_vm_list_resize(iree_vm_list_t* list,
     iree_vm_list_reset_range(list, new_size, list->count - new_size);
     list->count = new_size;
   } else if (new_size > list->capacity) {
-    // Extending beyond capacity.
-    IREE_RETURN_IF_ERROR(iree_vm_list_reserve(
-        list, iree_max(list->capacity * 2, iree_host_align(new_size, 64))));
+    // Extending beyond capacity. reserve() handles alignment and 2x growth.
+    IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, new_size));
   }
   list->count = new_size;
   return iree_ok_status();
@@ -396,8 +399,8 @@ static void iree_vm_list_copy_to_variant_list(iree_vm_list_t* src_list,
         if (iree_vm_type_def_is_ref(dst_storage[i].type)) {
           iree_vm_ref_release(&dst_storage[i].ref);
         }
-        dst_storage->type = iree_vm_make_ref_type_def(ref->type);
-        dst_storage->ref = *ref;
+        dst_storage[i].type = iree_vm_make_ref_type_def(ref->type);
+        dst_storage[i].ref = *ref;
       }
       break;
     }

@@ -223,20 +223,23 @@ static iree_status_t iree_hal_system_executable_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_system_executable_t* executable = NULL;
-  iree_host_size_t total_size =
-      sizeof(*executable) +
-      executable_params->constant_count * sizeof(*executable_params->constants);
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
-  if (iree_status_is_ok(status)) {
-    iree_hal_local_executable_initialize(&iree_hal_system_executable_vtable,
-                                         host_allocator, &executable->base);
-  }
+  iree_host_size_t total_size = 0;
+  iree_host_size_t constants_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(sizeof(*executable), &total_size,
+                             IREE_STRUCT_FIELD_ALIGNED(
+                                 executable_params->constant_count, uint32_t,
+                                 iree_alignof(uint32_t), &constants_offset)));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  iree_hal_local_executable_initialize(&iree_hal_system_executable_vtable,
+                                       host_allocator, &executable->base);
 
   // Copy executable constants so we own them.
-  if (iree_status_is_ok(status) && executable_params->constant_count > 0) {
+  if (executable_params->constant_count > 0) {
     uint32_t* target_constants =
-        (uint32_t*)((uint8_t*)executable + sizeof(*executable));
+        (uint32_t*)((uint8_t*)executable + constants_offset);
     memcpy(target_constants, executable_params->constants,
            executable_params->constant_count *
                sizeof(*executable_params->constants));
@@ -244,10 +247,8 @@ static iree_status_t iree_hal_system_executable_create(
   }
 
   // Attempt to extract the embedded library and load it.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_system_executable_load(
-        executable, executable_params->executable_data, host_allocator);
-  }
+  iree_status_t status = iree_hal_system_executable_load(
+      executable, executable_params->executable_data, host_allocator);
 
   // Query metadata and get the entry point function pointers.
   if (iree_status_is_ok(status)) {

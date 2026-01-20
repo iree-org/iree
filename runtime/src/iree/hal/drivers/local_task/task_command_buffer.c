@@ -238,9 +238,14 @@ static iree_status_t iree_hal_task_command_buffer_flush_tasks(
       // Since we couldn't know at the time how many tasks would end up in the
       // barrier we had to defer it until now.
       iree_task_t** dependent_tasks = NULL;
+      iree_host_size_t allocation_size = 0;
+      if (!iree_host_size_checked_mul(dependent_task_count,
+                                      sizeof(iree_task_t*), &allocation_size)) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "dependent task count overflow");
+      }
       IREE_RETURN_IF_ERROR(iree_arena_allocate(
-          &command_buffer->arena, dependent_task_count * sizeof(iree_task_t*),
-          (void**)&dependent_tasks));
+          &command_buffer->arena, allocation_size, (void**)&dependent_tasks));
       iree_task_t* task = task_head;
       for (iree_host_size_t i = 0; i < dependent_task_count; ++i) {
         dependent_tasks[i] = task;
@@ -757,14 +762,25 @@ static iree_status_t iree_hal_task_cmd_dispatch_tile(
           iree_task_affinity_set_count_ones(cmd->task.header.affinity_set),
       .binding_count = cmd->binding_count,
   };
-  uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
-  dispatch_state.constants = (uint32_t*)cmd_ptr;
-  cmd_ptr +=
-      iree_host_align(cmd->constant_count * sizeof(uint32_t), iree_max_align_t);
-  dispatch_state.binding_ptrs = (void**)cmd_ptr;
-  cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_ptrs);
-  dispatch_state.binding_lengths = (size_t*)cmd_ptr;
-  cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_lengths);
+  // Compute field offsets (must match allocation layout in
+  // iree_hal_task_command_buffer_dispatch).
+  iree_host_size_t total_cmd_size = 0;
+  iree_host_size_t constants_offset = 0;
+  iree_host_size_t binding_ptrs_offset = 0;
+  iree_host_size_t binding_lengths_offset = 0;
+  iree_status_ignore(IREE_STRUCT_LAYOUT(
+      sizeof(*cmd), &total_cmd_size,
+      IREE_STRUCT_FIELD_ALIGNED(cmd->constant_count, uint32_t,
+                                iree_alignof(uint32_t), &constants_offset),
+      IREE_STRUCT_FIELD_ALIGNED(cmd->binding_count, void*, iree_alignof(void*),
+                                &binding_ptrs_offset),
+      IREE_STRUCT_FIELD_ALIGNED(cmd->binding_count, size_t,
+                                iree_alignof(size_t),
+                                &binding_lengths_offset)));
+  dispatch_state.constants = (uint32_t*)((uint8_t*)cmd + constants_offset);
+  dispatch_state.binding_ptrs = (void**)((uint8_t*)cmd + binding_ptrs_offset);
+  dispatch_state.binding_lengths =
+      (size_t*)((uint8_t*)cmd + binding_lengths_offset);
 
   const iree_alignas(64)
       iree_hal_executable_workgroup_state_v0_t workgroup_state = {
@@ -807,13 +823,21 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
     dispatch_attrs = local_executable->dispatch_attrs[export_ordinal];
   }
 
+  // Calculate allocation size with overflow checking.
+  iree_host_size_t total_cmd_size = 0;
+  iree_host_size_t constants_offset = 0;
+  iree_host_size_t binding_ptrs_offset = 0;
+  iree_host_size_t binding_lengths_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_hal_task_cmd_dispatch_t), &total_cmd_size,
+      IREE_STRUCT_FIELD_ALIGNED(dispatch_attrs.constant_count, uint32_t,
+                                iree_alignof(uint32_t), &constants_offset),
+      IREE_STRUCT_FIELD_ALIGNED(dispatch_attrs.binding_count, void*,
+                                iree_alignof(void*), &binding_ptrs_offset),
+      IREE_STRUCT_FIELD_ALIGNED(dispatch_attrs.binding_count, size_t,
+                                iree_alignof(size_t),
+                                &binding_lengths_offset)));
   iree_hal_task_cmd_dispatch_t* cmd = NULL;
-  iree_host_size_t total_cmd_size =
-      sizeof(*cmd) +
-      iree_host_align(dispatch_attrs.constant_count * sizeof(uint32_t),
-                      iree_max_align_t) +
-      dispatch_attrs.binding_count * sizeof(void*) +
-      dispatch_attrs.binding_count * sizeof(size_t);
   IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->arena,
                                            total_cmd_size, (void**)&cmd));
 
@@ -870,12 +894,9 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
         (uint32_t)dispatch_attrs.constant_count,
         constants.data_length / sizeof(uint32_t));
   }
-  uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
-  uint32_t* constants_ptr = (uint32_t*)cmd_ptr;
+  uint32_t* constants_ptr = (uint32_t*)((uint8_t*)cmd + constants_offset);
   memcpy(constants_ptr, constants.data,
          dispatch_attrs.constant_count * sizeof(*constants_ptr));
-  cmd_ptr += iree_host_align(dispatch_attrs.constant_count * sizeof(uint32_t),
-                             iree_max_align_t);
 
   // Produce the dense binding list based on the declared bindings used.
   //
@@ -888,10 +909,8 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
         "binding count mismatch, expected %u but was provided %" PRIhsz,
         (uint32_t)dispatch_attrs.binding_count, bindings.count);
   }
-  void** binding_ptrs = (void**)cmd_ptr;
-  cmd_ptr += bindings.count * sizeof(*binding_ptrs);
-  size_t* binding_lengths = (size_t*)cmd_ptr;
-  cmd_ptr += bindings.count * sizeof(*binding_lengths);
+  void** binding_ptrs = (void**)((uint8_t*)cmd + binding_ptrs_offset);
+  size_t* binding_lengths = (size_t*)((uint8_t*)cmd + binding_lengths_offset);
   for (iree_host_size_t i = 0; i < bindings.count; ++i) {
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping = {{0}};

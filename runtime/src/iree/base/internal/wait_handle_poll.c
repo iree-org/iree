@@ -146,11 +146,17 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_host_size_t user_handle_list_size =
-      capacity * iree_sizeof_struct(iree_wait_handle_t);
-  iree_host_size_t poll_fd_list_size = capacity * sizeof(struct pollfd);
-  iree_host_size_t total_size = iree_sizeof_struct(iree_wait_set_t) +
-                                user_handle_list_size + poll_fd_list_size;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t user_handles_offset = 0;
+  iree_host_size_t poll_fds_offset = 0;
+  iree_status_t status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_wait_set_t), &total_size,
+      IREE_STRUCT_FIELD(capacity, iree_wait_handle_t, &user_handles_offset),
+      IREE_STRUCT_FIELD(capacity, struct pollfd, &poll_fds_offset));
+  if (!iree_status_is_ok(status)) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   iree_wait_set_t* set = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -160,10 +166,8 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
   iree_wait_set_clear(set);
 
   set->user_handles =
-      (iree_wait_handle_t*)((uint8_t*)set +
-                            iree_sizeof_struct(iree_wait_set_t));
-  set->poll_fds =
-      (struct pollfd*)((uint8_t*)set->user_handles + user_handle_list_size);
+      (iree_wait_handle_t*)((uint8_t*)set + user_handles_offset);
+  set->poll_fds = (struct pollfd*)((uint8_t*)set + poll_fds_offset);
 
   *out_set = set;
   IREE_TRACE_ZONE_END(z0);
@@ -178,7 +182,7 @@ void iree_wait_set_free(iree_wait_set_t* set) {
 }
 
 bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
-  return set->handle_count != 0;
+  return set->handle_count == 0;
 }
 
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,

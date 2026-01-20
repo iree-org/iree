@@ -80,16 +80,14 @@ static iree_status_t iree_tokenizer_literals_parse_entry(
   }
 
   if (unescaped_length > ctx->unescape_capacity) {
-    iree_host_size_t new_capacity = ctx->unescape_capacity * 2;
-    if (new_capacity < unescaped_length) new_capacity = unescaped_length;
-    if (new_capacity < 64) new_capacity = 64;
-    status = iree_allocator_realloc(ctx->literals->allocator, new_capacity,
-                                    (void**)&ctx->unescape_buffer);
+    status = iree_allocator_grow_array(
+        ctx->literals->allocator, iree_max(64, unescaped_length),
+        /*element_size=*/1, &ctx->unescape_capacity,
+        (void**)&ctx->unescape_buffer);
     if (!iree_status_is_ok(status)) {
       ctx->status = status;
       return iree_status_from_code(IREE_STATUS_CANCELLED);
     }
-    ctx->unescape_capacity = new_capacity;
   }
 
   status = iree_json_unescape_string(content_value, ctx->unescape_capacity,
