@@ -332,6 +332,35 @@ Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 Branches that do not meet these guidelines may be deleted, especially if
 they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
 
+### :octicons-hubot-16: AI tool use
+
+We adopt the [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
+and require all AI-assisted contributions (Pull Requests, issues, design
+proposals) to be reviewed and understood by the author(s).
+
+The key points include:
+
+1. "Contributors must read and review all LLM-generated code or text before they
+   ask other project members to review it."
+2. "Contributors are expected to be transparent and label contributions that
+   contain substantial amounts of tool-generated content." This can be done with
+   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
+   trailer in PR descriptions.
+3. "To ensure sufficient self review and understanding of the work, it is
+   strongly recommended that contributors write PR descriptions themselves (if
+   needed, using tools for translation or copy-editing)." This also extends to
+   code documentation, issue descriptions, and design proposals.
+4. "Contributors are responsible for ensuring that they have the right to
+   contribute code under the terms of our license, [...]. Using AI tools to
+   regenerate copyrighted material does not remove the copyright, and
+   contributors are responsible for ensuring that such material does not appear
+   in their contributions."
+
+We extend the LLVM policy with an exception for AI bot-authored contributions
+(e.g., updating dependencies, fixing build script, etc.); bot account may create
+Pull Requests as long as the bot maintainers ensure they are first in line and
+primarily responsible for reviewing those contributions.
+
 ## Tips for contributors
 
 ### Tool recommendations
