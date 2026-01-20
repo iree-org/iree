@@ -33,17 +33,11 @@ struct DistributionConfig {
 using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
     ArrayRef<int64_t> iterationBounds, MLIRContext *)>;
 
-/// Enum to indicate whether we're checking for map_scatter or map_gather.
-enum class RelayoutOpKind { Scatter, Gather };
-
 /// Control function type for layout transformation combination. The control
-/// function takes a leaf of a relayout op chain and the kind of relayout op
-/// (scatter or gather), and returns a bool indicating whether to combine the
-/// relayout op chain, starting from the leaf.
-using CombineRelayoutOpsControlFnRef =
-    function_ref<bool(OpResult leaf, RelayoutOpKind kind)>;
-using CombineRelayoutOpsControlFn =
-    std::function<bool(OpResult leaf, RelayoutOpKind kind)>;
+/// function takes a leaf of a relayout op chain, and returns a bool indicating
+/// whether to combine the relayout op chain, starting from the leaf.
+using CombineRelayoutOpsControlFnRef = function_ref<bool(OpResult leaf)>;
+using CombineRelayoutOpsControlFn = std::function<bool(OpResult leaf)>;
 
 namespace IREE::Codegen {
 /// Enum defining the scope of the CombineLayoutTransformationPass.
@@ -56,10 +50,7 @@ enum class RelayoutCombinationScope { Dispatch, Workgroup };
 } // namespace IREE::Codegen
 
 /// Get the corresponding control function for the given scope. The control
-/// function checks based on the RelayoutOpKind:
-/// - For Scatter: checks if the leaf has a StoreToBufferOp user
-/// - For Gather: checks if the leaf's producer chain starts from
-/// LoadFromBufferOp
+/// functions implement the filtering described in the enum definitions.
 CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
 
@@ -87,13 +78,6 @@ FailureOr<IREE::LinalgExt::MapScatterOp>
 foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                       IREE::LinalgExt::MapScatterOp mapScatterOp,
                       PadDistributionConfigFn padDistributionConfigFn);
-
-/// Fold the `op` into the `mapGatherOp` and return the resulting map_gather,
-/// or failure if the transformation is not supported. The `op` should be a
-/// supported relayout op that produces the source of the map_gather.
-FailureOr<IREE::LinalgExt::MapGatherOp>
-foldIntoMapGather(RewriterBase &rewriter, Operation *op,
-                  IREE::LinalgExt::MapGatherOp mapGatherOp);
 
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any

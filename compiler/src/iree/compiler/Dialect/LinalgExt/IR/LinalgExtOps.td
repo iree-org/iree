@@ -355,11 +355,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
         OpBuilder &builder,
         function_ref<SmallVector<Value>(ValueRange)> transformationBuilder);
 
-    // Return true if the map_gather op has vector semantics.
-    bool isVectorized() {
-      return isa<VectorType>(getOutputType());
-    }
-
     // Return true if the mapGatherOp is an identity transformation, meaning
     // it is just doing a copy from source to output. This is true if the
     // padding is unused (source and output shapes match) and the mapping
