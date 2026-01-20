@@ -53,9 +53,9 @@ util.func public @basic_arg_compare(%arg0: tensor<4096xf32>)
   // CHECK:     iree_linalg_ext.arg_compare
   // CHECK-SAME: ins({{.*}} : tensor<1024xf32>)
 
-  // Second level: merge 4 partials via linalg.reduce.
+  // Second level: merge 4 partials via arg_compare with explicit-index mode.
   // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.workgroups(%[[SPLIT]]#0, %[[SPLIT]]#1)
-  // CHECK:   linalg.reduce
+  // CHECK:   iree_linalg_ext.arg_compare
   // CHECK-SAME: ins({{.*}} : tensor<4xf32>, tensor<4xi32>)
   // CHECK-SAME: outs({{.*}} : tensor<f32>, tensor<i32>)
 
