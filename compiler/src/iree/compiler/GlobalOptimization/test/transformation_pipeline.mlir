@@ -50,13 +50,13 @@ util.func public @transpose_with_strided_conv(%arg0: tensor<40x1x1x32xbf16>, %ar
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<40x1x1x32xbf16>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<16x192x128x32xbf16>
 //       CHECK:   %[[START0:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG1]]
-//       CHECK:   %[[START1:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
-//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[START1]]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   %[[START1:.+]] = iree_tensor_ext.compute_barrier.start %[[COLLAPSED]]
 //       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[START0]][0, 0, 0, 0] [16, 96, 64, 32] [1, 2, 2, 1]
 //  CHECK-SAME:     tensor<16x192x128x32xbf16> to tensor<16x96x64x32xbf16>
 //       CHECK:   %[[CONTRACT:.+]] = linalg.generic
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-//  CHECK-SAME:     ins(%[[SLICE]], %[[COLLAPSED]] : tensor<16x96x64x32xbf16>, tensor<40x32xbf16>)
+//  CHECK-SAME:     ins(%[[SLICE]], %[[START1]] : tensor<16x96x64x32xbf16>, tensor<40x32xbf16>)
 //       CHECK:   %[[TRUNC:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[CONTRACT]] : tensor<16x96x64x40xf32>)
 //       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[TRUNC]]
