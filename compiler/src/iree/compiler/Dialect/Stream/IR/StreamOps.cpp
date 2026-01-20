@@ -2565,14 +2565,14 @@ void AsyncConstantOp::getAsyncAccessRanges(
 //===----------------------------------------------------------------------===//
 
 void AsyncSplatOp::build(OpBuilder &builder, OperationState &state,
-                         Type result_type, Value value, Value result_size,
-                         Attribute affinity, Value await_timepoint) {
-  state.addTypes(result_type);
-  if (await_timepoint) {
-    state.addOperands(await_timepoint);
+                         Type resultType, Value value, Value resultSize,
+                         Attribute affinity, Value awaitTimepoint) {
+  state.addTypes(resultType);
+  if (awaitTimepoint) {
+    state.addOperands(awaitTimepoint);
   }
   state.addOperands(value);
-  state.addOperands(result_size);
+  state.addOperands(resultSize);
   if (affinity) {
     state.addAttribute("affinity", affinity);
   }

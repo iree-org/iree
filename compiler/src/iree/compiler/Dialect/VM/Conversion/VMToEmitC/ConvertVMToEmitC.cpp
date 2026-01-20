@@ -2430,7 +2430,7 @@ private:
                                 /*type=*/
                                 emitc::LValueType::get(emitc::OpaqueType::get(
                                     ctx, "iree_byte_span_t")),
-                                /*memberName=*/"arguments",
+                                /*member=*/"arguments",
                                 /*operand=*/call)
             .getResult();
 
@@ -2525,7 +2525,7 @@ private:
                                 /*type=*/
                                 emitc::LValueType::get(emitc::OpaqueType::get(
                                     ctx, "iree_byte_span_t")),
-                                /*memberName=*/"arguments",
+                                /*member=*/"arguments",
                                 /*operand=*/call)
             .getResult();
 

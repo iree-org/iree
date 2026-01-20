@@ -75,9 +75,9 @@ struct opt_scope {
 // The apply method is a no-op since OptionsBinder handles the deprecation
 // warning through the callback mechanism, but it's required because LLVM's
 // applicator will try to call it when the modifier is forwarded.
-struct deprecated {
+struct Deprecated {
   llvm::StringRef message;
-  explicit deprecated(llvm::StringRef msg) : message(msg) {}
+  explicit Deprecated(llvm::StringRef msg) : message(msg) {}
   template <class Opt>
   void apply(Opt &) const {}
 };
@@ -111,7 +111,7 @@ public:
 
   template <typename T, typename V, typename... Mods>
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
-    const deprecated *dep = filterDeprecated(Ms...);
+    const Deprecated *dep = filterDeprecated(Ms...);
     auto [changedCallback, clCallback] = makeChangedCallback<V>(name, dep);
     OptionInfo &info = getOptionsStorage()[name];
     if (!scope) {
@@ -422,7 +422,7 @@ private:
   template <typename V>
   static std::pair<OptionInfo::ChangedCallback, llvm::cl::cb<void, V>>
   makeChangedCallback(llvm::StringRef name = "",
-                      const deprecated *dep = nullptr) {
+                      const Deprecated *dep = nullptr) {
     std::shared_ptr<bool> changed = std::make_shared<bool>(false);
     // Capture name and message by value for lambda lifetime.
     std::string optName = name.str();
@@ -493,11 +493,11 @@ private:
 
   // Extracts deprecated modifier from args (returns nullptr if not found).
   template <typename... Args>
-  static const deprecated *filterDeprecated(const Args &...args) {
-    const deprecated *result = nullptr;
+  static const Deprecated *filterDeprecated(const Args &...args) {
+    const Deprecated *result = nullptr;
     (
         [&] {
-          if constexpr (std::is_same_v<std::decay_t<Args>, deprecated>) {
+          if constexpr (std::is_same_v<std::decay_t<Args>, Deprecated>) {
             result = &args;
           }
         }(),
