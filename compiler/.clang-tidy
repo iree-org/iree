@@ -1,0 +1,71 @@
+HeaderFilterRegex: '(.*/llvm/include/llvm/.*)|(.*/mlir/include/mlir/.*)'
+Checks: >
+  -*,
+  clang-diagnostic-*,
+  llvm-*,
+  -llvm-prefer-static-over-anonymous-namespace,
+  -llvm-include-order,
+  misc-*,
+  -misc-const-correctness,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  -misc-unused-parameters,
+  -misc-use-anonymous-namespace,
+  -misc-override-with-different-visibility,
+  bugprone-*,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-unchecked-optional-access,
+  modernize-use-bool-literals,
+  modernize-loop-convert,
+  modernize-make-unique,
+  modernize-raw-string-literal,
+  modernize-use-equals-default,
+  modernize-use-default-member-init,
+  modernize-use-emplace,
+  modernize-min-max-use-initializer-list,
+  modernize-use-nodiscard,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-using,
+  performance-*,
+  readability-avoid-const-params-in-decls,
+  readability-const-return-type,
+  readability-container-contains,
+  readability-container-size-empty,
+  readability-identifier-naming,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-redundant-casting,
+  readability-redundant-control-flow,
+  readability-redundant-inline-specifier,
+  readability-redundant-smartptr-get,
+  readability-redundant-typename,
+  readability-redundant-void-arg,
+  readability-simplify-boolean-expr,
+  readability-simplify-subscript-expr,
+  readability-use-anyofallof
+
+CheckOptions:
+  - key:             readability-identifier-naming.MemberCase
+    value:           camelBack
+  - key:             readability-identifier-naming.ParameterCase
+    value:           camelBack
+  - key:             readability-identifier-naming.VariableCase
+    value:           camelBack
+  - key:             readability-identifier-naming.ClassCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.EnumCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.FunctionCase
+    value:           camelBack
+  - key:             readability-identifier-naming.UnionCase
+    value:           CamelCase
+  - key:             readability-redundant-member-init.IgnoreBaseInCopyConstructors
+    value:           1
+  - key:             modernize-use-default-member-init.UseAssignment
+    value:           1
+  - key:             readability-identifier-naming.VariableIgnoredRegexp
+    value:           'DebugType'
+  - key:             readability-identifier-naming.ParameterIgnoredRegexp
+    value:           'LevelOrType'
