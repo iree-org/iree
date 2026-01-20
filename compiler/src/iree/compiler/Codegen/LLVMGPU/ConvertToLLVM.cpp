@@ -364,10 +364,8 @@ public:
       if (auto correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_correlation")) {
         SmallVector<int64_t> correlatedBindings;
-        for (auto attr : correlationAttr) {
-          if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
-            correlatedBindings.push_back(intAttr.getInt());
-          }
+        for (IntegerAttr intAttr : correlationAttr.getAsRange<IntegerAttr>()) {
+          correlatedBindings.push_back(intAttr.getInt());
         }
         if (!correlatedBindings.empty()) {
           bindingCorrelationMap[binding] = std::move(correlatedBindings);
@@ -377,10 +375,8 @@ public:
       if (auto noaliasAttr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_noalias")) {
         SmallVector<int64_t> noaliasBindings;
-        for (auto attr : noaliasAttr) {
-          if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
-            noaliasBindings.push_back(intAttr.getInt());
-          }
+        for (IntegerAttr intAttr : noaliasAttr.getAsRange<IntegerAttr>()) {
+          noaliasBindings.push_back(intAttr.getInt());
         }
         if (!noaliasBindings.empty()) {
           bindingNoaliasMap[binding] = std::move(noaliasBindings);
