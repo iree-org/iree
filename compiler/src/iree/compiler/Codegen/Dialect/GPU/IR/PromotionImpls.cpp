@@ -36,9 +36,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
 }
 
 // Helper to insert a swizzle hint op and flatten the associated alloc.
-Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
-                          Attribute attr,
-                          Codegen::SwizzleAttrInterface swizzle) {
+static Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
+                                 Attribute attr,
+                                 Codegen::SwizzleAttrInterface swizzle) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   int64_t numElements = tensorType.getNumElements();
   SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(builder, loc, v);
@@ -62,8 +62,8 @@ Value swizzlePromoteValue(OpBuilder &builder, Location loc, Value v,
   return copy.getResult(0);
 }
 
-std::optional<Value> promotionImpl(OpBuilder &builder, OpOperand &operand,
-                                   Attribute attr) {
+static std::optional<Value> promotionImpl(OpBuilder &builder,
+                                          OpOperand &operand, Attribute attr) {
   if (auto producer = operand.get().getDefiningOp<TilingInterface>()) {
     // Skip promotion of fills.
     if (isa<linalg::FillOp>(producer)) {
