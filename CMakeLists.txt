@@ -79,6 +79,7 @@ option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
+option(IREE_BUILD_CLANG_TOOLS_EXTRA "Enables building the 'clang-tools-extra' LLVM targets." OFF)
 option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
 
 if(IREE_USE_SYSTEM_DEPS)
@@ -569,10 +570,6 @@ set_property(GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "")
 # and instrumented execution don't line up enough).
 if(IREE_ENABLE_RUNTIME_COVERAGE AND NOT _UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   message(FATAL_ERROR "IREE_ENABLE_*_COVERAGE requires building in Debug")
-endif()
-
-if(IREE_REVERSE_ITERATION)
-  set(LLVM_ENABLE_REVERSE_ITERATION ON CACHE BOOL "" FORCE)
 endif()
 
 #-------------------------------------------------------------------------------
