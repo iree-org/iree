@@ -13,6 +13,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
+#include "iree/compiler/Codegen/Common/CombineLayoutTransformationForMapGather.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
