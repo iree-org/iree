@@ -1786,8 +1786,8 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
       if (i == reductionDim) {
         continue;
       }
-      if (auto sizeAttr = dyn_cast<Attribute>(initSizes[i])) {
-        resultShape.push_back(cast<IntegerAttr>(sizeAttr).getInt());
+      if (auto constantSize = getConstantIntValue(initSizes[i])) {
+        resultShape.push_back(*constantSize);
       } else {
         resultShape.push_back(ShapedType::kDynamic);
       }
@@ -1851,8 +1851,7 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     // that applies the comparator elementwise and updates both value and
     // index accumulators.
     // All operands use identity maps: 1 input + 2 outputs (value, index).
-    AffineMap identityMap =
-        AffineMap::getMultiDimIdentityMap(rank, b.getContext());
+    auto identityMap = AffineMap::getMultiDimIdentityMap(rank, b.getContext());
     SmallVector<AffineMap> indexingMaps(3, identityMap);
     SmallVector<utils::IteratorType> iterators(rank,
                                                utils::IteratorType::parallel);
@@ -1869,12 +1868,12 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
 
           // Track the global index for each element so we can record which
           // position held the selected value.
-          Value localIdx =
+          auto localIdx =
               linalg::IndexOp::create(nestedBuilder, nestedLoc, reductionDim);
           Value offsetVal = getValueOrCreateConstantIndexOp(
               nestedBuilder, nestedLoc, offsets[reductionDim]);
-          Value globalIdx = arith::AddIOp::create(nestedBuilder, nestedLoc,
-                                                  offsetVal, localIdx);
+          auto globalIdx = arith::AddIOp::create(nestedBuilder, nestedLoc,
+                                                 offsetVal, localIdx);
 
           if (Value indexBase = getIndexBase()) {
             globalIdx = arith::AddIOp::create(nestedBuilder, nestedLoc,
@@ -1886,8 +1885,9 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
           Type idxElemType = accIdx.getType();
           Value newIdx = globalIdx;
           if (!idxElemType.isIndex()) {
-            newIdx = arith::IndexCastOp::create(nestedBuilder, nestedLoc,
-                                                idxElemType, globalIdx);
+            auto castedIdx = arith::IndexCastOp::create(
+                nestedBuilder, nestedLoc, idxElemType, globalIdx);
+            newIdx = castedIdx;
           }
 
           // Apply the user-defined comparison logic to decide whether the new
@@ -1907,10 +1907,10 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
           Value predicate =
               mapper.lookup(originalBlock.getTerminator()->getOperand(0));
 
-          Value selectedVal = arith::SelectOp::create(
-              nestedBuilder, nestedLoc, predicate, newVal, accVal);
-          Value selectedIdx = arith::SelectOp::create(
-              nestedBuilder, nestedLoc, predicate, newIdx, accIdx);
+          auto selectedVal = arith::SelectOp::create(nestedBuilder, nestedLoc,
+                                                     predicate, newVal, accVal);
+          auto selectedIdx = arith::SelectOp::create(nestedBuilder, nestedLoc,
+                                                     predicate, newIdx, accIdx);
 
           linalg::YieldOp::create(nestedBuilder, nestedLoc,
                                   ValueRange{selectedVal, selectedIdx});
@@ -2013,16 +2013,16 @@ LogicalResult ArgCompareOp::getPartialResultTilePosition(
   bool isOuterReduction =
       tilingStrategy == ReductionTilingStrategy::PartialReductionOuterReduction;
 
-  for (int64_t i = 0, e = getInputRank(); i < e; ++i) {
+  for (auto [i, offset, size] : llvm::enumerate(offsets, sizes)) {
     if (i == reductionDim) {
       // OuterReduction accumulates in place, always writing to offset 0.
       // OuterParallel writes each chunk to a separate slot indexed by chunkIdx.
       resultOffsets.push_back(isOuterReduction ? b.getIndexAttr(0)
                                                : splitReductionIvs[0]);
-      resultSizes.push_back(isOuterReduction ? sizes[i] : b.getIndexAttr(1));
+      resultSizes.push_back(isOuterReduction ? size : b.getIndexAttr(1));
     } else {
-      resultOffsets.push_back(offsets[i]);
-      resultSizes.push_back(sizes[i]);
+      resultOffsets.push_back(offset);
+      resultSizes.push_back(size);
     }
   }
 

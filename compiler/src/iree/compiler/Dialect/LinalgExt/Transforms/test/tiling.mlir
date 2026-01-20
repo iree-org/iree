@@ -3034,6 +3034,146 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @arg_compare_outer_reduction(%arg0: tensor<4x1x129024xf16>, %out_val: tensor<4x1xf16>, %out_idx: tensor<4x1xi32>) -> (tensor<4x1xf16>, tensor<4x1xi32>) {
+  %0:2 = iree_linalg_ext.arg_compare
+      dimension(2)
+      ins(%arg0 : tensor<4x1x129024xf16>) outs(%out_val, %out_idx : tensor<4x1xf16>, tensor<4x1xi32>) {
+    ^bb0(%in: f16, %init_val: f16):
+      %cmp = arith.cmpf ogt, %in, %init_val : f16
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4x1xf16>, tensor<4x1xi32>
+
+  return %0#0, %0#1 : tensor<4x1xf16>, tensor<4x1xi32>
+}
+
+// CHECK-LABEL: func.func @arg_compare_outer_reduction
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x1x129024xf16>, %[[OUT_VAL:.+]]: tensor<4x1xf16>, %[[OUT_IDX:.+]]: tensor<4x1xi32>)
+
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : index
+// CHECK-DAG: %[[C129024:.+]] = arith.constant 129024 : index
+
+// CHECK-DAG: %[[PARTIAL_VAL_EMPTY:.+]] = tensor.empty() : tensor<4x1x2048xf16>
+// CHECK-DAG: %[[PARTIAL_IDX_EMPTY:.+]] = tensor.empty() : tensor<4x1x2048xi32>
+
+// CHECK-DAG: %[[BROADCAST_VAL:.+]] = linalg.broadcast ins(%[[OUT_VAL]] : tensor<4x1xf16>) outs(%[[PARTIAL_VAL_EMPTY]] : tensor<4x1x2048xf16>) dimensions = [2]
+// CHECK-DAG: %[[BROADCAST_IDX:.+]] = linalg.broadcast ins(%[[OUT_IDX]] : tensor<4x1xi32>) outs(%[[PARTIAL_IDX_EMPTY]] : tensor<4x1x2048xi32>) dimensions = [2]
+
+// CHECK: %[[ITER:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[C129024]] step %[[C2048]] iter_args(%[[VAL_ARG:.+]] = %[[BROADCAST_VAL]], %[[IDX_ARG:.+]] = %[[BROADCAST_IDX]]) -> (tensor<4x1x2048xf16>, tensor<4x1x2048xi32>)
+// CHECK:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, 0, %[[IV]]] [4, 1, 2048] [1, 1, 1]
+// CHECK:   %[[RESULT:.+]]:2 = linalg.generic {{.*}} ins(%[[INPUT_SLICE]] : tensor<4x1x2048xf16>) outs(%[[VAL_ARG]], %[[IDX_ARG]] : tensor<4x1x2048xf16>, tensor<4x1x2048xi32>)
+// CHECK:       linalg.index 2
+// CHECK:       arith.addi %[[IV]]
+// CHECK:       arith.index_cast
+// CHECK:       arith.cmpf ogt
+// CHECK:       arith.select
+// CHECK:       arith.select
+// CHECK:       linalg.yield
+// CHECK:   scf.yield
+
+// CHECK: iree_linalg_ext.arg_compare
+// CHECK:     arith.cmpf ogt
+// CHECK:     iree_linalg_ext.yield
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %arg_compare_op by tile_sizes = [0, 0, 2048] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+func.func @arg_compare_outer_reduction_with_base(%arg0: tensor<2x64x1024xf32>, %base: index, %out_val: tensor<2x64xf32>, %out_idx: tensor<2x64xi32>) -> (tensor<2x64xf32>, tensor<2x64xi32>) {
+  %0:2 = iree_linalg_ext.arg_compare
+      dimension(2)
+      ins(%arg0 : tensor<2x64x1024xf32>) outs(%out_val, %out_idx : tensor<2x64xf32>, tensor<2x64xi32>)
+      index_base(%base : index) {
+    ^bb0(%in: f32, %init_val: f32):
+      %cmp = arith.cmpf ogt, %in, %init_val : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2x64xf32>, tensor<2x64xi32>
+
+  return %0#0, %0#1 : tensor<2x64xf32>, tensor<2x64xi32>
+}
+
+// CHECK-LABEL: func.func @arg_compare_outer_reduction_with_base
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<2x64x1024xf32>, %[[BASE:.+]]: index, %[[OUT_VAL:.+]]: tensor<2x64xf32>, %[[OUT_IDX:.+]]: tensor<2x64xi32>)
+
+// CHECK: linalg.broadcast
+// CHECK: linalg.broadcast
+
+// CHECK: scf.for
+// CHECK:   linalg.generic
+// CHECK:       linalg.index 2
+// CHECK:       arith.addi
+// CHECK:       arith.addi %[[BASE]]
+// CHECK:       arith.cmpf ogt
+// CHECK:       arith.select
+// CHECK:       arith.select
+// CHECK:       linalg.yield
+// CHECK:   scf.yield
+
+// CHECK: iree_linalg_ext.arg_compare
+// CHECK:     arith.cmpf ogt
+// CHECK:     iree_linalg_ext.yield
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %arg_compare_op by tile_sizes = [0, 0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+func.func @arg_compare_outer_reduction_index_type(%arg0: tensor<2x64x1024xf32>, %out_val: tensor<2x64xf32>, %out_idx: tensor<2x64xindex>) -> (tensor<2x64xf32>, tensor<2x64xindex>) {
+  %0:2 = iree_linalg_ext.arg_compare
+      dimension(2)
+      ins(%arg0 : tensor<2x64x1024xf32>) outs(%out_val, %out_idx : tensor<2x64xf32>, tensor<2x64xindex>) {
+    ^bb0(%in: f32, %init_val: f32):
+      %cmp = arith.cmpf ogt, %in, %init_val : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2x64xf32>, tensor<2x64xindex>
+
+  return %0#0, %0#1 : tensor<2x64xf32>, tensor<2x64xindex>
+}
+
+// CHECK-LABEL: func.func @arg_compare_outer_reduction_index_type
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<2x64x1024xf32>, %[[OUT_VAL:.+]]: tensor<2x64xf32>, %[[OUT_IDX:.+]]: tensor<2x64xindex>)
+
+// CHECK: linalg.broadcast
+// CHECK: linalg.broadcast
+
+// Verify OuterReduction uses scf.for with iter_args
+// CHECK: scf.for
+// CHECK:   linalg.generic
+// Verify index computation with index type (no index_cast needed since output uses index type)
+// CHECK:       linalg.index 2
+// CHECK:       arith.addi
+// CHECK:       arith.cmpf ogt
+// CHECK:       arith.select
+// CHECK:       arith.select
+// CHECK:       linalg.yield
+// CHECK:   scf.yield
+
+// Verify merge uses arg_compare in explicit-index mode
+// CHECK: iree_linalg_ext.arg_compare
+// CHECK:     arith.cmpf ogt
+// CHECK:     iree_linalg_ext.yield
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %arg_compare_op by tile_sizes = [0, 0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
