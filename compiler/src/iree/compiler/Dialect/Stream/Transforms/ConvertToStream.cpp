@@ -56,7 +56,7 @@ static bool doesOperationNeedWrapping(Operation *op) {
              return false;
            }
            return !llvm::all_of(result.getUsers(),
-                                llvm::IsaPred<TensorImportOp, tensor::DimOp>);
+                                llvm::IsaPred<TensorImportOp>);
          });
 }
 
@@ -111,6 +111,8 @@ struct GenericResourcePattern : public ConversionPattern {
 
       auto importAffinityAttr =
           affinityAnalysis->lookupResourceAffinity(result);
+      auto dynamicDims =
+          IREE::Util::buildDynamicDimsForValue(op->getLoc(), result, rewriter);
       SmallPtrSet<Operation *, 4> consumingOps;
       auto importedValue = buildTensorImportOp(
           op->getLoc(), result, rewriter.getType<IREE::Stream::ResourceType>(),
@@ -164,10 +166,6 @@ struct GenericResourcePattern : public ConversionPattern {
     // Gather dynamic dimensions from the input value.
     auto dynamicDims =
         IREE::Util::buildDynamicDimsForValue(loc, sourceTensor, builder);
-    // Operations determining the dynamic dimensions must operate on the
-    // original value to avoid a dominance issue.
-    llvm::for_each(dynamicDims,
-                   [&](Value v) { consumingOps.insert(v.getDefiningOp()); });
 
     // Compute the size of the tensor once in the stream resource.
     // This may differ from the external encoding of the tensor as imports are
@@ -293,13 +291,6 @@ struct ConvertToStreamPass final
         context, conversionTarget, typeConverter, &affinityAnalysis, patterns);
     populateHALToStreamConversionPatterns(
         context, conversionTarget, typeConverter, &affinityAnalysis, patterns);
-
-    // We need to allow tensor.dim here, because the import of dynamically
-    // shaped tensors from unknown operations needs to determine the dynamic
-    // dimensions. It is also important that this is marked legal here, or more
-    // specifically after `populateStandardToStreamConversionPatterns`, because
-    // that function would otherwise mark it illegal.
-    conversionTarget.addLegalOp<tensor::DimOp>();
 
     conversionTarget.markUnknownOpDynamicallyLegal(
         [&](Operation *op) -> bool { return !doesOperationNeedWrapping(op); });

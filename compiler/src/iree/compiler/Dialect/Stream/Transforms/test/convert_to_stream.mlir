@@ -68,24 +68,6 @@ util.func public @custom_ops(%arg0: tensor<4x8xf32>) -> tensor<8x4xf32> {
 
 // -----
 
-// Tests that ops producing dynamically shaped tensors in other dialects pass through ok.
-// CHECK-LABEL:   util.func public @custom_dynamic_ops
-// CHECK-SAME:      -> (!stream.resource<*>, index)
-
-util.func public @custom_dynamic_ops() -> tensor<8x?xf32> {
-  // CHECK:           %[[RET_TENSOR:.*]] = "some.op"() : () -> tensor<8x?xf32>
-  %0 = "some.op"() : () -> tensor<8x?xf32>
-  // CHECK:           %[[CONSTANT_1:.*]] = arith.constant 1
-  // CHECK:           %[[DIM_1:.*]] = tensor.dim %[[RET_TENSOR]], %[[CONSTANT_1]]
-  // CHECK:           %[[RET_SIZE:.*]] = stream.tensor.sizeof tensor<8x?xf32>{%[[DIM_1]]}
-  // CHECK:           %[[RET_EXTERNAL:.*]] = stream.tensor.import consume %[[RET_TENSOR]]
-  // CHECK:           %[[RET:.*]] = stream.async.transfer %[[RET_EXTERNAL]]
-  // CHECK:           util.return %[[RET]], %[[RET_SIZE]] : !stream.resource<*>, index
-  util.return %0 : tensor<8x?xf32>
-}
-
-// -----
-
 // This is the while test, which exercises flow control and readbacks but is
 // still simple enough to reason about: tests/e2e/tosa_ops/while.mlir
 // This test is also nice because it contains a check test op, which requires
