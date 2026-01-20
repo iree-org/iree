@@ -577,7 +577,7 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
 
 } // namespace
 
-class FuncConversionPass
+class FuncConversionPass final
     : public impl::FuncConversionPassBase<FuncConversionPass> {
 public:
   using Base::Base;
