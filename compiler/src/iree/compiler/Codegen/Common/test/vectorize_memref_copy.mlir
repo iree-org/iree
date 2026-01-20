@@ -158,6 +158,24 @@ func.func @memref_copy_fully_dynamic(%source: memref<1x4xbf16>, %dest: memref<32
 
 // -----
 
+func.func @memref_copy_dynamic_outer_dim(%source: memref<?x1xf32>, %dest: memref<?x1xf32>) {
+  memref.copy %source, %dest : memref<?x1xf32> to memref<?x1xf32>
+  return
+}
+// CHECK-LABEL: func.func @memref_copy_dynamic_outer_dim
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: memref<?x1xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: memref<?x1xf32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[DIM:.+]] = memref.dim %[[SOURCE]], %[[C0]]
+//       CHECK:   scf.for %[[ARG:.+]] = %[[C0]] to %[[DIM]] step %[[C4]]
+//       CHECK:     %[[MIN:.+]] = affine.min affine_map<(d0)[s0] -> (-d0 + s0, 4)>(%[[ARG]])[%[[DIM]]]
+//       CHECK:     %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[ARG]], 0] [%[[MIN]], 1] [1, 1]
+//       CHECK:     %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][%[[ARG]], 0] [%[[MIN]], 1] [1, 1]
+//       CHECK:     memref.copy %[[SOURCE_SUBVIEW]], %[[DEST_SUBVIEW]]
+
+// -----
+
 // Test that scf.for operations with `_is_tiled` attribute are simplified. The `memref.copy` should still be vectorized as well.
 
 func.func @for_with_tiled_attr(%source: memref<4x?xf32>, %dest: memref<4x?xf32>) {
