@@ -10,6 +10,7 @@ iree_lit_test_suite(
     "bitcast_tensor.mlir"
     "func_conversion.mlir"
     "func_conversion_invalid.mlir"
+    "func_conversion_transients.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
