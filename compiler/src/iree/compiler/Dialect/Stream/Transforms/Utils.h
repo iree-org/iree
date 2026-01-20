@@ -23,7 +23,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 template <typename T>
 SmallVector<const T *> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
   SmallPtrSet<const T *, 4> resultSet;
-  for (auto *dialect : moduleOp.getContext()->getLoadedDialects()) {
+  for (Dialect *dialect : moduleOp.getContext()->getLoadedDialects()) {
     auto *dialectInterface = dialect->getRegisteredInterface<T>();
     if (!dialectInterface) {
       continue;

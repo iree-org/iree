@@ -66,7 +66,7 @@ bool recognizeDispatchEntryPoints(ModuleOp moduleOp, SymbolTable &symbolTable,
       if (!isa<BindingType>(arg.getType())) {
         continue;
       }
-      for (auto *user : arg.getUsers()) {
+      for (Operation *user : arg.getUsers()) {
         auto subspanOp = dyn_cast<BindingSubspanOp>(user);
         if (!subspanOp) {
           result = false;
@@ -108,7 +108,7 @@ updateBindingEncodings(FunctionOpInterface funcOp,
                                  "does not have a valid encoding.\n");
       continue;
     }
-    for (auto *user : arg.getUsers()) {
+    for (Operation *user : arg.getUsers()) {
       auto subspanOp = cast<BindingSubspanOp>(user);
       auto encodingTypeInterface =
           cast<IREE::Encoding::EncodingTypeInterface>(subspanOp.getType());
