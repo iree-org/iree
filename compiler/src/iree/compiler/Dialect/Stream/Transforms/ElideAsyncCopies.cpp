@@ -1139,6 +1139,61 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
 // IREE::Stream::AsyncUpdateOp elision
 //===----------------------------------------------------------------------===//
 
+// Returns true if |user| is a tied operation that fully overwrites the region
+// written by |updateOp|. When a tied operation's result aliases the update's
+// target buffer, downstream reads might access the update region. This is only
+// safe if the tied operation writes to the exact same region (fully
+// overwriting the update's data).
+static bool doesTiedOpFullyOverwriteUpdate(Operation *user,
+                                           IREE::Stream::AsyncUpdateOp updateOp,
+                                           Value target, Value result) {
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
+  if (!tiedOp) {
+    return true; // Not a tied op, no aliasing concern.
+  }
+
+  // Check if any operand using our result is tied.
+  for (auto &operand : user->getOpOperands()) {
+    if (operand.get() != result) {
+      continue;
+    }
+    if (!tiedOp.isOperandTied(operand.getOperandNumber())) {
+      continue;
+    }
+
+    // Result is tied - the operation's result aliases our buffer.
+    // Check if the operation fully overwrites our update region.
+    auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user);
+    if (!accessOp) {
+      // Tied but no access info - conservatively assume it doesn't overwrite.
+      return false;
+    }
+
+    SmallVector<AsyncAccessRange> ranges;
+    accessOp.getAsyncAccessRanges(ranges);
+    for (auto &range : ranges) {
+      // Only check writes to our result/target.
+      if (range.resource != result && range.resource != target) {
+        continue;
+      }
+      if (range.isReadOnly()) {
+        continue;
+      }
+      // Check if this write fully covers our update region.
+      bool sameStart = (range.start == updateOp.getTargetOffset());
+      bool sameEnd = (range.end == updateOp.getTargetEnd());
+      if (sameStart && sameEnd) {
+        return true; // Found a write that fully overwrites.
+      }
+    }
+
+    // Tied operand but no write fully covers the update region.
+    return false;
+  }
+
+  return true; // No tied operands using our result.
+}
+
 // Returns true if |updateOp| is safe to elide by proving the mutation has no
 // observable effect. An update is not observable if no subsequent operation
 // reads from the mutated region.
@@ -1222,31 +1277,16 @@ static bool isSafeToElideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp,
       }
     }
 
-    // Check if result is used by a tied dispatch operation.
-    // When a dispatch is tied to our result, the dispatch's result aliases
-    // our buffer. Downstream operations reading from that dispatch result
-    // may read our update region, but we don't transitively track those reads
-    // through the tied chain. Conservatively block elision unless we can prove
-    // the dispatch fully overwrites our update region.
-    if (auto dispatchOp = dyn_cast<IREE::Stream::AsyncDispatchOp>(user)) {
-      for (auto &operand : user->getOpOperands()) {
-        if (operand.get() != result) {
-          continue;
-        }
-        if (dispatchOp.isOperandTied(operand.getOperandNumber())) {
-          // Result is tied to dispatch - check if dispatch fully overwrites
-          // the update region. If not, downstream reads might access our
-          // update region through the dispatch's tied result.
-          // For now, conservatively block elision for any tied dispatch usage.
-          // TODO(benvanik): check if dispatch write range fully covers update
-          // range, which would make elision safe.
-          LLVM_DEBUG(
-              llvm::dbgs()
-              << "  - result used by tied dispatch; cannot elide (downstream "
-                 "reads may access update region through tied result)\n");
-          return false;
-        }
-      }
+    // Check if result is used by a tied operation. When a tied operation's
+    // result aliases our buffer, downstream reads of that result might access
+    // our update region even if the operation itself writes to a different
+    // region. Block elision unless the operation fully overwrites our update
+    // region.
+    if (!doesTiedOpFullyOverwriteUpdate(user, updateOp, target, result)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - result used by tied op; cannot elide (downstream "
+                    "reads may access update region through tied result)\n");
+      return false;
     }
 
     if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
