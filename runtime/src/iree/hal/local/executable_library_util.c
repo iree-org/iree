@@ -72,20 +72,24 @@ iree_status_t iree_hal_executable_library_initialize_imports(
   // in cases where it needs to JIT, perform FFI/ABI conversion, etc.
   environment->import_thunk = import_thunk;
 
-  // Allocate storage for the imports.
-  iree_host_size_t import_funcs_size =
-      iree_host_align(import_table->count * sizeof(*environment->import_funcs),
-                      iree_max_align_t);
-  iree_host_size_t import_contexts_size = iree_host_align(
-      import_table->count * sizeof(*environment->import_contexts),
-      iree_max_align_t);
+  // Allocate storage for the imports with overflow checking.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t import_contexts_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &total_size,
+              IREE_STRUCT_FIELD_ALIGNED(import_table->count,
+                                        iree_hal_executable_import_v0_t,
+                                        iree_max_align_t, NULL),
+              IREE_STRUCT_FIELD_ALIGNED(import_table->count, const void*,
+                                        iree_max_align_t,
+                                        &import_contexts_offset)));
   uint8_t* base_ptr = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator,
-                                import_funcs_size + import_contexts_size,
-                                (void**)&base_ptr));
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&base_ptr));
   environment->import_funcs = (const iree_hal_executable_import_v0_t*)base_ptr;
-  environment->import_contexts = (const void**)(base_ptr + import_funcs_size);
+  environment->import_contexts =
+      (const void**)(base_ptr + import_contexts_offset);
 
   // Try to resolve each import.
   // Will fail if any required import is not found.

@@ -592,6 +592,49 @@ TEST_F(VMListTest, Reserve) {
   iree_vm_list_release(list);
 }
 
+// Tests that reserving extremely large capacities fails gracefully.
+// This verifies the overflow checking in reserve().
+TEST_F(VMListTest, ReserveOverflow) {
+  iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/0,
+                                     iree_allocator_system(), &list));
+
+  // Request a capacity that would overflow when aligned to 64-element boundary.
+  // IREE_HOST_SIZE_MAX - 32 when aligned up to 64 would overflow.
+  iree_host_size_t overflow_capacity = IREE_HOST_SIZE_MAX - 32;
+  EXPECT_THAT(Status(iree_vm_list_reserve(list, overflow_capacity)),
+              StatusIs(StatusCode::kOutOfRange));
+
+  // List should still be usable after failed reserve.
+  EXPECT_EQ(0, iree_vm_list_size(list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 10));
+  EXPECT_EQ(10, iree_vm_list_size(list));
+
+  iree_vm_list_release(list);
+}
+
+// Tests that resizing to extremely large sizes fails gracefully.
+TEST_F(VMListTest, ResizeOverflow) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/4,
+                                     iree_allocator_system(), &list));
+
+  // Request a size that would overflow when computing storage requirements.
+  iree_host_size_t overflow_size = IREE_HOST_SIZE_MAX / 2;
+  EXPECT_THAT(Status(iree_vm_list_resize(list, overflow_size)),
+              StatusIs(StatusCode::kOutOfRange));
+
+  // List should still be usable after failed resize.
+  EXPECT_EQ(0, iree_vm_list_size(list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 10));
+  EXPECT_EQ(10, iree_vm_list_size(list));
+
+  iree_vm_list_release(list);
+}
+
 // Tests the behavior of resize for truncation and extension on primitives.
 TEST_F(VMListTest, ResizeI32) {
   iree_vm_type_def_t element_type =

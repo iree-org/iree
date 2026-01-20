@@ -110,19 +110,11 @@ static iree_status_t iree_tokenizer_vocab_builder_reserve_strings(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Grow by 2x or to min_capacity, whichever is larger.
-  // Guard against overflow when doubling.
-  iree_host_size_t new_capacity = builder->string_capacity;
-  if (new_capacity <= IREE_HOST_SIZE_MAX / 2) {
-    new_capacity *= 2;
-  }
-  if (new_capacity < min_capacity) new_capacity = min_capacity;
-  if (new_capacity < 256) new_capacity = 256;
-
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_realloc(builder->allocator, new_capacity,
-                                 (void**)&builder->string_data));
-
-  builder->string_capacity = new_capacity;
+      z0,
+      iree_allocator_grow_array(builder->allocator, iree_max(256, min_capacity),
+                                /*element_size=*/1, &builder->string_capacity,
+                                (void**)&builder->string_data));
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

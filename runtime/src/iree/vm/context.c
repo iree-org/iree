@@ -46,6 +46,54 @@ static iree_status_t iree_vm_context_resolve_function_impl(
 
 static void iree_vm_context_destroy(iree_vm_context_t* context);
 
+// Grows the module list to accommodate at least |minimum_capacity| entries.
+// This allocates new parallel arrays and copies the existing entries.
+static iree_status_t iree_vm_context_grow_module_list(
+    iree_vm_context_t* context, iree_host_size_t minimum_capacity) {
+  if (minimum_capacity <= context->list.capacity) {
+    return iree_ok_status();
+  }
+
+  // Calculate new capacity: max(minimum_capacity, current * 2).
+  iree_host_size_t doubled_capacity = 0;
+  if (!iree_host_size_checked_mul(context->list.capacity, 2,
+                                  &doubled_capacity)) {
+    doubled_capacity = minimum_capacity;
+  }
+  iree_host_size_t new_capacity = iree_max(minimum_capacity, doubled_capacity);
+
+  // Allocate new parallel arrays.
+  iree_vm_module_t** new_modules = NULL;
+  iree_vm_module_state_t** new_states = NULL;
+  iree_status_t status =
+      iree_allocator_malloc_array(context->allocator, new_capacity,
+                                  sizeof(new_modules[0]), (void**)&new_modules);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc_array(context->allocator, new_capacity,
+                                    sizeof(new_states[0]), (void**)&new_states);
+  }
+  if (iree_status_is_ok(status)) {
+    // Copy existing entries to new arrays.
+    memcpy(new_modules, context->list.modules,
+           sizeof(new_modules[0]) * context->list.count);
+    memcpy(new_states, context->list.module_states,
+           sizeof(new_states[0]) * context->list.count);
+    // Free old arrays (only if dynamically allocated).
+    if (context->list.capacity > 0) {
+      iree_allocator_free(context->allocator, context->list.modules);
+      iree_allocator_free(context->allocator, context->list.module_states);
+    }
+    context->list.modules = new_modules;
+    context->list.module_states = new_states;
+    context->list.capacity = new_capacity;
+  } else {
+    // Cleanup partial allocation on failure.
+    iree_allocator_free(context->allocator, new_modules);
+  }
+  return status;
+}
+
 // Allocates a process-unique ID for a context to use.
 static iree_vm_context_id_t iree_vm_context_allocate_id(void) {
   static iree_atomic_int32_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
@@ -507,43 +555,25 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Try growing both our storage lists first, if needed.
-  if (context->list.count + module_count > context->list.capacity) {
+  // Calculate required capacity with overflow checking.
+  iree_host_size_t required_capacity = 0;
+  if (!iree_host_size_checked_add(context->list.count, module_count,
+                                  &required_capacity)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "module count overflow");
+  }
+
+  // Try growing our storage lists first, if needed.
+  if (required_capacity > context->list.capacity) {
     if (context->is_frozen) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "context was allocated as static and cannot "
                               "register modules after creation");
     }
-    iree_host_size_t new_capacity = context->list.capacity + module_count;
-    if (new_capacity < context->list.capacity * 2) {
-      // TODO(benvanik): tune list growth for module count >> 4.
-      new_capacity = context->list.capacity * 2;
-    }
-    iree_vm_module_t** new_module_list = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_malloc(context->allocator,
-                                  sizeof(iree_vm_module_t*) * new_capacity,
-                                  (void**)&new_module_list));
-    iree_vm_module_state_t** new_module_state_list = NULL;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_allocator_malloc(context->allocator,
-                              sizeof(iree_vm_module_state_t*) * new_capacity,
-                              (void**)&new_module_state_list));
-    memcpy(new_module_list, context->list.modules,
-           sizeof(iree_vm_module_t*) * context->list.count);
-    memcpy(new_module_state_list, context->list.module_states,
-           sizeof(iree_vm_module_state_t*) * context->list.count);
-    // The existing memory is only dynamically allocated if it has been
-    // grown.
-    if (context->list.capacity > 0) {
-      iree_allocator_free(context->allocator, context->list.modules);
-      iree_allocator_free(context->allocator, context->list.module_states);
-    }
-    context->list.modules = new_module_list;
-    context->list.module_states = new_module_state_list;
-    context->list.capacity = new_capacity;
+        z0, iree_vm_context_grow_module_list(context, required_capacity));
   }
 
   // VM stack used to call into module __init methods.
