@@ -50,11 +50,11 @@ static FuncInfo analyzeFunction(IREE::VM::FuncOp funcOp,
   funcOp.walk([&](Operation *op) {
     // Collect callees.
     if (auto callOp = dyn_cast<IREE::VM::CallOp>(op)) {
-      if (auto callee = symbolTable.lookup(callOp.getCallee())) {
+      if (auto *callee = symbolTable.lookup(callOp.getCallee())) {
         info.callees.push_back(callee);
       }
     } else if (auto callOp = dyn_cast<IREE::VM::CallVariadicOp>(op)) {
-      if (auto callee = symbolTable.lookup(callOp.getCallee())) {
+      if (auto *callee = symbolTable.lookup(callOp.getCallee())) {
         info.callees.push_back(callee);
       }
     }

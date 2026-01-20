@@ -2518,7 +2518,7 @@ private:
       return success();
     }
 
-    auto ctx = builder.getContext();
+    auto *ctx = builder.getContext();
 
     auto arguments =
         emitc::MemberOp::create(builder, loc,
@@ -3018,7 +3018,7 @@ class CallYieldableOpConversion
       return op.emitError() << "callee must be an import for yieldable call";
     }
 
-    auto ctx = op->getContext();
+    auto *ctx = op->getContext();
     auto loc = op.getLoc();
 
     auto moduleOp =
@@ -3174,7 +3174,7 @@ class CallVariadicYieldableOpConversion
       return op.emitError() << "callee must be an import for yieldable call";
     }
 
-    auto ctx = op->getContext();
+    auto *ctx = op->getContext();
     auto loc = op.getLoc();
 
     auto moduleOp =

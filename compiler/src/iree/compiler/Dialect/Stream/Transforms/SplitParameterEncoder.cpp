@@ -1710,7 +1710,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
     };
     llvm::MapVector<StringAttr, SmallVector<OutputReservation>> scopeOutputs;
     SmallVector<Value> outputSizes;
-    for (auto &output : step.expr->outputs) {
+    for (const EncodingExpr::Output &output : step.expr->outputs) {
       auto it = step.outputMap.find(&output);
       if (it == step.outputMap.end()) {
         continue; // no serialization required
@@ -1817,7 +1817,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
     }
 
     // Scatter the outputs into the parameter(s) for each scope.
-    for (auto [scope, outputReservations] : scopeOutputs) {
+    for (const auto &[scope, outputReservations] : scopeOutputs) {
       for (auto &reservation : outputReservations) {
         Location outputLoc = reservation.output->getLoc();
         Value outputValue =
@@ -1841,7 +1841,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
 
     // Scatter parameters from the transient slab into each target scope.
     SmallVector<Value> scatterTimepoints;
-    for (auto [scope, outputReservations] : scopeOutputs) {
+    for (const auto &[scope, outputReservations] : scopeOutputs) {
       SmallVector<Location> outputLocs;
       SmallVector<Value> sourceOffsets;
       SmallVector<Value> sourceEnds;
@@ -1930,7 +1930,7 @@ static void replaceEncodedExprs(ArrayRef<TargetPlan> targetPlans) {
     }
 
     for (auto &output : step.expr->outputs) {
-      auto it = step.outputMap.find(&output);
+      const auto *it = step.outputMap.find(&output);
       if (it == step.outputMap.end()) {
         continue; // no serialization required
       }
@@ -2023,8 +2023,7 @@ static FailureOr<TargetPlan> planDefaultTarget(const EncodingExprSet &exprSet,
       -1);
 
   ParameterIndexBuilder parameterIndexBuilder(scope, encodingPolicy);
-  for (int i = 0; i < exprSet.exprs.size(); ++i) {
-    const EncodingExpr &expr = exprSet.exprs[i];
+  for (const EncodingExpr &expr : exprSet.exprs) {
     auto outputMapOr = parameterIndexBuilder.insertExpr(&expr);
     if (failed(outputMapOr)) {
       return mlir::emitError(expr.getLoc(),
@@ -2033,18 +2032,17 @@ static FailureOr<TargetPlan> planDefaultTarget(const EncodingExprSet &exprSet,
     targetPlan.appendExpr(&expr, std::move(outputMapOr.value()));
   }
   ParameterIndex parameterIndex = parameterIndexBuilder.finalize();
-  for (auto &entry : parameterIndex.entries) {
-    targetPlan.parameterEntries[std::make_pair(scope, entry.key)] = entry;
+  for (ParameterEntry &entry : parameterIndex.entries) {
+    targetPlan.parameterEntries[{scope, entry.key}] = entry;
   }
   targetPlan.parameterIndices.push_back(std::move(parameterIndex));
   return targetPlan;
 }
 
-struct SplitParameterEncoderPass
-    : public IREE::Stream::impl::SplitParameterEncoderPassBase<
+struct SplitParameterEncoderPass final
+    : IREE::Stream::impl::SplitParameterEncoderPassBase<
           SplitParameterEncoderPass> {
-  using IREE::Stream::impl::SplitParameterEncoderPassBase<
-      SplitParameterEncoderPass>::SplitParameterEncoderPassBase;
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     mlir::ModuleOp moduleOp = getOperation();

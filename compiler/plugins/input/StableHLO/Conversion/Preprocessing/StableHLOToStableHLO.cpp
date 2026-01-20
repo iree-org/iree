@@ -770,15 +770,15 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 
     // Compute the permutation require to transpose the batch dimensions to
     // the beginning.
-    auto updates = op.getUpdates();
-    auto updates0 = updates.front();
+    ValueRange updates = op.getUpdates();
+    Value updates0 = updates.front();
     auto updates0Ty = cast<ShapedType>(updates0.getType());
-    auto updatedWindowDims = dimNumbers.getUpdateWindowDims();
+    ArrayRef<int64_t> updatedWindowDims = dimNumbers.getUpdateWindowDims();
 
     // Determine which dimensions are batch dimensions.
     llvm::SmallVector<bool> isBatch(updates0Ty.getRank(), true);
-    for (int i = 0, s = updatedWindowDims.size(); i < s; ++i) {
-      isBatch[updatedWindowDims[i]] = false;
+    for (int64_t updatedWindowDim : updatedWindowDims) {
+      isBatch[updatedWindowDim] = false;
     }
 
     // Permute batch dimensions to the start of the update tensor.
@@ -807,8 +807,8 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
         auto updateTy = cast<ShapedType>(update.getType());
         llvm::SmallVector<int64_t> newShape;
         newShape.reserve(updateTy.getRank());
-        for (int i = 0, s = updatePerm.size(); i < s; i++) {
-          newShape.push_back(updateTy.getDimSize(updatePerm[i]));
+        for (long i : updatePerm) {
+          newShape.push_back(updateTy.getDimSize(i));
         }
         update = mlir::stablehlo::TransposeOp::create(
             builder, updateTy.clone(newShape), update,
