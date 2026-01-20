@@ -48,17 +48,33 @@ ENVIRONMENT VARIABLES
     Values: ON/YES/TRUE/Y/1 (enabled), OFF/NO/FALSE/N/0 (disabled)
     Defaults: local-sync, local-task, vulkan enabled (matches CMake)
 
-    Note: Compiler backends are always built in Bazel (plugin architecture).
+    Compiler Plugins:
+      IREE_COMPILER_PLUGINS=all      - All buildable plugins (default)
+      IREE_COMPILER_PLUGINS=all,-X   - All except plugin X
+      IREE_COMPILER_PLUGINS=X,Y      - Only plugins X and Y
+
+    Plugin detection (for "all"):
+      - CUDA: requires CUDA_ROOT/CUDA_HOME/CUDA_PATH or nvcc in PATH
+      - ROCm: requires ROCM_PATH/ROCM_ROOT/ROCM_HOME or hipcc in PATH
+      - Metal: requires macOS
+      - StableHLO: requires third_party/stablehlo submodule
+      - Torch: requires third_party/torch-mlir submodule
 
 EXAMPLES
-    # Configure with defaults
+    # Configure with defaults (all buildable plugins)
     iree-bazel-configure
 
-    # Enable CUDA
+    # Enable CUDA runtime driver
     IREE_HAL_DRIVER_CUDA=ON iree-bazel-configure
 
-    # Enable multiple drivers
+    # Enable multiple runtime drivers
     IREE_HAL_DRIVER_CUDA=ON IREE_HAL_DRIVER_VULKAN=ON iree-bazel-configure
+
+    # Exclude torch plugin (faster builds)
+    IREE_COMPILER_PLUGINS="all,-input_torch" iree-bazel-configure
+
+    # Only specific plugins
+    IREE_COMPILER_PLUGINS="hal_target_llvm_cpu,hal_target_vulkan_spirv" iree-bazel-configure
 
 AFTER CONFIGURATION
     iree-bazel-build      Build IREE targets
@@ -84,6 +100,11 @@ iree_info "Configuring IREE for Bazel in ${IREE_BAZEL_WORKTREE_DIR}..."
 # Run platform detection.
 if [[ -f "configure_bazel.py" ]]; then
     iree_info "Running configure_bazel.py..."
+    # Default to all buildable plugins unless explicitly set.
+    # Users who want selective plugins can set IREE_COMPILER_PLUGINS explicitly.
+    if [[ -z "${IREE_COMPILER_PLUGINS:-}" ]]; then
+        export IREE_COMPILER_PLUGINS="all"
+    fi
     python3 configure_bazel.py
 else
     iree_error "configure_bazel.py not found in ${IREE_BAZEL_WORKTREE_DIR}"
@@ -126,6 +147,11 @@ EOF
     iree_info "Created user.bazelrc with recommended settings"
 else
     iree_info "user.bazelrc already exists, skipping"
+    # Warn if user has set cache dir but file already exists
+    if [[ -n "${IREE_BAZEL_CACHE_DIR:-}" ]]; then
+        iree_warn "IREE_BAZEL_CACHE_DIR is set but user.bazelrc already exists."
+        iree_warn "Delete user.bazelrc and re-run to apply new cache directory."
+    fi
 fi
 
 iree_info "Configuration complete!"

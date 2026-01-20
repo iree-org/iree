@@ -1,0 +1,55 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# bazel-to-cmake: skip
+# This file contains Bazel-specific plugin configuration with no CMake equivalent.
+# CMake plugin registration uses iree_compiler_register_plugin() in each plugin's
+# CMakeLists.txt instead.
+
+load(":plugins.bzl", "iree_compiler_plugins")
+
+package(default_visibility = ["//visibility:public"])
+
+# All compiler plugins with their registration targets.
+# The macro generates:
+#   - config_setting: {plugin_id}_enabled
+#   - genrule: {plugin_id}_plugin_id -> {plugin_id}.inc
+#   - filegroup: plugins_incs (all enabled .inc files)
+#   - cc_library: plugins_deps (all enabled registration deps)
+iree_compiler_plugins(
+    name = "plugins",
+    # Plugins enabled by default (torch requires opt-in)
+    default_plugins = [
+        "input_stablehlo",
+        "input_tosa",
+        "hal_target_cuda",
+        "hal_target_llvm_cpu",
+        "hal_target_local",
+        "hal_target_metal_spirv",
+        "hal_target_rocm",
+        "hal_target_vmvx",
+        "hal_target_vulkan_spirv",
+        "example",
+        "simple_io_sample",
+    ],
+    plugins = {
+        # Input plugins
+        "input_stablehlo": "//compiler/plugins/input/StableHLO:registration",
+        "input_tosa": "//compiler/plugins/input/TOSA:registration",
+        "input_torch": "//compiler/plugins/input/Torch:registration",
+        # Target plugins
+        "hal_target_cuda": "//compiler/plugins/target/CUDA",
+        "hal_target_llvm_cpu": "//compiler/plugins/target/LLVMCPU",
+        "hal_target_local": "//compiler/plugins/target/Local",
+        "hal_target_metal_spirv": "//compiler/plugins/target/MetalSPIRV",
+        "hal_target_rocm": "//compiler/plugins/target/ROCM",
+        "hal_target_vmvx": "//compiler/plugins/target/VMVX",
+        "hal_target_vulkan_spirv": "//compiler/plugins/target/VulkanSPIRV",
+        # Sample plugins
+        "example": "//samples/compiler_plugins/example:registration",
+        "simple_io_sample": "//samples/compiler_plugins/simple_io_sample:registration",
+    },
+)

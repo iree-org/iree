@@ -12,28 +12,17 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Generates StaticLinkedPlugins.inc by concatenating .inc files from all enabled
+# plugins. Each .inc file contains a single HANDLE_PLUGIN_ID(plugin_id) macro.
+#
+# Plugin selection is controlled by --//compiler/plugins:enabled_plugins flag.
+# Use the --iree_compiler_plugins flag alias for convenience:
+#   bazel build --iree_compiler_plugins=input_stablehlo,hal_target_llvm_cpu //tools:iree-compile
 genrule(
     name = "StaticLinkedPlugins_inc__generate",
+    srcs = ["//compiler/plugins:plugins_incs"],
     outs = ["StaticLinkedPlugins.inc"],
-    # TODO: Should be pulling from a file generated in @iree_plugins which
-    # derives its content from the environment.
-    # For now, just enumerate all in-tree plugins.
-    cmd = (
-        "echo '" +
-        "HANDLE_PLUGIN_ID(hal_target_cuda)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_llvm_cpu)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_local)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_metal_spirv)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_rocm)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_vmvx)\n" +
-        "HANDLE_PLUGIN_ID(hal_target_vulkan_spirv)\n" +
-        "HANDLE_PLUGIN_ID(input_tosa)\n" +
-        "HANDLE_PLUGIN_ID(input_stablehlo)\n" +
-        # Samples
-        "HANDLE_PLUGIN_ID(example)\n" +
-        "HANDLE_PLUGIN_ID(simple_io_sample)\n" +
-        "' > $@"
-    ),
+    cmd = "touch $@ && cat $(SRCS) >> $@",
 )
 
 iree_compiler_cc_library(
@@ -43,20 +32,5 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "StaticLinkedPlugins",
     hdrs = ["StaticLinkedPlugins.inc"],
-    deps = [
-        # TODO: Should depend on a generated target in @iree_plugins which
-        # generates its deps from the environment.
-        # For now, we just hard include all in-tree plugins.
-        "//compiler/plugins/target/CUDA",
-        "//compiler/plugins/target/LLVMCPU",
-        "//compiler/plugins/target/Local",
-        "//compiler/plugins/target/MetalSPIRV",
-        "//compiler/plugins/target/ROCM",
-        "//compiler/plugins/target/VMVX",
-        "//compiler/plugins/target/VulkanSPIRV",
-        "//compiler/plugins/input/StableHLO:registration",
-        "//compiler/plugins/input/TOSA:registration",
-        "//samples/compiler_plugins/example:registration",
-        "//samples/compiler_plugins/simple_io_sample:registration",
-    ],
+    deps = ["//compiler/plugins:plugins_deps"],
 )

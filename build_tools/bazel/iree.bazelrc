@@ -45,7 +45,8 @@ build --force_pic
 ###############################################################################
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
-build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_runtime_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_compiler_plugins=//compiler/plugins:enabled_plugins
 build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
 # Builds the runtime with tracing support enabled.
