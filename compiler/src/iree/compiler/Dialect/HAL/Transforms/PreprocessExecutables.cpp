@@ -144,7 +144,7 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
 #endif // _WIN32
   Tokenize(command, stringSaver, rawArgs, /*MarkEOLs=*/false);
   SmallVector<StringRef> args;
-  for (auto rawArg : rawArgs) {
+  for (const char *rawArg : rawArgs) {
     args.push_back(StringRef(rawArg));
   }
 
