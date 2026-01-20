@@ -381,18 +381,6 @@ public:
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
-
-      // Check if this binding has correlation or noalias information.
-      // - Correlation: bindings in the same group point to the same resource
-      //   but with different offsets (noalias).
-      // - Noalias: bindings pointing to different resources (noalias).
-      auto correlationIt = bindingCorrelationMap.find(idx);
-      auto noaliasIt = bindingNoaliasMap.find(idx);
-
-      // It is safe to set the noalias attribute as it is guaranteed that the
-      // ranges within bindings won't alias. The correlation and noalias
-      // information above provides additional precision about which specific
-      // bindings don't alias with each other.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNonNullAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
