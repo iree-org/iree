@@ -14,6 +14,7 @@ class TargetConverter:
         self._repo_map = repo_map
 
         iree_core_repo = self._repo_alias("@iree_core")
+        torch_mlir_cmake_prefix = "iree::compiler::plugins::input::Torch"
         self._update_target_mappings(
             {
                 # Internal utilities to emulate various binary/library options.
@@ -107,6 +108,49 @@ class TargetConverter:
                 ],
                 "@stablehlo//:vhlo_ops": [
                     "VhloOps",
+                ],
+                # Torch-MLIR.
+                #
+                # The CMake vendor shim groups several fine-grained Bazel
+                # overlay libraries into coarser CMake libraries.
+                "@torch-mlir//:TorchMLIRConversionPasses": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTMTensorDialect": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir-dialects::TMTensorDialectIR",
+                ],
+                "@torch-mlir//:TorchMLIRTorchConversionDialect": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::TorchConversionDialectIR",
+                ],
+                "@torch-mlir//:TorchMLIRTorchConversionPasses": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchConversionToMLProgram": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchDialect": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::TorchDialectIR",
+                ],
+                "@torch-mlir//:TorchMLIRTorchOnnxToTorch": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::TorchOnnxToTorchPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchPasses": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::TorchDialectPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchToArith": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchToLinalg": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchToSCF": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchToTMTensor": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
+                ],
+                "@torch-mlir//:TorchMLIRTorchToTensor": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::ConversionPasses",
                 ],
                 # HIP
                 "@hip_api_headers//:headers": [

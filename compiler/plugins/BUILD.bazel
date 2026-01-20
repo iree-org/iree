@@ -1,0 +1,29 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# bazel-to-cmake: skip
+# This file contains Bazel-specific plugin configuration with no CMake equivalent.
+# CMake plugin registration uses iree_compiler_register_plugin() in each plugin's
+# CMakeLists.txt instead.
+
+load("@//build_tools/bazel:default_compiler_plugins.bzl", "iree_default_compiler_plugin_ids", "iree_default_compiler_plugins")
+load(":plugins.bzl", "iree_compiler_plugins")
+
+package(default_visibility = ["//visibility:public"])
+
+# All compiler plugins with their registration targets.
+# The macro generates:
+#   - config_setting: {plugin_id}_enabled
+#   - genrule: {plugin_id}_plugin_id -> {plugin_id}.inc
+#   - filegroup: plugins_incs (all enabled .inc files)
+#   - cc_library: plugins_deps (all enabled registration deps)
+iree_compiler_plugins(
+    name = "plugins",
+    # Plugins enabled by the plain Bazel default. configure_bazel.py may
+    # override this list and opt into torch when torch-mlir is available.
+    default_plugins = iree_default_compiler_plugin_ids(),
+    plugins = iree_default_compiler_plugins(),
+)

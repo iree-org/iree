@@ -345,6 +345,9 @@ iree-bazel-test //...
 # Reconfigure to enable multiple drivers
 IREE_HAL_DRIVER_CUDA=ON IREE_HAL_DRIVER_VULKAN=ON iree-bazel-configure
 
+# Reconfigure compiler plugins
+IREE_COMPILER_PLUGINS="all,-input_torch" iree-bazel-configure
+
 # Run tool from current directory
 iree-bazel-run //tools:iree-compile -- input.mlir -o output.vmfb
 
@@ -390,6 +393,17 @@ go install github.com/bazelbuild/bazel-watcher/cmd/ibazel@latest
     - `IREE_HAL_DRIVER_CUDA=ON`: Enable CUDA driver
     - `IREE_HAL_DRIVER_VULKAN=ON`: Enable Vulkan driver
     - Values: ON/YES/TRUE/Y/1 or OFF/NO/FALSE/N/0
+- `IREE_COMPILER_PLUGINS`: Select statically linked compiler plugins
+    (configure-time, default: `all` buildable plugins)
+    - `IREE_COMPILER_PLUGINS=all`: Enable every plugin whose prerequisites are
+      available
+    - `IREE_COMPILER_PLUGINS=all,-input_torch`: Enable all buildable plugins
+      except `input_torch`
+    - `IREE_COMPILER_PLUGINS=hal_target_llvm_cpu,input_tosa`: Enable only the
+      listed plugins
+- `VULKAN_SDK`: Vulkan SDK root for Bazel repository rules. If unset,
+    `iree-bazel-configure` probes `vulkaninfo` and common SDK install paths and
+    writes a detected SDK path to `configured.bazelrc`.
 - `IREE_FUZZ_CACHE`: Fuzzer corpus cache
     (default: `~/.cache/iree-fuzz-cache`)
 - `IREE_FUZZ_CORPUS`: Fuzzer dictionaries

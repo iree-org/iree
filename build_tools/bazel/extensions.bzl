@@ -13,13 +13,25 @@ load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
 
-    # Create llvm-raw only when IREE is the root module.
-    # This allows downstream consumers to provide their own LLVM.
-    if any([m.is_root and m.name == "iree_core" for m in module_ctx.modules]):
+    iree_is_root = any([m.is_root and m.name == "iree_core" for m in module_ctx.modules])
+
+    # Create MLIR-adjacent source repositories only when IREE is the root
+    # module. Downstream consumers can provide their own LLVM, StableHLO, and
+    # torch-mlir repositories when IREE is part of a larger project.
+    if iree_is_root:
         new_local_repository(
             name = "llvm-raw",
             build_file_content = "# empty",
             path = "third_party/llvm-project",
+        )
+        local_repository(
+            name = "stablehlo",
+            path = "third_party/stablehlo",
+        )
+        new_local_repository(
+            name = "torch-mlir-raw",
+            build_file_content = "# empty - BUILD files overlaid by torch_mlir_configure",
+            path = "third_party/torch-mlir",
         )
 
     # Googletest
@@ -40,12 +52,6 @@ def _iree_extension_impl(module_ctx):
         name = "vulkan_headers",
         build_file = "@iree_core//:build_tools/third_party/vulkan_headers/BUILD.overlay",
         path = "third_party/vulkan_headers",
-    )
-
-    # StableHLO
-    local_repository(
-        name = "stablehlo",
-        path = "third_party/stablehlo",
     )
 
     # Benchmark

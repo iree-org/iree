@@ -43,12 +43,24 @@ _PLATFORM_CMAKE_SYSTEM_NAME = {
     "@platforms//cpu:wasm32": "wasm_32",
 }
 
+_COMPILER_PLUGIN_CMAKE_OPTIONS = {
+    "//compiler/plugins:input_stablehlo_enabled": "IREE_INPUT_STABLEHLO",
+    "//compiler/plugins:input_torch_enabled": "IREE_INPUT_TORCH",
+    "//compiler/plugins:input_tosa_enabled": "IREE_INPUT_TOSA",
+    "//compiler/plugins:hal_target_cuda_enabled": "IREE_TARGET_BACKEND_CUDA",
+    "//compiler/plugins:hal_target_llvm_cpu_enabled": "IREE_TARGET_BACKEND_LLVM_CPU",
+    "//compiler/plugins:hal_target_metal_spirv_enabled": "IREE_TARGET_BACKEND_METAL_SPIRV",
+    "//compiler/plugins:hal_target_rocm_enabled": "IREE_TARGET_BACKEND_ROCM",
+    "//compiler/plugins:hal_target_vmvx_enabled": "IREE_TARGET_BACKEND_VMVX",
+    "//compiler/plugins:hal_target_vulkan_spirv_enabled": "IREE_TARGET_BACKEND_VULKAN_SPIRV",
+}
 
-class PlatformSelect:
-    """Represents a platform-conditional value from a Bazel select().
+
+class ConditionSelect:
+    """Represents a supported conditional value from a Bazel select().
 
     Carries the full condition→value mapping so that the rule handler can emit
-    CMake if/elseif/else blocks for platform-specific deps.
+    CMake if/elseif/else blocks for platform- or option-specific values.
     """
 
     def __init__(self, conditions):
@@ -57,29 +69,29 @@ class PlatformSelect:
         self.conditions = conditions
 
     def __radd__(self, other):
-        """Support: unconditional_list + PlatformSelect(...)."""
+        """Support: unconditional_list + ConditionSelect(...)."""
         if isinstance(other, list):
             return MixedDeps(unconditional=list(other), selects=[self])
         return NotImplemented
 
     def __add__(self, other):
-        """Support: PlatformSelect(...) + unconditional_list."""
+        """Support: ConditionSelect(...) + unconditional_list."""
         if isinstance(other, list):
             return MixedDeps(unconditional=list(other), selects=[self])
         return NotImplemented
 
 
 class MixedDeps:
-    """A deps value containing both unconditional entries and PlatformSelects.
+    """A deps value containing both unconditional entries and ConditionSelects.
 
-    Created by list + PlatformSelect concatenation in BUILD file exec context.
+    Created by list + ConditionSelect concatenation in BUILD file exec context.
     The rule handler splits this into a normal DEPS block (unconditional) plus
     CMake variable(s) for the conditional portions.
     """
 
     def __init__(self, unconditional, selects):
         self.unconditional = unconditional  # List of dep labels.
-        self.selects = selects  # List of PlatformSelect objects.
+        self.selects = selects  # List of ConditionSelect objects.
 
     def __add__(self, other):
         """Support: MixedDeps + list (e.g., cfg.py injecting extra deps)."""
@@ -163,37 +175,42 @@ class BuildFileFunctions(object):
             return f'IREE_ARCH STREQUAL "{cmake_name}"'
         return f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
 
+    def _convert_select_condition(self, label):
+        """Returns a CMake condition string for a supported select condition."""
+        condition = self._convert_platform_condition(label)
+        if condition:
+            return condition
+        return _COMPILER_PLUGIN_CMAKE_OPTIONS.get(label)
+
     def _emit_platform_guard_begin(self, target_compatible_with):
         """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
         if not target_compatible_with:
             return
 
-        # Handle PlatformSelect from select() in target_compatible_with.
+        # Handle ConditionSelect from select() in target_compatible_with.
         # Example: select({"@platforms//os:linux": [], "@platforms//os:macos": [],
         #                  "//conditions:default": ["@platforms//:incompatible"]})
-        # Platforms with empty list are compatible; default with incompatible means
-        # "only build on the explicitly listed platforms".
-        if isinstance(target_compatible_with, PlatformSelect):
-            compatible_platforms = []
+        # Conditions with empty list are compatible; default with incompatible
+        # means "only build when one of the explicitly listed conditions matches".
+        if isinstance(target_compatible_with, ConditionSelect):
+            compatible_conditions = []
             for label, value in target_compatible_with.conditions.items():
                 if label == "//conditions:default":
                     continue
-                # Empty list means compatible on this platform.
+                # Empty list means compatible for this condition.
                 if value == []:
-                    cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(label)
-                    if cmake_name:
-                        compatible_platforms.append(
-                            f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
-                        )
-            if compatible_platforms:
-                combined = " OR ".join(compatible_platforms)
+                    condition = self._convert_select_condition(label)
+                    if condition:
+                        compatible_conditions.append(condition)
+            if compatible_conditions:
+                combined = " OR ".join(compatible_conditions)
                 self._converter.body += f"if({combined})\n"
             return
 
         # target_compatible_with is a list of constraints (typically one).
         conditions = []
         for label in target_compatible_with:
-            cond = self._convert_platform_condition(label)
+            cond = self._convert_select_condition(label)
             if cond:
                 conditions.append(cond)
             else:
@@ -208,12 +225,12 @@ class BuildFileFunctions(object):
         if not target_compatible_with:
             return
 
-        # Handle PlatformSelect: check if any compatible platforms were found.
-        if isinstance(target_compatible_with, PlatformSelect):
+        # Handle ConditionSelect: check if any compatible conditions were found.
+        if isinstance(target_compatible_with, ConditionSelect):
             has_compatible = any(
                 label != "//conditions:default"
                 and value == []
-                and label in _PLATFORM_CMAKE_SYSTEM_NAME
+                and self._convert_select_condition(label)
                 for label, value in target_compatible_with.conditions.items()
             )
             if has_compatible:
@@ -223,7 +240,7 @@ class BuildFileFunctions(object):
 
         # Only emit if all labels are recognized (same check as begin).
         if all(
-            label in _PLATFORM_CMAKE_SYSTEM_NAME for label in target_compatible_with
+            self._convert_select_condition(label) for label in target_compatible_with
         ):
             # Strip trailing blank line from the target body so endif() is
             # adjacent to the closing paren.
@@ -231,16 +248,16 @@ class BuildFileFunctions(object):
             self._converter.body += f"endif()\n\n"
 
     def _convert_platform_select_deps(self, name, deps):
-        """Handles deps that may contain PlatformSelect entries.
+        """Handles deps that may contain ConditionSelect entries.
 
         If deps is a plain list, returns (converted_deps_block, "").
-        If deps is a MixedDeps or PlatformSelect, emits a CMake variable
+        If deps is a MixedDeps or ConditionSelect, emits a CMake variable
         with if/elseif/else blocks before the target and returns
         (converted_deps_block_with_variable, variable_block).
         """
         if deps is None:
             return self._convert_target_list_block("DEPS", None), ""
-        if isinstance(deps, PlatformSelect):
+        if isinstance(deps, ConditionSelect):
             deps = MixedDeps(unconditional=[], selects=[deps])
         if not isinstance(deps, MixedDeps):
             return self._convert_target_list_block("DEPS", deps), ""
@@ -254,7 +271,7 @@ class BuildFileFunctions(object):
             for label, values in ps.conditions.items():
                 if label == "//conditions:default":
                     continue
-                cond = self._convert_platform_condition(label)
+                cond = self._convert_select_condition(label)
                 if not cond:
                     self._convert_unimplemented_function("select condition", label)
                     continue
@@ -649,13 +666,13 @@ class BuildFileFunctions(object):
 
     def select(self, d):
         # Check if all condition keys (except //conditions:default) are known
-        # platform conditions. If so, return a PlatformSelect that the rule
-        # handler can convert to CMake if/elseif/else blocks.
+        # conditions. If so, return a ConditionSelect that the rule handler can
+        # convert to CMake if/elseif/else blocks.
         non_default_keys = [k for k in d if k != "//conditions:default"]
         if non_default_keys and all(
-            k in _PLATFORM_CMAKE_SYSTEM_NAME for k in non_default_keys
+            self._convert_select_condition(k) for k in non_default_keys
         ):
-            return PlatformSelect(d)
+            return ConditionSelect(d)
         # Unrecognized conditions: fall back to default-only with a warning.
         self._convert_unimplemented_function("select", str(d))
         return d.get("//conditions:default", [])
@@ -1362,7 +1379,15 @@ class BuildFileFunctions(object):
         )
 
     def iree_lit_test_suite(
-        self, name, srcs, tools=None, data=None, tags=None, timeout=None, **kwargs
+        self,
+        name,
+        srcs,
+        tools=None,
+        data=None,
+        tags=None,
+        timeout=None,
+        target_compatible_with=None,
+        **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
             return
@@ -1373,6 +1398,7 @@ class BuildFileFunctions(object):
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
+        self._emit_platform_guard_begin(target_compatible_with)
         self._converter.body += (
             f"iree_lit_test_suite(\n"
             f"{name_block}"
@@ -1383,6 +1409,7 @@ class BuildFileFunctions(object):
             f"{timeout_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_check_single_backend_test_suite(
         self,
