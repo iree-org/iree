@@ -204,7 +204,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
     // This tells us which other bindings are in the same correlation group
     // (i.e., point to the same resource but with different offsets, so they
     // don't alias each other).
-    // 
+    //
     // For bindings in different correlation groups (pointing to different
     // resources), we also store this information so that LLVM codegen can
     // infer that they don't alias each other (noalias).
@@ -214,27 +214,25 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
       if (binding.index() == otherBinding.index()) {
         continue;
       }
-      
+
       if (binding.value().correlationMap ==
           otherBinding.value().correlationMap) {
         // Same correlation group: same resource, different offsets (noalias)
-        correlatedIndices.push_back(
-            IntegerAttr::get(IntegerType::get(funcOp.getContext(), 32),
-                            otherBinding.index()));
+        correlatedIndices.push_back(IntegerAttr::get(
+            IntegerType::get(funcOp.getContext(), 32), otherBinding.index()));
       } else {
         // Different correlation groups: different resources (noalias)
-        noaliasIndices.push_back(
-            IntegerAttr::get(IntegerType::get(funcOp.getContext(), 32),
-                            otherBinding.index()));
+        noaliasIndices.push_back(IntegerAttr::get(
+            IntegerType::get(funcOp.getContext(), 32), otherBinding.index()));
       }
     }
     if (!correlatedIndices.empty()) {
       funcOp.setArgAttr(bindingArg.getArgNumber(), "stream.binding_correlation",
-                       ArrayAttr::get(funcOp.getContext(), correlatedIndices));
+                        ArrayAttr::get(funcOp.getContext(), correlatedIndices));
     }
     if (!noaliasIndices.empty()) {
       funcOp.setArgAttr(bindingArg.getArgNumber(), "stream.binding_noalias",
-                       ArrayAttr::get(funcOp.getContext(), noaliasIndices));
+                        ArrayAttr::get(funcOp.getContext(), noaliasIndices));
     }
   }
 

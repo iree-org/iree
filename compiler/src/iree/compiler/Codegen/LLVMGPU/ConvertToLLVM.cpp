@@ -341,11 +341,11 @@ public:
 
     // Set argument attributes.
     Attribute unit = rewriter.getUnitAttr();
-    
-    // Build a map from HAL binding index to correlation group and noalias bindings.
-    // This allows us to determine which bindings are in the same correlation
-    // group (i.e., point to the same resource but with different offsets) and
-    // which bindings point to different resources (noalias).
+
+    // Build a map from HAL binding index to correlation group and noalias
+    // bindings. This allows us to determine which bindings are in the same
+    // correlation group (i.e., point to the same resource but with different
+    // offsets) and which bindings point to different resources (noalias).
     DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
     DenseMap<int64_t, SmallVector<int64_t>> bindingNoaliasMap;
     for (auto subspan : subspans) {
@@ -375,20 +375,20 @@ public:
         }
       }
     }
-    
+
     for (auto [idx, info] : llvm::enumerate(bindingsInfo)) {
       // As a convention with HAL all the kernel argument pointers are 16Bytes
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
-      
+
       // Check if this binding has correlation or noalias information.
       // - Correlation: bindings in the same group point to the same resource
       //   but with different offsets (noalias).
       // - Noalias: bindings pointing to different resources (noalias).
       auto correlationIt = bindingCorrelationMap.find(idx);
       auto noaliasIt = bindingNoaliasMap.find(idx);
-      
+
       // It is safe to set the noalias attribute as it is guaranteed that the
       // ranges within bindings won't alias. The correlation and noalias
       // information above provides additional precision about which specific
