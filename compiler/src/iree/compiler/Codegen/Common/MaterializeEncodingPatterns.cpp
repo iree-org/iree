@@ -304,7 +304,8 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
   }
   if (destType.getEncoding()) {
     value = IREE::Encoding::SetEncodingOp::create(
-        rewriter, src.getLoc(), destType, value, /*encoding_dims=*/ValueRange{});
+        rewriter, src.getLoc(), destType, value,
+        /*encoding_dims=*/ValueRange{});
   }
   return value;
 }

@@ -226,14 +226,14 @@ void ParameterOptions::bindOptions(OptionsBinder &binder) {
   // Deprecated flags aliasing the new ones above.
   binder.opt<std::string>(
       "iree-opt-export-parameters", exportPath,
-      deprecated("use --iree-parameter-export=<path> instead"),
+      Deprecated("use --iree-parameter-export=<path> instead"),
       llvm::cl::Hidden,
       llvm::cl::desc("File path to an archive to export parameters to with an "
                      "optional `scope=` prefix."),
       llvm::cl::cat(category));
   binder.opt<std::string>(
       "iree-opt-splat-parameters", splatPath,
-      deprecated("use --iree-parameter-splat=<path> instead"), llvm::cl::Hidden,
+      Deprecated("use --iree-parameter-splat=<path> instead"), llvm::cl::Hidden,
       llvm::cl::desc(
           "File path to create a parameter archive of splat values out of all "
           "parameter backed globals."),
