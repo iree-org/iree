@@ -404,7 +404,7 @@ detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
     return std::nullopt;
   }
   auto valueAttrs = storageAttr.getValue();
-  if (valueAttrs.empty()) {
+  if (valueAttrs.empty() || resultIndex >= valueAttrs.size()) {
     return std::nullopt;
   }
   if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
