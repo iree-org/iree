@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Utils/ShapeUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler {
 
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
-                        ShapedType rhsType, ValueRange rhsDynamicDims) {
+                        ShapedType rhsType, ValueRange rhsDynamicDims,
+                        bool allowCasting) {
   if (lhsType.hasStaticShape() && rhsType.hasStaticShape()) {
     // Static shape equivalence means we can fast-path the check.
     return lhsType == rhsType;
@@ -17,25 +19,68 @@ bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   if (lhsType.getRank() != rhsType.getRank()) {
     return false;
   }
-  unsigned dynamicDimIndex = 0;
+  unsigned lhsDynDimIdx = 0;
+  unsigned rhsDynDimIdx = 0;
   unsigned numNonmatchingSSADims = 0;
   for (unsigned i = 0; i < lhsType.getRank(); ++i) {
-    if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
-      // Static/dynamic dimension mismatch - definitely differ.
-      return false;
-    } else if (lhsType.isDynamicDim(i)) {
-      unsigned j = dynamicDimIndex++;
-      if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
+    bool lhsIsDynamic = lhsType.isDynamicDim(i);
+    bool rhsIsDynamic = rhsType.isDynamicDim(i);
+    if (lhsIsDynamic && rhsIsDynamic) {
+      // Both dynamic - compare SSA values.
+      if (lhsDynamicDims[lhsDynDimIdx] != rhsDynamicDims[rhsDynDimIdx]) {
         numNonmatchingSSADims++;
       }
+      lhsDynDimIdx++;
+      rhsDynDimIdx++;
+    } else if (lhsIsDynamic) {
+      if (!allowCasting) {
+        return false;
+      }
+      // lhs is dynamic, rhs is static - check if dynamic is a matching
+      // constant.
+      std::optional<int64_t> lhsConst =
+          getConstantIntValue(lhsDynamicDims[lhsDynDimIdx]);
+      if (!lhsConst || *lhsConst != rhsType.getDimSize(i)) {
+        return false;
+      }
+      lhsDynDimIdx++;
+    } else if (rhsIsDynamic) {
+      if (!allowCasting) {
+        return false;
+      }
+      // lhs is static, rhs is dynamic - check if dynamic is a matching
+      // constant.
+      std::optional<int64_t> rhsConst =
+          getConstantIntValue(rhsDynamicDims[rhsDynDimIdx]);
+      if (!rhsConst || *rhsConst != lhsType.getDimSize(i)) {
+        return false;
+      }
+      rhsDynDimIdx++;
     } else {
+      // Both static - compare sizes directly.
       if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
-        // Static dimensions differ.
         return false;
       }
     }
   }
   return numNonmatchingSSADims <= 1;
+}
+
+bool compareShapesEqualExceptLastDim(ShapedType lhsType,
+                                     ValueRange lhsDynamicDims,
+                                     ShapedType rhsType,
+                                     ValueRange rhsDynamicDims,
+                                     bool allowCasting) {
+  if (lhsType.isDynamicDim(lhsType.getRank() - 1)) {
+    lhsDynamicDims = lhsDynamicDims.drop_back();
+  }
+  if (rhsType.isDynamicDim(rhsType.getRank() - 1)) {
+    rhsDynamicDims = rhsDynamicDims.drop_back();
+  }
+  ShapedType newLhsType = lhsType.clone(lhsType.getShape().drop_back());
+  ShapedType newRhsType = rhsType.clone(rhsType.getShape().drop_back());
+  return compareShapesEqual(newLhsType, lhsDynamicDims, newRhsType,
+                            rhsDynamicDims, allowCasting);
 }
 
 bool isCastableToTensorType(Type from, RankedTensorType to) {

@@ -53,9 +53,11 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     }
 
     // All dims except last must match (last dim can differ due to element type
-    // size change).
-    if (bitcastOp.getSourceDims().drop_back() !=
-        bitcastOp.getResultDims().drop_back()) {
+    // size change). This also filters out rank mismatches.
+    if (!compareShapesEqualExceptLastDim(
+            bitcastOp.getSource().getType(), bitcastOp.getSourceDims(),
+            bitcastOp.getResult().getType(), bitcastOp.getResultDims(),
+            /*allowCasting=*/true)) {
       return failure();
     }
 
@@ -69,30 +71,52 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     int64_t resDynamicDim = 0;
     SmallVector<int64_t> newResultSizes(resShape);
     // Drop the dynamic dims that become static after incorporating the cast.
-    for (auto [castSize, sourceSize] : llvm::zip_equal(
-             tensorCastSrcType.getShape(), intermediateTensorType.getShape())) {
-      if (!ShapedType::isDynamic(sourceSize)) {
-        continue;
-      }
+    for (auto [idx, sizes] : llvm::enumerate(
+             llvm::zip_equal(tensorCastSrcType.getShape(),
+                             intermediateTensorType.getShape(), resShape))) {
+      auto [castSize, sourceSize, resSize] = sizes;
 
-      while (!ShapedType::isDynamic(resShape[resDynamicDim])) {
-        ++resDynamicDim;
-      }
-
-      APInt cst;
       if (ShapedType::isDynamic(castSize)) {
         newDynSrcDims.push_back(
             bitcastOp.getSourceDims()[intermediateDynamicDim]);
-        newDynDestDims.push_back(
-            bitcastOp.getResultDims()[intermediateDynamicDim]);
-      } else if (matchPattern(bitcastOp.getResultDims()[intermediateDynamicDim],
-                              m_ConstantInt(&cst))) {
-        newResultSizes[resDynamicDim] = cst.getSExtValue();
-      } else {
-        newResultSizes[resDynamicDim] = castSize;
       }
-      ++intermediateDynamicDim;
-      ++resDynamicDim;
+
+      bool isLastDim = idx == resShape.size() - 1;
+      std::optional<int64_t> inferredSize;
+
+      // Try cast source static info (except for last dim).
+      if (ShapedType::isStatic(castSize) && !isLastDim) {
+        inferredSize = castSize;
+      }
+      // Try bitcast source dim, dynamic value is constant (except for last
+      // dim).
+      if (!inferredSize && ShapedType::isDynamic(sourceSize) && !isLastDim) {
+        inferredSize = getConstantIntValue(
+            bitcastOp.getSourceDims()[intermediateDynamicDim]);
+      }
+      // Try bitcast result static info.
+      if (!inferredSize && ShapedType::isStatic(resSize)) {
+        inferredSize = resSize;
+      }
+      // Try bitcast result dim, dynamic value is constant.
+      if (!inferredSize && ShapedType::isDynamic(resSize)) {
+        inferredSize =
+            getConstantIntValue(bitcastOp.getResultDims()[resDynamicDim]);
+      }
+
+      // Apply the inferred size or keep dynamic.
+      if (inferredSize) {
+        newResultSizes[idx] = *inferredSize;
+      } else if (ShapedType::isDynamic(resSize)) {
+        newDynDestDims.push_back(bitcastOp.getResultDims()[resDynamicDim]);
+      }
+
+      if (ShapedType::isDynamic(sourceSize)) {
+        ++intermediateDynamicDim;
+      }
+      if (ShapedType::isDynamic(resSize)) {
+        ++resDynamicDim;
+      }
     }
 
     auto newType =
