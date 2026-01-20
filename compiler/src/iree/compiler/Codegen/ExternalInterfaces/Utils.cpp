@@ -74,7 +74,7 @@ static Value computePackedIndex(OpBuilder &builder, Location loc,
   } else {
     // With swizzle: inner dimensions are expanded and permuted.
     // We need to compute the inner index from the expanded dimensions.
-    const auto &swizzle = *encodingInfo.swizzle;
+    const IREE::Codegen::TileSwizzle &swizzle = *encodingInfo.swizzle;
     ArrayRef<IREE::Codegen::TileSwizzle::Dim> expandDims =
         swizzle.expandShape[innerIdx];
 

@@ -704,24 +704,24 @@ func.func @vecmat_lowering_f32f32f32(
 // -----
 
 // Test that linalg.index ops are correctly remapped to account for packed dimensions.
-// The output tensor is packed as tensor<1x1x4x16x4xf32> with swizzle permutation.
-// Original dim 0 (M) maps to: d4 + d2*4 (inner_m * stride + outer_m)
-// Original dim 1 (N) maps to: d3 (inner_n)
+// The output tensor is packed as tensor<8x29x4x16x4xf32> with swizzle permutation.
+// Original dim 0 (M) maps to: d0 * 16 + (d4 + d2 * 4)
+// Original dim 1 (N) maps to: d1 * 16 + d3
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, 16, 64]>
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [123, 456, 789]>
 func.func @generic_with_linalg_index(
-    %arg0: tensor<16x16xf32, #encoding>
-) -> tensor<16x16xf32, #encoding> {
+    %arg0: tensor<123x456xf32, #encoding>
+) -> tensor<123x456xf32, #encoding> {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 0xFF800000 : f32
-  %0 = tensor.empty() : tensor<16x16xf32, #encoding>
+  %0 = tensor.empty() : tensor<123x456xf32, #encoding>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]
-  } ins(%arg0 : tensor<16x16xf32, #encoding>) outs(%0 : tensor<16x16xf32, #encoding>) {
+  } ins(%arg0 : tensor<123x456xf32, #encoding>) outs(%0 : tensor<123x456xf32, #encoding>) {
   ^bb0(%in: f32, %out: f32):
     %2 = linalg.index 0 : index
     %3 = linalg.index 1 : index
@@ -729,18 +729,25 @@ func.func @generic_with_linalg_index(
     %5 = arith.select %4, %cst, %cst_0 : f32
     %6 = arith.addf %in, %5 : f32
     linalg.yield %6 : f32
-  } -> tensor<16x16xf32, #encoding>
-  return %1 : tensor<16x16xf32, #encoding>
+  } -> tensor<123x456xf32, #encoding>
+  return %1 : tensor<123x456xf32, #encoding>
 }
 // CHECK-LABEL: func.func @generic_with_linalg_index(
-// CHECK-SAME:    %[[ARG0:.+]]: tensor<1x1x4x16x4xf32>
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<8x29x4x16x4xf32>
+// CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 // CHECK:       linalg.generic
-// CHECK-SAME:    ins(%[[ARG0]] : tensor<1x1x4x16x4xf32>)
+// CHECK-SAME:    ins(%[[ARG0]] : tensor<8x29x4x16x4xf32>)
 // CHECK:       ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// CHECK-DAG:     %[[D0:.+]] = linalg.index 0 : index
 // CHECK-DAG:     %[[D4:.+]] = linalg.index 4 : index
 // CHECK-DAG:     %[[D2:.+]] = linalg.index 2 : index
-// CHECK:         %[[MUL:.+]] = arith.muli %[[D2]], %[[C4]] : index
-// CHECK:         %[[IDX0:.+]] = arith.addi %[[D4]], %[[MUL]] : index
-// CHECK:         %[[IDX1:.+]] = linalg.index 3 : index
+// CHECK:         %[[MUL0:.+]] = arith.muli %[[D2]], %[[C4]] : index
+// CHECK:         %[[INNER0:.+]] = arith.addi %[[D4]], %[[MUL0]] : index
+// CHECK:         %[[OUTER0:.+]] = arith.muli %[[D0]], %[[C16]] : index
+// CHECK:         %[[IDX0:.+]] = arith.addi %[[OUTER0]], %[[INNER0]] : index
+// CHECK-DAG:     %[[D1:.+]] = linalg.index 1 : index
+// CHECK-DAG:     %[[D3:.+]] = linalg.index 3 : index
+// CHECK:         %[[OUTER1:.+]] = arith.muli %[[D1]], %[[C16]] : index
+// CHECK:         %[[IDX1:.+]] = arith.addi %[[OUTER1]], %[[D3]] : index
 // CHECK:         arith.cmpi sge, %[[IDX0]], %[[IDX1]] : index
