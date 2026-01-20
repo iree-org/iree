@@ -190,9 +190,9 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   SmallVector<BlockArgument> newBindingArgs;
   auto bindingType = IREE::Stream::BindingType::get(funcOp.getContext());
   auto offsetType = IndexType::get(funcOp.getContext());
-  for (auto binding : llvm::enumerate(bindings)) {
+  for (auto [idx, binding] : llvm::enumerate(bindings)) {
     SmallVector<Location> locs;
-    for (unsigned oldIdx : binding.value().correlationMap.set_bits()) {
+    for (unsigned oldIdx : binding.correlationMap.set_bits()) {
       locs.push_back(oldBindingArgs[oldIdx].getLoc());
     }
     auto loc = FusedLoc::get(funcOp.getContext(), locs);
@@ -210,20 +210,19 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
     // infer that they don't alias each other (noalias).
     SmallVector<Attribute> correlatedIndices;
     SmallVector<Attribute> noaliasIndices;
-    for (auto otherBinding : llvm::enumerate(bindings)) {
-      if (binding.index() == otherBinding.index()) {
+    for (auto [otherIdx, otherBinding] : llvm::enumerate(bindings)) {
+      if (idx == otherIdx) {
         continue;
       }
 
-      if (binding.value().correlationMap ==
-          otherBinding.value().correlationMap) {
+      if (binding.correlationMap == otherBinding.correlationMap) {
         // Same correlation group: same resource, different offsets (noalias)
         correlatedIndices.push_back(IntegerAttr::get(
-            IntegerType::get(funcOp.getContext(), 32), otherBinding.index()));
+            IntegerType::get(funcOp.getContext(), 32), otherIdx));
       } else {
         // Different correlation groups: different resources (noalias)
         noaliasIndices.push_back(IntegerAttr::get(
-            IntegerType::get(funcOp.getContext(), 32), otherBinding.index()));
+            IntegerType::get(funcOp.getContext(), 32), otherIdx));
       }
     }
     if (!correlatedIndices.empty()) {
