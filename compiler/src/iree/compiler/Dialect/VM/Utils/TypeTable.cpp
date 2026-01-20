@@ -17,7 +17,7 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
     if (auto refPtrType = dyn_cast<IREE::VM::RefType>(type)) {
       type = refPtrType.getObjectType();
     }
-    if (typeMap.count(type)) {
+    if (typeMap.contains(type)) {
       return;
     }
     std::string str;

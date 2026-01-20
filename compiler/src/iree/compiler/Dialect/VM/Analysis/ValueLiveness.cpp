@@ -260,7 +260,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values entering the block and dying within.
     for (auto value : blockSets.liveIn) {
-      if (blockSets.liveOut.count(value)) {
+      if (blockSets.liveOut.contains(value)) {
         continue;
       }
       Operation *lastUse = &block.front();
@@ -280,7 +280,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values defined within the block and not escaping.
     for (auto value : blockSets.defined) {
-      if (blockSets.liveOut.count(value)) {
+      if (blockSets.liveOut.contains(value)) {
         continue;
       }
       Operation *firstUse =
@@ -313,7 +313,7 @@ ArrayRef<Value> ValueLiveness::getBlockLiveOuts(Block *block) {
 
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
-  if (blockSets.liveOut.count(value)) {
+  if (blockSets.liveOut.contains(value)) {
     // Value is escapes the block the useOp is in so it is definitely not the
     // last use.
     return false;
@@ -370,7 +370,7 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
 
   // Check if value escapes block.
   auto &blockSets = blockLiveness_[useOp->getBlock()];
-  if (blockSets.liveOut.count(value)) {
+  if (blockSets.liveOut.contains(value)) {
     // Value is in liveOut. For non-terminators, this means the value has uses
     // after this block, so it's not at last use.
     if (!useOp->hasTrait<OpTrait::IsTerminator>()) {

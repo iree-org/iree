@@ -41,7 +41,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
       addressOfOps.push_back(addressOfOp);
     }
   });
-  if (addressOfOps.size() == 0) {
+  if (addressOfOps.empty()) {
     return;
   }
   OpBuilder builder(moduleOp);

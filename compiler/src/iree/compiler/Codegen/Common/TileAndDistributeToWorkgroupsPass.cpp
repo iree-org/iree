@@ -106,7 +106,7 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
   for (auto loopId : llvm::seq<unsigned>(0, tileSizes.size())) {
-    if (partitionableLoopsSet.count(loopId)) {
+    if (partitionableLoopsSet.contains(loopId)) {
       continue;
     }
     tileSizes[loopId] = 0;

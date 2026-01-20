@@ -234,7 +234,7 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   }
   llvm::SmallSetVector<Block *, 8> markedBlocks;
   std::function<void(Block *)> visit = [&](Block *block) {
-    if (markedBlocks.count(block) > 0) {
+    if (markedBlocks.contains(block)) {
       return;
     }
     for (auto *childBlock : dominanceInfo.getNode(block)->children()) {

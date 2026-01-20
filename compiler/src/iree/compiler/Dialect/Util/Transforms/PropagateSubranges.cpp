@@ -314,7 +314,7 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
   if (!resultResource) {
     return;
   }
-  if (subrangeMap.count(resultResource)) {
+  if (subrangeMap.contains(resultResource)) {
     return;
   }
 
