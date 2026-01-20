@@ -348,7 +348,7 @@ public:
     // offsets) and which bindings point to different resources (noalias).
     DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
     DenseMap<int64_t, SmallVector<int64_t>> bindingNoaliasMap;
-    for (auto subspan : subspans) {
+    for (IREE::HAL::InterfaceBindingSubspanOp subspan : subspans) {
       int64_t binding = subspan.getBinding().getSExtValue();
       // Try to read correlation information from the original function.
       // Note: This assumes the correlation attribute was preserved through
