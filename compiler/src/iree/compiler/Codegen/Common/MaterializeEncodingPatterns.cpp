@@ -300,11 +300,11 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
   if (srcType.getEncoding()) {
     value = IREE::Encoding::UnsetEncodingOp::create(
         rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims,
-        /*encodingDims=*/ValueRange{});
+        /*encoding_dims=*/ValueRange{});
   }
   if (destType.getEncoding()) {
     value = IREE::Encoding::SetEncodingOp::create(
-        rewriter, src.getLoc(), destType, value, /*encodingDims=*/ValueRange{});
+        rewriter, src.getLoc(), destType, value, /*encoding_dims=*/ValueRange{});
   }
   return value;
 }
