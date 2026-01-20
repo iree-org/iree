@@ -350,8 +350,13 @@ The key points include:
    strongly recommended that contributors write PR descriptions themselves (if
    needed, using tools for translation or copy-editing)." This also extends to
    code documentation, issue descriptions, and design proposals.
+ 4. "Contributors are responsible for ensuring that they have the right to
+   contribute code under the terms of our license, [...]. Using AI tools to
+   regenerate copyrighted material does not remove the copyright, and
+   contributors are responsible for ensuring that such material does not appear
+   in their contributions."
 
-We extend the LLVM policy with an exception for bot-authored contributions
+We extend the LLVM policy with an exception for AI bot-authored contributions
 (e.g., updating dependencies, fixing build script, etc.); bot account may create
 Pull Requests as long as the bot maintainers ensure they are first in line and
 primarily responsible for reviewing those contributions.
