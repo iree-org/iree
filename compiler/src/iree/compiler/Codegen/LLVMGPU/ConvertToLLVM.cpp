@@ -389,20 +389,6 @@ public:
       auto correlationIt = bindingCorrelationMap.find(idx);
       auto noaliasIt = bindingNoaliasMap.find(idx);
       
-      if (correlationIt != bindingCorrelationMap.end() && !correlationIt->second.empty()) {
-        // This binding is in a correlation group. The bindings in the same
-        // group don't alias each other (different offsets).
-        // TODO: In the future, we could use alias.scope metadata to be more
-        // precise about which bindings don't alias with each other.
-      }
-      
-      if (noaliasIt != bindingNoaliasMap.end() && !noaliasIt->second.empty()) {
-        // This binding points to a different resource than the bindings in
-        // noaliasIt->second. They are guaranteed to not alias.
-        // TODO: In the future, we could use alias.scope metadata to be more
-        // precise about which bindings don't alias with each other.
-      }
-      
       // It is safe to set the noalias attribute as it is guaranteed that the
       // ranges within bindings won't alias. The correlation and noalias
       // information above provides additional precision about which specific
