@@ -171,3 +171,18 @@ util.func public @linalg_with_dynamic_dims(%arg0: tensor<?x?xf32>) -> tensor<?x?
 //  CHECK-SAME:       ins(%[[START]] :
 //       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[GENERIC]]
 //       CHECK:   util.return %[[END]]
+
+// -----
+
+util.func public @with_tensor_ext_bitcast(%arg0: tensor<512x32xf4E2M1FN>) -> tensor<4x128x16xi8> {
+  %bitcast = iree_tensor_ext.bitcast %arg0 : tensor<512x32xf4E2M1FN> -> tensor<512x16xi8>
+  %expanded = tensor.expand_shape %bitcast [[0, 1], [2]] output_shape [4, 128, 16] : tensor<512x16xi8> into tensor<4x128x16xi8>
+  util.return %expanded : tensor<4x128x16xi8>
+}
+// CHECK-LABEL: util.func public @with_tensor_ext_bitcast
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[ARG0]]
+//       CHECK:   %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[START]]
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[BITCAST]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
+//       CHECK:   util.return %[[END]]
