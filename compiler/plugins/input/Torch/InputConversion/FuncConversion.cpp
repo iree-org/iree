@@ -652,7 +652,7 @@ public:
     // Determine whether to build pure async or async + sync wrapper.
     bool generateSyncWrapper = true;
     // Determine whether to include a new transient buffer input to the
-    // generated async wrapper.
+    // generated async function and corresponding sync wrapper.
     bool externalizeTransientMemory = externalizeTransients;
     StringRef originalName = torchFunc.getName();
     std::string asyncFunctionName = originalName.str();
