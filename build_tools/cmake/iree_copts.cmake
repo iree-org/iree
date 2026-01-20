@@ -174,6 +174,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-const-variable"
     "-Wno-unused-function"
     "-Wno-unused-private-field"
+    "-Wno-pointer-sign"
 
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
