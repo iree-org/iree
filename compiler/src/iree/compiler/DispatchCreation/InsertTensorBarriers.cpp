@@ -61,26 +61,6 @@ static void collectInputsToComputeRegion(Value val,
   }
 }
 
-// Traverse backward along use-def chains starting from `val` to identify values
-// produced by compute operations. These values are candidates for inserting
-// compute_barrier.end operations.
-static void
-collectOutputsFromComputeRegion(Value val, llvm::SetVector<Value> &outputValues,
-                                llvm::DenseSet<Value> &visited) {
-  Operation *definingOp = val.getDefiningOp();
-  if (!definingOp || !visited.insert(val).second) {
-    return;
-  }
-
-  if (isComputeOp(definingOp)) {
-    outputValues.insert(val);
-  } else {
-    llvm::for_each(definingOp->getOperands(), [&](Value operand) {
-      collectOutputsFromComputeRegion(operand, outputValues, visited);
-    });
-  }
-}
-
 struct InsertTensorBarriersPass final
     : public impl::InsertTensorBarriersPassBase<InsertTensorBarriersPass> {
   using Base::Base;
@@ -112,22 +92,29 @@ struct InsertTensorBarriersPass final
     }
 
     // Insert compute_barrier.end operations for values that flow out of compute
-    // ops.
+    // ops. We find compute operation results that are used by non-compute
+    // operations. This approach works even when the function doesn't directly
+    // return tensor values (e.g., when they flow through HAL operations).
     llvm::SetVector<Value> needsEndBarrier;
-    visited.clear();
     funcOp.walk([&](Operation *op) {
-      if (!op->hasTrait<OpTrait::ReturnLike>()) {
+      if (!isComputeOp(op)) {
         return;
       }
-      for (Value operand : op->getOperands()) {
-        collectOutputsFromComputeRegion(operand, needsEndBarrier, visited);
+      for (Value result : op->getResults()) {
+        if (!isa<RankedTensorType>(result.getType())) {
+          continue;
+        }
+        const bool hasNonComputeUse =
+            llvm::any_of(result.getUsers(), [](Operation *user) {
+              return !isComputeOp(user) && !isa<tensor::DimOp>(user);
+            });
+        if (hasNonComputeUse) {
+          needsEndBarrier.insert(result);
+        }
       }
     });
 
     for (Value val : needsEndBarrier) {
-      if (!isa<RankedTensorType>(val.getType())) {
-        continue;
-      }
       Operation *definingOp = val.getDefiningOp();
       if (!definingOp) {
         continue;
