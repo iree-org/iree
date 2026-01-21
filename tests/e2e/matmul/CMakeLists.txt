@@ -1216,7 +1216,8 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-${_CDNA_ARCH}"
+    "requires-gpu-cdna3"
+    "requires-gpu-cdna4"
 )
 
 iree_generated_e2e_runner_test(
@@ -1245,7 +1246,8 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-${_CDNA_ARCH}"
+    "requires-gpu-cdna3"
+    "requires-gpu-cdna4"
 )
 
 iree_generated_e2e_runner_test(
@@ -1274,7 +1276,8 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-${_CDNA_ARCH}"
+    "requires-gpu-cdna3"
+    "requires-gpu-cdna4"
 )
 
 iree_generated_e2e_runner_test(
@@ -1303,7 +1306,8 @@ iree_generated_e2e_runner_test(
     "nomsan"
     "notsan"
     "noubsan"
-    "requires-gpu-${_CDNA_ARCH}"
+    "requires-gpu-cdna3"
+    "requires-gpu-cdna4"
 )
 
 iree_generated_e2e_runner_test(
