@@ -1123,7 +1123,7 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       updatedResults.set(index);
     }
 
-    if (updatedResults.all()) {
+    if (didUpdate && updatedResults.all()) {
       // If we have replaced all results with a tensor.empty, there is no need
       // to update the operation in the next step.
       return success();
