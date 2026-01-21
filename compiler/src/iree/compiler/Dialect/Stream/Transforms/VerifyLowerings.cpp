@@ -6,7 +6,11 @@
 
 #include <utility>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
@@ -14,6 +18,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -255,6 +260,41 @@ struct VerifyInputPass
     verifier.addIllegalOp<IREE::Util::GlobalAddressOp>();
     verifier.addIllegalOp<IREE::Util::GlobalLoadIndirectOp>();
     verifier.addIllegalOp<IREE::Util::GlobalStoreIndirectOp>();
+
+    // Verify that we don't try to import dynamically shaped tensors from
+    // non-size, non-shape aware unknown operations, as we won't be able to
+    // determine their size during lowering to Stream resources.
+    verifier.addOpVerifier([](Operation *op)
+                               -> std::optional<Verifier::Legality> {
+      if (llvm::IsaPred<mlir::linalg::LinalgDialect, IREE::Util::UtilDialect,
+                        IREE::Encoding::IREEEncodingDialect,
+                        IREE::LinalgExt::IREELinalgExtDialect,
+                        IREE::HAL::HALDialect>(op->getDialect())) {
+        return std::nullopt;
+      }
+      if (llvm::IsaPred<mlir::tensor::EmptyOp, IREE::Codegen::UKernelGenericOp>(
+              op)) {
+        return std::nullopt;
+      }
+
+      auto anyDynamicTensorTy = [](TypeRange types) {
+        return llvm::any_of(types, [](Type t) {
+          if (auto tensorTy = dyn_cast<TensorType>(t)) {
+            return !tensorTy.hasStaticShape();
+          }
+          return false;
+        });
+      };
+      if (!llvm::IsaPred<IREE::Util::ShapeAwareOpInterface,
+                         IREE::Util::SizeAwareOpInterface>(op) &&
+          anyDynamicTensorTy(op->getResultTypes())) {
+        op->emitOpError()
+            << "cannot import dynamically shaped tensor from unknown "
+               "operation that is not size- or shape-aware";
+        return Verifier::Legality::ILLEGAL;
+      }
+      return std::nullopt;
+    });
 
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
