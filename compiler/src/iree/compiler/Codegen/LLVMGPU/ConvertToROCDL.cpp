@@ -137,41 +137,6 @@ static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
 
 } // namespace
 
-template <typename... Floats>
-static bool containsAPred(Type type) {
-  type = getElementTypeOrSelf(type);
-  return isa<Floats...>(type);
-}
-
-// Function to check valid data types on the ROCm backend.
-// Note to readers: different chips take different FP8 formats but re-use the
-// same instruction and intrinsic names, so we must filter out the "wrong" FP8
-// here.
-static LogicalResult validateDataTypes(Operation *op,
-                                       const amdgpu::Chipset &chipset) {
-  constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
-  if (!amdgpu::hasOcpFp8(chipset)) {
-    auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
-    if (llvm::any_of(op->getOperandTypes(), pred) ||
-        llvm::any_of(op->getResultTypes(), pred)) {
-      return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
-                             "gfx942 (MI-300) or older chipsets; try "
-                             "F8E5M2FNUZ or F8E4M3FNUZ instead.");
-    }
-  }
-
-  if (chipset != kGfx942) {
-    auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
-    if (llvm::any_of(op->getOperandTypes(), pred) ||
-        llvm::any_of(op->getResultTypes(), pred)) {
-      return op->emitOpError(
-          "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
-          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
-    }
-  }
-  return success();
-}
-
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -234,17 +199,6 @@ struct ConvertToROCDLPass final
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct);
-      // These patterns only convert a subset of arith that target specific
-      // rocdl intrinsics (e.g. fp8 conversions).
-      WalkResult allTypesValid = m.walk([&](Operation *op) {
-        if (failed(validateDataTypes(op, *maybeChipset))) {
-          return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-      });
-      if (allTypesValid.wasInterrupted()) {
-        return signalPassFailure();
-      }
       bool supportsScaledExtTrunc =
           !getGPUTargetAttr(m).getWgp().getScaledMma().empty();
       arith::populateArithToAMDGPUConversionPatterns(
