@@ -175,8 +175,7 @@ struct FoldRelayoutOpIntoMapGatherPattern
     if (!op) {
       return failure();
     }
-    // tensor.pad is not supported for MapGatherOp folding.
-    if (!isSupportedRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+    if (!isSupportedGatherRelayoutOp(op)) {
       return failure();
     }
     if (failed(foldIntoMapGather(rewriter, op, mapGatherOp))) {

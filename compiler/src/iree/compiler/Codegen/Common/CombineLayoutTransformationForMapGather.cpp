@@ -216,6 +216,63 @@ foldExtractSliceIntoMapGather(RewriterBase &rewriter,
   return mapGatherOp;
 }
 
+/// Fold a `padOp` into a consumer `mapGatherOp` by adjusting the index
+/// transformation to subtract low padding offsets and updating the padding
+/// value.
+///
+/// For a tensor.pad:
+///   padded[i, j, k] = source[i - lowPad[0], j - lowPad[1], k - lowPad[2]]
+///                     if indices are in bounds, else paddingValue
+///
+/// The map_gather's built-in bounds checking will automatically use the
+/// padding value when the computed source indices are out of bounds.
+static FailureOr<MapGatherOp> foldPadIntoMapGather(RewriterBase &rewriter,
+                                                   tensor::PadOp padOp,
+                                                   MapGatherOp mapGatherOp) {
+  assert(mapGatherOp.getSource() == padOp->getResult(0) &&
+         "expected padOp to be the producer of mapGatherOp source");
+
+  // We only support constant padding values for map_gather folding.
+  Value paddingValue = padOp.getConstantPaddingValue();
+  if (!paddingValue) {
+    return rewriter.notifyMatchFailure(
+        padOp, "non-constant padding value is not supported");
+  }
+
+  // Get the low padding offsets.
+  SmallVector<OpFoldResult> lowPadding = padOp.getMixedLowPad();
+  Location loc = mapGatherOp->getLoc();
+
+  // Build the index transformation: subtract low padding from each index.
+  auto indexTransformBuilder =
+      [&](ValueRange oldSourceIndices) -> SmallVector<Value> {
+    SmallVector<Value> newIndices;
+    for (auto [idx, lowPad] : llvm::zip_equal(oldSourceIndices, lowPadding)) {
+      Value lowPadValue =
+          getValueOrCreateConstantIndexOp(rewriter, loc, lowPad);
+      Value newIdx = arith::SubIOp::create(rewriter, loc, idx, lowPadValue);
+      newIndices.push_back(newIdx);
+    }
+    return newIndices;
+  };
+
+  // Update the map_gather: apply the index transformation and update padding.
+  rewriter.modifyOpInPlace(mapGatherOp, [&]() {
+    mapGatherOp.insertTransformationAtEnd(rewriter, indexTransformBuilder);
+    mapGatherOp.getSourceMutable().assign(padOp.getSource());
+
+    // Update the padding value in the yield op.
+    Block &transformBody = mapGatherOp.getTransformationRegion().front();
+    auto yieldOp =
+        cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+    // The last operand is the padding value.
+    rewriter.modifyOpInPlace(yieldOp, [&]() {
+      yieldOp->setOperand(yieldOp->getNumOperands() - 1, paddingValue);
+    });
+  });
+  return mapGatherOp;
+}
+
 FailureOr<MapGatherOp> foldIntoMapGather(RewriterBase &rewriter, Operation *op,
                                          MapGatherOp mapGatherOp) {
   return llvm::TypeSwitch<Operation *, FailureOr<MapGatherOp>>(op)
@@ -235,6 +292,9 @@ FailureOr<MapGatherOp> foldIntoMapGather(RewriterBase &rewriter, Operation *op,
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extractSliceOp) {
         return foldExtractSliceIntoMapGather(rewriter, extractSliceOp,
                                              mapGatherOp);
+      })
+      .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
+        return foldPadIntoMapGather(rewriter, padOp, mapGatherOp);
       })
       .Default([](Operation *) { return failure(); });
 }
@@ -263,13 +323,9 @@ static MapGatherOp insertIdentityMapGather(RewriterBase &rewriter,
 }
 
 bool isSupportedGatherRelayoutOp(Operation *op) {
-  // Note: tensor::PadOp is NOT supported for map_gather. Unlike map_scatter
-  // which can write padding values directly to the output buffer (obtained from
-  // store_to_buffer), map_gather reads from a source buffer and produces a
-  // tensor result. There is no output memref available to write padding values
-  // to at this stage.
   return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
-             tensor::ExtractSliceOp, linalg::CopyOp, linalg::TransposeOp>(op);
+             tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
+             linalg::TransposeOp>(op);
 }
 
 // This is only desirable in the dispatch scope but not in the workgroup scope.
