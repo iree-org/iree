@@ -13,27 +13,25 @@
 
 namespace mlir::iree_compiler {
 
-/// Helper to compare shapes of two shaped types for equality.
+/// Helper to compare shapes of two shaped types by SSA equivalence.
+/// Requires that all sizes are statically equal with no extra analysis.
+/// Dynamic dimensions with soft or provable equality will still return false.
 ///
-/// For dimensions that are both dynamic, SSA value equality is required.
-/// For dimensions that are both static, the sizes must match.
-///
-/// If `allowCasting` is false (default), a static dim will not match a dynamic
-/// dim even if the dynamic value is a constant. This strict mode is suitable
-/// for fold patterns where type equality matters.
-///
-/// If `allowCasting` is true, a static dim can match a dynamic dim if the
-/// dynamic value is a constant with the same size.
+/// This is in contrast with cast compatible comparison which allows static and
+/// dynamic sizes to compare positively.
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
-                        ShapedType rhsType, ValueRange rhsDynamicDims,
-                        bool allowCasting = false);
+                        ShapedType rhsType, ValueRange rhsDynamicDims);
 
-/// Same as compareShapesEqual, but ignores the last dimension.
-bool compareShapesEqualExceptLastDim(ShapedType lhsType,
-                                     ValueRange lhsDynamicDims,
-                                     ShapedType rhsType,
-                                     ValueRange rhsDynamicDims,
-                                     bool allowCasting);
+/// Similar to compareShapesEqual, but allows a static dim to match a dynamic
+/// dim if the dynamic value is a constant with the same size.
+bool compareMixedShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
+                             ShapedType rhsType, ValueRange rhsDynamicDims);
+
+/// Same as compareMixedShapesEqual, but ignores the last dimension.
+bool compareMixedShapesEqualExceptLast(ShapedType lhsType,
+                                       ValueRange lhsDynamicDims,
+                                       ShapedType rhsType,
+                                       ValueRange rhsDynamicDims);
 
 /// Helper to check whether 'from' is castable to the target ranked tensor type.
 bool isCastableToTensorType(Type from, RankedTensorType to);

@@ -10,8 +10,7 @@
 namespace mlir::iree_compiler {
 
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
-                        ShapedType rhsType, ValueRange rhsDynamicDims,
-                        bool allowCasting) {
+                        ShapedType rhsType, ValueRange rhsDynamicDims) {
   if (lhsType.hasStaticShape() && rhsType.hasStaticShape()) {
     // Static shape equivalence means we can fast-path the check.
     return lhsType == rhsType;
@@ -19,46 +18,20 @@ bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   if (lhsType.getRank() != rhsType.getRank()) {
     return false;
   }
-  unsigned lhsDynDimIdx = 0;
-  unsigned rhsDynDimIdx = 0;
+  unsigned dynamicDimIndex = 0;
   unsigned numNonmatchingSSADims = 0;
   for (unsigned i = 0; i < lhsType.getRank(); ++i) {
-    bool lhsIsDynamic = lhsType.isDynamicDim(i);
-    bool rhsIsDynamic = rhsType.isDynamicDim(i);
-    if (lhsIsDynamic && rhsIsDynamic) {
-      // Both dynamic - compare SSA values.
-      if (lhsDynamicDims[lhsDynDimIdx] != rhsDynamicDims[rhsDynDimIdx]) {
+    if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
+      // Static/dynamic dimension mismatch - definitely differ.
+      return false;
+    } else if (lhsType.isDynamicDim(i)) {
+      unsigned j = dynamicDimIndex++;
+      if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
         numNonmatchingSSADims++;
       }
-      lhsDynDimIdx++;
-      rhsDynDimIdx++;
-    } else if (lhsIsDynamic) {
-      if (!allowCasting) {
-        return false;
-      }
-      // lhs is dynamic, rhs is static - check if dynamic is a matching
-      // constant.
-      std::optional<int64_t> lhsConst =
-          getConstantIntValue(lhsDynamicDims[lhsDynDimIdx]);
-      if (!lhsConst || *lhsConst != rhsType.getDimSize(i)) {
-        return false;
-      }
-      lhsDynDimIdx++;
-    } else if (rhsIsDynamic) {
-      if (!allowCasting) {
-        return false;
-      }
-      // lhs is static, rhs is dynamic - check if dynamic is a matching
-      // constant.
-      std::optional<int64_t> rhsConst =
-          getConstantIntValue(rhsDynamicDims[rhsDynDimIdx]);
-      if (!rhsConst || *rhsConst != lhsType.getDimSize(i)) {
-        return false;
-      }
-      rhsDynDimIdx++;
     } else {
-      // Both static - compare sizes directly.
       if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
+        // Static dimensions differ.
         return false;
       }
     }
@@ -66,11 +39,23 @@ bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
   return numNonmatchingSSADims <= 1;
 }
 
-bool compareShapesEqualExceptLastDim(ShapedType lhsType,
-                                     ValueRange lhsDynamicDims,
-                                     ShapedType rhsType,
-                                     ValueRange rhsDynamicDims,
-                                     bool allowCasting) {
+bool compareMixedShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
+                             ShapedType rhsType, ValueRange rhsDynamicDims) {
+  if (lhsType.getRank() != rhsType.getRank()) {
+    return false;
+  }
+  // Construct OpFoldResults for both shapes.
+  SmallVector<OpFoldResult> lhsMixed =
+      getMixedValues(lhsType.getShape(), lhsDynamicDims, lhsType.getContext());
+  SmallVector<OpFoldResult> rhsMixed =
+      getMixedValues(rhsType.getShape(), rhsDynamicDims, rhsType.getContext());
+  return isEqualConstantIntOrValueArray(lhsMixed, rhsMixed);
+}
+
+bool compareMixedShapesEqualExceptLast(ShapedType lhsType,
+                                       ValueRange lhsDynamicDims,
+                                       ShapedType rhsType,
+                                       ValueRange rhsDynamicDims) {
   if (lhsType.isDynamicDim(lhsType.getRank() - 1)) {
     lhsDynamicDims = lhsDynamicDims.drop_back();
   }
@@ -79,8 +64,8 @@ bool compareShapesEqualExceptLastDim(ShapedType lhsType,
   }
   ShapedType newLhsType = lhsType.clone(lhsType.getShape().drop_back());
   ShapedType newRhsType = rhsType.clone(rhsType.getShape().drop_back());
-  return compareShapesEqual(newLhsType, lhsDynamicDims, newRhsType,
-                            rhsDynamicDims, allowCasting);
+  return compareMixedShapesEqual(newLhsType, lhsDynamicDims, newRhsType,
+                                 rhsDynamicDims);
 }
 
 bool isCastableToTensorType(Type from, RankedTensorType to) {

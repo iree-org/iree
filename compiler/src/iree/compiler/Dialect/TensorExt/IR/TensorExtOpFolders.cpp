@@ -8,6 +8,7 @@
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -53,70 +54,63 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     }
 
     // All dims except last must match (last dim can differ due to element type
-    // size change). This also filters out rank mismatches.
-    if (!compareShapesEqualExceptLastDim(
+    // size change). This check also filters out rank mismatches.
+    if (!compareMixedShapesEqualExceptLast(
             bitcastOp.getSource().getType(), bitcastOp.getSourceDims(),
-            bitcastOp.getResult().getType(), bitcastOp.getResultDims(),
-            /*allowCasting=*/true)) {
+            bitcastOp.getResult().getType(), bitcastOp.getResultDims())) {
       return failure();
     }
 
     RankedTensorType intermediateTensorType = bitcastOp.getSource().getType();
     RankedTensorType resTensorType = bitcastOp.getResult().getType();
-    ArrayRef<int64_t> resShape = resTensorType.getShape();
 
+    MLIRContext *ctx = bitcastOp.getContext();
+    SmallVector<OpFoldResult> resultMixed = getMixedValues(
+        resTensorType.getShape(), bitcastOp.getResultDims(), ctx);
+
+    // Build new result shape by propagating static information.
+    SmallVector<OpFoldResult> newResultMixed;
+    int64_t rank = resTensorType.getRank();
+    for (int64_t i = 0; i < rank - 1; ++i) {
+      int64_t castSize = tensorCastSrcType.getShape()[i];
+      OpFoldResult resOfr = resultMixed[i];
+      // Try cast source static info first.
+      if (!ShapedType::isDynamic(castSize)) {
+        newResultMixed.push_back(rewriter.getIndexAttr(castSize));
+        continue;
+      }
+      // Try result constant.
+      if (std::optional<int64_t> resConst = getConstantIntValue(resOfr)) {
+        newResultMixed.push_back(rewriter.getIndexAttr(*resConst));
+        continue;
+      }
+      // Keep dynamic.
+      newResultMixed.push_back(resOfr);
+    }
+
+    // Last dim: only use result info.
+    OpFoldResult lastResOfr = resultMixed.back();
+    if (std::optional<int64_t> resConst = getConstantIntValue(lastResOfr)) {
+      newResultMixed.push_back(rewriter.getIndexAttr(*resConst));
+    } else {
+      newResultMixed.push_back(lastResOfr);
+    }
+
+    // Decompose into static shape and dynamic values.
+    auto [newResultSizes, newDynDestDims] =
+        decomposeMixedValues(newResultMixed);
+
+    // Build new source dynamic dims from the cast source type.
     SmallVector<Value> newDynSrcDims;
-    SmallVector<Value> newDynDestDims;
-    int64_t intermediateDynamicDim = 0;
-    int64_t resDynamicDim = 0;
-    SmallVector<int64_t> newResultSizes(resShape);
-    // Drop the dynamic dims that become static after incorporating the cast.
-    for (auto [idx, sizes] : llvm::enumerate(
-             llvm::zip_equal(tensorCastSrcType.getShape(),
-                             intermediateTensorType.getShape(), resShape))) {
-      auto [castSize, sourceSize, resSize] = sizes;
-
-      if (ShapedType::isDynamic(castSize)) {
-        newDynSrcDims.push_back(
-            bitcastOp.getSourceDims()[intermediateDynamicDim]);
+    int64_t intermediateDynIdx = 0;
+    for (int64_t i = 0; i < tensorCastSrcType.getRank(); ++i) {
+      if (!intermediateTensorType.isDynamicDim(i)) {
+        continue;
       }
-
-      bool isLastDim = idx == resShape.size() - 1;
-      std::optional<int64_t> inferredSize;
-
-      // Try cast source static info (except for last dim).
-      if (ShapedType::isStatic(castSize) && !isLastDim) {
-        inferredSize = castSize;
+      if (tensorCastSrcType.isDynamicDim(i)) {
+        newDynSrcDims.push_back(bitcastOp.getSourceDims()[intermediateDynIdx]);
       }
-      // Try bitcast source dim, dynamic value is constant (except for last
-      // dim).
-      if (!inferredSize && ShapedType::isDynamic(sourceSize) && !isLastDim) {
-        inferredSize = getConstantIntValue(
-            bitcastOp.getSourceDims()[intermediateDynamicDim]);
-      }
-      // Try bitcast result static info.
-      if (!inferredSize && ShapedType::isStatic(resSize)) {
-        inferredSize = resSize;
-      }
-      // Try bitcast result dim, dynamic value is constant.
-      if (!inferredSize && ShapedType::isDynamic(resSize)) {
-        inferredSize =
-            getConstantIntValue(bitcastOp.getResultDims()[resDynamicDim]);
-      }
-
-      // Apply the inferred size or keep dynamic.
-      if (inferredSize) {
-        newResultSizes[idx] = *inferredSize;
-      } else if (ShapedType::isDynamic(resSize)) {
-        newDynDestDims.push_back(bitcastOp.getResultDims()[resDynamicDim]);
-      }
-
-      if (ShapedType::isDynamic(sourceSize)) {
-        ++intermediateDynamicDim;
-      }
-      if (ShapedType::isDynamic(resSize)) {
-        ++resDynamicDim;
-      }
+      ++intermediateDynIdx;
     }
 
     auto newType =
