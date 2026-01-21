@@ -1895,8 +1895,8 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
 }
 
 // Utility function to return the result inner tile sizes associated with the
-// mmt4d op. I.e. returns the M1 and N1 dimensions of the result shape
-// BxM0xN0xM1xN1. It also explicitly checks for scalable dimensions of the form
+// mmt4d op. I.e. returns the M0 and N0 dimensions of the result shape
+// BxM1xN1xM0xN0. It also explicitly checks for scalable dimensions of the form
 // %cst * vscale, returns the constant and sets the scalable flag of the
 // corresponding dimension to true. For example, if we have the inner tile sizes
 // [8, 8*vscale], this method returns [8, 8] as tile sizes and [false, true] as
@@ -1938,7 +1938,7 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
     innerDims = loadOp.getMixedSizes();
   }
-  // We only need the innermost M1 and N1 dims.
+  // We only need the innermost M0 and N0 dims.
   innerDims.erase(innerDims.begin(), innerDims.end() - 2);
   return getScalableTileSizesAndFlags(innerDims);
 }
@@ -1963,8 +1963,8 @@ static bool adjustVectorSizesForScalableVectorization(
   }
   if (hasAnySVEFeature(targetConfig) && ShapedType::isDynamic(n0)) {
     // Set the corresponding scalable tile size and flag for the inner N
-    // dimension, i.e. n1 from the iteration domain ([b, ], m0, n0, k0, m1, n1,
-    // k1). The inner M dimension is not considered here, because SVE currently
+    // dimension, i.e. N0 from the iteration domain ([b,] M1, N1, K1, M0, N0,
+    // K0). The inner M dimension is not considered here, because SVE currently
     // only makes the N dimension scalable.
     vecTileSizes[mmt4dDimBase + 4] =
         scalableInnerTilesAndFlags.value().first[1];
