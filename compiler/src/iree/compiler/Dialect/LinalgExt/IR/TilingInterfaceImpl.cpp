@@ -1778,14 +1778,9 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
       continue;
     }
 
-    if (std::optional<int64_t> size = getConstantIntValue(initSizes[i])) {
-      resultValShape.push_back(*size);
-      resultIdxShape.push_back(*size);
-      continue;
-    }
-
-    resultValShape.push_back(ShapedType::kDynamic);
-    resultIdxShape.push_back(ShapedType::kDynamic);
+    std::optional<int64_t> size = getConstantIntValue(initSizes[i]);
+    resultValShape.push_back(size.value_or(ShapedType::kDynamic));
+    resultIdxShape.push_back(size.value_or(ShapedType::kDynamic));
   }
 
   RankedTensorType sliceValResultType =
@@ -1859,7 +1854,7 @@ FailureOr<MergeResult>
 ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
                               ValueRange partialReduce,
                               const llvm::SetVector<unsigned> &reductionDims) {
-  int64_t reductionDim = *reductionDims.begin();
+  int64_t reductionDim = reductionDims.front();
 
   // Create arg_compare in explicit-index mode to merge the partial results.
   // Explicit-index mode: 2 inputs (value + index), no index_base.

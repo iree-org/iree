@@ -2906,32 +2906,37 @@ func.func @arg_compare_split_reduction_with_index_base(%arg0: tensor<4x128xf32>)
 }
 
 // CHECK-LABEL: func.func @arg_compare_split_reduction_with_index_base
-// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x128xf32>)
-
-// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-// CHECK-DAG: %[[C100:.+]] = arith.constant 100 : index
-
-// CHECK: %[[FILL_VAL:.+]] = linalg.fill
-// CHECK: %[[FILL_IDX:.+]] = linalg.fill
-
-// CHECK: %[[PARTIAL_VAL_EMPTY:.+]] = tensor.empty() : tensor<4x4xf32>
-// CHECK: %[[PARTIAL_IDX_EMPTY:.+]] = tensor.empty() : tensor<4x4xi32>
-
-// CHECK: %[[BROADCAST_VAL:.+]] = linalg.broadcast ins(%[[FILL_VAL]] : tensor<4xf32>) outs(%[[PARTIAL_VAL_EMPTY]] : tensor<4x4xf32>) dimensions = [1]
-// CHECK: %[[BROADCAST_IDX:.+]] = linalg.broadcast ins(%[[FILL_IDX]] : tensor<4xi32>) outs(%[[PARTIAL_IDX_EMPTY]] : tensor<4x4xi32>) dimensions = [1]
-
-// CHECK: %[[ITER:.+]]:2 = scf.forall (%[[IV:.+]]) = (0) to (128) step (32)
-
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<4x128xf32>)
+// CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[C0_I32:.+]] = arith.constant 0 : i32
+// CHECK-DAG:     %[[C100:.+]] = arith.constant 100 : index
+// CHECK:         %[[FILL_VAL:.+]] = linalg.fill
+// CHECK:         %[[FILL_IDX:.+]] = linalg.fill
+// CHECK:         %[[PARTIAL_VAL_EMPTY:.+]] = tensor.empty() : tensor<4x4xf32>
+// CHECK:         %[[PARTIAL_IDX_EMPTY:.+]] = tensor.empty() : tensor<4x4xi32>
+// CHECK:         %[[BROADCAST_VAL:.+]] = linalg.broadcast
+// CHECK-SAME:      ins(%[[FILL_VAL]] : tensor<4xf32>)
+// CHECK-SAME:      outs(%[[PARTIAL_VAL_EMPTY]] : tensor<4x4xf32>)
+// CHECK-SAME:      dimensions = [1]
+// CHECK:         %[[BROADCAST_IDX:.+]] = linalg.broadcast
+// CHECK-SAME:      ins(%[[FILL_IDX]] : tensor<4xi32>)
+// CHECK-SAME:      outs(%[[PARTIAL_IDX_EMPTY]] : tensor<4x4xi32>)
+// CHECK-SAME:      dimensions = [1]
+// CHECK:         %[[ITER:.+]]:2 = scf.forall (%[[IV:.+]]) = (0) to (128) step (32)
 // Verify that index_base is correctly computed for each chunk (base + chunk_offset).
-// CHECK-DAG:   %[[CHUNK_IDX:.+]] = affine.apply
-// CHECK-DAG:   %[[INDEX_BASE:.+]] = arith.addi
-
+// CHECK-DAG:       %[[CHUNK_IDX:.+]] = affine.apply
+// CHECK-DAG:       %[[INDEX_BASE:.+]] = arith.addi
 // Each partial reduction should have index_base (100 + chunk_offset).
-// CHECK:   %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare dimension(1) ins(%{{.+}} : tensor<4x32xf32>) outs(%{{.+}}, %{{.+}} : tensor<4xf32>, tensor<4xi32>) index_base(%{{.+}} : index)
-
+// CHECK:           %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:        dimension(1)
+// CHECK-SAME:        ins(%{{.+}} : tensor<4x32xf32>)
+// CHECK-SAME:        outs(%{{.+}}, %{{.+}} : tensor<4xf32>, tensor<4xi32>)
+// CHECK-SAME:        index_base(%{{.+}} : index)
 // Merge reduction should use explicit-index mode (2 inputs, no index_base).
-// CHECK: %[[REDUCED:.+]]:2 = iree_linalg_ext.arg_compare dimension(1) ins(%[[ITER]]#0, %[[ITER]]#1 : tensor<4x4xf32>, tensor<4x4xi32>) outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xf32>, tensor<4xi32>)
+// CHECK:         %[[REDUCED:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[ITER]]#0, %[[ITER]]#1 : tensor<4x4xf32>, tensor<4x4xi32>)
+// CHECK-SAME:      outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<4xf32>, tensor<4xi32>)
 // CHECK:   ^bb0(%[[IN:.+]]: f32, %[[INIT:.+]]: f32):
 // CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[INIT]] : f32
 // CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
