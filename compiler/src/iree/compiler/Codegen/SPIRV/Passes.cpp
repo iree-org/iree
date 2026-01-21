@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -232,6 +233,12 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
 
 /// Adds passes to perform the final SPIR-V conversion.
 static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
+  // Lower PCF ops to SCF.
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::PCF::createResolveTokensPass)
+      .addPass(IREE::PCF::createConvertSRefToMemRefPass)
+      .addPass(IREE::PCF::createLowerStructuralPCFPass);
+
   FunctionLikeNest(modulePassManager)
       .addPass(createPropagateDispatchSizeBoundsPass)
       .addPass(createCanonicalizerPass)
@@ -727,6 +734,13 @@ void registerCodegenSPIRVPasses() {
       "Runs the progressive lowering pipeline from linalg to SPIR-V",
       [](OpPassManager &variantPassManager) {
         buildSPIRVCodegenPassPipeline(variantPassManager);
+      });
+
+  static PassPipelineRegistration<> SPIRVLoweringPipeline(
+      "iree-codegen-spirv-lowering-pipeline",
+      "Runs the SPIR-V lowering passes including PCF lowering",
+      [](OpPassManager &modulePassManager) {
+        addSPIRVLoweringPasses(modulePassManager);
       });
 }
 
