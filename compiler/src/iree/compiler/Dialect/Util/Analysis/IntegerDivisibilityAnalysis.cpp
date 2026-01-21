@@ -82,9 +82,10 @@ void IntegerDivisibilityAnalysis::visitNonControlFlowArguments(
       auto value = cast<Value>(ofr.value());
       const IntegerDivisibilityLattice *lattice =
           getLatticeElementFor(getProgramPointBefore(block), value);
-      if (lattice != nullptr && !lattice->getValue().isUninitialized())
+      if (lattice != nullptr && !lattice->getValue().isUninitialized()) {
         return isUnsigned ? lattice->getValue().getValue().udiv()
                           : lattice->getValue().getValue().sdiv();
+      }
     }
     return isUnsigned
                ? IntegerDivisibility::getMinDivisibility().getValue().udiv()
