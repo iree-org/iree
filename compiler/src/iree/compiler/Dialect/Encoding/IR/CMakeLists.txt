@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgUtils
     MLIRSupport
     MLIRTensorDialect

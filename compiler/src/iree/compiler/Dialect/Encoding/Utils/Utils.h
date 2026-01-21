@@ -12,6 +12,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -79,6 +80,22 @@ MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding);
 /// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
 /// result of a matvec.
 bool isNarrowNResult(EncodingAttr encoding);
+
+/// Rematerialize encoding dims at the given insertion point. This is useful
+/// when propagating encodings through operations where the original encoding
+/// dims don't dominate the new insertion point.
+///
+/// Returns the rematerialized dims if successful, or failure if some dims
+/// cannot be rematerialized. On failure, no operations are created.
+///
+/// Recursively rematerializes operands as needed. Supports:
+/// - Values that already dominate the insertion point (used as-is).
+/// - tensor.dim ops on propagationSource (recreated using newSource).
+/// - Pure operations (cloned with rematerialized operands).
+FailureOr<SmallVector<Value>>
+rematerializeEncodingDims(RewriterBase &builder, Operation *insertionPoint,
+                          ValueRange encodingDims, Value propagationSource,
+                          Value newSource);
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 
