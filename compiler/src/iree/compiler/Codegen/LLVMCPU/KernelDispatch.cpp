@@ -1988,33 +1988,30 @@ static bool adjustVectorSizesForScalableVectorization(
   return false;
 }
 
-static SmallVector<std::pair<int, int>> getDivisorPairs(int n) {
-  SmallVector<std::pair<int, int>> divisorPairs;
-  for (int i = 1; i * i <= n; ++i) {
-    int j = n / i;
+static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
+  SmallVector<std::pair<int64_t, int64_t>> divisors;
+  for (int64_t i = 1; i * i <= n; ++i) {
+    int64_t j = n / i;
     if (i * j == n) {
-      divisorPairs.push_back({i, j});
+      divisors.push_back({i, j});
       if (j != i) {
-        divisorPairs.push_back({j, i});
+        divisors.push_back({j, i});
       }
     }
   }
-  llvm::sort(divisorPairs, [](auto p, auto q) { return p.first < q.first; });
-  return divisorPairs;
+  llvm::sort(divisors, llvm::less_first{});
+  return divisors;
 }
 
 static int getMatmulTileBytes(Operation *op) {
   if (clMatmulTileBytes) {
     return clMatmulTileBytes;
   }
-  IREE::HAL::ExecutableTargetAttr target =
-      IREE::HAL::ExecutableTargetAttr::lookup(op);
   // Generally we want to return a value that is between L2 and L3 cache sizes.
   // We don't have that information at compile time, so we have to make a
   // reasonable guess.
-  if (target) {
-    auto config = target.getConfiguration();
-    if (config) {
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    if (DictionaryAttr config = target.getConfiguration()) {
       if (isX86_64(config) && hasFeature(config, "+avx512f")) {
         // Recent or server X86.  This value was manually tuned in benchmarks on
         // EPYC 9575F on single-threaded bf16 matmuls.
@@ -2027,6 +2024,7 @@ static int getMatmulTileBytes(Operation *op) {
       }
     }
   }
+
   // Default, low-ish value.
   return 1 * 1024 * 1024;
 }
@@ -2036,33 +2034,43 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   Value rhs = op.getDpsInputs()[1];
   Value acc = op.getDpsInits()[0];
 
-  ShapedType lhsType = cast<ShapedType>(lhs.getType());
-  ShapedType rhsType = cast<ShapedType>(rhs.getType());
-  ShapedType accType = cast<ShapedType>(acc.getType());
-  int lhsTypeBits = lhsType.getElementTypeBitWidth();
-  int rhsTypeBits = rhsType.getElementTypeBitWidth();
-  int accTypeBits = accType.getElementTypeBitWidth();
+  const ShapedType lhsType = cast<ShapedType>(lhs.getType());
+  const ShapedType rhsType = cast<ShapedType>(rhs.getType());
+  const ShapedType accType = cast<ShapedType>(acc.getType());
+  const int lhsTypeBits = lhsType.getElementTypeBitWidth();
+  const int rhsTypeBits = rhsType.getElementTypeBitWidth();
+  const int accTypeBits = accType.getElementTypeBitWidth();
 
   SmallVector<int64_t> distTileSizes(op.getNumLoops(), 0);
-  int mmt4dDimBase = 0;
-  if (isa<linalg::BatchMmt4DOp>(op)) {
-    mmt4dDimBase = 1;
+  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  if (mmt4dDimBase == 1) {
     distTileSizes[0] = 1;
   }
-  auto lhsShape = lhsType.getShape();
-  auto rhsShape = rhsType.getShape();
-  int64_t M1 = lhsShape[mmt4dDimBase + 0];
-  int64_t N1 = rhsShape[mmt4dDimBase + 0];
-  int64_t K1 = lhsShape[mmt4dDimBase + 1];
-  int64_t M0 = lhsShape[mmt4dDimBase + 2];
-  int64_t N0 = rhsShape[mmt4dDimBase + 2];
-  int64_t K0 = lhsShape[mmt4dDimBase + 3];
+  const auto lhsShape = lhsType.getShape();
+  const auto rhsShape = rhsType.getShape();
 
-  auto divisorPairsOfM1 = getDivisorPairs(M1);
-  auto divisorPairsOfN1 = getDivisorPairs(N1);
+  // Get the M1, N1, K1 sizes from the shapes, but normalize Dynamic to some
+  // reasonable large-ish power-of-two value so that the heuristic below comes
+  // up with reasonable tile sizes for dynamic-shape matmuls.
+  auto staticSizeOr = [](int64_t value, int64_t valueIfDynamic) {
+    return ShapedType::isDynamic(value) ? valueIfDynamic : value;
+  };
+  const int64_t M1 = staticSizeOr(lhsShape[mmt4dDimBase + 0], 1024);
+  const int64_t N1 = staticSizeOr(rhsShape[mmt4dDimBase + 0], 1024);
+  const int64_t K1 = staticSizeOr(lhsShape[mmt4dDimBase + 1], 1024);
 
-  int64_t M = M0 * M1;
-  int64_t N = N0 * N1;
+  // M0, N0, K0 should almost always be static, but there could be an exception
+  // on targets like Arm SVE, so just to be safe, also normalize.
+  const int64_t M0 = staticSizeOr(lhsShape[mmt4dDimBase + 2], 16);
+  const int64_t N0 = staticSizeOr(rhsShape[mmt4dDimBase + 2], 16);
+  const int64_t K0 = staticSizeOr(lhsShape[mmt4dDimBase + 3], 16);
+
+  const int64_t M = M0 * M1;
+  const int64_t N = N0 * N1;
+
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(M1);
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(N1);
+
   // Helper to associate a cost to a candidate pair or tile sizes along the M
   // and N dimensions.
   auto evalTraversalCost = [=](int64_t numTilesM,
@@ -2080,8 +2088,8 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   const int matmulTileBytes = getMatmulTileBytes(op);
 
   // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
-  for (auto [tileM, numTilesM] : divisorPairsOfM1) {
-    for (auto [tileN, numTilesN] : divisorPairsOfN1) {
+  for (auto [tileM, numTilesM] : divisorsOfM1) {
+    for (auto [tileN, numTilesN] : divisorsOfN1) {
       // Compute candidate tile size in bytes.
       int64_t lhsBytes = tileM * M0 * K1 * K0 * lhsTypeBits / 8;
       int64_t rhsBytes = tileN * N0 * K1 * K0 * rhsTypeBits / 8;
