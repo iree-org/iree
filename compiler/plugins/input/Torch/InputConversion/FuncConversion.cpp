@@ -651,9 +651,6 @@ public:
     Location loc = torchFunc.getLoc();
     // Determine whether to build pure async or async + sync wrapper.
     bool generateSyncWrapper = true;
-    // Determine whether to include a new transient buffer input to the
-    // generated async function and corresponding sync wrapper.
-    bool externalizeTransientMemory = externalizeTransients;
     StringRef originalName = torchFunc.getName();
     std::string asyncFunctionName = originalName.str();
     if (generateSyncWrapper) {
@@ -672,14 +669,6 @@ public:
                                              torchFuncType.getInputs().end());
     convertedFuncInfo.torchResultTypes.append(
         torchFuncType.getResults().begin(), torchFuncType.getResults().end());
-    // When externalizing transient memory, put the input buffer before fences.
-    if (externalizeTransientMemory) {
-      convertedFuncInfo.torchInputTypes.push_back(bufferType);
-    }
-    // For the coarse-fences ABI, we add two fences to the end. Treat these as
-    // original types so that the lists line up.
-    convertedFuncInfo.torchInputTypes.push_back(fenceType);
-    convertedFuncInfo.torchInputTypes.push_back(fenceType);
     SmallVector<Type> ireeInputTypes(convertedFuncInfo.torchInputTypes);
     SmallVector<Type> ireeResultTypes(convertedFuncInfo.torchResultTypes);
     convertedFuncInfo.inputDispositions.resize(ireeInputTypes.size());
@@ -700,6 +689,19 @@ public:
       }
     }
 
+    // When externalizing transient memory, put the input buffer before fences.
+    if (externalizeTransients) {
+      convertedFuncInfo.torchInputTypes.push_back(bufferType);
+      ireeInputTypes.push_back(bufferType);
+      convertedFuncInfo.inputDispositions.push_back(
+          TypeDisposition::TRANSIENT_BUFFER);
+    }
+    // For the coarse-fences ABI, we add two fences to the end. Treat these as
+    // original types so that the lists line up.
+    convertedFuncInfo.torchInputTypes.append({fenceType, fenceType});
+    ireeInputTypes.append({fenceType, fenceType});
+    convertedFuncInfo.inputDispositions.append(
+        {TypeDisposition::FENCE, TypeDisposition::FENCE});
     // Build tied operands index mapping results back to operands.
     SmallVector<int64_t> tiedOperands;
     bool anyTiedOperands = false;
