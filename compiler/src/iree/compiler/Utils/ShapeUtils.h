@@ -22,6 +22,17 @@ namespace mlir::iree_compiler {
 bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
                         ShapedType rhsType, ValueRange rhsDynamicDims);
 
+/// Similar to compareShapesEqual, but allows a static dim to match a dynamic
+/// dim if the dynamic value is a constant with the same size.
+bool compareMixedShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
+                             ShapedType rhsType, ValueRange rhsDynamicDims);
+
+/// Same as compareMixedShapesEqual, but ignores the last dimension.
+bool compareMixedShapesEqualExceptLast(ShapedType lhsType,
+                                       ValueRange lhsDynamicDims,
+                                       ShapedType rhsType,
+                                       ValueRange rhsDynamicDims);
+
 /// Helper to check whether 'from' is castable to the target ranked tensor type.
 bool isCastableToTensorType(Type from, RankedTensorType to);
 

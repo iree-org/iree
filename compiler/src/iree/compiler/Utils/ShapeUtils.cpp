@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Utils/ShapeUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler {
 
@@ -36,6 +37,35 @@ bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
     }
   }
   return numNonmatchingSSADims <= 1;
+}
+
+bool compareMixedShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
+                             ShapedType rhsType, ValueRange rhsDynamicDims) {
+  if (lhsType.getRank() != rhsType.getRank()) {
+    return false;
+  }
+  // Construct OpFoldResults for both shapes.
+  SmallVector<OpFoldResult> lhsMixed =
+      getMixedValues(lhsType.getShape(), lhsDynamicDims, lhsType.getContext());
+  SmallVector<OpFoldResult> rhsMixed =
+      getMixedValues(rhsType.getShape(), rhsDynamicDims, rhsType.getContext());
+  return isEqualConstantIntOrValueArray(lhsMixed, rhsMixed);
+}
+
+bool compareMixedShapesEqualExceptLast(ShapedType lhsType,
+                                       ValueRange lhsDynamicDims,
+                                       ShapedType rhsType,
+                                       ValueRange rhsDynamicDims) {
+  if (lhsType.isDynamicDim(lhsType.getRank() - 1)) {
+    lhsDynamicDims = lhsDynamicDims.drop_back();
+  }
+  if (rhsType.isDynamicDim(rhsType.getRank() - 1)) {
+    rhsDynamicDims = rhsDynamicDims.drop_back();
+  }
+  ShapedType newLhsType = lhsType.clone(lhsType.getShape().drop_back());
+  ShapedType newRhsType = rhsType.clone(rhsType.getShape().drop_back());
+  return compareMixedShapesEqual(newLhsType, lhsDynamicDims, newRhsType,
+                                 rhsDynamicDims);
 }
 
 bool isCastableToTensorType(Type from, RankedTensorType to) {
