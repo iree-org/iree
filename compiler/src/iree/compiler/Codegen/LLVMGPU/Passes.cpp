@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -978,6 +979,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
+  // Lower PCF ops to SCF.
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::PCF::createResolveTokensPass)
+      .addPass(IREE::PCF::createConvertSRefToMemRefPass)
+      .addPass(IREE::PCF::createLowerStructuralPCFPass);
+
   FunctionLikeNest(modulePassManager)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
@@ -1315,6 +1322,24 @@ void registerCodegenROCDLPasses() {
             addLowerToLLVMGPUPasses(passManager, /*forROCDL=*/true,
                                     options.preserveDebugInfo);
           });
+
+  struct GPULowerToLLVMOptions final
+      : PassPipelineOptions<GPULowerToLLVMOptions> {
+    Option<bool> forROCDL{
+        *this, "rocdl",
+        llvm::cl::desc("Target ROCDL instead of NVVM")};
+    Option<bool> preserveDebugInfo{
+        *this, "preserve-debug-info",
+        llvm::cl::desc("Preserve debug information (do not strip)")};
+  };
+
+  static PassPipelineRegistration<GPULowerToLLVMOptions> LowerToLLVMGPUPasses(
+      "iree-codegen-gpu-lower-to-llvm",
+      "Runs pass pipeline to progressively lower to LLVM for GPU",
+      [](OpPassManager &passManager, const GPULowerToLLVMOptions &options) {
+        addLowerToLLVMGPUPasses(passManager, options.forROCDL,
+                                options.preserveDebugInfo);
+      });
 }
 
 } // namespace mlir::iree_compiler

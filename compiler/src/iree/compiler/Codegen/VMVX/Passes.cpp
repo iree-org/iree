@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -70,6 +71,11 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   // Lower to buffers.
   addCPUBufferizePasses(funcPassManager);
 
+  // Lower PCF ops to SCF.
+  funcPassManager.addPass(IREE::PCF::createResolveTokensPass());
+  funcPassManager.addPass(IREE::PCF::createConvertSRefToMemRefPass());
+  funcPassManager.addPass(IREE::PCF::createLowerStructuralPCFPass());
+
   // Cleanup the IR that may now have unused loops.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
@@ -114,6 +120,13 @@ void registerCodegenVMVXPasses() {
       "Runs the VMVX HAL executable linking pipeline",
       [](OpPassManager &modulePassManager) {
         buildVMVXLinkingPassPipeline(modulePassManager);
+      });
+
+  static PassPipelineRegistration<> VMVXDefaultPipeline(
+      "iree-codegen-vmvx-default-pipeline",
+      "Runs the VMVX default pipeline including PCF lowering",
+      [](OpPassManager &funcPassManager) {
+        addVMVXDefaultPassPipeline(funcPassManager, /*enableUKernels=*/false);
       });
 }
 
