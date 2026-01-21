@@ -712,3 +712,54 @@ util.func public @bubble_with_recursive_rematerialization(
 // CHECK:         linalg.generic
 // CHECK:         flow.return
 // CHECK:       }
+
+// -----
+
+// Test that set_encoding ops with encoding_dims computed via affine.apply can
+// still be hoisted. The affine.apply op is hoistable (its operands come from
+// outside the dispatch), but it's not in the isHoistableOp allow list.
+// encoding_dims operands should not block hoisting of the set_encoding op.
+// The affine.apply is hoisted along with set_encoding by hoistOutOfDispatch.
+
+#map_affine0 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map_affine1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map_affine2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#lhs_encoding_affine = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_affine0, #map_affine1, #map_affine2], iteration_sizes = [2, ?, 4096, 128]>
+#rhs_encoding_affine = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_affine0, #map_affine1, #map_affine2], iteration_sizes = [2, ?, 4096, 128]>
+#result_encoding_affine = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_affine0, #map_affine1, #map_affine2], iteration_sizes = [2, ?, 4096, 128]>
+module {
+  util.func public @hoist_with_affine_apply_encoding_dims(
+      %arg0: tensor<2x128x64xf32>, %arg1: tensor<2x4096x128xf32>, %batch: index) -> tensor<2x4096x64xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %result = flow.dispatch.region -> (tensor<2x4096x64xf32>) {
+      // encoding_dims computed via affine.apply. The affine.apply is hoistable
+      // and should not block hoisting of the set_encoding op.
+      %m = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%batch]
+      %lhs_encoded = iree_encoding.set_encoding %arg0 encoding_dims{%m} : tensor<2x128x64xf32> -> tensor<2x128x64xf32, #lhs_encoding_affine>
+      %rhs_encoded = iree_encoding.set_encoding %arg1 encoding_dims{%m} : tensor<2x4096x128xf32> -> tensor<2x4096x128xf32, #rhs_encoding_affine>
+      %empty = tensor.empty() : tensor<2x4096x64xf32, #result_encoding_affine>
+      %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x4096x64xf32, #result_encoding_affine>) -> tensor<2x4096x64xf32, #result_encoding_affine>
+      %matmul = linalg.generic {
+          indexing_maps = [#map_affine0, #map_affine1, #map_affine2],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+          ins(%lhs_encoded, %rhs_encoded : tensor<2x128x64xf32, #lhs_encoding_affine>, tensor<2x4096x128xf32, #rhs_encoding_affine>)
+          outs(%fill : tensor<2x4096x64xf32, #result_encoding_affine>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %9 = arith.mulf %in, %in_0 : f32
+        %10 = arith.addf %9, %out : f32
+        linalg.yield %10 : f32
+      } -> tensor<2x4096x64xf32, #result_encoding_affine>
+      %unset = iree_encoding.unset_encoding %matmul : tensor<2x4096x64xf32, #result_encoding_affine> -> tensor<2x4096x64xf32>
+      flow.return %unset : tensor<2x4096x64xf32>
+    }
+    util.return %result : tensor<2x4096x64xf32>
+  }
+}
+// CHECK-LABEL: @hoist_with_affine_apply_encoding_dims
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x128x64xf32>, %[[ARG1:.+]]: tensor<2x4096x128xf32>, %[[BATCH:.+]]: index
+// CHECK-DAG:   %[[M:.+]] = affine.apply {{.*}}()[%[[BATCH]]]
+// CHECK-DAG:   %[[LHS_ENC:.+]] = iree_encoding.set_encoding %[[ARG0]] encoding_dims{%[[M]]}
+// CHECK-DAG:   %[[RHS_ENC:.+]] = iree_encoding.set_encoding %[[ARG1]] encoding_dims{%[[M]]}
+// CHECK:       flow.dispatch.region
+// CHECK:         linalg.generic {{.*}} ins(%[[LHS_ENC]], %[[RHS_ENC]]
+// CHECK:         flow.return

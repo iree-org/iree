@@ -169,25 +169,6 @@ static bool isHoistableOp(Operation *op) {
     return IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
                                                            strides, srcShape);
   }
-  // tensor.dim ops are hoistable if their source tensor is outside the
-  // dispatch (e.g., a block argument or already hoisted value). These ops
-  // are commonly used as encoding_dims and need to be hoisted along with
-  // set_encoding ops.
-  if (auto dimOp = dyn_cast<tensor::DimOp>(op)) {
-    Value source = dimOp.getSource();
-    Operation *sourceOp = source.getDefiningOp();
-    // If source is a block argument (no defining op), it's outside the dispatch
-    // and the dim op can be hoisted.
-    if (!sourceOp) {
-      return true;
-    }
-    // If source is defined outside the dispatch, the dim op can be hoisted.
-    if (!sourceOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
-      return true;
-    }
-    // Otherwise, check if the source can also be hoisted.
-    return isHoistableOp(sourceOp);
-  }
   // ConstExprHoistingPolicy has an assumption that any root op is not hoistable
   // because they are already hoisted. This is not the case when the parent op
   // is a constant-like op, so we have a special rule here.
@@ -342,12 +323,18 @@ void HoistEncodingOpsPass::runOnOperation() {
       Operation *op = worklist.front();
       worklist.pop();
       opsWithinDispatch.insert(op);
-      for (auto input : op->getOperands()) {
+      // For SetEncodingOp, the encoding_dims operands are metadata and should
+      // not block hoistability. We still add their defining ops to the worklist
+      // so they get hoisted, but only the source operand affects hoistability.
+      auto setEnc = dyn_cast<IREE::Encoding::SetEncodingOp>(op);
+      for (Value input : op->getOperands()) {
         auto inputOp = input.getDefiningOp();
         if (inputOp &&
             inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
             !seen.contains(inputOp)) {
-          if (!isHoistableOp(inputOp)) {
+          // For SetEncodingOp, only the source operand affects hoistability.
+          bool affectsHoistability = !setEnc || input == setEnc.getSource();
+          if (affectsHoistability && !isHoistableOp(inputOp)) {
             isHoistable = false;
           }
           worklist.push(inputOp);
