@@ -218,10 +218,9 @@ util.func public @split_reduction_arg_compare(%arg0: tensor<4x1x128256xf16>) -> 
 //       CHECK:      } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
 //       CHECK:      flow.return %[[FORALL]]#0, %[[FORALL]]#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>
 //       CHECK:    }
-//       CHECK:    %[[REDUCE:.+]]:2 = linalg.reduce
-//  CHECK-SAME:        ins(%[[DISPATCH]]#0, %[[DISPATCH]]#1 :
-//  CHECK-SAME:        outs(%[[FILL_F16]], %[[FILL_I32]] :
-//  CHECK-SAME:        dimensions = [2]
+//       CHECK:    %[[REDUCE:.+]]:2 = iree_linalg_ext.arg_compare dimension(2)
+//  CHECK-SAME:        ins(%[[DISPATCH]]#0, %[[DISPATCH]]#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>)
+//  CHECK-SAME:        outs(%[[FILL_F16]], %[[FILL_I32]] : tensor<4x1xf16>, tensor<4x1xi32>)
 //       CHECK:    util.return %[[REDUCE]]#0, %[[REDUCE]]#1
 
 // -----
