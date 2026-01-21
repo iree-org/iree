@@ -45,6 +45,7 @@ iree_cc_library(
     "RemoveTensorBarriers.cpp"
     "SetEncoding.cpp"
     "SetSplitReductionSizes.cpp"
+    "SinkBitCast.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"

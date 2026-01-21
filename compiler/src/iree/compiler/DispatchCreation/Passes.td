@@ -210,6 +210,20 @@ def FusionPreprocessingPass :
   ];
 }
 
+def SinkBitCastPass :
+    Pass<"iree-dispatch-creation-sink-bitcast"> {
+  let summary = "Sink iree_tensor_ext.bitcast through reshape operations.";
+  let description = [{
+    This pass sinks iree_tensor_ext.bitcast operations through
+    tensor.expand_shape and tensor.collapse_shape operations. This can
+    help enable better fusion opportunities by moving bitcast operations
+    closer together where they can potentially be folded.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
 def SinkReshapesPass :
     Pass<"iree-dispatch-creation-sink-reshapes", ""> {
   let summary = "Sink reshapes to allow for compute op -> consumer fusion.";

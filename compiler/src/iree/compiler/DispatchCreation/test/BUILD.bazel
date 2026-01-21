@@ -60,6 +60,7 @@ iree_lit_test_suite(
             "set_split_reduction_sizes_conv.mlir",
             "set_split_reduction_sizes_gemm.mlir",
             "set_split_reduction_sizes_outer_reduction.mlir",
+            "sink_bitcast.mlir",
             "sink_reshapes.mlir",
             "split_reduction.mlir",
             "tensor_pad_to_tensor_insert_slice.mlir",
