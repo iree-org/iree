@@ -42,10 +42,10 @@ struct TorchOptions {
     binder.opt<bool>(
         "iree-externalize-transients", externalizeTransients,
         llvm::cl::cat(category),
-        llvm::cl::desc(
-            "If enabled, this option will append an external hal buffer to "
-            "program inputs. This buffer will be used for storing transient "
-            "memory and must be provided by the user."));
+        llvm::cl::desc("If enabled, an external hal buffer will be appended to "
+                       "program inputs when converting torch functions to IREE "
+                       "input. This buffer will be used for storing transient "
+                       "memory and must be provided by the user at runtime."));
   }
 };
 
