@@ -101,14 +101,8 @@ struct InsertTensorBarriersPass final
         return;
       }
       for (Value result : op->getResults()) {
-        if (!isa<RankedTensorType>(result.getType())) {
-          continue;
-        }
-        const bool hasNonComputeUse =
-            llvm::any_of(result.getUsers(), [](Operation *user) {
-              return !isComputeOp(user) && !isa<tensor::DimOp>(user);
-            });
-        if (hasNonComputeUse) {
+        if (isa<RankedTensorType>(result.getType()) &&
+            llvm::none_of(result.getUsers(), isComputeOp)) {
           needsEndBarrier.insert(result);
         }
       }
@@ -124,8 +118,7 @@ struct InsertTensorBarriersPass final
       auto endOp = IREE::TensorExt::ComputeBarrierEndOp::create(
           builder, val.getLoc(), val);
       val.replaceUsesWithIf(endOp.getResult(), [&](OpOperand &use) {
-        return !isComputeOp(use.getOwner()) && use.getOwner() != endOp &&
-               !isa<tensor::DimOp>(use.getOwner());
+        return !isComputeOp(use.getOwner()) && use.getOwner() != endOp;
       });
     }
   }
