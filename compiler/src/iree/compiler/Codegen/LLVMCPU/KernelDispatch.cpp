@@ -2055,9 +2055,9 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   auto staticSizeOr = [](int64_t value, int64_t valueIfDynamic) {
     return ShapedType::isDynamic(value) ? valueIfDynamic : value;
   };
-  const int64_t M1 = staticSizeOr(lhsShape[mmt4dDimBase + 0], 1024);
-  const int64_t N1 = staticSizeOr(rhsShape[mmt4dDimBase + 0], 1024);
-  const int64_t K1 = staticSizeOr(lhsShape[mmt4dDimBase + 1], 1024);
+  const int64_t M1 = staticSizeOr(lhsShape[mmt4dDimBase + 0], 64);
+  const int64_t N1 = staticSizeOr(rhsShape[mmt4dDimBase + 0], 64);
+  const int64_t K1 = staticSizeOr(lhsShape[mmt4dDimBase + 1], 64);
 
   // M0, N0, K0 should almost always be static, but there could be an exception
   // on targets like Arm SVE, so just to be safe, also normalize.
