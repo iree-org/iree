@@ -1,0 +1,14 @@
+// Invocation via command line option
+// RUN: (iree-opt --iree-load-plugin=invalid_option 2>&1 || true) | FileCheck %s --check-prefix=INVALID_OPTION
+// RUN: (iree-compile --iree-load-plugin=invalid_option 2>&1 || true) | FileCheck %s --check-prefix=INVALID_OPTION
+// RUN: (iree-opt --iree-load-plugin=sample_plugin=non_existent_path 2>&1 || true) | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+// RUN: (iree-compile --iree-load-plugin=sample_plugin=non_existent_path 2>&1 || true) | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+
+// Alternative invocation via environment variable
+// RUN: (IREE_LOAD_PLUGINS=invalid_option iree-opt || true) 2>&1 | FileCheck %s --check-prefix=INVALID_OPTION
+// RUN: (IREE_LOAD_PLUGINS=invalid_option iree-compile || true) 2>&1 | FileCheck %s --check-prefix=INVALID_OPTION
+// RUN: (IREE_LOAD_PLUGINS=sample_plugin=non_existent_path iree-opt || true) 2>&1 | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+// RUN: (IREE_LOAD_PLUGINS=sample_plugin=non_existent_path iree-compile || true) 2>&1 | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+
+// INVALID_OPTION: [IREE Dynamic Plugin ERROR]: malformed plugin option 'invalid_option', expected <plugin_id>=<path>
+// NON_EXISTENT_PATH: [IREE Dynamic Plugin ERROR]: could not load plugin library 'non_existent_path'

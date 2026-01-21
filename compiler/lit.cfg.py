@@ -11,12 +11,14 @@
 # pylint: disable=undefined-variable
 
 import os
+import platform
+import subprocess
 import tempfile
 
 import lit.formats
 
 config.name = "IREE"
-config.suffixes = [".mlir", ".txt"]
+config.suffixes = [".mlir", ".txt", ".c"]
 config.test_format = lit.formats.ShTest(
     execute_external=True, force_execute_external=True
 )
@@ -39,6 +41,17 @@ config.environment.update(
         if k.startswith("IREE_") or k in passthrough_env_vars
     }
 )
+
+# On macOS, ensure the SDK sysroot is available for clang invoked in tests.
+if platform.system() == "Darwin" and "SDKROOT" not in config.environment:
+    try:
+        sdkroot = subprocess.check_output(
+            ["/usr/bin/xcrun", "--show-sdk-path"], text=True
+        ).strip()
+        if sdkroot:
+            config.environment["SDKROOT"] = sdkroot
+    except Exception:
+        pass
 
 # Use the most preferred temp directory.
 config.test_exec_root = (

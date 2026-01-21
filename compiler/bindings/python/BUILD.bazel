@@ -1,0 +1,413 @@
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_filegroup")
+load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
+
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_compiler_cc_library", "iree_td_library")
+
+# Platform-specific rpath for shared library loading.
+# $ORIGIN is Linux-only; macOS needs @loader_path.
+MACOS_RPATH_LINKOPTS = select({
+    "@platforms//os:linux": ["-Wl,-rpath,$ORIGIN"],
+    "@platforms//os:macos": ["-Wl,-rpath,@loader_path"],
+    "//conditions:default": [],
+})
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+##---------------------------------------------------------------------------##
+# Flow dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "FlowOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/FlowBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Flow/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "FlowOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=flow",
+            ],
+            "iree/compiler/dialects/_flow_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/FlowBinding.td",
+    deps = [
+        ":FlowOpsPyTdFiles",
+    ],
+)
+
+gentbl_filegroup(
+    name = "FlowEnumPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-enum-bindings",
+                "-bind-dialect=flow",
+            ],
+            "iree/compiler/dialects/_flow_enum_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/FlowBinding.td",
+    deps = [
+        ":FlowOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "FlowOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/flow.py",
+        ":FlowOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# HAL dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "HALOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/HALBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "HALOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=hal",
+            ],
+            "iree/compiler/dialects/_hal_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/HALBinding.td",
+    deps = [
+        ":HALOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "HALOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/hal.py",
+        ":HALOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# IREECodegen dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "IREECodegenOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/IREECodegenBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "IREECodegenOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=iree_codegen",
+            ],
+            "iree/compiler/dialects/_iree_codegen_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/IREECodegenBinding.td",
+    deps = [
+        ":IREECodegenOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "IREECodegenOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/iree_codegen.py",
+        ":IREECodegenOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# IREEGPU dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "IREEGPUOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/IREEGPUBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "IREEGPUOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=iree_gpu",
+            ],
+            "iree/compiler/dialects/_iree_gpu_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/IREEGPUBinding.td",
+    deps = [
+        ":IREEGPUOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "IREEGPUOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/iree_gpu.py",
+        ":IREEGPUOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# Stream dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "StreamOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/StreamBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Stream/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "StreamOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=stream",
+            ],
+            "iree/compiler/dialects/_stream_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/StreamBinding.td",
+    deps = [
+        ":StreamOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "StreamOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/stream.py",
+        ":StreamOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# Util dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "UtilOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/UtilBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "UtilOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=util",
+            ],
+            "iree/compiler/dialects/_util_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/UtilBinding.td",
+    deps = [
+        ":UtilOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "UtilOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/util.py",
+        ":UtilOpsPyGen",
+    ],
+)
+
+##---------------------------------------------------------------------------##
+# VM dialect.
+##---------------------------------------------------------------------------##
+
+iree_td_library(
+    name = "VMOpsPyTdFiles",
+    srcs = [
+        "iree/compiler/dialects/VMBinding.td",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/VM/IR:td_files",
+    ],
+)
+
+gentbl_filegroup(
+    name = "VMOpsPyGen",
+    tbl_outs = [
+        (
+            [
+                "-gen-python-op-bindings",
+                "-bind-dialect=vm",
+            ],
+            "iree/compiler/dialects/_vm_ops_gen.py",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "iree/compiler/dialects/VMBinding.td",
+    deps = [
+        ":VMOpsPyTdFiles",
+    ],
+)
+
+filegroup(
+    name = "VMOpsPyFiles",
+    srcs = [
+        "iree/compiler/dialects/vm.py",
+        ":VMOpsPyGen",
+    ],
+)
+
+py_library(
+    name = "CompilerPyFiles",
+    srcs = glob(
+        ["iree/**/*.py"],
+        exclude = ["iree/compiler/dialects/**"],
+    ),
+)
+
+# These flags are needed for pybind11 to work.
+PYBIND11_COPTS = [
+    "-fexceptions",
+    "-frtti",
+]
+
+PYBIND11_FEATURES = [
+    # Cannot use header_modules (parse_headers feature fails).
+    "-use_header_modules",
+]
+
+cc_binary(
+    name = "_site_initialize_0.so",
+    srcs = ["IREECompilerRegistration.cpp"],
+    copts = PYBIND11_COPTS + ["-DMLIR_PYTHON_PACKAGE_PREFIX=iree.compiler."],
+    features = PYBIND11_FEATURES,
+    linkopts = MACOS_RPATH_LINKOPTS,
+    linkshared = 1,
+    linkstatic = 0,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:SharedImpl",
+        "//compiler/src/iree/compiler/PluginAPI:PluginManager",
+        "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:MLIRBindingsPythonNanobindHeaders",
+        "@nanobind",
+    ],
+)
+
+cc_binary(
+    name = "_ireeCompilerDialects.so",
+    srcs = ["IREECompilerDialectsModule.cpp"],
+    copts = PYBIND11_COPTS + ["-DMLIR_PYTHON_PACKAGE_PREFIX=iree.compiler."],
+    features = PYBIND11_FEATURES,
+    linkopts = MACOS_RPATH_LINKOPTS,
+    linkshared = 1,
+    linkstatic = 0,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:SharedImpl",
+        "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:MLIRBindingsPythonNanobindHeaders",
+        # Added for upstream LLVM commit 5a112dedff3b (Oct 2025).
+        # IREECompilerDialectsModule.cpp includes "mlir-c/Target/LLVMIR.h" for translate_module_to_llvmir.
+        "@llvm-project//mlir:CAPITarget",
+        "@nanobind",
+    ],
+)
+
+cc_binary(
+    name = "iree-compile",
+    srcs = ["IREECompileTool.c"],
+    linkopts = MACOS_RPATH_LINKOPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+    ],
+)
+
+cc_binary(
+    name = "iree-opt",
+    srcs = ["IREEOptTool.c"],
+    linkopts = MACOS_RPATH_LINKOPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+    ],
+)
+
+cc_binary(
+    name = "iree-lld",
+    srcs = ["LldTool.c"],
+    linkopts = MACOS_RPATH_LINKOPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+    ],
+)

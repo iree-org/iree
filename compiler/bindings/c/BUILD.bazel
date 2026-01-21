@@ -46,12 +46,22 @@ cc_test(
     srcs = [
         "iree/compiler/loader/loader_test.c",
     ],
-    args = [
-        "lib/libIREECompiler.so",
-    ],
-    data = [
-        "//lib:libIREECompiler.so",
-    ],
+    args = select({
+        "@platforms//os:macos": [
+            "$(location //lib:libIREECompiler_dylib)",
+        ],
+        "//conditions:default": [
+            "$(location //lib:libIREECompiler_so)",
+        ],
+    }),
+    data = select({
+        "@platforms//os:macos": [
+            "//lib:libIREECompiler_dylib",
+        ],
+        "//conditions:default": [
+            "//lib:libIREECompiler_so",
+        ],
+    }),
     tags = ["skip-bazel_to_cmake"],
     deps = [
         ":headers",

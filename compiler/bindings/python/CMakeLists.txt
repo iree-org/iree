@@ -204,6 +204,7 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
     iree_compiler_API_SharedImpl
   PRIVATE_LINK_LIBS
     LLVMSupport
+    iree::compiler::PluginAPI::PluginManager
 )
 
 declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects

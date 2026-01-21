@@ -13,18 +13,103 @@ package(
 )
 
 iree_compiler_cc_binary(
-    name = "libIREECompiler.so",
+    name = "libIREECompiler",
     srcs = [
         "//compiler/src/iree/compiler/API:api_exports.c",
     ],
-    linkopts = [
-        "-Wl,--version-script=$(location //compiler/src/iree/compiler/API:api_exports.ld)",
-        "-Wl,--no-undefined",
-    ],
+    additional_linker_inputs = select({
+        "//conditions:default": [
+            "//compiler/src/iree/compiler/API:api_exports.ld",
+        ],
+        "@platforms//os:macos": [
+            "//compiler/src/iree/compiler/API:api_exports.macos.lst",
+        ],
+    }),
+    linkopts = select({
+        "//conditions:default": [
+            "-Wl,--version-script=$(location //compiler/src/iree/compiler/API:api_exports.ld)",
+            "-Wl,--no-undefined",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-exported_symbols_list,$(location //compiler/src/iree/compiler/API:api_exports.macos.lst)",
+            "-Wl,-install_name,@rpath/libIREECompiler.dylib",
+        ],
+    }),
     linkshared = 1,
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:StaticImpl",
-        "//compiler/src/iree/compiler/API:api_exports.ld",
     ],
+)
+
+# We need to have a duplicate of the library without the symbols restricted to
+# enable the plugin mechanism to work (it needs to be able to look up symbols by
+# name). This is unfortunate but necessary since we can not expose all symbols
+# when loading the shared library into a python process as it conflicts
+# with other libraries also using LLVM (e.g. from tensorflow) which do not
+# have the symbols hidden.
+iree_compiler_cc_binary(
+    name = "libIREECompilerUnshielded",
+    srcs = [
+        "//compiler/src/iree/compiler/API:api_exports.c",
+    ],
+    linkopts = select({
+        "//conditions:default": [
+            "-Wl,--no-undefined",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-install_name,@rpath/libIREECompilerUnshielded.dylib",
+        ],
+    }),
+    linkshared = 1,
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:StaticImpl",
+    ],
+)
+
+# Post-build genrule to add .dylib suffix on macOS
+genrule(
+    name = "libIREECompiler_dylib",
+    srcs = [":libIREECompiler"],
+    outs = ["libIREECompiler.dylib"],
+    cmd = "cp $< $@",
+    target_compatible_with = [
+        "@platforms//os:macos",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "libIREECompilerUnshielded_dylib",
+    srcs = [":libIREECompilerUnshielded"],
+    outs = ["libIREECompilerUnshielded.dylib"],
+    cmd = "cp $< $@",
+    target_compatible_with = [
+        "@platforms//os:macos",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Post-build genrule to add .so suffix on Linux
+genrule(
+    name = "libIREECompiler_so",
+    srcs = [":libIREECompiler"],
+    outs = ["libIREECompiler.so"],
+    cmd = "cp $< $@",
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "libIREECompilerUnshielded_so",
+    srcs = [":libIREECompilerUnshielded"],
+    outs = ["libIREECompilerUnshielded.so"],
+    cmd = "cp $< $@",
+    target_compatible_with = [
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:public"],
 )

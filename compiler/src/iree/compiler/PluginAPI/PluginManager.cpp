@@ -10,9 +10,11 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/MLIRContext.h"
 
 // Declare entrypoints for each statically registered plugin.
 #define HANDLE_PLUGIN_ID(plugin_id)                                            \
@@ -37,6 +39,174 @@ void PluginManagerOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 }
 
+namespace {
+
+std::optional<DynamicPluginRegistry> dynamicPluginRegistryInstance;
+
+// Since parsing the CLI options for the plugins happens manually to allow them
+// to register their own CLI options, we actually can not use the normal parsing
+// of the CLI options. However, we still need to consume the arguments to avoid
+// unknown argument errors and provide documentation on the command line option.
+// This class consumes the options but does nothing with them.
+struct PluginOptionsSink {
+  llvm::SmallVector<std::string> pluginOpts;
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("IREE dynamic plugin options");
+    binder.list<std::string>(
+        "iree-load-plugin", pluginOpts,
+        llvm::cl::desc(
+            "Dynamic plugins to load, specified as <plugin_id>=<path> where "
+            "path is the plugin shared library."),
+        llvm::cl::cat(category));
+  }
+  using FromFlags = OptionsFromFlags<PluginOptionsSink>;
+};
+
+} // namespace
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(PluginOptionsSink);
+
+bool DynamicPluginRegistry::create(int argc, char **argv,
+                                   bool allowEnvPlugins) {
+  if (dynamicPluginRegistryInstance.has_value()) {
+    // We can not process the flags again, so just return false.
+    return false;
+  }
+
+  // Create the instance
+  dynamicPluginRegistryInstance = DynamicPluginRegistry();
+
+  if (argv) {
+    dynamicPluginRegistryInstance->loadPluginsFromCL(argc, argv);
+
+    // Also consume the options to avoid unknown argument errors.
+    (void)PluginOptionsSink::FromFlags::get();
+  }
+
+  if (allowEnvPlugins) {
+    dynamicPluginRegistryInstance->loadPluginPathsFromEnv();
+  }
+
+  return dynamicPluginRegistryInstance->isValid();
+}
+
+bool DynamicPluginRegistry::hasInstance() {
+  return dynamicPluginRegistryInstance.has_value();
+}
+
+DynamicPluginRegistry &DynamicPluginRegistry::get() {
+  assert(dynamicPluginRegistryInstance.has_value() &&
+         "DynamicPluginRegistry not initialized, call create() first");
+  return dynamicPluginRegistryInstance.value();
+}
+
+bool DynamicPluginRegistry::registerPlugins(PluginRegistrar *registrar) const {
+  bool success = true;
+  for (const auto &plugin : plugins) {
+    if (plugin.isValid()) {
+      success = success && plugin.registerFunction(registrar);
+    }
+  }
+  return success;
+}
+
+llvm::SmallVector<std::string> DynamicPluginRegistry::getLoadedPlugins() const {
+  llvm::SmallVector<std::string> pluginNames;
+  for (const auto &plugin : plugins) {
+    if (plugin.isValid()) {
+      pluginNames.push_back(plugin.pluginId);
+    }
+  }
+  return pluginNames;
+}
+
+void DynamicPluginRegistry::reportErrors(llvm::raw_ostream &os) const {
+  for (const auto &plugin : plugins) {
+    if (!plugin.isValid()) {
+      os << "[IREE Dynamic Plugin ERROR]: " << plugin.error.value() << "\n";
+    }
+  }
+}
+
+bool DynamicPluginRegistry::isValid() const {
+  for (const auto &plugin : plugins) {
+    if (!plugin.isValid()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+DynamicPluginRegistry::Plugin
+DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
+  Plugin plugin;
+
+  auto equalPos = str.find('=');
+  if (equalPos == std::string_view::npos) {
+    plugin.error = "malformed plugin option '" + std::string(str) +
+                   "', expected <plugin_id>=<path>";
+    return plugin;
+  }
+  plugin.pluginId = std::string(str.substr(0, equalPos));
+  plugin.path = std::string(str.substr(equalPos + 1));
+
+  // Load the dynamic library
+  std::string loadErrMsg;
+  plugin.library = llvm::sys::DynamicLibrary::getPermanentLibrary(
+      plugin.path.c_str(), &loadErrMsg);
+  if (!plugin.library.isValid()) {
+    plugin.error =
+        "could not load plugin library '" + plugin.path + "': " + loadErrMsg;
+    return plugin;
+  }
+
+  // Look up the registration function
+  std::string symbolName = "iree_register_compiler_plugin_" + plugin.pluginId;
+  plugin.registerFunction = reinterpret_cast<RegisterFunction>(
+      plugin.library.getAddressOfSymbol(symbolName.c_str()));
+  if (!plugin.registerFunction) {
+    plugin.error = "could not find registration function '" + symbolName +
+                   "' in plugin '" + plugin.path + "'";
+  }
+
+  return plugin;
+}
+
+void DynamicPluginRegistry::loadPluginsFromCL(int argc, char **argv) {
+  // Plugin options must adhere to the following format:
+  //   --iree-load-plugin=<plugin_id>=<path to plugin shared library>
+
+  for (int i = 1; i < argc; ++i) {
+    StringRef argStr = argv[i];
+    constexpr StringRef pluginOptionPrefix = "--iree-load-plugin";
+    if (!argStr.starts_with(pluginOptionPrefix)) {
+      continue;
+    }
+    if (argStr.size() <= pluginOptionPrefix.size() ||
+        argStr[pluginOptionPrefix.size()] != '=') {
+      Plugin plugin;
+      plugin.error =
+          "malformed iree-load-plugin option '" + std::string(argStr) +
+          "', expected format '--iree-load-plugin=<plugin_id>=<path>'";
+      plugins.push_back(std::move(plugin));
+      continue;
+    }
+    StringRef pluginInfo = argStr.drop_front(pluginOptionPrefix.size() + 1);
+    plugins.push_back(Plugin::loadFromString(pluginInfo));
+  }
+}
+
+void DynamicPluginRegistry::loadPluginPathsFromEnv() {
+  if (const char *envVar = std::getenv("IREE_LOAD_PLUGINS")) {
+    StringRef envVarStr = envVar;
+    SmallVector<StringRef, 4> pluginInfos;
+    envVarStr.split(pluginInfos, ',', -1, false);
+    for (StringRef pluginInfo : pluginInfos) {
+      plugins.push_back(Plugin::loadFromString(pluginInfo));
+    }
+  }
+}
+
 PluginManager::PluginManager() {}
 
 bool PluginManager::loadAvailablePlugins() {
@@ -46,6 +216,12 @@ bool PluginManager::loadAvailablePlugins() {
     return false;
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
+
+  // Initialize dynamic plugins
+  if (!DynamicPluginRegistry::get().registerPlugins(this)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -78,6 +254,10 @@ llvm::SmallVector<std::string> PluginManager::getLoadedPlugins() {
 #define HANDLE_PLUGIN_ID(plugin_id) plugins.push_back(#plugin_id);
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
+
+  auto dynamicPlugins = DynamicPluginRegistry::get().getLoadedPlugins();
+  plugins.append(dynamicPlugins.begin(), dynamicPlugins.end());
+
   return plugins;
 }
 
@@ -167,9 +347,10 @@ LogicalResult PluginManagerSession::initializePlugins() {
     }
     auto foundIt = allPluginSessions.find(pluginId);
     if (foundIt == allPluginSessions.end()) {
-      llvm::errs()
-          << "[IREE plugins error]: could not activate requested IREE plugin '"
-          << pluginId << "' because it is not registered (available plugins: ";
+      llvm::errs() << "[IREE plugins error]: could not activate requested "
+                      "IREE plugin '"
+                   << pluginId
+                   << "' because it is not registered (available plugins: ";
       llvm::interleaveComma(getAvailableIds(), llvm::errs());
       llvm::errs() << ")\n";
       return failure();

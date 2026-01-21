@@ -1526,6 +1526,16 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
 }
 
 void ireeCompilerGlobalInitialize() {
+  // Ensure that dynamic plugins are loaded at global initialization time.
+  if (!mlir::iree_compiler::DynamicPluginRegistry::hasInstance()) {
+    if (!mlir::iree_compiler::DynamicPluginRegistry::create(
+            0, nullptr,
+            /*allowEnvPlugins=*/true)) {
+      mlir::iree_compiler::DynamicPluginRegistry::get().reportErrors(
+          llvm::errs());
+    }
+  }
+
   if (globalInit) {
     globalInit->refCount.fetch_add(1);
     return;

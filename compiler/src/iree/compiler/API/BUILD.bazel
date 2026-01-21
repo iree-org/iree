@@ -17,7 +17,7 @@ exports_files([
     "api_exports.c",
     "api_exports.def",
     "api_exports.ld",
-    "api_exports.lst",
+    "api_exports.macos.lst",
 ])
 
 # IMPORTANT: If modifying the list of dependencies, mirror the changes
@@ -56,9 +56,28 @@ iree_compiler_cc_library(
 
 iree_compiler_cc_library(
     name = "SharedImpl",
-    srcs = [
-        "//lib:libIREECompiler.so",
-    ],
+    srcs = select({
+        "@platforms//os:macos": [
+            "//lib:libIREECompiler_dylib",
+        ],
+        "//conditions:default": [
+            "//lib:libIREECompiler_so",
+        ],
+    }),
+    tags = ["skip-bazel_to_cmake"],
+)
+
+# See lib/BUILD.bazel for explanation.
+iree_compiler_cc_library(
+    name = "SharedUnshieldedImpl",
+    srcs = select({
+        "@platforms//os:macos": [
+            "//lib:libIREECompilerUnshielded_dylib",
+        ],
+        "//conditions:default": [
+            "//lib:libIREECompilerUnshielded_so",
+        ],
+    }),
     tags = ["skip-bazel_to_cmake"],
 )
 

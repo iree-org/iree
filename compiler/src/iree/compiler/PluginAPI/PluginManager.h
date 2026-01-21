@@ -8,13 +8,14 @@
 #define IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
 
 #include <optional>
+#include <string>
 #include <string_view>
-#include <vector>
 
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/DynamicLibrary.h"
 
 namespace mlir::iree_compiler {
 
@@ -32,6 +33,61 @@ public:
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PluginManagerOptions>;
+};
+
+// Tracks dynamically loaded plugins and their registration callbacks.
+// Created once early so plugins can contribute CLI options.
+class DynamicPluginRegistry {
+public:
+  /// Creates the singleton instance and returns true on success; may only be
+  /// called once.
+  [[nodiscard]] static bool create(int argc, char **argv,
+                                   bool allowEnvPlugins = true);
+
+  /// Returns true if the singleton instance exists
+  static bool hasInstance();
+
+  /// Returns the singleton instance (must be created first).
+  static DynamicPluginRegistry &get();
+
+public:
+  /// Registers all loaded plugins with the given registrar.
+  [[nodiscard]] bool registerPlugins(PluginRegistrar *registrar) const;
+  /// Returns the plugin identifiers that were loaded.
+  llvm::SmallVector<std::string> getLoadedPlugins() const;
+  /// Emits any load/registration errors to the given stream.
+  void reportErrors(llvm::raw_ostream &os) const;
+  /// True if all plugins loaded and resolved successfully.
+  bool isValid() const;
+
+private:
+  struct Plugin {
+    using RegisterFunction = bool (*)(mlir::iree_compiler::PluginRegistrar *);
+
+    std::string path;
+    std::string pluginId;
+    llvm::sys::DynamicLibrary library;
+    std::optional<std::string> error;
+    RegisterFunction registerFunction = nullptr;
+
+    /// Loads a plugin from a string of the form <plugin_id>=<path>.
+    static Plugin loadFromString(std::string_view str);
+
+    bool isValid() const { return !error.has_value(); }
+  };
+
+  // Singleton instance, only allowed to be created via `create()`.
+  DynamicPluginRegistry() = default;
+
+  // We need to manually parse out the plugin options before we initialize
+  // the PluginManager since it needs to load plugins before we can parse the
+  // full set of command line options.
+  void loadPluginsFromCL(int argc, char **argv);
+
+  void loadPluginPathsFromEnv();
+
+private:
+  llvm::SmallVector<Plugin, 4> plugins;
 };
 
 // Manages global registrations for available plugins.
