@@ -1110,7 +1110,8 @@ struct ZeroExtentTensorCanon final : RewritePattern {
     // If the result is a zero-extent tensor, replace the whole op with an empty
     // tensor.
     bool didUpdate = false;
-    for (auto result : op->getResults()) {
+    llvm::BitVector updatedResults(op->getNumResults(), false);
+    for (auto [index, result] : llvm::enumerate(op->getResults())) {
       auto resultType = isZeroExtent(result.getType());
       if (!resultType || result.use_empty()) {
         continue;
@@ -1119,6 +1120,13 @@ struct ZeroExtentTensorCanon final : RewritePattern {
           result, tensor::EmptyOp::create(rewriter, loc, resultType->getShape(),
                                           resultType->getElementType()));
       didUpdate = true;
+      updatedResults.set(index);
+    }
+
+    if (updatedResults.all()) {
+      // If we have replaced all results with a tensor.empty, there is no need
+      // to update the operation in the next step.
+      return success();
     }
 
     // If one of the operands is a zero-extent tensor, replace the operand with
