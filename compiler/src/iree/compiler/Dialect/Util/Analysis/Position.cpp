@@ -96,7 +96,8 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
     regionOp.getSuccessorRegions(region, successors);
     for (auto &successor : successors) {
       if (successor.isParent()) {
-        return llvm::to_vector(getPositions(successor.getSuccessorInputs()));
+        return llvm::to_vector(
+            getPositions(regionOp.getSuccessorInputs(successor)));
       }
     }
     assert(false && "should have found a parent successor");
