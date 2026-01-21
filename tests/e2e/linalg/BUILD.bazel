@@ -232,6 +232,7 @@ ROCM_SRCS = enforce_glob(
         "index.mlir",
         "narrow_n_matmuls.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
@@ -243,7 +244,6 @@ ROCM_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "small_float_arith.mlir",
     ],
 )
 

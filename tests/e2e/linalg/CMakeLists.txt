@@ -168,6 +168,7 @@ iree_check_single_backend_test_suite(
     "index.mlir"
     "narrow_n_matmuls.mlir"
     "pack_i8.mlir"
+    "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
