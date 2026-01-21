@@ -2316,11 +2316,13 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
     if (clGPUEnableReductionVectorDistribution) {
+      LDBG() << "ReductionVectorDistribution: finding a suitable config...";
       if (succeeded(
               IREE::GPU::setReductionConfig(target, entryPointFn, linalgOp))) {
         LDBG() << "Vector Distribution Subgroup Reduction Config";
         return success();
       }
+      LDBG() << "ReductionVectorDistribution: failed to find a suitable config";
     }
     if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
       LDBG() << "Convolution Config";
