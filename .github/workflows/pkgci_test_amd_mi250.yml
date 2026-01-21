@@ -32,7 +32,23 @@ jobs:
       IREE_CUDA_ENABLE: 0
       IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
+    container:
+      # TODO: Update to latest complete image once it passes the CTS tests.
+      image: rocm/dev-ubuntu-22.04:6.3-complete
+      options: --ipc host
+        --group-add video
+        --device /dev/kfd
+        --device /dev/dri
+    defaults:
+      run:
+        shell: bash
     steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y git git-lfs cmake ninja-build clang
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
       - name: Check out repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -55,7 +71,8 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Check ROCm
+        run: ./build_tools/scripts/check_rocm.sh
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: Run GPU tests
