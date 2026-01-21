@@ -818,6 +818,7 @@ struct SwapCollapseShapeWithSlicePattern
 } // namespace
 
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns) {
+  //
   patterns.add<SwapCollapseShapeWithSlicePattern>(patterns.getContext());
 }
 
