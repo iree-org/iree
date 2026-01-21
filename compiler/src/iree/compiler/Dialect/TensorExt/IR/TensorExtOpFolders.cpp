@@ -72,14 +72,14 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     SmallVector<OpFoldResult> newResultMixed;
     int64_t rank = resTensorType.getRank();
     for (int64_t i = 0; i < rank - 1; ++i) {
-      int64_t castSize = tensorCastSrcType.getShape()[i];
-      OpFoldResult resOfr = resultMixed[i];
       // Try cast source static info first.
+      int64_t castSize = tensorCastSrcType.getShape()[i];
       if (!ShapedType::isDynamic(castSize)) {
         newResultMixed.push_back(rewriter.getIndexAttr(castSize));
         continue;
       }
       // Try result constant.
+      OpFoldResult resOfr = resultMixed[i];
       if (std::optional<int64_t> resConst = getConstantIntValue(resOfr)) {
         newResultMixed.push_back(rewriter.getIndexAttr(*resConst));
         continue;
