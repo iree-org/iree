@@ -1988,6 +1988,14 @@ static bool adjustVectorSizesForScalableVectorization(
   return false;
 }
 
+// Given a positive integer `n`, returns a list of all pairs of positive
+// integers `(a, b)` such that `a * b = n`, sorted by increasing `a`.
+//
+// The current single user (getMmt4dLoweringConfig) does not strongly rely on
+// the sorting. The sorting only affects tie-breaks in its selection of a tile
+// candidate, as the first tile considered takes precedence in case of a tie.
+// The purpose of sorting is thus only to prevent implementation changes in this
+// function from resulting in observable differences. It's also cheap anyway.
 static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
   SmallVector<std::pair<int64_t, int64_t>> divisors;
   for (int64_t i = 1; i * i <= n; ++i) {
@@ -2048,22 +2056,73 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   }
   const auto lhsShape = lhsType.getShape();
   const auto rhsShape = rhsType.getShape();
+  int64_t M0 = lhsShape[mmt4dDimBase + 2];
+  int64_t N0 = rhsShape[mmt4dDimBase + 2];
+  int64_t K0 = lhsShape[mmt4dDimBase + 3];
+  int64_t M1 = lhsShape[mmt4dDimBase + 0];
+  int64_t N1 = rhsShape[mmt4dDimBase + 0];
+  int64_t K1 = lhsShape[mmt4dDimBase + 1];
 
-  // Get the M1, N1, K1 sizes from the shapes, but normalize Dynamic to some
-  // reasonable large-ish power-of-two value so that the heuristic below comes
-  // up with reasonable tile sizes for dynamic-shape matmuls.
-  auto staticSizeOr = [](int64_t value, int64_t valueIfDynamic) {
-    return ShapedType::isDynamic(value) ? valueIfDynamic : value;
-  };
-  const int64_t M1 = staticSizeOr(lhsShape[mmt4dDimBase + 0], 64);
-  const int64_t N1 = staticSizeOr(rhsShape[mmt4dDimBase + 0], 64);
-  const int64_t K1 = staticSizeOr(lhsShape[mmt4dDimBase + 1], 64);
+  //
+  // Part 1: set the vectorization tile sizes, vecTileSizes.
+  // Normally these are just the M0, N0, K0 dimension sizes, as long as these
+  // are static. The difficulty is the possibility of dynamic tile sizes, which
+  // currently occurs with Arm SVE. In that case, these dimensions need to be
+  // resolved to static upper bounds. This needs to happen before we get to
+  // distribution tiles (Part 2) because the latter depends on the vectorization
+  // tile sizes.
+  //
 
-  // M0, N0, K0 should almost always be static, but there could be an exception
-  // on targets like Arm SVE, so just to be safe, also normalize.
-  const int64_t M0 = staticSizeOr(lhsShape[mmt4dDimBase + 2], 16);
-  const int64_t N0 = staticSizeOr(rhsShape[mmt4dDimBase + 2], 16);
-  const int64_t K0 = staticSizeOr(lhsShape[mmt4dDimBase + 3], 16);
+  unsigned numLoops = op.getNumLoops();
+  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+  assert(vecTileSizes.size() == mmt4dDimBase + 6);
+  vecTileSizes[mmt4dDimBase + 3] = M0;
+  vecTileSizes[mmt4dDimBase + 4] = N0;
+  vecTileSizes[mmt4dDimBase + 5] = K0;
+  IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
+                                                        false);
+  bool scalableTilesFound = false;
+  // If scalable vectorization is enabled, adjust the vector tile sizes and the
+  // corresponding scalable flags.
+  if (targetConfig && isScalableVectorizationEnabled()) {
+    scalableTilesFound = adjustVectorSizesForScalableVectorization(
+        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
+  }
+  // In the existence of scalable tiles, we do not yet support limiting vector
+  // sizes as this assumes static tile sizes.
+  // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
+  if (!scalableTilesFound) {
+    limitVectorTileSizes(op, vecTileSizes);
+  }
+  // Query back the final M0, N0, K0 values.
+  M0 = vecTileSizes[mmt4dDimBase + 3];
+  N0 = vecTileSizes[mmt4dDimBase + 4];
+  K0 = vecTileSizes[mmt4dDimBase + 5];
+  // By now, if any of these is still dynamic, that's an internal bug.
+  assert(!ShapedType::isDynamic(M0) && !ShapedType::isDynamic(N0) &&
+         !ShapedType::isDynamic(K0));
+
+  //
+  // Part 2: set the distribution tile sizes, distTileSizes.
+  // These are tilings along the M1, N1, K1 dimensions. We do not currently tile
+  // the K (reduction) dimension on CPU, so this is effectively only the tilings
+  // of the M1 and N1 dimensions. To avoid incurring padding or requiring
+  // mixed tiles, we select the tile sizes among the divisors of M1, N1.
+  //
+
+  const int64_t kTypicalDynamicSize = 1024;
+  if (ShapedType::isDynamic(M1)) {
+    M1 = kTypicalDynamicSize / M0;
+  }
+  if (ShapedType::isDynamic(N1)) {
+    N1 = kTypicalDynamicSize / N0;
+  }
+  if (ShapedType::isDynamic(K1)) {
+    K1 = kTypicalDynamicSize / K0;
+  }
+  // By now, all 6 size parameters {M,N,K}{0,1} are static.
+  assert(!ShapedType::isDynamic(M1) && !ShapedType::isDynamic(N1) &&
+         !ShapedType::isDynamic(K1));
 
   const int64_t M = M0 * M1;
   const int64_t N = N0 * N1;
@@ -2121,27 +2180,6 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   distTileSizes[mmt4dDimBase + 0] = selectedTileM;
   distTileSizes[mmt4dDimBase + 1] = selectedTileN;
 
-  unsigned numLoops = op.getNumLoops();
-  SmallVector<int64_t> vecTileSizes(numLoops, 1);
-  assert(vecTileSizes.size() == mmt4dDimBase + 6);
-  vecTileSizes[mmt4dDimBase + 3] = M0;
-  vecTileSizes[mmt4dDimBase + 4] = N0;
-  vecTileSizes[mmt4dDimBase + 5] = K0;
-  IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
-                                                        false);
-  bool scalableTilesFound = false;
-  // If scalable vectorization is enabled, adjust the vector tile sizes and the
-  // corresponding scalable flags.
-  if (targetConfig && isScalableVectorizationEnabled()) {
-    scalableTilesFound = adjustVectorSizesForScalableVectorization(
-        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
-  }
-  // In the existence of scalable tiles, we do not yet support limiting vector
-  // sizes as this assumes static tile sizes.
-  // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
-  if (!scalableTilesFound) {
-    limitVectorTileSizes(op, vecTileSizes);
-  }
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);
