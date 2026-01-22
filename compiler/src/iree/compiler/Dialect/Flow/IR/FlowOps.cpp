@@ -1188,6 +1188,24 @@ LogicalResult ExecutableOp::verify() {
   return success();
 }
 
+LogicalResult ExecutableOp::verifyRegions() {
+  ModuleOp innerModule = getInnerModule();
+  if (!innerModule) {
+    return success();
+  }
+  // Verify that none of the dispatch functions return a result.
+  for (auto funcOp : innerModule.getOps<mlir::FunctionOpInterface>()) {
+    if (!funcOp.isPublic()) {
+      continue;
+    }
+    if (funcOp.getNumResults() != 0) {
+      return funcOp->emitOpError()
+             << "flow dispatch functions should not have a result";
+    }
+  }
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // flow.executable.export
 //===----------------------------------------------------------------------===//
@@ -1199,7 +1217,7 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-LogicalResult ExecutableExportOp::verify() {
+LogicalResult ExecutableExportOp::verifyRegions() {
   // Workgroup count region is optional.
   if (!getWorkgroupCount().empty()) {
     // Verify the return ops all provide XYZ values.
@@ -1207,8 +1225,8 @@ LogicalResult ExecutableExportOp::verify() {
       if (returnOp.getNumOperands() != 3 ||
           !llvm::all_of(returnOp.getOperandTypes(),
                         [](Type type) { return type.isIndex(); })) {
-        return returnOp.emitOpError()
-               << "workgroup count region must return the XYZ dimension counts";
+        return returnOp.emitOpError() << "workgroup count region must return "
+                                         "the XYZ dimension counts";
       }
     }
   }
@@ -1272,8 +1290,8 @@ FunctionType DispatchOp::getEntryPointType() {
 std::string DispatchOp::getEntryPointName() {
   // Pick the first entry point we have. The common case is we only have one
   // but frontends may provide multiple variants - they're all likely the
-  // same name but with slight differences and enough for a user to know what's
-  // happening.
+  // same name but with slight differences and enough for a user to know
+  // what's happening.
   auto anyEntryPoint = *getEntryPointRefs().begin();
   std::string entryPointName =
       anyEntryPoint.getRootReference().getValue().str();
@@ -1313,9 +1331,9 @@ LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
         symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
             op, entryPointAttr);
     if (!exportOp) {
-      // TODO(benvanik): there are a lot of tests that are assuming this is not
-      // verified. We'll need to go add dummy executables for all of them. Today
-      // we just bail on the verifier if the symbol isn't found.
+      // TODO(benvanik): there are a lot of tests that are assuming this is
+      // not verified. We'll need to go add dummy executables for all of them.
+      // Today we just bail on the verifier if the symbol isn't found.
       //
       // Should be:
       //   return op->emitOpError() << "undefined entry point: " <<
