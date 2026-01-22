@@ -195,7 +195,7 @@ public:
             }
           }
           auto packedType =
-              cast<RankedTensorType>(linalg::PackOp::inferPackedType(
+              cast<RankedTensorType>(linalg::PackOp::inferPackedTensorType(
                   type, innerTileSizesVector, encodingInfo.innerDimsPos,
                   encodingInfo.outerDimsPerm));
 
