@@ -281,8 +281,7 @@ func.func @ukernel_dispatch() attributes {hal.executable.target = #executable_ta
 //       CHECK:       scf.for
 //       CHECK:         scf.for
 //       CHECK:           scf.for
-//       CHECK:             scf.for
-//   CHECK-NOT:               scf.for
+//   CHECK-NOT:             scf.for
 //       CHECK:   iree_codegen.ukernel.generic "iree_uk_mmt4d"
 
 // -----
