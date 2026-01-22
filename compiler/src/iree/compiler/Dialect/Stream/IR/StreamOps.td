@@ -2797,7 +2797,6 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getEntrySuccessorOperands",
-    "getSuccessorInputs",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2893,7 +2892,6 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getEntrySuccessorOperands",
-    "getSuccessorInputs",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -3865,7 +3863,6 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getEntrySuccessorOperands",
-    "getSuccessorInputs",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -3946,7 +3943,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
     "IREE::Stream::CmdConcurrentOp",
   ]>,
   RecursiveMemoryEffects,
-  DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
+  DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
   Stream_StreamableOp,
@@ -4012,7 +4009,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
     "IREE::Stream::CmdConcurrentOp",
   ]>,
   RecursiveMemoryEffects,
-  DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
+  DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
   Stream_StreamableOp,
