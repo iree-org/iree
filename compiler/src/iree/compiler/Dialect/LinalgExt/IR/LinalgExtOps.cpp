@@ -695,6 +695,47 @@ void MapGatherOp::inlineMapGatherBody(
                                  transformBodyIndices, bodyBuilder);
 }
 
+bool MapGatherOp::isIdentity() {
+  if (getSourceType() != getOutputType()) {
+    return false;
+  }
+  // Check that the block arguments are directly yielded in the order that they
+  // are defined in the block (excluding padding).
+  Block &transformBody = getTransformationRegion().getBlocks().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  for (unsigned i = 0; i < getSourceRank(); ++i) {
+    auto yieldedBbArg = dyn_cast<BlockArgument>(yieldOp.getOperand(i));
+    if (yieldedBbArg != transformBody.getArgument(i)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+namespace {
+/// Replace an identity map_gather with its source.
+struct ReplaceIdentityMapGather : public OpRewritePattern<MapGatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(MapGatherOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.isIdentity()) {
+      return failure();
+    }
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+    rewriter.replaceOp(op, op.getSource());
+    return success();
+  }
+};
+} // namespace
+
+void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *ctx) {
+  results.add<ReplaceIdentityMapGather>(ctx);
+}
+
 //===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//

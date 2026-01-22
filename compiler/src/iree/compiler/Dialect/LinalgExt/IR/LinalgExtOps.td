@@ -347,12 +347,20 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       OpBuilder &b, Location loc, ValueRange transformBodyIndices,
       function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
+    // Return true if the mapGatherOp is an identity transformation, meaning
+    // it is just reading from the source without any index transformation.
+    // This is true if source and output have the same type and the mapping
+    // from output to source index is identity.
+    bool isIdentity();
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
       return getOutputMutable();
     }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",

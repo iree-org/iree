@@ -232,3 +232,21 @@ func.func public @convert_identity_map_scatter_into_copy(
 //  CHECK-NOT:   iree_linalg_ext.map_scatter
 //      CHECK:   %[[COPY:.+]] = linalg.copy ins(%[[ARG0]]{{.*}} outs(%[[ARG1]]
 //      CHECK:   return %[[COPY]]
+
+// -----
+
+func.func public @replace_identity_map_gather_with_source(
+    %arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>
+) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %map_gather = iree_linalg_ext.map_gather %arg0 into %arg1 {
+  ^bb0(%arg2: index, %arg3: index):
+    iree_linalg_ext.yield %arg2, %arg3, %cst : index, index, f32
+  } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+  return %map_gather : tensor<?x?xf32>
+}
+//CHECK-LABEL: func public @replace_identity_map_gather_with_source(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-NOT:   iree_linalg_ext.map_gather
+//      CHECK:   return %[[ARG0]]
