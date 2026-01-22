@@ -218,6 +218,7 @@ iree_runtime_cc_library(
         ":function_util",
         ":instrument_util",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:base_stats",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:stream",
