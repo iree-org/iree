@@ -302,11 +302,10 @@ func.func @map_scatter_sub_byte_with_mask(
 //   CHECK-DAG:   %[[CST_2:.+]] = arith.constant dense<2> : vector<4x1xindex>
 //   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[OUTPUT]] {{.*}} memref<8x16xf4E2M1FN> into memref<128xf4E2M1FN>
 //   CHECK-DAG:   %[[STEP_4:.+]] = vector.step : vector<4xindex>
-//   CHECK-DAG:   %[[BROADCAST_1x4:.+]] = vector.broadcast %[[STEP_4]] : vector<4xindex> to vector<1x4xindex>
-//   CHECK-DAG:   %[[TRANSPOSE:.+]] = vector.transpose %[[BROADCAST_1x4]], [1, 0] : vector<1x4xindex> to vector<4x1xindex>
+//   CHECK-DAG:   %[[SHAPE_CAST_0:.+]] = vector.shape_cast %[[STEP_4]] : vector<4xindex> to vector<4x1xindex>
 //   CHECK-DAG:   %[[STEP_1:.+]] = vector.step : vector<1xindex>
-//   CHECK-DAG:   %[[CMPI:.+]] = arith.cmpi ult, %[[TRANSPOSE]], %[[CST_2]] : vector<4x1xindex>
-//   CHECK-DAG:   %[[MULI:.+]] = arith.muli %[[TRANSPOSE]], %[[CST_16]] overflow<nsw> : vector<4x1xindex>
+//   CHECK-DAG:   %[[CMPI:.+]] = arith.cmpi ult, %[[SHAPE_CAST_0]], %[[CST_2]] : vector<4x1xindex>
+//   CHECK-DAG:   %[[MULI:.+]] = arith.muli %[[SHAPE_CAST_0]], %[[CST_16]] overflow<nsw> : vector<4x1xindex>
 //   CHECK-DAG:   %[[BROADCAST_4x1:.+]] = vector.broadcast %[[STEP_1]] : vector<1xindex> to vector<4x1xindex>
 //   CHECK-DAG:   %[[ADDI:.+]] = arith.addi %[[MULI]], %[[BROADCAST_4x1]] overflow<nsw> : vector<4x1xindex>
 //       CHECK:   %[[EXTRACT_COND_0:.+]] = vector.extract %[[CMPI]][0, 0] : i1 from vector<4x1xi1>
