@@ -68,10 +68,10 @@ func.func @fill_matmul(
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @set_encoding_dynamic(%input: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding_lhs> attributes {
+func.func @set_encoding_dynamic(%input: tensor<?x?xf32>, %m: index, %n: index, %k: index) -> tensor<?x?xf32, #encoding_lhs> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_cpu.vmvx_encoding_resolver<>}>
 } {
-  %0 = iree_encoding.set_encoding %input : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
+  %0 = iree_encoding.set_encoding %input encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
   return %0 : tensor<?x?xf32, #encoding_lhs>
 }
 //       CHECK: func @set_encoding_dynamic(
@@ -89,10 +89,10 @@ func.func @set_encoding_dynamic(%input: tensor<?x?xf32>) -> tensor<?x?xf32, #enc
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @unset_encoding_dynamic(%input: tensor<?x?xf32, #encoding_lhs>, %d0: index, %d1: index) -> tensor<?x?xf32> attributes {
+func.func @unset_encoding_dynamic(%input: tensor<?x?xf32, #encoding_lhs>, %d0: index, %d1: index, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_cpu.vmvx_encoding_resolver<>}>
 } {
-  %0 = iree_encoding.unset_encoding %input : tensor<?x?xf32, #encoding_lhs> -> tensor<?x?xf32>{%d0, %d1}
+  %0 = iree_encoding.unset_encoding %input encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_lhs> -> tensor<?x?xf32>{%d0, %d1}
   return %0 : tensor<?x?xf32>
 }
 //       CHECK: func @unset_encoding_dynamic(

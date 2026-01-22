@@ -115,6 +115,7 @@ def EncodingAttr :
         "isSerialized",
         "cloneWithLayouts",
         "convertForBitcast",
+        "getNumDynamicEncodingDims",
       ]>,
       DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
         "getReductionDims",

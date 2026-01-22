@@ -13,15 +13,16 @@ func.func @matmul_lowering_f32f32f32_riscv(%lhs: tensor<?x?xf32>, %rhs: tensor<?
   %c1 = arith.constant 1 : index
   %M = tensor.dim %acc, %c0 : tensor<?x?xf32>
   %N = tensor.dim %acc, %c1 : tensor<?x?xf32>
-  %0 = iree_encoding.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
-  %1 = iree_encoding.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
-  %2 = iree_encoding.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
+  %K = tensor.dim %lhs, %c1 : tensor<?x?xf32>
+  %0 = iree_encoding.set_encoding %lhs encoding_dims{%M, %N, %K} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
+  %1 = iree_encoding.set_encoding %rhs encoding_dims{%M, %N, %K} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
+  %2 = iree_encoding.set_encoding %acc encoding_dims{%M, %N, %K} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
   %3 = linalg.matmul
       ins(%0, %1 : tensor<?x?xf32, #encoding_lhs>,
                    tensor<?x?xf32, #encoding_rhs>)
       outs(%2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
-  %4 = iree_encoding.unset_encoding %3 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
+  %4 = iree_encoding.unset_encoding %3 encoding_dims{%M, %N, %K} : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%M, %N}
   return %4 : tensor<?x?xf32>
 }
 // RISC-V targets does not implement data-tiling yet.

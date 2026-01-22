@@ -30,7 +30,9 @@ LogicalResult SetEncodingOp::verify() {
     return emitOpError(
         "source of set_encoding op cannot have a tensor encoding");
   }
-  if (!isa_and_nonnull<SerializableAttr>(getResultType().getEncoding())) {
+  auto encoding =
+      dyn_cast_or_null<SerializableAttr>(getResultType().getEncoding());
+  if (!encoding) {
     return emitOpError(
         "result of set_encoding op expected to have a valid tensor encoding");
   }
@@ -40,6 +42,14 @@ LogicalResult SetEncodingOp::verify() {
   }
   if (failed(verifyCompatibleShape(getResultType(), getSourceType()))) {
     return emitOpError("expected to preserve the logical shape of the tensor");
+  }
+  // Verify encoding_dims count matches what the encoding expects.
+  std::optional<int64_t> expectedDims = encoding.getNumDynamicEncodingDims();
+  if (expectedDims.has_value() &&
+      static_cast<int64_t>(getEncodingDims().size()) != expectedDims.value()) {
+    return emitOpError() << "encoding expects " << expectedDims.value()
+                         << " dynamic encoding dimension(s), but "
+                         << getEncodingDims().size() << " provided";
   }
   return success();
 }
@@ -63,7 +73,9 @@ LogicalResult UnsetEncodingOp::verify() {
     return emitOpError(
         "result of unset_encoding op cannot have a tensor encoding");
   }
-  if (!isa_and_nonnull<SerializableAttr>(getSourceType().getEncoding())) {
+  auto encoding =
+      dyn_cast_or_null<SerializableAttr>(getSourceType().getEncoding());
+  if (!encoding) {
     return emitOpError(
         "source of unset_encoding op expected to have a valid tensor encoding");
   }
@@ -80,6 +92,14 @@ LogicalResult UnsetEncodingOp::verify() {
                          << " dynamic dimensions but only "
                          << getResultDims().size()
                          << " dimension values are attached";
+  }
+  // Verify encoding_dims count matches what the encoding expects.
+  std::optional<int64_t> expectedDims = encoding.getNumDynamicEncodingDims();
+  if (expectedDims.has_value() &&
+      static_cast<int64_t>(getEncodingDims().size()) != expectedDims.value()) {
+    return emitOpError() << "encoding expects " << expectedDims.value()
+                         << " dynamic encoding dimension(s), but "
+                         << getEncodingDims().size() << " provided";
   }
   return success();
 }

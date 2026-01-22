@@ -258,6 +258,24 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return failure();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the number of dynamic encoding dimensions expected for this
+        encoding. This is used to validate `encoding_dims` operands on
+        `set_encoding` and `unset_encoding` ops.
+        Only dynamic dimensions need to be carried as operands.
+        For example, a matmul encoding with iteration_sizes = [?, 128, 64]
+        has 1 dynamic encoding dim (the M dimension).
+        Returns std::nullopt if the number cannot be determined.
+      }],
+      /*retTy=*/"std::optional<int64_t>",
+      /*methodName=*/"getNumDynamicEncodingDims",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
     >
   ];
 

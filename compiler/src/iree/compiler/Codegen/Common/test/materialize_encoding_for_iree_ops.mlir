@@ -572,10 +572,11 @@ func.func @set_encoding_LHS_with_layout() attributes {
   hal.executable.target = #executable_target
 } {
   %c0 = arith.constant 0 : index
+  %c512 = arith.constant 512 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>> -> tensor<1x256xf32>
-  %3 = iree_encoding.set_encoding %2 : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
+  %3 = iree_encoding.set_encoding %2 encoding_dims{%c512} : tensor<1x256xf32> -> tensor<1x256xf32, #encoding1>
   iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32, #encoding1> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x256xf32, #encoding>>
   return
 }
@@ -603,10 +604,11 @@ func.func @set_encoding_RHS_with_layout() attributes {
   hal.executable.target = #executable_target
 } {
   %c0 = arith.constant 0 : index
+  %c512 = arith.constant 512 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x10xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x10xf32, #encoding>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 10], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x10xf32>> -> tensor<256x10xf32>
-  %3 = iree_encoding.set_encoding %2 : tensor<256x10xf32> -> tensor<256x10xf32, #encoding1>
+  %3 = iree_encoding.set_encoding %2 encoding_dims{%c512} : tensor<256x10xf32> -> tensor<256x10xf32, #encoding1>
   iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [256, 10], strides = [1, 1] : tensor<256x10xf32, #encoding1> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x10xf32, #encoding>>
   return
 }
@@ -636,10 +638,11 @@ func.func @unset_encoding_RES_with_layout() attributes {
   hal.executable.target = #executable_target
 } {
   %c0 = arith.constant 0 : index
+  %c512 = arith.constant 512 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x10xf32, #encoding>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x10xf32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x10xf32, #encoding>> -> tensor<1x10xf32, #encoding1>
-  %3 = iree_encoding.unset_encoding %2 : tensor<1x10xf32, #encoding1> -> tensor<1x10xf32>
+  %3 = iree_encoding.unset_encoding %2 encoding_dims{%c512} : tensor<1x10xf32, #encoding1> -> tensor<1x10xf32>
   iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : tensor<1x10xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x10xf32>>
   return
 }

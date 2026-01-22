@@ -27,9 +27,9 @@ func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32() -> tensor<255x
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32>
+    %arg0: tensor<255x513xf32>, %k: index
 ) -> tensor<255x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
   return %0 : tensor<255x513xf32, #encoding>
 }
 
@@ -54,9 +54,9 @@ func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_LHS_narrow_unroll1x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32>
+    %arg0: tensor<255x513xf32>, %k: index
 ) -> tensor<255x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
   return %0 : tensor<255x513xf32, #encoding>
 }
 
@@ -81,9 +81,9 @@ func.func @set_encoding_LHS_narrow_unroll1x8x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [?, ?, ?]>
 func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<?x?xf32>
+    %arg0: tensor<?x?xf32>, %m: index, %n: index, %k: index
 ) -> tensor<?x?xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
   return %0 : tensor<?x?xf32, #encoding>
 }
 
@@ -108,9 +108,9 @@ func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32>
+    %arg0: tensor<255x513xf32>, %k: index
 ) -> tensor<255x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
   return %0 : tensor<255x513xf32, #encoding>
 }
 
@@ -135,9 +135,9 @@ func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_RHS_narrow_unroll8x1x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32>
+    %arg0: tensor<255x513xf32>, %k: index
 ) -> tensor<255x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
   return %0 : tensor<255x513xf32, #encoding>
 }
 
@@ -162,9 +162,9 @@ func.func @set_encoding_RHS_narrow_unroll8x1x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32>
+    %arg0: tensor<255x513xf32>, %k: index
 ) -> tensor<255x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
   return %0 : tensor<255x513xf32, #encoding>
 }
 
@@ -188,8 +188,8 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [?, 513, ?]>
-func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513xf32>) -> tensor<?x513xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<?x513xf32> -> tensor<?x513xf32, #encoding>
+func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513xf32>, %m: index, %k: index) -> tensor<?x513xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %k} : tensor<?x513xf32> -> tensor<?x513xf32, #encoding>
   return %0 : tensor<?x513xf32, #encoding>
 }
 // CHECK-LABEL: func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32
@@ -211,8 +211,8 @@ func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513x
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, ?, ?]>
-func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?xf32>) -> tensor<255x?xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x?xf32> -> tensor<255x?xf32, #encoding>
+func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?xf32>, %n: index, %k: index) -> tensor<255x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%n, %k} : tensor<255x?xf32> -> tensor<255x?xf32, #encoding>
   return %0 : tensor<255x?xf32, #encoding>
 }
 
@@ -236,8 +236,8 @@ func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?x
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [32, 524288, ?]>
-func.func @set_encoding_ACC_narrow_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<32x524288xf32>) -> tensor<32x524288xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<32x524288xf32> -> tensor<32x524288xf32, #encoding>
+func.func @set_encoding_ACC_narrow_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<32x524288xf32>, %k: index) -> tensor<32x524288xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<32x524288xf32> -> tensor<32x524288xf32, #encoding>
   return %0 : tensor<32x524288xf32, #encoding>
 }
 
@@ -250,8 +250,8 @@ func.func @set_encoding_ACC_narrow_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<32x5242
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [524288, 32, ?]>
-func.func @set_encoding_ACC_narrow_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<524288x32xf32>) -> tensor<524288x32xf32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<524288x32xf32> -> tensor<524288x32xf32, #encoding>
+func.func @set_encoding_ACC_narrow_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<524288x32xf32>, %k: index) -> tensor<524288x32xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<524288x32xf32> -> tensor<524288x32xf32, #encoding>
   return %0 : tensor<524288x32xf32, #encoding>
 }
 
@@ -265,9 +265,9 @@ func.func @set_encoding_ACC_narrow_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<524288x
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<255x513xf32, #encoding>
+    %arg0: tensor<255x513xf32, #encoding>, %k: index
 ) -> tensor<255x513xf32> {
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<255x513xf32, #encoding> -> tensor<255x513xf32>
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<255x513xf32, #encoding> -> tensor<255x513xf32>
   return %0 : tensor<255x513xf32>
 }
 
@@ -292,9 +292,9 @@ func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [?, ?, ?]>
 func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32(
-    %arg0: tensor<?x?xf32, #encoding>, %d0: index, %d1: index
+    %arg0: tensor<?x?xf32, #encoding>, %d0: index, %d1: index, %m: index, %n: index, %k: index
 ) -> tensor<?x?xf32> {
-  %2 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  %2 = iree_encoding.unset_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   return %2 : tensor<?x?xf32>
 }
 
@@ -391,9 +391,9 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x4_F32(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
-    %arg0: tensor<255x513xi8>
+    %arg0: tensor<255x513xi8>, %k: index
 ) -> tensor<255x513xi8, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
   return %0 : tensor<255x513xi8, #encoding>
 }
 
@@ -418,9 +418,9 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
-    %arg0: tensor<255x513xi8>
+    %arg0: tensor<255x513xi8>, %k: index
 ) -> tensor<255x513xi8, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xi8> -> tensor<255x513xi8, #encoding>
   return %0 : tensor<255x513xi8, #encoding>
 }
 
@@ -445,9 +445,9 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
-    %arg0: tensor<255x513xi32>
+    %arg0: tensor<255x513xi32>, %k: index
 ) -> tensor<255x513xi32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xi32> -> tensor<255x513xi32, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<255x513xi32> -> tensor<255x513xi32, #encoding>
   return %0 : tensor<255x513xi32, #encoding>
 }
 
@@ -472,9 +472,9 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
-    %arg0: tensor<255x513xi32, #encoding>
+    %arg0: tensor<255x513xi32, #encoding>, %k: index
 ) -> tensor<255x513xi32> {
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<255x513xi32, #encoding> -> tensor<255x513xi32>
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<255x513xi32, #encoding> -> tensor<255x513xi32>
   return %0 : tensor<255x513xi32>
 }
 
@@ -1104,9 +1104,9 @@ func.func @missing_user_indexing_maps() {
                                             user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                             iteration_sizes = [?, ?, ?]>
 func.func @set_encoding_rhs_bitcast_f16_to_f32(
-    %arg0: tensor<?x?xf32>
+    %arg0: tensor<?x?xf32>, %m: index, %n: index, %k: index
 ) -> tensor<?x?xf32, #encoding_bitcast> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_bitcast>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_bitcast>
   return %0 : tensor<?x?xf32, #encoding_bitcast>
 }
 
