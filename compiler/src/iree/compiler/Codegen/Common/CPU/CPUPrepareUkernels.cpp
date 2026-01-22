@@ -58,7 +58,7 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     }
 
     // Skip the tiling if the size is already 1.
-    RankedTensorType srcType = packOp.getSourceType();
+    ShapedType srcType = packOp.getSourceType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
       if (val && srcType.getDimSize(idx) == 1) {
         return;
@@ -95,7 +95,7 @@ static void tileNonPackedDimsFor5DPUnpackOps(RewriterBase &rewriter,
     }
 
     // Skip the tiling if the size is already 1.
-    RankedTensorType destType = unpackOp.getDestType();
+    ShapedType destType = unpackOp.getDestType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
       if (val && destType.getDimSize(idx) == 1) {
         return;
@@ -304,13 +304,14 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     }
 
     Location loc = packOp.getLoc();
-    auto reducedSrcType =
-        RankedTensorType::Builder(packOp.getSourceType()).dropDim(srcPos);
+    RankedTensorType sourceType =
+        cast<RankedTensorType>(packOp.getSourceType());
+    auto reducedSrcType = RankedTensorType::Builder(sourceType).dropDim(srcPos);
     auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, packOp.getSource(), reducedSrcType);
 
-    auto reducedDestType =
-        RankedTensorType::Builder(packOp.getDestType()).dropDim(destPos);
+    RankedTensorType destType = cast<RankedTensorType>(packOp.getDestType());
+    auto reducedDestType = RankedTensorType::Builder(destType).dropDim(destPos);
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, packOp.getDest(), reducedDestType);
 
@@ -385,13 +386,14 @@ struct Convert5DUnPackto4DUnPackPattern
     }
 
     Location loc = unpackOp.getLoc();
-    auto reducedSrcType =
-        RankedTensorType::Builder(unpackOp.getSourceType()).dropDim(srcPos);
+    RankedTensorType sourceType =
+        cast<RankedTensorType>(unpackOp.getSourceType());
+    auto reducedSrcType = RankedTensorType::Builder(sourceType).dropDim(srcPos);
     auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, unpackOp.getSource(), reducedSrcType);
 
-    auto reducedDestType =
-        RankedTensorType::Builder(unpackOp.getDestType()).dropDim(destPos);
+    RankedTensorType destType = cast<RankedTensorType>(unpackOp.getDestType());
+    auto reducedDestType = RankedTensorType::Builder(destType).dropDim(destPos);
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, unpackOp.getDest(), reducedDestType);
 

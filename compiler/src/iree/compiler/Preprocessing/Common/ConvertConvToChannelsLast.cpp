@@ -216,7 +216,10 @@ createTransposeAsTensorPack(
   SmallVector<AffineExpr> mapResults(inputMap.getResults());
   AffineMap transposedMap;
 
-  Value packedOperand = packedInput;
+  Value packedOperand;
+  if (!packedInput.getResults().empty()) {
+    packedOperand = packedInput.getResult();
+  }
   // Collapse the unit dims created by linalg.pack if the pack is just a
   // transpose.
   if (tilingFactor <= 0) {
