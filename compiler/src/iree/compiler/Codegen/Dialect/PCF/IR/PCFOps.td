@@ -259,7 +259,7 @@ def LoopOp : PCF_Op<"loop", [
        AutomaticAllocationScope,
        RecursiveMemoryEffects,
        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmBlockArgumentNames"]>,
-       DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
+       DeclareOpInterfaceMethods<RegionBranchOpInterface>,
        SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::PCF::ReturnOp">
      ]> {
   let summary = [{
