@@ -98,7 +98,7 @@ module {
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x4x8x32xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 32)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<32>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 4)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[IDY]]] [2, 8, 1, 4]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[COL]], %[[IDY]]] [8, 2, 1, 4]
@@ -140,7 +140,7 @@ module {
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x32x4x8xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 32)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<32>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 4)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[IDY]]] [2, 8, 1, 4]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[COL]], %[[IDY]]] [8, 2, 1, 4]
@@ -182,7 +182,7 @@ module {
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x4x8x32xi32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 32)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<32>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 4)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[IDY]]] [2, 8, 1, 4]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[COL]], %[[IDY]]] [8, 2, 1, 4]
@@ -223,12 +223,12 @@ module {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<8x2x16x16xf16>
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x8x2x16xf32>)
 //   CHECK-DAG:     %[[ID_1:.+]]:2 = affine.delinearize_index %[[LANEID]] into (16)
-//   CHECK-DAG:     %[[ROW_1:.+]] = iree_codegen.index_hint %[[ID_1]]#1(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[ROW_1:.+]] = iree_codegen.index_hint %[[ID_1]]#1(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ROW_1]], 0] [2, 8, 1, 16]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ROW_1]], 0] [8, 2, 1, 16]
 //   CHECK-DAG:     %[[ID_2:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW_2:.+]] = iree_codegen.index_hint %[[ID_2]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL_2:.+]] = iree_codegen.index_hint %[[ID_2]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL_2:.+]] = iree_codegen.index_hint %[[ID_2]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   Note: ID_2#1 and I_2#2 should not be delinearize outputs once we move to linearized indexing
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, 0, 0, %[[ROW_2]], %[[COL_2]]] [2, 2, 8, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
@@ -261,7 +261,7 @@ func.func @distribute_MFMA_F32_16x16x4_F32(%lhs: tensor<16x4xf32>, %rhs: tensor<
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (4, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[ROW]]] [1, 1]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[ROW]], %[[COL]]] [1, 1]
 //   CHECK-DAG:     %[[IDZ:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (4, 4)
@@ -295,7 +295,7 @@ func.func @distribute_F32_16x16x32_F8E4M3FNUZ(%lhs: tensor<16x32xf8E4M3FNUZ>, %r
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (4, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (4, 8)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[IDY]]] [1, 8]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDY]], %[[COL]]] [8, 1]
@@ -330,7 +330,7 @@ func.func @distribute_I32_32x32x16_I8(%lhs: tensor<32x16xi8>, %rhs: tensor<16x32
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<4x8x32xi32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 32)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<32>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<32, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 8)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[IDY]]] [1, 8]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDY]], %[[COL]]] [8, 1]
@@ -364,7 +364,7 @@ func.func @distribute_WMMAR3_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: ten
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x8x2xf16>)
 //   CHECK-DAG:     %[[ID:.+]]:2 = affine.delinearize_index %[[LANEID]] into (16)
-//   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[ROW]], 0] [1, 16]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, %[[ROW]]] [16, 1]
@@ -404,12 +404,12 @@ module {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<8x2x16x16xi8>
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x8x2x16xi32>)
 //   CHECK-DAG:     %[[ID:.+]]:2 = affine.delinearize_index %[[LANEID]] into (16)
-//   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[ROW]], 0] [2, 8, 1, 16]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[ROW]], 0] [8, 2, 1, 16]
 //   CHECK-DAG:     %[[ID_ACC:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW_ACC:.+]] = iree_codegen.index_hint %[[ID_ACC]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL_ACC:.+]] = iree_codegen.index_hint %[[ID_ACC]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL_ACC:.+]] = iree_codegen.index_hint %[[ID_ACC]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, 0, 0, %[[ROW_ACC]], %[[COL_ACC]]] [2, 2, 8, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
@@ -441,7 +441,7 @@ func.func @distribute_WMMAR4_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: ten
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf16>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 8)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[IDY]]] [1, 8]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDY]], %[[COL]]] [8, 1]
@@ -482,7 +482,7 @@ module {
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<2x2x16x16xi32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[IDY:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 8)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[IDY]]] [2, 8, 1, 8]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, %[[COL]], %[[IDY]]] [8, 2, 1, 8]
@@ -517,7 +517,7 @@ func.func @distribute_WMMA_F32_16x16x4_F32(%lhs: tensor<16x4xf32>, %rhs: tensor<
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[IDX:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 2)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[IDX]]] [1, 2]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDX]], %[[COL]]] [2, 1]
@@ -552,7 +552,7 @@ func.func @distribute_WMMA_F32_16x16x128_F8E4M3FN(%lhs: tensor<16x128xf8E4M3FN>,
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x16xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[IDX:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (2, 64)
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[COL]], %[[IDX]]] [1, 64]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][%[[IDX]], %[[COL]]] [64, 1]
@@ -1116,7 +1116,7 @@ func.func @scaled_matmul_f32_16x16x128_b32_fp4_fp8(%lhs: tensor<3x5x1x16x4x32xf4
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<3x7x16x16xf32>)
 //   CHECK-DAG:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (4, 16)
 //   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, 0, %[[COL]], %[[ROW]], 0] [3, 5, 1, 1, 1, 32]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, 0, 0, %[[ROW]], 0, %[[COL]]] [5, 1, 7, 1, 32, 1]
 //   CHECK-DAG:     %[[LHS_SCALE_SLICE:.+]] = tensor.extract_slice %[[LHS_SCALE]][0, 0, %[[COL]], %[[ROW]]] [3, 5, 1, 1]
@@ -1168,7 +1168,7 @@ func.func @scaled_matmul_trb_f32_16x16x128_b32_fp4_fp8(%lhs: tensor<3x5x4x16x4x3
 //  CHECK-SAME:   %[[RHS_SCALE:[A-Za-z0-9]+]]: tensor<5x7x16x4xf8E8M0FNU>
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<3x7x16x16xf32>)
 //   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_increment<16>) : index
+//   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_increment<16, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]{{.*}} [3, 5, 4, 1, 1, 32]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]{{.*}} [5, 4, 7, 1, 1, 32]
 //   CHECK-DAG:     %[[LHS_SCALE_SLICE:.+]] = tensor.extract_slice %[[LHS_SCALE]]{{.*}} [3, 5, 1, 1]
@@ -1214,7 +1214,7 @@ func.func @scaled_matmul_trb_f32_32x32x64_b32_fp4_fp8(%lhs: tensor<3x5x1x32x2x32
 //  CHECK-SAME:   %[[RHS_SCALE:[A-Za-z0-9]+]]: tensor<5x7x32x2xf8E8M0FNU>
 //       CHECK:   scf.forall (%[[LANEID:.+]]) in (64) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<3x7x4x8x32xf32>)
 //   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_constant<32>) : index
-//   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_increment<32>) : index
+//   CHECK-DAG:     iree_codegen.index_hint {{.*}}(#iree_gpu.lane_increment<32, aligned>) : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]{{.*}} [3, 5, 1, 1, 1, 32]
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]{{.*}} [5, 1, 7, 1, 1, 32]
 //   CHECK-DAG:     %[[LHS_SCALE_SLICE:.+]] = tensor.extract_slice %[[LHS_SCALE]]{{.*}} [3, 5, 1, 1]

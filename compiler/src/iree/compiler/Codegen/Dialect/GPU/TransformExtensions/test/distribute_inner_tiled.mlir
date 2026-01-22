@@ -36,7 +36,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   scf.forall (%[[LANE_ID:.+]]) in (64) shared_outs(%[[ITER_ARG:.+]] = %[[ACC]]) -> (tensor<2x2x16x16xf32>)
 //       CHECK:     %[[ID:.+]]:3 = affine.delinearize_index %[[LANE_ID]] into (4, 16)
 //       CHECK:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//       CHECK:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//       CHECK:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //       CHECK:     %[[ID1:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (4, 4)
 //       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[ID1]]]
 //  CHECK-SAME:       [2, 2, 1, 4] [1, 1, 1, 1] : tensor<2x2x16x16xf16> to tensor<2x2x1x4xf16>
@@ -90,7 +90,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   scf.forall (%[[LANE_ID:.+]]) in (64) shared_outs(%[[ITER_ARG:.+]] = %[[ACC]]) -> (tensor<2x2x16x16xi32>)
 //       CHECK:     %[[ID:.+]]:3  = affine.delinearize_index %[[LANE_ID]] into (4, 16)
 //       CHECK:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_constant<16>) : index
-//       CHECK:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16>) : index
+//       CHECK:     %[[COL:.+]] = iree_codegen.index_hint %[[ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
 //       CHECK:     %[[ID1:.+]] = affine.linearize_index disjoint [%[[ROW]], %c0] by (4, 8)
 //       CHECK:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0, %[[COL]], %[[ID1]]]
 //  CHECK-SAME:       [2, 2, 1, 8] [1, 1, 1, 1] : tensor<2x2x16x32xi8> to tensor<2x2x1x8xi8>
