@@ -182,6 +182,7 @@ def CombineLayoutTransformationPass :
   ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
   ];

@@ -449,3 +449,47 @@ func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf
 // DISPATCH-SCOPE-LABEL: func @unpack_no_padding_no_masking
 // DISPATCH-SCOPE: iree_linalg_ext.map_scatter
 // DISPATCH-SCOPE-NOT: arith.cmpi ult
+
+// -----
+
+// Tests that no padding scf.forall loops are emitted when
+// padding in linalg.pack is effectively a no-op.
+
+func.func @pack_dynamic_dim_tile_size_1_no_pad_loop(%source : tensor<16x?x128xf16>, %result : memref<16x8x?x16x1xf16>) {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 1 : index
+  %dim = tensor.dim %source, %cst_1 : tensor<16x?x128xf16>
+  %dest = tensor.empty(%dim) : tensor<16x8x?x16x1xf16>
+  %pack = linalg.pack %source padding_value(%cst : f16)
+    outer_dims_perm = [0, 2, 1]
+    inner_dims_pos = [2, 1]
+    inner_tiles = [16, 1]
+    into %dest : tensor<16x?x128xf16> -> tensor<16x8x?x16x1xf16>
+  iree_codegen.store_to_buffer %pack, %result : tensor<16x8x?x16x1xf16> into memref<16x8x?x16x1xf16>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @pack_dynamic_dim_tile_size_1_no_pad_loop
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+// Verify no padding loops are generated.
+//   DISPATCH-SCOPE-NOT:   scf.forall
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
+
+// -----
+
+func.func @pack_divisible_static_dim_tile_size_8_no_pad_loop(%source : tensor<16x?xf16>, %result : memref<2x?x8x1xf16>) {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 1 : index
+  %dim = tensor.dim %source, %cst_1 : tensor<16x?xf16>
+  %dest = tensor.empty(%dim) : tensor<2x?x8x1xf16>
+  %pack = linalg.pack %source padding_value(%cst : f16)
+    inner_dims_pos = [0, 1]
+    inner_tiles = [8, 1]
+    into %dest : tensor<16x?xf16> -> tensor<2x?x8x1xf16>
+  iree_codegen.store_to_buffer %pack, %result : tensor<2x?x8x1xf16> into memref<2x?x8x1xf16>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @pack_divisible_static_dim_tile_size_8_no_pad_loop
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+// Verify no padding loops are generated.
+//   DISPATCH-SCOPE-NOT:   scf.forall
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
