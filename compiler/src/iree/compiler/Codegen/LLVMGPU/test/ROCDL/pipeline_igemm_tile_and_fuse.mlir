@@ -77,7 +77,7 @@ hal.executable private @main {
 //      CHECK-DAG:       vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
 // CHECK-COUNT-32:       amdgpu.mfma 16x16x16
 //          CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
-//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x1x4x4x1xf32> to vector<4x1x4x4x1xf32> 
+//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x1x4x4x1xf32> to vector<4x1x4x4x1xf32>
 //          CHECK:     vector.transfer_write %[[CAST]], %[[BUF2]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
