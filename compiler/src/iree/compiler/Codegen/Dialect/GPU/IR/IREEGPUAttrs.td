@@ -1091,10 +1091,20 @@ def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
     groups of N consecutive lanes. For example, with group_size=16 and a base
     value B, lane i has value `B + (i % 16) * step`.
 
+    The `aligned` flag indicates that the base value (at lane 0 within each
+    group) is guaranteed to be a multiple of `group_size`. This is important
+    for propagating hints through operations like `affine.delinearize_index`,
+    where alignment ensures the delinearization doesn't cause wrap-around
+    within a lane group.
+
     This hint is used to guide optimizations like transpose load lowering,
     where the column index must increment by 1 across consecutive lanes.
   }];
-  let parameters = (ins "int64_t":$group_size, "int64_t":$step);
+  let parameters = (ins
+    "int64_t":$group_size,
+    "int64_t":$step,
+    DefaultValuedParameter<"bool", "false">:$aligned
+  );
   let hasCustomAssemblyFormat = 1;
 }
 
