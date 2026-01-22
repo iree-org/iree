@@ -616,6 +616,27 @@ static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
   return false;
 }
 
+/// Returns true if any of the DPS init operands of the `dpsOp` are produced by
+/// a LinalgOp or LinalgExtOp. This is a workaround constraint for C promotion
+/// in cases that will require map_gather to codegen without C promotion.
+/// Progress is being tracked in https://github.com/iree-org/iree/issues/23038.
+static bool
+checkForDPSOperandComputeOpProducers(DestinationStyleOpInterface dpsOp) {
+  for (Value dpsOperand : dpsOp.getDpsInits()) {
+    auto producer = dpsOperand.getDefiningOp();
+    // Fill ops are okay because they can become splat constants.
+    if (llvm::isa_and_nonnull<linalg::FillOp>(producer)) {
+      continue;
+    }
+    // Compute ops are expected to be linalg ops or linalg_ext ops.
+    if (llvm::isa_and_nonnull<IREE::LinalgExt::LinalgExtOp, linalg::LinalgOp>(
+            producer)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -1032,7 +1053,8 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
   bool CPromoteIfPadding = false;
   if (clGPUTestCpromotion) {
-    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
+                        checkForDPSOperandComputeOpProducers(linalgOp);
   }
   // Detect if the convolution is accumulating (reads existing accumulator).
   bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
@@ -1088,7 +1110,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Matmul TileAndFuse Config";
   bool CPromoteIfPadding = false;
   if (clGPUTestCpromotion) {
-    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp);
+    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
+                        checkForDPSOperandComputeOpProducers(linalgOp);
   }
 
   // Detect if the matmul is accumulating (reads existing accumulator from

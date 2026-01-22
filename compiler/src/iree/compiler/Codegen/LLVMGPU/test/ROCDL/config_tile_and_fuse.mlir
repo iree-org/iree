@@ -1140,3 +1140,36 @@ func.func @mixed_precision_matmul_f32xbf16(%lhs: tensor<16x64xf32>, %rhs: tensor
 // CHECK-LABEL: func.func @mixed_precision_matmul_f32xbf16(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //   CHECK-NOT:     mma_kind
+
+// -----
+
+func.func @gemm_with_dps_init_producer(
+    %lhs: tensor<127x512xf32>, %rhs: tensor<63x512xf32>,
+    %init: tensor<127x63xf32>) -> tensor<127x63xf32> {
+  %cst1 = arith.constant 1.0 : f32
+  %0 = tensor.empty() : tensor<127x63xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%init : tensor<127x63xf32>) outs(%0 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %add = arith.addf %in, %cst1 : f32
+    linalg.yield %add : f32
+  } -> tensor<127x63xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<127x512xf32>, tensor<63x512xf32>) outs(%1 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<127x63xf32>
+  return %2 : tensor<127x63xf32>
+}
+
+//     CHECK-LABEL: gemm_with_dps_init_producer
+//           CHECK: promote_operands = [0, 1, 2]

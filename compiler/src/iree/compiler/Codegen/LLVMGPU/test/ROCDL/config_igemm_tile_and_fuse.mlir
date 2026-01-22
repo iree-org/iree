@@ -358,3 +358,34 @@ func.func @nhwc_conv_mfma_truncf(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128
 
 //     CHECK-LABEL: nhwc_conv_mfma_truncf
 //           CHECK: promote_operands = [0, 1]
+
+// -----
+
+func.func @conv_with_dps_init_producer(
+    %lhs: tensor<2x64x58x58xf32>, %rhs: tensor<2x64x64x3x3xf32>,
+    %init: tensor<2x64xf32>) -> tensor<2x64x28x28xf32> {
+  %0 = tensor.empty() : tensor<2x64x28x28xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%init : tensor<2x64xf32>) outs(%0 : tensor<2x64x28x28xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<2x64x28x28xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 * 2 + d5, d3 * 2 + d6)>,
+                     affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5, d6)>,
+                     affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+    ins(%lhs, %rhs : tensor<2x64x58x58xf32>, tensor<2x64x64x3x3xf32>) outs(%1 : tensor<2x64x28x28xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<2x64x28x28xf32>
+  return %2 : tensor<2x64x28x28xf32>
+}
+
+//     CHECK-LABEL: conv_with_dps_init_producer
+//           CHECK: promote_operands = [0, 1, 2]
