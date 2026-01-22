@@ -1,10 +1,10 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/CombineLayoutTransformationForMapGather.h"
+#include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -27,34 +27,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 using IREE::LinalgExt::MapGatherOp;
-
-//===----------------------------------------------------------------------===//
-// Preprocessing Utilities
-//===----------------------------------------------------------------------===//
-
-/// Convert complex ops into simpler ops by decomposing or raising to a named
-/// op.
-///  - `UnPackOp`s are decomposed.
-///  - Transpose `linalg::GenericOp`s are raised to `linalg::TransposeOp`s.
-static void simplifyComplexRelayoutOpsForGather(RewriterBase &rewriter,
-                                                FunctionOpInterface funcOp) {
-  OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<linalg::UnPackOp> unPackOps(
-      funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
-  for (auto unPackOp : unPackOps) {
-    rewriter.setInsertionPoint(unPackOp);
-    (void)linalg::lowerUnPack(rewriter, unPackOp,
-                              /*lowerUnpadLikeWithExtractSlice=*/false);
-  }
-  SmallVector<linalg::GenericOp> genericOps(
-      funcOp.getFunctionBody().getOps<linalg::GenericOp>());
-  for (auto genericOp : genericOps) {
-    if (linalg::isaTransposeOpInterface(genericOp)) {
-      rewriter.setInsertionPoint(genericOp);
-      (void)linalg::specializeGenericOp(rewriter, genericOp);
-    }
-  }
-}
 
 //===----------------------------------------------------------------------===//
 // Combining Layout Transformation Ops into MapGatherOp
@@ -322,172 +294,58 @@ static MapGatherOp insertIdentityMapGather(RewriterBase &rewriter,
   return mapGatherOp;
 }
 
-bool isSupportedGatherRelayoutOp(Operation *op) {
-  return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
-             tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
-             linalg::TransposeOp>(op);
-}
-
-// This is only desirable in the dispatch scope but not in the workgroup scope.
-static bool shouldDoReshapesByExpansion(
-    IREE::Codegen::GatherRelayoutCombinationScope scope) {
-  if (scope == IREE::Codegen::GatherRelayoutCombinationScope::Dispatch) {
-    return true;
+/// Check if a relayout op chain starts from a LoadFromBufferOp. This is used
+/// to determine if the chain should be combined into a map_gather op.
+static bool startsFromLoadFromBuffer(OpResult leaf) {
+  Operation *current = leaf.getDefiningOp();
+  while (current) {
+    Value input = current->getOperand(0);
+    Operation *producer = input.getDefiningOp();
+    if (!producer) {
+      return false;
+    }
+    if (isa<IREE::Codegen::LoadFromBufferOp>(producer)) {
+      return true;
+    }
+    if (!isSupportedRelayoutOp(producer)) {
+      return false;
+    }
+    current = producer;
   }
   return false;
 }
 
 /// Insert identity map_gather ops after the given operation if it is a valid
 /// leaf op of a relayout op chain. A relayout op chain is a sequence of
-/// relayout ops (defined by `isSupportedGatherRelayoutOp`) for which the only
+/// relayout ops (defined by `isSupportedRelayoutOp`) for which the only
 /// users of the ops in the chain are relayout ops, except for the leaves of the
 /// chain. The leaves are simply relayout ops that have non relayout op users.
-/// The `controlFn` is a callback on the leaf OpResult that provides control
-/// over whether or not to insert a map_gather op.
 struct InsertMapGatherOpPattern : public RewritePattern {
-  InsertMapGatherOpPattern(
-      MLIRContext *context,
-      CombineRelayoutOpsForGatherControlFnRef controlFn = nullptr,
-      PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
-        controlFn(controlFn) {}
+  InsertMapGatherOpPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!isSupportedGatherRelayoutOp(op)) {
+    if (!isSupportedRelayoutOp(op)) {
       return failure();
     }
     // Relayout ops with only relayout op users are not leaves.
     auto isDimOrSupportedRelayoutOp = [](Operation *user) {
-      if (isa<tensor::DimOp>(user)) {
-        return true;
-      }
-      return isSupportedGatherRelayoutOp(user);
+      return (isa<tensor::DimOp>(user) || isSupportedRelayoutOp(user));
     };
     if (llvm::all_of(op->getUsers(), isDimOrSupportedRelayoutOp)) {
       return failure();
     }
     // All relayout ops have a single result.
     OpResult leaf = op->getResult(0);
-    if (controlFn && !controlFn(leaf)) {
+    // Only combine chains that start from LoadFromBufferOp.
+    if (!startsFromLoadFromBuffer(leaf)) {
       return failure();
     }
     (void)insertIdentityMapGather(rewriter, leaf);
     return success();
   }
-
-private:
-  CombineRelayoutOpsForGatherControlFnRef controlFn;
 };
-
-LogicalResult combineLayoutTransformationForMapGather(
-    MLIRContext *ctx, FunctionOpInterface funcOp, bool doReshapeByExpansion,
-    CombineRelayoutOpsForGatherControlFnRef controlFn) {
-  // Sink relayout operations to the end of the funcOp.
-  RewritePatternSet propagationPatterns(ctx);
-  tensor::populateFoldTensorEmptyPatterns(propagationPatterns);
-  tensor::ExpandShapeOp::getCanonicalizationPatterns(propagationPatterns, ctx);
-  tensor::CollapseShapeOp::getCanonicalizationPatterns(propagationPatterns,
-                                                       ctx);
-  if (doReshapeByExpansion) {
-    // Only sink reshape ops, so bail if the consumer operation is a reshape.
-    auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
-      Operation *consumer = operand->getOwner();
-      return !isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
-    };
-    linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
-                                                      controlSinkReshapesFn);
-  }
-  // Only sink unpack ops, so bail if the producer operation is not an unpack.
-  // Also only sink unpack ops when new pack operations will not be created.
-  auto controlPropagationFn = [](OpOperand *operand) -> bool {
-    Operation *producer = operand->get().getDefiningOp();
-    Operation *consumer = operand->getOwner();
-    if (!isa_and_nonnull<linalg::UnPackOp>(producer)) {
-      return false;
-    }
-    // Reshapes will not produce extra pack ops.
-    if (isa<tensor::ExpandShapeOp>(consumer)) {
-      return true;
-    }
-    // Otherwise, the consumer must be a GenericOp with all of its `outs`
-    // operands coming from tensor.empty ops, and the `operand` must be the
-    // sole `ins` operand of the generic op.
-    auto genericConsumer = dyn_cast<linalg::GenericOp>(consumer);
-    if (!genericConsumer || genericConsumer.getNumDpsInputs() != 1 ||
-        *genericConsumer.getDpsInputOperand(0) != *operand) {
-      return false;
-    }
-    return llvm::all_of(
-        genericConsumer.getDpsInits(), [&](Value consumerOperand) -> bool {
-          return consumerOperand.getDefiningOp<tensor::EmptyOp>();
-        });
-  };
-  linalg::populateDataLayoutPropagationPatterns(
-      propagationPatterns, controlPropagationFn, /*PoisonPaddingOk=*/true);
-  if (failed(applyPatternsGreedily(funcOp, std::move(propagationPatterns)))) {
-    return failure();
-  }
-
-  // Apply some preprocessing to convert complex layout transformation
-  // ops like unpack into simpler supported ops.
-  IRRewriter rewriter(ctx);
-  simplifyComplexRelayoutOpsForGather(rewriter, funcOp);
-
-  // Combine relayout operations into new map_gather ops.
-  RewritePatternSet relayoutCombinationPatterns(ctx);
-  relayoutCombinationPatterns.add<InsertMapGatherOpPattern>(ctx, controlFn);
-  // Use populateCombineRelayoutOpPatterns without pad distribution (no pad
-  // support for gather). This adds both scatter and gather folding patterns,
-  // but since we only insert map_gather ops, only those will be matched.
-  populateCombineRelayoutOpPatterns(relayoutCombinationPatterns,
-                                    /*padDistributionConfigFn=*/nullptr);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(
-      relayoutCombinationPatterns);
-  if (failed(applyPatternsGreedily(funcOp,
-                                   std::move(relayoutCombinationPatterns)))) {
-    return failure();
-  }
-
-  // Clean up any identity map_gather ops after combining.
-  funcOp->walk([&](MapGatherOp mapGatherOp) {
-    if (mapGatherOp.isIdentity()) {
-      rewriter.replaceOp(mapGatherOp, mapGatherOp.getSource());
-    }
-  });
-  return success();
-}
-
-CombineRelayoutOpsForGatherControlFn getCombineRelayoutOpsForGatherControlFn(
-    IREE::Codegen::GatherRelayoutCombinationScope scope) {
-  CombineRelayoutOpsForGatherControlFn controlFn;
-  switch (scope) {
-  // Control function for Dispatch scope. Checks that producer chain starts
-  // from LoadFromBufferOp.
-  case IREE::Codegen::GatherRelayoutCombinationScope::Dispatch:
-    controlFn = [](OpResult leaf) {
-      // Walk back to verify root is LoadFromBufferOp.
-      Operation *current = leaf.getDefiningOp();
-      while (current) {
-        Value input = current->getOperand(0);
-        Operation *producer = input.getDefiningOp();
-        if (!producer) {
-          return false;
-        }
-        if (isa<IREE::Codegen::LoadFromBufferOp>(producer)) {
-          return true;
-        }
-        if (!isSupportedGatherRelayoutOp(producer)) {
-          return false;
-        }
-        current = producer;
-      }
-      return false;
-    };
-    break;
-  }
-  return controlFn;
-}
 
 namespace {
 
@@ -497,24 +355,29 @@ struct CombineLayoutTransformationForMapGatherPass final
   using Base::Base;
 
   void runOnOperation() override {
-    CombineRelayoutOpsForGatherControlFn controlFn =
-        getCombineRelayoutOpsForGatherControlFn(this->scope);
-    bool doReshapesByExpansion = shouldDoReshapesByExpansion(this->scope);
-    if (failed(combineLayoutTransformationForMapGather(
-            &getContext(), getOperation(), doReshapesByExpansion, controlFn))) {
+    MLIRContext *context = &getContext();
+    FunctionOpInterface funcOp = getOperation();
+
+    // Apply some preprocessing to convert complex layout transformation
+    // ops like unpack into simpler supported ops.
+    IRRewriter rewriter(context);
+    simplifyComplexRelayoutOps(rewriter, funcOp);
+
+    // Combine relayout operations into new map_gather ops.
+    RewritePatternSet patterns(context);
+    patterns.add<InsertMapGatherOpPattern>(context);
+    populateCombineRelayoutOpPatterns(patterns);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
 
-    MLIRContext *context = &getContext();
-    FunctionOpInterface funcOp = getOperation();
-    {
-      RewritePatternSet patterns(context);
-      scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-      tensor::populateFoldTensorEmptyPatterns(patterns);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
+    // Clean up any identity map_gather ops after combining.
+    funcOp->walk([&](MapGatherOp mapGatherOp) {
+      if (mapGatherOp.isIdentity()) {
+        rewriter.replaceOp(mapGatherOp, mapGatherOp.getSource());
       }
-    }
+    });
   }
 };
 

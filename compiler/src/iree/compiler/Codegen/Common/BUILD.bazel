@@ -180,7 +180,6 @@ iree_compiler_cc_library(
     hdrs = [
         "BufferizationAnalysis.h",
         "CombineLayoutTransformation.h",
-        "CombineLayoutTransformationForMapGather.h",
         "EmulateNarrowType.h",
         "EncodingUtils.h",
         "ExtractAddressComputation.h",

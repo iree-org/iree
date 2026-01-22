@@ -193,29 +193,14 @@ def CombineLayoutTransformationForMapGatherPass :
   let summary =
     "Combines layout transformation operations into a single map_gather operation.";
   let description = [{
-    Starting from the specified root ops, iteratively combine consumer
-    layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
-    tensor.expand_shape, tensor.extract_slice, etc.) into a single
-    iree_linalg_ext.map_gather operation.
-
-    Note: tensor.pad is NOT supported for map_gather. Unlike map_scatter which
-    can write padding values directly to the output buffer (obtained from
-    store_to_buffer), map_gather reads from a source buffer and produces a
-    tensor result. There is no output memref available to write padding values
-    to at this stage.
+    Starting from `iree_codegen.load_from_buffer` ops, iteratively combine
+    consumer layout/indexing transformation ops (linalg.transpose,
+    tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
+    tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.
   }];
-  let options = [
-    Option<"scope", "scope",
-           "::mlir::iree_compiler::IREE::Codegen::GatherRelayoutCombinationScope",
-           /*default=*/"IREE::Codegen::GatherRelayoutCombinationScope::Dispatch",
-           "Specify the roots for layout transformation combination.",
-           [{
-           ::llvm::cl::values(
-             clEnumValN(IREE::Codegen::GatherRelayoutCombinationScope::Dispatch, "dispatch",
-               "Combine relayout ops starting from iree_codegen.load_from_buffer"))
-           }]>
-  ];
   let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"

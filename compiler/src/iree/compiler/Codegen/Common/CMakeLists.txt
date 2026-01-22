@@ -54,7 +54,6 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "CombineLayoutTransformation.h"
-    "CombineLayoutTransformationForMapGather.h"
     "EmulateNarrowType.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
