@@ -6960,6 +6960,11 @@ where row indices must be uniform within a 16-lane group.</p>
 on which it indicates that the index value increments by <code>step</code> within
 groups of N consecutive lanes. For example, with group_size=16 and a base
 value B, lane i has value <code>B + (i % 16) * step</code>.</p>
+<p>The <code>aligned</code> flag indicates that the base value (at lane 0 within each
+group) is guaranteed to be a multiple of <code>group_size</code>. This is important
+for propagating hints through operations like <code>affine.delinearize_index</code>,
+where alignment ensures the delinearization doesn't cause wrap-around
+within a lane group.</p>
 <p>This hint is used to guide optimizations like transpose load lowering,
 where the column index must increment by 1 across consecutive lanes.</p>
 <h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
@@ -6980,6 +6985,11 @@ where the column index must increment by 1 across consecutive lanes.</p>
 <tr>
 <td style="text-align: center;">step</td>
 <td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">aligned</td>
+<td style="text-align: center;"><code>bool</code></td>
 <td></td>
 </tr>
 </tbody>
