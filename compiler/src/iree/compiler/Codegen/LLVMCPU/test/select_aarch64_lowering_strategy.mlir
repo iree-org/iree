@@ -177,7 +177,7 @@ func.func @mmt4d_384x384x512_4x1x4_dispatch_0(%3: tensor<96x384x4x1xf32>, %4: te
   %6 = linalg.mmt4d ins(%3, %4 : tensor<96x384x4x1xf32>, tensor<128x384x4x1xf32>) outs(%5 : tensor<96x128x4x4xf32>) -> tensor<96x128x4x4xf32>
   return %6 : tensor<96x128x4x4xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [48, 64, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 4, 4, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [16, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 4, 4, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 //       CHECK: func.func @mmt4d_384x384x512_4x1x4_dispatch_0(
 //       CHECK:   linalg.mmt4d
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
