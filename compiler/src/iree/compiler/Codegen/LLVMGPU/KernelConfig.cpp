@@ -205,8 +205,8 @@ getMatmulConfig(IREE::GPU::TargetAttr target) {
 // Vector Distribution Contraction/Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
-                                     ArrayRef<int64_t> projectedDims) {
+IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
+                              ArrayRef<int64_t> projectedDims) {
   // Projection simply involves projecting the mapping and keeping the counts.
   IREE::GPU::Basis projectedBasis;
   projectedBasis.counts = basis.counts;
@@ -279,7 +279,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Value rhs = op.getDpsInputOperand(1)->get();
   Value init = op.getDpsInitOperand(0)->get();
 
-  Type lhsElemType = getElementTypeOrSelf(lhs);
+  Type lhs_ElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
@@ -289,7 +289,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // schedule->m/n/kTileSizes[0] and schedule->m/n/kSizes[0] need to use the
   // full list of sizes instead of just the first element.
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
-                             lhsElemType,  rhsElemType,  initElemType};
+                             lhs_ElemType, rhsElemType,  initElemType};
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,
@@ -1214,7 +1214,8 @@ static LogicalResult setAttentionReductionConfig(
   // Create projected QK thread tile sizes by removing N dimensions.
   SmallVector<int64_t> qkThreadTileSizes;
   for (auto [i, tile] : llvm::enumerate(threadTileSizes)) {
-    if (llvm::find(opInfo.getNDims(), i) != opInfo.getNDims().end()) {
+    if (std::find(opInfo.getNDims().begin(), opInfo.getNDims().end(), i) !=
+        opInfo.getNDims().end()) {
       continue;
     }
     qkThreadTileSizes.push_back(tile);
