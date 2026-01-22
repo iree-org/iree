@@ -14,7 +14,6 @@
 #include "mlir/Analysis/DataFlowFramework.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-buffer-instructions-optimization"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 
@@ -43,7 +42,8 @@ static bool isInnermostMaskIndexDivisible(Value maskIndex, int64_t maskSize,
       solver.lookupState<IREE::Util::IntegerDivisibilityLattice>(maskIndex);
 
   if (lattice && !lattice->getValue().isUninitialized()) {
-    const auto &div = lattice->getValue().getValue();
+    const IREE::Util::ConstantIntDivisibility &div =
+        lattice->getValue().getValue();
     LDBG() << "Divisibility analysis for mask index:";
     LDBG() << "  udiv = " << div.udiv() << ", sdiv = " << div.sdiv();
     LDBG() << "  mask size = " << maskSize;
@@ -209,9 +209,9 @@ struct ROCDLBufferInstructionsOptimizationPass final
 
     // Setup divisibility analysis.
     DataFlowSolver solver;
+    solver.load<dataflow::SparseConstantPropagation>();
     solver.load<dataflow::DeadCodeAnalysis>();
     solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
-    solver.load<dataflow::SparseConstantPropagation>();
     if (failed(solver.initializeAndRun(funcOp))) {
       return signalPassFailure();
     }
