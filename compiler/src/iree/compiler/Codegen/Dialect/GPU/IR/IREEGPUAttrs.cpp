@@ -822,7 +822,7 @@ createTransposeLoadIndexHint(OpBuilder &builder, Location loc,
   auto laneConstantAttr =
       IREE::GPU::LaneConstantAttr::get(builder.getContext(), groupSize);
   auto laneIncrementAttr = IREE::GPU::LaneIncrementAttr::get(
-      builder.getContext(), groupSize, /*step=*/1);
+      builder.getContext(), groupSize, /*step=*/1, /*aligned=*/true);
 
   SmallVector<Value> results;
   for (auto [i, value] : llvm::enumerate(delinearizedLaneId)) {

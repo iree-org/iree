@@ -26,7 +26,8 @@ func.func @no_transform_global_memory(%src: memref<128x256xf16>) -> vector<4x1xf
 // CHECK-LABEL: func.func @no_transform_column_hint_unused
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_column_hint_unused(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @no_transform_column_hint_unused() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %c5 = arith.constant 5 : index
   %tid = gpu.thread_id x
@@ -46,7 +47,8 @@ func.func @no_transform_column_hint_unused(%src: memref<128x256xf16, #gpu.addres
 // CHECK-LABEL: func.func @no_transform_column_size_not_1
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_column_size_not_1(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x2xf16> {
+func.func @no_transform_column_size_not_1() -> vector<4x2xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -64,7 +66,8 @@ func.func @no_transform_column_size_not_1(%src: memref<128x256xf16, #gpu.address
 // CHECK-LABEL: func.func @no_transform_f32
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_f32(%src: memref<128x256xf32, #gpu.address_space<workgroup>>) -> vector<4x1xf32> {
+func.func @no_transform_f32() -> vector<4x1xf32> {
+  %src = memref.alloc() : memref<128x256xf32, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -82,7 +85,8 @@ func.func @no_transform_f32(%src: memref<128x256xf32, #gpu.address_space<workgro
 // CHECK-LABEL: func.func @no_transform_non_multiple_row_size
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_non_multiple_row_size(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<3x1xf16> {
+func.func @no_transform_non_multiple_row_size() -> vector<3x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -101,7 +105,8 @@ func.func @no_transform_non_multiple_row_size(%src: memref<128x256xf16, #gpu.add
 // CHECK-LABEL: func.func @no_transform_column_step_not_1
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_column_step_not_1(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @no_transform_column_step_not_1() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -121,7 +126,8 @@ func.func @no_transform_column_step_not_1(%src: memref<128x256xf16, #gpu.address
 // CHECK-LABEL: func.func @no_transform_column_group_size_too_small
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_column_group_size_too_small(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @no_transform_column_group_size_too_small() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -141,7 +147,8 @@ func.func @no_transform_column_group_size_too_small(%src: memref<128x256xf16, #g
 // CHECK-LABEL: func.func @no_transform_row_group_size_not_multiple
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_row_group_size_not_multiple(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @no_transform_row_group_size_not_multiple() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   // Row hint has group_size=20, which is not a multiple of 16
@@ -164,7 +171,8 @@ func.func @no_transform_row_group_size_not_multiple(%src: memref<128x256xf16, #g
 // CHECK-LABEL: func.func @no_transform_row_from_column_hint
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_row_from_column_hint(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @no_transform_row_from_column_hint() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -183,7 +191,8 @@ func.func @no_transform_row_from_column_hint(%src: memref<128x256xf16, #gpu.addr
 // CHECK-LABEL: func.func @no_transform_row_from_block_arg
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_row_from_block_arg(%src: memref<128x256xf16, #gpu.address_space<workgroup>>, %row_arg: index) -> vector<4x1xf16> {
+func.func @no_transform_row_from_block_arg(%row_arg: index) -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %col = iree_codegen.index_hint %tid(#iree_gpu.lane_increment<16, aligned>) : index
@@ -192,6 +201,50 @@ func.func @no_transform_row_from_block_arg(%src: memref<128x256xf16, #gpu.addres
   %0 = vector.transfer_read %src[%row_arg, %col], %cst
        {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
        : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<4x1xf16>
+  return %0 : vector<4x1xf16>
+}
+
+// -----
+
+// Test: Memref from function argument (not from alloc) - should NOT transform
+// CHECK-LABEL: func.func @no_transform_memref_from_arg
+// CHECK-NOT: amdgpu.transpose_load
+// CHECK: vector.transfer_read
+func.func @no_transform_memref_from_arg(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+  %c0 = arith.constant 0 : index
+  %tid = gpu.thread_id x
+  %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
+  %col = iree_codegen.index_hint %tid(#iree_gpu.lane_increment<16, aligned>) : index
+  %cst = arith.constant 0.0 : f16
+  %0 = vector.transfer_read %src[%row, %col], %cst
+       {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
+       : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<4x1xf16>
+  return %0 : vector<4x1xf16>
+}
+
+// -----
+
+// Test: Subview of allocation - should NOT transform
+// Subview may introduce offsets that violate the access pattern requirements.
+// CHECK-LABEL: func.func @no_transform_subview
+// CHECK-NOT: amdgpu.transpose_load
+// CHECK: vector.transfer_read
+func.func @no_transform_subview() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<256x512xf16, #gpu.address_space<workgroup>>
+  %tid_y = gpu.thread_id y
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c256 = arith.constant 256 : index
+  %subview = memref.subview %src[%tid_y, 0][128, 256][1, 1]
+      : memref<256x512xf16, #gpu.address_space<workgroup>>
+      to memref<128x256xf16, strided<[512, 1], offset: ?>, #gpu.address_space<workgroup>>
+  %tid = gpu.thread_id x
+  %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
+  %col = iree_codegen.index_hint %tid(#iree_gpu.lane_increment<16, aligned>) : index
+  %cst = arith.constant 0.0 : f16
+  %0 = vector.transfer_read %subview[%row, %col], %cst
+       {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
+       : memref<128x256xf16, strided<[512, 1], offset: ?>, #gpu.address_space<workgroup>>, vector<4x1xf16>
   return %0 : vector<4x1xf16>
 }
 
@@ -221,7 +274,8 @@ func.func @no_transform_row_from_block_arg(%src: memref<128x256xf16, #gpu.addres
 // CHECK: %[[LOAD:.+]] = amdgpu.transpose_load %{{.*}}[%[[NEW_ROW]], %[[NEW_COL]]] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
 // CHECK: %[[CAST:.+]] = vector.shape_cast %[[LOAD]] : vector<4xf16> to vector<4x1xf16>
 // CHECK: return %[[CAST]]
-func.func @transform_basic_f16_4x1(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @transform_basic_f16_4x1() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -240,7 +294,8 @@ func.func @transform_basic_f16_4x1(%src: memref<128x256xf16, #gpu.address_space<
 // CHECK: gpu.lane_id
 // CHECK: amdgpu.transpose_load
 // CHECK: vector.shape_cast
-func.func @transform_row_hint_plus_constant(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @transform_row_hint_plus_constant() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c10 = arith.constant 10 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c10(#iree_gpu.lane_constant<16>) : index
@@ -262,7 +317,8 @@ func.func @transform_row_hint_plus_constant(%src: memref<128x256xf16, #gpu.addre
 // CHECK: gpu.lane_id
 // CHECK: amdgpu.transpose_load
 // CHECK: vector.shape_cast
-func.func @transform_row_affine_apply(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16> {
+func.func @transform_row_affine_apply() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c10 = arith.constant 10 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c10(#iree_gpu.lane_constant<16>) : index
@@ -298,7 +354,8 @@ func.func @transform_row_affine_apply(%src: memref<128x256xf16, #gpu.address_spa
 // CHECK: %[[NEW_ROW:.+]] = arith.addi %[[ROW]], %[[DIV2]] : index
 // CHECK: %[[LOAD:.+]] = amdgpu.transpose_load %{{.*}}[%[[NEW_ROW]], %[[NEW_COL]]] : memref<128x256xi8, #gpu.address_space<workgroup>> -> vector<8xi8>
 // CHECK: vector.shape_cast %[[LOAD]] : vector<8xi8> to vector<8x1xi8>
-func.func @transform_i8_8x1(%src: memref<128x256xi8, #gpu.address_space<workgroup>>) -> vector<8x1xi8> {
+func.func @transform_i8_8x1() -> vector<8x1xi8> {
+  %src = memref.alloc() : memref<128x256xi8, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -336,7 +393,8 @@ func.func @transform_i8_8x1(%src: memref<128x256xi8, #gpu.address_space<workgrou
 // CHECK: vector.insert_strided_slice %[[L0]], {{.*}} {offsets = [0], strides = [1]}
 // CHECK: vector.insert_strided_slice %[[L1]], {{.*}} {offsets = [4], strides = [1]}
 // CHECK: vector.shape_cast {{.*}} : vector<8xf16> to vector<8x1xf16>
-func.func @transform_unroll_f16_8x1(%src: memref<128x256xf16, #gpu.address_space<workgroup>>) -> vector<8x1xf16> {
+func.func @transform_unroll_f16_8x1() -> vector<8x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   %c0 = arith.constant 0 : index
   %tid = gpu.thread_id x
   %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
@@ -361,8 +419,9 @@ func.func @transform_unroll_f16_8x1(%src: memref<128x256xf16, #gpu.address_space
 // CHECK-LABEL: func.func @preprocess_delinearize_3d
 // CHECK: amdgpu.transpose_load
 // CHECK: vector.shape_cast
-func.func @preprocess_delinearize_3d(%src: memref<64x128x256xf16, #gpu.address_space<workgroup>>) -> vector<4x1xf16>
+func.func @preprocess_delinearize_3d() -> vector<4x1xf16>
     attributes {translation_info = #translation_128} {
+  %src = memref.alloc() : memref<64x128x256xf16, #gpu.address_space<workgroup>>
   %tid = gpu.thread_id x
   // Delinearize into (2, 4, 16): outer results get lane_constant, final gets lane_increment
   %indices:3 = affine.delinearize_index %tid into (2, 4, 16) : index, index, index
@@ -382,7 +441,8 @@ func.func @preprocess_delinearize_3d(%src: memref<64x128x256xf16, #gpu.address_s
 // CHECK-LABEL: func.func @preprocess_delinearize_preexisting_hint
 // CHECK: amdgpu.transpose_load
 // CHECK: vector.shape_cast
-func.func @preprocess_delinearize_preexisting_hint(%src: memref<128x256xf16, #gpu.address_space<workgroup>>, %arg: index) -> vector<4x1xf16> {
+func.func @preprocess_delinearize_preexisting_hint(%arg: index) -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   // Pre-existing aligned lane_increment hint on a function argument
   // The pattern should propagate hints through delinearize when aligned=true
   %arg_hinted = iree_codegen.index_hint %arg(#iree_gpu.lane_increment<64, aligned>) : index
@@ -404,7 +464,8 @@ func.func @preprocess_delinearize_preexisting_hint(%src: memref<128x256xf16, #gp
 // CHECK-LABEL: func.func @no_transform_delinearize_nonaligned_hint
 // CHECK-NOT: amdgpu.transpose_load
 // CHECK: vector.transfer_read
-func.func @no_transform_delinearize_nonaligned_hint(%src: memref<128x256xf16, #gpu.address_space<workgroup>>, %arg: index) -> vector<4x1xf16> {
+func.func @no_transform_delinearize_nonaligned_hint(%arg: index) -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
   // lane_increment<64> without aligned:
   // - Cannot propagate safely through delinearize
   // - Pattern fails, no hints propagated, blocking transformation
@@ -412,6 +473,37 @@ func.func @no_transform_delinearize_nonaligned_hint(%src: memref<128x256xf16, #g
   %indices:2 = affine.delinearize_index %arg_hinted into (4, 16) : index, index
   %cst = arith.constant 0.0 : f16
   %0 = vector.transfer_read %src[%indices#0, %indices#1], %cst
+       {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
+       : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<4x1xf16>
+  return %0 : vector<4x1xf16>
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Tests for reshape operations on allocations
+//===----------------------------------------------------------------------===//
+
+// Test: expand_shape and collapse_shape on allocation - should transform
+// These ops preserve the full view of the allocation, just changing the shape.
+// CHECK-LABEL: func.func @transform_expand_collapse_shape
+// CHECK: amdgpu.transpose_load
+// CHECK: vector.shape_cast
+func.func @transform_expand_collapse_shape() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
+  %expanded = memref.expand_shape %src [[0, 1], [2]]
+      output_shape [4, 32, 256]
+      : memref<128x256xf16, #gpu.address_space<workgroup>>
+      into memref<4x32x256xf16, #gpu.address_space<workgroup>>
+  %collapsed = memref.collapse_shape %expanded [[0, 1], [2]]
+      : memref<4x32x256xf16, #gpu.address_space<workgroup>>
+      into memref<128x256xf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %tid = gpu.thread_id x
+  %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
+  %col = iree_codegen.index_hint %tid(#iree_gpu.lane_increment<16, aligned>) : index
+  %cst = arith.constant 0.0 : f16
+  %0 = vector.transfer_read %collapsed[%row, %col], %cst
        {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
        : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<4x1xf16>
   return %0 : vector<4x1xf16>

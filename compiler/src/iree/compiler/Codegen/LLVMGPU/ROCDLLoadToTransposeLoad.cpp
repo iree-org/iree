@@ -11,11 +11,13 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -37,6 +39,47 @@ constexpr llvm::StringLiteral kPassLocalHintAttr = "__pass_local_hint";
 //===----------------------------------------------------------------------===//
 // Validation Helpers
 //===----------------------------------------------------------------------===//
+
+/// Returns true if the memref is either directly the result of a memref.alloc,
+/// or if it is produced by a chain of ops that maintain the full view of the
+/// memref. Currently, the only ops that are supported are memref.expand_shape
+/// and memref.collapse_shape.
+static bool isFullAllocationView(Value memref) {
+  Operation *definingOp = memref.getDefiningOp();
+  if (!definingOp) {
+    return false;
+  }
+
+  // Use backwards slice to collect the full producer chain of the memref.
+  SetVector<Operation *> slice;
+  BackwardSliceOptions opts;
+  opts.inclusive = true;
+  opts.filter = [](Operation *op) {
+    // We only care about memref values, since we want to find the chain of
+    // views that produce the memref.
+    return llvm::any_of(op->getResultTypes(),
+                        [](Type t) { return isa<MemRefType>(t); });
+  };
+  LogicalResult result = getBackwardSlice(definingOp, &slice, opts);
+  if (failed(result)) {
+    return false;
+  }
+
+  // We must also find the source allocation, or else the memref may be coming
+  // from a block argument.
+  bool foundAlloc = false;
+  for (Operation *op : slice) {
+    if (isa<memref::AllocOp>(op)) {
+      foundAlloc = true;
+      continue;
+    }
+    if (isa<memref::CollapseShapeOp, memref::ExpandShapeOp>(op)) {
+      continue;
+    }
+    return false;
+  }
+  return foundAlloc;
+}
 
 /// Returns the required vector size for transpose_load given an element type.
 /// Returns std::nullopt if the element type is not supported.
@@ -696,16 +739,27 @@ struct TransferReadToTransposeLoad final
     // Validate memory space.
     auto memrefType = cast<MemRefType>(transferOp.getBase().getType());
     if (!hasSharedMemoryAddressSpace(memrefType)) {
-      LDBG() << "  -> Source is not workgroup memory\n";
-      return failure();
+      return rewriter.notifyMatchFailure(transferOp,
+                                         "source is not workgroup memory");
+    }
+
+    // Subviews of the shared memory allocation are not allowed, because they
+    // may indirectly introduce indexing that will not be analyzed by this pass.
+    // It is possible to extend the analysis and transformation to handle
+    // subviews, but it adds additional complexity, and it is not necessary for
+    // the cases we see in IREE.
+    if (!isFullAllocationView(transferOp.getBase())) {
+      return rewriter.notifyMatchFailure(
+          transferOp,
+          "transfer_read is not reading from a full view of the allocation");
     }
 
     // Analyze and validate access pattern.
     std::optional<TransposeLoadAnalysis> analysis =
         analyzeTransferReadForTransposeLoad(transferOp);
     if (!analysis) {
-      LDBG() << "  -> Access pattern analysis failed\n";
-      return failure();
+      return rewriter.notifyMatchFailure(transferOp,
+                                         "access pattern analysis failed");
     }
 
     LDBG() << "  -> Transforming to transpose_load (unroll="
