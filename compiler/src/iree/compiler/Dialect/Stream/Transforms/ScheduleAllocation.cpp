@@ -1175,7 +1175,7 @@ static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
       auto terminatorOp =
           cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
       value = terminatorOp.getSuccessorOperands(
-          RegionSuccessor::parent())[resultIndex];
+          RegionSuccessor(definingOp, definingOp->getResults()))[resultIndex];
     } else if (auto tiedOp =
                    dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
       // If the producer is tied then try to get the operand.
@@ -1540,7 +1540,7 @@ static Value findTiedYieldResult(Value seedValue) {
       cast<RegionBranchOpInterface>(seedValue.getParentRegion()->getParentOp());
   SmallVector<RegionSuccessor> regions;
   regionOp.getSuccessorRegions(regionOp->getRegion(0), regions);
-  auto results = regionOp.getSuccessorInputs(regions.front());
+  auto results = regions.front().getSuccessorInputs();
   SmallVector<Value> worklist;
   worklist.push_back(seedValue);
   while (!worklist.empty()) {
