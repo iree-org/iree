@@ -499,13 +499,12 @@ util.func @fold_unit_dims_with_encoding(%arg0: tensor<1x1x4x8xi1, #iree_encoding
 // CHECK-SAME:        into tensor<4x8xi1, #iree_encoding.packed_storage>
 // CHECK:           %[[COLLAPSE_SHAPE_1:.*]] = tensor.collapse_shape %[[TENSOR_0]] {{\[\[}}0, 1, 2], [3]] : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
 // CHECK-SAME:        into tensor<4x8xi1, #iree_encoding.packed_storage>
-// CHECK:           %[[EMPTY_0:.*]] = tensor.empty() : tensor<4x8xi1>
-// CHECK:           %[[CAST_0:.*]] = tensor.cast %[[EMPTY_0]] : tensor<4x8xi1> to tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[EMPTY_0:.*]] = tensor.empty() : tensor<4x8xi1, #iree_encoding.packed_storage>
 // CHECK:           %[[GENERIC_0:.*]] = linalg.generic
 // CHECK-SAME:        {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>]
 // CHECK-SAME:        iterator_types = ["parallel", "parallel"]}
 // CHECK-SAME:        ins(%[[COLLAPSE_SHAPE_0]], %[[COLLAPSE_SHAPE_1]] : tensor<4x8xi1, #iree_encoding.packed_storage>, tensor<4x8xi1, #iree_encoding.packed_storage>)
-// CHECK-SAME:        outs(%[[CAST_0]] : tensor<4x8xi1, #iree_encoding.packed_storage>) {
+// CHECK-SAME:        outs(%[[EMPTY_0]] : tensor<4x8xi1, #iree_encoding.packed_storage>) {
 // CHECK:           ^bb0(%[[VAL_0:.*]]: i1, %[[VAL_1:.*]]: i1, %[[VAL_2:.*]]: i1):
 // CHECK:             %[[ORI_0:.*]] = arith.ori %[[VAL_0]], %[[VAL_1]] : i1
 // CHECK:             linalg.yield %[[ORI_0]] : i1
