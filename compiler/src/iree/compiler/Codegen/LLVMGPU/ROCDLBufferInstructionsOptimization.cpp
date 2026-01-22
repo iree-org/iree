@@ -7,9 +7,14 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-buffer-instructions-optimization"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
 
@@ -28,10 +33,39 @@ Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
   }
   return base;
 }
+
+// Check if the innermost mask index is divisible by the mask size using
+// divisibility analysis. Returns true if divisible or if analysis is
+// inconclusive.
+static bool isInnermostMaskIndexDivisible(Value maskIndex, int64_t maskSize,
+                                          DataFlowSolver &solver) {
+  auto *lattice =
+      solver.lookupState<IREE::Util::IntegerDivisibilityLattice>(maskIndex);
+
+  if (lattice && !lattice->getValue().isUninitialized()) {
+    const auto &div = lattice->getValue().getValue();
+    LDBG() << "Divisibility analysis for mask index:";
+    LDBG() << "  udiv = " << div.udiv() << ", sdiv = " << div.sdiv();
+    LDBG() << "  mask size = " << maskSize;
+
+    // Check if the mask index is divisible by the mask size.
+    if (div.udiv() % maskSize == 0) {
+      LDBG() << "  -> Divisible! Can optimize.";
+      return true;
+    }
+    LDBG() << "  -> Not divisible. Skipping optimization.";
+    return false;
+  }
+  LDBG() << "Divisibility analysis uninitialized for mask index. Skipping.";
+  return false;
+}
+
 // Determine if the mask vector is all ones or all zeros and if so, then replace
 // the masked transferReadOp with transferReadOp with no mask for when the mask
 // is all ones and the padding values when the mask is all zeros. The pattern
 // thus does the following optimization.
+//
+// Case 1: Unit dimensions with dynamic indices.
 // clang-format off
 // mask = vector.create_mask %0, ..., %n, %c8 : vector<1x ... x1x8xi1>
 // %read = vector.transfer_read %memref, %mask : memref<..., amdgpu.raw_fat_buffer>
@@ -40,22 +74,34 @@ Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
 // %read = vector.transfer_read %memref : memref<..., amdgpu.raw_fat_buffer> // no mask!
 // %masked_read
 //   = arith.select %0 && ... && %n ? %read : %padding : index,vector<1x ... x1x8xbf16>
+//
+// Case 2: Innermost dimension with divisible dynamic index.
+// When the innermost mask dimension has a dynamic index that is divisible by the
+// mask size (determined via divisibility analysis), we can optimize similarly:
+// %divisible = util.assume.int %arg<udiv = 8> : index
+// mask = vector.create_mask %c1, %divisible : vector<1x8xi1>
+// %read = vector.transfer_read %memref, %mask : memref<1x?xbf16, amdgpu.raw_fat_buffer>
+// becomes
+// %padding = arith.constant dense<0> : vector<1x8xbf16>
+// %cmp = arith.cmpi eq, %divisible, %c8 : index
+// %read = vector.transfer_read %memref : memref<1x?xbf16, amdgpu.raw_fat_buffer> // no mask!
+// %masked_read = arith.select %cmp, %read, %padding : vector<1x8xbf16>
 // clang-format on
 // Note we currently dont support cases where muliple masks are ANDed or ORed
 // together to form the final mask to a read but such support can be added where
 // we track a set of valid masks and add that an AND or OR of valid masks is
-// valid
-
-void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
+// valid.
+void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp,
+                     DataFlowSolver &solver) {
   Location loc = maskOp.getLoc();
 
-  SmallVector<vector::TransferReadOp> validReads;
   // First determine if the mask meets the criteria of being either all ones or
   // all empty.
-  SmallVector<Value> ValuesToAnd;
+  SmallVector<Value> valuesToAnd;
   SmallVector<Value> maskIndices = maskOp.getOperands();
   ArrayRef<int64_t> maskShape = maskOp.getResult().getType().getShape();
   bool isValid = true;
+  Value innermostNonConstantMaskIndex = nullptr;
   for (auto [idx, maskIndex] : llvm::enumerate(maskIndices)) {
 
     std::optional<int64_t> constantValue = getConstantIndex(maskIndex);
@@ -65,17 +111,26 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
         break;
       }
     } else {
-      if (maskShape[idx] != 1) {
+      // For non-constant mask indices, we either need:
+      // 1. The mask shape dimension to be 1 (will be added to valuesToAnd).
+      // 2. Or it's the innermost dimension (will be handled specially if stride
+      // is divisible).
+      bool isInnermostDim = (idx == maskIndices.size() - 1);
+      if (maskShape[idx] == 1) {
+        valuesToAnd.push_back(maskIndex);
+      } else if (isInnermostDim) {
+        // Save this for later stride divisibility check.
+        innermostNonConstantMaskIndex = maskIndex;
+      } else {
         isValid = false;
         break;
       }
-      ValuesToAnd.push_back(maskIndex);
     }
   }
   // Bail out if the mask doesnt meet the criteria or
   // is statically all 1's in which case we dont need
   // to do anything.
-  if (!isValid || ValuesToAnd.empty()) {
+  if (!isValid || (valuesToAnd.empty() && !innermostNonConstantMaskIndex)) {
     return;
   }
 
@@ -87,7 +142,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
     }
 
     auto sourceType = dyn_cast<MemRefType>(readOp.getBase().getType());
-    // only supported for fat raw buffers.
+    // Only supported for fat raw buffers.
     if (!sourceType || !hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
       continue;
     }
@@ -100,7 +155,39 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
     }
 
     rewriter.setInsertionPoint(readOp);
-    Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
+
+    Value selectValue = nullptr;
+
+    // Check if we need to handle the innermost dimension specially.
+    if (innermostNonConstantMaskIndex) {
+      int64_t innerDimIdx = sourceType.getRank() - 1;
+      int64_t maskInnerDimSize = maskShape[innerDimIdx];
+
+      // Use divisibility analysis to check if optimization is valid.
+      if (!isInnermostMaskIndexDivisible(innermostNonConstantMaskIndex,
+                                         maskInnerDimSize, solver)) {
+        continue;
+      }
+
+      // Create a compare: innerDimMaskIndex == maskInnerDimSize.
+      Value maskSizeConstant =
+          arith::ConstantIndexOp::create(rewriter, loc, maskInnerDimSize);
+      Value cmpResult = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq,
+          innermostNonConstantMaskIndex, maskSizeConstant);
+
+      // Start with this comparison.
+      if (valuesToAnd.empty()) {
+        selectValue = cmpResult;
+      } else {
+        // Combine with other mask conditions.
+        Value andValue = createI1And(loc, valuesToAnd, rewriter);
+        selectValue = arith::AndIOp::create(rewriter, loc, andValue, cmpResult);
+      }
+    } else {
+      // No special innermost handling needed.
+      selectValue = createI1And(loc, valuesToAnd, rewriter);
+    }
     auto constantValue = vector::BroadcastOp::create(
         rewriter, loc, readOp.getVectorType(), readOp.getPadding());
 
@@ -119,13 +206,23 @@ struct ROCDLBufferInstructionsOptimizationPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     FunctionOpInterface funcOp = getOperation();
+
+    // Setup divisibility analysis.
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
+    solver.load<dataflow::SparseConstantPropagation>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      return signalPassFailure();
+    }
+
     SmallVector<vector::CreateMaskOp> maskOps;
     funcOp.walk(
         [&](vector::CreateMaskOp maskOp) { maskOps.push_back(maskOp); });
 
     IRRewriter rewriter(context);
     for (vector::CreateMaskOp maskOp : maskOps) {
-      simplifyMaskOps(rewriter, maskOp);
+      simplifyMaskOps(rewriter, maskOp, solver);
     }
   }
 };
