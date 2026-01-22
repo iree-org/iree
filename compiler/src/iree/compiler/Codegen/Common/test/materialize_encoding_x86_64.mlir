@@ -1523,6 +1523,9 @@ func.func @scaled_matmul_f4E2M1FN_f8E8M0FNU_f32(
   } -> tensor<256x512xf32, #encoding_c>
   return %0 : tensor<256x512xf32, #encoding_c>
 }
+
+// -----
+
 // CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 // CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
@@ -1540,3 +1543,29 @@ func.func @scaled_matmul_f4E2M1FN_f8E8M0FNU_f32(
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction", "reduction"]
 //  CHECK-SAME:       ins(%[[A]], %[[B]], %[[A_SCALES]], %[[B_SCALES]] : tensor<256x128x32xf4E2M1FN>, tensor<512x128x32xf4E2M1FN>, tensor<256x128xf8E8M0FNU>, tensor<512x128xf8E8M0FNU>)
 //  CHECK-SAME:       outs(%[[C]] : tensor<256x512xf32>)
+// Test case: RHS tensor was bitcast from ui4 to i8 (storage type differs from
+// original type). The encoding's original_element_type = ui4 records the type
+// before bitcast packing. Tile sizes should be halved for the K dimension
+// since each i8 stores 2 x ui4 elements.
+#map_bitcast = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1_bitcast = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2_bitcast = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_rhs_bitcast = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i16, ui4, i32], original_element_type = ui4, user_indexing_maps = [#map_bitcast, #map1_bitcast, #map2_bitcast], iteration_sizes = [?, ?, ?]>
+func.func @set_encoding_rhs_bitcast_ui4_to_i8(
+    %rhs: tensor<?x?xi8>
+) -> tensor<?x?xi8, #encoding_rhs_bitcast> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  // The input has i8 storage type but encoding records ui4 as original type.
+  // Shape: tensor<?x?xi8> where the K dimension is halved compared to ui4.
+  %encoded = iree_encoding.set_encoding %rhs : tensor<?x?xi8> -> tensor<?x?xi8, #encoding_rhs_bitcast>
+  return %encoded : tensor<?x?xi8, #encoding_rhs_bitcast>
+}
+// For i16ui4i32 with avx512vnni, the normal RHS tile would be 32x8 (N=32, K=8).
+// Since i8 stores 2 x ui4 elements, the K tile size should be halved to 4.
+// CHECK-LABEL: func @set_encoding_rhs_bitcast_ui4_to_i8(
+//  CHECK-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xi8>
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[RHS]]
+//  CHECK-SAME:       inner_dims_pos = [1, 0]
+//  CHECK-SAME:       inner_tiles = [32, 4]
+//       CHECK:   return %[[PACK]]

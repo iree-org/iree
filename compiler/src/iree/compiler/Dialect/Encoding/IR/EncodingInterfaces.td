@@ -237,6 +237,27 @@ def IREEEncoding_SerializableAttr :
       /*defaultImplementation=*/[{
         return nullptr;
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Converts the encoding for a bitcast operation. Given the shape and
+        element types, returns the new shape and encoding to maintain the same
+        total bit count.
+        Returns failure if the conversion is not possible (e.g., bits don't
+        divide evenly).
+      }],
+      /*retTy=*/"::llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::BitcastEncodingInfo>",
+      /*methodName=*/"convertForBitcast",
+      /*args=*/(ins
+        "::llvm::ArrayRef<int64_t>":$shape,
+        "::mlir::Type":$original_element_type,
+        "::mlir::Type":$new_element_type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
     >
   ];
 
