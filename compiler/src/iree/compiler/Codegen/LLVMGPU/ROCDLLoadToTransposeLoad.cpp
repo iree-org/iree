@@ -205,13 +205,18 @@ static bool isRowIndexUniform(Value rowIndex) {
 
 /// Analysis result for a transfer_read that can be transformed.
 struct TransposeLoadAnalysis {
-  int64_t columnMemrefDim; // Which memref dimension is the column
-  SmallVector<int64_t>
-      rowMemrefDims;             // Memref dims for rows (ordered by vector dim)
-  SmallVector<int64_t> rowSizes; // Vector sizes for row dims (same order)
-  int64_t totalRowSize;          // Product of rowSizes
-  int64_t intrinsicVectorSize;   // Required size per transpose_load
-  int64_t unrollCount;           // Number of transpose_loads needed
+  // Which memref dimension is the column.
+  int64_t columnMemrefDim;
+  // Memref dims for rows.
+  SmallVector<int64_t> rowMemrefDims;
+  // Vector sizes for row dims.
+  SmallVector<int64_t> rowSizes;
+  // Product of rowSizes.
+  int64_t totalRowSize;
+  // Transpose_load vector size in number of elements.
+  int64_t intrinsicVectorSize;
+  // Number of transpose_loads needed.
+  int64_t unrollCount;
 };
 
 /// Analyzes a transfer_read to determine if it can be lowered to
@@ -228,52 +233,41 @@ struct TransposeLoadAnalysis {
 static std::optional<TransposeLoadAnalysis>
 analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   VectorType vecType = transferOp.getVectorType();
-
-  // Vector must have at least 1 dimension.
+  // There must be at least a row and column dimension, and the column dimension
+  // must have size 1.
   if (vecType.getRank() < 1) {
     return std::nullopt;
   }
-
-  // Innermost vector dimension must have size 1 (this is the column).
   if (vecType.getDimSize(vecType.getRank() - 1) != 1) {
     return std::nullopt;
   }
 
+  // Only projected permutation maps are supported. Analyzing other maps is
+  // complex, and they are rarely seen.
   AffineMap permMap = transferOp.getPermutationMap();
-
-  // Permutation map must have same number of results as vector rank
-  // and must be a projected permutation.
   if (permMap.getNumResults() != static_cast<unsigned>(vecType.getRank()) ||
       !permMap.isProjectedPermutation()) {
     return std::nullopt;
   }
-
-  // Column dimension is the last result in the permutation map
-  // (corresponds to innermost vector dimension).
   int64_t columnMemrefDim =
       getMemrefDimFromMapResult(permMap, vecType.getRank() - 1);
   Value columnIndex = transferOp.getIndices()[columnMemrefDim];
 
-  // Check if the column index comes from an index_hint with lane_increment.
-  auto opResult = dyn_cast<OpResult>(columnIndex);
-  if (!opResult) {
-    return std::nullopt;
-  }
-  auto indexHintOp = dyn_cast<IREE::Codegen::IndexHintOp>(opResult.getOwner());
+  // Validate the lane-dependent behavior of the column:
+  // - Must be lane_increment.
+  // - The group_size must be a multiple of 16 (transpose_load operates on
+  //   16-lane groups).
+  // - The step must be 1 (column indices must be consecutive).
+  auto indexHintOp =
+      dyn_cast<IREE::Codegen::IndexHintOp>(columnIndex.getDefiningOp());
   if (!indexHintOp) {
     return std::nullopt;
   }
-
-  // Validate the lane_increment attribute:
-  // - Must be lane_increment (not lane_constant)
-  // - group_size must be >= 16 (transpose_load operates on 16-lane groups)
-  // - step must be 1 (column indices must be consecutive)
   auto laneIncrement =
       dyn_cast<IREE::GPU::LaneIncrementAttr>(indexHintOp.getHint());
   if (!laneIncrement) {
     return std::nullopt;
   }
-  // The group_size must be a multiple of 16 for proper alignment.
   if (laneIncrement.getGroupSize() % kTransposeLoadLaneGroupSize != 0) {
     LDBG() << "Column index lane_increment group_size "
            << laneIncrement.getGroupSize() << " is not a multiple of "
@@ -286,6 +280,7 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
     return std::nullopt;
   }
 
+  // Now we analyze the access pattern of the load.
   TransposeLoadAnalysis analysis;
   analysis.columnMemrefDim = columnMemrefDim;
 
@@ -323,7 +318,6 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
            << analysis.intrinsicVectorSize << "\n";
     return std::nullopt;
   }
-
   analysis.unrollCount = analysis.totalRowSize / analysis.intrinsicVectorSize;
 
   // 4. Validate column dimension is contiguous (stride 1).
@@ -343,7 +337,6 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
       return std::nullopt;
     }
   }
-
   return analysis;
 }
 
@@ -369,14 +362,13 @@ static SmallVector<Value> computeTransposeLoadIndices(
   OperandRange originalIndices = transferOp.getIndices();
   int64_t intrinsicSize = analysis.intrinsicVectorSize;
 
-  // Compute linear element index for this unroll iteration
+  // Compute linear element index for this unroll iteration.
   // linearElemIdx = unrollIndex * intrinsicSize + rowGroupIdx
   Value cUnrollBase = arith::ConstantIndexOp::create(
       rewriter, loc, unrollIndex * intrinsicSize);
   Value linearElemIdx =
       arith::AddIOp::create(rewriter, loc, cUnrollBase, rowGroupIdx);
 
-  // Delinearize to get indices for each row dimension
   SmallVector<Value> rowIndices;
   assert(!analysis.rowSizes.empty() && "expected at least one row dim");
   auto delinOp = affine::AffineDelinearizeIndexOp::create(
@@ -384,20 +376,16 @@ static SmallVector<Value> computeTransposeLoadIndices(
       /*hasOuterBound=*/true);
   rowIndices.assign(delinOp.getResults().begin(), delinOp.getResults().end());
 
-  // Build the full index list for the memref
-  // Start with original indices, then update row and column dimensions
+  // Build the full index list for the memref. Some dimensions may remain
+  // unchanged (unit/batch dimensions), so initialized with with original
+  // indices.
   SmallVector<Value> newIndices(originalIndices.begin(), originalIndices.end());
-
-  // Update row dimension indices: newOffset = originalOffset + delinearizedIdx
   for (auto [i, memrefDim] : llvm::enumerate(analysis.rowMemrefDims)) {
     Value originalIdx = originalIndices[memrefDim];
     newIndices[memrefDim] =
         arith::AddIOp::create(rewriter, loc, originalIdx, rowIndices[i]);
   }
-
-  // Update column dimension index
   newIndices[analysis.columnMemrefDim] = newColIdx;
-
   return newIndices;
 }
 
@@ -442,56 +430,47 @@ static Value generateTransposeLoads(vector::TransferReadOp transferOp,
   int64_t totalRowSize = analysis.totalRowSize;
   Value source = transferOp.getBase();
 
-  // The intrinsic produces a 1D vector
+  // The intrinsic produces a 1D vector.
   VectorType intrinsicVecType = VectorType::get({intrinsicSize}, elementType);
 
-  // Compute lane ID and derived values (shared across all unrolls)
+  // Step 1: Compute column index, which is shared by all unrolled loads. Each
+  //         group of lanes can be remapped independently, so we use the group
+  //         ID instead of the lane ID to compute the column indices.
   Value laneId = gpu::LaneIdOp::create(rewriter, loc, /*upper_bound=*/nullptr);
   Value cLaneGroupSize = arith::ConstantIndexOp::create(
       rewriter, loc, kTransposeLoadLaneGroupSize);
   Value laneInGroup =
       arith::RemUIOp::create(rewriter, loc, laneId, cLaneGroupSize);
-
-  // Compute rowGroupIdx = laneInGroup / loadsPerColumn (shared across unrolls)
   int64_t loadsPerColumn = kTransposeLoadLaneGroupSize / intrinsicSize;
   Value cLoadsPerCol =
       arith::ConstantIndexOp::create(rewriter, loc, loadsPerColumn);
   Value rowGroupIdx =
       arith::DivUIOp::create(rewriter, loc, laneInGroup, cLoadsPerCol);
-
-  // Compute column index (shared across all unrolls)
   Value originalColIdx = transferOp.getIndices()[analysis.columnMemrefDim];
   Value newColIdx = computeColumnIndex(originalColIdx, laneInGroup,
                                        intrinsicSize, rewriter, loc);
 
-  // Generate transpose_load ops for each unroll iteration
+  // Step 2: Generate transpose_load ops for each unroll iteration. This is
+  //         where we compute the row indices.
   SmallVector<Value> results;
   for (int64_t i = 0; i < unrollCount; ++i) {
-    // Compute all memref indices for this transpose_load
     SmallVector<Value> indices = computeTransposeLoadIndices(
         transferOp, analysis, i, rowGroupIdx, newColIdx, rewriter, loc);
-
-    // Create transpose_load op with all indices
     auto transposeLoadOp = amdgpu::TransposeLoadOp::create(
         rewriter, loc, intrinsicVecType, source, indices);
-
     results.push_back(transposeLoadOp.getResult());
   }
 
-  // Combine results into a 1D vector
+  // Step 3: Combine all unrolled loads into a flat vector, and expand it back
+  //         to the original load shape.
   VectorType flat1DType = VectorType::get({totalRowSize}, elementType);
-
   Value combined;
   if (results.size() == 1) {
-    // Single result - just use it directly (already 1D)
     combined = results[0];
   } else {
-    // Multiple results - concatenate into 1D vector
     combined = arith::ConstantOp::create(rewriter, loc, flat1DType,
                                          rewriter.getZeroAttr(flat1DType));
-
     for (auto [idx, result] : llvm::enumerate(results)) {
-      // Insert at offset [idx * intrinsicSize]
       SmallVector<int64_t> offsets = {static_cast<int64_t>(idx) *
                                       intrinsicSize};
       SmallVector<int64_t> strides = {1};
@@ -499,8 +478,6 @@ static Value generateTransposeLoads(vector::TransferReadOp transferOp,
           rewriter, loc, result, combined, offsets, strides);
     }
   }
-
-  // Reshape from 1D to original N-D shape
   return vector::ShapeCastOp::create(rewriter, loc, resultType, combined);
 }
 
