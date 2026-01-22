@@ -70,7 +70,7 @@ LogicalResult IntegerDivisibilityAnalysis::visitOperation(
 }
 
 void IntegerDivisibilityAnalysis::visitNonControlFlowArguments(
-    Operation *op, const RegionSuccessor &successor,
+    Operation *op, const RegionSuccessor &successor, ValueRange successorInputs,
     ArrayRef<IntegerDivisibilityLattice *> argLattices, unsigned firstIndex) {
   // Get the constant divisibility, or query the lattice for Values.
   auto getDivFromOfr = [&](std::optional<OpFoldResult> ofr, Block *block,
@@ -99,7 +99,7 @@ void IntegerDivisibilityAnalysis::visitNonControlFlowArguments(
     std::optional<SmallVector<OpFoldResult>> steps = loop.getLoopSteps();
     if (!ivs || !lbs || !steps) {
       return SparseForwardDataFlowAnalysis::visitNonControlFlowArguments(
-          op, successor, argLattices, firstIndex);
+          op, successor, successorInputs, argLattices, firstIndex);
     }
     for (auto [iv, lb, step] : llvm::zip_equal(*ivs, *lbs, *steps)) {
       IntegerDivisibilityLattice *ivEntry = getLatticeElement(iv);
@@ -122,7 +122,7 @@ void IntegerDivisibilityAnalysis::visitNonControlFlowArguments(
   }
 
   return SparseForwardDataFlowAnalysis::visitNonControlFlowArguments(
-      op, successor, argLattices, firstIndex);
+      op, successor, successorInputs, argLattices, firstIndex);
 }
 
 } // namespace mlir::iree_compiler::IREE::Util
