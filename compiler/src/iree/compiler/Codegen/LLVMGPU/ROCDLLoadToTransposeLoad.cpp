@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -95,26 +96,23 @@ static bool isDimensionContiguous(MemRefType memrefType, int64_t dim) {
 /// relevant thread_id ops should already have index_hint users with appropriate
 /// lane attributes.
 static bool isRowIndexUniform(Value rowIndex) {
-  LLVM_DEBUG(llvm::dbgs() << "isRowIndexUniform: checking value: " << rowIndex
-                          << "\n");
+  LDBG() << "isRowIndexUniform: checking value: " << rowIndex << "\n";
   // Verify that the rowIndex is some function of constants and hint ops.
   // Use SetVector as worklist to avoid revisiting the same value.
   llvm::SetVector<Value> worklist;
   worklist.insert(rowIndex);
   while (!worklist.empty()) {
     Value currentVal = worklist.pop_back_val();
-    LLVM_DEBUG(llvm::dbgs()
-               << "  checking worklist item: " << currentVal << "\n");
+    LDBG() << "  checking worklist item: " << currentVal << "\n";
     auto opResult = dyn_cast<OpResult>(currentVal);
     if (!opResult) {
-      LLVM_DEBUG(llvm::dbgs() << "  FAIL: value is not an OpResult (likely a "
-                                 "block argument)\n");
+      LDBG() << "  FAIL: value is not an OpResult (likely a block argument)\n";
       return false;
     }
     Operation *definingOp = opResult.getOwner();
-    LLVM_DEBUG(llvm::dbgs() << "  defining op: " << *definingOp << "\n");
+    LDBG() << "  defining op: " << *definingOp << "\n";
     if (matchPattern(definingOp, m_Constant())) {
-      LLVM_DEBUG(llvm::dbgs() << "  OK: is a constant\n");
+      LDBG() << "  OK: is a constant\n";
       continue;
     }
     // Check for index_hint op with lane attributes.
@@ -125,27 +123,22 @@ static bool isRowIndexUniform(Value rowIndex) {
         // For transpose_load, we need uniformity within 16-lane groups.
         // The group_size must be a multiple of 16 for proper alignment.
         if (laneConstant.getGroupSize() % kTransposeLoadLaneGroupSize == 0) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "  OK: index_hint with lane_constant, group_size="
-                     << laneConstant.getGroupSize() << " is multiple of 16\n");
+          LDBG() << "  OK: index_hint with lane_constant, group_size="
+                 << laneConstant.getGroupSize() << " is multiple of 16\n";
           continue;
         }
-        LLVM_DEBUG(llvm::dbgs()
-                   << "  FAIL: index_hint with lane_constant, group_size="
-                   << laneConstant.getGroupSize()
-                   << " is not a multiple of 16\n");
+        LDBG() << "  FAIL: index_hint with lane_constant, group_size="
+               << laneConstant.getGroupSize() << " is not a multiple of 16\n";
         return false;
       }
       if (isa<IREE::GPU::LaneIncrementAttr>(hint)) {
         // lane_increment means varying across lanes - NOT OK for row index.
-        LLVM_DEBUG(llvm::dbgs()
-                   << "  FAIL: index_hint with lane_increment attribute "
-                      "(column index, not uniform)\n");
+        LDBG() << "  FAIL: index_hint with lane_increment attribute (column "
+                  "index, not uniform)\n";
         return false;
       }
       // Unknown hint type - be conservative and fail.
-      LLVM_DEBUG(llvm::dbgs()
-                 << "  FAIL: index_hint with unknown hint attribute type\n");
+      LDBG() << "  FAIL: index_hint with unknown hint attribute type\n";
       return false;
     }
     // Use a whitelist of arith/affine ops to be conservative for non-leaf ops.
@@ -153,20 +146,17 @@ static bool isRowIndexUniform(Value rowIndex) {
     // ops is unsafe when the semantics of the ops are unknown.
     if (!isa<arith::ArithDialect, affine::AffineDialect>(
             definingOp->getDialect())) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "  FAIL: op is not from arith or affine dialect (dialect: "
-                 << definingOp->getDialect()->getNamespace() << ")\n");
+      LDBG() << "  FAIL: op is not from arith or affine dialect (dialect: "
+             << definingOp->getDialect()->getNamespace() << ")\n";
       return false;
     }
-    LLVM_DEBUG(llvm::dbgs()
-               << "  OK: arith/affine op, adding "
-               << definingOp->getNumOperands() << " operands to worklist\n");
+    LDBG() << "  OK: arith/affine op, adding " << definingOp->getNumOperands()
+           << " operands to worklist\n";
     for (Value operand : definingOp->getOperands()) {
       worklist.insert(operand);
     }
   }
-  LLVM_DEBUG(
-      llvm::dbgs() << "isRowIndexUniform: SUCCESS - all values uniform\n");
+  LDBG() << "isRowIndexUniform: SUCCESS - all values uniform\n";
   return true;
 }
 
@@ -242,15 +232,14 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   }
   // The group_size must be a multiple of 16 for proper alignment.
   if (laneIncrement.getGroupSize() % kTransposeLoadLaneGroupSize != 0) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Column index lane_increment group_size "
-               << laneIncrement.getGroupSize() << " is not a multiple of "
-               << kTransposeLoadLaneGroupSize << "\n");
+    LDBG() << "Column index lane_increment group_size "
+           << laneIncrement.getGroupSize() << " is not a multiple of "
+           << kTransposeLoadLaneGroupSize << "\n";
     return std::nullopt;
   }
   if (laneIncrement.getStep() != 1) {
-    LLVM_DEBUG(llvm::dbgs() << "Column index lane_increment step "
-                            << laneIncrement.getStep() << " != 1\n");
+    LDBG() << "Column index lane_increment step " << laneIncrement.getStep()
+           << " != 1\n";
     return std::nullopt;
   }
 
@@ -262,7 +251,7 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   std::optional<int64_t> intrinsicSize =
       getTransposeLoadVectorSize(elementType);
   if (!intrinsicSize) {
-    LLVM_DEBUG(llvm::dbgs() << "Unsupported element type\n");
+    LDBG() << "Unsupported element type\n";
     return std::nullopt;
   }
   analysis.intrinsicVectorSize = *intrinsicSize;
@@ -286,9 +275,9 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
 
   // 3. Validate total row size is a multiple of intrinsic size.
   if (analysis.totalRowSize % analysis.intrinsicVectorSize != 0) {
-    LLVM_DEBUG(llvm::dbgs() << "Total row size " << analysis.totalRowSize
-                            << " is not a multiple of intrinsic size "
-                            << analysis.intrinsicVectorSize << "\n");
+    LDBG() << "Total row size " << analysis.totalRowSize
+           << " is not a multiple of intrinsic size "
+           << analysis.intrinsicVectorSize << "\n";
     return std::nullopt;
   }
 
@@ -297,7 +286,7 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   // 4. Validate column dimension is contiguous (stride 1).
   MemRefType memrefType = cast<MemRefType>(transferOp.getBase().getType());
   if (!isDimensionContiguous(memrefType, analysis.columnMemrefDim)) {
-    LLVM_DEBUG(llvm::dbgs() << "Column dimension is not contiguous\n");
+    LDBG() << "Column dimension is not contiguous\n";
     return std::nullopt;
   }
 
@@ -305,8 +294,9 @@ analyzeTransferReadForTransposeLoad(vector::TransferReadOp transferOp) {
   for (int64_t memrefDim : analysis.rowMemrefDims) {
     Value rowIndex = transferOp.getIndices()[memrefDim];
     if (!isRowIndexUniform(rowIndex)) {
-      LLVM_DEBUG(llvm::dbgs() << "Row index for memref dim " << memrefDim
-                              << " is not uniform across lanes\n");
+      LDBG() << "Row index for memref dim " << memrefDim
+             << " is not uniform "
+                "across lanes\n";
       return std::nullopt;
     }
   }
@@ -557,9 +547,9 @@ static void seedThreadIdHints(FunctionOpInterface funcOp, IRRewriter &rewriter,
 ///
 /// The pattern fails if any result already has an index_hint user, ensuring
 /// hints are only propagated once.
-struct PropagateHintThroughDelinearize
+struct PropagateHintThroughDelinearize final
     : OpRewritePattern<affine::AffineDelinearizeIndexOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineDelinearizeIndexOp op,
                                 PatternRewriter &rewriter) const override {
@@ -586,7 +576,7 @@ struct PropagateHintThroughDelinearize
     return llvm::TypeSwitch<Attribute, LogicalResult>(inputHint)
         // Case 1: lane_constant propagates to all results unchanged.
         // Dynamic basis is allowed since we don't need basis values.
-        .Case<IREE::GPU::LaneConstantAttr>([&](auto laneConstant) {
+        .Case([&](IREE::GPU::LaneConstantAttr laneConstant) {
           for (Value result : op.getResults()) {
             if (result.use_empty()) {
               continue;
@@ -602,7 +592,7 @@ struct PropagateHintThroughDelinearize
         // We process from innermost to outermost, computing group sizes from
         // static bases. Dynamic bases are pessimized to 1 (their minimum
         // value).
-        .Case<IREE::GPU::LaneIncrementAttr>([&](auto laneIncrement) {
+        .Case([&](IREE::GPU::LaneIncrementAttr laneIncrement) {
           if (basis.empty()) {
             return failure();
           }
@@ -650,7 +640,7 @@ struct PropagateHintThroughDelinearize
             }
           }
 
-          for (unsigned i = 0; i < op.getNumResults(); ++i) {
+          for (unsigned i = 0, e = op.getNumResults(); i < e; ++i) {
             Value result = op.getResult(i);
             if (result.use_empty()) {
               continue;
@@ -695,18 +685,18 @@ struct PropagateHintThroughDelinearize
 /// seedThreadIdHints + PropagateHintThroughDelinearize). The greedy driver
 /// iterates until fixpoint, so hints will propagate through all delinearize
 /// ops before this pattern can match.
-struct TransferReadToTransposeLoad : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct TransferReadToTransposeLoad final
+    : OpRewritePattern<vector::TransferReadOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp transferOp,
                                 PatternRewriter &rewriter) const override {
-    LLVM_DEBUG(llvm::dbgs() << "TransferReadToTransposeLoad: checking "
-                            << transferOp << "\n");
+    LDBG() << "TransferReadToTransposeLoad: checking " << transferOp << "\n";
 
     // Validate memory space.
     auto memrefType = cast<MemRefType>(transferOp.getBase().getType());
     if (!hasSharedMemoryAddressSpace(memrefType)) {
-      LLVM_DEBUG(llvm::dbgs() << "  -> Source is not workgroup memory\n");
+      LDBG() << "  -> Source is not workgroup memory\n";
       return failure();
     }
 
@@ -714,12 +704,12 @@ struct TransferReadToTransposeLoad : OpRewritePattern<vector::TransferReadOp> {
     std::optional<TransposeLoadAnalysis> analysis =
         analyzeTransferReadForTransposeLoad(transferOp);
     if (!analysis) {
-      LLVM_DEBUG(llvm::dbgs() << "  -> Access pattern analysis failed\n");
+      LDBG() << "  -> Access pattern analysis failed\n";
       return failure();
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "  -> Transforming to transpose_load (unroll="
-                            << analysis->unrollCount << ")\n");
+    LDBG() << "  -> Transforming to transpose_load (unroll="
+           << analysis->unrollCount << ")\n";
 
     // Generate transpose_load ops.
     rewriter.setInsertionPoint(transferOp);
@@ -770,8 +760,8 @@ struct ROCDLLoadToTransposeLoadPass final
 
     // Phase 2: Propagate hints and lower transfer_reads via greedy patterns
     RewritePatternSet patterns(funcOp.getContext());
-    patterns.add<PropagateHintThroughDelinearize>(funcOp.getContext());
-    patterns.add<TransferReadToTransposeLoad>(funcOp.getContext());
+    patterns.add<PropagateHintThroughDelinearize, TransferReadToTransposeLoad>(
+        funcOp.getContext());
 
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
