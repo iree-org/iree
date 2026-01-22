@@ -571,7 +571,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
 
 def HAL_DeviceMemoizeOp : HAL_Op<"device.memoize", [
   RecursiveMemoryEffects,
-  DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+  DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
   SingleBlockImplicitTerminator<"IREE::HAL::ReturnOp">,
 ]> {
   let summary = [{Memoizes resources for a particular device and queue affinity.}];

@@ -623,8 +623,7 @@ TraversalResult Explorer::walkReturnOperands(Operation *parentOp,
   return walkReturnOps(parentOp, [&](Operation *returnOp) {
     if (auto terminatorOp =
             dyn_cast<RegionBranchTerminatorOpInterface>(returnOp)) {
-      return fn(terminatorOp.getSuccessorOperands(
-          RegionSuccessor(parentOp, parentOp->getResults())));
+      return fn(terminatorOp.getSuccessorOperands(RegionSuccessor::parent()));
     } else {
       return fn(returnOp->getOperands());
     }
@@ -1008,7 +1007,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
     SmallVector<RegionSuccessor, 2> entrySuccessors;
     regionOp.getSuccessorRegions(RegionBranchPoint::parent(), entrySuccessors);
     for (auto &entrySuccessor : entrySuccessors) {
-      auto successorInputs = entrySuccessor.getSuccessorInputs();
+      auto successorInputs = regionOp.getSuccessorInputs(entrySuccessor);
       if (operandIdx >= successorInputs.size()) {
         // Implicit capture; argument has the same SSA value on the inside of
         // the region. Uses show up as normal so we ignore here.
@@ -1030,9 +1029,8 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
   // Move within/out-of a region.
   auto traverseRegionBranchOp = [&](RegionBranchTerminatorOpInterface branchOp,
                                     unsigned operandIdx) {
-    Operation *parentOp = branchOp.getOperation()->getParentOp();
-    auto successorOperands = branchOp.getSuccessorOperands(
-        RegionSuccessor(parentOp, parentOp->getResults()));
+    auto successorOperands =
+        branchOp.getSuccessorOperands(RegionSuccessor::parent());
     unsigned beginIdx = successorOperands.getBeginOperandIndex();
     if (operandIdx < beginIdx ||
         operandIdx >= beginIdx + successorOperands.size()) {

@@ -1013,15 +1013,19 @@ void DeviceMemoizeOp::build(OpBuilder &builder, OperationState &state,
   state.addRegion();
 }
 
+ValueRange DeviceMemoizeOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+}
+
 void DeviceMemoizeOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor({}));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 

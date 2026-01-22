@@ -42,6 +42,7 @@ public:
   /// on known loop bounds and steps.
   void visitNonControlFlowArguments(
       Operation *op, const RegionSuccessor &successor,
+      ValueRange successorInputs,
       ArrayRef<IntegerDivisibilityLattice *> argLattices,
       unsigned firstIndex) override;
 };
