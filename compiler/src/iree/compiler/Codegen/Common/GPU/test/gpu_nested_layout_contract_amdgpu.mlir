@@ -68,20 +68,16 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @contract_to_mfma_32x32x8_mm
 // CHECK-SAME: (%[[A:.+]]: vector<32x8xf16>, %[[B:.+]]: vector<8x32xf16>, %[[C:.+]]: vector<32x32xf32>)
-// CHECK:       %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<32x32xf32> -> vector<1x1x4x1x4x1xf32>
-// CHECK:       %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<32x8xf16>  -> vector<1x1x1x1x1x4xf16>
-// CHECK:       %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<8x32xf16>  -> vector<1x1x1x1x4x1xf16>
-// CHECK:       %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<4x1x4x1xf32> from vector<1x1x4x1x4x1xf32>
-// CHECK:       %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<1x1x1x1x1x4xf16>
-// CHECK:       %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x4x1xf16> from vector<1x1x1x1x4x1xf16>
-// CHECK:       %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x4xf16> to vector<4xf16>
-// CHECK:       %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x4x1xf16> to vector<4xf16>
-// CHECK:       %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<4x1x4x1xf32> to vector<16xf32>
+// CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<32x32xf32> -> vector<1x1x4x1x4x1xf32>
+// CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<32x8xf16>  -> vector<1x1x1x1x1x4xf16>
+// CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<8x32xf16>  -> vector<1x1x1x1x4x1xf16>
+// CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x4xf16> to vector<4xf16>
+// CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x4x1xf16> to vector<4xf16>
+// CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x4x1x4x1xf32> to vector<16xf32>
 // CHECK:       %[[MFMA:.+]] = amdgpu.mfma 32x32x8 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
-// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]] : vector<16xf32> to vector<4x1x4x1xf32>
-// CHECK:       %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<4x1x4x1xf32> to vector<1x1x4x1x4x1xf32>
-// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
+// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]] : vector<16xf32> to vector<1x1x4x1x4x1xf32>
+// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
 // CHECK:       return %[[R_SIMD]]
 
 // -----
@@ -144,21 +140,17 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @contract_to_mfma_16x16x16_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x16xf16>, %[[B:.+]]: vector<16x16xf16>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x4x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x4xf16>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x4x1xf16>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x4x1xf32> from vector<1x1x1x1x4x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<1x1x1x1x1x4xf16>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x4x1xf16> from vector<1x1x1x1x4x1xf16>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x4xf16> to vector<4xf16>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x4x1xf16> to vector<4xf16>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x4x1xf32> to vector<4xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x4x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x4xf16>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x4x1xf16>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x4xf16> to vector<4xf16>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x4x1xf16> to vector<4xf16>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x4x1xf32> to vector<4xf32>
 //       CHECK:   %[[MFMA:.+]] = amdgpu.mfma 16x16x16 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] blgp =  none
 //  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4xf32>
 
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]]  : vector<4xf32> to vector<1x1x4x1xf32>
-//       CHECK:   %[[B_OUT:.*]]  = vector.broadcast %[[R_CAST]] : vector<1x1x4x1xf32> to vector<1x1x1x1x4x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x4x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]]  : vector<4xf32> to vector<1x1x1x1x4x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x4x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -573,19 +565,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_WMMAR3_16x16x16_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x16xf16>, %[[B:.+]]: vector<16x16xf16>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x8x1x1x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x16xf16>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x16x1xf16>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<8x1x1x1xf32> from vector<1x1x8x1x1x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x16x1xf16> from vector<1x1x1x1x16x1xf16>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x16x1xf16> to vector<16xf16>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<8x1x1x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x8x1x1x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x16xf16>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x16x1xf16>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x16xf16> to vector<16xf16>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x16x1xf16> to vector<16xf16>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x8x1x1x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x16 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]]
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<8x1x1x1xf32>
-//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<8x1x1x1xf32> to vector<1x1x8x1x1x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x8x1x1x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1x1x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x8x1x1x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -659,19 +647,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_WMMAR4_16x16x16_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x16xf16>, %[[B:.+]]: vector<16x16xf16>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x8xf16>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x8x1xf16>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x8xf16> from vector<1x1x1x1x1x8xf16>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x8x1xf16> from vector<1x1x1x1x8x1xf16>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x8xf16> to vector<8xf16>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x8x1xf16> to vector<8xf16>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x8xf16>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x8x1xf16>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x8xf16> to vector<8xf16>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x8x1xf16> to vector<8xf16>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x8x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x16 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]]
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
-//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -744,19 +728,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x4_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x4xf32>, %[[B:.+]]: vector<4x16xf32>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x4xf32> -> vector<1x1x1x1x1x2xf32>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<4x16xf32> -> vector<1x1x1x1x2x1xf32>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x2xf32> from vector<1x1x1x1x1x2xf32>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x2x1xf32> from vector<1x1x1x1x2x1xf32>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x2xf32> to vector<2xf32>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x2x1xf32> to vector<2xf32>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x4xf32> -> vector<1x1x1x1x1x2xf32>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<4x16xf32> -> vector<1x1x1x1x2x1xf32>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x2xf32> to vector<2xf32>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x2x1xf32> to vector<2xf32>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x8x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x4 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<2xf32>, vector<2xf32>, vector<8xf32>
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
-//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -829,19 +809,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x32_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x32xf16>, %[[B:.+]]: vector<32x16xf16>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x32xf16> -> vector<1x1x1x1x1x16xf16>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<32x16xf16> -> vector<1x1x1x1x16x1xf16>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x16x1xf16> from vector<1x1x1x1x16x1xf16>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x16x1xf16> to vector<16xf16>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x32xf16> -> vector<1x1x1x1x1x16xf16>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<32x16xf16> -> vector<1x1x1x1x16x1xf16>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x16xf16> to vector<16xf16>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x16x1xf16> to vector<16xf16>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x8x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x32 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<16xf16>, vector<16xf16>, vector<8xf32>
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
-//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -914,19 +890,15 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x64_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x64xf8E4M3FN>, %[[B:.+]]: vector<64x16xf8E4M3FN>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x64xf8E4M3FN> -> vector<1x1x1x1x1x32xf8E4M3FN>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<64x16xf8E4M3FN> -> vector<1x1x1x1x32x1xf8E4M3FN>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x32xf8E4M3FN> from vector<1x1x1x1x1x32xf8E4M3FN>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x32x1xf8E4M3FN> from vector<1x1x1x1x32x1xf8E4M3FN>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x32xf8E4M3FN> to vector<32xf8E4M3FN>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x32x1xf8E4M3FN> to vector<32xf8E4M3FN>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x64xf8E4M3FN> -> vector<1x1x1x1x1x32xf8E4M3FN>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<64x16xf8E4M3FN> -> vector<1x1x1x1x32x1xf8E4M3FN>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x32xf8E4M3FN> to vector<32xf8E4M3FN>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x32x1xf8E4M3FN> to vector<32xf8E4M3FN>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x8x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x64 %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]] : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<8xf32>
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x8x1xf32>
-//       CHECK:   %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<1x1x8x1xf32> to vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<1x1x1x1x8x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x8x1xf32> -> vector<16x16xf32>
 //       CHECK:   return %[[R_SIMD]]
 
 // -----
@@ -999,15 +971,12 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func.func @contract_to_gfx1250_WMMA_16x16x128_mm
 //  CHECK-SAME: (%[[A:.+]]: vector<16x128xf8E4M3FN>, %[[B:.+]]: vector<128x16xf8E4M3FN>, %[[C:.+]]: vector<16x16xf32>)
-//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x128xf8E4M3FN> -> vector<1x1x1x1x1x64xf8E4M3FN>
-//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<128x16xf8E4M3FN> -> vector<1x1x1x1x64x1xf8E4M3FN>
-//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<1x1x8x1xf32> from vector<1x1x1x1x8x1xf32>
-//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x64xf8E4M3FN> from vector<1x1x1x1x1x64xf8E4M3FN>
-//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x64x1xf8E4M3FN> from vector<1x1x1x1x64x1xf8E4M3FN>
-//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x64xf8E4M3FN> to vector<64xf8E4M3FN>
-//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x64x1xf8E4M3FN> to vector<64xf8E4M3FN>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<1x1x8x1xf32> to vector<8xf32>
+//   CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x1x1x8x1xf32>
+//   CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x128xf8E4M3FN> -> vector<1x1x1x1x1x64xf8E4M3FN>
+//   CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<128x16xf8E4M3FN> -> vector<1x1x1x1x64x1xf8E4M3FN>
+//   CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x64xf8E4M3FN> to vector<64xf8E4M3FN>
+//   CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x64x1xf8E4M3FN> to vector<64xf8E4M3FN>
+//   CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x8x1xf32> to vector<8xf32>
 //       CHECK:   %[[WMMA:.+]] = amdgpu.wmma 16x16x128 %[[A_CAST]] * %[[B_CAST]]
 
 // -----
@@ -1085,9 +1054,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // 3. Result of first mma becomes the second mma's accumulator.
 
 // CHECK-LABEL: func @contract_to_vmfma_32x32x16_mm
-// CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x1x8xf16> to vector<8xf16>
-// CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x8x1xf16> to vector<8xf16>
-// CHECK:       %[[C_CAST:.+]] = vector.shape_cast %{{.+}} : vector<4x1x4x1xf32> to vector<16xf32>
+// CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x1x1x1x8xf16> to vector<8xf16>
+// CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x1x1x8x1xf16> to vector<8xf16>
+// CHECK:       %[[C_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x4x1x4x1xf32> to vector<16xf32>
 // CHECK:       %[[A_SLICE_0:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[B_SLICE_0:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[MFMA_0:.*]] = amdgpu.mfma 32x32x8 %[[A_SLICE_0]] * %[[B_SLICE_0]] + %[[C_CAST]] blgp =  none
@@ -1096,9 +1065,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[B_SLICE_1:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[MFMA_1:.+]] = amdgpu.mfma 32x32x8 %[[A_SLICE_1]] * %[[B_SLICE_1]] + %[[MFMA_0]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
-// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA_1]] : vector<16xf32> to vector<4x1x4x1xf32>
-// CHECK:       %[[B_OUT:.*]] = vector.broadcast %[[R_CAST]] : vector<4x1x4x1xf32> to vector<1x1x4x1x4x1xf32>
-// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
+// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[MFMA_1]] : vector<16xf32> to vector<1x1x4x1x4x1xf32>
+// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x4x1x4x1xf32> -> vector<32x32xf32>
 // CHECK:       return %[[R_SIMD]]
 
 // -----

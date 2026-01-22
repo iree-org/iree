@@ -7,7 +7,8 @@
 // CHECK: scf.for
 // CHECK:   vector.transfer_read {{.+}} : tensor<f32>, vector<f32>
 // CHECK:   arith.mulf {{.+}} : vector<f32>
-// CHECK:   vector.broadcast {{.+}} : vector<f32> to vector<1xf32>
+// CHECK:   %[[VEC:.+]] = vector.extract {{.+}}[] : f32 from vector<f32>
+// CHECK:   vector.insert %[[VEC]], {{.+}} [0] : f32 into vector<1xf32>
 // CHECK:   vector.transfer_write {{.+}} : vector<1xf32>, tensor<32xf32>
 
 func.func @main(%0: tensor<32xf32>, %1: tensor<f32>) -> tensor<32xf32> {

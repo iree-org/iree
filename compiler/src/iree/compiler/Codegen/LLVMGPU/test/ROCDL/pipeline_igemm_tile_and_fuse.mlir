@@ -72,14 +72,13 @@ hal.executable private @main {
 //      CHECK-DAG:       vector.transfer_write %[[RHS_RD]]
 //          CHECK:       gpu.barrier
 //      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x1x1x2x4xf16>
-//      CHECK-DAG:       %[[LHS_MM1:.+]] = vector.broadcast {{.*}} vector<4x1x1x2x4xf16> to vector<1x4x1x1x2x4xf16>
+//      CHECK-DAG:       %[[LHS_MM1:.+]] = vector.shape_cast {{.*}} vector<4x1x1x2x4xf16> to vector<1x4x1x2x1x4xf16>
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<2x4x4x1xf16>
-//      CHECK-DAG:       vector.transpose %[[LHS_MM1]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x1x2x4xf16> to vector<1x4x1x2x1x4xf16>
 //      CHECK-DAG:       vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
 // CHECK-COUNT-32:       amdgpu.mfma 16x16x16
 //          CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
-//          CHECK:     %[[EXTRACT:.+]] = vector.extract %[[LOOP_T]][0] : vector<4x1x4x4x1xf32> from vector<1x4x1x4x4x1xf32>
-//          CHECK:     vector.transfer_write %[[EXTRACT]], %[[BUF2]]
+//          CHECK:     %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x1x4x4x1xf32> to vector<4x1x4x4x1xf32>
+//          CHECK:     vector.transfer_write %[[CAST]], %[[BUF2]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // TODO(Max191): Add tests for more convolution types
