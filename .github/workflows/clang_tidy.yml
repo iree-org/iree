@@ -1,0 +1,75 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Clang Tidy
+
+on:
+  pull_request:
+    paths:
+      - '**.h'
+      - '**.c'
+      - '**.cpp'
+      - '.clang-tidy'
+      - '.github/workflows/clang_tidy.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Initialize submodules
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init --depth=1
+
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+
+      - name: Generate compilation database (compile_commands.json)
+        run: |
+          IREE_CONFIGURE_ONLY=1 ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+
+      - name: Run clang-tidy
+        uses: cpp-linter/cpp-linter-action@b6edc0625e3941baa1797f4b4326adeab6890c97 # v1.11.4
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: '21'
+          style: ''  # Disable clang-format (already handled by pre-commit).
+          tidy-checks: ''  # Use .clang-tidy config files.
+          database: ${{ env.BUILD_DIR }}
+          files-changed-only: true
+          lines-changed-only: diff
+          ignore: 'third_party'
+          thread-comments: false
+          step-summary: true
+          # TODO(kuhar): Use a custom clang-tidy binary based on the latest integrate.
+
+      # Non-blocking: always succeed regardless of clang-tidy findings.
+      - name: Report findings count
+        run: |
+          echo "clang-tidy reported ${{ steps.linter.outputs.clang-tidy-checks-failed }} issue(s)"
