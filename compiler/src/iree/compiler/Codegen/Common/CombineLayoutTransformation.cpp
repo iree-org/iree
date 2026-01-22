@@ -33,12 +33,8 @@ using IREE::LinalgExt::MapScatterOp;
 // Preprocessing Utilities
 //===----------------------------------------------------------------------===//
 
-/// Convert complex ops into simpler ops by decomposing or raising to a named
-/// op.
-///  - `PackOp`s and `UnPackOp`s are decomposed.
-///  - Transpose `linalg::GenericOp`s are raised to `linalg::TransposeOp`s.
-static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
-                                       FunctionOpInterface funcOp) {
+void simplifyComplexRelayoutOps(RewriterBase &rewriter,
+                                FunctionOpInterface funcOp) {
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<linalg::PackOp> packOps(
       funcOp.getFunctionBody().getOps<linalg::PackOp>());
