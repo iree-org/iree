@@ -65,6 +65,10 @@ def ROCDLLoadToTransposeLoadPass :
     attributes) and converts them to amdgpu.transpose_load operations when
     the access pattern matches the requirements for transpose load instructions.
 
+    This pass relies on shape information from memrefs to verify and perform the
+    transformation, so this pass should be run before any memref flattening,
+    and before fully unrolling non-contiguous vector loads into scalar loads.
+
     This pass is ROCDL-specific as transpose_load is an AMD GPU feature
     (available on CDNA architectures like gfx950+).
   }];
