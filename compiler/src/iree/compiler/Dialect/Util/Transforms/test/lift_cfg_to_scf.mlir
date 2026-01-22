@@ -880,3 +880,11 @@ util.func public @multi_entry_loop(%cond: i1) {
 // CHECK: }
 // CHECK: util.call @process(%{{.*}}#1)
 // CHECK: util.return
+
+// -----
+
+// Test that the pass doesn't break on empty (i.e., no region) functions as
+// previously reported in https://github.com/iree-org/iree/issues/22971.
+
+// CHECK-LABEL: flow.func private @empty_function
+flow.func private @empty_function()
