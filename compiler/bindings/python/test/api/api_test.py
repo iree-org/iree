@@ -82,6 +82,23 @@ else:
             self.assertIn("--iree-global-optimization-opt-level=O0", flags)
             self.assertIn("--iree-opt-strip-assertions=false", flags)
 
+        def testCodegenOptLevelCascade(self):
+            # Set global opt level to O2, check cascade to codegen opt levels.
+            session = Session()
+            session.set_flags("--iree-opt-level=O2")
+            flags = session.get_flags()
+            self.assertIn("--iree-codegen-opt-level=O2", flags)
+            self.assertIn("--iree-llvmcpu-opt-level=O2", flags)
+
+        def testCodegenOptLevelOverride(self):
+            # Override just the CPU opt level, verify it doesn't affect others.
+            session = Session()
+            session.set_flags("--iree-opt-level=O2")
+            session.set_flags("--iree-llvmcpu-opt-level=O0")
+            flags = session.get_flags()
+            self.assertIn("--iree-codegen-opt-level=O2", flags)
+            self.assertIn("--iree-llvmcpu-opt-level=O0", flags)
+
     class DlInvocationTest(unittest.TestCase):
         def testCreate(self):
             session = Session()

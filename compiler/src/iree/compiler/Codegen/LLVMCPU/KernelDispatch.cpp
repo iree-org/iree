@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -67,11 +68,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::desc("number of threads that are used at runtime if codegen "
                    "thread distribution is enabled"),
     llvm::cl::init(8));
-
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution",
-    llvm::cl::desc("disable thread distribution in codegen"),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<int>
     clDefaultDistTileSize("iree-llvmcpu-distribution-size",
@@ -532,7 +528,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
   size_t numDims = lbs.size();
   // Set all the distribution tile sizes to zero if thread distribution is
   // disabled.
-  if (clDisableDistribution) {
+  if (CPUCodegenOptions::FromFlags::get().disableDistribution) {
     return SmallVector<int64_t>(numDims, 0);
   }
 

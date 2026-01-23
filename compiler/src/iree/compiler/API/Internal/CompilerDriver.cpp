@@ -41,6 +41,7 @@
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -296,6 +297,12 @@ void GlobalInit::registerCommandLineOptions() {
   clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
   clParameterOptions = &ParameterOptions::FromFlags::get();
   clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
+
+  // Codegen options (inherit from global opt level).
+  // Note: Registration order matters for inheritance.
+  (void)CodegenOptions::FromFlags::get();
+  (void)CPUCodegenOptions::FromFlags::get();
+
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();

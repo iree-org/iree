@@ -100,3 +100,17 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorDialect",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "CodegenOptions",
+    srcs = [
+        "CodegenOptions.cpp",
+    ],
+    hdrs = [
+        "CodegenOptions.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+    ],
+)

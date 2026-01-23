@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -95,6 +96,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
   LLVMCPUPipelineOptions pipelineOpts;
+  pipelineOpts.cpuOpts = CPUCodegenOptions::FromFlags::get();
   if (isX86(targetConfig) || isRISCV(targetConfig)) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
@@ -110,11 +112,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.enableAArch64I8mm =
       isAArch64(targetConfig) && hasI8mmFeature(targetConfig);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
-  if (loweringConfig &&
-      llvm::all_of(loweringConfig.getWorkgroupTileSizes(),
-                   [](int64_t tileSize) { return tileSize == 0; })) {
-    pipelineOpts.disableDistribution = true;
-  }
 
   OpPassManager passManager(func::FuncOp::getOperationName());
   switch (pipeline) {

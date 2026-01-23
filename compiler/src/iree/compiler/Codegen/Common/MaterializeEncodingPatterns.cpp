@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -359,8 +360,9 @@ struct DecomposeMismatchEncodingTensorLoadOp
           loadOp, "the source type and the result type match after conversion");
     }
 
-    LDBG() << "Performance warning: decomposing mismatched encoding load op: "
-           << loadOp;
+    if (CodegenOptions::FromFlags::get().emitPerformanceWarnings) {
+      loadOp.emitWarning("decomposing mismatched encoding load op");
+    }
     Location loc = loadOp.getLoc();
     Value result = IREE::TensorExt::DispatchTensorLoadOp::create(
         rewriter, loc, boundTensorType, loadOp.getSource(),
@@ -425,8 +427,9 @@ struct DecomposeMismatchEncodingTensorStoreOp
           storeOp, "the value type and the target type match");
     }
 
-    LDBG() << "Performance warning: decomposing mismatched encoding store op: "
-           << storeOp;
+    if (CodegenOptions::FromFlags::get().emitPerformanceWarnings) {
+      storeOp.emitWarning("decomposing mismatched encoding store op");
+    }
     Location loc = storeOp.getLoc();
     Value valueToStore = storeOp.getValue();
     SmallVector<Value> dynamicDims = llvm::to_vector(storeOp.getSizes());
