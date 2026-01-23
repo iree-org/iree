@@ -1,0 +1,99 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Builds clang-tidy from the bundled llvm-project and uploads it as an artifact.
+# This workflow runs when the llvm-project submodule is updated on main.
+
+name: Build clang-tidy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'third_party/llvm-project'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Only run on iree-org/iree repository.
+jobs:
+  build_clang_tidy:
+    if: github.repository == 'iree-org/iree'
+    runs-on: azure-linux-scale
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "build_clang_tidy"
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+
+      - name: "Setting up CMake"
+        run: |
+          source ./build_tools/cmake/setup_build.sh
+          source ./build_tools/cmake/setup_sccache.sh
+
+          CMAKE_ARGS=(
+            "-G" "Ninja"
+            "-B" "${BUILD_DIR}"
+            "-DCMAKE_BUILD_TYPE=Release"
+
+            # Use lld for faster linking.
+            "-DIREE_ENABLE_LLD=ON"
+
+            # Enable split dwarf and thin archives for faster linking.
+            "-DIREE_ENABLE_SPLIT_DWARF=ON"
+            "-DIREE_ENABLE_THIN_ARCHIVES=ON"
+
+            # Enable clang-tools-extra to build clang-tidy.
+            "-DIREE_BUILD_CLANG_TOOLS_EXTRA=ON"
+
+            # Enable the llvm-cpu backend which sets up clang.
+            "-DIREE_TARGET_BACKEND_LLVM_CPU=ON"
+
+            # Disable backends and features we don't need.
+            "-DIREE_TARGET_BACKEND_CUDA=OFF"
+            "-DIREE_TARGET_BACKEND_ROCM=OFF"
+            "-DIREE_TARGET_BACKEND_METAL_SPIRV=OFF"
+            "-DIREE_TARGET_BACKEND_VULKAN_SPIRV=OFF"
+            "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=OFF"
+            "-DIREE_BUILD_TESTS=OFF"
+            "-DIREE_BUILD_SAMPLES=OFF"
+          )
+
+          "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
+
+      - name: "Building clang-tidy"
+        run: cmake --build "${BUILD_DIR}" --target clang-tidy -- -k 0
+
+      - name: "Prepare artifact"
+        run: |
+          mkdir -p artifact
+          cp "${BUILD_DIR}/llvm-project/bin/clang-tidy" artifact/clang-tidy
+          # Include version information.
+          cd third_party/llvm-project && git rev-parse HEAD > ../../artifact/llvm-project-revision.txt
+
+      - name: "Upload clang-tidy artifact"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: iree-clang-tidy-linux-x86_64
+          path: artifact/
+          retention-days: 90
+
+      - name: "Show sccache stats"
+        if: always()
+        run: sccache --show-stats
