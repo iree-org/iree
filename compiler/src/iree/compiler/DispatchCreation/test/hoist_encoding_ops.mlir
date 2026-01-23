@@ -763,3 +763,43 @@ module {
 // CHECK:       flow.dispatch.region
 // CHECK:         linalg.generic {{.*}} ins(%[[LHS_ENC]], %[[RHS_ENC]]
 // CHECK:         flow.return
+
+// -----
+
+// Test that sinking UnsetEncodingOp preserves encoding_dims through the propagation.
+
+#map_sink = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_sink1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map_sink2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map_sink3 = affine_map<(d0, d1) -> (d0, d1)>
+#map_sink4 = affine_map<(d0, d1) -> ()>
+#encoding_sink = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], user_indexing_maps = [#map_sink, #map_sink1, #map_sink2], iteration_sizes = [?, 4096, 4096]>
+util.func public @sink_unset_encoding_with_encoding_dims(%arg0: tensor<?x4096xf32, #encoding_sink>, %arg1: tensor<f32>, %m: index) -> tensor<?x4096xbf16> {
+  %0 = flow.dispatch.region -> (tensor<?x4096xbf16>{%m}) {
+    %1 = iree_encoding.unset_encoding %arg0 encoding_dims{%m} : tensor<?x4096xf32, #encoding_sink> -> tensor<?x4096xf32>{%m}
+    %2 = tensor.empty(%m) : tensor<?x4096xbf16>
+    %3 = linalg.generic {indexing_maps = [#map_sink3, #map_sink4, #map_sink3], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<?x4096xf32>, tensor<f32>) outs(%2 : tensor<?x4096xbf16>) {
+    ^bb0(%in: f32, %in_0: f32, %out: bf16):
+      %4 = arith.mulf %in, %in_0 : f32
+      %5 = arith.truncf %4 : f32 to bf16
+      linalg.yield %5 : bf16
+    } -> tensor<?x4096xbf16>
+    flow.return %3 : tensor<?x4096xbf16>
+  }
+  util.return %0 : tensor<?x4096xbf16>
+}
+// CHECK-DAG:   #[[$ENCODING_SINK:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], {{.*}}iteration_sizes = [?, 4096, 4096]>
+// CHECK-DAG:   #[[$ENCODING_SINK1:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f16, f16, f32], {{.*}}iteration_sizes = [?, 4096, 4096]>
+// CHECK-LABEL: @sink_unset_encoding_with_encoding_dims
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<?x4096xf32, #[[$ENCODING_SINK]]>, %[[ARG1:.+]]: tensor<f32>, %[[M:.+]]: index
+// CHECK:         flow.dispatch.region -> (tensor<?x4096xbf16>{%[[M]]}) {
+// The set_encoding for the scalar should also have encoding_dims preserved
+// CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ARG1]] encoding_dims{%[[M]]} : tensor<f32> -> tensor<f32, #[[$ENCODING_SINK1]]>
+// CHECK:           %[[EMPTY:.+]] = tensor.empty(%[[M]]) : tensor<?x4096xbf16, #[[$ENCODING_SINK]]>
+// CHECK:           %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[ARG0]], %[[SET_ENCODING]] : tensor<?x4096xf32, #[[$ENCODING_SINK]]>, tensor<f32, #[[$ENCODING_SINK1]]>)
+// CHECK-SAME:        outs(%[[EMPTY]] : tensor<?x4096xbf16, #[[$ENCODING_SINK]]>)
+// The final unset_encoding should preserve the encoding_dims
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] encoding_dims{%[[M]]} : tensor<?x4096xbf16, #[[$ENCODING_SINK]]> -> tensor<?x4096xbf16>
+// CHECK:           flow.return %[[UNSET_ENCODING]] : tensor<?x4096xbf16>
+// CHECK:         }
