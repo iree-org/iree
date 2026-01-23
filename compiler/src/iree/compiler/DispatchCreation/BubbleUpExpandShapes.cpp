@@ -17,9 +17,12 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -377,6 +380,197 @@ struct BubbleExpandThroughConcat final
   }
 };
 
+/// Bubble expand_shape through bitcast: expand_shape(bitcast(x)) ->
+/// bitcast(expand_shape(x)).
+struct BubbleExpandThroughBitCast final
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    auto bitcastOp =
+        expandOp.getSrc().getDefiningOp<IREE::TensorExt::BitCastOp>();
+    if (!bitcastOp || !bitcastOp->hasOneUse()) {
+      return failure();
+    }
+
+    // All dims except last must match (last dim can differ due to element
+    // type size change). This check also filters out rank mismatches.
+    RankedTensorType bitcastSrcType = bitcastOp.getSource().getType();
+    RankedTensorType bitcastDstType = bitcastOp.getResult().getType();
+    if (!compareMixedShapesEqualExceptLast(
+            bitcastSrcType, bitcastOp.getSourceDims(), bitcastDstType,
+            bitcastOp.getResultDims())) {
+      return failure();
+    }
+
+    // For rank > 1, the new expand output shape's last dim is derived from the
+    // bitcast source's last dim (scaled by bitwidth ratio). We don't support
+    // dynamic last dim yet since we'd need affine expressions to scale it.
+    // For rank 1, the bitwidth ratio is 1:1, so it doesn't matter.
+    if (bitcastSrcType.getRank() > 1 &&
+        ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
+      return failure();
+    }
+
+    // When src_bits < dst_bits (e.g., f4 -> i32), the bitcast shrinks the last
+    // dim by the bitwidth ratio (4 / 32). Assume before sinking, the last dim
+    // size at bitcast source is 16, then through bitcast, the last dim size at
+    // result is 16 * 4 / 32 = 2. Now if expand then splits that last dim into
+    // multiple output dims (16 -> 8x2), we may need to scale multiple split
+    // dims when sinking. For simplicity, we reject this case for now, by
+    // checking that the last group of reassociation indices has only one
+    // dimension.
+    if (bitcastSrcType.getElementTypeBitWidth() <
+        bitcastDstType.getElementTypeBitWidth()) {
+      SmallVector<ReassociationIndices> reassoc =
+          expandOp.getReassociationIndices();
+      if (reassoc.empty()) {
+        return failure();
+      }
+      const ReassociationIndices &lastGroup = reassoc.back();
+      if (lastGroup.size() != 1) {
+        return failure();
+      }
+    }
+
+    // Compute the new expand output shape. Same as original but with the last
+    // dim scaled according to the bitcast source and destination element type
+    // bitwidths.
+    RankedTensorType expandResultType = expandOp.getResultType();
+    SmallVector<int64_t> newOutputShape(expandResultType.getShape());
+    newOutputShape.back() =
+        (newOutputShape.back() * bitcastDstType.getElementTypeBitWidth()) /
+        bitcastSrcType.getElementTypeBitWidth();
+
+    SmallVector<OpFoldResult> oldMixedOutputShape =
+        expandOp.getMixedOutputShape();
+    SmallVector<OpFoldResult> newMixedOutputShape(oldMixedOutputShape);
+    newMixedOutputShape.back() = rewriter.getIndexAttr(newOutputShape.back());
+
+    // Create the new expand_shape with the original bitcast source, but with
+    // the new output shape.
+    auto newExpandResultType =
+        RankedTensorType::get(newOutputShape, bitcastSrcType.getElementType());
+    auto newExpandOp = tensor::ExpandShapeOp::create(
+        rewriter, expandOp.getLoc(), newExpandResultType, bitcastOp.getSource(),
+        expandOp.getReassociationIndices(), newMixedOutputShape);
+
+    // Build the dynamic dims for the new bitcast.
+    int64_t expandResultRank = expandResultType.getRank();
+    SmallVector<Value> newDynSrcDims;
+    for (int64_t i = 0; i < expandResultRank; ++i) {
+      if (ShapedType::isStatic(newOutputShape[i])) {
+        continue;
+      }
+      Value dimVal = getValueOrCreateConstantIndexOp(
+          rewriter, bitcastOp.getLoc(), newMixedOutputShape[i]);
+      newDynSrcDims.push_back(dimVal);
+    }
+
+    SmallVector<Value> newDynDstDims;
+    for (int64_t i = 0; i < expandResultRank; ++i) {
+      if (!expandResultType.isDynamicDim(i)) {
+        continue;
+      }
+      Value dimVal = getValueOrCreateConstantIndexOp(
+          rewriter, bitcastOp.getLoc(), oldMixedOutputShape[i]);
+      newDynDstDims.push_back(dimVal);
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::TensorExt::BitCastOp>(
+        expandOp, expandResultType, newExpandOp, newDynSrcDims, newDynDstDims);
+    return success();
+  }
+};
+
+/// Sink collapse_shape through bitcast: bitcast(collapse_shape(x)) ->
+/// collapse_shape(bitcast(x)).
+struct SinkCollapseThroughBitCast final
+    : public OpRewritePattern<IREE::TensorExt::BitCastOp> {
+  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const override {
+    auto collapseOp =
+        bitcastOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+    if (!collapseOp || !collapseOp->hasOneUse()) {
+      return failure();
+    }
+
+    RankedTensorType collapseSrcType = collapseOp.getSrcType();
+    RankedTensorType collapseDstType = collapseOp.getResultType();
+    RankedTensorType bitcastDstType = bitcastOp.getResult().getType();
+
+    // All dims except last must match for bitcast (last dim can differ due to
+    // element type size change). This check also filters out rank mismatches.
+    if (!compareMixedShapesEqualExceptLast(
+            collapseDstType, bitcastOp.getSourceDims(), bitcastDstType,
+            bitcastOp.getResultDims())) {
+      return failure();
+    }
+
+    // We don't support dynamic last dim yet since we'd need affine expressions
+    // to scale it.
+    if (ShapedType::isDynamic(collapseSrcType.getShape().back())) {
+      return failure();
+    }
+
+    // Check that all dynamic dimensions are in their own reassociation groups,
+    // so we don't need to deal with the case where it is merged with other
+    // dimensions.
+    SmallVector<ReassociationIndices> reassoc =
+        collapseOp.getReassociationIndices();
+    for (const auto &group : reassoc) {
+      for (int64_t dim : group) {
+        if (collapseSrcType.isDynamicDim(dim) && group.size() != 1) {
+          return failure();
+        }
+      }
+    }
+
+    // Compute the new bitcast result shape (same rank as collapse source).
+    // The last dim of the new bitcast result should be scaled by the bitcast
+    // source and destination element type bitwidths.
+    SmallVector<int64_t> newBitcastResultShape(collapseSrcType.getShape());
+    newBitcastResultShape.back() = (newBitcastResultShape.back() *
+                                    collapseDstType.getElementTypeBitWidth()) /
+                                   bitcastDstType.getElementTypeBitWidth();
+
+    // Create the new bitcast operating on the collapse_shape source.
+    auto newBitcastResultType = RankedTensorType::get(
+        newBitcastResultShape, bitcastDstType.getElementType());
+
+    // Build dynamic dims for the new bitcast. For dims that are in their own
+    // reassociation group, we can reuse the corresponding source dims.
+    SmallVector<Value> newBitcastSrcDims;
+    SmallVector<Value> newBitcastDstDims;
+    for (int64_t i = 0; i < collapseSrcType.getRank(); ++i) {
+      if (collapseSrcType.isDynamicDim(i)) {
+        Value dimVal = tensor::DimOp::create(rewriter, collapseOp.getLoc(),
+                                             collapseOp.getSrc(), i);
+        newBitcastSrcDims.push_back(dimVal);
+      }
+      if (ShapedType::isDynamic(newBitcastResultShape[i])) {
+        Value dimVal = tensor::DimOp::create(rewriter, collapseOp.getLoc(),
+                                             collapseOp.getSrc(), i);
+        newBitcastDstDims.push_back(dimVal);
+      }
+    }
+
+    auto newBitcastOp = IREE::TensorExt::BitCastOp::create(
+        rewriter, bitcastOp.getLoc(), newBitcastResultType, collapseOp.getSrc(),
+        newBitcastSrcDims, newBitcastDstDims);
+
+    SmallVector<int64_t> newCollapseResultShape(bitcastDstType.getShape());
+    auto newCollapseResultType = RankedTensorType::get(
+        newCollapseResultShape, bitcastDstType.getElementType());
+    rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+        bitcastOp, newCollapseResultType, newBitcastOp, reassoc);
+    return success();
+  }
+};
+
 static bool
 isExpandingUnitDims(ArrayRef<ReassociationIndices> reassociationIndices,
                     ArrayRef<int64_t> expandedShape) {
@@ -507,6 +701,9 @@ void BubbleUpExpandShapesPass::runOnOperation() {
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughExtract>(context);
   bubbleExpandShapePatterns.insert<BubbleExpandThroughConcat>(context);
+  // Bitcast patterns: bubble expand up and sink collapse down through bitcast.
+  bubbleExpandShapePatterns.insert<BubbleExpandThroughBitCast>(context);
+  bubbleExpandShapePatterns.insert<SinkCollapseThroughBitCast>(context);
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(

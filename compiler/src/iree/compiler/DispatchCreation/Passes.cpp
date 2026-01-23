@@ -286,15 +286,6 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
   }
   FunctionLikeNest(passManager)
-      // Sink bitcast operations through reshapes to enable better fusion
-      // of encoding ops into dispatch regions.
-      .addPass(DispatchCreation::createSinkBitCastPass)
-      // Canonicalize to fold chained bitcasts.
-      .addPass([&]() {
-        IREE::Flow::CanonicalizePassOptions options;
-        options.cseConstants = false;
-        return IREE::Flow::createCanonicalizePass(options);
-      })
       .addPass([&]() {
         FuseEncodingOpsIntoDispatchRegionsPassOptions passOptions;
         passOptions.enableAggressiveFusion =
