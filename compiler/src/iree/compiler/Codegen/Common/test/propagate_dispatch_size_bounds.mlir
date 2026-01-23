@@ -97,6 +97,9 @@ hal.executable private @manual_subgroup_size {
 // CHECK-NEXT: gpu.lane_id upper_bound 64
         %lane_id = gpu.lane_id
 
+// CHECK-NEXT: arith.constant 64 : index
+        %subgroup_size = gpu.subgroup_size : index
+
         return
       }
     }
