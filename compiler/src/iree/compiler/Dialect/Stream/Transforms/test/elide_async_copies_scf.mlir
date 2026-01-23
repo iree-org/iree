@@ -234,3 +234,210 @@ util.func public @scf_nested_for_inplace_caller(%size: index) -> !stream.resourc
   %result = util.call @scf_nested_for_inplace_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
   util.return %result : !stream.resource<*>
 }
+
+// -----
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%binding: !stream.binding) {
+      return
+    }
+  }
+}
+
+// Tests scf.if where clone is mutated inside branch, but source is used after.
+// Clone must be preserved to protect source for the post-if dispatch.
+
+// CHECK-LABEL: @scf_if_clone_mutated_source_used_after
+util.func public @scf_if_clone_mutated_source_used_after(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[IF_RESULT:.+]] = scf.if
+  %if_result = scf.if %cond -> !stream.resource<*> {
+    // Clone preserved because source is used after the scf.if.
+    // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+    %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+    // CHECK: stream.async.dispatch @ex::@dispatch(%[[CLONE]]{{.*}}) : ({{.*}}) -> %[[CLONE]]
+    %mutated = stream.async.dispatch @ex::@dispatch(%clone[%c0 to %size for %size])
+        : (!stream.resource<*>{%size}) -> %clone{%size}
+    scf.yield %mutated : !stream.resource<*>
+  } else {
+    // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+    %read = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+        : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+    scf.yield %read : !stream.resource<*>
+  }
+  // Post-if use of source - this is why the clone must be preserved.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[IF_RESULT]]
+  util.return %if_result, %after : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests scf.for where clone is mutated but source is used after the loop.
+// Clone must be preserved to protect source for the post-loop dispatch.
+
+// CHECK-LABEL: @scf_for_clone_mutated_source_used_after
+util.func public @scf_for_clone_mutated_source_used_after(%size: index, %count: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone preserved because source is used after the loop.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[FOR:.+]] = scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[CLONE]])
+  %loop_result = scf.for %i = %c0 to %count step %c1 iter_args(%iter = %clone) -> !stream.resource<*> {
+    // CHECK: stream.async.fill {{.*}}, %[[ITER]]
+    %fill = stream.async.fill %c123_i32, %iter[%c0 to %size for %size] : i32 -> %iter as !stream.resource<*>{%size}
+    scf.yield %fill : !stream.resource<*>
+  }
+  // Post-loop use of source - this is why the clone must be preserved.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[FOR]]
+  util.return %loop_result, %after : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests scf.if where both branches mutate clones, and source is used after.
+// Both clones must be preserved to protect source for the post-if dispatch.
+
+// CHECK-LABEL: @scf_if_both_branches_mutate_source_used_after
+util.func public @scf_if_both_branches_mutate_source_used_after(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[IF_RESULT:.+]] = scf.if
+  %if_result = scf.if %cond -> !stream.resource<*> {
+    // CHECK: %[[CLONE1:.+]] = stream.async.clone %[[SOURCE]]
+    %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+    // CHECK: stream.async.fill %c123_i32, %[[CLONE1]]
+    %fill = stream.async.fill %c123_i32, %clone[%c0 to %size for %size] : i32 -> %clone as !stream.resource<*>{%size}
+    scf.yield %fill : !stream.resource<*>
+  } else {
+    // CHECK: %[[CLONE2:.+]] = stream.async.clone %[[SOURCE]]
+    %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+    // CHECK: stream.async.fill %c456_i32, %[[CLONE2]]
+    %fill = stream.async.fill %c456_i32, %clone[%c0 to %size for %size] : i32 -> %clone as !stream.resource<*>{%size}
+    scf.yield %fill : !stream.resource<*>
+  }
+  // Post-if use of source - this is why both clones must be preserved.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[IF_RESULT]]
+  util.return %if_result, %after : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests scf.while where clone is mutated in the loop body, and source is used
+// after the while loop. Clone must be preserved.
+
+// CHECK-LABEL: @scf_while_clone_mutated_source_used_after
+util.func public @scf_while_clone_mutated_source_used_after(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone preserved because source is used after the while loop.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[WHILE:.+]] = scf.while
+  %result = scf.while (%arg = %clone) : (!stream.resource<*>) -> !stream.resource<*> {
+    scf.condition(%cond) %arg : !stream.resource<*>
+  } do {
+  ^bb0(%body_arg: !stream.resource<*>):
+    // Mutation in the loop body.
+    %fill = stream.async.fill %c123_i32, %body_arg[%c0 to %size for %size] : i32 -> %body_arg as !stream.resource<*>{%size}
+    scf.yield %fill : !stream.resource<*>
+  }
+  // Post-while use of source.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[WHILE]]
+  util.return %result, %after : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that a read-only clone in a loop is elided even when source is used
+// after the loop. Since neither source nor clone result is ever mutated, the
+// copy is unnecessary.
+
+// CHECK-LABEL: @scf_for_readonly_clone_elided
+util.func public @scf_for_readonly_clone_elided(%size: index, %count: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone is elided: neither source nor clone result is ever mutated.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[LOOP_RESULT:.+]] = scf.for {{.*}} iter_args({{.*}} = %[[SOURCE]])
+  %loop_result = scf.for %i = %c0 to %count step %c1 iter_args(%acc = %clone) -> !stream.resource<*> {
+    // Dispatch reads %acc but produces a new resource (no tied output to %acc).
+    %dispatched = stream.async.dispatch @ex::@dispatch(%acc[%c0 to %size for %size])
+        : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+    scf.yield %dispatched : !stream.resource<*>
+  }
+  // Consume loop_result with a non-tied dispatch so the clone's resource
+  // doesn't escape through the function return.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[LOOP_RESULT]]
+  %consumed = stream.async.dispatch @ex::@dispatch(%loop_result[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // Post-loop read of source.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %consumed, %after : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests nested scf.for inside scf.if where clone is mutated in the loop,
+// and source is used after the outer scf.if. Clone must be preserved.
+
+// CHECK-LABEL: @scf_nested_for_in_if_source_used_after
+util.func public @scf_nested_for_in_if_source_used_after(%cond: i1, %size: index, %count: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[IF_RESULT:.+]] = scf.if
+  %if_result = scf.if %cond -> !stream.resource<*> {
+    // Clone inside if is preserved because source is used after the scf.if.
+    // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+    %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+    // Mutating loop over the clone.
+    // CHECK: scf.for {{.*}} iter_args({{.*}} = %[[CLONE]])
+    %loop_result = scf.for %i = %c0 to %count step %c1 iter_args(%iter = %clone) -> !stream.resource<*> {
+      %fill = stream.async.fill %c123_i32, %iter[%c0 to %size for %size] : i32 -> %iter as !stream.resource<*>{%size}
+      scf.yield %fill : !stream.resource<*>
+    }
+    scf.yield %loop_result : !stream.resource<*>
+  } else {
+    scf.yield %source : !stream.resource<*>
+  }
+  // Post-if use of source.
+  // CHECK: stream.async.dispatch @ex::@dispatch(%[[SOURCE]]
+  %after = stream.async.dispatch @ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[IF_RESULT]]
+  util.return %if_result, %after : !stream.resource<*>, !stream.resource<*>
+}

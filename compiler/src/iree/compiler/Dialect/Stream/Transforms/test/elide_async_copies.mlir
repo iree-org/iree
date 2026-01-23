@@ -1325,6 +1325,48 @@ util.func private @updateNotElided_followedByTiedDispatch(
 
 // -----
 
+// Tests that multiple clones of an immutable source are all elided.
+// When neither source nor clone results are mutated, all clones can be elided
+// because sharing the underlying buffer has no observable effect.
+// Uses a splat (op result) as source since function args have by-ref semantics.
+// Note: After clone elision, CSE may fold identical dispatches.
+
+stream.executable private @dispatch_ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @multiCloneImmutableSource
+util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*>, !stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // Source is a splat (op result, not function arg).
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Multiple clones of same source, all used by read-only dispatches.
+  // All clones can be elided because neither source nor results are mutated.
+  // After elision, CSE folds the identical dispatches into one.
+  // CHECK-NOT: stream.async.clone
+  %clone0 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone0[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  %clone1 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d1 = stream.async.dispatch @dispatch_ex::@dispatch(%clone1[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  %clone2 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d2 = stream.async.dispatch @dispatch_ex::@dispatch(%clone2[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: util.return %[[DISPATCH]], %[[DISPATCH]], %[[DISPATCH]]
+  util.return %d0, %d1, %d2 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
 // Missed optimization: Copy writes to [0, 16) which fully contains the update
 // region [4, 8), so the update could theoretically be elided. However, we
 // currently only check for exact range matches, not supersets. This is
@@ -1362,4 +1404,327 @@ util.func private @updateNotElided_copyWritesSupersetRegion(
       : !stream.resource<*>{%c16} -> %updated as !stream.resource<*>{%size}
   // CHECK: util.return %[[COPY]]
   util.return %copy : !stream.resource<*>
+}
+
+// -----
+
+// Tests that multiple clones of an immutable source are all elided.
+// When neither source nor clone results are mutated, all clones can be elided
+// because sharing the underlying buffer has no observable effect.
+// Uses a splat (op result) as source since function args have by-ref semantics.
+// Note: After clone elision, CSE may fold identical dispatches.
+
+stream.executable private @dispatch_ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @multiCloneImmutableSource
+util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*>, !stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // Source is a splat (op result, not function arg).
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Multiple clones of same source, all used by read-only dispatches.
+  // All clones can be elided because neither source nor results are mutated.
+  // After elision, CSE folds the identical dispatches into one.
+  // CHECK-NOT: stream.async.clone
+  %clone0 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone0[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  %clone1 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d1 = stream.async.dispatch @dispatch_ex::@dispatch(%clone1[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  %clone2 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  %d2 = stream.async.dispatch @dispatch_ex::@dispatch(%clone2[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: util.return %[[DISPATCH]], %[[DISPATCH]], %[[DISPATCH]]
+  util.return %d0, %d1, %d2 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone is preserved when result is mutated AND clone is not the
+// last user of source. This ensures we don't incorrectly elide when mutation
+// could affect other users of the source.
+
+// CHECK-LABEL: @cloneMutatedNotLastUser
+util.func public @cloneMutatedNotLastUser(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone is NOT the last user because source is used by d1 after the clone.
+  // Clone result is mutated by tied dispatch, so clone MUST be preserved.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[D0:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[CLONE]]{{.*}}) : ({{.*}}) -> %[[CLONE]]
+  %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %clone{%size}
+  // Source used after clone - clone is not the last user.
+  // CHECK: %[[D1:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  %d1 = stream.async.dispatch @dispatch_ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[D0]], %[[D1]]
+  util.return %d0, %d1 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone is elided when result is mutated BUT clone IS the last user
+// of source. The last-user optimization safely elides the clone because
+// source's lifetime ends at the clone point anyway.
+
+// CHECK-LABEL: @cloneMutatedLastUser
+util.func public @cloneMutatedLastUser(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone IS the last (and only) user of source.
+  // Even though result is mutated, elision is safe because source is dead after.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[D:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]{{.*}}) : ({{.*}}) -> %[[SOURCE]]
+  %d = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return %[[D]]
+  util.return %d : !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone is preserved when the source is mutated by another operation.
+// Even if clone result is not mutated, the source mutation means aliasing would
+// expose the mutation to clone users.
+
+// CHECK-LABEL: @clonePreservedSourceMutatedElsewhere
+util.func public @clonePreservedSourceMutatedElsewhere(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone must be preserved because source is mutated after.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Source is mutated (fill writes to it in-place).
+  // CHECK: %[[MUTATED_SOURCE:.+]] = stream.async.fill {{.*}}, %[[SOURCE]]
+  %mutated_source = stream.async.fill %c123_i32, %source[%c0 to %size for %size] : i32 -> %0 as !stream.resource<*>{%size}
+  // Clone is only read (not mutated), but must be preserved because source changed.
+  // CHECK: %[[READ_CLONE:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[CLONE]]
+  %read_clone = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[MUTATED_SOURCE]], %[[READ_CLONE]]
+  util.return %mutated_source, %read_clone : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone is preserved when source is mutated via tied dispatch.
+// Similar to above but mutation is through dispatch tied operand.
+
+// CHECK-LABEL: @clonePreservedSourceMutatedViaTiedDispatch
+util.func public @clonePreservedSourceMutatedViaTiedDispatch(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone must be preserved.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Source is mutated via tied dispatch result.
+  // CHECK: %[[MUTATED:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]{{.*}}) : ({{.*}}) -> %[[SOURCE]]
+  %mutated = stream.async.dispatch @dispatch_ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %source{%size}
+  // Clone is read-only.
+  // CHECK: %[[READ:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[CLONE]]
+  %read = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[MUTATED]], %[[READ]]
+  util.return %mutated, %read : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone elision respects cross-function mutation.
+// If clone is passed to a callee that mutates it, elision must not happen
+// if source is used after the call.
+
+// Callee that mutates its argument via tied result.
+// CHECK-LABEL: util.func private @mutating_callee
+util.func private @mutating_callee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  %mutated = stream.async.fill %c123_i32, %arg[%c0 to %size for %size] : i32 -> %0 as !stream.resource<*>{%size}
+  util.return %mutated : !stream.resource<*>
+}
+
+// CHECK-LABEL: @clonePreservedCrossFunctionMutation
+util.func public @clonePreservedCrossFunctionMutation(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone must be preserved - callee mutates it.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Call mutates the clone.
+  // CHECK: %[[CALL_RESULT:.+]] = util.call @mutating_callee(%[[CLONE]]
+  %call_result = util.call @mutating_callee(%clone, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  // Source used after - would see mutation if clone was elided.
+  // CHECK: %[[READ:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  %read = stream.async.dispatch @dispatch_ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[CALL_RESULT]], %[[READ]]
+  util.return %call_result, %read : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that clone CAN be elided when callee only reads (no mutation).
+
+// Callee that only reads its argument.
+// CHECK-LABEL: util.func private @reading_callee
+util.func private @reading_callee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // No tied result - just reads and produces new output.
+  %result = stream.async.dispatch @dispatch_ex::@dispatch(%arg[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @cloneElidedCrossFunctionReadOnly
+util.func public @cloneElidedCrossFunctionReadOnly(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Clone can be elided - callee only reads.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: %[[CALL_RESULT:.+]] = util.call @reading_callee(%[[SOURCE]]
+  %call_result = util.call @reading_callee(%clone, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  // Source used after - safe because callee only read.
+  // CHECK: %[[READ:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  %read = stream.async.dispatch @dispatch_ex::@dispatch(%source[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[CALL_RESULT]], %[[READ]]
+  util.return %call_result, %read : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// TODO(benvanik): Tests slice aliasing. The clone of source is elided because
+// source appears unmutated (slice mutations are tracked separately). This is
+// safe because slices have CoW semantics and become independent allocations,
+// but tracking slice aliasing could enable better elision decisions.
+
+// CHECK-LABEL: @clonePreservedAfterSliceMutation
+util.func public @clonePreservedAfterSliceMutation(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c50 = arith.constant 50 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SOURCE:.+]] = stream.async.splat
+  %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK: %[[SLICE:.+]] = stream.async.slice %[[SOURCE]]
+  %slice = stream.async.slice %source[%c0 to %c50] : !stream.resource<*>{%size} -> !stream.resource<*>{%c50}
+  // Clone elided; slice has CoW semantics so this is safe.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.async.fill {{.*}}, %[[SLICE]]
+  %mutated_slice = stream.async.fill %c123_i32, %slice[%c0 to %c50 for %c50] : i32 -> %0 as !stream.resource<*>{%c50}
+  // Dispatch uses source directly; slice becomes independent allocation.
+  // CHECK: stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  %read = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %mutated_slice, %read : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that a cross-lifetime clone (external → *) is preserved by the first
+// ElideAsyncCopies pass even when neither side is mutated. Cross-lifetime
+// elision is handled by ResourceUsageAnalysis propagating source usage through
+// the clone, RefineUsage unifying the types, and the second ElideAsyncCopies
+// pass eliding the now-same-type clone.
+
+stream.executable private @dispatch_ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @crossLifetimeClonePreserved_readOnly
+util.func public @crossLifetimeClonePreserved_readOnly(%input: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.async.clone
+  %clone = stream.async.clone %input : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %d = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %d : !stream.resource<*>
+}
+
+// -----
+
+// Tests that a cross-lifetime clone (external → *) is preserved when the
+// clone result is mutated via a tied dispatch (in-place write).
+
+stream.executable private @dispatch_ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @crossLifetimeClonePreserved_resultMutated
+util.func public @crossLifetimeClonePreserved_resultMutated(%input: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[CLONE:.+]] = stream.async.clone
+  %clone = stream.async.clone %input : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // Tied dispatch mutates clone in-place.
+  // CHECK: stream.async.dispatch @dispatch_ex::@dispatch(%[[CLONE]]{{.*}}) : ({{.*}}) -> %[[CLONE]]
+  %d = stream.async.dispatch @dispatch_ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %clone{%size}
+  util.return %d : !stream.resource<*>
+}
+
+// -----
+
+// Tests that multiple cross-lifetime clones (external → *) are preserved
+// by the first pass. The full pipeline (RefineUsage + second ElideAsyncCopies)
+// handles their elimination.
+
+stream.executable private @dispatch_ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// CHECK-LABEL: @crossLifetimeClonePreserved_multipleReadOnly
+util.func public @crossLifetimeClonePreserved_multipleReadOnly(%input: !stream.resource<external>, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.async.clone
+  %clone0 = stream.async.clone %input : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone0[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: stream.async.clone
+  %clone1 = stream.async.clone %input : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %d1 = stream.async.dispatch @dispatch_ex::@dispatch(%clone1[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return
+  util.return %d0, %d1 : !stream.resource<*>, !stream.resource<*>
 }
