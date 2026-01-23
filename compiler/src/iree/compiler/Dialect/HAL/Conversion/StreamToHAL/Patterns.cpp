@@ -1399,11 +1399,11 @@ struct CmdExecuteOpPattern
       auto memoizeOp = IREE::HAL::DeviceMemoizeOp::create(
           rewriter, loc, rewriter.getType<IREE::HAL::CommandBufferType>(),
           device, queueAffinity);
-      auto ip = rewriter.saveInsertionPoint();
-      rewriter.setInsertionPointToStart(&memoizeOp.getBody().emplaceBlock());
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(
+          rewriter.createBlock(&memoizeOp.getBody()));
       IREE::HAL::ReturnOp::create(
           rewriter, loc, recordCommandBuffer(device, queueAffinity, rewriter));
-      rewriter.restoreInsertionPoint(ip);
       commandBuffer = memoizeOp.getResult(0);
     } else {
       commandBuffer = recordCommandBuffer(device, queueAffinity, rewriter);
