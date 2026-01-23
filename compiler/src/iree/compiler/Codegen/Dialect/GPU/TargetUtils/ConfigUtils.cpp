@@ -653,7 +653,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool CPromoteIfPadding, bool hasExistingAccumulator = false,
+    bool cPromoteIfPadding, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -834,7 +834,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // - Padding requires C promotion, OR
   // - The operation has an existing accumulator (matmul_accumulate)
   bool doCPromotion =
-      (couldNeedPadding && CPromoteIfPadding) || hasExistingAccumulator;
+      (couldNeedPadding && cPromoteIfPadding) || hasExistingAccumulator;
 
   bool mustBeAligned = true;
   Location loc = operands[0].getLoc();
@@ -847,7 +847,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     // For unaligned schedules, C promotion is needed for padding OR existing
     // accumulator.
-    bool doCPromotionUnaligned = CPromoteIfPadding || hasExistingAccumulator;
+    bool doCPromotionUnaligned = cPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, loc, transposedLhs, transposedRhs, isGemm,
         mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
@@ -938,7 +938,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     promotionArray = {};
     promotionList.append({2, 3});
   }
-  if ((!mustBeAligned || couldNeedPadding) && CPromoteIfPadding) {
+  if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled
     // and scaled GEMM respectively.
     promotionList.push_back(promotionList.size());
@@ -1051,9 +1051,9 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<int64_t> igemmLoopBounds =
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
-  bool CPromoteIfPadding = false;
+  bool cPromoteIfPadding = false;
   if (clGPUTestCpromotion) {
-    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
+    cPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
                         checkForDPSOperandComputeOpProducers(linalgOp);
   }
   // Detect if the convolution is accumulating (reads existing accumulator).
@@ -1064,7 +1064,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
           /*scaled=*/false, splitReductionTripCnt,
-          /*CPromoteIfPadding=*/CPromoteIfPadding, hasExistingAccumulator,
+          /*cPromoteIfPadding=*/cPromoteIfPadding, hasExistingAccumulator,
           convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
@@ -1108,9 +1108,9 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "Matmul TileAndFuse Config";
-  bool CPromoteIfPadding = false;
+  bool cPromoteIfPadding = false;
   if (clGPUTestCpromotion) {
-    CPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
+    cPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
                         checkForDPSOperandComputeOpProducers(linalgOp);
   }
 
@@ -1122,7 +1122,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-          /*scaled=*/false, splitReductionTripCnt, CPromoteIfPadding,
+          /*scaled=*/false, splitReductionTripCnt, cPromoteIfPadding,
           hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
@@ -1133,7 +1133,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
-        /*scaled=*/true, splitReductionTripCnt, CPromoteIfPadding,
+        /*scaled=*/true, splitReductionTripCnt, cPromoteIfPadding,
         hasExistingAccumulator);
   }
 
