@@ -241,7 +241,7 @@ struct ShardAllGatherToFlow
   LogicalResult matchAndRewrite(shard::AllGatherOp op,
                                 PatternRewriter &rewriter) const override {
     if (!cast<RankedTensorType>(op.getOperand().getType()).hasStaticShape() ||
-        !op.getResult().getType().hasStaticShape()) {
+        !cast<ShapedType>(op.getResult().getType()).hasStaticShape()) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
                                          "Dynamic tensor case is unsupported.");
@@ -260,9 +260,9 @@ struct ShardAllGatherToFlow
 
     RankedTensorType flowAllGatherResultType = transpose(
         cast<RankedTensorType>(op.getResult().getType()), 0, gatherAxis);
-    Value target =
-        tensor::EmptyOp::create(builder, flowAllGatherResultType.getShape(),
-                                op.getResult().getType().getElementType());
+    Value target = tensor::EmptyOp::create(
+        builder, flowAllGatherResultType.getShape(),
+        cast<ShapedType>(op.getResult().getType()).getElementType());
     auto flowAllGather = IREE::Flow::CollectiveAllGatherOp::create(
         builder, getCollectiveElementTypeAttr(flowAllGatherResultType), target,
         flowAllGatherOperand, channel);
