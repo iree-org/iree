@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -255,6 +256,28 @@ struct VerifyInputPass
     verifier.addIllegalOp<IREE::Util::GlobalAddressOp>();
     verifier.addIllegalOp<IREE::Util::GlobalLoadIndirectOp>();
     verifier.addIllegalOp<IREE::Util::GlobalStoreIndirectOp>();
+
+    verifier.addOpVerifier<IREE::Flow::ExecutableOp>(
+        [](IREE::Flow::ExecutableOp exeOp)
+            -> std::optional<Verifier::Legality> {
+          ModuleOp innerModule = exeOp.getInnerModule();
+          if (!innerModule) {
+            return std::nullopt;
+          }
+          // Verify that none of the dispatch functions return a result.
+          for (auto funcOp : innerModule.getOps<mlir::FunctionOpInterface>()) {
+            if (!funcOp.isPublic()) {
+              continue;
+            }
+            if (funcOp.getNumResults() != 0) {
+              exeOp->emitOpError()
+                  << "cannot be converted to stream because it contains public "
+                  << "functions with a result";
+              return Verifier::Legality::ILLEGAL;
+            }
+          }
+          return std::nullopt;
+        });
 
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();

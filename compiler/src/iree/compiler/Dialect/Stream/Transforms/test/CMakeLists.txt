@@ -70,6 +70,7 @@ iree_lit_test_suite(
     "unify_encoding_for_globals.mlir"
     "verify_affinities.mlir"
     "verify_async_access_ranges.mlir"
+    "verify_input.mlir"
   TOOLS
     FileCheck
     iree-opt
