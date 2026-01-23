@@ -23,6 +23,7 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "IREEGPUAttrs.td",
             "IREEGPUDialect.td",
@@ -91,6 +92,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -104,9 +106,11 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LoopLikeInterface",
         "@llvm-project//mlir:ParallelCombiningOpInterface",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
@@ -136,11 +140,17 @@ iree_gentbl_cc_library(
     name = "IREEGPUEnums",
     tbl_outs = [
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=iree_gpu",
+            ],
             "IREEGPUEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=iree_gpu",
+            ],
             "IREEGPUEnums.cpp.inc",
         ),
     ],

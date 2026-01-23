@@ -26,6 +26,7 @@ iree_cc_library(
     "ConvertEncodingToFlow.cpp"
     "ConvertTensorToFlow.cpp"
     "ElementwiseOpFusion.cpp"
+    "FoldReshapesIntoTensorBarriers.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
@@ -37,9 +38,11 @@ iree_cc_library(
     "FusionUtils.cpp"
     "HoistEncodingOps.cpp"
     "HoistUniformScalarCompute.cpp"
+    "InsertTensorBarriers.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "PropagateEncodings.cpp"
+    "RemoveTensorBarriers.cpp"
     "SetEncoding.cpp"
     "SetSplitReductionSizes.cpp"
     "SinkReshapes.cpp"
@@ -83,6 +86,7 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Encoding::Utils

@@ -60,7 +60,7 @@ struct UsageInfo {
   void analyze(mlir::ModuleOp moduleOp) {
     SymbolTable symbolTable(moduleOp);
     for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-      if (llvm::isa<IREE::Stream::ResourceType>(globalOp.getType())) {
+      if (isa<IREE::Stream::ResourceType>(globalOp.getType())) {
         resourceGlobalOps[globalOp.getName()] = globalOp;
       }
     }
@@ -126,9 +126,10 @@ struct Statistics {
     // Globals:
     for (auto [name, globalOp] : usageInfo.resourceGlobalOps) {
       auto globalType =
-          llvm::dyn_cast<IREE::Stream::ResourceType>(globalOp.getType());
-      if (!globalType)
+          dyn_cast<IREE::Stream::ResourceType>(globalOp.getType());
+      if (!globalType) {
         continue;
+      }
       // TODO(benvanik): analyze size in UsageInfo where possible.
       switch (globalType.getLifetime()) {
       case IREE::Stream::Lifetime::Constant:
@@ -436,14 +437,16 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
     TypeSwitch<Operation *>(op)
         .Case<IREE::Stream::CmdSerialOp>([&](auto op) {
           ++depth;
-          for (auto &nestedOp : op.getBody().front())
+          for (auto &nestedOp : op.getBody().front()) {
             dumpRow(&nestedOp);
+          }
           --depth;
         })
         .Case<IREE::Stream::CmdConcurrentOp>([&](auto op) {
           ++depth;
-          for (auto &nestedOp : op.getBody().front())
+          for (auto &nestedOp : op.getBody().front()) {
             dumpRow(&nestedOp);
+          }
           --depth;
         })
         .Case<IREE::Stream::CmdFillOp>([&](auto op) {
@@ -462,8 +465,9 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
           auto workload = op.getWorkload();
           SmallString<32> workloadStr;
           for (unsigned i = 0; i < workload.size(); ++i) {
-            if (i > 0)
+            if (i > 0) {
               workloadStr.append(";");
+            }
             APInt dimValue;
             if (matchPattern(workload[i], m_ConstantInt(&dimValue))) {
               dimValue.toString(workloadStr, 10, /*signed=*/true);
@@ -575,8 +579,9 @@ openOutputFile(StringRef filePath) {
     std::error_code ec;
     auto result = std::make_unique<llvm::raw_fd_ostream>(
         filePath, ec, llvm::sys::fs::OF_TextWithCRLF);
-    if (!ec)
+    if (!ec) {
       return result;
+    }
     llvm::errs() << "Error opening iree-stream-dump-statistics output file '"
                  << filePath << "'\n";
     return std::make_unique<llvm::raw_fd_ostream>(2, false); // stderr.
@@ -588,8 +593,9 @@ struct DumpStatisticsPass
   using IREE::Stream::impl::DumpStatisticsPassBase<
       DumpStatisticsPass>::DumpStatisticsPassBase;
   void runOnOperation() override {
-    if (outputFormat == DumpOutputFormat::None)
+    if (outputFormat == DumpOutputFormat::None) {
       return;
+    }
 
     // Open the output file we'll be streaming to.
     // Since we are processing the entire module at once we overwrite the file.

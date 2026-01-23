@@ -480,7 +480,7 @@ typedef struct iree_hal_dispatch_config_t {
 static inline iree_hal_dispatch_config_t iree_hal_make_static_dispatch_config(
     uint32_t workgroup_count_x, uint32_t workgroup_count_y,
     uint32_t workgroup_count_z) {
-  iree_hal_dispatch_config_t config = {0};
+  iree_hal_dispatch_config_t config = {};
   config.workgroup_count[0] = workgroup_count_x;
   config.workgroup_count[1] = workgroup_count_y;
   config.workgroup_count[2] = workgroup_count_z;

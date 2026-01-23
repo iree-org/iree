@@ -133,8 +133,9 @@ static SmallVector<Value> inlineConstantBlockOp(
   // Replace the hal.return with a func.return.
   for (auto returnOp :
        llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
-    OpBuilder(returnOp).create<IREE::Util::ReturnOp>(returnOp.getLoc(),
-                                                     returnOp.getOperands());
+    OpBuilder builder(returnOp);
+    IREE::Util::ReturnOp::create(builder, returnOp.getLoc(),
+                                 returnOp.getOperands());
     returnOp.erase();
   }
 
@@ -334,8 +335,9 @@ getDeviceFallbackGlobals(IREE::Util::GlobalOpInterface deviceGlobal,
                          SymbolTable &symbolTable) {
   SetVector<IREE::Util::GlobalOpInterface> resultSet;
   auto processAttr = [&](Attribute attr) {
-    if (!attr)
+    if (!attr) {
       return true; // ignore uninitialized devices
+    }
     return TypeSwitch<Attribute, bool>(attr)
         .Case<IREE::HAL::DeviceOrdinalAttr>([](auto attr) { return true; })
         .Case<IREE::HAL::DeviceTargetAttr>([](auto attr) { return true; })

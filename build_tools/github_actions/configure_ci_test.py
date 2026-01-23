@@ -64,6 +64,21 @@ class ConfigureCITest(unittest.TestCase):
         )
         self.assertCountEqual(jobs, all_jobs)
 
+    def test_get_enabled_jobs_modified_ci(self):
+        trailers = {}
+        all_jobs = {"job1", "job2", "job3"}
+        is_pr = True
+        is_llvm_integrate_pr = False
+        modified_paths = [".github/workflows/ci_linux_arm64_clang.yml", "runtime/file"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
+        )
+        self.assertCountEqual(jobs, all_jobs | {"linux_arm64_clang"})
+
     def test_get_enabled_jobs_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
@@ -114,6 +129,23 @@ class ConfigureCITest(unittest.TestCase):
             is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
+
+    def test_get_enabled_jobs_llvm_integrate_with_ci_extra(self):
+        trailers = {"ci-extra": "linux_x64_clang_tsan"}
+        default_jobs = {"job1", "job2", "job3"}
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
+        all_jobs = default_jobs | {postsubmit_job} | {"linux_x64_clang_tsan"}
+        is_pr = True
+        is_llvm_integrate_pr = True
+        modified_paths = ["runtime/file"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
+        )
+        self.assertEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_no_modifies(self):
         trailers = {}

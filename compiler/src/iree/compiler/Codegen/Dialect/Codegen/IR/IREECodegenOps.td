@@ -11,9 +11,11 @@ include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Dialect/Linalg/IR/LinalgBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/Properties.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
@@ -21,7 +23,7 @@ include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
-def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
+def TensorTypeAttr : TypeAttrBase<"::mlir::TensorType", "Tensor type attribute">;
 
 def IREECodegen_QueryTileSizesOp :
     Op<IREECodegen_Dialect, "query_tile_sizes", [Pure]> {
@@ -111,6 +113,22 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 }
 
 //===----------------------------------------------------------------------===//
+// FusionBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_FusionBarrierOp :
+    Op<IREECodegen_Dialect, "fusion_barrier", [
+      SameOperandsAndResultType, Pure]> {
+  let summary = [{Prevents fusion through a tensor value}];
+
+  let arguments = (ins AnyRankedTensor:$source);
+  let results = (outs AnyRankedTensor:$result);
+  let assemblyFormat = [{
+    attr-dict $source `:` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // SwizzleHintOp
 //===----------------------------------------------------------------------===//
 
@@ -118,13 +136,13 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     SameOperandsAndResultType, Pure]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
-    Optimization hint to swizzle all accesses to the memref this takes a view
-    of. This only affects reads/writes immediately consuming this operation and
-    is best effort. If the desired swizzling is not apparently possible, this
+    Optimization hint to swizzle all accesses to the memref or tensor that this takes a
+    view of. This only affects reads/writes that immediately consume this operation
+    and is best effort. If the desired swizzling is not apparently possible, this
     op will no-op. As a result, it should not be relied on for correctness.
 
-    Any subviews on this operation will cause swizzling to fail. The expectation
-    is for all view like operations to fold into the accessing ops
+    Any subviews on this operation will cause the swizzle application to fail. The
+    expectation is for all view like operations to fold into the accessing ops
     (loads/stores) before this op takes effect.
 
     Note that this only rewrites direct users. If there are any aliased loads
@@ -155,9 +173,9 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     is otherwise perfectly legal.
   }];
 
-  let arguments = (ins MemRefRankOf<[AnyType], [1]>:$operand,
+  let arguments = (ins AnyRankedTensorOrMemRef:$operand,
                        IREECodegen_AnySwizzleAttr:$swizzle);
-  let results = (outs MemRefRankOf<[AnyType], [1]>:$result);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
     $operand `[` $swizzle attr-dict `]` `:` type($result)
@@ -184,7 +202,8 @@ def IREECodegen_NullPointerOp :
 
 def IREECodegen_LoadFromBufferOp : Op<IREECodegen_Dialect, "load_from_buffer",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface,
+       ["reifyResultShapes"]>]> {
   let summary = [{Loads a tensor from a memref.}];
   let description = [{
     Loads a tensor from a memref with a compatible shape and the same element
@@ -266,8 +285,6 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     outer loop iterator in the iterator type list, to each dimension of each
     operand.
 
-    The combiner type is defined by the intrinsic.
-
     Example:
 
     ```mlir
@@ -279,7 +296,9 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      distributed = true,
+      opaque = false
     }
     %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
@@ -312,7 +331,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     }
     ```
 
-    Or alternatively unrolled to a single intrinsic when operation on vectors.
+    Or alternatively unrolled to a single intrinsic when operating on vectors.
     ```mlir
     #contraction_accesses = [
      affine_map<() -> ()>,
@@ -322,18 +341,36 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = [],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      distributed = true,
+      opaque = false
     }
     %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<4xf16>, vector<4xf16> into vector<4xf32>
     ```
 
     This operation can represent an intrinsic both in undistributed
-    (workgroup/subgroup/warp) and distributed (thread) level. The descriptor
-    attribute specifies the inner tile sizes for both the undistributed form
-    (where the operands represent the data to be processed by an entire group of
-    parallel workers) and the distributed form (where the operands represent the
-    data processed by a single workitem/thread).
+    (workgroup/subgroup/warp) and distributed (thread) level. This is indicated
+    by the `distributed` boolean attribute. The same `kind` attribute may be
+    used in both cases.
+
+    The inner-tile shapes of tensor operands (defined as above as the trailing
+    dimensions not present in the indexing maps) must agree with the shapes of
+    the vector tiles implied by the intrinsic specified in `kind`. The exact
+    criterion depends on the `opaque` boolean attribute:
+    * When `opaque = true`, the only requirement is that they have the same
+      number of elements.
+    * When `opaque = false`, the shapes must match exactly after omitting any
+      unit-dimensions.
+
+    Note that different `kind` attributes may adopt different conventions as to
+    the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
+    and it may be necessary to use `opaque = true` to accomodate them. Others
+    may use higher-rank vectors with shapes reflecting semantics, allowing to
+    use `opaque = false`, which is preferable when possible at all thanks to the
+    stricter semantics. However, that is not only a function of the `kind`
+    attribute: using `opaque = false` also requires the tensor operands to have
+    appropriate shapes.
 
     In some cases, variations on the inner tiled operations can be expressed
     with the permutations attribute. This attribute represents the permutation
@@ -341,13 +378,8 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     this is row-major storage of the inner tile) to the format of the inner tile
     in the arguments, with a permutation specified for each argument.
 
-    Since the canonical dimensionality of the inner dimensions are somewhat
-    intrinsic specific, verification of this op requires only that element
-    counts of the inner dimensions match the intrinsic.
-
     For example, an MMT product of inner dimensions with warp semantics can be
-    represented with the following. Permutations are only allowed for ops with
-    undistributed semantics and must be resolved before distribution.
+    represented with the following.
 
     ```mlir
     #contraction_accesses = [
@@ -382,22 +414,16 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     choice for a shared operation is intended to ease the lowering process and
     allow for different transformations at different stages of the pipeline
     without needing to essentially clone this op.
-
-    The choice to let the inner dimensions required to compute the intrinsic be
-    implicit based on the indexing maps was made to make this operation easier
-    to generate and to skip the need for type conversion ops. However this comes
-    at the expense of ease of verification for the operation. It is also
-    implicitly linked to a lane-level parent `scf.forall` operation.
   }];
 
-  let arguments = (ins
-    Variadic<AnyRankedTensorOrVector>:$inputs,
-    Variadic<AnyRankedTensorOrVector>:$outputs,
-    TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
-    IteratorTypeArrayAttr:$iterator_types,
-    IREECodegen_AnyInnerTileDescAttr:$kind,
-    OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr, "permutations">>:$permutations
-  );
+  let arguments = (ins Variadic<AnyRankedTensorOrVector>:$inputs,
+      Variadic<AnyRankedTensorOrVector>:$outputs,
+      TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
+      IteratorTypeArrayAttr:$iterator_types,
+      IREECodegen_AnyInnerTileDescAttr:$kind,
+      IREECodegen_AnyInnerTiledSemanticscAttr:$semantics,
+      OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr,
+                                      "permutations">>:$permutations);
   let results = (outs
     Variadic<AnyRankedTensorOrVector>:$results
   );
@@ -407,22 +433,26 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     `:` type($inputs) `into` type($outputs)
   }];
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<ArrayAttr>", "std::nullopt">:$permutations)>,
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
-      "ArrayRef<utils::IteratorType>":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<SmallVector<SmallVector<int64_t>>>", "std::nullopt">:$permutationss)>,
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayRef<AffineMap>":$indexingMaps,
-      "ArrayRef<utils::IteratorType>":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<SmallVector<SmallVector<int64_t>>>", "std::nullopt">:$permutationss)>
-  ];
+  let builders =
+      [OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<ArrayAttr>", "std::nullopt">:$permutations)>,
+       OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
+           "ArrayRef<utils::IteratorType>":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<SmallVector<SmallVector<int64_t>>>",
+                "std::nullopt">:$permutationss)>,
+       OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayRef<AffineMap>":$indexingMaps,
+           "ArrayRef<utils::IteratorType>":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<SmallVector<SmallVector<int64_t>>>",
+                "std::nullopt">:$permutationss)>];
   let extraClassDeclaration = [{
     ::llvm::SmallVector<::mlir::ShapedType> getOperandShapedTypes() {
       return ::llvm::map_to_vector(getOperandTypes(), [](auto t) {
@@ -441,8 +471,6 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     bool hasTensorSemantics() {
       return isa<RankedTensorType>(getOutputs().front().getType());
     }
-
-    bool hasThreadSemantics();
 
     llvm::SmallVector<::mlir::AffineMap, 4> getIndexingMapsArray() {
       return llvm::to_vector<4>(getIndexingMaps().getAsValueRange<::mlir::AffineMapAttr>());
@@ -481,6 +509,110 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// HintWorkgroupCountOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_WorkgroupCountHintOp :
+    Op<IREECodegen_Dialect, "workgroup_count_hint", []> {
+  let summary = [{Hints at the workgroup count to set}];
+
+  let description = [{
+    Captures a set of values to use as the workgroup count. The backward slice
+    starting from this op's operands is cloned into the workgroup count region
+    of all transitive callers.
+
+    The sizes are specified in logical order (innermost to outermost), matching
+    the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
+    are provided, the remaining dimensions default to 1.
+
+    If multiple hints inform the same entry point, the **elementwise maximum**
+    across all hints is used as the count along each dimension. For example:
+
+    ```mlir
+    hal.executable.export @entry_point
+    module {
+      func.func @entry_point() {
+        iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+        iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+      }
+    }
+    ```
+
+    resolves to:
+
+    ```mlir
+    hal.executable.export @entry_point {
+      %wx = arith.maxsi %a, %x
+      %wy = arith.maxsi %b, %y
+      %wz = arith.maxsi %c, %z
+      hal.return %wx, %wy, %wz
+    }
+    ```
+
+    #### Common Usage: Linearized Workgroup Counts
+
+    The most common use case for this operation involves computing a linearized
+    (1-D) workgroup count and specifying it as a single size.
+
+    ```mlir
+    %num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
+    iree_codegen.workgroup_count_hint sizes(%num_workgroups)
+    ```
+
+    This results in `(%num_workgroups, 1, 1)` as the final workgroup count.
+  }];
+
+  let arguments = (ins
+    Variadic<Index>:$sizes,
+    DenseI64ArrayAttr:$static_sizes
+  );
+  let results = (outs);
+  let hasCustomAssemblyFormat = 1;
+
+  let builders = [
+    OpBuilder<(ins "ArrayRef<OpFoldResult>":$sizes)>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns a vector with all the static and dynamic sizes.
+    SmallVector<OpFoldResult> getMixedSizes() {
+      OpBuilder builder(getContext());
+      return ::mlir::getMixedValues(getStaticSizes(), getSizes(), builder);
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// IndexHintOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
+  let summary = "Compiler hint providing semantic information about an index";
+  let description = [{
+    Pure pass-through operation that annotates an index value with semantic
+    information about how it varies across parallel workers (e.g., GPU lanes).
+
+    The hint attribute describes the index behavior. Common hints include:
+    - `#iree_gpu.lane_constant<N>`: Index is uniform within groups of N lanes
+    - `#iree_gpu.lane_increment<N>`: Index increments by 1 within groups of N lanes
+
+    This operation is always safe to remove (replace with input). It exists
+    purely to guide optimization passes.
+
+    Example:
+    ```mlir
+    %row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
+    %col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
+    ```
+  }];
+
+  let arguments = (ins Index:$input, AnyAttr:$hint);
+  let results = (outs Index:$result);
+
+  let assemblyFormat = "$input `(` $hint `)` attr-dict `:` type($input)";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

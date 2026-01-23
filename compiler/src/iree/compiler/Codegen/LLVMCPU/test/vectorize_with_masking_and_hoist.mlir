@@ -16,7 +16,7 @@
 // so that it becomes a loop variable. This is highly desirable as the opposite
 // leads to very poor performance.
 
-// CHECK-LABEL: @pipeline(
+// CHECK-LABEL: func.func @pipeline(
 // CHECK:       scf.for {{.*}} iter_args(%[[OUT_TENSOR:.*]] = {{.*}}) -> (tensor<1024x1024xf32>) {
 // CHECK-NEXT:    scf.for {{.*}} iter_args(%[[OUT_TENSOR_1:.*]] = %[[OUT_TENSOR]]) -> (tensor<1024x1024xf32>) {
 // CHECK-NEXT:      %[[OUT_SLICE:.*]] = tensor.extract_slice %[[OUT_TENSOR_1]]{{.*}} : tensor<1024x1024xf32> to tensor<8x?xf32>

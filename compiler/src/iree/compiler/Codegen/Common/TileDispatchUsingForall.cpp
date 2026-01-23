@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -18,6 +20,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -213,8 +216,9 @@ static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
 /// for the DPS `user`. Returns false if the user is not in DPS.
 static bool isUsedAsInit(Operation *producer, Operation *user) {
   auto dpsIface = dyn_cast<DestinationStyleOpInterface>(user);
-  if (!dpsIface)
+  if (!dpsIface) {
     return false;
+  }
   ValueRange results = producer->getResults();
   return llvm::any_of(dpsIface.getDpsInits(), [&](Value operand) {
     return llvm::is_contained(results, operand);
@@ -232,7 +236,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   if (failed(tilingInfo)) {
     return signalPassFailure();
   }
-  auto tilableOp = dyn_cast_or_null<TilingInterface>(tilingInfo->tilableOp);
+  auto tilableOp = dyn_cast_if_present<TilingInterface>(tilingInfo->tilableOp);
   if (!tilableOp) {
     // Did not find a tileable op. So do nothing.
     return;
@@ -248,25 +252,54 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // an init of a DPS op, the user currently cannot be fused. Having a
     // replacement for it would attempt fusion and fail, so avoid such cases.
     if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          if (isUsedAsInit(op, user))
+          if (isUsedAsInit(op, user)) {
             return false;
+          }
           return dominanceInfo.properlyDominates(tilableOp, user) ||
                  !tiledAndFusedOps.contains(user);
         })) {
       yieldReplacementsFor.insert(op);
     }
   }
-  scf::SCFTilingOptions tilingOptions;
-  tilingOptions.setTileSizes(tilingInfo->tileSizes);
-  tilingOptions.setInterchange(tilingInfo->interchange);
-  tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
+  scf::SCFTilingOptions tilingOptions;
+  tilingOptions.setTileSizes(tilingInfo->tileSizes);
+  tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
+
+  IREE::Codegen::WorkgroupReorderingAttrInterface workgroupReorderingStrategy =
+      getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
+  if (workgroupReorderingStrategy) {
+    scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
+        [&workgroupReorderingStrategy](RewriterBase &rewriter, Location loc,
+                                       ArrayRef<Range> loopRanges,
+                                       ArrayRef<OpFoldResult> givenTileSizes,
+                                       ValueRange outerDestinationTensors)
+        -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
+      return workgroupReorderingStrategy.generateLoopHeaderFn(
+          rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
+    };
+    scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
+        [&workgroupReorderingStrategy](
+            RewriterBase &rewriter, Location loc,
+            ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
+            ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+            ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+            ValueRange destinationTensors) -> LogicalResult {
+      return workgroupReorderingStrategy.generateLoopTerminatorFn(
+          rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
+          destinationTensors);
+    };
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
+    tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
+  } else {
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  }
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   tileAndFuseOptions.setTilingOptions(tilingOptions);
@@ -277,6 +310,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
   // MLIR version once it is available (llvm-project/pull/126898).
   populateSwapExtractWithExpandPattern(cleanupPatterns);
+  populateFoldExtractSliceOfBroadcastPattern(cleanupPatterns);
   // When fusing pads we do not want to generate zeroSliceGuards when doing
   // workgroup tiling. In `GPUApplyTilingLevelPass` we do have an option called
   // `allowZeroSlices` that can control this but we do not want these
@@ -381,6 +415,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     populateSwapExtractWithCollapsePattern(patterns);
+    populateFoldExtractSliceOfBroadcastPattern(patterns);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     context->getOrLoadDialect<tensor::TensorDialect>()

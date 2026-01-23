@@ -53,8 +53,9 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
   Type type;
   OptionalParseResult parseResult =
       generatedTypeParser(parser, &mnemonic, type);
-  if (parseResult.has_value())
+  if (parseResult.has_value()) {
     return type;
+  }
   parser.emitError(parser.getCurrentLocation())
       << "unknown Flow type: " << mnemonic;
   return {};
@@ -166,7 +167,7 @@ int64_t NamedParameterAttr::getStorageSize() const {
       return lengthAttr.getInt();
     }
   }
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
+  if (auto shapedType = dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());

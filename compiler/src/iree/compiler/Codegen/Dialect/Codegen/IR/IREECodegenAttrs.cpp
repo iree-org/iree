@@ -137,11 +137,13 @@ void LoweringConfigTilingLevelAttr::print(mlir::AsmPrinter &printer) const {
                             [&](auto pair) {
                               auto [tileSize, isScalable] = pair;
                               // Wrap scalable sizes in square brackets.
-                              if (isScalable)
+                              if (isScalable) {
                                 printer << '[';
+                              }
                               printer << tileSize;
-                              if (isScalable)
+                              if (isScalable) {
                                 printer << ']';
+                              }
                             });
     }
     printer << ']';
@@ -163,8 +165,9 @@ Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
   auto parseListOfSizes = [&](SmallVector<bool> *scalableFlags = nullptr,
                               bool prefixChecked =
                                   false) -> FailureOr<SmallVector<int64_t>> {
-    if (!prefixChecked && parser.parseLSquare())
+    if (!prefixChecked && parser.parseLSquare()) {
       return failure();
+    }
     if (parser.parseOptionalRSquare().succeeded()) {
       // Empty list.
       return SmallVector<int64_t>();
@@ -177,15 +180,18 @@ Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
               expectScalableSizes && parser.parseOptionalLSquare().succeeded();
           int64_t size = 0;
           if (parser.parseInteger(size) ||
-              (isScalable && parser.parseRSquare()))
+              (isScalable && parser.parseRSquare())) {
             return failure();
+          }
           sizes.push_back(size);
-          if (scalableFlags)
+          if (scalableFlags) {
             scalableFlags->push_back(isScalable);
+          }
           return success();
         });
-    if (failed(listParse) || parser.parseRSquare())
+    if (failed(listParse) || parser.parseRSquare()) {
       return failure();
+    }
     return sizes;
   };
   SmallVector<bool> scalableFlags;
@@ -193,8 +199,9 @@ Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
     // Case 1: Simple list of tile sizes, e.g.:
     // [0, [32], 16]
     auto tileSizes = parseListOfSizes(&scalableFlags, /*prefixChecked=*/true);
-    if (failed(tileSizes))
+    if (failed(tileSizes)) {
       return {};
+    }
     return parser.getChecked<LoweringConfigTilingLevelAttr>(
         loc, parser.getContext(), *tileSizes, ArrayRef<int64_t>{},
         scalableFlags);
@@ -202,15 +209,18 @@ Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
   // Case 2: sizes and interchange, e.g.:
   // {sizes = [0, [32], 16], interchange = [0, 1, 2]}
   if (parser.parseLBrace() || parser.parseKeyword("sizes") ||
-      parser.parseEqual())
+      parser.parseEqual()) {
     return {};
+  }
   auto tileSizes = parseListOfSizes(&scalableFlags);
   if (failed(tileSizes) || parser.parseComma() ||
-      parser.parseKeyword("interchange") || parser.parseEqual())
+      parser.parseKeyword("interchange") || parser.parseEqual()) {
     return {};
+  }
   auto tileInterchange = parseListOfSizes();
-  if (failed(tileInterchange) || parser.parseRBrace())
+  if (failed(tileInterchange) || parser.parseRBrace()) {
     return {};
+  }
   return parser.getChecked<LoweringConfigTilingLevelAttr>(
       loc, parser.getContext(), *tileSizes, *tileInterchange, scalableFlags);
 }
@@ -218,8 +228,9 @@ Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
 LogicalResult LoweringConfigTilingLevelAttr::verify(
     function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> tileInterchange, ArrayRef<bool> scalableFlags) {
-  if (!scalableFlags.empty() && scalableFlags.size() != tileSizes.size())
+  if (!scalableFlags.empty() && scalableFlags.size() != tileSizes.size()) {
     return emitError() << "scalable flags length does not match tile sizes";
+  }
   return success();
 }
 
@@ -254,29 +265,33 @@ LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() const {
   TileSizesListType tileSizes;
-  for (auto &level : getTilingLevels())
+  for (auto &level : getTilingLevels()) {
     tileSizes.push_back(SmallVector<int64_t>(level.getSizes()));
+  }
   return tileSizes;
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) const {
   auto levels = getTilingLevels();
-  if (level >= levels.size())
+  if (level >= levels.size()) {
     return {};
+  }
   return SmallVector<int64_t>(levels[level].getSizes());
 }
 
 ScalableTileFlagsListType LoweringConfigAttr::getScalableTileFlagVals() {
   ScalableTileFlagsListType scalableFlags;
-  for (auto &level : getTilingLevels())
+  for (auto &level : getTilingLevels()) {
     scalableFlags.push_back(SmallVector<bool>(level.getScalableFlags()));
+  }
   return scalableFlags;
 }
 
 SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
   auto levels = getTilingLevels();
-  if (level >= levels.size())
+  if (level >= levels.size()) {
     return {};
+  }
   SmallVector<bool> scalableFlags(levels[level].getScalableFlags());
   // Extend the scalable flags with `false` to match the length of the sizes.
   scalableFlags.resize(levels[level].getSizes().size());
@@ -286,8 +301,9 @@ SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
 SmallVector<int64_t>
 LoweringConfigAttr::getTileInterchangeVals(unsigned level) const {
   auto levels = getTilingLevels();
-  if (level >= levels.size())
+  if (level >= levels.size()) {
     return {};
+  }
   return SmallVector<int64_t>(levels[level].getInterchange());
 }
 
@@ -338,8 +354,9 @@ bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels) {
-  if (!levels)
+  if (!levels) {
     return emitError() << "missing lowering config levels";
+  }
   return success();
 }
 
@@ -354,7 +371,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
-  if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
+  if (auto defaultConfig = dyn_cast<LoweringConfigAttr>(loweringConfig)) {
     if (failed(LoweringConfigAttr::verify(emitError,
                                           defaultConfig.getTilingLevels()))) {
       return emitError() << "invalid lowering config: " << defaultConfig;
@@ -416,7 +433,7 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
   auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(loc);
   for (auto attr : attrs) {
     auto typedAttr =
-        ::mlir::dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        dyn_cast_if_present<IREE::Codegen::WorkgroupMappingAttr>(attr);
     if (!typedAttr) {
       return emitError() << "expected all the mapping attribute to be of "
                             "`WorkgroupMappingAttr` type";
@@ -466,6 +483,16 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_codegen.local_mapping
+//===----------------------------------------------------------------------===//
+
+int64_t LocalMappingAttr::getMappingId() const { return getDim(); }
+
+bool LocalMappingAttr::isLinearMapping() const { return true; }
+
+int64_t LocalMappingAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
 // iree_codegen.simple_target
 //===----------------------------------------------------------------------===//
 
@@ -506,23 +533,27 @@ static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
                                                   OpFoldResult offset,
                                                   int64_t rotationInvariant) {
   auto value = dyn_cast_if_present<Value>(offset);
-  if (!value)
+  if (!value) {
     return offset;
+  }
 
   auto add = value.getDefiningOp<arith::AddIOp>();
-  if (!add)
+  if (!add) {
     return offset;
+  }
 
   llvm::APInt constant;
-  if (!matchPattern(add.getRhs(), m_ConstantInt(&constant)))
+  if (!matchPattern(add.getRhs(), m_ConstantInt(&constant))) {
     return offset;
+  }
 
   int64_t constantOffset = constant.getSExtValue();
   int64_t baseMod = constantOffset % rotationInvariant;
 
   // Skip constructing the new apply if it's not needed (c < rotationInvariant).
-  if (baseMod == constantOffset)
+  if (baseMod == constantOffset) {
     return offset;
+  }
 
   Value modOffset = arith::ConstantIndexOp::create(b, loc, baseMod);
   // If the original add is nsw/nuw, then the new add must also be given we're
@@ -788,14 +819,16 @@ void eraseTranslationInfo(FunctionOpInterface funcOp) {
 
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level) {
   IREE::Codegen::LoweringConfigAttrInterface configAttr = getLoweringConfig(op);
-  if (!configAttr)
+  if (!configAttr) {
     return {};
+  }
   return configAttr.getStaticTilingLevelSizes(level, op);
 }
 SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level) {
   IREE::Codegen::LoweringConfigAttrInterface configAttr = getLoweringConfig(op);
-  if (!configAttr)
+  if (!configAttr) {
     return {};
+  }
   return llvm::map_to_vector(configAttr.getTilingLevelSizes(b, level, op),
                              [&](OpFoldResult s) -> Value {
                                return getValueOrCreateConstantIndexOp(
@@ -846,8 +879,9 @@ bool hasRootOpInfo(Operation *op) {
 
 IREE::Codegen::UKernelProviderInterface
 getUKernelProviderFromTarget(DictionaryAttr dict) {
-  if (!dict)
+  if (!dict) {
     return {};
+  }
   return dict.getAs<IREE::Codegen::UKernelProviderInterface>(
       kUKernelProviderName);
 }
@@ -860,6 +894,32 @@ IREE::Codegen::UKernelDescriptorAttr getUKernelDescriptor(Operation *op) {
 void setUKernelDescriptor(Operation *op,
                           IREE::Codegen::UKernelDescriptorAttr descriptor) {
   op->setAttr(kUKernelDescriptorName, descriptor);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_codegen.workgroup_scope
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to make the <> optional. It will either parse/print as
+//   #iree_codegen.workgroup_scope<linearize>
+// or without the <>.
+//   #iree_codegen.workgroup_scope
+Attribute IREE::Codegen::WorkgroupScopeAttr::parse(AsmParser &parser, Type) {
+  bool linearize = false;
+  if (succeeded(parser.parseOptionalLess())) {
+    if (failed(parser.parseKeyword("linearize")) ||
+        failed(parser.parseGreater())) {
+      return {};
+    }
+    linearize = true;
+  }
+  return WorkgroupScopeAttr::get(parser.getContext(), linearize);
+}
+
+void IREE::Codegen::WorkgroupScopeAttr::print(AsmPrinter &printer) const {
+  if (getLinearize()) {
+    printer << "<" << "linearize" << ">";
+  }
 }
 
 } // namespace mlir::iree_compiler

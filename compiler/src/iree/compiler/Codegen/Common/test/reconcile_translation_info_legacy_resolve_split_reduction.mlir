@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize, cse)))" %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize, cse)))" \
+// RUN:   %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s --enable-var-scope
 
 // Test that the legacy approach to split-reduction loop resolution works.
 
@@ -6,7 +7,7 @@
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_executable {
-  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_variant target(<"", "">) {
     hal.executable.export public @split_reduction layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
@@ -39,7 +40,7 @@ hal.executable private @split_reduction_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * (s2 * (s0 * s1)))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> ((s5 * (s3 * s4)) * ((-s0 + s1) ceildiv s2))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
 //   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
@@ -52,7 +53,7 @@ hal.executable private @split_reduction_executable {
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG6]], %[[ARG5]], %[[ARG4]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction()
 //   CHECK-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
@@ -76,11 +77,11 @@ hal.executable private @split_reduction_executable {
 
 // Test resolution of split reduction loop with rank > 1.
 
-#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_2d_executable {
-  hal.executable.variant public @split_reduction_2d_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_2d_variant target(<"", "">) {
     hal.executable.export public @split_reduction_2d layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5)
@@ -111,7 +112,7 @@ hal.executable private @split_reduction_2d_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> ((s3 * s4) * (s2 * (s0 * s1)))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> ((s4 * (s2 * s3)) * (s0 * s1))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s0 floordiv (s1 * s2))>
 //       CHECK: @split_reduction_2d_variant
 //       CHECK:   hal.executable.export
@@ -121,7 +122,7 @@ hal.executable private @split_reduction_2d_executable {
 //  CHECK-SAME:       %[[ARG4:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG5]], %[[ARG4]], %[[ARG3]], %[[ARG1]], %[[ARG2]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG2]], %[[ARG5]], %[[ARG4]], %[[ARG3]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction_2d()
 //   CHECK-DAG:     %[[SPLIT_UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
@@ -146,7 +147,7 @@ hal.executable private @split_reduction_2d_executable {
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_2d_permuted_mapping_executable {
-  hal.executable.variant public @split_reduction_2d_permuted_mapping_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_2d_permuted_mapping_variant target(<"", "">) {
     hal.executable.export public @split_reduction_2d_permuted_mapping layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
@@ -179,7 +180,7 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s3 * s4) * s5) * (s2 * (s0 * s1)))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> ((s5 * (s3 * s4)) * ((s0 * s1) * s2))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((s1 * s2) * s3))>
 //       CHECK: @split_reduction_2d_permuted_mapping_variant
 //       CHECK:   hal.executable.export
@@ -190,7 +191,7 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG6]], %[[ARG5]], %[[ARG4]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction_2d_permuted_mapping()
 //   CHECK-DAG:     %[[SPLIT_UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)

@@ -50,9 +50,9 @@ struct SinkReshapesPass final
 /// we just approximate it (and try to be optimistic)
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
-  return llvm::isa_and_nonnull<IREE::LinalgExt::LinalgFusionOpInterface,
-                               linalg::LinalgOp, linalg::UnPackOp,
-                               IREE::Encoding::UnsetEncodingOp>(producer);
+  return isa_and_nonnull<IREE::LinalgExt::LinalgFusionOpInterface,
+                         linalg::LinalgOp, linalg::UnPackOp,
+                         IREE::Encoding::UnsetEncodingOp>(producer);
 }
 
 /// Control function to check if a `tensor.collapse_shape` (which is the
@@ -175,7 +175,7 @@ void SinkReshapesPass::runOnOperation() {
 
   auto collapsingControlFn = [](OpOperand *opOperand) {
     auto collapseOp =
-        llvm::dyn_cast_or_null<tensor::CollapseShapeOp>(opOperand->getOwner());
+        dyn_cast_if_present<tensor::CollapseShapeOp>(opOperand->getOwner());
     if (collapseOp) {
       return shouldBubbleCollapseShapeOp(collapseOp, opOperand);
     }

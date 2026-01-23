@@ -8,7 +8,9 @@
 #define IREE_DIALECT_MODULES_VMVX_BASE
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "iree/compiler/Utils/DocMetadata.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VMVX (Virtual Machine-based Linear Algebra) dialect
@@ -66,10 +68,48 @@ def VMVX_Buffer : AnyTypeOf<[
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Base VMVX op classes
+// Base dialect op/type/attr/interface classes
 //===----------------------------------------------------------------------===//
 
 class VMVX_Op<string mnemonic, list<Trait> traits = []> :
-    Op<VMVX_Dialect, mnemonic, !listconcat(traits, [])> {}
+    Op<VMVX_Dialect, mnemonic, !listconcat(traits, [])> {
+  let hasCustomAssemblyFormat = 1;
+
+  // Optional documentation metadata for rich doc generation.
+  Util_OpDocMetadata docMetadata = ?;
+}
+
+class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
+    VMVX_Op<mnemonic, !listconcat(traits, [Pure])>;
+
+class VMVX_TypeDef<string name, list<Trait> traits = []> :
+    TypeDef<VMVX_Dialect, name, traits> {
+  // Optional documentation metadata for rich doc generation.
+  Util_TypeDocMetadata docMetadata = ?;
+}
+
+class VMVX_AttrDef<string name, list<Trait> traits = []> :
+    AttrDef<VMVX_Dialect, name, traits> {
+  // Optional documentation metadata for rich doc generation.
+  Util_AttrDocMetadata docMetadata = ?;
+}
+
+class VMVX_OpInterface<string name, list<Interface> baseInterfaces = []> :
+    OpInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
+}
+
+class VMVX_TypeInterface<string name, list<Interface> baseInterfaces = []> :
+    TypeInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
+}
+
+class VMVX_AttrInterface<string name, list<Interface> baseInterfaces = []> :
+    AttrInterface<name, baseInterfaces> {
+  // Optional documentation metadata for rich doc generation.
+  Util_InterfaceDocMetadata docMetadata = ?;
+}
 
 #endif  // IREE_DIALECT_MODULES_VMVX_BASE

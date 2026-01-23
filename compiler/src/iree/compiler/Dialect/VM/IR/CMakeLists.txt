@@ -70,8 +70,8 @@ iree_tablegen_library(
   TD_FILE
     "VMBase.td"
   OUTS
-    --gen-enum-decls VMEnums.h.inc
-    --gen-enum-defs VMEnums.cpp.inc
+    --gen-enum-decls --dialect=vm VMEnums.h.inc
+    --gen-enum-defs --dialect=vm VMEnums.cpp.inc
 )
 
 iree_tablegen_library(

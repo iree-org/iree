@@ -7,12 +7,13 @@
 #include <cstdint>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -35,8 +36,9 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
 static bool isBroadcast(AffineExpr expr) {
-  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
+  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
     return constExpr.getValue() == 0;
+  }
   return false;
 }
 
@@ -80,8 +82,9 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     // a constant less than `elementCount`, we can do this, unlocking
     // potential optimizations.
     bool disjoint = false;
-    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
+    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset)) {
       disjoint = *offsetConst < elementCount;
+    }
     slicedIndices[pos] =
         affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
   }
@@ -221,8 +224,9 @@ static LogicalResult populateWarpAndThreadIndices(
   int64_t rank = vectorLayout.getRank();
   SmallVector<Value> threadIds =
       vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
-  if (threadIds.empty() && rank != 0)
+  if (threadIds.empty() && rank != 0) {
     return failure();
+  }
   warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
   threadIndices = SmallVector<Value>(threadIds.begin() + rank,
                                      threadIds.begin() + 2 * rank);
@@ -423,9 +427,70 @@ struct DistributeTransferWrite final
   using OpDistributionPattern::OpDistributionPattern;
 
   DistributeTransferWrite(MLIRContext *context, Value threadId,
-                          int64_t subgroupSize)
+                          int64_t subgroupSize, ArrayRef<int64_t> workgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
-        subgroupSize(subgroupSize) {}
+        subgroupSize(subgroupSize) {
+
+    // The number of threads in the workgroup is the product of the dimensions
+    // of workgroupSize, unless workgroupSize is empty.
+    if (!workgroupSize.empty()) {
+      numThreadsInWorkgroup = llvm::product_of(workgroupSize);
+    }
+  }
+
+  /// Compute a boolean in SIMT semantics that is true for the first virtual
+  /// lane(thread) id (vtid) and virtual subgroup id (vsid) carrying broadcasted
+  /// data.
+  ///
+  /// We do this by computing a basis for vtid and vsid computation, and adding
+  /// a check for basis elements that are not used (i.e. they are duplicated)
+  /// to be zero.
+  FailureOr<Value> getNoOverlapCondition(OpBuilder &b, Location loc,
+                                         NestedLayoutAttr layout) const {
+    ArrayRef<int64_t> threadTile = layout.getThreadTile();
+    ArrayRef<int64_t> threadStrides = layout.getThreadStrides();
+    ArrayRef<int64_t> subgroupTile = layout.getSubgroupTile();
+    // Multiply the subgroup strides by subgroup_size to reflect thread id
+    // relative strides.
+    auto subgroupStrides =
+        llvm::map_to_vector(layout.getSubgroupStrides(),
+                            [&](int64_t x) { return x * subgroupSize; });
+    auto concatTiles =
+        llvm::to_vector(llvm::concat<const int64_t>(subgroupTile, threadTile));
+    auto concatStrides = llvm::to_vector(
+        llvm::concat<const int64_t>(subgroupStrides, threadStrides));
+    SmallVector<int64_t> basis;
+    SmallVector<size_t> dimToResult;
+    if (failed(basisFromSizesStrides(concatTiles, concatStrides, basis,
+                                     dimToResult))) {
+      return failure();
+    }
+    // Make the outer bound numThreadsInWorkgroup / prod(basis) to remove
+    // redundant checks.
+    if (numThreadsInWorkgroup.has_value()) {
+      int64_t outerBound =
+          numThreadsInWorkgroup.value() / llvm::product_of(basis);
+      basis.insert(basis.begin(), outerBound);
+    }
+    // Create a delinearize operation and check that all results not present in
+    // dimToResult are 0.
+    SmallVector<Value> delinearized;
+    b.createOrFold<affine::AffineDelinearizeIndexOp>(
+        delinearized, loc, threadId, basis,
+        /*hasOuterbound=*/numThreadsInWorkgroup.has_value());
+    // Get all results which are not in dimToResult and check they are 0.
+    Value condition = arith::ConstantOp::create(b, loc, b.getBoolAttr(true));
+    for (auto [idx, result] : llvm::enumerate(delinearized)) {
+      if (llvm::is_contained(dimToResult, idx)) {
+        continue;
+      }
+      Value isZero = b.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, result,
+          arith::ConstantIndexOp::create(b, loc, 0));
+      condition = b.createOrFold<arith::AndIOp>(loc, condition, isZero);
+    }
+    return condition;
+  }
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
@@ -457,7 +522,6 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     int64_t rank = vectorLayout.getRank();
-
     SmallVector<Value> warpIndices, threadIndices;
     if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
                                             vectorLayout, warpIndices,
@@ -465,6 +529,18 @@ struct DistributeTransferWrite final
       return rewriter.notifyMatchFailure(
           writeOp, "warp or thread tiles have overlapping strides");
     }
+
+    // If the distribution results in threads writing to the same address, guard
+    // with an scf.if to ensure only one thread writes per duplication group.
+    Location loc = writeOp.getLoc();
+    FailureOr<Value> doWrite =
+        getNoOverlapCondition(rewriter, loc, vectorLayout);
+    if (failed(doWrite)) {
+      return rewriter.notifyMatchFailure(
+          writeOp, "failed to compute no-overlap condition");
+    }
+    auto ifOp = scf::IfOp::create(rewriter, loc, doWrite.value());
+    rewriter.setInsertionPoint(ifOp.thenYield());
 
     Value distributedVector =
         getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
@@ -486,7 +562,6 @@ struct DistributeTransferWrite final
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
-
       // Extract the "element vector" from the inner most dimensions. All outer
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
@@ -517,6 +592,7 @@ struct DistributeTransferWrite final
 
   Value threadId;
   int64_t subgroupSize;
+  std::optional<int64_t> numThreadsInWorkgroup = std::nullopt;
 };
 
 /// Pattern to distribute `vector.transfer_gather` ops with nested layouts.
@@ -911,7 +987,8 @@ struct DistributeMultiReduction final
     auto accVector = dyn_cast<VectorValue>(acc);
     auto resVector = dyn_cast<VectorValue>(res);
 
-    auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
+    auto srcLayout =
+        dyn_cast_if_present<NestedLayoutAttr>(signature[srcVector]);
     if (!srcLayout) {
       return rewriter.notifyMatchFailure(multiReduceOp,
                                          "expected nested layout attr");
@@ -939,7 +1016,7 @@ struct DistributeMultiReduction final
 
     VectorValue mask = nullptr;
     if (maskOp) {
-      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+      auto maskLayout = dyn_cast_if_present<NestedLayoutAttr>(
           maskSignature.value()[maskOp.getMask()]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(maskOp,
@@ -1064,7 +1141,7 @@ struct DistributeMultiReduction final
 
     auto constOp = arith::ConstantOp::create(rewriter, loc,
                                              rewriter.getZeroAttr(flatVecType));
-    auto res = llvm::cast<VectorValue>(constOp.getResult());
+    auto res = cast<VectorValue>(constOp.getResult());
 
     for (unsigned i = 0; i < numElements; ++i) {
       Value extracted = vector::ExtractOp::create(rewriter, loc, flat, i);
@@ -1381,7 +1458,7 @@ struct DistributeContract final
 
     VectorValue mask = nullptr;
     if (maskOp) {
-      auto maskLayout = dyn_cast_or_null<NestedLayoutAttr>(
+      auto maskLayout = dyn_cast_if_present<NestedLayoutAttr>(
           maskSignature.value()[maskOp.getMask()]);
       if (!maskLayout) {
         return rewriter.notifyMatchFailure(maskOp,
@@ -2128,13 +2205,14 @@ struct DistributeConstantMask final
 
 } // namespace
 
-void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
-                                                   Value threadId,
-                                                   int64_t subgroupSize,
-                                                   int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite,
-               DistributeTransferGather, DistributeMapScatter>(
-      patterns.getContext(), threadId, subgroupSize);
+void populateGPUDistributeNestedLayoutAttrPatterns(
+    RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
+    ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
+  patterns.add<DistributeTransferRead, DistributeTransferGather,
+               DistributeMapScatter>(patterns.getContext(), threadId,
+                                     subgroupSize);
+  patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
+                                        subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);

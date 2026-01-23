@@ -48,8 +48,9 @@ public:
 
     // Scalar case.
     addConversion([](FloatType ty) -> std::optional<Type> {
-      if (ty.isBF16())
+      if (ty.isBF16()) {
         return IntegerType::get(ty.getContext(), 16);
+      }
       return ty;
     });
 
@@ -59,12 +60,14 @@ public:
 
     addConversion([this](FunctionType ty) -> std::optional<Type> {
       SmallVector<Type> inputs;
-      if (failed(convertTypes(ty.getInputs(), inputs)))
+      if (failed(convertTypes(ty.getInputs(), inputs))) {
         return std::nullopt;
+      }
 
       SmallVector<Type> results;
-      if (failed(convertTypes(ty.getResults(), results)))
+      if (failed(convertTypes(ty.getResults(), results))) {
         return std::nullopt;
+      }
 
       return FunctionType::get(ty.getContext(), inputs, results);
     });
@@ -82,10 +85,11 @@ struct ConvertHalInterfaceBindingSubspan final
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newResultTy = getTypeConverter()->convertType(op.getType());
-    if (!newResultTy)
+    if (!newResultTy) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
           llvm::formatv("failed to legalize memref type: {}", op.getType()));
+    }
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -105,10 +109,11 @@ struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
   matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newTy = getTypeConverter()->convertType(op.getType());
-    if (!newTy)
+    if (!newTy) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
           llvm::formatv("failed to convert memref type: {}", op.getType()));
+    }
 
     rewriter.replaceOpWithNewOp<memref::AllocOp>(
         op, newTy, adaptor.getDynamicSizes(), adaptor.getSymbolOperands(),
@@ -191,10 +196,11 @@ struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newResTy = getTypeConverter()->convertType(op.getType());
-    if (!newResTy)
+    if (!newResTy) {
       return rewriter.notifyMatchFailure(
           op->getLoc(), llvm::formatv("failed to convert memref type: {}",
                                       op.getMemRefType()));
+    }
 
     rewriter.replaceOpWithNewOp<memref::LoadOp>(
         op, newResTy, adaptor.getMemref(), adaptor.getIndices(),
@@ -210,10 +216,11 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newTy = getTypeConverter()->convertType(op.getMemRefType());
-    if (!newTy)
+    if (!newTy) {
       return rewriter.notifyMatchFailure(
           op->getLoc(), llvm::formatv("failed to convert memref type: {}",
                                       op.getMemRefType()));
+    }
 
     rewriter.replaceOpWithNewOp<memref::StoreOp>(
         op, adaptor.getValue(), adaptor.getMemref(), adaptor.getIndices(),
@@ -315,7 +322,8 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
           vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
           vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
-          vector::MaskOp, vector::TransposeOp, vector::YieldOp>(
+          vector::MaskOp, vector::TransposeOp, vector::YieldOp,
+          vector::FromElementsOp, vector::ToElementsOp>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()
@@ -326,8 +334,9 @@ struct ConvertBf16ToUInt16BuffersPass final
       RewritePatternSet patterns(ctx);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);
 
-      if (failed(applyPartialConversion(op, target, std::move(patterns))))
+      if (failed(applyPartialConversion(op, target, std::move(patterns)))) {
         signalPassFailure();
+      }
     }
   }
 };

@@ -12,20 +12,16 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
-#include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/IR/Iterators.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -46,7 +42,7 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
-        loweringConfig.hasTilingLevel(level)) {
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       if (rootOp) {
         return nullptr;
       }
@@ -56,14 +52,43 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
   return rootOp;
 }
 
-/// Returns the last operation that has `level` tiling level in lowering config.
-/// Returns nullptr if the operation does not exist.
-static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
-                                  IREE::CPU::TilingLevel level) {
+/// Returns the last operation that has `level` tiling level in lowering config
+/// after the root op (or ukernel ops) in the compute sequence.
+static Operation *getLastAnchorOpAfterRootOp(ArrayRef<Operation *> computeOps,
+                                             IREE::CPU::TilingLevel level) {
   for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
-    if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
+    if ((loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) ||
+        isa<IREE::Codegen::UKernelGenericOp>(op)) {
+      break;
+    }
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
+      return op;
+    }
+  }
+  return nullptr;
+}
+
+/// Returns the last operation that has `level` tiling level in lowering config
+/// before the root op (or ukernel ops) in the compute sequence.
+static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
+                                              IREE::CPU::TilingLevel level) {
+  bool foundRootOrUkernelOp = false;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
+    if ((loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) ||
+        isa<IREE::Codegen::UKernelGenericOp>(op)) {
+      foundRootOrUkernelOp = true;
+      continue;
+    }
+    if (!foundRootOrUkernelOp) {
+      continue;
+    }
+    if (loweringConfig &&
+        loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
       return op;
     }
   }
@@ -77,7 +102,7 @@ static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
 /// operands.
 static FailureOr<Operation *>
 tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
-                                int64_t tilingLevel,
+                                IREE::CPU::TilingLevel tilingLevel,
                                 bool onlyFuseProducerInputOperands) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
@@ -107,7 +132,8 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   int64_t numLoops = rootOp.getLoopIteratorTypes().size();
   auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-      getLoweringConfig(rootOp).getTilingLevelAttr(tilingLevel));
+      getLoweringConfig(rootOp).getTilingLevelAttr(
+          static_cast<unsigned>(tilingLevel)));
   SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
   SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
   tileSizes.resize(numLoops, 0);
@@ -232,37 +258,39 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  Operation *anchorOp;
+  SmallVector<Operation *> anchorOps;
   if (anchorOnRootOp) {
-    anchorOp = getRootOp(computeOps, tilingLevel);
+    Operation *anchorOp = getRootOp(computeOps, tilingLevel);
+    if (anchorOp) {
+      anchorOps.push_back(anchorOp);
+    }
+
   } else {
-    // TODO(hanchung): Support the case that anchor op is root op's producer. It
-    // is not common that the producer op has additional iteration dimensions,
-    // but it should be handled like consumers. I.e., the additional dimensions
-    // should be tiled. It is easier to support after we have solid lowering
-    // config propagation.
-    Operation *rootOp =
-        getRootOp(computeOps, IREE::CPU::TilingLevel::DistributionTiles);
-    anchorOp = getLastAnchorOp(computeOps, tilingLevel);
-    if (rootOp &&
-        llvm::find(computeOps, rootOp) > llvm::find(computeOps, anchorOp)) {
-      LDBG() << "anchor op that is rootOp's producer is not supported";
-      return;
+    if (Operation *anchorOp =
+            getLastAnchorOpAfterRootOp(computeOps, tilingLevel)) {
+      anchorOps.push_back(anchorOp);
+    }
+    if (Operation *anchorOp =
+            getLastAnchorOpBeforeRootOp(computeOps, tilingLevel)) {
+      anchorOps.push_back(anchorOp);
     }
   }
-  if (!anchorOp) {
+  if (anchorOps.empty()) {
     LDBG() << "unable to find an anchor operation that has "
            << IREE::CPU::getTilingLevelName(tilingLevel) << " config";
     return;
   }
 
-  if (failed(tileRootAndFuseProducerConsumer(
-          rewriter, cast<TilingInterface>(anchorOp), tilingLevel,
-          onlyFuseProducerInputOperands))) {
-    funcOp.emitError() << "tiling of level "
-                       << IREE::CPU::getTilingLevelName(tilingLevel)
-                       << " failed\n";
-    return signalPassFailure();
+  for (auto anchorOp : anchorOps) {
+    LDBG() << "anchorOp: " << *anchorOp;
+    if (failed(tileRootAndFuseProducerConsumer(
+            rewriter, cast<TilingInterface>(anchorOp), tilingLevel,
+            onlyFuseProducerInputOperands))) {
+      funcOp.emitError() << "tiling of level "
+                         << IREE::CPU::getTilingLevelName(tilingLevel)
+                         << " failed\n";
+      return signalPassFailure();
+    }
   }
 
   RewritePatternSet patterns =

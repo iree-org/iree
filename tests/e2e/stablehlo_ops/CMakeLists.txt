@@ -287,6 +287,7 @@ iree_check_single_backend_test_suite(
     "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
+    "reverse.mlir"
     "rng_normal.mlir"
     "rng_uniform.mlir"
     "round.mlir"
@@ -765,9 +766,8 @@ iree_check_single_backend_test_suite(
     "while.mlir"
   TARGET_BACKEND
     "rocm"
-  # Only test compilation for now, the ROCm driver is experimental.
-  # DRIVER
-  #   "rocm"
+  DRIVER
+    "hip"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
 )

@@ -55,8 +55,9 @@ public:
     }
 
     // No constants found; omit the constant block entirely.
-    if (allLoadOps.empty())
+    if (allLoadOps.empty()) {
       return;
+    }
 
     // Create global ops for each constant and replace the HAL ops so they load
     // from them. Each global will track what constant key it represents for
@@ -76,9 +77,9 @@ public:
                                 return loadOp.getLoc();
                               }));
       auto globalType = loadOps.front().getType();
-      auto globalName = (kConstantBlockGlobalPrefix +
-                         llvm::cast<StringAttr>(keyAttr).getValue())
-                            .str();
+      auto globalName =
+          (kConstantBlockGlobalPrefix + cast<StringAttr>(keyAttr).getValue())
+              .str();
 
       // Placeholder ordinal that'll be updated during linking.
       auto ordinalGlobalOp = IREE::Util::GlobalOp::create(

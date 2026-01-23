@@ -18,7 +18,6 @@ namespace {
 struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
   using Base::Base;
-
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -90,16 +89,18 @@ class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Handled by import-specific conversion.
-    if (srcOp.isExternal())
+    if (srcOp.isExternal()) {
       return failure();
+    }
 
     // Convert function signature.
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
     auto newFuncType = convertFuncSignature(srcOp, *getTypeConverter(),
                                             signatureConversion, rewriter);
-    if (failed(newFuncType))
+    if (failed(newFuncType)) {
       return failure();
+    }
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
@@ -166,8 +167,9 @@ class ExternalFuncOpConversion
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Handled by internal-specific conversion.
-    if (!srcOp.isExternal())
+    if (!srcOp.isExternal()) {
       return failure();
+    }
 
     // If the user declared an intended signature then we can use that instead
     // of running conversion ourselves. This can be used in cases where the
@@ -177,7 +179,7 @@ class ExternalFuncOpConversion
     auto signatureAttr = srcOp->getAttrOfType<TypeAttr>("vm.signature");
     if (signatureAttr) {
       // Directly use the signature from the user.
-      newSignature = llvm::dyn_cast<FunctionType>(signatureAttr.getValue());
+      newSignature = dyn_cast<FunctionType>(signatureAttr.getValue());
       if (!newSignature) {
         return rewriter.notifyMatchFailure(srcOp, "invalid vm.signature");
       }
@@ -187,8 +189,9 @@ class ExternalFuncOpConversion
           srcOp.getNumArguments());
       auto convertedSignature = convertFuncSignature(
           srcOp, *getTypeConverter(), signatureConversion, rewriter);
-      if (failed(convertedSignature))
+      if (failed(convertedSignature)) {
         return failure();
+      }
       newSignature = *convertedSignature;
     }
 
@@ -329,8 +332,9 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
     rewriter.setInsertionPointToStart(fallbackBlock);
     auto fallbackResults = convertCallOp(rootOp, loc, fallbackName, operands,
                                          resultTypes, rewriter);
-    if (failed(fallbackResults))
+    if (failed(fallbackResults)) {
       return failure();
+    }
     IREE::VM::BranchOp::create(rewriter, loc, exitBlock, *fallbackResults);
 
     return exitResults;
@@ -368,11 +372,25 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
 
 struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
   using Base::Base;
-
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct UnreachableOpConversion
+    : public OpConversionPattern<IREE::Util::UnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Create INTERNAL status code (13) for unreachable code.
+    auto status = IREE::VM::ConstI32Op::create(rewriter, op.getLoc(),
+                                               rewriter.getI32IntegerAttr(13));
+    rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(op, status.getResult(),
+                                                  op.getMessageAttr());
     return success();
   }
 };
@@ -387,8 +405,8 @@ void populateUtilStructuralToVMPatterns(MLIRContext *context,
   conversionTarget.addIllegalOp<IREE::Util::InitializerOp, IREE::Util::FuncOp,
                                 IREE::Util::CallOp, IREE::Util::ReturnOp>();
   patterns.insert<InitializerOpConversion, FuncOpConversion,
-                  ExternalFuncOpConversion, ReturnOpConversion>(typeConverter,
-                                                                context);
+                  ExternalFuncOpConversion, ReturnOpConversion,
+                  UnreachableOpConversion>(typeConverter, context);
   patterns.insert<CallOpConversion>(typeConverter, context, importTable);
 }
 

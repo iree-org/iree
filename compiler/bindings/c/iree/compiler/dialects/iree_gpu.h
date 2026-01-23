@@ -38,12 +38,12 @@ MLIR_CAPI_EXPORTED
 bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute ireeGPUPipelineOptionsAttrGet(
-    MlirContext mlirCtx, bool *prefetchSharedMemory,
+    MlirContext mlirCtx, int64_t *prefetchNumStages,
     bool *noReduceSharedMemoryBankConflicts, bool *useIgemmConvolution,
     MlirAttribute *reorderWorkgroupsStrategy);
 
 MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr);
+ireeGPUPipelineOptionsAttrGetPrefetchNumStages(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
@@ -158,6 +158,8 @@ struct ireeGPUTargetInfo {
   int32_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
   int32_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
   MlirAttribute mmaIntrinsics;        // MMA Intrinsics.
+  uint32_t wgpCount;                  // Workgroup count (CUs).
+  int32_t simdsPerWgp;                // Optional SIMD num.
 };
 
 // Queries GPU target info from the given `ExecutableTargetAttr` attribute.
@@ -168,6 +170,7 @@ MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
     MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
     size_t numSubgroupChoices, const int32_t *workgroupSizes,
     size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    uint32_t wgpCount, int32_t simdsPerWgp,
     const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics);
 
 // Extracts MMA intrinsic values and their virtual status from an ArrayAttr.

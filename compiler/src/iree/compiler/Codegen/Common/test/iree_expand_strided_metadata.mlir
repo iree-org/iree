@@ -5,15 +5,15 @@ func.func @resolve_subview_memref(%arg0: memref<384x128xf32>, %arg1 : index, %ar
     %0 = memref.subview %arg0[%arg1, %arg2] [64, 64] [1, 1] : memref<384x128xf32> to memref<64x64xf32, #map0>
     %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<64x64xf32, #map0> -> memref<f32>, index, index, index, index, index
     return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
-  }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 128 + s1)>
-//     CHECK: func @resolve_subview_memref(
-// CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
-// CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:2, %[[BASE_STRIDES:.+]]:2 = memref.extract_strided_metadata %arg0
-//     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2]
-//     CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C64]], %[[C64]], %[[C128]], %[[C1]]
+}
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 128 + s1)>
+// CHECK-LABEL: func @resolve_subview_memref(
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:2, %[[BASE_STRIDES:.+]]:2 = memref.extract_strided_metadata %arg0
+//       CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[$MAP]]()[%arg1, %arg2]
+//       CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C64]], %[[C64]], %[[C128]], %[[C1]]
 
 // -----
 
@@ -23,12 +23,11 @@ func.func @resolve_subview_rankreducing_memref(%arg0: memref<384x128xf32>, %arg1
   %base_buffer, %offset, %size, %stride = memref.extract_strided_metadata %0 : memref<64xf32, #map0> -> memref<f32>, index, index, index
   return %base_buffer, %offset, %size, %stride : memref<f32>, index, index, index
 }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 128 + s1)>
 //     CHECK: func @resolve_subview_rankreducing_memref(
 // CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 // CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:2, %[[BASE_STRIDES:.+]]:2 = memref.extract_strided_metadata %arg0
-// CHECK-DAG:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2]
+// CHECK-DAG:   %[[SUB_OFFSET:.+]] = affine.apply #[[$MAP]]()[%arg1, %arg2]
 //     CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C64]], %[[C128]]
 
 // -----
@@ -52,14 +51,13 @@ func.func @resolve_subview_rankreducing_not_at_the_end_memref(%arg0: memref<8x16
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<6x3xf32, strided<[4,1], offset : ?>> -> memref<f32>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
 }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 64 + s1 * 4)>
 //     CHECK: func @resolve_subview_rankreducing_not_at_the_end_memref(
 // CHECK-DAG:   %[[C6:.+]] = arith.constant 6 : index
 // CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:3, %[[BASE_STRIDES:.+]]:3 = memref.extract_strided_metadata %arg0
-//     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2]
+//     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[$MAP]]()[%arg1, %arg2]
 //     CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C6]], %[[C3]], %[[C4]], %[[C1]]
 
 // -----
@@ -73,14 +71,14 @@ func.func @resolve_binding_subspan_zero_offset_memref() -> (memref<f32>, index, 
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xf32> -> memref<f32>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
 }
-//     CHECK: func @resolve_binding_subspan_zero_offset_memref(
-// CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
-// CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<196608xf32>
-//     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
-//     CHECK:   return %[[BASE_PTR]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+// CHECK-LABEL: func @resolve_binding_subspan_zero_offset_memref(
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<196608xf32>
+//       CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
+//       CHECK:   return %[[BASE_PTR]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
@@ -92,19 +90,19 @@ func.func @resolve_binding_subspan_offset_index_memref(%arg0 : index) -> (memref
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xindex, strided<[384, 1], offset:?>> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
-//     CHECK: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
-//     CHECK: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1 + 196608)>
-//     CHECK: func @resolve_binding_subspan_offset_index_memref(
-// CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
-// CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK:   %[[SIZEOF:.+]] = util.sizeof index
-//     CHECK:   %[[OFFSET:.+]] = affine.apply #[[MAP0]]()[%arg0, %[[SIZEOF]]]
-//     CHECK:   %[[SUBSPAN_SIZE:.+]] = affine.apply #[[MAP1]]()[%arg0, %[[SIZEOF]]]
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SUBSPAN_SIZE]]}
-//     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
-//     CHECK:   return %[[BASE_PTR]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1)>
+//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 floordiv s1 + 196608)>
+// CHECK-LABEL: func @resolve_binding_subspan_offset_index_memref(
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[SIZEOF:.+]] = util.sizeof index
+//       CHECK:   %[[OFFSET:.+]] = affine.apply #[[$MAP]]()[%arg0, %[[SIZEOF]]]
+//       CHECK:   %[[SUBSPAN_SIZE:.+]] = affine.apply #[[$MAP1]]()[%arg0, %[[SIZEOF]]]
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SUBSPAN_SIZE]]}
+//       CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
+//       CHECK:   return %[[BASE_PTR]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
@@ -117,13 +115,13 @@ func.func @resolve_binding_subspan_dyn_dims_memref(%arg0 : index, %arg1 : index)
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<?x?xindex> -> memref<index>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<index>, index, index, index, index, index
 }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-//     CHECK: func @resolve_binding_subspan_dyn_dims_memref(
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[MAP]]()[%arg0, %arg1]
-//     CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SIZE]]}
-//     CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+// CHECK-LABEL: func @resolve_binding_subspan_dyn_dims_memref(
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP]]()[%arg0, %arg1]
+//       CHECK:   %[[BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[C0]]) : memref<?xindex>{%[[SIZE]]}
+//       CHECK:   %[[BASE_PTR:.+]] = memref.reinterpret_cast %[[BINDING]] to offset: [0], sizes: [], strides: []
 //     CHECK:   return %[[BASE_PTR]], %[[C0]], %arg0, %arg1, %arg1, %[[C1]]
 
 // -----
@@ -166,15 +164,15 @@ func.func @resolve_global_memref() -> (memref<f32>, index, index, index, index, 
   %base_buffer, %offset, %sizes:2, %strides:2 = memref.extract_strided_metadata %0 : memref<512x384xf32> -> memref<f32>, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : memref<f32>, index, index, index, index, index
 }
-//     CHECK: memref.global "private" constant @[[CONSTANT:.+]] :
-//     CHECK: func @resolve_global_memref()
-// CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
-// CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[GET_GLOBAL:.+]] = memref.get_global @[[CONSTANT]]
-//     CHECK:   %[[CAST:.+]] = memref.reinterpret_cast %[[GET_GLOBAL]] to offset: [0], sizes: [], strides: []
-//     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+//   CHECK-DAG: memref.global "private" constant @[[$CONSTANT_GLOBAL:.+]] : memref<512x384xf32> = dense<0.000000e+00>
+// CHECK-LABEL: func @resolve_global_memref()
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C384:.+]] = arith.constant 384 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[GET_GLOBAL:.+]] = memref.get_global @[[$CONSTANT_GLOBAL]]
+//       CHECK:   %[[CAST:.+]] = memref.reinterpret_cast %[[GET_GLOBAL]] to offset: [0], sizes: [], strides: []
+//       CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
 
 // -----
 
@@ -194,3 +192,79 @@ func.func @external_func_entry_point() -> (memref<bf16>, index) {
 // CHECK-LABEL: func.func @external_func_entry_point()
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //       CHECK:   %{{.+}} = memref.reinterpret_cast %[[SUBSPAN]]
+
+// -----
+
+// Tests that memref.extract_strided_metadata on a HAL binding gets fully
+// resolved and does not remain as any extract op (neither memref nor
+// iree_codegen version). This test would fail if the fallback pattern handling
+// conversion of iree_codegen to memref fires before
+// ResolveExtractMetadataFromHalInterfaceBindingSubspan.
+#pipeline_layout_2 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @must_resolve_hal_binding_extract(%dim: index) -> (memref<f32>, index) {
+  %c0 = arith.constant 0 : index
+  %binding = hal.interface.binding.subspan layout(#pipeline_layout_2) binding(0)
+      alignment(64) offset(%c0) : memref<?xf32>{%dim}
+  // This extract MUST be converted to iree_codegen then resolved to concrete
+  // values. Without the guard in the pattern this could be converted back to
+  // memref.extract_strided_metadata before the other pattern resolves it.
+  %base, %offset, %size, %stride = memref.extract_strided_metadata %binding
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @must_resolve_hal_binding_extract
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BINDING:.+]] = hal.interface.binding.subspan{{.*}}: memref<?xf32>
+// CHECK:       %[[CAST:.+]] = memref.reinterpret_cast %[[BINDING]]
+// CHECK:       return %[[CAST]], %[[C0]]
+// Verify no extract ops remain (would indicate the fallback fired too early).
+// CHECK-NOT:   memref.extract_strided_metadata
+// CHECK-NOT:   iree_codegen.extract_strided_metadata
+
+// -----
+
+// Tests that iree_codegen.extract_strided_metadata on a non-HAL source
+// correctly converts to memref.extract_strided_metadata (fallback should
+// fire). This ensures the guard in the fallback doesn't break non-HAL cases.
+func.func @must_convert_non_hal_iree_codegen_extract(%arg0: memref<?xf32>) -> (memref<f32>, index) {
+  // Directly use iree_codegen version on a non-HAL source.
+  // Fallback must convert this to memref version.
+  %base, %offset, %size, %stride = iree_codegen.extract_strided_metadata %arg0
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @must_convert_non_hal_iree_codegen_extract
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BASE:.+]], %{{.+}}, %{{.+}}, %{{.+}} = memref.extract_strided_metadata %arg0
+// CHECK:       return %[[BASE]], %[[C0]]
+// Verify iree_codegen version is gone (fallback should have converted it).
+// CHECK-NOT:   iree_codegen.extract_strided_metadata
+
+// -----
+
+// Tests that HAL binding extraction works even when the binding is wrapped
+// in transparent operations like memref.assume_alignment. This tests that
+// getSourceInterfaceBinding() correctly walks through wrappers.
+#pipeline_layout_3 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @hal_binding_through_assume_alignment(%dim: index) -> (memref<f32>, index) {
+  %c0 = arith.constant 0 : index
+  %binding = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0)
+      alignment(64) offset(%c0) : memref<?xf32>{%dim}
+  %aligned = memref.assume_alignment %binding, 64 : memref<?xf32>
+  // Extract on the assume_alignment result should still be resolved.
+  %base, %offset, %size, %stride = memref.extract_strided_metadata %aligned
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @hal_binding_through_assume_alignment
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BINDING:.+]] = hal.interface.binding.subspan{{.*}}: memref<?xf32>
+// CHECK:       %[[CAST:.+]] = memref.reinterpret_cast %[[BINDING]]
+// CHECK:       return %[[CAST]], %[[C0]]
+// Verify resolution happened despite assume_alignment wrapper.
+// CHECK-NOT:   memref.extract_strided_metadata
+// CHECK-NOT:   iree_codegen.extract_strided_metadata

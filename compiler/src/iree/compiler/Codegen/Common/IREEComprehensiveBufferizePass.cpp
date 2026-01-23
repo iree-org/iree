@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -62,9 +63,10 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
+    if (isa<IREE::HAL::DescriptorTypeAttr>(storage)) {
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
+    }
   }
   return memref::AllocOp::create(builder, loc, type, dynamicSizes).getResult();
 }
@@ -171,12 +173,14 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
                       const OneShotBufferizationOptions &options) {
   // Analyze IR.
   OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state)))
+  if (failed(analyzeOp(op, state))) {
     return failure();
+  }
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state))) {
     return failure();
+  }
 
   return success();
 }
@@ -214,11 +218,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
-  if (failed(analyzeOp(funcOp, state)))
+  if (failed(analyzeOp(funcOp, state))) {
     return signalPassFailure();
+  }
   // Eliminate empty tensors.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state))) {
     return signalPassFailure();
+  }
 }
 
 // The following is copied from bufferization::runOneShotBufferize with
@@ -228,16 +234,39 @@ runIREEOneShotBufferize(Operation *op,
                         const IREEOneShotBufferizationOptions &options,
                         bufferization::BufferizationState &state) {
   OneShotAnalysisState analyzeState(op, options);
-  if (failed(analyzeOp(op, analyzeState)))
+  if (failed(analyzeOp(op, analyzeState))) {
     return failure();
-  if (options.testAnalysisOnly)
+  }
+  if (options.testAnalysisOnly) {
     return success();
-  return bufferization::runOneShotBufferize(op, options, state);
+  }
+  if (failed(bufferization::runOneShotBufferize(op, options, state))) {
+    return failure();
+  }
+
+  // All to_buffer ops on constants can be safely marked as read only since
+  // constants are immutable and any write conflicts would have already been
+  // resolved by the bufferization analysis (which inserts copies as needed).
+  op->walk([](bufferization::ToBufferOp toBuffer) {
+    if (toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      toBuffer.setReadOnly(true);
+    }
+  });
+
+  return success();
 }
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
+
+  // First drop all fusion barriers. Fusion is done at this point and these can
+  // be safely removed.
+  IRRewriter rewriter(funcOp.getContext());
+  funcOp.walk([&](IREE::Codegen::FusionBarrierOp barrier) {
+    rewriter.replaceOp(barrier, barrier.getSource());
+  });
+
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
@@ -253,18 +282,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
   }
-
-  // All to_buffer ops on single use constants will have already had any
-  // write conflicts resolved by the analysis, so we can safely mark them as
-  // read only.
-  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
-    if (auto constant =
-            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
-      if (constant->hasOneUse()) {
-        toBuffer.setReadOnly(true);
-      }
-    }
-  });
 
   // Remove redundant args and unused results.
   {
@@ -287,16 +304,27 @@ void IREEBufferizeConstantsPass::runOnOperation() {
     signalPassFailure();
     return;
   }
+
+  // All to_buffer ops on constants can be safely marked as read only since
+  // constants are immutable and any write conflicts would have already been
+  // resolved by the bufferization analysis (which inserts copies as needed).
+  getOperation()->walk([](bufferization::ToBufferOp toBuffer) {
+    if (toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      toBuffer.setReadOnly(true);
+    }
+  });
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  if (!allocationFn)
+  if (!allocationFn) {
     allocationFn = defaultAllocationFn;
-  if (!memCpyFn)
+  }
+  if (!memCpyFn) {
     memCpyFn = defaultMemCpyFn;
+  }
   return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn.value(),
                                                           memCpyFn.value());
 }

@@ -18,6 +18,7 @@ exports_files(["VMOps.td"])
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "VMBase.td",
             "VMOpcodesCore.td",
@@ -29,6 +30,7 @@ iree_td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
@@ -112,11 +114,17 @@ iree_gentbl_cc_library(
     name = "VMEnumsGen",
     tbl_outs = [
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=vm",
+            ],
             "VMEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=vm",
+            ],
             "VMEnums.cpp.inc",
         ),
     ],

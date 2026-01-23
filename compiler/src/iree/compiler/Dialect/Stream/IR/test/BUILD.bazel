@@ -15,18 +15,21 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "async_folding.mlir",
             "async_ops.mlir",
+            "async_parameter_folding.mlir",
+            "async_parameter_ops.mlir",
             "channel_folding.mlir",
             "channel_ops.mlir",
             "cmd_folding.mlir",
             "cmd_ops.mlir",
+            "cmd_parameter_folding.mlir",
+            "cmd_parameter_ops.mlir",
             "context_ops.mlir",
             "executable_ops.mlir",
             "file_ops.mlir",
-            "parameter_folding.mlir",
-            "parameter_ops.mlir",
             "resource_folding.mlir",
             "resource_ops.mlir",
             "tensor_folding.mlir",

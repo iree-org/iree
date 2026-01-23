@@ -31,7 +31,7 @@ func.func @pad_matmul_static_dispatch_0() {
 }
 
 builtin.module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.consumed}) {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
     transform.iree.eliminate_empty_tensors %func : (!transform.any_op) -> ()
     %_ = transform.iree.bufferize { target_gpu } %func: (!transform.any_op) -> !transform.any_op

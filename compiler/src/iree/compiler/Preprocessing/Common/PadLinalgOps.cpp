@@ -30,23 +30,26 @@ public:
     Operation *op = linalgOp.getOperation();
     const bool isBatchMatmul = isa<linalg::BatchMatmulOp>(op);
     const bool isMatmul = isa<linalg::MatmulOp>(op);
-    if (!isBatchMatmul && !isMatmul)
+    if (!isBatchMatmul && !isMatmul) {
       return failure();
+    }
 
     Location loc = linalgOp.getLoc();
     Value lhs = linalgOp.getDpsInputOperand(0)->get();
     Value rhs = linalgOp.getDpsInputOperand(1)->get();
     Value result = linalgOp.getDpsInitOperand(0)->get();
 
-    auto lhsType = llvm::dyn_cast<RankedTensorType>(lhs.getType());
-    auto rhsType = llvm::dyn_cast<RankedTensorType>(rhs.getType());
-    auto resultType = llvm::dyn_cast<RankedTensorType>(result.getType());
+    auto lhsType = dyn_cast<RankedTensorType>(lhs.getType());
+    auto rhsType = dyn_cast<RankedTensorType>(rhs.getType());
+    auto resultType = dyn_cast<RankedTensorType>(result.getType());
 
-    if (!lhsType || !rhsType)
+    if (!lhsType || !rhsType) {
       return failure();
+    }
 
-    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape())
+    if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) {
       return failure();
+    }
 
     auto lhsShape = lhsType.getShape();
     auto rhsShape = rhsType.getShape();
@@ -63,13 +66,15 @@ public:
     int paddingForN = newNSize - N;
     int paddingForK = newKSize - K;
 
-    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
+    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0) {
       return failure();
+    }
 
     auto getFullShape = [&](ArrayRef<int> dims) {
       SmallVector<int64_t, 3> shape;
-      if (isBatchMatmul)
+      if (isBatchMatmul) {
         shape.push_back(B);
+      }
       llvm::append_range(shape, dims);
       return shape;
     };

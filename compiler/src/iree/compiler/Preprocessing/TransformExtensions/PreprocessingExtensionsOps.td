@@ -175,13 +175,32 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
 def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     [MatchOpInterface,
      SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims", "k_dims"]>
+     ]> {
   let summary = [{Check whether the op is a contraction operation.}];
   let description = [{
     Matches operations that implement the ContractionOpInterface.
     This includes operations like linalg.matmul, linalg.batch_matmul, etc.
 
     Optionally matches specific indexing maps patterns.
+
+    ### Example
+
+    ```mlir
+    #map_lhs = affine_map<(d0, d1, d2) -> (d0, d2)>
+    #map_rhs = affine_map<(d0, d1, d2) -> (d1, d2)>
+    #map_output = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+    %batch_dims, %m_dims, %n_dims, %k_dims =
+      transform.iree.match.contraction %matmul_op,
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_lhs, #map_rhs, #map_output] :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%matmul_op` is a contraction operation with f32 input
+    types and f32 output type, and matches the specified indexing maps pattern.
 
     #### Return modes
 
@@ -217,8 +236,172 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     `,` `lhs_type` `=` $lhs_type
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
-    (`indexing_maps` $indexing_maps^)?
-    attr-dict `:` functional-type(operands, results)
+    (`,` `indexing_maps` `=` $indexing_maps^)?
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "output_image_dims", "output_channel_dims",
+                    "filter_dims", "input_channel_dims", "depth_dims",
+                    "strides", "dilations"]>
+     ]> {
+  let summary = [{Check whether the op is a convolution operation.}];
+  let description = [{
+    Matches operations that implement the ConvolutionOpInterface.
+    This includes operations like linalg.conv_2d_nhwc_hwcf,
+    linalg.conv_2d_nchw_fchw, linalg.depthwise_conv_2d_nhwc_hwc, etc.
+
+    Optionally matches specific indexing maps patterns.
+
+    ### Example
+
+    ```mlir
+    #map_input = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+    #map_filter = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+    %batch_dims, %output_image_dims, %output_channel_dims, %filter_dims,
+    %input_channel_dims, %depth_dims, %strides, %dilations =
+      transform.iree.match.convolution %conv_op,
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_input, #map_filter, #map_output] :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%conv_op` is a convolution operation with f32 element
+    types for input, filter, and output tensors.
+
+    #### Return modes
+
+    Succeeds if the operation is a convolution operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each convolution dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - output_image_dims: Array of output spatial dimension sizes.
+    - output_channel_dims: Array of output channel dimension sizes.
+    - filter_dims: Array of filter spatial dimension sizes.
+    - input_channel_dims: Array of input channel dimension sizes.
+    - depth_dims: Array of depth dimension sizes (for depthwise convolutions).
+    - strides: Array of stride values.
+    - dilations: Array of dilation values.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$lhs_type,
+    TypeAttr:$rhs_type,
+    TypeAttr:$output_type,
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$output_image_dims,
+    TransformParamTypeInterface:$output_channel_dims,
+    TransformParamTypeInterface:$filter_dims,
+    TransformParamTypeInterface:$input_channel_dims,
+    TransformParamTypeInterface:$depth_dims,
+    TransformParamTypeInterface:$strides,
+    TransformParamTypeInterface:$dilations
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
+    (`,` `indexing_maps` `=` $indexing_maps^)?
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchAttentionOp : Op<Transform_Dialect, "iree.match.attention",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims",
+                    "k1_dims", "k2_dims"]>
+     ]> {
+  let summary = [{Check whether the op is an attention operation.}];
+  let description = [{
+    Matches operations from the IREELinalgExt dialect that implement
+    attention: iree_linalg_ext.attention.
+
+    ### Example
+
+    ```mlir
+    #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+    #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+    #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+    #map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+
+    %batch_dims, %m_dims, %n_dims, %k1_dims, %k2_dims =
+      transform.iree.match.attention %attn_op,
+        query_type = f32, key_type = f32, value_type = f32, output_type = f32,
+        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%attn_op` is an attention operation with f32 element
+    types for query, key, value, and output tensors, and matches the specified
+    indexing maps pattern.
+
+    #### Return modes
+
+    Succeeds if the operation is an attention operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes extracted from the iteration domain:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of query sequence length dimension sizes.
+    - n_dims: Array of number of heads dimension sizes.
+    - k1_dims: Array of key/value sequence length dimension sizes.
+    - k2_dims: Array of key embedding dimension sizes.
+
+    The exact interpretation depends on the indexing maps of the attention op.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$query_type,
+    TypeAttr:$key_type,
+    TypeAttr:$value_type,
+    TypeAttr:$output_type,
+    AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k1_dims,
+    TransformParamTypeInterface:$k2_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `query_type` `=` $query_type
+    `,` `key_type` `=` $key_type
+    `,` `value_type` `=` $value_type
+    `,` `output_type` `=` $output_type
+    `,` `indexing_maps` `=` $indexing_maps
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 
@@ -251,7 +434,7 @@ def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
 
   let arguments = (ins
     TransformParamTypeInterface:$dimension_sizes, // Array of dimension parameters.
-    DenseI64ArrayAttr:$expected_values                    // Array of expected i64 values.
+    DenseI64ArrayAttr:$expected_values            // Array of expected i64 values.
   );
 
   let assemblyFormat = [{

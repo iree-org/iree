@@ -59,22 +59,25 @@ LLD_HAS_DRIVER(wasm)
 
 static Flavor getFlavor(StringRef s) {
   return StringSwitch<Flavor>(s)
-      .CasesLower("ld", "ld.lld", "gnu", Gnu)
-      .CasesLower("wasm", "ld-wasm", Wasm)
+      .CasesLower({"ld", "ld.lld", "gnu"}, Gnu)
+      .CasesLower({"wasm", "ld-wasm"}, Wasm)
       .CaseLower("link", WinLink)
-      .CasesLower("ld64", "ld64.lld", "darwin", "darwinnew",
-                  "ld64.lld.darwinnew", Darwin)
+      .CasesLower(
+          {"ld64", "ld64.lld", "darwin", "darwinnew", "ld64.lld.darwinnew"},
+          Darwin)
       .Default(Invalid);
 }
 
 static Flavor parseFlavor(std::vector<const char *> &v) {
   // Parse -flavor option.
   if (v.size() > 1 && v[1] == StringRef("-flavor")) {
-    if (v.size() <= 2)
+    if (v.size() <= 2) {
       die("missing arg value for '-flavor'");
+    }
     Flavor f = getFlavor(v[2]);
-    if (f == Invalid)
+    if (f == Invalid) {
       die("Unknown flavor: " + StringRef(v[2]));
+    }
     v.erase(v.begin() + 1, v.begin() + 3);
     return f;
   }

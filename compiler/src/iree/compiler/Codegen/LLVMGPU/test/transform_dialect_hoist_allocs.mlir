@@ -29,7 +29,6 @@ module attributes { transform.with_named_sequence } {
 func.func @nested_op_alloc_subview_use_static(%arg0 : index, %o0 : index, %o1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c42 = arith.constant 42 : i32
   scf.for %iv = %c0 to %arg0 step %c1 {
     %0 = affine.min #map(%iv)
     %1 = memref.alloc() : memref<16x16xi32>
@@ -62,7 +61,6 @@ module attributes { transform.with_named_sequence } {
 func.func @nested_op_alloc_subview_use_dynamic(%arg0 : index, %o0 : index, %o1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %c42 = arith.constant 42 : i32
   scf.for %iv = %c0 to %arg0 step %c1 {
     %0 = affine.min #map(%iv)
     %1 = memref.alloc(%0, %0) : memref<?x?xi32>

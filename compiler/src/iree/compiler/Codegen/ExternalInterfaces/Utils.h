@@ -22,6 +22,14 @@ namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
+// Adjusts tile sizes when the tensor was bitcast from a different element type.
+// The encoding's `original_element_type` field records the element type before
+// bitcast packing. Tile sizes are computed for the original (semantic) element
+// count, so we scale them by the bit width ratio to match the storage shape.
+// This also adjusts the swizzle's expandShape innermost dimension if present.
+void adjustTileSizesForBitcast(RankedTensorType type,
+                               IREE::Codegen::MaterializeEncodingInfo &info);
+
 // This class is the base class for the external model of different packed
 // encoding layout attributes. It provides a public method, `getEncodingInfo` to
 // reduce the duplicated implementations before. To inherit it, it requires the
@@ -47,7 +55,107 @@ public:
         return info.value();
       }
     }
-    return impl->getEncodingInfoImpl(attr, type);
+    IREE::Codegen::MaterializeEncodingInfo info =
+        impl->getEncodingInfoImpl(attr, type);
+    adjustTileSizesForBitcast(type, info);
+    return info;
+  }
+
+  LogicalResult verifyPackedLayoutWithType(
+      Attribute attr, ArrayRef<int64_t> shape, Type elementType,
+      function_ref<InFlightDiagnostic()> emitError) const {
+    const EncodingPackedLayoutMaterializerAttr *impl =
+        static_cast<const EncodingPackedLayoutMaterializerAttr *>(this);
+    DictionaryAttr config = impl->getConfiguration(attr);
+    if (!config) {
+      return success();
+    }
+
+    auto encodingInfoAttr = config.getNamed(kEncodingInfoAttrName);
+    if (!encodingInfoAttr) {
+      return success();
+    }
+
+    std::optional<IREE::Codegen::MaterializeEncodingInfo> info =
+        IREE::Codegen::deserializeEncodingInfo(
+            cast<DictionaryAttr>(encodingInfoAttr->getValue()));
+    if (!info) {
+      return emitError() << "invalid encoding_info in configuration";
+    }
+
+    // Identity layouts are always valid.
+    if (IREE::Codegen::isIdentityLayout(info.value())) {
+      return success();
+    }
+
+    if (info->innerDimsPos.size() != info->innerTileSizes.size()) {
+      return emitError() << "innerDimsPos size (" << info->innerDimsPos.size()
+                         << ") does not match innerTileSizes size ("
+                         << info->innerTileSizes.size() << ")";
+    }
+
+    int64_t rank = shape.size();
+
+    // Utility to check that indices are valid (in bounds) and unique.
+    auto verifyIndices = [&](ArrayRef<int64_t> indices,
+                             StringRef fieldName) -> LogicalResult {
+      llvm::SmallDenseSet<int64_t> seenIndices;
+      for (int64_t pos : indices) {
+        if (pos < 0 || pos >= rank) {
+          return emitError() << fieldName << " index " << pos
+                             << " is out of bounds for tensor rank " << rank;
+        }
+        if (!seenIndices.insert(pos).second) {
+          return emitError()
+                 << fieldName << " contains duplicate index " << pos;
+        }
+      }
+      return success();
+    };
+
+    if (failed(verifyIndices(info->innerDimsPos, "innerDimsPos"))) {
+      return failure();
+    }
+    if (failed(verifyIndices(info->outerDimsPerm, "outerDimsPerm"))) {
+      return failure();
+    }
+
+    // Verify swizzle if present.
+    if (info->swizzle) {
+      const IREE::Codegen::TileSwizzle &swizzle = *info->swizzle;
+
+      // Verify internal consistency of the swizzle (permutation size and
+      // validity).
+      if (failed(swizzle.verify(emitError))) {
+        return failure();
+      }
+
+      // The expand shape should have the same number of entries as inner tile
+      // dimensions.
+      if (swizzle.expandShape.size() != info->innerTileSizes.size()) {
+        return emitError() << "swizzle expandShape size ("
+                           << swizzle.expandShape.size()
+                           << ") does not match innerTileSizes size ("
+                           << info->innerTileSizes.size() << ")";
+      }
+
+      // For each inner dimension, the product of expanded sizes should match
+      // the inner tile size.
+      for (auto [idx, expandDims] : llvm::enumerate(swizzle.expandShape)) {
+        int64_t product = 1;
+        for (const Codegen::TileSwizzle::Dim &dim : expandDims) {
+          product *= dim.size;
+        }
+        if (product != info->innerTileSizes[idx]) {
+          return emitError()
+                 << "swizzle expandShape[" << idx << "] product (" << product
+                 << ") does not match innerTileSizes[" << idx << "] ("
+                 << info->innerTileSizes[idx] << ")";
+        }
+      }
+    }
+
+    return success();
   }
 };
 
@@ -65,7 +173,7 @@ public:
   Type convertType(Attribute attr, Type type) const {
     EncodingLayoutAttr layoutAttr = cast<EncodingLayoutAttr>(attr);
     return TypeSwitch<Type, Type>(type)
-        .template Case<RankedTensorType>([&](auto type) {
+        .Case([&](RankedTensorType type) {
           // For a given tensor type with an encoding, return the materialized
           // type to use for it. If no encoding is set, then return the tensor
           // type itself.
@@ -87,7 +195,7 @@ public:
             }
           }
           auto packedType =
-              cast<RankedTensorType>(linalg::PackOp::inferPackedType(
+              cast<RankedTensorType>(linalg::PackOp::inferPackedTensorType(
                   type, innerTileSizesVector, encodingInfo.innerDimsPos,
                   encodingInfo.outerDimsPerm));
 
@@ -108,16 +216,15 @@ public:
           newShape.append(swizzledTileShape);
           return RankedTensorType::get(newShape, packedType.getElementType());
         })
-        .template Case<IREE::TensorExt::DispatchTensorType>(
-            [&](auto dispatchTensorType) {
-              Type boundType = dispatchTensorType.getBoundType();
-              Type convertedBoundType = convertType(attr, boundType);
-              if (convertedBoundType == boundType) {
-                return dispatchTensorType;
-              }
-              return IREE::TensorExt::DispatchTensorType::get(
-                  dispatchTensorType.getAccess(), convertedBoundType);
-            })
+        .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
+          Type boundType = dispatchTensorType.getBoundType();
+          Type convertedBoundType = convertType(attr, boundType);
+          if (convertedBoundType == boundType) {
+            return dispatchTensorType;
+          }
+          return IREE::TensorExt::DispatchTensorType::get(
+              dispatchTensorType.getAccess(), convertedBoundType);
+        })
         .Default([&](auto concreteType) { return concreteType; });
   }
 
@@ -128,17 +235,22 @@ public:
       ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
       SmallVectorImpl<OpFoldResult> &newSizes,
       SmallVectorImpl<OpFoldResult> &newStrides) const {
-    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
+    auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
+    if (!boundType || !boundType.getEncoding()) {
+      return failure();
+    }
+
     // Only handle cases where the slice spans the whole
     // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(jornt): Enable partial slices.
     if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
       return failure();
     }
-    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
+
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
     IREE::Codegen::MaterializeEncodingInfo encodingInfo =
-        getEncodingInfoFromLayout(boundTensorType, layoutAttr);
-    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+        getEncodingInfoFromLayout(boundType, layoutAttr);
+    newSizes = getMixedValues(boundType.getShape(), dynamicDims, builder);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
         getPackedDimsForDispatchTensorImpl(builder, loc, type, dynamicDims,
                                            layoutAttr, encodingInfo);
@@ -176,6 +288,22 @@ DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
 /// in the `dictAttr`.
 void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
                              DictionaryAttr dictAttr, StringRef name);
+
+/// Returns a `linalg.fill` operation with provided operands, which are assumed
+/// to have types without encodings.
+Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
+                                          linalg::FillOp fillOp,
+                                          TypeRange convertedResTypes,
+                                          ValueRange convertedOperands);
+
+/// Converts a linalg::GenericOp with encoded inputs into the packed domain,
+/// with an optional swizzle expansion and permutation if applicable. The
+/// `genericOp` must have all parallel iterator types and a single output with
+/// an identity indexing map.
+Operation *lowerGenericOpWithResolvedLayouts(
+    OpBuilder &builder, linalg::GenericOp genericOp,
+    TypeRange convertedResTypes, ValueRange convertedOperands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr);
 
 } // namespace mlir::iree_compiler::IREE
 

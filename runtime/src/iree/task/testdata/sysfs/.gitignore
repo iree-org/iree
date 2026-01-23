@@ -1,0 +1,8 @@
+# Ignore all extracted sysfs snapshot directories.
+# Only tar.gz archives should be checked in.
+
+# Allow tar.gz archives (override root .gitignore).
+!*.tar.gz
+
+# Ignore all directories.
+*/

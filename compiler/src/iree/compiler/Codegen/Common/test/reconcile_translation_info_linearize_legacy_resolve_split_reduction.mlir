@@ -1,11 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z fold-split-reduction-loop-into-workgroup-mapping-loop=false}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z fold-split-reduction-loop-into-workgroup-mapping-loop=false}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
 
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D_dynamic_tile_size {
-  hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @scf_forall_2D_dynamic_tile_size target(#hal.executable.target<"", "">) {
     hal.executable.export public @scf_forall_2D_dynamic_tile_size layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       hal.return %x, %y, %z : index, index, index
@@ -34,7 +34,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
   }
 }
 //         CHECK-ALL:   hal.executable.export
-//    CHECK-ALL-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: !hal.device
+//    CHECK-ALL-SAME:       {{.+}}: !hal.device
 //    CHECK-ALL-SAME:       %[[ARG1:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG2:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG3:[a-zA-Z0-9]+]]: index
@@ -93,12 +93,12 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[IDX]], %[[ARG5]], %[[ARG1]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]])
 
-// // -----
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_3D_tile_size {
-  hal.executable.variant public @scf_forall_3D_tile_size target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @scf_forall_3D_tile_size target(#hal.executable.target<"", "">) {
     hal.executable.export public @scf_forall_3D_tile_size layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
@@ -171,7 +171,7 @@ hal.executable private @scf_forall_3D_tile_size {
     #hal.pipeline.binding<storage_buffer, "ReadOnly">,
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @split_reduction_executable {
-  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
+  hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "">) {
     hal.executable.export public @split_reduction layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
@@ -214,13 +214,13 @@ hal.executable private @split_reduction_executable {
 //    CHECK-ALL-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 
 //   DISTRIBUTEX-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * (s2 * (s0 * s1)))>
-//  DISTRIBUTEX-SAME:         [%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEX:     %[[NUMWORKGROUPSX:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4, s5] -> ((s5 * (s3 * s4)) * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEX-SAME:         [%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG6]], %[[ARG5]], %[[ARG4]]]
 //       DISTRIBUTEX:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 
 //   DISTRIBUTEY-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> (((-s2 + s3) ceildiv s4) * (s0 * s1))>
-//  DISTRIBUTEY-SAME:         [%[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//       DISTRIBUTEY:     %[[NUMWORKGROUPSY:.+]] = affine.apply affine_map<()[s0, s1, s2, s3, s4] -> ((s3 * s4) * ((-s0 + s1) ceildiv s2))>
+//  DISTRIBUTEY-SAME:         [%[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG5]], %[[ARG4]]]
 //       DISTRIBUTEY:     hal.return %[[ARG6]], %[[NUMWORKGROUPSY]], %[[C1]]
 
 //       DISTRIBUTEZ:     %[[NUMWORKGROUPSZ:.+]] = affine.apply affine_map<(d0)[s0, s1, s2] -> (d0 * ((-s0 + s1) ceildiv s2))>

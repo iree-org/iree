@@ -62,12 +62,13 @@ struct LLVMGPUCastAddressSpaceFunctionPass final
       rewriter.setInsertionPoint(callOp);
       if (castOperands(callOp->getOperands(), newOperands)) {
         callOp.getArgOperandsMutable().assign(newOperands);
-        auto fnDecl = dyn_cast_or_null<mlir::FunctionOpInterface>(
+        auto fnDecl = dyn_cast_if_present<mlir::FunctionOpInterface>(
             SymbolTable::lookupSymbolIn(moduleOp, callee));
         if (fnDecl) {
           SmallVector<Type> callArgumentTypes;
-          for (auto op : newOperands)
+          for (auto op : newOperands) {
             callArgumentTypes.push_back(op.getType());
+          }
           FunctionType functionType = rewriter.getFunctionType(
               callArgumentTypes, fnDecl->getResultTypes());
           fnDecl.setType(functionType);

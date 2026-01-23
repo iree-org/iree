@@ -36,13 +36,46 @@ def BubbleUpExpandShapesPass :
     Pass<"iree-dispatch-creation-bubble-up-expand-shapes"> {
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
   let options = [
-    Option<"enableBubbleUpExpandShapesAcrossReductionOps", "enable-bubble-up-expand-shapes-across-reduction-ops", "bool",
-           /*default=*/"false", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
+    Option<"enableReshapeMovementAcrossReductions", "enable-reshape-movement-across-reductions", "bool",
+           /*default=*/"false", "Enables propagation of 'expand_shape's and 'collapse_shape's through 'linalg.generic's with reductions">
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
     "mlir::linalg::LinalgDialect",
     "IREE::LinalgExt::IREELinalgExtDialect",
+  ];
+}
+
+def InsertTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-insert-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Insert tensor barrier markers around computation regions.";
+  let description = [{
+    Walks from function boundaries and inserts iree_tensor_ext.compute_barrier.start
+    and iree_tensor_ext.compute_barrier.end operations at the boundaries of
+    computation regions (tensor/linalg/linalgext ops). These barriers allow
+    controlling where certain transformations like reshape propagation can occur.
+
+    The pass identifies compute operations and wraps tensor values flowing
+    into and out of the compute region with the barrier operations.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
+}
+
+def RemoveTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-remove-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensor barrier markers from the program.";
+  let description = [{
+    Removes iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end
+    operations from the program. These are identity operations that simply
+    pass through their operands, so they can be safely removed by replacing
+    all uses of their results with their operands.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 
@@ -63,6 +96,21 @@ def ElementwiseOpFusionPass :
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
+  ];
+}
+
+def FoldReshapesIntoTensorBarriersPass :
+    InterfacePass<"iree-dispatch-creation-fold-reshapes-into-tensor-barriers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Fold reshape operations into tensor barriers.";
+  let description = [{
+    Moves tensor.expand_shape and tensor.collapse_shape operations through
+    iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end operations.
+    This blocks reshapes on the edge of the program from being propagated.
+  }];
+  let dependentDialects = [
+    "IREE::TensorExt::IREETensorExtDialect",
+    "mlir::tensor::TensorDialect",
   ];
 }
 
@@ -318,6 +366,11 @@ def FuseEncodingOpsIntoDispatchRegionsPass :
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
     "IREE::Encoding::IREEEncodingDialect",
+  ];
+  let options = [
+    Option<"enableAggressiveFusion", "enable-aggressive-fusion", "bool",
+    /*default=*/"false",
+    "Enable encoding op fusion if the producer has more than one use">,
   ];
 }
 

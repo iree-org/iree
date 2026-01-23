@@ -21,6 +21,7 @@ iree_cc_library(
     ::BufferizationInterfaces
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
+    ::TensorMaskingOpInterface
     ::UKernelOpInterface
     IREELinalgTransformDialect
     MLIRAMDGPUDialect
@@ -47,6 +48,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::GPU::TransformExtensions::IREEGPUExtensions
+    iree::compiler::Codegen::Dialect::PCF::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::ExternalInterfaces::ExternalModels
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
@@ -174,6 +176,39 @@ iree_tablegen_library(
   OUTS
     --gen-op-interface-decls ProcessorOpInterfaces.h.inc
     --gen-op-interface-defs ProcessorOpInterfaces.cpp.inc
+)
+
+iree_cc_library(
+  NAME
+    TensorMaskingOpInterface
+  HDRS
+    "TensorMaskingOpInterface.h"
+  TEXTUAL_HDRS
+    "TensorMaskingOpInterface.cpp.inc"
+    "TensorMaskingOpInterface.h.inc"
+  SRCS
+    "TensorMaskingOpInterface.cpp"
+  DEPS
+    ::TensorMaskingOpInterfaceGen
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRFunctionInterfaces
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgTransforms
+    MLIRUBDialect
+    iree::compiler::Dialect::LinalgExt::IR
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    TensorMaskingOpInterfaceGen
+  TD_FILE
+    "TensorMaskingOpInterface.td"
+  OUTS
+    --gen-op-interface-decls TensorMaskingOpInterface.h.inc
+    --gen-op-interface-defs TensorMaskingOpInterface.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -37,13 +37,6 @@ def IREELinalgExt_Dialect : Dialect {
 // Type definitions
 //===----------------------------------------------------------------------===//
 
-class RankedTensorOrMemRefOf<list<Type> allowedTypes> :
-  ShapedContainerType<allowedTypes,
-      Or<[IsMemRefTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
-  "ranked tensor or memref", "::mlir::ShapedType">;
-
-def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
-
 class RankedTensorOrScalarType<list<Type> allowedTypes> :
   AnyTypeOf<[RankedTensorOf<allowedTypes>, AnyTypeOf<allowedTypes>]>;
 
@@ -92,6 +85,14 @@ def SplitReductionMappingAttr :
         const ::mlir::iree_compiler::IREE::LinalgExt::SplitReductionMappingAttr &rhs)
         const;
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// Base Op class.
+//===----------------------------------------------------------------------===//
+
+class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
+    Op<IREELinalgExt_Dialect, mnemonic, traits> {
 }
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

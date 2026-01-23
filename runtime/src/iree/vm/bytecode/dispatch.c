@@ -17,7 +17,19 @@
 #include "iree/vm/ops.h"
 
 //===----------------------------------------------------------------------===//
-// Register remapping utilities
+// Ref register debug checking
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_VM_REF_DEBUG_MOVE)
+#define IREE_VM_ISA_DISPATCH_REF_DEBUG_CHECK(ptr)        \
+  IREE_ASSERT_NE((ptr)->type, IREE_VM_REF_TYPE_POISONED, \
+                 "use-after-move: ref register accessed after move")
+#else
+#define IREE_VM_ISA_DISPATCH_REF_DEBUG_CHECK(ptr) ((void)0)
+#endif  // IREE_VM_REF_DEBUG_MOVE
+
+//===----------------------------------------------------------------------===//
+// Register remapping/branch utilities
 //===----------------------------------------------------------------------===//
 
 // Remaps registers from a source set to a destination set within the same stack
@@ -35,14 +47,35 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
     // Could write two arrays: one for prims and one for refs.
     uint16_t src_reg = remap_list->pairs[i].src_reg;
     uint16_t dst_reg = remap_list->pairs[i].dst_reg;
-    if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
-      iree_vm_ref_retain_or_move(src_reg & IREE_REF_REGISTER_MOVE_BIT,
-                                 &regs_ref[src_reg & IREE_REF_REGISTER_MASK],
-                                 &regs_ref[dst_reg & IREE_REF_REGISTER_MASK]);
+    if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
+      iree_vm_ref_retain_or_move(
+          src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+          &regs_ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+          &regs_ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
     } else {
       regs_i32[dst_reg] = regs_i32[src_reg];
     }
   }
+}
+
+static inline iree_vm_source_offset_t iree_vm_bytecode_dispatch_branch_to(
+    int32_t* IREE_RESTRICT regs_i32, iree_vm_ref_t* IREE_RESTRICT regs_ref,
+    iree_vm_source_offset_t target_pc,
+    const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list,
+    iree_vm_source_offset_t pc_delta) {
+  if (IREE_UNLIKELY(remap_list->size > 0)) {
+    iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                     remap_list);
+  }
+  return target_pc + pc_delta;
+}
+
+static inline iree_vm_source_offset_t iree_vm_bytecode_dispatch_branch_to_block(
+    int32_t* IREE_RESTRICT regs_i32, iree_vm_ref_t* IREE_RESTRICT regs_ref,
+    iree_vm_source_offset_t block_pc,
+    const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list) {
+  return iree_vm_bytecode_dispatch_branch_to(
+      regs_i32, regs_ref, block_pc, remap_list, IREE_VM_BLOCK_MARKER_SIZE);
 }
 
 // Discards ref registers in the list if they are marked move.
@@ -54,9 +87,11 @@ static void iree_vm_bytecode_dispatch_discard_registers(
   for (int i = 0; i < reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     uint16_t reg = reg_list->registers[i];
-    if ((reg & (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) ==
-        (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) {
-      iree_vm_ref_release(&regs_ref[reg & IREE_REF_REGISTER_MASK]);
+    if ((reg & (IREE_VM_ISA_REF_REGISTER_TYPE_BIT |
+                IREE_VM_ISA_REF_REGISTER_MOVE_BIT)) ==
+        (IREE_VM_ISA_REF_REGISTER_TYPE_BIT |
+         IREE_VM_ISA_REF_REGISTER_MOVE_BIT)) {
+      iree_vm_ref_release(&regs_ref[reg & IREE_VM_ISA_REF_REGISTER_MASK]);
     }
   }
 }
@@ -78,16 +113,55 @@ static inline iree_vm_registers_t iree_vm_bytecode_get_register_storage(
 }
 
 // Releases any remaining refs held in the frame storage.
+// On success paths (result_code == OK), the compiler guarantees all refs are
+// explicitly released via MOVE bits and vm.discard.refs, so we can skip this.
+// On error/unwind paths (result_code != OK), we need to release remaining refs.
+// The result_code is initialized to UNKNOWN and only set to OK on successful
+// return - frames that error or get unwound retain the non-OK value.
 static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
-  // TODO(benvanik): allow the VM to elide this when it's known that there are
-  // no more live registers.
   const iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(frame);
+
+  // On success paths (result_code == OK), the compiler guarantees all refs
+  // are explicitly released. Skip the cleanup loop.
+  if (IREE_LIKELY(stack_storage->result_code == IREE_STATUS_OK)) {
+#if defined(IREE_VM_REF_DEBUG_CLEAN)
+    // Verify compiler guarantee: all refs should be NULL on success path.
+    iree_vm_ref_t* refs = (iree_vm_ref_t*)((uintptr_t)stack_storage +
+                                           stack_storage->ref_register_offset);
+    for (uint16_t i = 0; i < stack_storage->ref_register_count; ++i) {
+#if defined(IREE_VM_REF_DEBUG_MOVE)
+      if (refs[i].type == IREE_VM_REF_TYPE_POISONED) {
+        // Ignore debug sentinels.
+        continue;
+      }
+#endif  // IREE_VM_REF_DEBUG_MOVE
+      if (refs[i].ptr) {
+        iree_string_view_t func_name = iree_vm_function_name(&frame->function);
+        fprintf(stderr, "DEBUG: ref r%d not zeroed in %.*s (ptr=%p, type=%d)\n",
+                i, (int)func_name.size, func_name.data, refs[i].ptr,
+                (int)refs[i].type);
+        fflush(stderr);
+      }
+      IREE_ASSERT(!refs[i].ptr,
+                  "ref register %d not zeroed on success path - "
+                  "compiler bug in ref lifetime management",
+                  i);
+    }
+#endif  // IREE_VM_REF_DEBUG_CLEAN
+    return;
+  }
+
+  // Error/unwind path: release all remaining refs. This handles:
+  // - Frames that explicitly errored (vm.fail, import failures)
+  // - Frames that were unwound due to callee errors (result_code == UNKNOWN)
   iree_vm_ref_t* refs = (iree_vm_ref_t*)((uintptr_t)stack_storage +
                                          stack_storage->ref_register_offset);
   for (uint16_t i = 0; i < stack_storage->ref_register_count; ++i) {
     iree_vm_ref_t* ref = &refs[i];
-    if (ref->ptr) iree_vm_ref_release(ref);
+    if (ref->ptr) {
+      iree_vm_ref_release(ref);
+    }
   }
 }
 
@@ -112,8 +186,8 @@ static iree_status_t iree_vm_bytecode_function_enter(
   // We've verified all register storage prior to execution.
   uint32_t i32_register_count = target_descriptor->i32_register_count;
   uint32_t ref_register_count = target_descriptor->ref_register_count;
-  IREE_ASSERT_LE(i32_register_count, IREE_I32_REGISTER_MASK);
-  IREE_ASSERT_LE(ref_register_count, IREE_REF_REGISTER_MASK);
+  IREE_ASSERT_LE(i32_register_count, IREE_VM_ISA_I32_REGISTER_MASK);
+  IREE_ASSERT_LE(ref_register_count, IREE_VM_ISA_REF_REGISTER_MASK);
 
   // We need to align the ref register start to the natural machine
   // alignment in case the compiler is expecting that (it makes it easier to
@@ -126,6 +200,7 @@ static iree_status_t iree_vm_bytecode_function_enter(
       iree_host_align(ref_register_count * sizeof(iree_vm_ref_t), 16);
   iree_host_size_t frame_size =
       header_size + i32_register_size + ref_register_size;
+  IREE_ASSERT_ALIGNED(frame_size, sizeof(iree_max_align_t));
 
   // Enter function and allocate stack frame storage.
   IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
@@ -141,10 +216,22 @@ static iree_status_t iree_vm_bytecode_function_enter(
   stack_storage->i32_register_offset = header_size;
   stack_storage->ref_register_count = ref_register_count;
   stack_storage->ref_register_offset = header_size + i32_register_size;
+
+  // Initialize result_code to UNKNOWN - indicating the frame hasn't completed.
+  // On successful return, this gets set to OK. On error or unwind, it stays
+  // non-OK, causing cleanup to release any remaining refs.
+  stack_storage->result_code = IREE_STATUS_UNKNOWN;
+
   *out_callee_registers =
       iree_vm_bytecode_get_register_storage(*out_callee_frame);
 
   return iree_ok_status();
+}
+
+// Aligns a pointer up to the given alignment.
+static inline uint8_t* iree_vm_bytecode_align_ptr(uint8_t* p,
+                                                  iree_host_size_t alignment) {
+  return (uint8_t*)iree_host_align((uintptr_t)p, alignment);
 }
 
 // Enters an internal bytecode stack frame from an external caller.
@@ -181,6 +268,7 @@ static iree_status_t iree_vm_bytecode_external_enter(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr((uint8_t*)p, sizeof(int64_t));
         i32_reg = iree_host_align(i32_reg, 2);  // ensure aligned
         uint16_t dst_reg = i32_reg;
         i32_reg += 2;
@@ -188,10 +276,12 @@ static iree_status_t iree_vm_bytecode_external_enter(
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr((uint8_t*)p,
+                                       iree_alignof(iree_vm_ref_t));
         uint16_t dst_reg = ref_reg++;
         iree_vm_ref_retain(
             (iree_vm_ref_t*)p,
-            &callee_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
+            &callee_registers.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
       } break;
     }
@@ -210,7 +300,7 @@ static iree_status_t iree_vm_bytecode_external_leave(
     const iree_vm_registers_t* IREE_RESTRICT callee_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     iree_byte_span_t results) {
-  const iree_vm_bytecode_frame_storage_t* stack_storage =
+  iree_vm_bytecode_frame_storage_t* stack_storage =
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
           callee_frame);
 
@@ -229,18 +319,23 @@ static iree_status_t iree_vm_bytecode_external_leave(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(p, &callee_registers->i32[src_reg], sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         iree_vm_ref_retain_or_move(
-            src_reg & IREE_REF_REGISTER_MOVE_BIT,
-            &callee_registers->ref[src_reg & IREE_REF_REGISTER_MASK],
+            src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+            &callee_registers->ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
             (iree_vm_ref_t*)p);  // safe unaligned
         p += sizeof(iree_vm_ref_t);
       } break;
     }
   }
+
+  // Mark successful completion - compiler guarantees all refs are released.
+  stack_storage->result_code = IREE_STATUS_OK;
 
   // Leave and deallocate bytecode stack frame.
   return iree_vm_stack_function_leave(stack);
@@ -287,14 +382,14 @@ static iree_status_t iree_vm_bytecode_internal_enter(
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
     uint16_t src_reg = src_reg_list->registers[i];
-    if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
+    if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
       uint16_t dst_reg = ref_reg_offset++;
-      memset(&dst_regs->ref[dst_reg & IREE_REF_REGISTER_MASK], 0,
+      memset(&dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK], 0,
              sizeof(iree_vm_ref_t));
       iree_vm_ref_retain_or_move(
-          src_reg & IREE_REF_REGISTER_MOVE_BIT,
-          &src_regs.ref[src_reg & IREE_REF_REGISTER_MASK],
-          &dst_regs->ref[dst_reg & IREE_REF_REGISTER_MASK]);
+          src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+          &src_regs.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+          &dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
     } else {
       uint16_t dst_reg = i32_reg_offset++;
       dst_regs->i32[dst_reg] = src_regs.i32[src_reg];
@@ -341,15 +436,24 @@ static iree_status_t iree_vm_bytecode_internal_leave(
     // Could write two arrays: one for prims and one for refs.
     uint16_t src_reg = src_reg_list->registers[i];
     uint16_t dst_reg = dst_reg_list->registers[i];
-    if (src_reg & IREE_REF_REGISTER_TYPE_BIT) {
+    if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
       iree_vm_ref_retain_or_move(
-          src_reg & IREE_REF_REGISTER_MOVE_BIT,
-          &callee_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
-          &caller_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
+          src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+          &callee_registers.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+          &caller_registers.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
     } else {
       caller_registers.i32[dst_reg] = callee_registers.i32[src_reg];
     }
   }
+  // Clear return_registers so it's not misinterpreted as resume state by
+  // subsequent yieldable import calls in the caller frame.
+  caller_storage->return_registers = NULL;
+
+  // Mark successful completion - compiler guarantees all refs are released.
+  iree_vm_bytecode_frame_storage_t* callee_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          callee_frame);
+  callee_storage->result_code = IREE_STATUS_OK;
 
   // Leave and deallocate bytecode stack frame.
   *out_caller_frame = caller_frame;
@@ -383,14 +487,17 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
                sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         uint16_t src_reg = src_reg_list->registers[reg_i++];
-        iree_vm_ref_assign(
-            &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
+        iree_vm_ref_retain_or_move(
+            src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+            &caller_registers.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
             (iree_vm_ref_t*)p);  // safe unaligned
         p += sizeof(iree_vm_ref_t);
       } break;
@@ -407,6 +514,28 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
                    cconv_arguments.data[i] != IREE_VM_CCONV_TYPE_SPAN_END);
           continue;
         }
+        // Compute span element alignment by scanning the element types.
+        iree_host_size_t span_max_alignment = sizeof(int32_t);
+        for (iree_host_size_t scan_i = i + 1;
+             scan_i < cconv_arguments.size &&
+             cconv_arguments.data[scan_i] != IREE_VM_CCONV_TYPE_SPAN_END;
+             ++scan_i) {
+          switch (cconv_arguments.data[scan_i]) {
+            case IREE_VM_CCONV_TYPE_I64:
+            case IREE_VM_CCONV_TYPE_F64:
+              if (sizeof(int64_t) > span_max_alignment) {
+                span_max_alignment = sizeof(int64_t);
+              }
+              break;
+            case IREE_VM_CCONV_TYPE_REF:
+              if (iree_alignof(iree_vm_ref_t) > span_max_alignment) {
+                span_max_alignment = iree_alignof(iree_vm_ref_t);
+              }
+              break;
+          }
+        }
+        // Align to span element alignment before writing span elements.
+        p = iree_vm_bytecode_align_ptr(p, span_max_alignment);
         iree_host_size_t span_start_i = i + 1;
         for (int32_t j = 0; j < span_count; ++j) {
           for (i = span_start_i;
@@ -426,15 +555,19 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               } break;
               case IREE_VM_CCONV_TYPE_I64:
               case IREE_VM_CCONV_TYPE_F64: {
+                p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
                 memcpy(p,
                        &caller_registers.i32[src_reg_list->registers[reg_i++]],
                        sizeof(int64_t));
                 p += sizeof(int64_t);
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
+                p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
                 uint16_t src_reg = src_reg_list->registers[reg_i++];
-                iree_vm_ref_assign(
-                    &caller_registers.ref[src_reg & IREE_REF_REGISTER_MASK],
+                iree_vm_ref_retain_or_move(
+                    src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+                    &caller_registers
+                         .ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
                     (iree_vm_ref_t*)p);  // safe unaligned
                 p += sizeof(iree_vm_ref_t);
               } break;
@@ -446,9 +579,102 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
   }
 }
 
+// Releases all refs in an import call argument buffer.
+// This must be called after the import returns to clean up retained refs.
+static void iree_vm_bytecode_release_import_cconv_arguments(
+    iree_string_view_t cconv_arguments,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    iree_byte_span_t storage) {
+  uint8_t* IREE_RESTRICT p = storage.data;
+  for (iree_host_size_t i = 0, seg_i = 0; i < cconv_arguments.size;
+       ++i, ++seg_i) {
+    switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        iree_vm_ref_release((iree_vm_ref_t*)p);
+        p += sizeof(iree_vm_ref_t);
+        break;
+      case IREE_VM_CCONV_TYPE_SPAN_START: {
+        IREE_ASSERT(segment_size_list);
+        int32_t span_count = segment_size_list->registers[seg_i];
+        p += sizeof(int32_t);
+        if (!span_count) {
+          do {
+            ++i;
+          } while (i < cconv_arguments.size &&
+                   cconv_arguments.data[i] != IREE_VM_CCONV_TYPE_SPAN_END);
+          continue;
+        }
+        // Compute span element alignment by scanning the element types.
+        iree_host_size_t span_max_alignment = sizeof(int32_t);
+        for (iree_host_size_t scan_i = i + 1;
+             scan_i < cconv_arguments.size &&
+             cconv_arguments.data[scan_i] != IREE_VM_CCONV_TYPE_SPAN_END;
+             ++scan_i) {
+          switch (cconv_arguments.data[scan_i]) {
+            case IREE_VM_CCONV_TYPE_I64:
+            case IREE_VM_CCONV_TYPE_F64:
+              if (sizeof(int64_t) > span_max_alignment) {
+                span_max_alignment = sizeof(int64_t);
+              }
+              break;
+            case IREE_VM_CCONV_TYPE_REF:
+              if (iree_alignof(iree_vm_ref_t) > span_max_alignment) {
+                span_max_alignment = iree_alignof(iree_vm_ref_t);
+              }
+              break;
+          }
+        }
+        // Align to span element alignment before reading span elements.
+        p = iree_vm_bytecode_align_ptr(p, span_max_alignment);
+        iree_host_size_t span_start_i = i + 1;
+        for (int32_t j = 0; j < span_count; ++j) {
+          for (i = span_start_i;
+               i < cconv_arguments.size &&
+               cconv_arguments.data[i] != IREE_VM_CCONV_TYPE_SPAN_END;
+               ++i) {
+            switch (cconv_arguments.data[i]) {
+              case IREE_VM_CCONV_TYPE_VOID:
+                break;
+              case IREE_VM_CCONV_TYPE_I32:
+              case IREE_VM_CCONV_TYPE_F32:
+                p += sizeof(int32_t);
+                break;
+              case IREE_VM_CCONV_TYPE_I64:
+              case IREE_VM_CCONV_TYPE_F64:
+                p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
+                p += sizeof(int64_t);
+                break;
+              case IREE_VM_CCONV_TYPE_REF:
+                p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
+                iree_vm_ref_release((iree_vm_ref_t*)p);
+                p += sizeof(iree_vm_ref_t);
+                break;
+            }
+          }
+        }
+      } break;
+    }
+  }
+}
+
 // Issues a populated import call and marshals the results into |dst_reg_list|.
+// After the call completes, releases any refs in the argument buffer.
 static iree_status_t iree_vm_bytecode_issue_import_call(
     iree_vm_stack_t* stack, const iree_vm_function_call_t call,
+    iree_string_view_t cconv_arguments,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
     iree_string_view_t cconv_results,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
     iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
@@ -456,6 +682,12 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   // Call external function.
   iree_status_t call_status =
       call.function.module->begin_call(call.function.module->self, stack, call);
+
+  // Release refs in argument buffer regardless of call status.
+  // The import borrows these refs during execution but we own them.
+  iree_vm_bytecode_release_import_cconv_arguments(
+      cconv_arguments, segment_size_list, call.arguments);
+
   if (iree_status_is_deferred(call_status)) {
     if (!iree_byte_span_is_empty(call.results)) {
       iree_status_ignore(call_status);
@@ -469,9 +701,9 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
                                 iree_make_cstring_view("while calling import"));
   }
 
-  // NOTE: we don't support yielding within imported functions right now so it's
-  // safe to assume the stack is still valid here. If the called function can
-  // yield then we'll need to requery all pointers here.
+  // NOTE: this synchronous call path requires the import to complete without
+  // yielding. Functions that may yield must use vm.call.yieldable, which has
+  // its own path that handles DEFERRED status and frame pointer revalidation.
   *out_caller_frame = iree_vm_stack_current_frame(stack);
   *out_caller_registers =
       iree_vm_bytecode_get_register_storage(*out_caller_frame);
@@ -492,13 +724,15 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
         break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
         memcpy(&caller_registers.i32[dst_reg], p, sizeof(int64_t));
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
         iree_vm_ref_move(
             (iree_vm_ref_t*)p,  // safe unaligned
-            &caller_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
+            &caller_registers.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);
         break;
     }
@@ -514,7 +748,7 @@ static iree_status_t iree_vm_bytecode_verify_import(
   *out_import = NULL;
 
   // Ordinal has been checked as in-bounds during verification.
-  import_ordinal &= 0x7FFFFFFFu;
+  import_ordinal = iree_vm_isa_function_ordinal_as_import(import_ordinal);
   IREE_ASSERT(import_ordinal < module_state->import_count);
 
   const iree_vm_bytecode_import_t* import =
@@ -571,9 +805,9 @@ static iree_status_t iree_vm_bytecode_call_import(
   call.results.data_length = import->result_buffer_size;
   call.results.data = iree_alloca(call.results.data_length);
   memset(call.results.data, 0, call.results.data_length);
-  return iree_vm_bytecode_issue_import_call(stack, call, import->results,
-                                            dst_reg_list, out_caller_frame,
-                                            out_caller_registers);
+  return iree_vm_bytecode_issue_import_call(
+      stack, call, import->arguments, /*segment_size_list=*/NULL,
+      import->results, dst_reg_list, out_caller_frame, out_caller_registers);
 }
 
 // Calls a variadic imported function from another module.
@@ -612,14 +846,248 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
   call.results.data_length = import->result_buffer_size;
   call.results.data = iree_alloca(call.results.data_length);
   memset(call.results.data, 0, call.results.data_length);
-  return iree_vm_bytecode_issue_import_call(stack, call, import->results,
-                                            dst_reg_list, out_caller_frame,
-                                            out_caller_registers);
+  return iree_vm_bytecode_issue_import_call(
+      stack, call, import->arguments, segment_size_list, import->results,
+      dst_reg_list, out_caller_frame, out_caller_registers);
+}
+
+// Issues a yieldable import call that supports deferral with results.
+// Uses frame->return_registers to track begin vs resume state:
+//   - NULL: Fresh call, will call begin_call and set return_registers
+//   - Non-NULL: Resume, will call resume_call
+// On DEFERRED: returns DEFERRED (PC should be set to re-execute instruction).
+// On OK: copies results to dst_reg_list, clears return_registers, returns OK.
+static iree_status_t iree_vm_bytecode_call_import_yieldable(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_t* caller_frame,
+    const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_registers_t* out_caller_registers) {
+  // Get frame storage to check/set return_registers for begin/resume tracking.
+  // NOTE: We must use the passed-in caller_frame, not
+  // iree_vm_stack_current_frame, because on resume the native import's frame is
+  // still on top of the stack.
+  iree_vm_bytecode_frame_storage_t* frame_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          caller_frame);
+
+  // Prepare |call| by looking up the import information.
+  const iree_vm_bytecode_import_t* import = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
+                                                      import_ordinal, &import));
+
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = import->function;
+
+  // Allocate result buffer (fresh each call via alloca).
+  call.results.data_length = import->result_buffer_size;
+  call.results.data = iree_alloca(call.results.data_length);
+  memset(call.results.data, 0, call.results.data_length);
+
+  iree_status_t call_status = iree_ok_status();
+  if (frame_storage->return_registers == NULL) {
+    // Fresh call: marshal arguments and call begin_call.
+    frame_storage->return_registers = dst_reg_list;
+
+    call.arguments.data_length = import->argument_buffer_size;
+    call.arguments.data = iree_alloca(call.arguments.data_length);
+    memset(call.arguments.data, 0, call.arguments.data_length);
+    iree_vm_bytecode_populate_import_cconv_arguments(
+        import->arguments, caller_registers,
+        /*segment_size_list=*/NULL, src_reg_list, call.arguments);
+
+    call_status = call.function.module->begin_call(call.function.module->self,
+                                                   stack, call);
+
+    // Release refs in argument buffer regardless of call status.
+    iree_vm_bytecode_release_import_cconv_arguments(
+        import->arguments, /*segment_size_list=*/NULL, call.arguments);
+  } else {
+    // Resume: import already has arguments, just need results buffer.
+    call_status = call.function.module->resume_call(call.function.module->self,
+                                                    stack, call.results);
+  }
+
+  if (iree_status_is_deferred(call_status)) {
+    // Still waiting - return_registers stays set for next resume.
+    return call_status;
+  } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+    frame_storage->return_registers = NULL;  // Clear on error.
+    return iree_status_annotate(call_status,
+                                iree_make_cstring_view("while calling import"));
+  }
+
+  // Call completed. Update output registers.
+  // The bytecode frame doesn't move during import calls, so we use
+  // caller_frame.
+  *out_caller_registers = iree_vm_bytecode_get_register_storage(caller_frame);
+
+  // Get dst_reg_list from return_registers.
+  dst_reg_list = frame_storage->return_registers;
+  frame_storage->return_registers = NULL;  // Clear for next call.
+
+  // Marshal outputs from the ABI results buffer to registers.
+  iree_vm_registers_t regs = *out_caller_registers;
+  uint8_t* IREE_RESTRICT p = call.results.data;
+  iree_string_view_t cconv_results = import->results;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+       ++i) {
+    uint16_t dst_reg = dst_reg_list->registers[i];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        memcpy(&regs.i32[dst_reg], p, sizeof(int32_t));
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
+        memcpy(&regs.i32[dst_reg], p, sizeof(int64_t));
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        iree_vm_ref_move((iree_vm_ref_t*)p,
+                         &regs.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+        p += sizeof(iree_vm_ref_t);
+        break;
+    }
+  }
+
+  return iree_ok_status();
+}
+
+// Issues a variadic yieldable import call that supports deferral with results.
+// Combines variadic argument handling with yieldable begin/resume semantics.
+// Uses frame->return_registers to track begin vs resume state:
+//   - NULL: Fresh call, will call begin_call and set return_registers
+//   - Non-NULL: Resume, will call resume_call
+// On DEFERRED: returns DEFERRED (PC should be set to re-execute instruction).
+// On OK: copies results to dst_reg_list, clears return_registers, returns OK.
+static iree_status_t iree_vm_bytecode_call_import_variadic_yieldable(
+    iree_vm_stack_t* stack, iree_vm_stack_frame_t* caller_frame,
+    const iree_vm_bytecode_module_state_t* module_state,
+    uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
+    const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
+    const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
+    const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
+    iree_vm_registers_t* out_caller_registers) {
+  // Get frame storage to check/set return_registers for begin/resume tracking.
+  // NOTE: We must use the passed-in caller_frame, not
+  // iree_vm_stack_current_frame, because on resume the native import's frame is
+  // still on top of the stack.
+  iree_vm_bytecode_frame_storage_t* frame_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          caller_frame);
+
+  // Prepare |call| by looking up the import information.
+  const iree_vm_bytecode_import_t* import = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_verify_import(stack, module_state,
+                                                      import_ordinal, &import));
+
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.function = import->function;
+
+  // Allocate result buffer (fresh each call via alloca).
+  call.results.data_length = import->result_buffer_size;
+  call.results.data = iree_alloca(call.results.data_length);
+  memset(call.results.data, 0, call.results.data_length);
+
+  iree_status_t call_status = iree_ok_status();
+  if (frame_storage->return_registers == NULL) {
+    // Fresh call: compute variadic argument size and marshal, then begin_call.
+    frame_storage->return_registers = dst_reg_list;
+
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
+        import->arguments, segment_size_list, &call.arguments.data_length));
+    call.arguments.data = iree_alloca(call.arguments.data_length);
+    memset(call.arguments.data, 0, call.arguments.data_length);
+    iree_vm_bytecode_populate_import_cconv_arguments(
+        import->arguments, caller_registers, segment_size_list, src_reg_list,
+        call.arguments);
+
+    call_status = call.function.module->begin_call(call.function.module->self,
+                                                   stack, call);
+
+    // Release refs in argument buffer regardless of call status.
+    iree_vm_bytecode_release_import_cconv_arguments(
+        import->arguments, segment_size_list, call.arguments);
+  } else {
+    // Resume: import already has arguments, just need results buffer.
+    call_status = call.function.module->resume_call(call.function.module->self,
+                                                    stack, call.results);
+  }
+
+  if (iree_status_is_deferred(call_status)) {
+    // Still waiting - return_registers stays set for next resume.
+    return call_status;
+  } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
+    frame_storage->return_registers = NULL;  // Clear on error.
+    return iree_status_annotate(
+        call_status, iree_make_cstring_view("while calling variadic import"));
+  }
+
+  // Call completed. Update output registers.
+  // The bytecode frame doesn't move during import calls, so we use
+  // caller_frame.
+  *out_caller_registers = iree_vm_bytecode_get_register_storage(caller_frame);
+
+  // Get dst_reg_list from return_registers.
+  dst_reg_list = frame_storage->return_registers;
+  frame_storage->return_registers = NULL;  // Clear for next call.
+
+  // Marshal outputs from the ABI results buffer to registers.
+  iree_vm_registers_t regs = *out_caller_registers;
+  uint8_t* IREE_RESTRICT p = call.results.data;
+  iree_string_view_t cconv_results = import->results;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+       ++i) {
+    uint16_t dst_reg = dst_reg_list->registers[i];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_VOID:
+        break;
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        memcpy(&regs.i32[dst_reg], p, sizeof(int32_t));
+        p += sizeof(int32_t);
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
+        memcpy(&regs.i32[dst_reg], p, sizeof(int64_t));
+        p += sizeof(int64_t);
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
+        iree_vm_ref_move((iree_vm_ref_t*)p,
+                         &regs.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+        p += sizeof(iree_vm_ref_t);
+        break;
+    }
+  }
+
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
 // Main interpreter dispatch routine
 //===----------------------------------------------------------------------===//
+
+// ISA decoding policy for dispatch.
+// NOTE: dispatch assumes verified bytecode.
+#define IREE_VM_ISA_BYTECODE_DATA bytecode_data
+#define IREE_VM_ISA_PC pc
+#define IREE_VM_ISA_REQUIRE(bytes) ((void)0)
+#define IREE_VM_ISA_LOOKUP_TYPE(type_id, out_type)             \
+  do {                                                         \
+    (out_type) = iree_vm_map_type(module, (int32_t)(type_id)); \
+  } while (0)
+#include "iree/vm/bytecode/utils/isa_decoder.inl"
 
 static iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
@@ -642,6 +1110,11 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
   iree_status_t status = iree_vm_bytecode_dispatch(stack, module, current_frame,
                                                    regs, call.results);
   if (!iree_status_is_ok(status) && !iree_status_is_deferred(status)) {
+    // Mark as error path so frame cleanup releases refs.
+    iree_vm_bytecode_frame_storage_t* stack_storage =
+        (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+            current_frame);
+    stack_storage->result_code = iree_status_code(status);
     // Balance the external_enter on failure.
     IREE_IGNORE_ERROR(iree_vm_stack_function_leave(stack));
   }
@@ -651,15 +1124,28 @@ iree_status_t iree_vm_bytecode_dispatch_begin(
 iree_status_t iree_vm_bytecode_dispatch_resume(
     iree_vm_stack_t* stack, iree_vm_bytecode_module_t* module,
     iree_byte_span_t call_results) {
+  // Find the bytecode frame belonging to this module.
+  // When a yieldable import yields, the native import's frame remains on top
+  // of the bytecode frame. We need to find our bytecode frame to get the
+  // register storage and resume dispatch. The native frame(s) will be resumed
+  // by the CallYieldable handler when it re-executes.
   iree_vm_stack_frame_t* current_frame = iree_vm_stack_top(stack);
   if (IREE_UNLIKELY(!current_frame)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "no frame at top of stack to resume");
   }
+
+  // Walk up the stack to find our bytecode frame.
+  while (current_frame && current_frame->function.module->self != module) {
+    current_frame = iree_vm_stack_parent_frame(stack);
+  }
+  if (IREE_UNLIKELY(!current_frame)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no frame belonging to this module on stack");
+  }
+
   iree_vm_registers_t regs =
       iree_vm_bytecode_get_register_storage(current_frame);
-  // TODO(benvanik): assert the module is at the top of the frame? We should
-  // only be coming in from a call based on the current frame.
   return iree_vm_bytecode_dispatch(stack, module, current_frame, regs,
                                    call_results);
 }
@@ -671,7 +1157,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_registers_t regs, iree_byte_span_t call_results) {
   // When required emit the dispatch tables here referencing the labels we are
   // defining below.
-  DEFINE_DISPATCH_TABLES();
+  IREE_VM_ISA_DISPATCH_DEFINE_TABLES();
 
   // Primary dispatch state. This is our 'native stack frame' and really
   // just enough to make dereferencing common addresses (like the current
@@ -688,35 +1174,37 @@ static iree_status_t iree_vm_bytecode_dispatch(
           .bytecode_offset;
 
   int32_t* IREE_RESTRICT regs_i32 = regs.i32;
-  IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
   iree_vm_ref_t* IREE_RESTRICT regs_ref = regs.ref;
-  IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+  IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
 
   iree_vm_source_offset_t pc = current_frame->pc;
-  BEGIN_DISPATCH_CORE() {
+  IREE_VM_ISA_DISPATCH_BEGIN_CORE() {
     //===------------------------------------------------------------------===//
     // Globals
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, GlobalLoadI32, {
-      uint32_t byte_offset = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadI32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(value);
       IREE_ASSERT(byte_offset + 4 <= module_state->rwdata_storage.data_length);
-      int32_t* value = VM_DecResultRegI32("value");
       const int32_t global_value =
           vm_global_load_i32(module_state->rwdata_storage.data, byte_offset);
       *value = global_value;
     });
 
-    DISPATCH_OP(CORE, GlobalStoreI32, {
-      uint32_t byte_offset = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreI32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value);
       IREE_ASSERT(byte_offset + 4 <= module_state->rwdata_storage.data_length);
-      int32_t value = VM_DecOperandRegI32("value");
       vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
                           value);
     });
 
-    DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
-      uint32_t byte_offset = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadIndirectI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(value);
+      const uint32_t byte_offset = (uint32_t)byte_offset_i32;
       if (IREE_UNLIKELY(byte_offset + 4 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
@@ -724,14 +1212,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
-      int32_t* value = VM_DecResultRegI32("value");
       const int32_t global_value =
           vm_global_load_i32(module_state->rwdata_storage.data, byte_offset);
       *value = global_value;
     });
 
-    DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
-      uint32_t byte_offset = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreIndirectI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value);
+      const uint32_t byte_offset = (uint32_t)byte_offset_i32;
       if (IREE_UNLIKELY(byte_offset + 4 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
@@ -739,30 +1228,31 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
-      int32_t value = VM_DecOperandRegI32("value");
       vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
                           value);
     });
 
-    DISPATCH_OP(CORE, GlobalLoadI64, {
-      uint32_t byte_offset = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadI64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(value);
       IREE_ASSERT(byte_offset + 8 <= module_state->rwdata_storage.data_length);
-      int64_t* value = VM_DecResultRegI64("value");
       const int64_t global_value =
           vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
       *value = global_value;
     });
 
-    DISPATCH_OP(CORE, GlobalStoreI64, {
-      uint32_t byte_offset = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreI64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(value);
       IREE_ASSERT(byte_offset + 8 <= module_state->rwdata_storage.data_length);
-      int64_t value = VM_DecOperandRegI64("value");
       vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
                           value);
     });
 
-    DISPATCH_OP(CORE, GlobalLoadIndirectI64, {
-      uint32_t byte_offset = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadIndirectI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(value);
+      const uint32_t byte_offset = (uint32_t)byte_offset_i32;
       if (IREE_UNLIKELY(byte_offset + 8 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
@@ -770,14 +1260,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
-      int64_t* value = VM_DecResultRegI64("value");
       const int64_t global_value =
           vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
       *value = global_value;
     });
 
-    DISPATCH_OP(CORE, GlobalStoreIndirectI64, {
-      uint32_t byte_offset = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreIndirectI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(value);
+      const uint32_t byte_offset = (uint32_t)byte_offset_i32;
       if (IREE_UNLIKELY(byte_offset + 8 >
                         module_state->rwdata_storage.data_length)) {
         return iree_make_status(
@@ -785,62 +1276,59 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
-      int64_t value = VM_DecOperandRegI64("value");
       vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
                           value);
     });
 
-    DISPATCH_OP(CORE, GlobalLoadRef, {
-      uint32_t global = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadRef, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       IREE_ASSERT(global < module_state->global_ref_count);
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
           result_is_move, global_ref, iree_vm_type_def_as_ref(type_def),
           result));
     });
 
-    DISPATCH_OP(CORE, GlobalStoreRef, {
-      uint32_t global = VM_DecGlobalAttr("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreRef, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(value);
       IREE_ASSERT(global < module_state->global_ref_count);
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
-      bool value_is_move;
-      iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
           value_is_move, value, iree_vm_type_def_as_ref(type_def), global_ref));
     });
 
-    DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
-      uint32_t global = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalLoadIndirectRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(global_i32);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
+      const uint32_t global = (uint32_t)global_i32;
       if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%" PRIhsz ")", global,
             module_state->global_ref_count);
       }
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
           result_is_move, global_ref, iree_vm_type_def_as_ref(type_def),
           result));
     });
 
-    DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
-      uint32_t global = VM_DecOperandRegI32("global");
+    IREE_VM_ISA_DISPATCH_OP(CORE, GlobalStoreIndirectRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(global_i32);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(value);
+      const uint32_t global = (uint32_t)global_i32;
       if (IREE_UNLIKELY(global >= module_state->global_ref_count)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "global ref ordinal out of range: %d (table=%" PRIhsz ")", global,
             module_state->global_ref_count);
       }
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("value");
-      bool value_is_move;
-      iree_vm_ref_t* value = VM_DecOperandRegRef("value", &value_is_move);
       iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
           value_is_move, value, iree_vm_type_def_as_ref(type_def), global_ref));
@@ -850,39 +1338,52 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Constants
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, ConstI32, {
-      int32_t value = VM_DecAttrI32("value");
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstI32, {
+      IREE_VM_ISA_DECODE_ATTR_I32(value);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = value;
     });
 
-    DISPATCH_OP(CORE, ConstI32Zero, {
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstI32Zero, {
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = 0;
     });
 
-    DISPATCH_OP(CORE, ConstI64, {
-      int64_t value = VM_DecAttrI64("value");
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstI64, {
+      IREE_VM_ISA_DECODE_ATTR_I64(value);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       *result = value;
     });
 
-    DISPATCH_OP(CORE, ConstI64Zero, {
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstI64Zero, {
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       *result = 0;
     });
 
-    DISPATCH_OP(CORE, ConstRefZero, {
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstRefZero, {
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       iree_vm_ref_release(result);
     });
 
-    DISPATCH_OP(CORE, ConstRefRodata, {
-      uint32_t rodata_ordinal = VM_DecRodataAttr("rodata");
+    IREE_VM_ISA_DISPATCH_OP(CORE, DiscardRefs, {
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(reg_list);
+      for (int i = 0; i < reg_list->size; ++i) {
+        uint16_t reg = reg_list->registers[i];
+        // All registers in this list are refs; unconditionally release.
+        iree_vm_ref_release(&regs_ref[reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+      }
+    });
+
+    IREE_VM_ISA_DISPATCH_OP(CORE, AssignRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(source);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
+      iree_vm_ref_retain_or_move(source_is_move, source, result);
+    });
+
+    IREE_VM_ISA_DISPATCH_OP(CORE, ConstRefRodata, {
+      IREE_VM_ISA_DECODE_RODATA_ATTR(rodata_ordinal);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       IREE_ASSERT(rodata_ordinal < module->rodata_ref_count);
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("value", &result_is_move);
       IREE_RETURN_IF_ERROR(
           iree_vm_ref_wrap_retain(&module->rodata_ref_table[rodata_ordinal],
                                   iree_vm_buffer_type(), result));
@@ -892,11 +1393,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Buffers
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, BufferAlloc, {
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      iree_host_size_t alignment = VM_DecOperandRegI32("alignment");
-      bool result_is_move;
-      iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferAlloc, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(alignment_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result_ref);
+      const iree_host_size_t alignment = (iree_host_size_t)alignment_i32;
       iree_vm_buffer_t* buffer = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_create(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
@@ -905,19 +1406,17 @@ static iree_status_t iree_vm_bytecode_dispatch(
           iree_vm_ref_wrap_assign(buffer, iree_vm_buffer_type(), result_ref));
     });
 
-    DISPATCH_OP(CORE, BufferClone, {
-      bool source_is_move;
-      iree_vm_ref_t* source_ref =
-          VM_DecOperandRegRef("source", &source_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferClone, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(source_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(alignment_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result_ref);
       iree_vm_buffer_t* source = iree_vm_buffer_deref(*source_ref);
       if (IREE_UNLIKELY(!source)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "source is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      iree_host_size_t alignment = VM_DecOperandRegI32("alignment");
-      bool result_is_move;
-      iree_vm_ref_t* result_ref = VM_DecResultRegRef("result", &result_is_move);
+      const iree_host_size_t alignment = (iree_host_size_t)alignment_i32;
       iree_vm_buffer_t* result = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_buffer_clone(
           IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST,
@@ -926,67 +1425,56 @@ static iree_status_t iree_vm_bytecode_dispatch(
           iree_vm_ref_wrap_assign(result, iree_vm_buffer_type(), result_ref));
     });
 
-    DISPATCH_OP(CORE, BufferLength, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLength, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result_i64);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      uint64_t* result = (uint64_t*)VM_DecResultRegI64("result");
+      uint64_t* result = (uint64_t*)result_i64;
       *result = (uint64_t)iree_vm_buffer_length(buffer);
     });
 
-    DISPATCH_OP(CORE, BufferCopy, {
-      bool source_buffer_is_move;
-      iree_vm_ref_t* source_buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &source_buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferCopy, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(source_buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(source_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(target_buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(target_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
       iree_vm_buffer_t* source_buffer =
           iree_vm_buffer_deref(*source_buffer_ref);
       if (IREE_UNLIKELY(!source_buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t source_offset =
-          VM_DecOperandRegI64HostSize("source_offset");
-      bool target_buffer_is_move;
-      iree_vm_ref_t* target_buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &target_buffer_is_move);
       iree_vm_buffer_t* target_buffer =
           iree_vm_buffer_deref(*target_buffer_ref);
       if (IREE_UNLIKELY(!target_buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      iree_host_size_t target_offset =
-          VM_DecOperandRegI64HostSize("target_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
       IREE_RETURN_IF_ERROR(iree_vm_buffer_copy_bytes(
           source_buffer, source_offset, target_buffer, target_offset, length));
     });
 
-    DISPATCH_OP(CORE, BufferCompare, {
-      bool lhs_buffer_is_move;
-      iree_vm_ref_t* lhs_buffer_ref =
-          VM_DecOperandRegRef("lhs_buffer", &lhs_buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferCompare, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(lhs_buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(lhs_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(rhs_buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(rhs_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* lhs_buffer = iree_vm_buffer_deref(*lhs_buffer_ref);
       if (IREE_UNLIKELY(!lhs_buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "lhs_buffer is null");
       }
-      iree_host_size_t lhs_offset = VM_DecOperandRegI64HostSize("lhs_offset");
-      bool rhs_buffer_is_move;
-      iree_vm_ref_t* rhs_buffer_ref =
-          VM_DecOperandRegRef("rhs_buffer", &rhs_buffer_is_move);
       iree_vm_buffer_t* rhs_buffer = iree_vm_buffer_deref(*rhs_buffer_ref);
       if (IREE_UNLIKELY(!rhs_buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "rhs_buffer is null");
       }
-      iree_host_size_t rhs_offset = VM_DecOperandRegI64HostSize("rhs_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      int32_t* result = VM_DecResultRegI32("result");
       IREE_RETURN_IF_ERROR(vm_buffer_compare(lhs_buffer, lhs_offset, rhs_buffer,
                                              rhs_offset, length, result));
     });
@@ -995,56 +1483,52 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // body - they all only vary by the length passed to fill_elements. The
     // gotcha is that on big-endian machines we'd have to flip around the bytes.
     // See VMOpcodesCore.td for more information on the encoding.
-    DISPATCH_OP(CORE, BufferFillI8, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferFillI8, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
+      const uint8_t value = (uint8_t)value_i32;
       vm_buffer_fill_i8_inline(buffer, offset, length, value);
     });
-    DISPATCH_OP(CORE, BufferFillI16, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferFillI16, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
+      const uint16_t value = (uint16_t)value_i32;
       vm_buffer_fill_i16_inline(buffer, offset, length, value);
     });
-    DISPATCH_OP(CORE, BufferFillI32, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferFillI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      uint32_t value = VM_DecOperandRegI32("value");
+      const uint32_t value = (uint32_t)value_i32;
       vm_buffer_fill_i32_inline(buffer, offset, length, value);
     });
-    DISPATCH_OP(CORE, BufferFillI64, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferFillI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(value_i64);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      uint64_t value = VM_DecOperandRegI64("value");
+      const uint64_t value = (uint64_t)value_i64;
       vm_buffer_fill_i64_inline(buffer, offset, length, value);
     });
 
@@ -1052,155 +1536,136 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // body - they only vary on the length and sign/zero extension mode but
     // can be packed into a single handler to reduce code-size.
     // See VMOpcodesCore.td for more information on the encoding.
-    DISPATCH_OP(CORE, BufferLoadI8U, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI8U, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int32_t* result = VM_DecResultRegI32("result");
       vm_buffer_load_i8u_inline(buffer, offset, result);
     });
-    DISPATCH_OP(CORE, BufferLoadI8S, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI8S, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int32_t* result = VM_DecResultRegI32("result");
       vm_buffer_load_i8s_inline(buffer, offset, result);
     });
-    DISPATCH_OP(CORE, BufferLoadI16U, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI16U, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int32_t* result = VM_DecResultRegI32("result");
       vm_buffer_load_i16u_inline(buffer, offset, result);
     });
-    DISPATCH_OP(CORE, BufferLoadI16S, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI16S, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int32_t* result = VM_DecResultRegI32("result");
       vm_buffer_load_i16s_inline(buffer, offset, result);
     });
-    DISPATCH_OP(CORE, BufferLoadI32, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int32_t* result = VM_DecResultRegI32("result");
       vm_buffer_load_i32_inline(buffer, offset, result);
     });
-    DISPATCH_OP(CORE, BufferLoadI64, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferLoadI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-      int64_t* result = VM_DecResultRegI64("result");
       vm_buffer_load_i64_inline(buffer, offset, result);
     });
 
     // TODO(benvanik): rework dispatch so that the StoreI* ops can share the
     // same body - they only vary on the length.
     // See VMOpcodesCore.td for more information on the encoding.
-    DISPATCH_OP(CORE, BufferStoreI8, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferStoreI8, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      uint8_t value = (uint8_t)VM_DecOperandRegI32("value");
+      const uint8_t value = (uint8_t)value_i32;
       vm_buffer_store_i8_inline(buffer, offset, value);
     });
-    DISPATCH_OP(CORE, BufferStoreI16, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferStoreI16, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      uint16_t value = (uint16_t)VM_DecOperandRegI32("value");
+      const uint16_t value = (uint16_t)value_i32;
       vm_buffer_store_i16_inline(buffer, offset, value);
     });
-    DISPATCH_OP(CORE, BufferStoreI32, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferStoreI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value_i32);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      uint32_t value = VM_DecOperandRegI32("value");
+      const uint32_t value = (uint32_t)value_i32;
       vm_buffer_store_i32_inline(buffer, offset, value);
     });
-    DISPATCH_OP(CORE, BufferStoreI64, {
-      bool buffer_is_move;
-      iree_vm_ref_t* buffer_ref =
-          VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferStoreI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(value_i64);
       iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
       if (IREE_UNLIKELY(!buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "target_buffer is null");
       }
-      iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-      uint64_t value = (uint64_t)VM_DecOperandRegI64("value");
+      const uint64_t value = (uint64_t)value_i64;
       vm_buffer_store_i64_inline(buffer, offset, value);
     });
 
-    DISPATCH_OP(CORE, BufferHash, {
-      bool source_buffer_is_move;
-      iree_vm_ref_t* source_buffer_ref =
-          VM_DecOperandRegRef("source_buffer", &source_buffer_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, BufferHash, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(source_buffer_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(source_offset);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       iree_vm_buffer_t* source_buffer =
           iree_vm_buffer_deref(*source_buffer_ref);
       if (IREE_UNLIKELY(!source_buffer)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "source_buffer is null");
       }
-      iree_host_size_t source_offset =
-          VM_DecOperandRegI64HostSize("source_offset");
-      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-      int64_t* result = VM_DecResultRegI64("result");
       IREE_RETURN_IF_ERROR(
           iree_vm_buffer_hash(source_buffer, source_offset, length, result));
     });
@@ -1209,11 +1674,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Lists
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, ListAlloc, {
-      const iree_vm_type_def_t element_type_def = VM_DecTypeOf("element_type");
-      uint32_t initial_capacity = VM_DecOperandRegI32("initial_capacity");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListAlloc, {
+      IREE_VM_ISA_DECODE_TYPE_OF(element_type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(initial_capacity_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
+      const uint32_t initial_capacity = (uint32_t)initial_capacity_i32;
       iree_vm_list_t* list = NULL;
       IREE_RETURN_IF_ERROR(iree_vm_list_create(
           element_type_def, initial_capacity, module_state->allocator, &list));
@@ -1221,108 +1686,106 @@ static iree_status_t iree_vm_bytecode_dispatch(
           iree_vm_ref_wrap_assign(list, iree_vm_list_type(), result));
     });
 
-    DISPATCH_OP(CORE, ListReserve, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListReserve, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(minimum_capacity_i32);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t minimum_capacity = VM_DecOperandRegI32("minimum_capacity");
+      const uint32_t minimum_capacity = (uint32_t)minimum_capacity_i32;
       IREE_RETURN_IF_ERROR(iree_vm_list_reserve(list, minimum_capacity));
     });
 
-    DISPATCH_OP(CORE, ListSize, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListSize, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      int32_t* result = VM_DecResultRegI32("result");
       *result = (int32_t)iree_vm_list_size(list);
     });
 
-    DISPATCH_OP(CORE, ListResize, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListResize, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(new_size_i32);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t new_size = VM_DecOperandRegI32("new_size");
+      const uint32_t new_size = (uint32_t)new_size_i32;
       IREE_RETURN_IF_ERROR(iree_vm_list_resize(list, new_size));
     });
 
-    DISPATCH_OP(CORE, ListGetI32, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListGetI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      int32_t* result = VM_DecResultRegI32("result");
+      const uint32_t index = (uint32_t)index_i32;
       iree_vm_value_t value;
       IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
           list, index, IREE_VM_VALUE_TYPE_I32, &value));
       *result = value.i32;
     });
 
-    DISPATCH_OP(CORE, ListSetI32, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListSetI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(raw_value);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      int32_t raw_value = VM_DecOperandRegI32("raw_value");
+      const uint32_t index = (uint32_t)index_i32;
       iree_vm_value_t value = iree_vm_value_make_i32(raw_value);
       IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
     });
 
-    DISPATCH_OP(CORE, ListGetI64, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListGetI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      int64_t* result = VM_DecResultRegI64("result");
+      const uint32_t index = (uint32_t)index_i32;
       iree_vm_value_t value;
       IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
           list, index, IREE_VM_VALUE_TYPE_I64, &value));
       *result = value.i64;
     });
 
-    DISPATCH_OP(CORE, ListSetI64, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListSetI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(raw_value);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      int64_t raw_value = VM_DecOperandRegI64("value");
+      const uint32_t index = (uint32_t)index_i32;
       iree_vm_value_t value = iree_vm_value_make_i64(raw_value);
       IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
     });
 
-    DISPATCH_OP(CORE, ListGetRef, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListGetRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
-      // TODO(benvanik): use result_is_move with a _retain_or_move.
-      IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain(list, index, result));
+      const uint32_t index = (uint32_t)index_i32;
+      IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_retain_or_move(
+          list, index, result_is_move, result));
       if (result->type != IREE_VM_REF_TYPE_NULL &&
           (iree_vm_type_def_is_value(type_def) ||
            result->type != iree_vm_type_def_as_ref(type_def))) {
@@ -1332,16 +1795,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CORE, ListSetRef, {
-      bool list_is_move;
-      iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, ListSetRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(operand);
       iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
       if (IREE_UNLIKELY(!list)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
       }
-      uint32_t index = VM_DecOperandRegI32("index");
-      bool operand_is_move;
-      iree_vm_ref_t* operand = VM_DecOperandRegRef("value", &operand_is_move);
+      const uint32_t index = (uint32_t)index_i32;
       if (operand_is_move) {
         IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(list, index, operand));
       } else {
@@ -1353,35 +1815,30 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Conditional assignment
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, SelectI32, {
-      int32_t condition = VM_DecOperandRegI32("condition");
-      int32_t true_value = VM_DecOperandRegI32("true_value");
-      int32_t false_value = VM_DecOperandRegI32("false_value");
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, SelectI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(true_value);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(false_value);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_select_i32(condition, true_value, false_value);
     });
 
-    DISPATCH_OP(CORE, SelectI64, {
-      int32_t condition = VM_DecOperandRegI32("condition");
-      int64_t true_value = VM_DecOperandRegI64("true_value");
-      int64_t false_value = VM_DecOperandRegI64("false_value");
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, SelectI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(true_value);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(false_value);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       *result = vm_select_i64(condition, true_value, false_value);
     });
 
-    DISPATCH_OP(CORE, SelectRef, {
-      int32_t condition = VM_DecOperandRegI32("condition");
+    IREE_VM_ISA_DISPATCH_OP(CORE, SelectRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
       // TODO(benvanik): remove the type_id and use either LHS/RHS (if both are
       // null then output is always null so no need to know the type).
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("true_value");
-      bool true_value_is_move;
-      iree_vm_ref_t* true_value =
-          VM_DecOperandRegRef("true_value", &true_value_is_move);
-      bool false_value_is_move;
-      iree_vm_ref_t* false_value =
-          VM_DecOperandRegRef("false_value", &false_value_is_move);
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(true_value);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(false_value);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       if (condition) {
         // Select LHS.
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
@@ -1401,12 +1858,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CORE, SwitchI32, {
-      int32_t index = VM_DecOperandRegI32("index");
-      int32_t default_value = VM_DecOperandRegI32("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_DecVariadicOperands("values");
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, SwitchI32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(default_value);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       if (index >= 0 && index < value_reg_list->size) {
         *result = regs_i32[value_reg_list->registers[index]];
       } else {
@@ -1414,12 +1870,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CORE, SwitchI64, {
-      int32_t index = VM_DecOperandRegI32("index");
-      int64_t default_value = VM_DecOperandRegI64("default_value");
-      const iree_vm_register_list_t* value_reg_list =
-          VM_DecVariadicOperands("values");
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, SwitchI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(default_value);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       if (index >= 0 && index < value_reg_list->size) {
         *result = regs_i32[value_reg_list->registers[index]];
       } else {
@@ -1427,27 +1882,23 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CORE, SwitchRef, {
-      int32_t index = VM_DecOperandRegI32("index");
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
-      bool default_is_move;
-      iree_vm_ref_t* default_value =
-          VM_DecOperandRegRef("default_value", &default_is_move);
-      const iree_vm_register_list_t* value_reg_list =
-          VM_DecVariadicOperands("values");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, SwitchRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(default_value);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       if (index >= 0 && index < value_reg_list->size) {
-        bool is_move =
-            value_reg_list->registers[index] & IREE_REF_REGISTER_MOVE_BIT;
+        bool is_move = value_reg_list->registers[index] &
+                       IREE_VM_ISA_REF_REGISTER_MOVE_BIT;
         iree_vm_ref_t* new_value = &regs_ref[value_reg_list->registers[index] &
-                                             IREE_REF_REGISTER_MASK];
+                                             IREE_VM_ISA_REF_REGISTER_MASK];
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
             is_move, new_value, iree_vm_type_def_as_ref(type_def), result));
       } else {
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
-            default_is_move, default_value, iree_vm_type_def_as_ref(type_def),
-            result));
+            default_value_is_move, default_value,
+            iree_vm_type_def_as_ref(type_def), result));
       }
     });
 
@@ -1455,79 +1906,77 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_BINARY_I32(AddI32, vm_add_i32);
-    DISPATCH_OP_CORE_BINARY_I32(SubI32, vm_sub_i32);
-    DISPATCH_OP_CORE_BINARY_I32(MulI32, vm_mul_i32);
-    DISPATCH_OP_CORE_BINARY_I32(DivI32S, vm_div_i32s);
-    DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
-    DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
-    DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
-    DISPATCH_OP_CORE_TERNARY_I32(FMAI32, vm_fma_i32);
-    DISPATCH_OP_CORE_UNARY_I32(AbsI32, vm_abs_i32);
-    DISPATCH_OP_CORE_BINARY_I32(MinI32S, vm_min_i32s);
-    DISPATCH_OP_CORE_BINARY_I32(MinI32U, vm_min_i32u);
-    DISPATCH_OP_CORE_BINARY_I32(MaxI32S, vm_max_i32s);
-    DISPATCH_OP_CORE_BINARY_I32(MaxI32U, vm_max_i32u);
-    DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
-    DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
-    DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
-    DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
-    DISPATCH_OP_CORE_UNARY_I32(CtlzI32, vm_ctlz_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(AddI32, vm_add_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(SubI32, vm_sub_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(MulI32, vm_mul_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(DivI32S, vm_div_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(DivI32U, vm_div_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(RemI32S, vm_rem_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(RemI32U, vm_rem_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_TERNARY_I32(FMAI32, vm_fma_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(AbsI32, vm_abs_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(MinI32S, vm_min_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(MinI32U, vm_min_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(MaxI32S, vm_max_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(MaxI32U, vm_max_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(NotI32, vm_not_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(AndI32, vm_and_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(OrI32, vm_or_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(XorI32, vm_xor_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(CtlzI32, vm_ctlz_i32);
 
-    DISPATCH_OP_CORE_BINARY_I64(AddI64, vm_add_i64);
-    DISPATCH_OP_CORE_BINARY_I64(SubI64, vm_sub_i64);
-    DISPATCH_OP_CORE_BINARY_I64(MulI64, vm_mul_i64);
-    DISPATCH_OP_CORE_BINARY_I64(DivI64S, vm_div_i64s);
-    DISPATCH_OP_CORE_BINARY_I64(DivI64U, vm_div_i64u);
-    DISPATCH_OP_CORE_BINARY_I64(RemI64S, vm_rem_i64s);
-    DISPATCH_OP_CORE_BINARY_I64(RemI64U, vm_rem_i64u);
-    DISPATCH_OP_CORE_TERNARY_I64(FMAI64, vm_fma_i64);
-    DISPATCH_OP_CORE_UNARY_I64(AbsI64, vm_abs_i64);
-    DISPATCH_OP_CORE_BINARY_I64(MinI64S, vm_min_i64s);
-    DISPATCH_OP_CORE_BINARY_I64(MinI64U, vm_min_i64u);
-    DISPATCH_OP_CORE_BINARY_I64(MaxI64S, vm_max_i64s);
-    DISPATCH_OP_CORE_BINARY_I64(MaxI64U, vm_max_i64u);
-    DISPATCH_OP_CORE_UNARY_I64(NotI64, vm_not_i64);
-    DISPATCH_OP_CORE_BINARY_I64(AndI64, vm_and_i64);
-    DISPATCH_OP_CORE_BINARY_I64(OrI64, vm_or_i64);
-    DISPATCH_OP_CORE_BINARY_I64(XorI64, vm_xor_i64);
-    DISPATCH_OP_CORE_UNARY_I64(CtlzI64, vm_ctlz_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(AddI64, vm_add_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(SubI64, vm_sub_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(MulI64, vm_mul_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(DivI64S, vm_div_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(DivI64U, vm_div_i64u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(RemI64S, vm_rem_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(RemI64U, vm_rem_i64u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_TERNARY_I64(FMAI64, vm_fma_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I64(AbsI64, vm_abs_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(MinI64S, vm_min_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(MinI64U, vm_min_i64u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(MaxI64S, vm_max_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(MaxI64U, vm_max_i64u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I64(NotI64, vm_not_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(AndI64, vm_and_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(OrI64, vm_or_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I64(XorI64, vm_xor_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I64(CtlzI64, vm_ctlz_i64);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
     // NOTE: these all operate on 32-bit registers.
-    DISPATCH_OP_CORE_UNARY_I32(TruncI32I8, vm_trunc_i32i8);
-    DISPATCH_OP_CORE_UNARY_I32(TruncI32I16, vm_trunc_i32i16);
-    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32S, vm_ext_i8i32s);
-    DISPATCH_OP_CORE_UNARY_I32(ExtI8I32U, vm_ext_i8i32u);
-    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32S, vm_ext_i16i32s);
-    DISPATCH_OP_CORE_UNARY_I32(ExtI16I32U, vm_ext_i16i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(TruncI32I8, vm_trunc_i32i8);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(TruncI32I16, vm_trunc_i32i16);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(ExtI8I32S, vm_ext_i8i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(ExtI8I32U, vm_ext_i8i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(ExtI16I32S, vm_ext_i16i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(ExtI16I32U, vm_ext_i16i32u);
 
     // NOTE: 64-bit ones are actually changing register widths.
-    DISPATCH_OP(CORE, TruncI64I32, {
-      int64_t operand = VM_DecOperandRegI64("operand");
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, TruncI64I32, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_trunc_i64i32(operand);
     });
-    DISPATCH_OP(CORE, ExtI32I64S, {
-      int32_t operand = VM_DecOperandRegI32("operand");
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ExtI32I64S, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       *result = vm_ext_i32i64s(operand);
     });
-    DISPATCH_OP(CORE, ExtI32I64U, {
-      int32_t operand = VM_DecOperandRegI32("operand");
-      int64_t* result = VM_DecResultRegI64("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, ExtI32I64U, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
       *result = vm_ext_i32i64u(operand);
     });
 
-    DISPATCH_OP(CORE, CastAnyRef, {
-      bool operand_is_move;
-      iree_vm_ref_t* operand = VM_DecOperandRegRef("operand", &operand_is_move);
-      const iree_vm_type_def_t type_def = VM_DecTypeOf("result");
-      bool result_is_move;
-      iree_vm_ref_t* result = VM_DecResultRegRef("result", &result_is_move);
+    IREE_VM_ISA_DISPATCH_OP(CORE, CastAnyRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(operand);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
           operand_is_move, operand, iree_vm_type_def_as_ref(type_def), result));
     });
@@ -1536,84 +1985,74 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define DISPATCH_OP_CORE_SHIFT_I32(op_name, op_func)  \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int32_t operand = VM_DecOperandRegI32("operand"); \
-    int32_t amount = VM_DecOperandRegI32("amount");   \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(operand, amount);               \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);            \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(amount);             \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);              \
+    *result = op_func(operand, amount);                          \
   });
 
-    DISPATCH_OP_CORE_SHIFT_I32(ShlI32, vm_shl_i32);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, vm_shr_i32s);
-    DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, vm_shr_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I32(ShlI32, vm_shl_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I32(ShrI32S, vm_shr_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I32(ShrI32U, vm_shr_i32u);
 
-#define DISPATCH_OP_CORE_SHIFT_I64(op_name, op_func)  \
-  DISPATCH_OP(CORE, op_name, {                        \
-    int64_t operand = VM_DecOperandRegI64("operand"); \
-    int32_t amount = VM_DecOperandRegI32("amount");   \
-    int64_t* result = VM_DecResultRegI64("result");   \
-    *result = op_func(operand, amount);               \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                       \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);            \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(amount);             \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);              \
+    *result = op_func(operand, amount);                          \
   });
 
-    DISPATCH_OP_CORE_SHIFT_I64(ShlI64, vm_shl_i64);
-    DISPATCH_OP_CORE_SHIFT_I64(ShrI64S, vm_shr_i64s);
-    DISPATCH_OP_CORE_SHIFT_I64(ShrI64U, vm_shr_i64u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I64(ShlI64, vm_shl_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I64(ShrI64S, vm_shr_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_SHIFT_I64(ShrI64U, vm_shr_i64u);
 
     //===------------------------------------------------------------------===//
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP_CORE_BINARY_I32(CmpEQI32, vm_cmp_eq_i32);
-    DISPATCH_OP_CORE_BINARY_I32(CmpNEI32, vm_cmp_ne_i32);
-    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32S, vm_cmp_lt_i32s);
-    DISPATCH_OP_CORE_BINARY_I32(CmpLTI32U, vm_cmp_lt_i32u);
-    DISPATCH_OP_CORE_UNARY_I32(CmpNZI32, vm_cmp_nz_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(CmpEQI32, vm_cmp_eq_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(CmpNEI32, vm_cmp_ne_i32);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(CmpLTI32S, vm_cmp_lt_i32s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_BINARY_I32(CmpLTI32U, vm_cmp_lt_i32u);
+    IREE_VM_ISA_DISPATCH_OP_CORE_UNARY_I32(CmpNZI32, vm_cmp_nz_i32);
 
-#define DISPATCH_OP_CORE_CMP_I64(op_name, op_func)  \
-  DISPATCH_OP(CORE, op_name, {                      \
-    int64_t lhs = VM_DecOperandRegI64("lhs");       \
-    int64_t rhs = VM_DecOperandRegI64("rhs");       \
-    int32_t* result = VM_DecResultRegI32("result"); \
-    *result = op_func(lhs, rhs);                    \
+#define IREE_VM_ISA_DISPATCH_OP_CORE_CMP_I64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(CORE, op_name, {                     \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(lhs);              \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(rhs);              \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);            \
+    *result = op_func(lhs, rhs);                               \
   });
 
-    DISPATCH_OP_CORE_CMP_I64(CmpEQI64, vm_cmp_eq_i64);
-    DISPATCH_OP_CORE_CMP_I64(CmpNEI64, vm_cmp_ne_i64);
-    DISPATCH_OP_CORE_CMP_I64(CmpLTI64S, vm_cmp_lt_i64s);
-    DISPATCH_OP_CORE_CMP_I64(CmpLTI64U, vm_cmp_lt_i64u);
-    DISPATCH_OP(CORE, CmpNZI64, {
-      int64_t operand = VM_DecOperandRegI64("operand");
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP_CORE_CMP_I64(CmpEQI64, vm_cmp_eq_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_CMP_I64(CmpNEI64, vm_cmp_ne_i64);
+    IREE_VM_ISA_DISPATCH_OP_CORE_CMP_I64(CmpLTI64S, vm_cmp_lt_i64s);
+    IREE_VM_ISA_DISPATCH_OP_CORE_CMP_I64(CmpLTI64U, vm_cmp_lt_i64u);
+    IREE_VM_ISA_DISPATCH_OP(CORE, CmpNZI64, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_cmp_nz_i64(operand);
     });
 
-    DISPATCH_OP(CORE, CmpEQRef, {
-      bool lhs_is_move;
-      iree_vm_ref_t* lhs = VM_DecOperandRegRef("lhs", &lhs_is_move);
-      bool rhs_is_move;
-      iree_vm_ref_t* rhs = VM_DecOperandRegRef("rhs", &rhs_is_move);
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CmpEQRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(lhs);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(rhs);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_cmp_eq_ref(lhs, rhs);
-      if (lhs_is_move) iree_vm_ref_release(lhs);
-      if (rhs_is_move) iree_vm_ref_release(rhs);
     });
-    DISPATCH_OP(CORE, CmpNERef, {
-      bool lhs_is_move;
-      iree_vm_ref_t* lhs = VM_DecOperandRegRef("lhs", &lhs_is_move);
-      bool rhs_is_move;
-      iree_vm_ref_t* rhs = VM_DecOperandRegRef("rhs", &rhs_is_move);
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CmpNERef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(lhs);
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(rhs);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_cmp_ne_ref(lhs, rhs);
-      if (lhs_is_move) iree_vm_ref_release(lhs);
-      if (rhs_is_move) iree_vm_ref_release(rhs);
     });
-    DISPATCH_OP(CORE, CmpNZRef, {
-      bool operand_is_move;
-      iree_vm_ref_t* operand = VM_DecOperandRegRef("operand", &operand_is_move);
-      int32_t* result = VM_DecResultRegI32("result");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CmpNZRef, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(operand);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
       *result = vm_cmp_nz_ref(operand);
-      if (operand_is_move) iree_vm_ref_release(operand);
     });
 
     //===------------------------------------------------------------------===//
@@ -1621,89 +2060,72 @@ static iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     // No-op in the interpreter.
-    DISPATCH_OP(CORE, Block, {});
+    IREE_VM_ISA_DISPATCH_OP(CORE, Block, {});
 
-    DISPATCH_OP(CORE, Branch, {
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_DecBranchOperands("operands");
-      pc = block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-      if (IREE_UNLIKELY(remap_list->size > 0)) {
-        iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                         remap_list);
-      }
+    IREE_VM_ISA_DISPATCH_OP(CORE, Branch, {
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
+      pc = iree_vm_bytecode_dispatch_branch_to_block(regs_i32, regs_ref,
+                                                     block_pc, remap_list);
     });
 
-    DISPATCH_OP(CORE, CondBranch, {
-      int32_t condition = VM_DecOperandRegI32("condition");
-      int32_t true_block_pc = VM_DecBranchTarget("true_dest");
-      const iree_vm_register_remap_list_t* true_remap_list =
-          VM_DecBranchOperands("true_operands");
-      int32_t false_block_pc = VM_DecBranchTarget("false_dest");
-      const iree_vm_register_remap_list_t* false_remap_list =
-          VM_DecBranchOperands("false_operands");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CondBranch, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(true_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(true_remap_list);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(false_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(false_remap_list);
       if (condition) {
-        pc = true_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-        if (IREE_UNLIKELY(true_remap_list->size > 0)) {
-          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                           true_remap_list);
-        }
+        pc = iree_vm_bytecode_dispatch_branch_to_block(
+            regs_i32, regs_ref, true_block_pc, true_remap_list);
       } else {
-        pc = false_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-        if (IREE_UNLIKELY(false_remap_list->size > 0)) {
-          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                           false_remap_list);
-        }
+        pc = iree_vm_bytecode_dispatch_branch_to_block(
+            regs_i32, regs_ref, false_block_pc, false_remap_list);
       }
     });
 
-    DISPATCH_OP(CORE, BranchTable, {
-      int32_t index = VM_DecOperandRegI32("index");
-      int32_t default_block_pc = VM_DecBranchTarget("default_dest");
-      const iree_vm_register_remap_list_t* default_remap_list =
-          VM_DecBranchOperands("default_operands");
-      uint16_t table_size = VM_DecConstI16("table_size");
+    IREE_VM_ISA_DISPATCH_OP(CORE, BranchTable, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(default_block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(default_remap_list);
+      IREE_VM_ISA_DECODE_CONST_I16(table_size);
       if (index < 0 || index >= table_size) {
         // Out-of-bounds index; jump to default block.
-        pc = default_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-        if (IREE_UNLIKELY(default_remap_list->size > 0)) {
-          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                           default_remap_list);
-        }
+        pc = iree_vm_bytecode_dispatch_branch_to_block(
+            regs_i32, regs_ref, default_block_pc, default_remap_list);
       } else {
         // In-bounds index; decode until we hit the case and branch as the
         // cases are all variable length and we can't directly index.
         for (uint16_t i = 0; i < index; ++i) {
-          (void)VM_DecBranchTarget("case_dest");
-          (void)VM_DecBranchOperands("case_operands");
+          IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(skip_case_pc_u32);
+          IREE_VM_ISA_DECODE_BRANCH_OPERANDS(skip_case_operands);
+          (void)skip_case_pc_u32;
+          (void)skip_case_operands;
         }
-        int32_t case_block_pc = VM_DecBranchTarget("case_dest");
-        const iree_vm_register_remap_list_t* case_remap_list =
-            VM_DecBranchOperands("case_operands");
-        pc = case_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-        if (IREE_UNLIKELY(case_remap_list->size > 0)) {
-          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                           case_remap_list);
-        }
+        IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(case_block_pc);
+        IREE_VM_ISA_DECODE_BRANCH_OPERANDS(case_remap_list);
+        pc = iree_vm_bytecode_dispatch_branch_to_block(
+            regs_i32, regs_ref, case_block_pc, case_remap_list);
       }
     });
 
-    DISPATCH_OP(CORE, Call, {
-      int32_t function_ordinal = VM_DecFuncAttr("callee");
-      const iree_vm_register_list_t* src_reg_list =
-          VM_DecVariadicOperands("operands");
-      const iree_vm_register_list_t* dst_reg_list =
-          VM_DecVariadicResults("results");
+    IREE_VM_ISA_DISPATCH_OP(CORE, Call, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
       current_frame->pc = pc;
 
       // NOTE: we assume validation has ensured these functions exist.
       // TODO(benvanik): something more clever than just a high bit?
-      int is_import = (function_ordinal & 0x80000000u) != 0;
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
       if (is_import) {
-        // Call import (and possible yield).
-        IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import(
+        // Call import.
+        iree_status_t call_status = iree_vm_bytecode_call_import(
             stack, module_state, function_ordinal, regs, src_reg_list,
-            dst_reg_list, &current_frame, &regs));
+            dst_reg_list, &current_frame, &regs);
+        IREE_ASSERT(!iree_status_is_deferred(call_status),
+                    "deferred calls must use vm.call.yieldable");
+        IREE_RETURN_IF_ERROR(call_status);
       } else {
         // Switch execution to the target function and continue running in the
         // bytecode dispatcher.
@@ -1718,27 +2140,24 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // Restore the local dispatch variables that may have changed during the
       // function call due to stack growth.
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
-    DISPATCH_OP(CORE, CallVariadic, {
+    IREE_VM_ISA_DISPATCH_OP(CORE, CallVariadic, {
       // TODO(benvanik): dedupe with above or merge and always have the seg size
       // list be present (but empty) for non-variadic calls.
-      int32_t function_ordinal = VM_DecFuncAttr("callee");
-      const iree_vm_register_list_t* segment_size_list =
-          VM_DecVariadicOperands("segment_sizes");
-      const iree_vm_register_list_t* src_reg_list =
-          VM_DecVariadicOperands("operands");
-      const iree_vm_register_list_t* dst_reg_list =
-          VM_DecVariadicResults("results");
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
       current_frame->pc = pc;
 
       // NOTE: we assume validation has ensured these functions exist.
       // TODO(benvanik): something more clever than just a high bit?
-      int is_import = (function_ordinal & 0x80000000u) != 0;
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
       if (IREE_UNLIKELY(!is_import)) {
         // Variadic calls are currently only supported for import functions.
         return iree_make_status(
@@ -1746,23 +2165,117 @@ static iree_status_t iree_vm_bytecode_dispatch(
             "variadic calls only supported for internal callees");
       }
 
-      // Call import (and possible yield).
-      IREE_RETURN_IF_ERROR(iree_vm_bytecode_call_import_variadic(
+      // Call import.
+      iree_status_t call_status = iree_vm_bytecode_call_import_variadic(
           stack, module_state, function_ordinal, regs, segment_size_list,
-          src_reg_list, dst_reg_list, &current_frame, &regs));
+          src_reg_list, dst_reg_list, &current_frame, &regs);
+      IREE_ASSERT(!iree_status_is_deferred(call_status),
+                  "deferred calls must use vm.call.yieldable");
+      IREE_RETURN_IF_ERROR(call_status);
 
       // Restore the local dispatch variables that may have changed during the
       // function call due to stack growth.
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
-    DISPATCH_OP(CORE, Return, {
-      const iree_vm_register_list_t* src_reg_list =
-          VM_DecVariadicOperands("operands");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CallYieldable, {
+      // Yieldable call that may return DEFERRED.
+      // Supports both imports (via begin/resume) and internal functions
+      // (via vm.yield in the callee).
+      // Save instruction start for DEFERRED resume (pc already advanced past
+      // opcode by dispatch macro).
+      iree_vm_source_offset_t instruction_pc = pc - 1;
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(resume_pc);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
+
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
+      if (is_import) {
+        // Call import (handles begin/resume via return_registers).
+        iree_status_t call_status = iree_vm_bytecode_call_import_yieldable(
+            stack, current_frame, module_state, function_ordinal, regs,
+            src_reg_list, dst_reg_list, &regs);
+        if (iree_status_is_deferred(call_status)) {
+          // Import yielded - set PC to re-execute this instruction on resume.
+          current_frame->pc = instruction_pc;
+          return call_status;
+        }
+        IREE_RETURN_IF_ERROR(call_status);
+        // Call completed - results already in dst_reg_list.
+        // Update frame PC to resume block (will be read by common code below).
+        current_frame->pc = resume_pc + IREE_VM_BLOCK_MARKER_SIZE;
+      } else {
+        // Internal function call - callee may yield via vm.yield.
+        // Set return PC to resume block (not instruction after call).
+        // When callee returns, internal_leave copies results to dst_reg_list
+        // and Return handler will continue at current_frame->pc (resume block).
+        current_frame->pc = resume_pc + IREE_VM_BLOCK_MARKER_SIZE;
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_internal_enter(
+            stack, current_frame->function.module, function_ordinal,
+            src_reg_list, dst_reg_list, &current_frame, &regs));
+        bytecode_data =
+            module->bytecode_data.data +
+            module->function_descriptor_table[function_ordinal].bytecode_offset;
+      }
+
+      // Restore dispatch state (may have changed during call/enter).
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
+      pc = current_frame->pc;
+    });
+
+    IREE_VM_ISA_DISPATCH_OP(CORE, CallVariadicYieldable, {
+      // Variadic yieldable call that may return DEFERRED.
+      // Only supports imports (variadic calls to internal functions not
+      // supported).
+      // Save instruction start for DEFERRED resume (pc already advanced past
+      // opcode by dispatch macro).
+      iree_vm_source_offset_t instruction_pc = pc - 1;
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(resume_pc);
+      IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
+
+      int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
+      if (IREE_UNLIKELY(!is_import)) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variadic yieldable calls only supported for imports");
+      }
+
+      // Call variadic import (handles begin/resume via return_registers).
+      iree_status_t call_status =
+          iree_vm_bytecode_call_import_variadic_yieldable(
+              stack, current_frame, module_state, function_ordinal, regs,
+              segment_size_list, src_reg_list, dst_reg_list, &regs);
+      if (iree_status_is_deferred(call_status)) {
+        // Import yielded - set PC to re-execute this instruction on resume.
+        current_frame->pc = instruction_pc;
+        return call_status;
+      }
+      IREE_RETURN_IF_ERROR(call_status);
+      // Call completed - results already in dst_reg_list.
+      // Update frame PC to resume block.
+      current_frame->pc = resume_pc + IREE_VM_BLOCK_MARKER_SIZE;
+
+      // Restore dispatch state (may have changed during call).
+      regs_i32 = regs.i32;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
+      regs_ref = regs.ref;
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
+      pc = current_frame->pc;
+    });
+
+    IREE_VM_ISA_DISPATCH_OP(CORE, Return, {
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       current_frame->pc = pc;
 
       // TODO(benvanik): faster check for escaping; this is slow (cache misses).
@@ -1784,16 +2297,16 @@ static iree_status_t iree_vm_bytecode_dispatch(
           module->function_descriptor_table[current_frame->function.ordinal]
               .bytecode_offset;
       regs_i32 = regs.i32;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
-      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, 16);
+      IREE_BUILTIN_ASSUME_ALIGNED(regs_ref, sizeof(iree_max_align_t));
       pc = current_frame->pc;
     });
 
-    DISPATCH_OP(CORE, Fail, {
-      uint32_t status_code = VM_DecOperandRegI32("status");
-      iree_string_view_t message;
-      VM_DecStrAttr("message", &message);
+    IREE_VM_ISA_DISPATCH_OP(CORE, Fail, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(status_code_i32);
+      IREE_VM_ISA_DECODE_STRING_ATTR(message);
+      const uint32_t status_code = (uint32_t)status_code_i32;
       if (status_code != 0) {
         // TODO(benvanik): capture source information.
         return iree_status_allocate_f(status_code, "<vm>", 0, "%.*s",
@@ -1801,10 +2314,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
-    DISPATCH_OP(CORE, ImportResolved, {
-      uint32_t function_ordinal = VM_DecFuncAttr("import");
-      int32_t* result = VM_DecResultRegI32("result");
-      uint32_t import_ordinal = function_ordinal & 0x7FFFFFFFu;
+    IREE_VM_ISA_DISPATCH_OP(CORE, ImportResolved, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
+      IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
+      uint32_t import_ordinal =
+          iree_vm_isa_function_ordinal_as_import(function_ordinal);
       IREE_ASSERT(import_ordinal < module_state->import_count);
       const iree_vm_bytecode_import_t* import =
           &module_state->import_table[import_ordinal];
@@ -1815,17 +2329,13 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Async/fiber ops
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, Yield, {
+    IREE_VM_ISA_DISPATCH_OP(CORE, Yield, {
       // Perform branch before yielding; in this way we will resume at the
       // target without needing to retain any information about the yield.
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                       remap_list);
-      current_frame->pc =
-          block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
-
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
+      current_frame->pc = iree_vm_bytecode_dispatch_branch_to_block(
+          regs_i32, regs_ref, block_pc, remap_list);
       // Return magic status code indicating a yield.
       // This isn't an error, though callers not supporting coroutines will
       // treat it as one and propagate it up.
@@ -1836,45 +2346,37 @@ static iree_status_t iree_vm_bytecode_dispatch(
     // Debugging
     //===------------------------------------------------------------------===//
 
-    DISPATCH_OP(CORE, Trace, {
-      iree_string_view_t event_name;
-      VM_DecStrAttr("event_name", &event_name);
-      const iree_vm_register_list_t* src_reg_list =
-          VM_DecVariadicOperands("operands");
+    IREE_VM_ISA_DISPATCH_OP(CORE, Trace, {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       // TODO(benvanik): trace (if enabled).
       iree_vm_bytecode_dispatch_discard_registers(regs_ref, src_reg_list);
     });
 
-    DISPATCH_OP(CORE, Print, {
-      iree_string_view_t event_name;
-      VM_DecStrAttr("event_name", &event_name);
-      const iree_vm_register_list_t* src_reg_list =
-          VM_DecVariadicOperands("operands");
+    IREE_VM_ISA_DISPATCH_OP(CORE, Print, {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       // TODO(benvanik): print.
       iree_vm_bytecode_dispatch_discard_registers(regs_ref, src_reg_list);
     });
 
-    DISPATCH_OP(CORE, Break, {
+    IREE_VM_ISA_DISPATCH_OP(CORE, Break, {
       // TODO(benvanik): break unconditionally.
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                       remap_list);
-      pc = block_pc;
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
+      pc = iree_vm_bytecode_dispatch_branch_to(regs_i32, regs_ref, block_pc,
+                                               remap_list, /*pc_delta=*/0);
     });
 
-    DISPATCH_OP(CORE, CondBreak, {
-      int32_t condition = VM_DecOperandRegI32("condition");
+    IREE_VM_ISA_DISPATCH_OP(CORE, CondBreak, {
+      IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
       if (condition) {
         // TODO(benvanik): cond break.
       }
-      int32_t block_pc = VM_DecBranchTarget("dest");
-      const iree_vm_register_remap_list_t* remap_list =
-          VM_DecBranchOperands("operands");
-      iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
-                                                       remap_list);
-      pc = block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+      IREE_VM_ISA_DISPATCH_DECODE_BRANCH_TARGET(block_pc);
+      IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
+      pc = iree_vm_bytecode_dispatch_branch_to_block(regs_i32, regs_ref,
+                                                     block_pc, remap_list);
     });
 
     //===------------------------------------------------------------------===//
@@ -1882,32 +2384,34 @@ static iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
 #if IREE_VM_EXT_F32_ENABLE
-    BEGIN_DISPATCH_PREFIX(PrefixExtF32, EXT_F32) {
+    IREE_VM_ISA_DISPATCH_BEGIN_PREFIX(PrefixExtF32, EXT_F32) {
       //===----------------------------------------------------------------===//
       // ExtF32: Globals
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, GlobalLoadF32, {
-        uint32_t byte_offset = VM_DecGlobalAttr("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, GlobalLoadF32, {
+        IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(value);
         IREE_ASSERT(byte_offset + 4 <=
                     module_state->rwdata_storage.data_length);
-        float* value = VM_DecResultRegF32("value");
         const float global_value =
             vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
       });
 
-      DISPATCH_OP(EXT_F32, GlobalStoreF32, {
-        uint32_t byte_offset = VM_DecGlobalAttr("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, GlobalStoreF32, {
+        IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(value);
         IREE_ASSERT(byte_offset + 4 <=
                     module_state->rwdata_storage.data_length);
-        float value = VM_DecOperandRegF32("value");
         vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
                             value);
       });
 
-      DISPATCH_OP(EXT_F32, GlobalLoadIndirectF32, {
-        uint32_t byte_offset = VM_DecOperandRegI32("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, GlobalLoadIndirectF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(value);
+        const uint32_t byte_offset = (uint32_t)byte_offset_i32;
         if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
@@ -1915,14 +2419,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
               "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
-        float* value = VM_DecResultRegF32("value");
         const float global_value =
             vm_global_load_f32(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
       });
 
-      DISPATCH_OP(EXT_F32, GlobalStoreIndirectF32, {
-        uint32_t byte_offset = VM_DecOperandRegI32("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, GlobalStoreIndirectF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(value);
+        const uint32_t byte_offset = (uint32_t)byte_offset_i32;
         if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
@@ -1930,7 +2435,6 @@ static iree_status_t iree_vm_bytecode_dispatch(
               "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
-        float value = VM_DecOperandRegF32("value");
         vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
                             value);
       });
@@ -1939,14 +2443,14 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Constants
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, ConstF32, {
-        float value = VM_DecAttrF32("value");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, ConstF32, {
+        IREE_VM_ISA_DECODE_ATTR_F32(value);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = value;
       });
 
-      DISPATCH_OP(EXT_F32, ConstF32Zero, {
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, ConstF32Zero, {
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = 0;
       });
 
@@ -1954,30 +2458,30 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Lists
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, ListGetF32, {
-        bool list_is_move;
-        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, ListGetF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
-        uint32_t index = VM_DecOperandRegI32("index");
-        float* result = VM_DecResultRegF32("result");
+        const uint32_t index = (uint32_t)index_i32;
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             list, index, IREE_VM_VALUE_TYPE_F32, &value));
         *result = value.f32;
       });
 
-      DISPATCH_OP(EXT_F32, ListSetF32, {
-        bool list_is_move;
-        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, ListSetF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(raw_value);
         iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
-        uint32_t index = VM_DecOperandRegI32("index");
-        float raw_value = VM_DecOperandRegF32("value");
+        const uint32_t index = (uint32_t)index_i32;
         iree_vm_value_t value = iree_vm_value_make_f32(raw_value);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
       });
@@ -1986,20 +2490,19 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Conditional assignment
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, SelectF32, {
-        int32_t condition = VM_DecOperandRegI32("condition");
-        float true_value = VM_DecOperandRegF32("true_value");
-        float false_value = VM_DecOperandRegF32("false_value");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, SelectF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(true_value);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(false_value);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_select_f32(condition, true_value, false_value);
       });
 
-      DISPATCH_OP(EXT_F32, SwitchF32, {
-        int32_t index = VM_DecOperandRegI32("index");
-        float default_value = VM_DecOperandRegF32("default_value");
-        const iree_vm_register_list_t* value_reg_list =
-            VM_DecVariadicOperands("values");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, SwitchF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(default_value);
+        IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         if (index >= 0 && index < value_reg_list->size) {
           *result = *((float*)&regs_i32[value_reg_list->registers[index]]);
         } else {
@@ -2011,90 +2514,91 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Native floating-point arithmetic
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP_EXT_F32_BINARY_F32(AddF32, vm_add_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(SubF32, vm_sub_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(MulF32, vm_mul_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(DivF32, vm_div_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(RemF32, vm_rem_f32);
-      DISPATCH_OP_EXT_F32_TERNARY_F32(FMAF32, vm_fma_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(AbsF32, vm_abs_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(NegF32, vm_neg_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32Even, vm_round_f32_even);
-      DISPATCH_OP_EXT_F32_BINARY_F32(MinF32, vm_min_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(MaxF32, vm_max_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(AddF32, vm_add_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(SubF32, vm_sub_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(MulF32, vm_mul_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(DivF32, vm_div_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(RemF32, vm_rem_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_TERNARY_F32(FMAF32, vm_fma_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(AbsF32, vm_abs_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(NegF32, vm_neg_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(CeilF32, vm_ceil_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(FloorF32, vm_floor_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32, vm_round_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(RoundF32Even,
+                                                vm_round_f32_even);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(MinF32, vm_min_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(MaxF32, vm_max_f32);
 
-      DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(SinF32, vm_sin_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(ExpF32, vm_exp_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Exp2F32, vm_exp2_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(ExpM1F32, vm_expm1_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(LogF32, vm_log_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log10F32, vm_log10_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log1pF32, vm_log1p_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(Log2F32, vm_log2_f32);
-      DISPATCH_OP_EXT_F32_BINARY_F32(PowF32, vm_pow_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
-      DISPATCH_OP_EXT_F32_UNARY_F32(ErfF32, vm_erf_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(AtanF32, vm_atan_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(Atan2F32, vm_atan2_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(CosF32, vm_cos_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(SinF32, vm_sin_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(ExpF32, vm_exp_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(Exp2F32, vm_exp2_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(ExpM1F32, vm_expm1_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(LogF32, vm_log_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(Log10F32, vm_log10_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(Log1pF32, vm_log1p_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(Log2F32, vm_log2_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_BINARY_F32(PowF32, vm_pow_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_UNARY_F32(ErfF32, vm_erf_f32);
 
       //===----------------------------------------------------------------===//
       // ExtF32: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, CastSI32F32, {
-        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastSI32F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_cast_si32f32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastSI64F32, {
-        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastSI64F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_cast_si64f32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastUI32F32, {
-        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastUI32F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_cast_ui32f32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastUI64F32, {
-        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastUI64F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_cast_ui64f32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastF32SI32, {
-        float operand = VM_DecOperandRegF32("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastF32SI32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cast_f32si32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastF32SI64, {
-        float operand = VM_DecOperandRegF32("operand");
-        int64_t* result = VM_DecResultRegI64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastF32SI64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
         *result = vm_cast_f32si64(operand);
       });
-      DISPATCH_OP(EXT_F32, CastF32UI32, {
-        float operand = VM_DecOperandRegF32("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastF32UI32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cast_f32ui32(operand);
       });
-      DISPATCH_OP(EXT_F32, CastF32UI64, {
-        float operand = VM_DecOperandRegF32("operand");
-        int64_t* result = VM_DecResultRegI64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CastF32UI64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
         *result = vm_cast_f32ui64(operand);
       });
-      DISPATCH_OP(EXT_F32, BitcastI32F32, {
-        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, BitcastI32F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_bitcast_i32f32(operand);
       });
-      DISPATCH_OP(EXT_F32, BitcastF32I32, {
-        float operand = VM_DecOperandRegF32("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, BitcastF32I32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_bitcast_f32i32(operand);
       });
 
@@ -2102,25 +2606,25 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Comparison ops
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_F32_CMP_F32(op_name, op_func) \
-  DISPATCH_OP(EXT_F32, op_name, {                     \
-    float lhs = VM_DecOperandRegF32("lhs");           \
-    float rhs = VM_DecOperandRegF32("rhs");           \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(lhs, rhs);                      \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                     \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(lhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(rhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);               \
+    *result = op_func(lhs, rhs);                                  \
   });
 
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32O, vm_cmp_eq_f32o);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32U, vm_cmp_eq_f32u);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32O, vm_cmp_ne_f32o);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32U, vm_cmp_ne_f32u);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32O, vm_cmp_lt_f32o);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32U, vm_cmp_lt_f32u);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32O, vm_cmp_lte_f32o);
-      DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32U, vm_cmp_lte_f32u);
-      DISPATCH_OP(EXT_F32, CmpNaNF32, {
-        float operand = VM_DecOperandRegF32("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32O, vm_cmp_eq_f32o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpEQF32U, vm_cmp_eq_f32u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32O, vm_cmp_ne_f32o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpNEF32U, vm_cmp_ne_f32u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32O, vm_cmp_lt_f32o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpLTF32U, vm_cmp_lt_f32u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32O, vm_cmp_lte_f32o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F32_CMP_F32(CmpLTEF32U, vm_cmp_lte_f32u);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, CmpNaNF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cmp_nan_f32(operand);
       });
 
@@ -2128,81 +2632,77 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF32: Buffers
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F32, BufferFillF32, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, BufferFillF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(value);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-        iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-        float value = VM_DecOperandRegF32("value");
         IREE_RETURN_IF_ERROR(vm_buffer_fill_f32(buffer, offset, length, value));
       });
 
-      DISPATCH_OP(EXT_F32, BufferLoadF32, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, BufferLoadF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "source_buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-        float* result = VM_DecResultRegF32("result");
         vm_buffer_load_f32_inline(buffer, offset, result);
       });
 
-      DISPATCH_OP(EXT_F32, BufferStoreF32, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F32, BufferStoreF32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(value);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "target_buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-        float value = VM_DecOperandRegF32("value");
         vm_buffer_store_f32_inline(buffer, offset, value);
       });
     }
-    END_DISPATCH_PREFIX();
+    IREE_VM_ISA_DISPATCH_END_PREFIX();
 #else
-    UNHANDLED_DISPATCH_PREFIX(PrefixExtF32, EXT_F32);
+    IREE_VM_ISA_DISPATCH_UNHANDLED_PREFIX(PrefixExtF32, EXT_F32);
 #endif  // IREE_VM_EXT_F32_ENABLE
 
 #if IREE_VM_EXT_F64_ENABLE
-    BEGIN_DISPATCH_PREFIX(PrefixExtF64, EXT_F64) {
+    IREE_VM_ISA_DISPATCH_BEGIN_PREFIX(PrefixExtF64, EXT_F64) {
       //===----------------------------------------------------------------===//
       // ExtF64: Globals
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, GlobalLoadF64, {
-        uint32_t byte_offset = VM_DecGlobalAttr("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, GlobalLoadF64, {
+        IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(value);
         IREE_ASSERT(byte_offset + 4 <=
                     module_state->rwdata_storage.data_length);
-        double* value = VM_DecResultRegF64("value");
         const double global_value =
             vm_global_load_f64(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
       });
 
-      DISPATCH_OP(EXT_F64, GlobalStoreF64, {
-        uint32_t byte_offset = VM_DecGlobalAttr("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, GlobalStoreF64, {
+        IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(value);
         IREE_ASSERT(byte_offset + 4 <=
                     module_state->rwdata_storage.data_length);
-        double value = VM_DecOperandRegF64("value");
         vm_global_store_f64(module_state->rwdata_storage.data, byte_offset,
                             value);
       });
 
-      DISPATCH_OP(EXT_F64, GlobalLoadIndirectF64, {
-        uint32_t byte_offset = VM_DecOperandRegI32("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, GlobalLoadIndirectF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(value);
+        const uint32_t byte_offset = (uint32_t)byte_offset_i32;
         if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
@@ -2210,14 +2710,15 @@ static iree_status_t iree_vm_bytecode_dispatch(
               "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
-        double* value = VM_DecResultRegF64("value");
         const double global_value =
             vm_global_load_f64(module_state->rwdata_storage.data, byte_offset);
         *value = global_value;
       });
 
-      DISPATCH_OP(EXT_F64, GlobalStoreIndirectF64, {
-        uint32_t byte_offset = VM_DecOperandRegI32("global");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, GlobalStoreIndirectF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(value);
+        const uint32_t byte_offset = (uint32_t)byte_offset_i32;
         if (IREE_UNLIKELY(byte_offset + 4 >
                           module_state->rwdata_storage.data_length)) {
           return iree_make_status(
@@ -2225,7 +2726,6 @@ static iree_status_t iree_vm_bytecode_dispatch(
               "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
-        double value = VM_DecOperandRegF64("value");
         vm_global_store_f64(module_state->rwdata_storage.data, byte_offset,
                             value);
       });
@@ -2234,14 +2734,14 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Constants
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, ConstF64, {
-        double value = VM_DecAttrF64("value");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, ConstF64, {
+        IREE_VM_ISA_DECODE_ATTR_F64(value);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = value;
       });
 
-      DISPATCH_OP(EXT_F64, ConstF64Zero, {
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, ConstF64Zero, {
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = 0;
       });
 
@@ -2249,30 +2749,30 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Lists
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, ListGetF64, {
-        bool list_is_move;
-        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, ListGetF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
-        uint32_t index = VM_DecOperandRegI32("index");
-        double* result = VM_DecResultRegF64("result");
+        const uint32_t index = (uint32_t)index_i32;
         iree_vm_value_t value;
         IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
             list, index, IREE_VM_VALUE_TYPE_F64, &value));
         *result = value.f64;
       });
 
-      DISPATCH_OP(EXT_F64, ListSetF64, {
-        bool list_is_move;
-        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, ListSetF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(list_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index_i32);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(raw_value);
+        const uint32_t index = (uint32_t)index_i32;
         iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
         if (IREE_UNLIKELY(!list)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
         }
-        uint32_t index = VM_DecOperandRegI32("index");
-        double raw_value = VM_DecOperandRegF64("value");
         iree_vm_value_t value = iree_vm_value_make_f64(raw_value);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
       });
@@ -2281,20 +2781,19 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Conditional assignment
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, SelectF64, {
-        int32_t condition = VM_DecOperandRegI32("condition");
-        double true_value = VM_DecOperandRegF64("true_value");
-        double false_value = VM_DecOperandRegF64("false_value");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, SelectF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(condition);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(true_value);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(false_value);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_select_f64(condition, true_value, false_value);
       });
 
-      DISPATCH_OP(EXT_F64, SwitchF64, {
-        int32_t index = VM_DecOperandRegI32("index");
-        double default_value = VM_DecOperandRegF64("default_value");
-        const iree_vm_register_list_t* value_reg_list =
-            VM_DecVariadicOperands("values");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, SwitchF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(index);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(default_value);
+        IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         if (index >= 0 && index < value_reg_list->size) {
           *result = *((double*)&regs_i32[value_reg_list->registers[index]]);
         } else {
@@ -2306,100 +2805,101 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Native floating-point arithmetic
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP_EXT_F64_BINARY_F64(AddF64, vm_add_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(SubF64, vm_sub_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(MulF64, vm_mul_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(DivF64, vm_div_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(RemF64, vm_rem_f64);
-      DISPATCH_OP_EXT_F64_TERNARY_F64(FMAF64, vm_fma_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(AbsF64, vm_abs_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(NegF64, vm_neg_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(CeilF64, vm_ceil_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(FloorF64, vm_floor_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64, vm_round_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64Even, vm_round_f64_even);
-      DISPATCH_OP_EXT_F64_BINARY_F64(MinF64, vm_min_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(MaxF64, vm_max_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(AddF64, vm_add_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(SubF64, vm_sub_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(MulF64, vm_mul_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(DivF64, vm_div_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(RemF64, vm_rem_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_TERNARY_F64(FMAF64, vm_fma_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(AbsF64, vm_abs_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(NegF64, vm_neg_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(CeilF64, vm_ceil_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(FloorF64, vm_floor_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64, vm_round_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64Even,
+                                                vm_round_f64_even);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(MinF64, vm_min_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(MaxF64, vm_max_f64);
 
-      DISPATCH_OP_EXT_F64_UNARY_F64(AtanF64, vm_atan_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(Atan2F64, vm_atan2_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(CosF64, vm_cos_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(SinF64, vm_sin_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(ExpF64, vm_exp_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(Exp2F64, vm_exp2_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(ExpM1F64, vm_expm1_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(LogF64, vm_log_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(Log10F64, vm_log10_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(Log1pF64, vm_log1p_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(Log2F64, vm_log2_f64);
-      DISPATCH_OP_EXT_F64_BINARY_F64(PowF64, vm_pow_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(RsqrtF64, vm_rsqrt_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(SqrtF64, vm_sqrt_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(TanhF64, vm_tanh_f64);
-      DISPATCH_OP_EXT_F64_UNARY_F64(ErfF64, vm_erf_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(AtanF64, vm_atan_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(Atan2F64, vm_atan2_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(CosF64, vm_cos_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(SinF64, vm_sin_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(ExpF64, vm_exp_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(Exp2F64, vm_exp2_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(ExpM1F64, vm_expm1_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(LogF64, vm_log_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(Log10F64, vm_log10_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(Log1pF64, vm_log1p_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(Log2F64, vm_log2_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_BINARY_F64(PowF64, vm_pow_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(RsqrtF64, vm_rsqrt_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(SqrtF64, vm_sqrt_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(TanhF64, vm_tanh_f64);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_UNARY_F64(ErfF64, vm_erf_f64);
 
       //===----------------------------------------------------------------===//
       // ExtF64: Casting and type conversion/emulation
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, TruncF64F32, {
-        double operand = (double)VM_DecOperandRegF64("operand");
-        float* result = VM_DecResultRegF32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, TruncF64F32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
         *result = vm_trunc_f64f32(operand);
       });
-      DISPATCH_OP(EXT_F64, ExtF32F64, {
-        float operand = (float)VM_DecOperandRegF32("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, ExtF32F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_ext_f32f64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastSI32F64, {
-        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastSI32F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_cast_si32f64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastUI32F64, {
-        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastUI32F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_cast_ui32f64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastF64SI32, {
-        double operand = VM_DecOperandRegF64("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastF64SI32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cast_f64si32(operand);
       });
-      DISPATCH_OP(EXT_F64, CastF64UI32, {
-        double operand = VM_DecOperandRegF64("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastF64UI32, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cast_f64ui32(operand);
       });
-      DISPATCH_OP(EXT_F64, CastSI64F64, {
-        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastSI64F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_cast_si64f64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastUI64F64, {
-        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastUI64F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_cast_ui64f64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastF64SI64, {
-        double operand = VM_DecOperandRegF64("operand");
-        int64_t* result = VM_DecResultRegI64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastF64SI64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
         *result = vm_cast_f64si64(operand);
       });
-      DISPATCH_OP(EXT_F64, CastF64UI64, {
-        double operand = VM_DecOperandRegF64("operand");
-        int64_t* result = VM_DecResultRegI64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CastF64UI64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
         *result = vm_cast_f64ui64(operand);
       });
-      DISPATCH_OP(EXT_F64, BitcastI64F64, {
-        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
-        double* result = VM_DecResultRegF64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, BitcastI64F64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         *result = vm_bitcast_i64f64(operand);
       });
-      DISPATCH_OP(EXT_F64, BitcastF64I64, {
-        double operand = VM_DecOperandRegF64("operand");
-        int64_t* result = VM_DecResultRegI64("result");
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, BitcastF64I64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
         *result = vm_bitcast_f64i64(operand);
       });
 
@@ -2407,25 +2907,25 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Comparison ops
       //===----------------------------------------------------------------===//
 
-#define DISPATCH_OP_EXT_F64_CMP_F64(op_name, op_func) \
-  DISPATCH_OP(EXT_F64, op_name, {                     \
-    double lhs = VM_DecOperandRegF64("lhs");          \
-    double rhs = VM_DecOperandRegF64("rhs");          \
-    int32_t* result = VM_DecResultRegI32("result");   \
-    *result = op_func(lhs, rhs);                      \
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F64, op_name, {                     \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(lhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(rhs);                 \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);               \
+    *result = op_func(lhs, rhs);                                  \
   });
 
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64O, vm_cmp_eq_f64o);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64U, vm_cmp_eq_f64u);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64O, vm_cmp_ne_f64o);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64U, vm_cmp_ne_f64u);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64O, vm_cmp_lt_f64o);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64U, vm_cmp_lt_f64u);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64O, vm_cmp_lte_f64o);
-      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64U, vm_cmp_lte_f64u);
-      DISPATCH_OP(EXT_F64, CmpNaNF64, {
-        double operand = VM_DecOperandRegF64("operand");
-        int32_t* result = VM_DecResultRegI32("result");
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64O, vm_cmp_eq_f64o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64U, vm_cmp_eq_f64u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64O, vm_cmp_ne_f64o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64U, vm_cmp_ne_f64u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64O, vm_cmp_lt_f64o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64U, vm_cmp_lt_f64u);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64O, vm_cmp_lte_f64o);
+      IREE_VM_ISA_DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64U, vm_cmp_lte_f64u);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, CmpNaNF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(operand);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
         *result = vm_cmp_nan_f64(operand);
       });
 
@@ -2433,56 +2933,50 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // ExtF64: Buffers
       //===----------------------------------------------------------------===//
 
-      DISPATCH_OP(EXT_F64, BufferFillF64, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, BufferFillF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(length);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(value);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-        iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
-        double value = VM_DecOperandRegF64("value");
         IREE_RETURN_IF_ERROR(vm_buffer_fill_f64(buffer, offset, length, value));
       });
 
-      DISPATCH_OP(EXT_F64, BufferLoadF64, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, BufferLoadF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "source_buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
-        double* result = VM_DecResultRegF64("result");
         vm_buffer_load_f64_inline(buffer, offset, result);
       });
 
-      DISPATCH_OP(EXT_F64, BufferStoreF64, {
-        bool buffer_is_move;
-        iree_vm_ref_t* buffer_ref =
-            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+      IREE_VM_ISA_DISPATCH_OP(EXT_F64, BufferStoreF64, {
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF(buffer_ref);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64_HOST_SIZE(offset);
+        IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(value);
         iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
         if (IREE_UNLIKELY(!buffer)) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "target_buffer is null");
         }
-        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
-        double value = VM_DecOperandRegF64("value");
         vm_buffer_store_f64_inline(buffer, offset, value);
       });
     }
-    END_DISPATCH_PREFIX();
+    IREE_VM_ISA_DISPATCH_END_PREFIX();
 #else
-    UNHANDLED_DISPATCH_PREFIX(PrefixExtF64, EXT_F64);
+    IREE_VM_ISA_DISPATCH_UNHANDLED_PREFIX(PrefixExtF64, EXT_F64);
 #endif  // IREE_VM_EXT_F64_ENABLE
 
     // NOLINTNEXTLINE(misc-static-assert)
-    DISPATCH_UNHANDLED_CORE();
+    IREE_VM_ISA_DISPATCH_UNHANDLED_CORE();
   }
-  END_DISPATCH_CORE();
+  IREE_VM_ISA_DISPATCH_END_CORE();
 }

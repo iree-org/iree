@@ -6,7 +6,8 @@
 
 # Utilities for working with IREE MLIR types.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -14,10 +15,27 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "CommonTypeConstraints.td",
+            "DocMetadata.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
+        "EncodingUtils.cpp",
         "EquivalenceUtils.cpp",
         "FlatbufferUtils.cpp",
         "Indexing.cpp",
@@ -33,9 +51,9 @@ iree_compiler_cc_library(
     hdrs = [
         "ConversionUtils.h",
         "EmbeddedDataDirectory.h",
+        "EncodingUtils.h",
         "EquivalenceUtils.h",
         "FlatbufferUtils.h",
-        "Folding.h",
         "Indexing.h",
         "IntegerSet.h",
         "ModuleUtils.h",
@@ -45,6 +63,7 @@ iree_compiler_cc_library(
         "PatternUtils.h",
         "Permutation.h",
         "RegionOpUtils.h",
+        "RewriteUtils.h",
         "ShapeUtils.h",
         "StringUtils.h",
         "ToolUtils.h",
@@ -60,6 +79,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",

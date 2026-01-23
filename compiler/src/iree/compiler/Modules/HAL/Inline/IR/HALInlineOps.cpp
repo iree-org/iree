@@ -103,12 +103,13 @@ void BufferStorageOp::getAsmResultNames(
 
 OpFoldResult BufferStorageOp::fold(FoldAdaptor operands) {
   auto *definingOp = getBuffer().getDefiningOp();
-  if (!definingOp)
+  if (!definingOp) {
     return {};
-  if (auto sourceOp =
-          dyn_cast_or_null<IREE::HAL::Inline::BufferAllocateOp>(definingOp)) {
+  }
+  if (auto sourceOp = dyn_cast_if_present<IREE::HAL::Inline::BufferAllocateOp>(
+          definingOp)) {
     return sourceOp.getStorage();
-  } else if (auto sourceOp = dyn_cast_or_null<
+  } else if (auto sourceOp = dyn_cast_if_present<
                  IREE::HAL::Inline::BufferAllocateInitializedOp>(definingOp)) {
     return sourceOp.getStorage();
   }
@@ -158,8 +159,8 @@ struct FoldBufferViewCreateSubspan
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
     auto newSourceBuffer = op.getSourceBuffer();
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+    auto newSourceOffset = cast<Value>(op.getSourceOffset());
+    if (auto subspanOp = dyn_cast_if_present<BufferSubspanOp>(
             op.getSourceBuffer().getDefiningOp())) {
       newSourceBuffer = subspanOp.getSourceBuffer();
       newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
@@ -168,8 +169,9 @@ struct FoldBufferViewCreateSubspan
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
@@ -202,7 +204,7 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
+    if (auto createOp = dyn_cast_if_present<BufferViewCreateOp>(
             op.getBufferView().getDefiningOp())) {
       rewriter.replaceOp(op, createOp.getSourceBuffer());
       return success();
@@ -225,8 +227,7 @@ void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
 LogicalResult DeviceQueryOp::verify() {
   DeviceQueryOp op = *this;
   if (op.getDefaultValue().has_value()) {
-    if (auto typedDefaultValue =
-            llvm::dyn_cast<TypedAttr>(*op.getDefaultValue())) {
+    if (auto typedDefaultValue = dyn_cast<TypedAttr>(*op.getDefaultValue())) {
       if (typedDefaultValue.getType() != op.getValue().getType()) {
         return op.emitOpError()
                << "type mismatch between result and default value";

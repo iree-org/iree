@@ -19,6 +19,7 @@ iree_c_embed_data(
     iree_specialization_patterns_amdgpu
   SRCS
     "specialization_patterns_gfx942.mlir"
+    "specialization_patterns_gfx950.mlir"
   C_FILE_OUTPUT
     "iree_specialization_patterns_amdgpu.c"
   H_FILE_OUTPUT
@@ -32,6 +33,7 @@ iree_lit_test_suite(
     verify_specialization_patterns_amdgpu
   SRCS
     "specialization_patterns_gfx942.mlir"
+    "specialization_patterns_gfx950.mlir"
   TOOLS
     iree-opt
 )

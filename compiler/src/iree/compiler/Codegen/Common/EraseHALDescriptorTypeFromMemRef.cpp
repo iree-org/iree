@@ -32,9 +32,9 @@ namespace {
 
 /// Returns true if the given `type` is considered as legal.
 static bool isLegalType(Type type) {
-  if (auto memRefType = llvm::dyn_cast<BaseMemRefType>(type)) {
+  if (auto memRefType = dyn_cast<BaseMemRefType>(type)) {
     Attribute spaceAttr = memRefType.getMemorySpace();
-    return !spaceAttr || !llvm::isa<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
+    return !spaceAttr || !isa<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
   }
   return true;
 }
@@ -46,11 +46,12 @@ struct EraseHALDescriptorTypeFromMemRefPass final
     AttrTypeReplacer replacer;
     replacer.addReplacement(
         [](BaseMemRefType memRefType) -> std::optional<BaseMemRefType> {
-          if (isLegalType(memRefType))
+          if (isLegalType(memRefType)) {
             return std::nullopt;
+          }
 
           // Erase the #hal.descriptor_type memory space.
-          if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
+          if (auto rankedType = dyn_cast<MemRefType>(memRefType)) {
             return MemRefType::get(memRefType.getShape(),
                                    memRefType.getElementType(),
                                    rankedType.getLayout());
@@ -74,13 +75,14 @@ struct ConvertHALDescriptorTypeToGPUAddressSpacePass final
     AttrTypeReplacer replacer;
     replacer.addReplacement(
         [](BaseMemRefType memRefType) -> std::optional<BaseMemRefType> {
-          if (isLegalType(memRefType))
+          if (isLegalType(memRefType)) {
             return std::nullopt;
+          }
 
           Attribute globalSpace = gpu::AddressSpaceAttr::get(
               memRefType.getContext(), gpu::AddressSpace::Global);
           // Erase the #hal.descriptor_type memory space.
-          if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
+          if (auto rankedType = dyn_cast<MemRefType>(memRefType)) {
             return MemRefType::get(memRefType.getShape(),
                                    memRefType.getElementType(),
                                    rankedType.getLayout(), globalSpace);

@@ -14,7 +14,7 @@ module {
 }
 
 // CHECK-LABEL:   func.func @dead_alloc
-//   CHECK-NOT:     alloc
+//   CHECK-NOT:     memref.alloc
 //   CHECK-NOT:     memref.subview
 //   CHECK-NOT:     vector.transfer_write
 //       CHECK:     return

@@ -50,7 +50,7 @@ struct ExpandedGlobal {
 using ExpandedGlobalMap = DenseMap<StringRef, ExpandedGlobal>;
 
 static bool isDynamicTensor(Type type) {
-  if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
     return !tensorType.hasStaticShape();
   }
   return false;
@@ -81,7 +81,7 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp,
     OpBuilder builder(global.tensorOp);
     builder.setInsertionPointAfter(global.tensorOp);
 
-    auto tensorType = llvm::cast<RankedTensorType>(global.tensorOp.getType());
+    auto tensorType = cast<RankedTensorType>(global.tensorOp.getType());
     for (auto it : llvm::enumerate(tensorType.getShape())) {
       if (ShapedType::isDynamic(it.value())) {
         auto dimName =
@@ -112,7 +112,7 @@ static bool usesDynamicTensors(Operation *op) {
 
 static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
   newTypes.push_back(type);
-  if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
     newTypes.append(tensorType.getNumDynamicDims(),
                     IndexType::get(type.getContext()));
   }
@@ -121,8 +121,9 @@ static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
 // Expands tensors in the given |types| list to (tensor, dynamic dims...).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
-  if (types.empty())
+  if (types.empty()) {
     return {};
+  }
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
@@ -153,7 +154,7 @@ static ExpandedValue consumeExpandedValue(Location loc, Value value,
   // If the value comes from a tie shape we can bypass the slower checks.
   // This happens a lot during expansion as we'll expand function and block args
   // and insert ties before processing nested ops that consume them.
-  if (auto tieShapeOp = dyn_cast_or_null<IREE::Flow::TensorTieShapeOp>(
+  if (auto tieShapeOp = dyn_cast_if_present<IREE::Flow::TensorTieShapeOp>(
           value.getDefiningOp())) {
     ExpandedValue expandedValue;
     expandedValue.tensor = tieShapeOp.getOperand();
@@ -205,22 +206,25 @@ static void expandTensorDims(Operation *op, SymbolTable &symbolTable,
 static void expandRegion(Region &region, SymbolTable &symbolTable,
                          ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                          TensorDimMap tensorDimMap) {
-  if (region.empty())
+  if (region.empty()) {
     return;
+  }
 
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
-    if (!llvm::any_of(block.getArgumentTypes(), isDynamicTensor))
+    if (llvm::none_of(block.getArgumentTypes(), isDynamicTensor)) {
       continue;
+    }
 
     // Insert and build a list of expanded (tensor, dynamic dims...) tuples.
     SmallVector<ExpandedValue> expansions;
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
-      auto tensorType = llvm::dyn_cast<RankedTensorType>(arg.getType());
-      if (!tensorType || tensorType.hasStaticShape())
+      auto tensorType = dyn_cast<RankedTensorType>(arg.getType());
+      if (!tensorType || tensorType.hasStaticShape()) {
         continue;
+      }
       ExpandedValue expandedValue;
       expandedValue.tensor = arg;
       for (unsigned j = 0; j < tensorType.getNumDynamicDims(); ++j) {
@@ -271,7 +275,7 @@ static void retieResults(Operation *op, Operation *newOp,
   unsigned newIdx = 0;
   for (unsigned oldIdx = 0; oldIdx < op->getNumResults(); ++oldIdx) {
     auto oldResult = op->getResult(oldIdx);
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(oldResult.getType());
+    auto tensorType = dyn_cast<RankedTensorType>(oldResult.getType());
     if (!tensorType || tensorType.hasStaticShape()) {
       auto newResult = newOp->getResult(newIdx++);
       oldResult.replaceAllUsesWith(newResult);
@@ -302,8 +306,9 @@ static void retieResults(Operation *op, Operation *newOp,
 static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
+  }
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto &expandedGlobal = globalMap[op.getGlobalName()];
@@ -335,8 +340,9 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet,
                                 TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
+  }
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
   auto expandedValue = consumeExpandedValue(
@@ -395,13 +401,15 @@ static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
 //  %2 = flow.tensor.tie_shape %r : tensor<?xf32>{%rd}
 static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
                          IndexSet &indexSet, TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
+  }
 
   // Ignore calls to public/external functions.
   auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
-  if (IREE::Util::isPublicOrExternal(calleeOp))
+  if (IREE::Util::isPublicOrExternal(calleeOp)) {
     return;
+  }
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
@@ -429,10 +437,13 @@ static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
 //  util.return %0, %d
 static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
-  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
+  }
+  if (IREE::Util::isPublicOrExternal(
+          op->getParentOfType<IREE::Util::FuncOp>())) {
     return;
+  }
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
@@ -462,8 +473,9 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
 
 static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
                                TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
+  }
   OpBuilder builder(op);
   mlir::cf::CondBranchOp::create(
       builder, op.getLoc(), op.getCondition(), op.getTrueDest(),
@@ -487,8 +499,9 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
 //   %4 = flow.tensor.tie_shape %2 : tensor<?xf32>{%3}
 static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
-  if (!usesDynamicTensors(op))
+  if (!usesDynamicTensors(op)) {
     return;
+  }
   OpBuilder builder(op);
 
   auto trueValue = consumeExpandedValue(op.getLoc(), op.getTrueValue(),

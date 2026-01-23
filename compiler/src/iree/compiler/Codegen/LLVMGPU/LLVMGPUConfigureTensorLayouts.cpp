@@ -204,8 +204,8 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
   // MMA intrinsics can be weird and usually don't have a single subgroup
   // iteration space, so we need to find their value subgroup iteration space
   // indvidually.
-  auto getFragmentLayout = [&](IREE::GPU::MMAFragment fragment,
-                               int64_t outerDim, int64_t innerDim,
+  auto getFragmentLayout = [&](int operandIndex, int64_t outerDim,
+                               int64_t innerDim,
                                AffineMap map) -> VectorLayoutInterface {
     // Note that the struct MMASingleSubgroupLayout contains the partial layout
     // for the canonical (M, K) x (K, N) -> (M, N) matmul form. We treat the
@@ -217,7 +217,7 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
     SmallVector<int64_t> threadStrides(rank, 0);
 
     MMASingleSubgroupLayout subgroupLayout =
-        IREE::GPU::getSingleSubgroupLayout(intrinsic, fragment);
+        IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
     outerCounts[outerDim] = subgroupLayout.outer[0];
     outerCounts[innerDim] = subgroupLayout.outer[1];
     threadCounts[outerDim] = subgroupLayout.thread[0];
@@ -235,15 +235,12 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
     return fragmentSpaceLayout.apply(map);
   };
 
-  VectorLayoutInterface lhs =
-      getFragmentLayout(IREE::GPU::MMAFragment::Lhs, innerMDim, innerKDim,
-                        contractIndexingMaps[0]);
-  VectorLayoutInterface rhs =
-      getFragmentLayout(IREE::GPU::MMAFragment::Rhs, innerKDim, innerNDim,
-                        contractIndexingMaps[1]);
-  VectorLayoutInterface acc =
-      getFragmentLayout(IREE::GPU::MMAFragment::Acc, innerMDim, innerNDim,
-                        contractIndexingMaps[2]);
+  VectorLayoutInterface lhs = getFragmentLayout(
+      IREE::GPU::kMMAOperandLhs, innerMDim, innerKDim, contractIndexingMaps[0]);
+  VectorLayoutInterface rhs = getFragmentLayout(
+      IREE::GPU::kMMAOperandRhs, innerKDim, innerNDim, contractIndexingMaps[1]);
+  VectorLayoutInterface acc = getFragmentLayout(
+      IREE::GPU::kMMAOperandAcc, innerMDim, innerNDim, contractIndexingMaps[2]);
 
   return ContractionLayout{lhs, rhs, acc};
 }
@@ -459,11 +456,14 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   IREE::Codegen::InnerTileDescAttrInterface pvIntrinsic =
       getIntrinsic(pvMatmul);
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Lhs);
+      IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
+                                         IREE::GPU::kMMAOperandLhs);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
-      getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Rhs);
+      IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
+                                         IREE::GPU::kMMAOperandRhs);
   IREE::GPU::MMASingleSubgroupLayout outLayout =
-      getSingleSubgroupLayout(qkIntrinsic, IREE::GPU::MMAFragment::Acc);
+      IREE::GPU::getSingleSubgroupLayout(qkIntrinsic,
+                                         IREE::GPU::kMMAOperandAcc);
 
   auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout layoutA,
                         IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
@@ -737,9 +737,9 @@ struct LLVMGPUConfigureTensorLayoutsPass final
       return signalPassFailure();
     }
 
-    auto attentionQKMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+    auto attentionQKMatmul = dyn_cast_if_present<linalg::LinalgOp>(
         getOpWithAttr(funcOp, "attention_qk_matmul"));
-    auto attentionPVMatmul = dyn_cast_or_null<linalg::LinalgOp>(
+    auto attentionPVMatmul = dyn_cast_if_present<linalg::LinalgOp>(
         getOpWithAttr(funcOp, "attention_pv_matmul"));
 
     if (attentionQKMatmul && !attentionPVMatmul) {

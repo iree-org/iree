@@ -185,6 +185,18 @@ int main(int argc, char** argv) {
 #elif defined(IREE_ARCH_RISCV_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1,
                                    "v");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 6, 16, 1,
+                                   "zvfhmin");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 6, 16, 1,
+                                   "zvfhmin");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 7, 16, 1,
+                                   "zvfh");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 7, 16, 1,
+                                   "zvfh");
+  iree_uk_benchmark_register_mmt4d(
+      IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
+          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
+      7, 16, 1, "zvfh");
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.

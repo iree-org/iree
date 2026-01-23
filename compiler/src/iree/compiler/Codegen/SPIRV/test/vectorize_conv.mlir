@@ -15,7 +15,7 @@ func.func @ncw_conv_1d(%input: tensor<2x4x4xf32>, %filter: tensor<4x4x1xf32>, %i
 //  CHECK-COUNT-8:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
 // CHECK-COUNT-16:   vector.transfer_read %[[FILTER]]{{.+}} : tensor<4x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:   vector.transfer_read %[[INIT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
-// CHECK-COUNT-16:   vector.extract %{{.+}}[0] : f32 from vector<1xf32>
+// CHECK-COUNT-4:   vector.extract %{{.+}}[0] : f32 from vector<1xf32>
 //      CHECK-NOT:   vector.insert
 // CHECK-COUNT-32:   vector.fma {{.+}} : vector<4xf32>
 //      CHECK-NOT:   vector.insert
@@ -33,7 +33,6 @@ func.func @nwc_conv_1d_dot_prod(%input: tensor<1x7x3xi8>, %filter: tensor<1x3x4x
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>}>} {
   %c0 = arith.constant 0 : i32
-  %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<1x4x4xi32>
   %fill = linalg.fill ins(%c0 : i32) outs(%init : tensor<1x4x4xi32>) -> tensor<1x4x4xi32>
   %conv = linalg.conv_1d_nwc_wcf {

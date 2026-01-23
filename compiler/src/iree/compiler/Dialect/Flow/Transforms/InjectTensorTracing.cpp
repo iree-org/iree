@@ -34,8 +34,9 @@ static std::string inferTraceKey(Operation *op) {
 static SmallVector<Value> filterTensorValues(ValueRange &&range) {
   SmallVector<Value> result;
   for (auto value : range) {
-    if (llvm::isa<TensorType>(value.getType()))
+    if (isa<TensorType>(value.getType())) {
       result.push_back(value);
+    }
   }
   return result;
 }
@@ -76,10 +77,11 @@ struct InjectTensorTracingPass
     funcOp.walk([&](Operation *op) {
       if (auto attr = op->getAttr(attrName)) {
         std::string traceKey;
-        if (auto stringAttr = dyn_cast<StringAttr>(attr))
+        if (auto stringAttr = dyn_cast<StringAttr>(attr)) {
           traceKey = stringAttr.getValue().str();
-        else
+        } else {
           traceKey = inferTraceKey(op);
+        }
         injectTracingOnOp(op, traceKey);
         op->removeAttr(attrName);
       }

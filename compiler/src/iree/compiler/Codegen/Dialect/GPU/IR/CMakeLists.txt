@@ -58,9 +58,11 @@ iree_cc_library(
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLoopLikeInterface
     MLIRParallelCombiningOpInterface
     MLIRParser
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
@@ -72,6 +74,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
     iree::compiler::bindings::c::headers
@@ -94,8 +97,8 @@ iree_tablegen_library(
   TD_FILE
     "IREEGPUEnums.td"
   OUTS
-    --gen-enum-decls IREEGPUEnums.h.inc
-    --gen-enum-defs IREEGPUEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_gpu IREEGPUEnums.h.inc
+    --gen-enum-defs --dialect=iree_gpu IREEGPUEnums.cpp.inc
 )
 
 iree_tablegen_library(

@@ -50,7 +50,17 @@ from iree.compiler.dialects.transform import vector as vt
 from iree.compiler.dialects.transform import loop
 
 # Make sure that our dialects import.
-from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
+from iree.compiler.dialects import (
+    flow,
+    hal,
+    stream,
+    vm,
+    util,
+    iree_codegen,
+    iree_gpu,
+    iree_tensor_ext,
+    preprocessing_transform,
+)
 
 
 def get_index_attr(val: int) -> ir.IntegerAttr:
@@ -153,51 +163,51 @@ def gpu_pipeline_options_attr():
     assert reorder_attr.value == iree_gpu.ReorderWorkgroupsStrategy.Transpose
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
-        True,
+        2,
         False,
         False,
         reorder_attr,
     )
     assert type(gpu_attr) is iree_gpu.PipelineOptionsAttr
-    assert gpu_attr.prefetch_shared_memory
+    assert gpu_attr.prefetch_num_stages == 2
     assert not gpu_attr.no_reduce_shared_memory_bank_conflicts
     assert not gpu_attr.use_igemm_convolution
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
-        False,
+        0,
         True,
         True,
         iree_gpu.ReorderWorkgroupsStrategyAttr.get(
             iree_gpu.ReorderWorkgroupsStrategy.Transpose
         ),
     )
-    assert not gpu_attr.prefetch_shared_memory
+    assert gpu_attr.prefetch_num_stages == 0
     assert gpu_attr.no_reduce_shared_memory_bank_conflicts
     assert gpu_attr.use_igemm_convolution
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get()
     assert (
-        gpu_attr.prefetch_shared_memory is None
+        gpu_attr.prefetch_num_stages is None
         and gpu_attr.no_reduce_shared_memory_bank_conflicts is None
         and gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True)
-    assert gpu_attr.prefetch_shared_memory
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2)
+    assert gpu_attr.prefetch_num_stages == 2
     assert (
         gpu_attr.no_reduce_shared_memory_bank_conflicts is None
         and gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True, False)
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2, False)
     assert (
         gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True, False, False)
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2, False, False)
     assert gpu_attr.reorder_workgroups_strategy is None
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
@@ -207,7 +217,7 @@ def gpu_pipeline_options_attr():
         gpu_attr.no_reduce_shared_memory_bank_conflicts is not None
         and not gpu_attr.no_reduce_shared_memory_bank_conflicts
     )
-    assert gpu_attr.prefetch_shared_memory is None
+    assert gpu_attr.prefetch_num_stages is None
     assert gpu_attr.use_igemm_convolution is None
     assert gpu_attr.reorder_workgroups_strategy is None
 
@@ -416,8 +426,10 @@ def gpu_target_info_attribute_parsing():
                     max_workgroup_sizes = [256, 512, 1024],
                     max_thread_count_per_workgroup = 1024,
                     max_workgroup_memory_bytes = 65536,
-                    max_workgroup_counts = [256, 512, 1024]
-                    >
+                    max_workgroup_counts = [256, 512, 1024],
+                    simds_per_wgp = 4
+                    >,
+                    chip = <wgp_count = 304, sku = "mi300x">
                 >
                 }>
             ) {
@@ -435,6 +447,15 @@ def gpu_target_info_attribute_parsing():
 
     arch = gpu_target_info.arch
     assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
+
+    workgroup_count = gpu_target_info.workgroup_count
+    simds_per_workgroup = gpu_target_info.simds_per_workgroup
+    assert (
+        workgroup_count == 304
+    ), f"Expected workgroup_count 304, got {workgroup_count}"
+    assert (
+        simds_per_workgroup == 4
+    ), f"Expected simds_per_workgroup 4, got {simds_per_workgroup}"
 
     subgroup_size_choices = gpu_target_info.subgroup_size_choices
     assert subgroup_size_choices == [
@@ -478,6 +499,8 @@ def gpu_target_info_constructor():
         max_workgroup_sizes=[256, 512, 1024],
         max_thread_count_per_workgroup=1024,
         max_workgroup_memory_bytes=65536,
+        workgroup_count=304,
+        simds_per_workgroup=4,
         mma_intrinsics=[
             iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
             iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
@@ -503,6 +526,12 @@ def gpu_target_info_constructor():
     assert (
         target_info.max_workgroup_memory_bytes == 65536
     ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
+    assert (
+        target_info.workgroup_count == 304
+    ), f"Expected workgroup_count 304, got {target_info.workgroup_count}"
+    assert (
+        target_info.simds_per_workgroup == 4
+    ), f"Expected simds_per_workgroup 4, got {target_info.simds_per_workgroup}"
     mma_intrinsics = target_info.mma_intrinsics
     assert mma_intrinsics == [
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
@@ -527,6 +556,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count=304,
+            simds_per_workgroup=4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong arch type"
@@ -541,6 +572,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count=304,
+            simds_per_workgroup=4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong subgroup_size_choices type"
@@ -555,6 +588,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256.0, 512, 1024],  # should be list of int.
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536,
+            workgroup_count=304,
+            simds_per_workgroup=4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_workgroup_sizes type"
@@ -569,6 +604,8 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024.0,  # should be int.
             max_workgroup_memory_bytes=65536,
+            workgroup_count=304,
+            simds_per_workgroup=4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_thread_count_per_workgroup type"
@@ -583,9 +620,59 @@ def gpu_target_info_constructor_error_cases():
             max_workgroup_sizes=[256, 512, 1024],
             max_thread_count_per_workgroup=1024,
             max_workgroup_memory_bytes=65536.0,  # should be int.
+            workgroup_count=304,
+            simds_per_workgroup=4,
             mma_intrinsics=[],
         )
         assert False, "Expected TypeError for wrong max_workgroup_memory_bytes type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count=304.0,  # Should be int.
+            simds_per_workgroup=4,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong workgroup_count type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count=-304,  # Should be non-negative.
+            simds_per_workgroup=4,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected ValueError for negative workgroup_count"
+    except ValueError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            workgroup_count=304,
+            simds_per_workgroup=4.0,  # Should be int.
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong simds_per_workgroup type"
     except TypeError:
         pass
 
@@ -602,3 +689,218 @@ def gpu_target_info_constructor_error_cases():
         assert False, "Expected TypeError for wrong MMA intrinsic object type"
     except TypeError:
         pass
+
+
+# ======================================================================
+# IREE TensorExt Dialect
+# ======================================================================
+
+
+@run
+def iree_tensor_ext_smoke_test():
+    # Make sure that generated op bindings are accessible.
+    assert issubclass(iree_tensor_ext.ComputeBarrierStartOp, ir.OpView)
+
+
+# ======================================================================
+# Preprocessing Transform Extensions
+# ======================================================================
+
+
+@run
+def preprocessing_transform_match_contraction_in_named_sequence():
+    module_op = ir.Module.create()
+    module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
+    map_lhs = ir.AffineMap.get(
+        dim_count=3,
+        symbol_count=0,
+        exprs=[ir.AffineExpr.get_dim(0), ir.AffineExpr.get_dim(2)],
+    )
+    map_rhs = ir.AffineMap.get(
+        dim_count=3,
+        symbol_count=0,
+        exprs=[ir.AffineExpr.get_dim(2), ir.AffineExpr.get_dim(1)],
+    )
+    map_output = ir.AffineMap.get(
+        dim_count=3,
+        symbol_count=0,
+        exprs=[ir.AffineExpr.get_dim(0), ir.AffineExpr.get_dim(1)],
+    )
+
+    with ir.InsertionPoint(module_op.body):
+        named_seq = transform.NamedSequenceOp(
+            "match_matmul", [transform.AnyOpType.get()], [transform.AnyOpType.get()]
+        )
+        with ir.InsertionPoint(named_seq.body):
+            batch, m, n, k = preprocessing_transform.MatchContractionOp(
+                operand_handle=named_seq.bodyTarget,
+                lhs_type=ir.F32Type.get(),
+                rhs_type=ir.F32Type.get(),
+                output_type=ir.F32Type.get(),
+                indexing_maps=[map_lhs, map_rhs, map_output],
+            )
+            transform.YieldOp([named_seq.bodyTarget])
+
+    module_str = str(module_op)
+    assert "affine_map<(d0, d1, d2) -> (d0, d2)>" in module_str
+    assert "affine_map<(d0, d1, d2) -> (d2, d1)>" in module_str
+    assert "affine_map<(d0, d1, d2) -> (d0, d1)>" in module_str
+    assert "transform.with_named_sequence" in module_str
+    assert "transform.named_sequence @match_matmul" in module_str
+    assert "transform.iree.match.contraction %arg0" in module_str
+    assert "lhs_type = f32, rhs_type = f32, output_type = f32" in module_str
+    assert "indexing_maps = [#map, #map1, #map2]" in module_str
+
+
+@run
+def preprocessing_transform_match_convolution_in_named_sequence():
+    module_op = ir.Module.create()
+    module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
+
+    map_input = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1) + ir.AffineExpr.get_dim(4),
+            ir.AffineExpr.get_dim(2) + ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(6),
+        ],
+    )
+    map_filter = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(4),
+            ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(6),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+    map_output = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+
+    with ir.InsertionPoint(module_op.body):
+        named_seq = transform.NamedSequenceOp(
+            "match_conv", [transform.AnyOpType.get()], [transform.AnyOpType.get()]
+        )
+        with ir.InsertionPoint(named_seq.body):
+            (
+                batch,
+                out_img,
+                out_ch,
+                filt,
+                in_ch,
+                depth,
+                strides,
+                dilations,
+            ) = preprocessing_transform.MatchConvolutionOp(
+                operand_handle=named_seq.bodyTarget,
+                lhs_type=ir.F32Type.get(),
+                rhs_type=ir.F32Type.get(),
+                output_type=ir.F32Type.get(),
+                indexing_maps=[map_input, map_filter, map_output],
+            )
+            transform.YieldOp([named_seq.bodyTarget])
+
+    module_str = str(module_op)
+    assert (
+        "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>"
+        in module_str
+    )
+    assert "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>" in module_str
+    assert "transform.with_named_sequence" in module_str
+    assert "transform.named_sequence @match_conv" in module_str
+    assert "transform.iree.match.convolution %arg0" in module_str
+    assert "lhs_type = f32, rhs_type = f32, output_type = f32" in module_str
+    assert "indexing_maps = [#map, #map1, #map2]" in module_str
+
+
+@run
+def preprocessing_transform_match_attention_in_named_sequence():
+    module_op = ir.Module.create()
+    module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
+    map_query = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(4),
+        ],
+    )
+    map_key = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(4),
+        ],
+    )
+    map_value = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(3),
+            ir.AffineExpr.get_dim(5),
+        ],
+    )
+    map_scale = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[],
+    )
+    map_output = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+
+    with ir.InsertionPoint(module_op.body):
+        named_seq = transform.NamedSequenceOp(
+            "match_attention", [transform.AnyOpType.get()], [transform.AnyOpType.get()]
+        )
+        with ir.InsertionPoint(named_seq.body):
+            batch, m, n, k1, k2 = preprocessing_transform.MatchAttentionOp(
+                operand_handle=named_seq.bodyTarget,
+                query_type=ir.F16Type.get(),
+                key_type=ir.F16Type.get(),
+                value_type=ir.F16Type.get(),
+                output_type=ir.F16Type.get(),
+                indexing_maps=[map_query, map_key, map_value, map_scale, map_output],
+            )
+            transform.YieldOp([named_seq.bodyTarget])
+
+    module_str = str(module_op)
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> ()>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>" in module_str
+    assert "transform.with_named_sequence" in module_str
+    assert "transform.named_sequence @match_attention" in module_str
+    assert "transform.iree.match.attention %arg0" in module_str
+    assert (
+        "query_type = f16, key_type = f16, value_type = f16, output_type = f16"
+        in module_str
+    )
+    assert "indexing_maps = [#map, #map1, #map2, #map3, #map4]" in module_str

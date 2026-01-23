@@ -33,6 +33,7 @@ iree_cc_library(
     LLVMExecutionEngine
     LLVMIRReader
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRBufferizationDialect
     MLIRGPUDialect
     MLIRGPUTransformOps
@@ -42,7 +43,9 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRParser
+    MLIRROCDLDialect
     MLIRSupport
+    MLIRVectorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
@@ -50,6 +53,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
     iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernel_patterns_amdgpu

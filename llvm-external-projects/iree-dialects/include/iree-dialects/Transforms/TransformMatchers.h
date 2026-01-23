@@ -198,10 +198,12 @@ protected:
   /// purposes.
   template <typename T>
   void recordNestedMatcher(T &nested) {
-    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
+    if constexpr (std::is_base_of_v<CapturingOpMatcher, T>) {
       nestedCapturingMatchers.push_back(&nested);
-    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
+    }
+    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>) {
       nestedCapturingValueMatchers.push_back(&nested);
+    }
   }
 
   /// Appends all nested capturing matchers of a certain kind, excluding this
@@ -970,10 +972,11 @@ public:
   /// operation is non-null, adds an empty list otherwise. Useful for results of
   /// optional matches.
   void addPotentiallyEmptyPayloadGroup(Operation *op) {
-    if (!op)
+    if (!op) {
       addPayloadGroup(ArrayRef<Operation *>());
-    else
+    } else {
       addPayloadGroup(ArrayRef<Operation *>(op));
+    }
   }
 
 private:
@@ -1010,8 +1013,9 @@ public:
   /// name, or null if it is not present in the registry.
   const MatchCallbackFn *get(StringRef name) const {
     auto iter = callbacks.find(name);
-    if (iter == callbacks.end())
+    if (iter == callbacks.end()) {
       return nullptr;
+    }
     return &iter->getValue();
   }
 

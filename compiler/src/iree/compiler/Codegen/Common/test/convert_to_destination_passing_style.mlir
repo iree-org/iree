@@ -208,11 +208,6 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @reshape_simple() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %c4 = arith.constant 4 : index
-  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
@@ -234,11 +229,6 @@ func.func @reshape_simple() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @reshape_fused_source() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %c4 = arith.constant 4 : index
-  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
@@ -274,11 +264,6 @@ func.func @reshape_fused_source() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @reshape_fused_source_and_copyout() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %c4 = arith.constant 4 : index
-  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<12xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4xi32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4xi32>>
@@ -317,11 +302,6 @@ func.func @reshape_fused_source_and_copyout() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @reshape_fused_target() {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c3 = arith.constant 3 : index
-  %c4 = arith.constant 4 : index
-  %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x4xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<12xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x4xi32>> -> tensor<3x4xi32>
@@ -358,7 +338,6 @@ func.func @reshape_fused_target() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @cast_followed_by_store() {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c4 = arith.constant 4 : index
   %c64 = arith.constant 64 : index
@@ -693,7 +672,6 @@ func.func @clone_index_computations() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @gemm_gather() {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x256xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x512xf32>>
@@ -728,9 +706,11 @@ func.func @gemm_gather() {
   return
 }
 // CHECK-LABEL: func @gemm_gather
+//   CHECK-DAG:   %[[INDICES:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(3)
+//       CHECK:   %[[INDICES_LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES]]
 //       CHECK:   %[[GEMM:.+]] = linalg.matmul
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%{{[a-zA-Z0-9]+}} :
+//  CHECK-SAME:       ins(%[[INDICES_LOAD]] :
 //  CHECK-SAME:       outs(%[[GEMM]] :
 
 // -----
@@ -741,7 +721,6 @@ func.func @gemm_gather() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @reduce_broadcast_generic() {
-  %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x1024xf32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10xf32>>

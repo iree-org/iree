@@ -195,9 +195,7 @@ module {
 module {
   func.func @shared_memory_copy() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
-    %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
     %cst_0 = arith.constant 0.000000e+00 : f32
-    %c32 = arith.constant 32 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x32xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x32xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index

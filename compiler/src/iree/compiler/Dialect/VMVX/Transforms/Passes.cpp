@@ -18,7 +18,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
-#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Affine/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -112,7 +112,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
 static void buildLoopOptimizationVMVXTransformPassPipeline(
     FunctionLikeNest &funcPassManager) {
-  funcPassManager.addPass(createLowerAffinePass)
+  funcPassManager.addPass(createIREECodegenLowerAffinePass)
       .addPass(createForOpCanonicalizationPass)
       .addPass(createIREELoopInvariantCodeMotionPass);
 }
@@ -125,6 +125,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
   buildVectorVMVXTransformPassPipeline(variantPassManager);
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   // ---------------------------------------------------------------------------
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------

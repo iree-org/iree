@@ -190,8 +190,8 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        maybeLoweringConfig.getTilingLevelAttr(
-            IREE::CPU::TilingLevel::VectorReductionTiles));
+        maybeLoweringConfig.getTilingLevelAttr(static_cast<unsigned>(
+            IREE::CPU::TilingLevel::VectorReductionTiles)));
     ArrayRef<bool> scalableDims = attr.getScalableFlags();
     if (scalableDims.back()) {
       LDBG() << "scalable reduction dimensions not yet supported, skip "

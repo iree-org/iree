@@ -122,14 +122,17 @@ static constexpr char kPtxasCompilerName[] = "ptxas";
 static FailureOr<std::string> findPtxasCompiler(const CUDAOptions &options,
                                                 std::string *message) {
   std::string ptxasCompiler;
-  if (!options.clUsePtxasFrom.empty())
+  if (!options.clUsePtxasFrom.empty()) {
     ptxasCompiler = options.clUsePtxasFrom;
-  if (llvm::sys::fs::exists(ptxasCompiler))
+  }
+  if (llvm::sys::fs::exists(ptxasCompiler)) {
     return ptxasCompiler;
+  }
 
   ptxasCompiler = findTool(kPtxasCompilerName);
-  if (llvm::sys::fs::exists(ptxasCompiler))
+  if (llvm::sys::fs::exists(ptxasCompiler)) {
     return ptxasCompiler;
+  }
 
   *message = std::string(
       "Could not find ptxas compiler. Try passing it explicitly with "
@@ -181,8 +184,9 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
   llvm::StringSaver stringSaver(scratchAllocator);
   SmallVector<const char *> rawArgs;
   Tokenize(ptxasParams, stringSaver, rawArgs, /*MarkEOLs=*/false);
-  for (auto rawArg : rawArgs)
+  for (auto rawArg : rawArgs) {
     ArgVector.push_back(StringRef(rawArg));
+  }
 
   std::optional<StringRef> redirects[] = {
       stdinFile.str(),
@@ -233,8 +237,9 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
 static std::string produceGpuImage(const CUDAOptions &options,
                                    StringRef targetArch,
                                    std::string &ptxImage) {
-  if (!options.clUsePtxas)
+  if (!options.clUsePtxas) {
     return ptxImage;
+  }
 
   std::string message;
   FailureOr<std::string> ptxasCompiler = findPtxasCompiler(options, &message);
@@ -243,8 +248,9 @@ static std::string produceGpuImage(const CUDAOptions &options,
     FailureOr<std::string> maybeCubinImage =
         compileWithPtxas(ptxasCompiler.value(), targetArch,
                          options.clUsePtxasParams, ptxImage, &message);
-    if (succeeded(maybeCubinImage))
+    if (succeeded(maybeCubinImage)) {
       return maybeCubinImage.value();
+    }
   }
 
   llvm::WithColor::warning()
@@ -376,7 +382,7 @@ static void optimizeModule(llvm::Module &module,
 
 class CUDATargetDevice final : public TargetDevice {
 public:
-  CUDATargetDevice(const CUDAOptions &options) : options(options) {}
+  CUDATargetDevice(const CUDAOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -395,9 +401,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const CUDAOptions &options;
 };
 
 class CUDATargetBackend final : public TargetBackend {
@@ -417,8 +420,9 @@ public:
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-    if (failed(options.verify(b)))
+    if (failed(options.verify(b))) {
       return nullptr;
+    }
 
     if (auto target = GPU::getCUDATargetDetails(
             options.clTarget, options.clTargetFeatures, context)) {
@@ -451,7 +455,8 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, false);
+    buildLLVMGPUCodegenPassPipeline(passManager, false,
+                                    /*preserveDebugInfo=*/false);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
@@ -501,7 +506,7 @@ public:
       }
 
       // Read the PTX from the object file.
-      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(
           variantOp.getObjects()->getValue().front());
       if (auto data = objectAttr.loadData()) {
         targetPTX = data.value();
@@ -699,7 +704,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_cuda_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 

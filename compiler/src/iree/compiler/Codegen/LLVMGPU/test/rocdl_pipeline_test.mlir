@@ -12,13 +12,12 @@
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
+  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @add_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
@@ -53,8 +52,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -88,7 +87,7 @@ hal.executable @dot_dispatch_0 {
 //           RDNA3:   llvm.br
 //   RDNA3-COUNT-1:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<32xf32>
 //  RDNA3-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<7> -> vector<16xf32>
-//  RDNA3-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//  RDNA3-COUNT-32:    llvm.intr.fma({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
 //   RDNA3-COUNT-1:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<7>
 //           RDNA3:   llvm.br
 
@@ -104,8 +103,8 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @ceildiv_expand_dispatch {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @ceildiv_expand layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
+  hal.executable.export public @ceildiv_expand layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -135,7 +134,7 @@ hal.executable @ceildiv_expand_dispatch {
 // CDNA3-COUNT-1:     llvm.sdiv {{.*}} : vector<1xi32>
 // CDNA3-COUNT-1:     llvm.mul {{.*}} : vector<1xi32>
 // CDNA3-COUNT-3:     llvm.icmp {{.*}} : vector<1xi32>
-// CHECK-COUNT-1:     llvm.icmp {{.*}} : vector<1xi1>
+// CDNA3-COUNT-1:     llvm.icmp {{.*}} : vector<1xi1>
 // CDNA3-COUNT-1:     llvm.and {{.*}} : vector<1xi1>
 // CDNA3-COUNT-1:     llvm.add {{.*}} : vector<1xi32>
 // CDNA3-COUNT-1:     llvm.select {{.*}} : vector<1xi1>, vector<1xi32>

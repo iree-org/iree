@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
+    "AttributeCallGraph.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
     "DumpModule.cpp"
@@ -29,6 +30,8 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
+    "LiftCFGToSCF.cpp"
+    "LinkModules.cpp"
     "OptimizeIntArithmetic.cpp"
     "Passes.cpp"
     "Patterns.cpp"
@@ -38,6 +41,9 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
+    "TestIntegerDivisibilityAnalysis.cpp"
+    "VerifyInitializationOrder.cpp"
+    "VerifyStructuredControlFlow.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -49,17 +55,21 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRBytecodeWriter
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect
     MLIRMemRefDialect
+    MLIRParser
     MLIRPass
     MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes

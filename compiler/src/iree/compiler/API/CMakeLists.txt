@@ -15,6 +15,7 @@ iree_cc_library(
     StaticImpl
   DEPS
     IREEDialectsCAPI
+    MLIRCAPIAMDGPU
     MLIRCAPIDebug
     MLIRCAPIGPU
     MLIRCAPIIR
@@ -22,13 +23,16 @@ iree_cc_library(
     MLIRCAPILLVM
     MLIRCAPILinalg
     MLIRCAPIPDL
+    MLIRCAPITarget
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
+    MLIRTargetLLVMIRImport
     iree::compiler::API::Internal::CompilerDriver
     iree::compiler::API::Internal::IREECodegenDialectCAPI
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEGPUDialectCAPI
+    iree::compiler::API::Internal::IREELinkToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
     iree::compiler::API::Internal::IREEReduceToolEntryPoint
@@ -67,6 +71,7 @@ iree_cc_library(
 ################################################################################
 
 set(_EXPORT_OBJECT_LIBS
+  obj.MLIRCAPIAMDGPU
   obj.IREEDialectsCAPI
   obj.MLIRCAPIDebug
   obj.MLIRCAPIIR
@@ -75,6 +80,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPILLVM
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
+  obj.MLIRCAPITarget
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
@@ -82,6 +88,7 @@ set(_EXPORT_OBJECT_LIBS
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREECodegenDialectCAPI.objects
   iree_compiler_API_Internal_IREEGPUDialectCAPI.objects
+  iree_compiler_API_Internal_IREELinkToolEntryPoint.objects
   iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
   iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
@@ -181,6 +188,11 @@ target_sources(iree_compiler_API_SharedImpl PRIVATE
 # isolated boundary for C consumers.
 target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
   ${_EXPORT_OBJECT_DEPS}
+)
+
+# Link MLIRTargetLLVMIRImport directly since it is not exported as an object library.
+target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
+  MLIRTargetLLVMIRImport
 )
 
 # If not using sanitizers, ask linkers to error on undefined symbols.

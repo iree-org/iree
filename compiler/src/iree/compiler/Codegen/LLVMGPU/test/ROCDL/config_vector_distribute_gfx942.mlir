@@ -39,8 +39,8 @@ func.func @expanded_matmul_transpose_b() {
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b()
 // CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
-// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
-// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 256]
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 128]
 // CHECK-SAME{LITERAL}:                   subgroup_basis = [[1, 1, 1, 4, 1], [0, 1, 2, 3, 4]]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
@@ -70,8 +70,8 @@ func.func @conv_nhwc() {
 
 // CHECK-LABEL: func.func @conv_nhwc()
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
-// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 64]
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 32]
 // CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 2, 2, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6]]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
@@ -134,8 +134,8 @@ func.func @mfma_matmul_1024x1024x1024() {
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
-// CHECK-SAME:                           reduction =  [0, 0, 128]
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:                           reduction =  [0, 0, 64]
 // CHECK-SAME{LITERAL}:                   subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // CHECK-SAME:                           workgroup =  [64, 128, 0]
 
@@ -184,8 +184,8 @@ func.func @conv_nchwc() {
 
 // CHECK-LABEL: func.func @conv_nchwc()
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
-// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 64]
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 32]
 // CHECK-SAME{LITERAL}:                   subgroup_basis = [[1, 1, 1, 2, 2, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6, 7, 8]]
 // CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]
 
@@ -233,7 +233,7 @@ func.func @matmul_dynamic_dim() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
 
@@ -278,7 +278,7 @@ func.func @attention_20x4096x64x4096x64() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64_f8()
 
@@ -324,7 +324,7 @@ func.func @attention_20x4096x64x4096x64_f8() {
 // -----
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
+// CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
 

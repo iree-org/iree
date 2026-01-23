@@ -40,16 +40,19 @@ static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
                      unsigned paddingSizeBits) {
   auto allocOpShape = allocOp.getType().getShape();
-  if (allocOpShape.empty())
+  if (allocOpShape.empty()) {
     return;
+  }
   int64_t innerDim = allocOpShape.back();
-  if (ShapedType::isDynamic(innerDim))
+  if (ShapedType::isDynamic(innerDim)) {
     return;
+  }
 
   // Return if we have CollapseShape op as an user as padding in that case is
   // unsupported.
-  if (hasCollapseShapeUser(allocOp))
+  if (hasCollapseShapeUser(allocOp)) {
     return;
+  }
 
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
@@ -87,7 +90,7 @@ static int64_t computeSharedMemoryUsage(mlir::FunctionOpInterface funcOp) {
       return WalkResult::interrupt();
     }
 
-    MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+    MemRefType allocType = cast<MemRefType>(allocOp.getType());
     unsigned byteWidth =
         allocType.getElementType().isIndex()
             ? 8 // IREE's default byteWidth for indexes
@@ -122,11 +125,12 @@ static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
   funcOp.walk([&](memref::AllocOp allocOp) {
     if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
         allocOp.getType().hasStaticShape()) {
-      MemRefType allocType = llvm::cast<MemRefType>(allocOp.getType());
+      MemRefType allocType = cast<MemRefType>(allocOp.getType());
 
       ArrayRef<int64_t> shape = allocType.getShape();
-      if (shape.empty())
+      if (shape.empty()) {
         return;
+      }
 
       int outerProduct = 1;
       for (std::size_t i = 0; i < shape.size() - 1; ++i) {
@@ -181,8 +185,9 @@ struct GPUReduceBankConflictsPass final
       return;
     }
 
-    if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingBits)))
+    if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingBits))) {
       signalPassFailure();
+    }
   }
 };
 
@@ -198,8 +203,9 @@ LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
       sharedMemAllocs.push_back(allocOp);
     }
   });
-  for (memref::AllocOp alloc : sharedMemAllocs)
+  for (memref::AllocOp alloc : sharedMemAllocs) {
     padAlloc(funcOp->getContext(), alloc, paddingSize);
+  }
 
   // In the current form this always succeeds.
   return success();

@@ -86,13 +86,15 @@ class BindSymbolicShapesPass final
     auto operand = bindOp.getOperand();
     // Torch programs are single block and use structured control flow, so
     // presume this is an entrypoint.
-    if (llvm::isa<BlockArgument>(operand))
+    if (isa<BlockArgument>(operand)) {
       return true;
+    }
 
     // Mutable tensors can exist at the boundary and must be "copied" to a
     // vtensor prior to use. Therefore, we anchor on the point of copy.
-    if (operand.getDefiningOp<Torch::CopyToValueTensorOp>())
+    if (operand.getDefiningOp<Torch::CopyToValueTensorOp>()) {
       return true;
+    }
 
     return false;
   }
@@ -117,10 +119,12 @@ class BindSymbolicShapesPass final
     // Gets the canonical dim for this symbol, returning {} if there
     // is no canonical dim.
     Value getCanonicalDimValue(OpBuilder &builder) {
-      if (canonicalDimValue)
+      if (canonicalDimValue) {
         return canonicalDimValue;
-      if (equalityDimInfos.empty())
+      }
+      if (equalityDimInfos.empty()) {
         return {};
+      }
       canonicalDimValue = getEqualityDimValue(builder, 0);
       return canonicalDimValue;
     }
@@ -213,8 +217,9 @@ class BindSymbolicShapesPass final
     std::optional<std::pair<int64_t, int64_t>>
     evaluateExprBounds(AffineExpr expr,
                        llvm::DenseMap<Value, SymbolInfo> &symbolInfos) {
-      if (!expr.isSymbolicOrConstant())
+      if (!expr.isSymbolicOrConstant()) {
         return {};
+      }
       llvm::SmallVector<std::optional<int64_t>> lowerBounds;
       llvm::SmallVector<std::optional<int64_t>> upperBounds;
       lowerBounds.reserve(symbols.size());
@@ -233,14 +238,16 @@ class BindSymbolicShapesPass final
       auto upperBound = getBoundForAffineExpr(
           expr, /*numDims=*/0, /*numSymbols=*/symbols.size(), lowerBounds,
           upperBounds, /*isUpper=*/true);
-      if (!upperBound)
+      if (!upperBound) {
         return {};
+      }
 
       auto lowerBound = getBoundForAffineExpr(
           expr, /*numDims=*/0, /*numSymbols=*/symbols.size(), lowerBounds,
           upperBounds, /*isUpper=*/false);
-      if (!lowerBound)
+      if (!lowerBound) {
         return {};
+      }
 
       return std::make_pair(*lowerBound, *upperBound);
     }
@@ -250,9 +257,10 @@ class BindSymbolicShapesPass final
     void associateEqualityDims(llvm::DenseMap<Value, SymbolInfo> &symbolInfos) {
       OpBuilder builder(anchorOp);
       for (auto [index, expr] : llvm::enumerate(shapeMap.getResults())) {
-        if (expr.getKind() != AffineExprKind::SymbolId)
+        if (expr.getKind() != AffineExprKind::SymbolId) {
           continue;
-        auto symbolPos = llvm::cast<AffineSymbolExpr>(expr).getPosition();
+        }
+        auto symbolPos = cast<AffineSymbolExpr>(expr).getPosition();
         Value symbol = symbols[symbolPos];
         auto symbolInfoIt = symbolInfos.find(symbol);
         assert(symbolInfoIt != symbolInfos.end() &&
@@ -265,15 +273,17 @@ class BindSymbolicShapesPass final
     Value materializeDimExpr(Location loc, OpBuilder &builder,
                              AffineExpr genericExpr,
                              llvm::DenseMap<Value, SymbolInfo> &symbolInfos) {
-      if (auto binaryExpr = llvm::dyn_cast<AffineBinaryOpExpr>(genericExpr)) {
+      if (auto binaryExpr = dyn_cast<AffineBinaryOpExpr>(genericExpr)) {
         auto lhs =
             materializeDimExpr(loc, builder, binaryExpr.getLHS(), symbolInfos);
-        if (!lhs)
+        if (!lhs) {
           return {};
+        }
         auto rhs =
             materializeDimExpr(loc, builder, binaryExpr.getRHS(), symbolInfos);
-        if (!rhs)
+        if (!rhs) {
           return {};
+        }
 
         switch (binaryExpr.getKind()) {
         case AffineExprKind::Add:
@@ -296,19 +306,21 @@ class BindSymbolicShapesPass final
         return arith::ConstantOp::create(
             builder, loc,
             builder.getIndexAttr(
-                llvm::cast<AffineConstantExpr>(genericExpr).getValue()));
+                cast<AffineConstantExpr>(genericExpr).getValue()));
       case AffineExprKind::DimId:
         // Unsupported.
         break;
       case AffineExprKind::SymbolId: {
-        auto symExpr = llvm::cast<AffineSymbolExpr>(genericExpr);
+        auto symExpr = cast<AffineSymbolExpr>(genericExpr);
         auto pos = symExpr.getPosition();
-        if (pos >= symbols.size())
+        if (pos >= symbols.size()) {
           break;
+        }
         Value symbolValue = symbols[pos];
         auto foundIt = symbolInfos.find(symbolValue);
-        if (foundIt == symbolInfos.end())
+        if (foundIt == symbolInfos.end()) {
           break;
+        }
         SymbolInfo &info = foundIt->second;
         return info.getCanonicalDimValue(builder); // May legally return {}
       }
@@ -327,8 +339,9 @@ class BindSymbolicShapesPass final
     void materializeDims(llvm::DenseMap<Value, SymbolInfo> &symbolInfos) {
       OpBuilder builder(anchorOp);
       for (auto [index, expr] : llvm::enumerate(shapeMap.getResults())) {
-        if (!builtinTensorType.isDynamicDim(index))
+        if (!builtinTensorType.isDynamicDim(index)) {
           continue;
+        }
 
         Value dimValue =
             materializeDimExpr(anchorOp->getLoc(), builder, expr, symbolInfos);
@@ -406,18 +419,18 @@ class BindSymbolicShapesPass final
 
     // Walk the ops we care about and stash for analysis.
     getOperation()->walk([&](Operation *childOp) {
-      if (auto symbolOp = llvm::dyn_cast<Torch::SymbolicIntOp>(childOp)) {
+      if (auto symbolOp = dyn_cast<Torch::SymbolicIntOp>(childOp)) {
         cleanupOpList.push_back(symbolOp);
         symbolInfos.insert_or_assign(symbolOp.getResult(),
                                      SymbolInfo(symbolOp));
-      } else if (auto bindOp =
-                     llvm::dyn_cast<Torch::BindSymbolicShapeOp>(childOp)) {
+      } else if (auto bindOp = dyn_cast<Torch::BindSymbolicShapeOp>(childOp)) {
         cleanupOpList.push_back(bindOp);
-        if (!isEligibleBinding(bindOp))
+        if (!isEligibleBinding(bindOp)) {
           return;
+        }
         auto torchType =
-            llvm::cast<Torch::ValueTensorType>(bindOp.getOperand().getType());
-        auto builtinType = llvm::dyn_cast_or_null<RankedTensorType>(
+            cast<Torch::ValueTensorType>(bindOp.getOperand().getType());
+        auto builtinType = dyn_cast_if_present<RankedTensorType>(
             typeConverter.convertType(torchType));
         if (!builtinType) {
           emitError(childOp->getLoc())

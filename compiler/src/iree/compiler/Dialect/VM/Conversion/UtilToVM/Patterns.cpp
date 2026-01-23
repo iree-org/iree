@@ -75,7 +75,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
   matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
-    if (llvm::isa<IREE::VM::RefType>(operandType)) {
+    if (isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpEQRefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
@@ -94,7 +94,7 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
   matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operandType = adaptor.getLhs().getType();
-    if (llvm::isa<IREE::VM::RefType>(operandType)) {
+    if (isa<IREE::VM::RefType>(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::CmpNERefOp>(
           op, rewriter.getI32Type(), adaptor.getLhs(), adaptor.getRhs());
       return success();
@@ -104,21 +104,17 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
 };
 
 //===----------------------------------------------------------------------===//
-// Compiler hints
+// util.optimization_barrier
 //===----------------------------------------------------------------------===//
 
-struct UnreachableOpConversion
-    : public OpConversionPattern<IREE::Util::UnreachableOp> {
-  using Base::Base;
+struct OptimizationBarrierOpConversion
+    : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
+  using OpConversionPattern::OpConversionPattern;
   LogicalResult
-  matchAndRewrite(IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
-        srcOp,
-        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-            srcOp.getLoc(),
-            static_cast<int32_t>(IREE::Util::StatusCode::Unknown)),
-        srcOp.getMessage());
+    rewriter.replaceOpWithNewOp<IREE::VM::OptimizationBarrierOp>(
+        op, adaptor.getOperands());
     return success();
   }
 };
@@ -133,7 +129,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<CmpNEOpConversion>(typeConverter, context);
-  patterns.insert<UnreachableOpConversion>(typeConverter, context);
+  patterns.insert<OptimizationBarrierOpConversion>(typeConverter, context);
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);

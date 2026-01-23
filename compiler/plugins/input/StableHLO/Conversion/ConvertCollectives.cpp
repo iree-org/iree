@@ -97,10 +97,11 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
                                                     OpBuilder &builder) {
   IndexSet indexSet(loc, builder);
   Value noColor = indexSet.get(-1);
-  if (!groups)
+  if (!groups) {
     return std::make_pair(noColor, noColor);
+  }
 
-  auto groupsType = llvm::cast<RankedTensorType>(groups.getType());
+  auto groupsType = cast<RankedTensorType>(groups.getType());
   assert(groupsType.getRank() == 2);
   int64_t rows = groupsType.getShape()[0];
   int64_t cols = groupsType.getShape()[1];
@@ -152,7 +153,7 @@ convertToRankGroupsByCrossReplica(DenseIntElementsAttr replicaGroups,
     return replicaGroups;
   }
 
-  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
+  auto groupsType = cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -186,7 +187,7 @@ convertToRankGroupsByCrossPartition(DenseIntElementsAttr partitionGroups,
     return partitionGroups;
   }
 
-  auto groupsType = llvm::cast<RankedTensorType>(partitionGroups.getType());
+  auto groupsType = cast<RankedTensorType>(partitionGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -224,7 +225,7 @@ static DenseIntElementsAttr convertToRankGroupsByCrossReplicaAndPartition(
     return replicaGroups;
   }
 
-  auto groupsType = llvm::cast<RankedTensorType>(replicaGroups.getType());
+  auto groupsType = cast<RankedTensorType>(replicaGroups.getType());
   assert(groupsType.getRank() == 2);
   int rows = groupsType.getShape()[0];
   int cols = groupsType.getShape()[1];
@@ -311,8 +312,9 @@ static Value createChannelWithGroupInfo(
     DenseIntElementsAttr replicaGroups, std::optional<bool> useGlobalDeviceIds,
     OpBuilder &builder) {
   // Set numPartitions to 1 if not set by the user.
-  if (numPartitions == -1)
+  if (numPartitions == -1) {
     numPartitions = 1;
+  }
 
   // Base channel that may be split by the group info.
   Value baseChannel = IREE::Flow::ChannelDefaultOp::create(
@@ -420,8 +422,7 @@ struct PartitionIdOpConversion
                                                 /*value=*/numPartitions);
       value = arith::RemUIOp::create(rewriter, loc, rank, cst);
     }
-    auto resultType =
-        llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
+    auto resultType = cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem =
@@ -456,8 +457,7 @@ struct ReplicaIdOpConversion
       rank = arith::DivUIOp::create(rewriter, loc, rank, cst);
     }
 
-    auto resultType =
-        llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
+    auto resultType = cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
     auto rankElem = arith::IndexCastUIOp::create(rewriter, loc, elemType, rank);
@@ -856,8 +856,9 @@ struct CollectivePermuteOpConversion
     int64_t numParticipants = mode == CollectiveOpGroupMode::CrossReplica
                                   ? numReplicas
                                   : numPartitions;
-    if (numParticipants == -1)
+    if (numParticipants == -1) {
       numParticipants = 1;
+    }
     SmallVector<Attribute> replicaGroups;
     for (int64_t i = 0; i < numParticipants; ++i) {
       replicaGroups.push_back(rewriter.getI64IntegerAttr(i));
@@ -871,7 +872,7 @@ struct CollectivePermuteOpConversion
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
         replicaGroupsAttr, /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
-    auto inputType = llvm::cast<RankedTensorType>(op.getOperand().getType());
+    auto inputType = cast<RankedTensorType>(op.getOperand().getType());
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =

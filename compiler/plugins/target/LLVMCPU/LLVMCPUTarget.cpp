@@ -272,8 +272,9 @@ public:
     // multi-threading issues.
     llvm::LLVMContext context;
     auto maybeTarget = getVariantTarget(variantOp);
-    if (!maybeTarget)
+    if (!maybeTarget) {
       return failure();
+    }
     const LLVMTarget &target = *maybeTarget;
     LLVM_DEBUG(dbgs() << "LLVM-CPU SerializeExecutable:\n"
                       << "-----------------------------\n";
@@ -372,8 +373,8 @@ public:
     if (auto importsAttr =
             variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
       for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
-        auto nameAttr = llvm::cast<StringAttr>(importAttr[0]);
-        auto weakAttr = llvm::cast<BoolAttr>(importAttr[1]);
+        auto nameAttr = cast<StringAttr>(importAttr[0]);
+        auto weakAttr = cast<BoolAttr>(importAttr[1]);
         libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
       }
       variantOp->removeAttr(importsAttrName);
@@ -384,8 +385,9 @@ public:
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
-      if (!llvmFunc)
+      if (!llvmFunc) {
         continue;
+      }
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
 
@@ -595,8 +597,9 @@ public:
     // Strip any compiler identifiers that may have snuck in. We let the linker
     // tag the module.
     auto *llvmIdent = llvmModule->getNamedMetadata("llvm.ident");
-    if (llvmIdent)
+    if (llvmIdent) {
       llvmIdent->clearOperands();
+    }
 
     // Dump all linked bitcode prior to optimization.
     if (!options.dumpIntermediatesPath.empty()) {
@@ -680,7 +683,7 @@ public:
                                                    {".o", ".obj", ".a", ".lib"},
                                                    linkerObjectAttrs);
     for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
-      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(attr);
+      auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(attr);
       if (auto dataAttr = objectAttr.getData()) {
         objectFiles.push_back(Artifact::createTemporary(
             objectFiles.front().path + "_object_" + std::to_string(index),
@@ -732,6 +735,7 @@ public:
     // loader which static library to load for the target binary.
     std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                            libraryName.end());
+    libraryNameVector.push_back(0); // NUL
     IREE::HAL::ExecutableBinaryOp::create(executableBuilder, variantOp.getLoc(),
                                           variantOp.getSymName(), "static",
                                           libraryNameVector);

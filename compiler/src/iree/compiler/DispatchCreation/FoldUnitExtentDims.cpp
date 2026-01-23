@@ -26,8 +26,10 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-fold-unit-extent-dims"
 
@@ -183,7 +185,12 @@ struct DropUnitDimsFromCollapseOfExpand
     // needed. Both ops require a non-identity reassociation (i.e. they can't be
     // no-ops).
     Value newExpanded = expandOp.getSrc();
-    if (!llvm::all_of(newExpandReassoc,
+    // Special case: If the source has no shape (e.g., `tensor<f32>`), we
+    // produce an empty reassociation, but still need to insert an
+    // `expand_shape`.
+    bool noSrcShape = srcShape.empty() && !newInterShape.empty();
+    if (noSrcShape ||
+        !llvm::all_of(newExpandReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
       newExpanded = tensor::ExpandShapeOp::create(
           rewriter, expandOp.getLoc(),
@@ -204,14 +211,60 @@ struct DropUnitDimsFromCollapseOfExpand
   }
 };
 
+// Fold unit dims from `tensor.extract` ops.
+struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    RankedTensorType srcType = extractOp.getTensor().getType();
+    if (srcType.getShape().empty() ||
+        llvm::none_of(srcType.getShape(),
+                      [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+    SmallVector<Value> oldIndices = extractOp.getIndices();
+
+    SmallVector<int64_t> newShape;
+    SmallVector<Value> newIndices;
+    SmallVector<ReassociationIndices> reassoc;
+    ReassociationIndices currReassoc;
+
+    // Build reassociation groups where each non-unit dimension forms one output
+    // dimension, and unit dimensions are grouped with adjacent non-unit dims.
+    for (auto [idx, size] : llvm::enumerate(srcType.getShape())) {
+      currReassoc.push_back(idx);
+
+      if (size != 1) {
+        // Non-unit dimension: this forms one output dimension
+        // Finish current group and start a new one
+        reassoc.push_back(std::move(currReassoc));
+        currReassoc.clear();
+        newShape.push_back(size);
+        newIndices.push_back(oldIndices[idx]);
+      }
+    }
+
+    // If we have trailing unit dims, merge them with the last group
+    if (!currReassoc.empty() && !reassoc.empty()) {
+      reassoc.back().append(currReassoc.begin(), currReassoc.end());
+    }
+
+    rewriter.setInsertionPointAfterValue(extractOp.getTensor());
+    auto collapseOp = tensor::CollapseShapeOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getTensor(), reassoc);
+
+    rewriter.setInsertionPointAfter(extractOp);
+    auto newExtract = tensor::ExtractOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getResult().getType(),
+        collapseOp.getResult(), newIndices);
+    rewriter.replaceOp(extractOp, newExtract);
+    return success();
+  }
+};
+
 } // namespace
 
-//===----------------------------------------------------------------------===//
-// Pass helpers
-//===----------------------------------------------------------------------===//
-
-static void
-populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
+static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
   linalg::ControlDropUnitDims options;
   auto defaultFn = options.controlFn;
 
@@ -226,12 +279,100 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
     return defaultFn(op);
   };
 
-  linalg::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns, options);
-  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
-                                                      options);
-  linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  foldUnitDimsPatterns.insert<DropUnitDimsFromCollapseOfExpand>(
-      foldUnitDimsPatterns.getContext());
+  auto getCollapsedEncoding =
+      [](Attribute encoding, ArrayRef<int64_t> origShape,
+         ArrayRef<int64_t> targetShape) -> FailureOr<Attribute> {
+    if (!encoding) {
+      return encoding;
+    }
+    auto serializableEncoding =
+        dyn_cast<IREE::Encoding::SerializableAttr>(encoding);
+    if (!serializableEncoding) {
+      // If the encoding doesn't implement the interface, it can't be collapsed.
+      return failure();
+    }
+    Attribute collapsedEncoding =
+        serializableEncoding.getCollapsedEncoding(origShape, targetShape);
+    if (!collapsedEncoding) {
+      // If the interface function returns nullptr, the encoding can't be
+      // collapsed.
+      return failure();
+    }
+    return collapsedEncoding;
+  };
+
+  options.collapseFn =
+      [=](RewriterBase &rewriter, Location loc, Value operand,
+          ArrayRef<int64_t> targetShape,
+          ArrayRef<ReassociationIndices> reassociation,
+          const linalg::ControlDropUnitDims &control) -> FailureOr<Value> {
+    auto tensorType = cast<RankedTensorType>(operand.getType());
+    assert(control.rankReductionStrategy ==
+               linalg::ControlDropUnitDims::RankReductionStrategy::
+                   ReassociativeReshape &&
+           "unexpected rank reduction strategy");
+    ArrayRef<int64_t> origShape = tensorType.getShape();
+    Attribute encoding = tensorType.getEncoding();
+    FailureOr<Attribute> maybeCollapsedEncoding =
+        getCollapsedEncoding(encoding, origShape, targetShape);
+    if (failed(maybeCollapsedEncoding)) {
+      // If the tensor has an encoding and that encoding does not implement the
+      // interface or cannot be collapsed, return failure to abort the
+      // transformation.
+      return failure();
+    }
+    auto targetType =
+        RankedTensorType::get(targetShape, tensorType.getElementType(),
+                              maybeCollapsedEncoding.value());
+    return tensor::CollapseShapeOp::create(rewriter, loc, targetType, operand,
+                                           reassociation)
+        .getResult();
+  };
+
+  options.expandFn =
+      [=](RewriterBase &rewriter, Location loc, Value result, Value origDest,
+          ArrayRef<ReassociationIndices> reassociation,
+          const linalg::ControlDropUnitDims &control) -> FailureOr<Value> {
+    auto origResultType = cast<RankedTensorType>(origDest.getType());
+    assert(control.rankReductionStrategy ==
+               linalg::ControlDropUnitDims::RankReductionStrategy::
+                   ReassociativeReshape &&
+           "unknown rank reduction strategy");
+    ArrayRef<int64_t> origShape = origResultType.getShape();
+    Attribute origEncoding = origResultType.getEncoding();
+    auto newResultType = cast<RankedTensorType>(result.getType());
+    ArrayRef<int64_t> targetShape = newResultType.getShape();
+    FailureOr<Attribute> maybeCollapsedEncoding =
+        getCollapsedEncoding(origEncoding, origShape, targetShape);
+    if (failed(maybeCollapsedEncoding)) {
+      // If the tensor has an encoding and that encoding does not implement the
+      // interface or cannot be collapsed, return failure to abort the
+      // transformation.
+      return failure();
+    }
+    return tensor::ExpandShapeOp::create(rewriter, loc, origResultType, result,
+                                         reassociation)
+        .getResult();
+  };
+  return options;
+}
+
+/// Populate patterns for the core unit-extent dim folding transformations.
+/// These patterns are applied with a walk-based driver.
+static void populateFoldUnitDimsPatterns(RewritePatternSet &patterns,
+                                         linalg::ControlDropUnitDims &options) {
+  linalg::populateFoldUnitExtentDimsPatterns(patterns, options);
+  IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(patterns, options);
+}
+
+/// Populate canonicalization patterns that clean up after unit-extent dim
+/// folding. These patterns are applied with a greedy driver.
+static void populateFoldUnitDimsCanonicalizationPatterns(
+    RewritePatternSet &patterns, linalg::ControlDropUnitDims &options) {
+  patterns.insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
+      patterns.getContext());
+  linalg::populateMoveInitOperandsToInputPattern(patterns);
+  linalg::populateFoldUnitExtentDimsCanonicalizationPatterns(patterns, options);
 }
 
 static LogicalResult
@@ -249,8 +390,9 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   auto newGlobalType = globalType.clone(newShape);
   auto initialValue = global.getGlobalInitialValue();
-  if (!initialValue)
+  if (!initialValue) {
     return success();
+  }
   // TODO: Handle other cases
   auto newInitialValue =
       llvm::TypeSwitch<Attribute, Attribute>(initialValue)
@@ -356,25 +498,42 @@ void FoldUnitExtentDimsPass::runOnOperation() {
     }
   });
 
-  RewritePatternSet foldUnitDimsPatterns(context);
-  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  GreedyRewriteConfig rewriterConfig;
-  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
-  if (failed(applyPatternsGreedily(moduleOp, std::move(foldUnitDimsPatterns),
-                                   rewriterConfig))) {
-    return signalPassFailure();
+  linalg::ControlDropUnitDims options = getControlDropUnitDimsOptions();
+  // Apply fold unit extent dims patterns with walk-based driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsPatterns(patterns, options);
+    walkAndApplyPatterns(moduleOp, std::move(patterns));
+  }
+
+  // Apply canonicalization patterns with greedy driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsCanonicalizationPatterns(patterns, options);
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 
 void FoldUnitExtentDimsForFuncPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet foldUnitDimsPatterns(context);
-  populatefoldUnitDimsPatterns(foldUnitDimsPatterns);
-  GreedyRewriteConfig rewriterConfig;
-  rewriterConfig.setMaxIterations(GreedyRewriteConfig::kNoLimit);
-  if (failed(applyPatternsGreedily(
-          getOperation(), std::move(foldUnitDimsPatterns), rewriterConfig))) {
-    return signalPassFailure();
+  Operation *op = getOperation();
+  linalg::ControlDropUnitDims options = getControlDropUnitDimsOptions();
+  // Apply fold unit extent dims patterns with walk-based driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsPatterns(patterns, options);
+    walkAndApplyPatterns(op, std::move(patterns));
+  }
+
+  // Apply canonicalization patterns with greedy driver.
+  {
+    RewritePatternSet patterns(context);
+    populateFoldUnitDimsCanonicalizationPatterns(patterns, options);
+    if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 

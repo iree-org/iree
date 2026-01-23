@@ -31,40 +31,21 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
   transform.yield
 }
 
-transform.named_sequence @match_attention_f16(%root: !transform.any_op {transform.readonly})
-  -> !transform.any_op {
-  transform.match.operation_name %root ["iree_linalg_ext.attention"] : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%query: tensor<?x?x?x?xf16>,
-         %key: tensor<?x?x?x?xf16>,
-         %value: tensor<?x?x?x?xf16>,
-         %softmax_scale: f16,
-         %out: tensor<?x?x?x?xf16>):
-
-      %attn = iree_linalg_ext.attention {indexing_maps = [
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> ()>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>]}
-        ins(%query, %key, %value, %softmax_scale :
-            tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, f16)
-        outs(%out : tensor<?x?x?x?xf16>){
-          ^bb0(%arg0: f32):
-            iree_linalg_ext.yield %arg0 : f32
-        } -> tensor<?x?x?x?xf16>
-  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-
-  transform.yield %root : !transform.any_op
-}
-
 transform.named_sequence
 @match_attention_2x10x4096x64x64x64_f16(%attention: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
-  %matched = transform.include @match_attention_f16 failures(propagate) (%attention)
-    : (!transform.any_op) -> !transform.any_op
+  %batch, %m, %k1, %k2, %n =
+    transform.iree.match.attention %attention,
+      query_type = f16, key_type = f16, value_type = f16, output_type = f16,
+      indexing_maps = [
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> ()>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>
+      ] : !transform.any_op -> !transform.param<i64>
 
   %query = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
   %key = transform.get_operand %attention[1] : (!transform.any_op) -> !transform.any_value
@@ -112,37 +93,19 @@ transform.named_sequence
   transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
 }
 
-transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
-  transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%lhs: tensor<?x?xf16>, %rhs: tensor<?x?xf16>, %out: tensor<?x?xf32>):
-    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d1, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d0, d1)>],
-                          iterator_types = ["parallel", "parallel", "reduction"]}
-        ins(%lhs, %rhs : tensor<?x?xf16>, tensor<?x?xf16>) outs(%out : tensor<?x?xf32>) {
-      ^bb0(%in: f16, %in_0: f16, %acc: f32):
-        %8 = arith.extf %in : f16 to f32
-        %9 = arith.extf %in_0 : f16 to f32
-        %10 = arith.mulf %8, %9 : f32
-        %11 = arith.addf %acc, %10 : f32
-        linalg.yield %11 : f32
-      } -> tensor<?x?xf32>
-  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-  transform.yield %root : !transform.any_op
-}
-
 transform.named_sequence
 @match_mmt_2048x1280x5120_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul)
-    : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<2048x5120xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x5120xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [2048] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [5120] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
     lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -151,7 +114,7 @@ transform.named_sequence
                                                  workgroup = [64, 128, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
       workgroup_size = [256, 1, 1] subgroup_size = 64,
-      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>}>
+      {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>}>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }

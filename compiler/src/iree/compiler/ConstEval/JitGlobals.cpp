@@ -49,10 +49,12 @@ static llvm::cl::opt<bool> clEnableDebug(
 namespace {
 
 static bool isDebugEnabled() {
-  if (clEnableDebug)
+  if (clEnableDebug) {
     return true;
-  if (std::getenv("IREE_COMPILER_DEBUG_CONSTEVAL"))
+  }
+  if (std::getenv("IREE_COMPILER_DEBUG_CONSTEVAL")) {
     return true;
+  }
   return false;
 }
 
@@ -69,9 +71,11 @@ emitDebugWarning(Location loc,
 // shared.
 // TODO: See if we can make them copyable?
 struct CompileOptions {
+  GlobalPipelineOptions pipelineOptions;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
+  ParameterOptions parameterOptions;
   GlobalOptimizationOptions globalOptimizationOptions;
   DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
@@ -81,8 +85,9 @@ struct CompileOptions {
 };
 
 static inline bool isAttrParameterized(Attribute attr) {
-  if (!attr)
+  if (!attr) {
     return false;
+  }
   return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
          !isa<IREE::Util::SerializableAttrInterface>(attr);
 }
@@ -92,8 +97,9 @@ static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
                                            AccessorTy op) {
   auto global =
       moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
-  if (!global)
+  if (!global) {
     return true;
+  }
   return isAttrParameterized(global.getGlobalInitialValue());
 }
 
@@ -116,8 +122,9 @@ static bool isParameterized(const SymbolTable &moduleSymbols,
               return isAttrParameterized(accessor.getValueAttr());
             })
             .Default([=](auto) { return false; });
-    if (parameterized)
+    if (parameterized) {
       return WalkResult::interrupt();
+    }
     return WalkResult::advance();
   });
   return res.wasInterrupted();
@@ -155,8 +162,9 @@ public:
   Availability
   getInitializerAvailability(IREE::Util::InitializerOpInterface initializerOp) {
     auto it = initializerAvailability.find(initializerOp);
-    if (it == initializerAvailability.end())
+    if (it == initializerAvailability.end()) {
       return Availability::Unknown;
+    }
     return it->second;
   }
 
@@ -191,11 +199,13 @@ private:
   Availability queryGlobalInitializationStatus(StringRef globalName,
                                                unsigned opOrdinal) {
     auto &timeline = globalTimelines[globalName];
-    if (timeline.empty())
+    if (timeline.empty()) {
       return Availability::Unknown;
+    }
     for (auto &timepoint : timeline) {
-      if (timepoint.first > opOrdinal)
+      if (timepoint.first > opOrdinal) {
         return timepoint.second;
+      }
     }
     return timeline.back().second;
   }
@@ -220,10 +230,11 @@ private:
       availability = static_cast<Availability>(
           std::min(static_cast<unsigned>(availability),
                    static_cast<unsigned>(newAvailability)));
-      if (previousAvailability != availability)
+      if (previousAvailability != availability) {
         emitDebugWarning(
             initializerOp.getLoc(),
             [&](InFlightDiagnostic &diagnostic) { diagnostic << reason; });
+      }
     };
 
     if (initializerOp->getRegions().size() != 1 ||
@@ -402,8 +413,9 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
                                       OpBuilder &moduleBuilder) {
   // Gather all symbol uses within the function.
   auto uses = SymbolTable::getSymbolUses(funcOp);
-  if (!uses.has_value())
+  if (!uses.has_value()) {
     return success();
+  }
 
   // Verify that all uses are to object-like types we can clone.
   for (auto use : uses.value()) {
@@ -414,14 +426,16 @@ static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
       return use.getUser()->emitOpError()
              << "references undefined symbol " << use.getSymbolRef();
     }
-    if (!objectOp->hasTrait<OpTrait::IREE::Util::ObjectLike>())
+    if (!objectOp->hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
       continue;
+    }
 
     // Check if the object exists in the target yet. Since we create the
     // target we know there should be no conflicts: the only symbols with the
     // same name will be already cloned copies of the same source.
-    if (targetSymbolTable.lookup(objectNameAttr))
+    if (targetSymbolTable.lookup(objectNameAttr)) {
       continue;
+    }
 
     // Clone the object. It's isolated and safe to copy wholesale.
     auto *clonedOp = moduleBuilder.clone(*objectOp);
@@ -462,16 +476,18 @@ public:
     //  compile dynamic initializers.
     auto availability =
         initializationAnalysis.getInitializerAvailability(initializerOp);
-    if (availability != InitializationAnalysis::Availability::Compiler)
+    if (availability != InitializationAnalysis::Availability::Compiler) {
       return failure();
+    }
 
     OpBuilder moduleBuilder = OpBuilder::atBlockEnd(targetModuleOp.getBody());
 
     // Find any object-like symbol references used by the initializer and
     // clone them.
     if (failed(cloneUsedObjects(initializerOp, sourceSymbolTable,
-                                targetSymbolTable, moduleBuilder)))
+                                targetSymbolTable, moduleBuilder))) {
       return failure();
+    }
 
     auto funcOp = IREE::Util::FuncOp::create(
         moduleBuilder, initializerOp.getLoc(), "jit_eval",
@@ -505,7 +521,7 @@ private:
 
     // Find immutable loads.
     for (auto loadOp : funcOp.getOps<IREE::Util::GlobalLoadOpInterface>()) {
-      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
+      auto globalOp = dyn_cast_if_present<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(loadOp.getGlobalAttr().getAttr()));
       if (!globalOp || globalOp.isGlobalMutable()) {
         emitDebugWarning(loadOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
@@ -534,8 +550,9 @@ private:
     for (auto constantOp : funcOp.getOps<arith::ConstantOp>()) {
       auto tensorType = dyn_cast<TensorType>(constantOp.getResult().getType());
       auto elementsAttr = dyn_cast<ElementsAttr>(constantOp.getValue());
-      if (!tensorType || !elementsAttr)
+      if (!tensorType || !elementsAttr) {
         continue;
+      }
       if (!supportedTypes.supportsType(tensorType)) {
         emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
           diagnostic << "skipping consteval initializer: unsupported type for "
@@ -555,7 +572,7 @@ private:
     // Find immutable stores, early exiting if not supported.
     // The consumers must come after rewrites of the producers above.
     for (auto storeOp : funcOp.getOps<IREE::Util::GlobalStoreOpInterface>()) {
-      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
+      auto globalOp = dyn_cast_if_present<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(storeOp.getGlobalAttr().getAttr()));
       assert(globalOp && "should have been checked in isConstExpr");
 
@@ -624,12 +641,13 @@ public:
     // Disable constant evaluation for our Jit compilation pipeline.
     // It would make no sense to recursively do constant evaluation, and since
     // we omit the necessary hooks, it is unsupported anyway.
-    compileOptions->globalOptimizationOptions.constExprHoisting = false;
+    compileOptions->pipelineOptions.constExprHoisting = false;
     compileOptions->globalOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
-        *targetRegistry.value, compileOptions->bindingOptions,
-        compileOptions->inputOptions, compileOptions->preprocessingOptions,
+        *targetRegistry.value, compileOptions->pipelineOptions,
+        compileOptions->bindingOptions, compileOptions->inputOptions,
+        compileOptions->preprocessingOptions, compileOptions->parameterOptions,
         compileOptions->globalOptimizationOptions,
         compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,
@@ -665,15 +683,18 @@ public:
 
       FunctionCall call(binary, jitFunction.argumentBindings.size(),
                         jitFunction.resultBindings.size());
-      if (failed(call.initialize(jitFunction.loc)))
+      if (failed(call.initialize(jitFunction.loc))) {
         return failure();
+      }
 
       // Convert arguments.
       for (ArgumentBinding &arg : jitFunction.argumentBindings) {
         switch (arg.getType()) {
         case ArgumentBinding::Type::ElementsAttr: {
-          if (failed(call.addArgument(jitFunction.loc, arg.getElementsAttr())))
+          if (failed(
+                  call.addArgument(jitFunction.loc, arg.getElementsAttr()))) {
             return failure();
+          }
           break;
         }
         case ArgumentBinding::Type::GlobalOp: {
@@ -684,8 +705,10 @@ public:
                       "invalid: global "
                    << arg.getGlobalOp().getGlobalName() << " has no value";
           }
-          if (failed(call.addArgument(arg.getGlobalOp().getLoc(), globalValue)))
+          if (failed(
+                  call.addArgument(arg.getGlobalOp().getLoc(), globalValue))) {
             return failure();
+          }
           break;
         }
         }
@@ -703,8 +726,9 @@ public:
           TypedAttr attr;
           if (failed(call.getResultAsAttr(
                   resultBinding.getGlobalOp().getLoc(), it.index(),
-                  resultBinding.getGlobalOp().getGlobalType(), attr)))
+                  resultBinding.getGlobalOp().getGlobalType(), attr))) {
             return failure();
+          }
           resultBinding.getGlobalOp().setGlobalInitialValue(attr);
           break;
         }

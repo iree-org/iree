@@ -23,7 +23,7 @@ namespace {
 /// Compute the dynamic dims of the given value and add them to the vector.
 static void appendDynamicDims(OpBuilder &b, Location loc,
                               SmallVector<Value> &argumentDims, Value tensor) {
-  auto tensorType = llvm::cast<RankedTensorType>(tensor.getType());
+  auto tensorType = cast<RankedTensorType>(tensor.getType());
 
   // Fast-path for if the value comes from ops that support our dynamic
   // shape interfaces. Otherwise we have to insert tensor.dim ops.
@@ -36,8 +36,9 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (ShapedType::isStatic(dim.value()))
+    if (ShapedType::isStatic(dim.value())) {
       continue;
+    }
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
   }
@@ -50,8 +51,9 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
                                     Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (isa<OpResult>(v))
+    if (isa<OpResult>(v)) {
       return !regionOp->isAncestor(v.getDefiningOp());
+    }
     assert(isa<BlockArgument>(v) && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
@@ -99,16 +101,18 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   llvm::SetVector<Value> argumentsSet;
   mlir::getUsedValuesDefinedAbove(region, argumentsSet);
   // Unranked tensors are not supported.
-  assert(!llvm::any_of(argumentsSet, [](Value v) {
-    return isa<UnrankedTensorType>(v.getType());
-  }) && "unranked tensors are not supported");
+  assert(llvm::none_of(
+             argumentsSet,
+             [](Value v) { return isa<UnrankedTensorType>(v.getType()); }) &&
+         "unranked tensors are not supported");
 
   // Compute dimensions of tensor args.
   SmallVector<Value> argumentDims;
   for (Value tensor : argumentsSet) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(tensor.getType());
-    if (!tensorType)
+    auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
+    if (!tensorType) {
       continue;
+    }
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
 
@@ -129,13 +133,15 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
          llvm::enumerate(origTerminators.front()->getOperands())) {
       auto tiedArgument =
           findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
-      if (!tiedArgument.has_value())
+      if (!tiedArgument.has_value()) {
         continue;
+      }
       assert(argumentsSet.contains(*tiedArgument) &&
              "expected that tiedArgument is already an argument");
       // Do not tie an argument to multiple results.
-      if (tiedArgumentsSet.contains(*tiedArgument))
+      if (tiedArgumentsSet.contains(*tiedArgument)) {
         continue;
+      }
       tiedArgumentsSet.insert(*tiedArgument);
       tiedArguments[it.index()] = std::distance(
           argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
@@ -184,7 +190,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.setInsertionPointToStart(newBodyEntry);
   SmallVector<Value> argValues;
   for (const auto &it : llvm::enumerate(arguments)) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(it.value().getType());
+    auto tensorType = dyn_cast<RankedTensorType>(it.value().getType());
     if (!tensorType) {
       argValues.push_back(it.value());
       continue;

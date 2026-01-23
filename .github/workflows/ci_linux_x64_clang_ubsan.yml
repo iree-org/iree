@@ -1,0 +1,44 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Linux x64 clang UBSan and Reverse Iteration
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  linux_x64_clang_ubsan:
+    runs-on: azure-linux-scale
+    container: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: Build and test with UBSan
+        env:
+          # Use a modern clang explicitly.
+          CC: clang-19
+          CXX: clang++-19
+          # Enable reverse iteration of unordered LLVM containers. This helps
+          # catch non-determinism bugs.
+          IREE_REVERSE_ITERATION: "ON"
+          SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+          SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+          SCCACHE_CACHE_ZSTD_LEVEL: 10
+          SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_ubsan"
+        run: |
+          source build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_and_test_ubsan.sh
+          sccache --show-stats
+
+      # Alerting on failure is the responsibility of the calling job.

@@ -28,7 +28,7 @@ namespace {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
-  if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
+  if (auto elementsAttr = dyn_cast<ElementsAttr>(value)) {
     // Don't outline splats - we want those fused.
     return !elementsAttr.isSplat();
   } else if (isa<IREE::Flow::NamedParameterAttr>(value)) {
@@ -49,8 +49,9 @@ static SmallVector<ConstantDef> findConstantsInModule(mlir::ModuleOp moduleOp) {
   SmallVector<ConstantDef> results;
   for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
     auto *region = callableOp.getCallableRegion();
-    if (!region)
+    if (!region) {
       continue;
+    }
     region->walk([&](Operation *op) {
       if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
         if (isOutlinableValue(constantOp.getValue())) {
@@ -80,8 +81,9 @@ static Operation *getParentInOp(Operation *childOp, Operation *ancestorOp) {
   assert(childOp != ancestorOp && "child can't be its own ancestor");
   do {
     auto *parentOp = childOp->getParentOp();
-    if (parentOp == ancestorOp)
+    if (parentOp == ancestorOp) {
       return childOp;
+    }
     childOp = parentOp;
   } while (childOp);
   assert(false && "child must be nested under ancestor");
@@ -94,16 +96,18 @@ static std::string getConstantName(ConstantDef &def) {
   if (auto parameterAttr =
           dyn_cast<IREE::Flow::NamedParameterAttr>(def.value)) {
     os << "__parameter_";
-    if (parameterAttr.getScope() && !parameterAttr.getScope().empty())
+    if (parameterAttr.getScope() && !parameterAttr.getScope().empty()) {
       os << parameterAttr.getScope().getValue() << "_";
+    }
     os << parameterAttr.getKey().getValue() << "_";
   } else {
     os << "__constant_";
   }
   def.type.print(os);
   str = sanitizeSymbolName(str);
-  if (str.substr(str.size() - 1) == "_")
+  if (str.substr(str.size() - 1) == "_") {
     str = str.substr(0, str.size() - 1); // strip trailing _
+  }
   return str;
 }
 
@@ -115,8 +119,9 @@ struct OutlineConstantsPass
     : public IREE::Flow::impl::OutlineConstantsPassBase<OutlineConstantsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     SymbolTable moduleSymbols(moduleOp);
 
@@ -127,8 +132,9 @@ struct OutlineConstantsPass
       // contains the constant.
       OpBuilder moduleBuilder(&moduleOp.getBody()->front());
       auto parentFuncOp = getParentInOp(def.op, moduleOp);
-      if (parentFuncOp)
+      if (parentFuncOp) {
         moduleBuilder.setInsertionPoint(parentFuncOp);
+      }
 
       // New immutable global takes the constant attribute in its specified
       // encoding.

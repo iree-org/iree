@@ -90,8 +90,9 @@ void setSPIRVCooperativeMatrixInfo(mlir::FunctionOpInterface funcOp,
 ArrayRef<int64_t>
 getSPIRVCooperativeMatrixShape(mlir::FunctionOpInterface funcOp) {
   auto attr = funcOp->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
-  if (!attr)
+  if (!attr) {
     return {};
+  }
   return attr.asArrayRef();
 }
 
@@ -110,10 +111,12 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
 
   SmallVector<int64_t> subgroupCounts;
   for (int i = 0, e = workgroupTileSizes.size(); i < e; ++i) {
-    if (subgroupTileSizes[i] == 0)
+    if (subgroupTileSizes[i] == 0) {
       continue;
-    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i]))
+    }
+    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) {
       continue;
+    }
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
@@ -174,17 +177,20 @@ std::optional<SmallVector<int64_t>>
 getExtOpVectorShape(ExtOpTy op, ArrayRef<int64_t> nativeShape) {
   auto insert =
       op.getOperand().template getDefiningOp<vector::InsertStridedSliceOp>();
-  if (!insert)
+  if (!insert) {
     return std::nullopt;
+  }
 
   VectorType sliceType = insert.getSourceVectorType();
   for (Operation *users : op->getUsers()) {
     auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-    if (!extract)
+    if (!extract) {
       return std::nullopt;
-    auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-    if (!llvm::equal(sliceType.getShape(), vecType.getShape()))
+    }
+    auto vecType = cast<VectorType>(extract.getResult().getType());
+    if (!llvm::equal(sliceType.getShape(), vecType.getShape())) {
       return std::nullopt;
+    }
   }
 
   return llvm::to_vector(sliceType.getShape());
@@ -201,8 +207,9 @@ getCooperativeOpVectorShape(Operation *op, ArrayRef<int64_t> nativeShape) {
 
   // Unroll elementwise ops according to native cooperative matrix size.
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
-    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0]))
+    if (auto vecType = dyn_cast<VectorType>(op->getResultTypes()[0])) {
       return llvm::to_vector(nativeShape.drop_back()); // Drop K dim size
+    }
   }
 
   // Unrolling vector.contract generates vector.{insert|extract}_strided_slice
@@ -231,27 +238,32 @@ getCooperativeOpVectorShape(Operation *op, ArrayRef<int64_t> nativeShape) {
     auto sourceOp = op;
     if (op->hasOneUse()) {
       auto user = *op->user_begin();
-      if (isa<arith::ExtUIOp>(user) || isa<arith::ExtSIOp>(user))
+      if (isa<arith::ExtUIOp>(user) || isa<arith::ExtSIOp>(user)) {
         sourceOp = user;
+      }
     }
 
     VectorType sliceType;
     for (Operation *users : sourceOp->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract)
+      if (!extract) {
         return std::nullopt;
-      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-      if (sliceType && sliceType != vecType)
+      }
+      auto vecType = cast<VectorType>(extract.getResult().getType());
+      if (sliceType && sliceType != vecType) {
         return std::nullopt;
+      }
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
   }
 
-  if (auto extOp = dyn_cast<arith::ExtSIOp>(op))
+  if (auto extOp = dyn_cast<arith::ExtSIOp>(op)) {
     return getExtOpVectorShape<arith::ExtSIOp>(extOp, nativeShape);
-  if (auto extOp = dyn_cast<arith::ExtUIOp>(op))
+  }
+  if (auto extOp = dyn_cast<arith::ExtUIOp>(op)) {
     return getExtOpVectorShape<arith::ExtUIOp>(extOp, nativeShape);
+  }
 
   return std::nullopt;
 }
@@ -309,8 +321,9 @@ public:
       newSources.push_back(transposeOp.getVector());
       foundTranspose = true;
     }
-    if (!foundTranspose)
+    if (!foundTranspose) {
       return failure();
+    }
 
     Value res = vector::ContractionOp::create(
         rewriter, loc, newSources[0], newSources[1], newSources[2],

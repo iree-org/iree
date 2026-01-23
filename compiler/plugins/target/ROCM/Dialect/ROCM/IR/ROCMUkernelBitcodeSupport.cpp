@@ -81,7 +81,7 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
   }
   auto mma = cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
   IREE::Codegen::TileSwizzle accSwizzle =
-      getSwizzle(mma, IREE::GPU::MMAFragment::Acc);
+      getSwizzle(mma, IREE::GPU::kMMAOperandAcc);
   SmallVector<IREE::Codegen::TileSwizzle::Dim> swizzleDims;
   for (IREE::Codegen::TileSwizzle::ExpandShapeDimVectorType group :
        accSwizzle.expandShape) {
@@ -100,6 +100,12 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
       return std::nullopt;
     }
     return outputIdx;
+  }
+  // Handle the case where there are no `CrossIntrinsic` dims present in
+  // `accSwizzle`, as `intrinsicsM` and `intrinsicsN` are both set as 1. In this
+  // case, we can assume `swizzleIdx` = 0 and just return the rank difference.
+  if (swizzleDims.size() > 0) {
+    return rankDiff;
   }
   return std::nullopt;
 }
@@ -213,6 +219,10 @@ static std::optional<int64_t> expensivelyEvaluateSharedMemoryBytes(
   if (!func) {
     op.emitWarning(llvm::formatv(
         "Bitcode does not contain a function named {}.", queryFuncName));
+    return {};
+  }
+  if (mma.getSubgroupsK() != 1) {
+    // SubgroupsK not supported by current bitcode ukernels.
     return {};
   }
   auto constI32 = [](int32_t val) {

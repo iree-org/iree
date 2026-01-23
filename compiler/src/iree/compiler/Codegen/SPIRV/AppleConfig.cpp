@@ -22,8 +22,7 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
                                           IREE::GPU::TargetAttr target) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
-  auto inputType =
-      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
+  auto inputType = cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {4, 8, 8};
   } else {
@@ -41,16 +40,18 @@ LogicalResult setAppleCodeGenConfig(IREE::GPU::TargetAttr target,
   int subgroupSize = target.getPreferredSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (isMatmulOrBatchMatmul(linalgOp))
+    if (isMatmulOrBatchMatmul(linalgOp)) {
       return setAppleMatmulConfig(linalgOp, target);
+    }
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32)
+    if (bitwidth > 32) {
       return failure();
+    }
     const int multipler = 32 / bitwidth;
     const int bestTilingFactor = 16 * multipler;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,

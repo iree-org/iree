@@ -12,7 +12,7 @@
   subgroup_size = 64,
   {
      gpu_pipeline_options = #iree_gpu.pipeline_options<
-       prefetch_shared_memory = false,
+       prefetch_num_stages = 0,
        no_reduce_shared_memory_bank_conflicts = false,
        use_igemm_convolution = false>
   }>
@@ -66,17 +66,17 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //      CHECK-DAG:   %[[C36:.+]] = arith.constant 36 : index
 //          CHECK:   scf.forall ({{.*}}) in (16, 48, 9) {
-//          CHECK:     %[[LOOP1:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:       %[[LOOP2:.+]] = scf.for %[[IV2:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:         %[[LOOP3:.+]] = scf.for %[[IV3:.+]] = %[[C0]] to %[[C36]] step %[[C4]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//          CHECK:       scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
+//          CHECK:         scf.for {{.+}} = %[[C0]] to %[[C36]] step %[[C4]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:           gpu.barrier
-//      CHECK-DAG:           %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<4xf16>
+//      CHECK-DAG:           %[[LHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<4xf16>
 //      CHECK-DAG:           vector.transfer_write %[[LHS_RD]]
-//      CHECK-DAG:           %[[RHS_RD:.+]] = vector.transfer_read %[[BUF1]]{{.*}} vector<8xf16>
+//      CHECK-DAG:           %[[RHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<8xf16>
 //      CHECK-DAG:           vector.transfer_write %[[RHS_RD]]
 //          CHECK:           gpu.barrier
-//      CHECK-DAG:           %[[LHS_MM:.+]] = vector.transfer_read {{.*}} vector<4x4xf16>
-//      CHECK-DAG:           %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<4x4xf16>
-//  CHECK-COUNT-4:           amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
+//      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
+//      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
+//  CHECK-COUNT-4:           amdgpu.mfma 16x16x16
 //          CHECK:     vector.transfer_write %{{.*}}, %[[BUF2]]
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

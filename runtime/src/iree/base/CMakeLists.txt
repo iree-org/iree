@@ -85,8 +85,20 @@ iree_cc_library(
     ::core_headers
     iree::base::internal::time
     iree::base::tracing::provider
+    ${IREE_LIBBACKTRACE_TARGET}
     ${_IREE_ALLOCATOR_SYSTEM_DEPS}
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    allocator_test
+  SRCS
+    "allocator_test.cc"
+  DEPS
+    ::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -145,6 +157,15 @@ iree_cc_test(
     ::base
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_fuzz(
+  NAME
+    string_view_fuzz
+  SRCS
+    "string_view_fuzz.cc"
+  DEPS
+    ::base
 )
 
 iree_cc_test(

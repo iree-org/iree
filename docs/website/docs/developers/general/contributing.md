@@ -218,12 +218,24 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-* Please keep PRs small (focused on a single issue) to make reviews and later
-  culprit-finding easier.
-* You may see trusted core contributors bending this rule for project
-  maintenance and major subsystem renovation. If you feel like the rules aren't
-  working for a certain situation, please ask as we bias towards pragmatism for
-  cases that require it.
+* Please keep PRs small (focused on a single issue or feature) to make reviews
+  and later culprit-finding easier.
+    - You may see trusted core contributors bending above rule for project
+      maintenance and major subsystem renovation. If you feel like the rules
+      aren't working for a certain situation, please ask as we bias towards
+      pragmatism for cases that require it.
+* We require review comments to be addressed before merging, even when there is
+  an approval from another reviewer. Unless stated otherwise, we treat request
+  for changes as blocking. Reviewers may indicate that some comments
+  requesting changes are optional (commonly by prefixing them with 'nit' or
+  'optional') -- use your best engineering judgement to decide whether to
+  follow these suggestions or not.
+* If there are new comments requesting changes after a PR was merged, these
+  comments should be addressed as well, either through follow-up discussion
+  or code changes. Small issues may be fixed forward, but reviewers may also
+  ask for your PR to be reverted. This is not a sign that your PR was faulty
+  -- we prefer to err on the side of caution and reverting allows more time
+  for design discussion.
 
 ### :material-check-all: GitHub Actions workflows
 
@@ -266,7 +278,7 @@ Access to repositories is divided into tiers following the
 | Tier | Description | Team links |
 | ---- | ----------- | --------- |
 Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | <ul><li>[iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)<br>(access to most repositories)</li></ul>
-Write | **Established contributors can request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | <ul><li>[iree-write](https://github.com/orgs/iree-org/teams/iree-write)<br>(access to most repositories)</li><li>[iree-turbine-write](https://github.com/orgs/iree-org/teams/iree-turbine-write)<br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li></ul>
+Write | **Established contributors can request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | <ul><li>[iree-write](https://github.com/orgs/iree-org/teams/iree-write)<br>(access to most repositories)</li><li>[iree-turbine-write](https://github.com/orgs/iree-org/teams/iree-turbine-write)<br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li><li>[iree-fusilli-write](https://github.com/orgs/iree-org/teams/iree-fusilli-write)<br>(access to <a href="https://github.com/iree-org/fusilli">fusilli</a>)</li></ul>
 Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
@@ -319,6 +331,35 @@ Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 
 Branches that do not meet these guidelines may be deleted, especially if
 they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
+
+### :octicons-hubot-16: AI tool use
+
+We adopt the [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
+and require all AI-assisted contributions (Pull Requests, issues, design
+proposals) to be reviewed and understood by the author(s).
+
+The key points include:
+
+1. "Contributors must read and review all LLM-generated code or text before they
+   ask other project members to review it."
+2. "Contributors are expected to be transparent and label contributions that
+   contain substantial amounts of tool-generated content." This can be done with
+   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
+   trailer in PR descriptions.
+3. "To ensure sufficient self review and understanding of the work, it is
+   strongly recommended that contributors write PR descriptions themselves (if
+   needed, using tools for translation or copy-editing)." This also extends to
+   code documentation, issue descriptions, and design proposals.
+4. "Contributors are responsible for ensuring that they have the right to
+   contribute code under the terms of our license, [...]. Using AI tools to
+   regenerate copyrighted material does not remove the copyright, and
+   contributors are responsible for ensuring that such material does not appear
+   in their contributions."
+
+We extend the LLVM policy with an exception for AI bot-authored contributions
+(e.g., updating dependencies, fixing build script, etc.); bot account may create
+Pull Requests as long as the bot maintainers ensure they are first in line and
+primarily responsible for reviewing those contributions.
 
 ## Tips for contributors
 
@@ -435,10 +476,28 @@ runs.
     ci-exactly: linux_x64_bazel
     ```
 
+* Opt in to the Linux arm64 build:
+
+    ``` text
+    ci-extra: linux_arm64_clang
+    ```
+
 * Opt in to the Windows compiler build and test workflow:
 
     ``` text
     ci-extra: windows_x64_msvc
+    ```
+
+* Opt in to the MacOS build and test workflows:
+
+    ``` text
+    ci-extra: macos_arm64_clang, macos_x64_clang
+    ```
+
+* Other opt in builds:
+
+    ``` text
+    ci-extra: linux_x64_clang_byollvm, linux_x64_clang_debug, linux_x64_clang_tsan
     ```
 
 For example, this PR opted in to running the `build_test_all_windows` job

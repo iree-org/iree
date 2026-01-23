@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,8 +34,8 @@ namespace mlir::iree_compiler {
 
 static bool accGemmToGemmPrecondition(Operation *op) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
-    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr>(
-        innerTiledOp.getKind());
+    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
+               IREE::GPU::DataTiledMMAInterfaceAttr>(innerTiledOp.getKind());
   }
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
@@ -48,8 +49,22 @@ static bool accGemmToGemmPrecondition(Operation *op) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return false;
   }
+  if (isValidInPlaceAccumulatingOp(
+          cast<DestinationStyleOpInterface>(linalgOp.getOperation()))) {
+    return false;
+  }
+
   return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(0))
       .isProjectedPermutation();
+}
+
+static bool isFuncArgument(Value v) {
+  auto blockArg = dyn_cast<BlockArgument>(v);
+  if (!blockArg) {
+    return false;
+  }
+  return isa<func::FuncOp, IREE::Util::FuncOp>(
+      blockArg.getParentBlock()->getParentOp());
 }
 
 static void convertAccGemmToGemm(RewriterBase &rewriter,
@@ -58,8 +73,10 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
       llvm::to_vector(llvm::make_pointer_range(dpsOp.getDpsInitsMutable()));
   Value outputOperand = outputOperands.front()->get();
   auto outsDefiningOp = outputOperand.getDefiningOp();
-  // If not DispatchTensorLoadOp or LoadFromBufferOp then do nothing.
-  if (!isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp,
+  // If, not a function argument, and not DispatchTensorLoadOp/LoadFromBufferOp
+  // then do nothing.
+  if (!isFuncArgument(outputOperand) &&
+      !isa_and_nonnull<IREE::TensorExt::DispatchTensorLoadOp,
                        IREE::Codegen::LoadFromBufferOp>(outsDefiningOp)) {
     return;
   }
@@ -98,7 +115,7 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
       ValueRange{initOp}, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
         Value result;
-        if (llvm::isa<FloatType>(elementType)) {
+        if (isa<FloatType>(elementType)) {
           result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
         } else {
           result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);

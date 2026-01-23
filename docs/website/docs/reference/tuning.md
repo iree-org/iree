@@ -42,17 +42,17 @@ graph LR;
 ### :octicons-book-16: Overview
 
 While tuning can be done manually, the
-[SHARK Tuner](https://github.com/nod-ai/shark-ai/tree/main/sharktuner) tool
-can automatically search through possible knob values for individual
+[AMDSHARK Tuner](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner)
+tool can automatically search through possible knob values for individual
 dispatches to improve overall program performance. Dispatches are blocks of
 code that are created as part of IREE's compilation flow by splitting the
 input program into blocks that can be executed concurrently and atomically.
 For further information on dispatches see the sections below.
 
 !!! info
-    For more information about SHARK Tuner, see its source in the
-    [shark-ai GitHub repository](https://github.com/nod-ai/shark-ai/tree/main/sharktuner)
-    and the [Model Tuner example](https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner).
+    For more information about AMDSHARK Tuner, see its source in the
+    [amd-shark-ai GitHub repository](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner)
+    and the [Model Tuner example](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner/model_tuner).
 
 In our experience, using the SHARK Tuner can provide **meaningful speedup** of
 model execution.
@@ -119,7 +119,7 @@ the created dispatches.
 ```mlir
 // RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
-            --iree-hal-dump-executable-files-to=<some directory>
+            --iree-hal-dump-executable-files-to=<some directory> -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<...>) {
     module {
@@ -214,10 +214,9 @@ earlier example.
 linalg.matmul {lowering_config = #iree_gpu.lowering_config<{
     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     promote_operands = [0, 1],
-    reduction = [0, 0, 128],
-    subgroup_m_count = 1 : i64,
-    subgroup_n_count = 4 : i64,
-    workgroup = [16, 128, 0]}>,
+    reduction = [0, 0, 8],
+    subgroup = [1, 2, 0],
+    workgroup = [32, 64, 0]}>,
     root_op
 } ins(%3, %4 : tensor<32x1024xf16>, tensor<1024x2048xf16>)
   outs(%6 : tensor<32x2048xf32>) -> tensor<32x2048xf32>
@@ -275,11 +274,12 @@ module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.w
     transform.yield
   }
   transform.named_sequence @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32(%arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
-    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %arg0 {
-    ^bb0(%arg1: tensor<32x1024xf16>, %arg2: tensor<1024x2048xf16>, %arg3: tensor<32x2048xf32>):
-      %1 = linalg.matmul ins(%arg1, %arg2 : tensor<32x1024xf16>, tensor<1024x2048xf16>) outs(%arg3 : tensor<32x2048xf32>) -> tensor<32x2048xf32>
-    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-    %0 = transform.param.constant #iree_codegen.compilation_info<lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [32, 128, 0]}>, translation_info = <pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>> -> !transform.any_param
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %arg0, lhs_type = f16, rhs_type = f16, output_type = f32, indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+    transform.iree.match.dims_equal %batch_dims, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m_dims, [32] : !transform.param<i64>
+    transform.iree.match.dims_equal %n_dims, [2048] : !transform.param<i64>
+    transform.iree.match.dims_equal %k_dims, [1024] : !transform.param<i64>
+    %0 = transform.param.constant #iree_codegen.compilation_info<lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}>, translation_info = <pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>> -> !transform.any_param
     transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -> !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {
@@ -306,6 +306,12 @@ that conform to the following format:
   the tuning spec includes a named sequence op with name `__kernel_config`,
   which must contain exactly one `foreach_match` op. That `foreach_match` op
   must have exactly one argument and one result of type any_op.
+* IREE provides transform match operations (e.g.,
+  `transform.iree.match.contraction`, `transform.iree.match.convolution`,
+  `transform.iree.match.attention`) that are more robust and user-friendly than
+  the generic `transform.iree.match.cast_compatible_dag_from_root`, as they are
+  less sensitive to extraneous IR attributes and can automatically extract
+  dimension information.
 
 The tuning spec above attempts to match `linalg.matmul` ops that correspond to
 the shape `32x1024x2048` and `f16` operand element types and `f32` result

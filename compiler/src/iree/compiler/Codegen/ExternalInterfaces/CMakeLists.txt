@@ -18,27 +18,36 @@ iree_cc_library(
     "CodegenExternalModels.h"
     "GPUEncodingExternalModels.h"
     "Interfaces.h"
+    "UtilExternalModels.h"
     "Utils.h"
   SRCS
     "CPUEncodingExternalModels.cpp"
     "CodegenExternalModels.cpp"
     "GPUEncodingExternalModels.cpp"
     "Interfaces.cpp"
+    "UtilExternalModels.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRTensorDialect
+    MLIRValueBoundsOpInterface
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
+    iree::compiler::Codegen::Dialect::PCF::IR
+    iree::compiler::Codegen::Dialect::PCF::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Encoding::Utils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )

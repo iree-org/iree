@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper for setting up a data tiled multi-MMA inner_tiled config based on the
 /// specified target.
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
 
@@ -58,6 +58,12 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op);
 
+/// Helper for setting up a memory bound reduction configuration, focusing
+/// on getting peak global memory bandwidth.
+LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
+                                 mlir::FunctionOpInterface entryPoint,
+                                 linalg::LinalgOp op);
+
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options
 //===----------------------------------------------------------------------===//
@@ -66,7 +72,9 @@ using IREE::GPU::ReorderWorkgroupsStrategy;
 
 struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
-  bool prefetchSharedMemory = false;
+  // Number of software pipelining stages for shared memory prefetching.
+  // 0 or 1 disables prefetching, 2+ enables it with that many stages.
+  unsigned prefetchNumStages = 0;
   bool useIgemmConvolution = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;

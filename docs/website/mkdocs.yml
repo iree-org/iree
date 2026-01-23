@@ -240,10 +240,12 @@ nav:
           - "developers/debugging/android-with-lldb.md"
           - "developers/debugging/compile-time-regressions.md"
           - "developers/debugging/gpu.md"
+          - "developers/debugging/llvm.md"
           - "developers/debugging/integration-tests.md"
           - "developers/debugging/model-development.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"
+          - "developers/debugging/fuzzing.md"
       - "Performance":
           - "developers/performance/benchmarking.md"
           - "developers/performance/profiling.md"

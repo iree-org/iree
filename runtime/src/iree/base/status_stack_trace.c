@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Must define _GNU_SOURCE before includes to get Dl_info/dladdr from dlfcn.h.
+#define _GNU_SOURCE
+
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_APPLE)
@@ -11,16 +14,17 @@
 #include <execinfo.h>
 #define IREE_HAVE_BACKTRACE 1
 #define IREE_STATUS_HAVE_STACK_TRACE_SUPPORT 1
-#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
-// Currently disabled because we can't get meaningful stacks on Linux.
-// #define _GNU_SOURCE 1
-// #include <dlfcn.h>
-// #include <execinfo.h>
-// #define IREE_HAVE_BACKTRACE 1
-// #define IREE_STATUS_HAVE_STACK_TRACE_SUPPORT 1
 #elif defined(IREE_PLATFORM_WINDOWS)
 #pragma warning(disable : 4091)
 #include <dbghelp.h>
+#define IREE_STATUS_HAVE_STACK_TRACE_SUPPORT 1
+#elif (defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)) && \
+    defined(IREE_HAVE_LIBBACKTRACE)
+// Include our wrapper header which re-exports backtrace.h.
+// This allows Bazel's layering check to see the header dependency.
+#include <dlfcn.h>
+#include <iree_libbacktrace.h>
+#define IREE_USE_LIBBACKTRACE 1
 #define IREE_STATUS_HAVE_STACK_TRACE_SUPPORT 1
 #endif  // IREE_PLATFORM_*
 
@@ -74,6 +78,106 @@ static iree_host_size_t IREE_PRINTF_ATTRIBUTE(4, 5)
   va_end(varargs);
   return IREE_UNLIKELY(n < 0) ? 0 : buffer_length + n;
 }
+
+#if defined(IREE_USE_LIBBACKTRACE)
+
+// pthread_once is used for thread-safe one-time initialization.
+// We inline it here rather than using iree/base/internal/call_once.h because:
+// 1. The :synchronization target has a circular dependency with :base.
+// 2. Bare metal builds may not have pthreads, but libbacktrace requires it.
+#include <pthread.h>
+
+// Global backtrace state - initialized on first use.
+static struct backtrace_state* iree_libbacktrace_state = NULL;
+static pthread_once_t iree_libbacktrace_init_once = PTHREAD_ONCE_INIT;
+
+static void iree_libbacktrace_error_callback(void* data, const char* msg,
+                                             int errnum) {
+  // Silently ignore errors - we don't want errors while reporting errors.
+  (void)data;
+  (void)msg;
+  (void)errnum;
+}
+
+static void iree_libbacktrace_initialize(void) {
+  iree_libbacktrace_state =
+      backtrace_create_state(NULL,  // Let libbacktrace find the executable.
+                             1,     // threaded = true
+                             iree_libbacktrace_error_callback, NULL);
+}
+
+static struct backtrace_state* iree_libbacktrace_get_state(void) {
+  pthread_once(&iree_libbacktrace_init_once, iree_libbacktrace_initialize);
+  return iree_libbacktrace_state;
+}
+
+// Capture callback for backtrace_simple().
+typedef struct {
+  uintptr_t* addresses;
+  int max_frames;
+  int frame_count;
+} iree_libbacktrace_capture_state_t;
+
+static int iree_libbacktrace_capture_callback(void* data, uintptr_t pc) {
+  iree_libbacktrace_capture_state_t* state =
+      (iree_libbacktrace_capture_state_t*)data;
+  if (state->frame_count >= state->max_frames) return 1;  // Stop.
+  state->addresses[state->frame_count++] = pc;
+  return 0;  // Continue.
+}
+
+// Format callback state for backtrace_pcinfo().
+typedef struct {
+  iree_host_size_t buffer_capacity;
+  char* buffer;
+  iree_host_size_t buffer_length;
+  bool found;
+} iree_libbacktrace_format_state_t;
+
+static int iree_libbacktrace_pcinfo_callback(void* data, uintptr_t pc,
+                                             const char* filename, int lineno,
+                                             const char* function) {
+  iree_libbacktrace_format_state_t* state =
+      (iree_libbacktrace_format_state_t*)data;
+  state->found = true;
+
+  // Format: module <function+offset> (file:line)
+  // We use dladdr for module name since libbacktrace doesn't provide it
+  // directly in this callback.
+  Dl_info info;
+  if (dladdr((void*)pc, &info) != 0 && info.dli_fname) {
+    iree_string_view_t fname = iree_status_trim_file_path(info.dli_fname);
+    state->buffer_length = iree_string_buffer_append_format(
+        state->buffer_capacity, state->buffer, state->buffer_length, "%.*s",
+        (int)fname.size, fname.data);
+  } else {
+    state->buffer_length = iree_string_buffer_append_cstr(
+        state->buffer_capacity, state->buffer, state->buffer_length, "???");
+  }
+
+  state->buffer_length = iree_string_buffer_append_cstr(
+      state->buffer_capacity, state->buffer, state->buffer_length, " <");
+  if (function) {
+    state->buffer_length = iree_string_buffer_append_cstr(
+        state->buffer_capacity, state->buffer, state->buffer_length, function);
+  } else {
+    state->buffer_length = iree_string_buffer_append_cstr(
+        state->buffer_capacity, state->buffer, state->buffer_length, "???");
+  }
+  state->buffer_length = iree_string_buffer_append_cstr(
+      state->buffer_capacity, state->buffer, state->buffer_length, ">");
+
+  if (filename && lineno > 0) {
+    iree_string_view_t file = iree_status_trim_file_path(filename);
+    state->buffer_length = iree_string_buffer_append_format(
+        state->buffer_capacity, state->buffer, state->buffer_length,
+        " (%.*s:%d)", (int)file.size, file.data, lineno);
+  }
+
+  return 0;  // Continue (for inlined frames).
+}
+
+#endif  // IREE_USE_LIBBACKTRACE
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
@@ -298,6 +402,46 @@ static iree_host_size_t iree_status_payload_stack_trace_format_frame(
     buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
                                                    buffer_length, "???");
   }
+#elif defined(IREE_USE_LIBBACKTRACE)
+  // Use libbacktrace for file:line:function info.
+  struct backtrace_state* state = iree_libbacktrace_get_state();
+  if (state) {
+    iree_libbacktrace_format_state_t format_state = {
+        .buffer_capacity = buffer_capacity,
+        .buffer = buffer,
+        .buffer_length = buffer_length,
+        .found = false,
+    };
+    backtrace_pcinfo(state, (uintptr_t)address,
+                     iree_libbacktrace_pcinfo_callback,
+                     iree_libbacktrace_error_callback, &format_state);
+    if (format_state.found) {
+      buffer_length = format_state.buffer_length;
+    } else {
+      // pcinfo failed, fallback to dladdr for basic symbol info.
+      Dl_info info;
+      if (dladdr(address, &info) != 0 && info.dli_sname) {
+        if (info.dli_fname) {
+          iree_string_view_t fname = iree_status_trim_file_path(info.dli_fname);
+          buffer_length = iree_string_buffer_append_format(
+              buffer_capacity, buffer, buffer_length, "%.*s", (int)fname.size,
+              fname.data);
+        }
+        buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
+                                                       buffer_length, " <");
+        buffer_length = iree_string_buffer_append_cstr(
+            buffer_capacity, buffer, buffer_length, info.dli_sname);
+        buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
+                                                       buffer_length, ">");
+      } else {
+        buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
+                                                       buffer_length, "???");
+      }
+    }
+  } else {
+    buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
+                                                   buffer_length, "???");
+  }
 #else
   // Symbol resolution not implemented on the platform.
   buffer_length = iree_string_buffer_append_cstr(buffer_capacity, buffer,
@@ -363,6 +507,20 @@ iree_status_t iree_status_attach_stack_trace(iree_status_t status,
   payload->frame_count =
       CaptureStackBackTrace(skip_frames, IREE_STATUS_MAX_STACK_TRACE_FRAMES,
                             (void**)&payload->addresses, NULL);
+#elif defined(IREE_USE_LIBBACKTRACE)
+  // Use libbacktrace's backtrace_simple for unwinding.
+  struct backtrace_state* state = iree_libbacktrace_get_state();
+  if (state) {
+    iree_libbacktrace_capture_state_t capture_state = {
+        .addresses = payload->addresses,
+        .max_frames = IREE_STATUS_MAX_STACK_TRACE_FRAMES,
+        .frame_count = 0,
+    };
+    payload->skip_frames = skip_frames;
+    backtrace_simple(state, 0, iree_libbacktrace_capture_callback,
+                     iree_libbacktrace_error_callback, &capture_state);
+    payload->frame_count = capture_state.frame_count;
+  }
 #endif
 
   return iree_status_append_payload(status, storage,

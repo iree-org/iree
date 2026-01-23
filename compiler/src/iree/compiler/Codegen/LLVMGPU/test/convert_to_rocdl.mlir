@@ -10,7 +10,6 @@
 ]>
 builtin.module {
   func.func @abs_ex_dispatch_0() {
-    %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) flags(ReadOnly) : memref<16xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32>
@@ -54,7 +53,7 @@ builtin.module {
         strided<[4096, 64, 1], offset: ?>>
   %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32
-  %4 = vector.splat %3 : vector<2xf32>
+  %4 = vector.broadcast %3 : f32 to vector<2xf32>
   vector.store %4, %1[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   return
   }
@@ -283,14 +282,14 @@ module {
     rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
     rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
     rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
-    %0 = amdgpu.mfma %in * %in + %out {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %0 = amdgpu.mfma 4x4x1 %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %1 = amdgpu.mfma %in * %in + %0 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %1 = amdgpu.mfma 4x4x1 %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
-    %2 = amdgpu.mfma %in * %in + %1 {
-      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    %2 = amdgpu.mfma 4x4x1 %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, blocks = 16 : i32
     }  blgp = none : f32, f32, vector<4xf32>
     call @foo(%2) : (vector<4xf32>) -> ()
     return

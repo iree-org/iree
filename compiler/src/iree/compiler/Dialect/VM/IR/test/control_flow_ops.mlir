@@ -174,6 +174,19 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @call_yieldable
+vm.module @my_module {
+  vm.import private @yieldable_fn(%arg0 : i32) -> i32 attributes {vm.yield}
+  vm.func @call_yieldable(%arg0 : i32) -> i32 {
+    // CHECK: vm.call.yieldable @yieldable_fn(%arg0) : (i32) -> ^bb1 (i32)
+    vm.call.yieldable @yieldable_fn(%arg0) : (i32) -> ^bb1(i32)
+  ^bb1(%result : i32):
+    vm.return %result : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @return_empty
 vm.module @my_module {
   vm.func @return_empty() {

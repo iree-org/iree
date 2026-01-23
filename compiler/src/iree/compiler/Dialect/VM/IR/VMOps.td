@@ -19,19 +19,6 @@ include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
-// Trial ops do not have any memory effects but may invoke Undefine Behavior on
-// some inputs. This makes them conditionally speculatable/hoistable.
-class VM_TrivialOp<string mnemonic, list<Trait> traits = []> :
-      VM_Op<mnemonic, !listconcat(traits, [NoMemoryEffect])>;
-
-// Pure ops do not have any memory effects, do not invoke Undefined Behavior,
-// and are always safe to speculate/hoist.
-//
-// TODO(https://github.com/iree-org/iree/issues/11179): More VM ops should be
-// made pure.
-class VM_PureOp<string mnemonic, list<Trait> traits = []> :
-      VM_TrivialOp<mnemonic, !listconcat(traits, [AlwaysSpeculatable])>;
-
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
@@ -828,7 +815,8 @@ def VM_GlobalStoreIndirectF64Op :
 }
 
 def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
     ]> {
   let summary = [{Global ref<T> load operation.}];
   let description = [{
@@ -841,9 +829,23 @@ def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
     VM_EncTypeOf<"value">,
     VM_EncResult<"value">,
   ];
+
+  let extraClassDeclaration = [{
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalLoadOp(*this, symbolTable);
+    }
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // No ref operands.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE (runtime uses retain_or_move).
+    }
+  }];
 }
 
-def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
+def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> stores operation.}];
   let description = [{
     Stores a ref<T> to a global, retaining it until the global is reset.
@@ -855,10 +857,24 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
     VM_EncTypeOf<"value">,
     VM_EncOperand<"value", 0>,
   ];
+
+  let extraClassDeclaration = [{
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalStoreOp(*this, symbolTable);
+    }
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // value operand supports MOVE (runtime uses retain_or_move).
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 def VM_GlobalLoadIndirectRefOp :
-    VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref"> {
+    VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> load operation.}];
   let description = [{
     Loads the value of a global containing a ref of the given type.
@@ -872,10 +888,21 @@ def VM_GlobalLoadIndirectRefOp :
   ];
 
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // global operand is a ptr, not a ref.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE (runtime uses retain_or_move).
+    }
+  }];
 }
 
 def VM_GlobalStoreIndirectRefOp :
-    VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref"> {
+    VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref", [
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>
+    ]> {
   let summary = [{Global ref<T> stores operation.}];
   let description = [{
     Stores a ref<T> to a global, retaining it until the global is reset.
@@ -889,6 +916,16 @@ def VM_GlobalStoreIndirectRefOp :
   ];
 
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is global (ptr), operand 1 is value (ref).
+      return operandIndex == 1;  // Only value operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 } // OpGroupGlobalOps
@@ -1092,6 +1129,67 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
   let hasFolder = 1;
 }
 
+def VM_DiscardRefsOp : VM_Op<"discard.refs", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    MemoryEffects<[MemWrite]>,
+  ]> {
+  let summary = [{Discards reference values, releasing them.}];
+  let description = [{
+    Explicitly releases reference values. This is used by the compiler to insert
+    early releases at ref death points, enabling functions to be marked as
+    "refs clean" so the runtime can skip cleanup on the success path.
+
+    The encode method is implemented manually in C++ to support per-operand
+    elision based on register allocation analysis. Operands that have already
+    been released via a MOVE bit on a preceding use are elided from encoding.
+  }];
+
+  let arguments = (ins
+    Variadic<VM_AnyRef>:$refs
+  );
+
+  let assemblyFormat = [{
+    ($refs^ `:` type($refs))? attr-dict
+  }];
+}
+
+def VM_AssignRefOp : VM_Op<"assign.ref", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+  ]> {
+  let summary = [{Assigns a ref value between registers.}];
+  let description = [{
+    Assigns a reference value from one register to another. This is a runtime
+    operation that performs retain/move semantics based on the MOVE bit.
+
+    This operation exists to support efficient ref-to-ref assignments where
+    the source and destination may have the same or different registers. When
+    the source and destination registers are the same, this operation becomes
+    a no-op and is elided during bytecode encoding.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$source
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $source attr-dict `:` type($source) `->` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    // RefMoveInterface methods.
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Source supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
+}
+
 def VM_RodataOp : VM_Op<"rodata", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
@@ -1267,6 +1365,7 @@ def VM_BufferAllocOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new zero-initialized buffer.}];
   let description = [{
@@ -1298,6 +1397,7 @@ def VM_BufferCloneOp :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead]>,
       AlwaysSpeculatable,
+      VM_MayFail,
     ]> {
   let summary = [{Clones a buffer.}];
   let description = [{
@@ -1362,6 +1462,7 @@ def VM_BufferCopyOp :
     VM_Op<"buffer.copy", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Copies a range of a buffer to another.}];
   let description = [{
@@ -1394,6 +1495,7 @@ def VM_BufferCompareOp :
     VM_Op<"buffer.compare", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Compares a range of a buffer to another.}];
   let description = [{
@@ -1431,6 +1533,7 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Fills an element range of the buffer with the given value, like memset.
@@ -1489,6 +1592,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Loads a value from the buffer at the given element offset.
@@ -1520,6 +1624,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let description = [{
     Stores a value to the buffer at the given element offset.
@@ -1611,6 +1716,7 @@ def VM_BufferStoreF64Op :
 def VM_BufferHashOp : VM_Op<"buffer.hash", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let description = [{
     Computes the SipHash-2-4 of the source buffer at the given offset for
@@ -1662,6 +1768,7 @@ def VM_ListAllocOp :
     VM_Op<"list.alloc", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc]>,
+      VM_MayFail,
     ]> {
   let summary = [{Allocates a new empty list.}];
   let description = [{
@@ -1691,6 +1798,7 @@ def VM_ListReserveOp :
     VM_Op<"list.reserve", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemAlloc, MemRead, MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Reserves capacity for list growth.}];
   let description = [{
@@ -1718,6 +1826,7 @@ def VM_ListSizeOp :
     VM_Op<"list.size", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{The size of the list in elements.}];
   let description = [{
@@ -1746,6 +1855,7 @@ def VM_ListResizeOp :
     VM_Op<"list.resize", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{Resizes the list to a new count in elements.}];
   let description = [{
@@ -1775,6 +1885,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element accessor.}];
   let description = [{
@@ -1806,6 +1917,7 @@ class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ])> {
   let summary = [{Primitive type element mutator.}];
   let description = [{
@@ -1857,7 +1969,9 @@ def VM_ListSetF64Op :
 def VM_ListGetRefOp :
     VM_Op<"list.get.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemRead]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element accessor.}];
   let description = [{
@@ -1886,12 +2000,26 @@ def VM_ListGetRefOp :
   ];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return false;  // list operand does NOT support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      // Result supports MOVE - like std::move(vec[i]) for shared_ptr.
+      // When MOVE is set, runtime moves ref out of list (list element becomes
+      // null) instead of retaining.
+      return true;
+    }
+  }];
 }
 
 def VM_ListSetRefOp :
     VM_Op<"list.set.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       MemoryEffects<[MemWrite]>,
+      VM_MayFail,
     ]> {
   let summary = [{ref type element mutator.}];
   let description = [{
@@ -1916,6 +2044,17 @@ def VM_ListSetRefOp :
   ];
 
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 = list (no MOVE), operand 2 = value (supports MOVE).
+      // Note: operand 1 = index (not a ref).
+      return operandIndex == 2;  // Only value operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 } // OpGroupListOps
@@ -1996,6 +2135,7 @@ def VM_SelectF64Op : VM_SelectPrimitiveOp<F64, "select.f64", VM_OPC_SelectF64,
 
 def VM_SelectRefOp : VM_PureOp<"select.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     AllTypesMatch<["true_value", "false_value", "result"]>,
   ]> {
   let summary = [{ref<T> select operation.}];
@@ -2028,6 +2168,16 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
   ];
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is condition (i32), operands 1,2 are refs.
+      return operandIndex > 0;  // true_value and false_value support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
@@ -2132,6 +2282,7 @@ def VM_SwitchF64Op : VM_SwitchFloatOp<F64, "switch.f64", VM_OPC_SwitchF64,
 
 def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     AllTypesMatch<["default_value", "result"]>,
   ]> {
   let summary = [{ref<T> switch operation.}];
@@ -2170,6 +2321,16 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
   ];
 
   let hasFolder = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is index (i32), all others are refs.
+      return operandIndex > 0;  // default_value and values all support MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 } // OpGroupConditionalAssignmentOps
@@ -3257,6 +3418,7 @@ def VM_BitcastF64I64Op :
 def VM_CastAnyRefOp :
     VM_PureOp<"cast.any.ref", [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     ]> {
   let summary = [{Casts from any ref to a specific ref type.}];
   let description = [{
@@ -3285,14 +3447,28 @@ def VM_CastAnyRefOp :
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 def VM_CastRefAnyOp :
-    VM_PureOp<"cast.ref.any", [VM_AssignmentOp]> {
+    VM_PureOp<"cast.ref.any", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    ]> {
   let summary = [{Casts from a specific ref to any ref type.}];
   let description = [{
     Performs a compile-time widening cast of a specific `!vm.ref<T>` to an
-    opaque `!vm.ref<?>`.
+    opaque `!vm.ref<?>`. At runtime this is equivalent to a ref assignment
+    since all refs have the same representation. Uses the same encoding as
+    vm.assign.ref.
   }];
 
   let arguments = (ins
@@ -3308,6 +3484,16 @@ def VM_CastRefAnyOp :
 
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    // RefMoveInterface methods.
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return true;  // Operand supports MOVE.
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return true;  // Result supports MOVE.
+    }
+  }];
 }
 
 } // OpGroupCastingAndConversionOps
@@ -3978,6 +4164,7 @@ let opDocGroup = OpGroupControlFlowOps in {
 def VM_BranchOp : VM_Op<"br", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Unconditional branch operation.}];
@@ -4023,6 +4210,15 @@ def VM_BranchOp : VM_Op<"br", [
 
     /// Erase the operand at 'index' from the operand list.
     void eraseOperand(unsigned index);
+
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // All ref operands support MOVE (runtime uses retain_or_move for remapping).
+      return isa<IREE::VM::RefType>(getDestOperands()[operandIndex].getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
   }];
 
   let hasCanonicalizer = 1;
@@ -4032,6 +4228,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Conditional branch operation.}];
@@ -4133,6 +4330,18 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       getFalseDestOperandsMutable().erase(index);
     }
 
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is the condition (i32), all others are branch operands.
+      // All ref branch operands support MOVE (runtime uses retain_or_move).
+      if (operandIndex == 0) return false;  // condition is not a ref
+      Value operand = getOperand(operandIndex);
+      return isa<IREE::VM::RefType>(operand.getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+
   private:
     /// Get the index of the first true destination operand.
     unsigned getTrueDestOperandIndex() { return 1; }
@@ -4150,6 +4359,7 @@ def VM_BranchTableOp : VM_PureOp<"br_table", [
     AttrSizedOperandSegments,
     DeclareOpInterfaceMethods<BranchOpInterface, ["getSuccessorForOperands"]>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Terminator,
   ]> {
   let summary = [{Branch table operation.}];
@@ -4206,6 +4416,18 @@ def VM_BranchTableOp : VM_PureOp<"br_table", [
     MutableOperandRange getCaseOperandsMutable(unsigned index) {
       return getCaseOperandsMutable()[index];
     }
+
+    /// RefMoveInterface: All ref operands support MOVE (runtime uses retain_or_move).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // operand 0 is the index (i32), all others are branch operands.
+      // All ref branch operands support MOVE (runtime uses retain_or_move).
+      if (operandIndex == 0) return false;  // index is not a ref
+      Value operand = getOperand(operandIndex);
+      return isa<IREE::VM::RefType>(operand.getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
   }];
 }
 
@@ -4213,7 +4435,9 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      DeclareOpInterfaceMethods<VM_RefMoveInterface>,
       CallOpInterface,
+      VM_MayFail,
     ])> {
   let extraClassDeclaration = [{
     /// Get the argument operands to the called function.
@@ -4237,6 +4461,15 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     /// required by the call interface.
     MutableOperandRange getArgOperandsMutable() {
       return getOperandsMutable();
+    }
+
+    /// RefMoveInterface: All ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getOperand(operandIndex).getType());
+    }
+    /// RefMoveInterface: All ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResult(resultIndex).getType());
     }
   }];
 }
@@ -4352,8 +4585,244 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
   let hasCanonicalizer = 1;
 }
 
+def VM_CallYieldableOp : VM_Op<"call.yieldable", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    CallOpInterface,
+    Terminator,
+    Util_YieldPoint,
+    VM_MayFail,
+  ]> {
+  let summary = [{Call operation that may yield.}];
+  let description = [{
+    Calls a VM function (internal or imported) that may yield. If the call
+    yields execution resumes at the specified successor block with the call
+    results as block arguments. If the call completes synchronously control
+    branches to the successor with the results.
+
+    This op is a terminator that combines a call with an explicit resume point,
+    making the yield/resume semantics visible in the IR.
+
+    ```
+    ^bb0:
+      vm.call.yieldable @hal.fence.await(%timeout, %fence) : (i32, !vm.ref<?>) -> ^resume(i32)
+    ^resume(%result : i32):
+      vm.return %result
+    ```
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    Variadic<VM_AnyType>:$arguments,
+    TypeArrayAttr:$result_types,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+    `->` $dest custom<ResultTypeList>($result_types)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallYieldable>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncVariadicOperands<"arguments">,
+    VM_EncBranchTarget<"dest">,
+    VM_EncBlockArgResults<"dest">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "FlatSymbolRefAttr":$callee,
+      "ValueRange":$arguments,
+      "Block *":$dest,
+      "ArrayRef<Type>":$resultTypes),
+    [{
+      $_state.addAttribute("callee", callee);
+      $_state.addOperands(arguments);
+      $_state.addAttribute("result_types",
+          $_builder.getTypeArrayAttr(resultTypes));
+      $_state.addSuccessors(dest);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return getArguments();
+    }
+    MutableOperandRange getArgOperandsMutable() {
+      return getArgumentsMutable();
+    }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+    }
+
+    /// Get the result types of the call.
+    SmallVector<Type> getResultTypesVec() {
+      SmallVector<Type> types;
+      for (auto typeAttr : getResultTypes())
+        types.push_back(cast<TypeAttr>(typeAttr).getValue());
+      return types;
+    }
+
+    void setDest(Block *block);
+
+    /// RefMoveInterface: ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getArguments()[operandIndex].getType());
+    }
+    /// RefMoveInterface: ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResultTypesVec()[resultIndex]);
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
+def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
+    CallOpInterface,
+    Terminator,
+    Util_YieldPoint,
+    VM_MayFail,
+  ]> {
+  let summary = [{Variadic call operation that may yield.}];
+  let description = [{
+    Calls a variadic VM import function that may yield. If the call yields,
+    execution resumes at the specified successor block with the call results
+    as block arguments. If the call completes synchronously, control branches
+    to the successor with the results.
+
+    Variadic arguments must be specified with a total count in the segment_sizes
+    attribute. Only imports are supported (not internal functions).
+
+    ```
+    ^bb0:
+      vm.call.variadic.yieldable @import(%a, %b, %c) {segment_sizes = dense<[1, 2]> : vector<2xi16>}
+        : (i32, i32, i32) -> ^resume(i32)
+    ^resume(%result : i32):
+      vm.return %result
+    ```
+  }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    SignlessIntElementsAttr<16>:$segment_sizes,
+    TypeArrayAttr:$segment_types,
+    Variadic<VM_AnyType>:$operands,
+    TypeArrayAttr:$result_types,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+    `->` $dest custom<ResultTypeList>($result_types)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallVariadicYieldable>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncPrimitiveArrayAttr<"segment_sizes", 16>,
+    VM_EncVariadicOperands<"operands">,
+    VM_EncBranchTarget<"dest">,
+    VM_EncBlockArgResults<"dest">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "FlatSymbolRefAttr":$callee,
+      "ArrayRef<int16_t>":$segmentSizes,
+      "ArrayRef<Type>":$segmentTypes,
+      "ValueRange":$operands,
+      "Block *":$dest,
+      "ArrayRef<Type>":$resultTypes),
+    [{
+      $_state.addAttribute("callee", callee);
+      $_state.addAttribute("segment_sizes",
+          DenseIntElementsAttr::get(
+              VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                              $_builder.getIntegerType(16)),
+              segmentSizes));
+      $_state.addAttribute("segment_types", $_builder.getArrayAttr(
+          llvm::map_to_vector(segmentTypes, [&](Type type) {
+              return cast<Attribute>(TypeAttr::get(type));
+          })));
+      $_state.addOperands(operands);
+      $_state.addAttribute("result_types",
+          $_builder.getTypeArrayAttr(resultTypes));
+      $_state.addSuccessors(dest);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return getOperands();
+    }
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+    }
+
+    /// Get the result types of the call.
+    SmallVector<Type> getResultTypesVec() {
+      SmallVector<Type> types;
+      for (auto typeAttr : getResultTypes())
+        types.push_back(cast<TypeAttr>(typeAttr).getValue());
+      return types;
+    }
+
+    void setDest(Block *block);
+
+    /// RefMoveInterface: ref operands support MOVE (callee handles ownership).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      return isa<IREE::VM::RefType>(getOperands()[operandIndex].getType());
+    }
+    /// RefMoveInterface: ref results support MOVE (callee transfers ownership).
+    bool isRefResultMovable(unsigned resultIndex) {
+      return isa<IREE::VM::RefType>(getResultTypesVec()[resultIndex]);
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<VM_RefMoveInterface>,
     Pure,
     ReturnLike,
     Terminator,
@@ -4388,11 +4857,23 @@ def VM_ReturnOp : VM_Op<"return", [
       build($_builder, $_state, {});
     }]>,
   ];
+
+  let extraClassDeclaration = [{
+    /// RefMoveInterface: All ref operands support MOVE (transferred to caller).
+    bool isRefOperandMovable(unsigned operandIndex) {
+      // All ref operands support MOVE (transferred to caller).
+      return isa<IREE::VM::RefType>(getOperand(operandIndex).getType());
+    }
+    bool isRefResultMovable(unsigned resultIndex) {
+      return false;  // No results.
+    }
+  }];
 }
 
 def VM_FailOp : VM_Op<"fail", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure.}];
   let description = [{
@@ -4445,6 +4926,7 @@ def VM_FailOp : VM_Op<"fail", [
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
     VM_PseudoOp,
+    VM_MayFail,
   ]> {
   let summary = [{Raises a global failure if the condition is true.}];
   let description = [{
@@ -4861,5 +5343,48 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 }
 
 } // OpGroupDebuggingOps
+
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def OpGroupCompilerHintOps : OpDocGroup {
+  let summary = "Compiler hint ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCompilerHintOps in {
+
+def VM_OptimizationBarrierOp : VM_Op<"optimization_barrier", [
+    VM_PseudoOp,
+    AllTypesMatch<["operands", "results"]>,
+  ]> {
+  let summary = [{Prevents compiler optimizations across a value.}];
+  let description = [{
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
+  }];
+
+  let arguments = (ins
+    Variadic<VM_AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<VM_AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    attr-dict ($operands^ `:` type($operands))?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+}
+
+} // OpGroupCompilerHintOps
 
 #endif  // IREE_DIALECT_VM_OPS

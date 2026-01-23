@@ -658,12 +658,25 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         Value outVal = args[1];
         Value outIdx = args[2];
         Value reductionIdx = linalg::IndexOp::create(b, loc, reductionDim + 1);
-        if (outIdx.getType() != reductionIdx.getType())
+        if (outIdx.getType() != reductionIdx.getType()) {
           reductionIdx = arith::IndexCastOp::create(b, loc, outIdx.getType(),
                                                     reductionIdx);
-        Value maxVal = arith::MaximumFOp::create(b, loc, in, outVal);
-        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, in,
-                                          outVal);
+        }
+        Value inCast = in;
+        Type inType = in.getType();
+        Type outType = outVal.getType();
+        unsigned inBitWidth = inType.getIntOrFloatBitWidth();
+        unsigned outBitWidth = outType.getIntOrFloatBitWidth();
+
+        if (outBitWidth > inBitWidth) {
+          inCast = arith::ExtFOp::create(b, loc, outVal.getType(), in);
+        } else if (outBitWidth < inBitWidth) {
+          inCast = arith::TruncFOp::create(b, loc, outVal.getType(), in);
+        }
+
+        Value maxVal = arith::MaximumFOp::create(b, loc, inCast, outVal);
+        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT,
+                                          inCast, outVal);
         Value selIdx =
             arith::SelectOp::create(b, loc, cmp, reductionIdx, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
@@ -703,8 +716,9 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         Value outIdx = inputs[3];
         Value outer = linalg::IndexOp::create(b, loc, insertSplitDimension);
         Value offset = arith::MulIOp::create(b, loc, outer, tileSize);
-        if (offset.getType() != local.getType())
+        if (offset.getType() != local.getType()) {
           offset = arith::IndexCastOp::create(b, loc, local.getType(), offset);
+        }
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
         Operation *clonedMax = b.clone(*combinerOps.maxOp);

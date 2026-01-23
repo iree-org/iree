@@ -139,9 +139,9 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 
     auto loc = op.getLoc();
     Value input = op.getOperand();
-    ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
+    ShapedType inputType = dyn_cast<ShapedType>(input.getType());
     ShapedType resultType =
-        llvm::dyn_cast_if_present<ShapedType>(op.getResult().getType());
+        dyn_cast_if_present<ShapedType>(op.getResult().getType());
     if (!inputType || !resultType || !inputType.hasRank() ||
         !resultType.hasRank()) {
       return rewriter.notifyMatchFailure(op, "not ranked shaped types");
@@ -402,8 +402,9 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     SmallVector<Value> outputDynamicShapes;
     for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (ShapedType::isStatic(resultShape))
+      if (ShapedType::isStatic(resultShape)) {
         continue;
+      }
       outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
           rewriter, reshapeOp.getLoc(), outputShp));
     }

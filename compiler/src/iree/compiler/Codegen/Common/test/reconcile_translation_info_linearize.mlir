@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z}, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=x}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEX --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=y}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-reconcile-translation-info{distribute-along=z}, iree-codegen-resolve-workgroup-count-hints, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
 
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
@@ -34,7 +34,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
   }
 }
 //         CHECK-ALL:   hal.executable.export
-//    CHECK-ALL-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: !hal.device
+//    CHECK-ALL-SAME:       {{.+}}: !hal.device
 //    CHECK-ALL-SAME:       %[[ARG1:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG2:[a-zA-Z0-9]+]]: index
 //    CHECK-ALL-SAME:       %[[ARG3:[a-zA-Z0-9]+]]: index
@@ -93,7 +93,7 @@ hal.executable private @scf_forall_2D_dynamic_tile_size {
 //   DISTRIBUTEZ-DAG:     %[[IV1:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[IDX]], %[[ARG5]], %[[ARG1]]]
 //       DISTRIBUTEZ:     "use"(%[[IV0]], %[[IV1]])
 
-// // -----
+// -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 0, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
@@ -266,7 +266,7 @@ hal.executable private @split_reduction_executable {
 
 // Check for case where the max workgroup count is specified.
 
-#pipeline_layout = #hal.pipeline.layout<constants = 12, bindings = [
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @bounded_scf_forall_4D {
   hal.executable.variant public @bounded_scf_forall_4D target(#hal.executable.target<"", "", {
@@ -307,15 +307,15 @@ hal.executable private @bounded_scf_forall_4D {
 //      DISTRIBUTEX:   hal.return %[[NWGX]], %[[C1]], %[[C1]]
 
 //      DISTRIBUTEY:   %[[C1:.+]] = arith.constant 1 : index
+//      DISTRIBUTEY:   %[[NWGX:.+]] = affine.min affine_map<()[s0] -> (1024, s0)>()[%[[ARG4]]]
 //      DISTRIBUTEY:   %[[NWGY:.+]] = affine.min affine_map<()[s0, s1, s2] -> (s2 * (s0 * s1), 512)>()
 // DISTRIBUTEY-SAME:       [%[[ARG3]], %[[ARG2]], %[[ARG1]]]
-//      DISTRIBUTEY:   %[[NWGX:.+]] = affine.min affine_map<()[s0] -> (1024, s0)>()[%[[ARG4]]]
 //      DISTRIBUTEY:   hal.return %[[NWGX]], %[[NWGY]], %[[C1]]
 
+//      DISTRIBUTEZ:   %[[NWGX:.+]] = affine.min affine_map<()[s0] -> (1024, s0)>()[%[[ARG4]]]
+//      DISTRIBUTEZ:   %[[NWGY:.+]] = affine.min affine_map<()[s0] -> (512, s0)>()[%[[ARG3]]]
 //      DISTRIBUTEZ:   %[[NWGZ:.+]] = affine.min affine_map<()[s0, s1] -> (s0 * s1, 256)>()
 // DISTRIBUTEZ-SAME:       [%[[ARG2]], %[[ARG1]]]
-//      DISTRIBUTEZ:   %[[NWGY:.+]] = affine.min affine_map<()[s0] -> (512, s0)>()[%[[ARG3]]]
-//      DISTRIBUTEZ:   %[[NWGX:.+]] = affine.min affine_map<()[s0] -> (1024, s0)>()[%[[ARG4]]]
 //      DISTRIBUTEZ:   hal.return %[[NWGX]], %[[NWGY]], %[[NWGZ]]
 
 //        CHECK-ALL: func.func @bounded_scf_forall_4D()

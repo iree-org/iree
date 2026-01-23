@@ -21,9 +21,9 @@ module attributes {transform.with_named_sequence} {
         %lhs = stream.binding.subspan %arg0[%c0] : !stream.binding -> memref<?x?xf32>{%m, %k}
         %rhs = stream.binding.subspan %arg1[%c0] : !stream.binding -> memref<?x?xf32>{%k, %n}
         %result = stream.binding.subspan %arg2[%c0] : !stream.binding -> memref<?x?xf32>{%m, %n}
-        %p0, %o0, %s00, %s01, %t00, %t01 = memref.extract_strided_metadata %lhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
-        %p1, %o1, %s10, %s11, %t10, %t11 = memref.extract_strided_metadata %rhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
-        %p2, %o2, %s20, %s21, %t20, %t21 = memref.extract_strided_metadata %result : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
+        %p0, %o0, %s00, %s01, %t00, %t01 = iree_codegen.extract_strided_metadata %lhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
+        %p1, %o1, %s10, %s11, %t10, %t11 = iree_codegen.extract_strided_metadata %rhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
+        %p2, %o2, %s20, %s21, %t20, %t21 = iree_codegen.extract_strided_metadata %result : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
         func.call @mlp_external(%p0, %o0, %p1, %o1, %p2, %o2, %arg3, %arg4, %arg5, %do_relu) : (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32, i1) -> ()
         return
       }

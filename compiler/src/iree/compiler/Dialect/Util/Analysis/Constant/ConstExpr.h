@@ -44,8 +44,9 @@ public:
   // uninitialized. If they are all initialized, then they will either be all
   // const-expr or all non const-expr, so just return the first result's info.
   const ConstValueInfo *lookup(Operation *queryOp) const {
-    if (queryOp->getNumResults() == 0)
+    if (queryOp->getNumResults() == 0) {
       return nullptr;
+    }
     if (llvm::any_of(queryOp->getResults(),
                      [&](Value v) { return !lookup(v); })) {
       return nullptr;
@@ -56,8 +57,9 @@ public:
   // Returns true if the given value is only derived from immutable inputs.
   bool isConstExprValue(Value queryValue) const {
     ConstValueInfo *found = constInfoMap.lookup(queryValue);
-    if (!found)
+    if (!found) {
       return false;
+    }
     return found->state == ConstValueInfo::CONSTANT;
   }
 
@@ -174,7 +176,7 @@ private:
   //   LoadGlobalOp.result -> GlobalOp
   //   ConstantOp.result -> ConstantOp
   // Entries can come from the whole program.
-  llvm::DenseMap<Value, Operation *> constantRoots;
+  llvm::MapVector<Value, Operation *> constantRoots;
 
   // Map of analyzed value to corresponding info struct.
   llvm::DenseMap<Value, ConstValueInfo *> constInfoMap;

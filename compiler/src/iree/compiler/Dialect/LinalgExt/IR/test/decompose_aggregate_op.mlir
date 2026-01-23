@@ -190,6 +190,7 @@ func.func @online_attention_f16(%query: tensor<192x1024x64xf16>,
 // correct number of extf/truncfs are emitted.
 // CHECK-LABEL: @online_attention_f16
 // Q = Q * scale
+// CHECK: arith.constant 1.442380e+00 : f16
 // CHECK: linalg.generic
 // CHECK:   arith.mulf
 // S = Q @ K
@@ -416,3 +417,142 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
+
+// -----
+
+// Spec to decompose online attention op.
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
+func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
+                         %key: tensor<192x1024x64xf16>,
+                         %value: tensor<192x1024x64xf16>,
+                         %output: tensor<192x1024x64xf32>,
+                         %max: tensor<192x1024xf32>,
+                         %sum: tensor<192x1024xf32>)
+                         -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+  %scale = arith.constant 1.0 : f16
+
+  %out:3 = iree_linalg_ext.online_attention
+        {decomposition_config = {use_exp2=false}, indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     }
+        -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+
+  return %out#0, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
+}
+
+// We want to check that we're correctly using exp
+// when specified so from the decomposition_config.
+// CHECK-LABEL: @online_attention_f16_noexp2
+// Q = Q * scale
+// CHECK: arith.constant 1.000000e+00 : f16
+// CHECK: linalg.generic
+// CHECK:   arith.mulf
+// norm = exp (oldMax - newMax)
+// CHECK: linalg.generic
+// CHECK:   arith.subf
+// CHECK-NOT: arith.extf
+// CHECK-NOT:   math.exp2
+// CHECK:   linalg.yield
+// P = exp(S - newMax)
+// CHECK: linalg.generic
+// CHECK:   arith.subf
+// CHECK-NOT: arith.extf
+// CHECK-NOT:   math.exp2
+// CHECK:   linalg.yield
+
+// -----
+
+// Spec to decompose exp reduction op.
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.exp_reduction"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+func.func @exp_reduction(
+  %s_in: tensor<20x4096x4096xf32>,
+  %v_in: tensor<20x4096x64xf32>,
+  %max_init: tensor<20x4096xf32>,
+  %sum_init: tensor<20x4096xf32>,
+  %acc_init: tensor<20x4096x64xf32>
+) -> (tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
+  {
+  %max, %sumt, %pv = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(B, M, N, K2) -> (B, M, K2)>,
+      affine_map<(B, M, N, K2) -> (B, K2, N)>,
+      affine_map<(B, M, N, K2) -> (B, M)>,
+      affine_map<(B, M, N, K2) -> (B, M)>,
+      affine_map<(B, M, N, K2) -> (B, M, N)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1, 2]
+  }
+    ins(%s_in, %v_in : tensor<20x4096x4096xf32>, tensor<20x4096x64xf32>)
+    outs(%max_init, %sum_init, %acc_init : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>)
+  {
+  ^bb0(%ex : f32, %v : f32, %m : f32, %sum : f32, %acc : f32):
+    %nsum = arith.addf %ex, %sum : f32
+    %mul  = arith.mulf %ex, %v : f32
+    %nacc = arith.addf %mul, %acc : f32
+    iree_linalg_ext.yield %m, %nsum, %nacc : f32, f32, f32
+  } -> tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
+
+  return %max, %sumt, %pv : tensor<20x4096xf32>, tensor<20x4096xf32>, tensor<20x4096x64xf32>
+}
+// CHECK-LABEL: @exp_reduction
+// CHECK-SAME:    %[[S:[0-9A-Za-z]*]]: tensor<20x4096x4096xf32>
+// CHECK-SAME:    %[[V:[0-9A-Za-z]*]]: tensor<20x4096x64xf32>
+// CHECK:       %[[M:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[S]]
+// CHECK-SAME:                      outs(
+// CHECK:                             arith.maximumf
+// CHECK:       %[[sub:.*]]     = linalg.generic
+// CHECK-SAME:                      ins(%[[M]]
+// CHECK-SAME:                      outs(%[[S]]
+// CHECK:                             arith.subf
+// CHECK:                             math.exp2
+// CHECK:       %[[n:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[M]]
+// CHECK:                             arith.subf
+// CHECK:                             math.exp2
+// CHECK:      %[[max_norm:.*]] = linalg.generic
+// CHECK-SAME:                      ins(%[[n]]
+// CHECK:                             arith.mulf
+// CHECK:      %[[acc_norm:.*]] = linalg.generic
+// CHECK-SAME:                      ins(%[[n]]
+// CHECK:                             arith.mulf
+// CHECK:      %[[SUM:.*]]      = linalg.generic
+// CHECK-SAME:                      ins(%[[sub]]
+// CHECK-SAME:                      outs(%[[max_norm]]
+// CHECK:                             arith.addf
+// CHECK:      %[[PV:.*]]       = linalg.generic
+// CHECK-SAME:                      ins(%[[sub]], %[[V]]
+// CHECK-SAME:                      outs(%[[acc_norm]]
+// CHECK:                             arith.mulf
+// CHECK:                             arith.addf
+// CHECK:      return %[[M]], %[[SUM]], %[[PV]]

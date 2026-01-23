@@ -47,7 +47,7 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 };
 
 void LLVMCPUTilePass::runOnOperation() {
-  if (tilingLevel == -1) {
+  if (tilingLevel == IREE::CPU::TilingLevel::InvalidLevel) {
     LDBG() << "tilingLevel not set, skip tiling";
     return;
   }
@@ -57,15 +57,17 @@ void LLVMCPUTilePass::runOnOperation() {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   for (auto computeOp : computeOps) {
     auto op = dyn_cast<TilingInterface>(computeOp);
-    if (!op || op.getLoopIteratorTypes().empty())
+    if (!op || op.getLoopIteratorTypes().empty()) {
       continue;
+    }
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
     // operations might be those introduced by the padding-based
     // codegeneration strategy. Those are not meant to be tiled again.
     // Need a better way for handling this, but this works for now.
-    if (isa<tensor::PadOp>(computeOp))
+    if (isa<tensor::PadOp>(computeOp)) {
       continue;
+    }
 
     IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
         getLoweringConfig(op);
@@ -73,7 +75,8 @@ void LLVMCPUTilePass::runOnOperation() {
       LDBG() << "can't find lowering_config, skip tiling";
       continue;
     }
-    if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
+    if (!maybeLoweringConfig.hasTilingLevel(
+            static_cast<unsigned>(tilingLevel.getValue()))) {
       LDBG() << "target tiling level does not exist";
       continue;
     }
@@ -85,7 +88,8 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
+        getLoweringConfig(op).getTilingLevelAttr(
+            static_cast<unsigned>(tilingLevel.getValue())));
     SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
     SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
     scf::SCFTilingOptions tilingOptions;
@@ -102,8 +106,9 @@ void LLVMCPUTilePass::runOnOperation() {
                     std::move(tileScalableFlags));
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCF(rewriter, op, options);
-    if (failed(tiledResults))
+    if (failed(tiledResults)) {
       continue;
+    }
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 
@@ -122,7 +127,7 @@ void LLVMCPUTilePass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
+createLLVMCPUTilePass(IREE::CPU::TilingLevel tilingLevel, bool skipRootOp) {
   LLVMCPUTilePassOptions options;
   options.tilingLevel = tilingLevel;
   options.skipRootOp = skipRootOp;

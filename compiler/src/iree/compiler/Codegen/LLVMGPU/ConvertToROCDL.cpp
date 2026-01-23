@@ -69,13 +69,8 @@ struct ReplaceGPUBarrierWithLDSBarrier
   }
 };
 
-static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns,
-                                               const amdgpu::Chipset &chipset) {
-  // TODO(kdrewnia): This if statement is an emergency fix for an incorrect
-  // lowering of amdgpu.lds_barrier.
-  if (chipset.majorVersion != 12) {
-    patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
-  }
+static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
+  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
@@ -145,7 +140,7 @@ static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
 template <typename... Floats>
 static bool containsAPred(Type type) {
   type = getElementTypeOrSelf(type);
-  return llvm::isa<Floats...>(type);
+  return isa<Floats...>(type);
 }
 
 // Function to check valid data types on the ROCm backend.
@@ -231,6 +226,9 @@ struct ConvertToROCDLPass final
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
+    GreedyRewriteConfig config;
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
+
     {
       RewritePatternSet patterns(&getContext());
       auto options =
@@ -255,7 +253,7 @@ struct ConvertToROCDLPass final
           /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
-      populateConvertGPUToAMDGPUPatterns(patterns, *maybeChipset);
+      populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -281,7 +279,7 @@ struct ConvertToROCDLPass final
           patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
-      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
 
@@ -290,8 +288,8 @@ struct ConvertToROCDLPass final
       arith::populateExpandScalingExtTruncPatterns(fallbackSmallFloatPatterns);
       arith::populateExpandF4E2M1Patterns(fallbackSmallFloatPatterns);
       arith::populateExpandF8E8M0Patterns(fallbackSmallFloatPatterns);
-      if (failed(applyPatternsGreedily(
-              m, std::move(fallbackSmallFloatPatterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(fallbackSmallFloatPatterns),
+                                       config))) {
         LDBG() << "Small float patterns failed\n" << m;
         return signalPassFailure();
       }
@@ -304,7 +302,7 @@ struct ConvertToROCDLPass final
       populateGpuRewritePatterns(patterns);
       populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
       populateGpuSubgroupIdPatterns(patterns);
-      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
     }
@@ -318,7 +316,7 @@ struct ConvertToROCDLPass final
       // (https://github.com/llvm/llvm-project/issues/67815).
       RewritePatternSet patterns(&getContext());
       populateReplaceSlowMinMaxOpsPatterns(patterns);
-      if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
     }
@@ -353,7 +351,8 @@ struct ConvertToROCDLPass final
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
-      populateMathToROCDLConversionPatterns(converter, llvmPatterns);
+      populateMathToROCDLConversionPatterns(converter, llvmPatterns,
+                                            /*chipset=*/*maybeChipset);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {

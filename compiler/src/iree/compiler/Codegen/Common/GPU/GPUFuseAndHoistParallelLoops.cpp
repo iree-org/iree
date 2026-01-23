@@ -175,6 +175,11 @@ struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
       tileableProducer = forallOp.getTiedLoopInit(iterArg)
                              ->get()
                              .getDefiningOp<TilingInterface>();
+      // Pad fusion is handled separately as we dont want zero slice guards that
+      // happen by default.
+      if (tileableProducer && isa<tensor::PadOp>(tileableProducer)) {
+        tileableProducer = nullptr;
+      }
       if (tileableProducer) {
         break;
       }
@@ -266,7 +271,9 @@ struct FuseTilableSliceProducers final
       return failure();
     }
     auto tilableProducer = sliceOp.getSource().getDefiningOp<TilingInterface>();
-    if (!tilableProducer) {
+    // Pad fusion is handled separately as we dont want zero slice guards that
+    // happen by default.
+    if (!tilableProducer || isa<tensor::PadOp>(tilableProducer)) {
       return failure();
     }
 
@@ -338,9 +345,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
   std::optional<int64_t> maybeFlatWorkgroupSize = std::nullopt;
   if (std::optional<SmallVector<int64_t>> workgroupSize =
           getWorkgroupSize(funcOp)) {
-    maybeFlatWorkgroupSize =
-        std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
-                        std::multiplies<int64_t>());
+    maybeFlatWorkgroupSize = llvm::product_of(*workgroupSize);
   }
 
   // First run the hoisting and fusion patterns.
@@ -360,6 +365,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseNestedLaneAndWarpForalls>(context);
     populateForallLoopHoistingPattern(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 1)");
       return signalPassFailure();
     }
   }
@@ -381,6 +387,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 2)");
       return signalPassFailure();
     }
   }
@@ -394,7 +401,14 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     patterns.add<FuseTilableSliceProducers>(context);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
+    auto zeroSliceGuard = [](tensor::ExtractSliceOp) -> std::optional<bool> {
+      // Do not use zero slice gaurd.
+      return false;
+    };
+    patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(context,
+                                                             zeroSliceGuard);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("failed to apply fusion + hoisting patterns (set 3)");
       return signalPassFailure();
     }
   }

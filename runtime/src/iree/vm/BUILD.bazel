@@ -138,6 +138,7 @@ iree_runtime_cc_library(
         "native_module_test.h",
     ],
     deps = [
+        ":cc",
         ":impl",
         "//runtime/src/iree/base",
     ],

@@ -24,18 +24,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 //===----------------------------------------------------------------------===//
-// Op types
-//===----------------------------------------------------------------------===//
-
-class Util_Op<string mnemonic, list<Trait> traits = []> :
-    Op<Util_Dialect, mnemonic, traits> {
-  let hasCustomAssemblyFormat = 1;
-}
-
-class Util_PureOp<string mnemonic, list<Trait> traits = []> :
-    Util_Op<mnemonic, !listconcat(traits, [Pure])>;
-
-//===----------------------------------------------------------------------===//
 // Type manipulation
 //===----------------------------------------------------------------------===//
 
@@ -567,35 +555,6 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
-def Util_UnreachableOp : Util_Op<"unreachable", [
-  NoMemoryEffect,
-  ReturnLike,
-  Terminator
-]> {
-  let summary = [{Unreachable assertion op.}];
-  let description = [{
-    Signals to the compiler that the parent block should not be reachable.
-    This may be converted into a runtime assertion, though ideally they are
-    stripped during translation.
-
-    ```mlir
-    ^bb0:
-      %true = arith.constant true
-      cond_br %true, ^bb2, ^bb1
-    ^bb1:
-      // Indicates that this branch should never be taken.
-      util.unreachable "shouldn't be here"
-    ^bb2:
-      ...
-
-    ```
-  }];
-
-  let arguments = (ins StrAttr:$message);
-
-  let assemblyFormat = "$message attr-dict";
-}
-
 } // OpGroupCompilerHintOps
 
 //===----------------------------------------------------------------------===//
@@ -620,6 +579,40 @@ def Util_InitializerOp : Util_Op<"initializer", [
     A function that is called in definition order upon module initialization.
     Must not load any globals that are defined or initialized after it in the
     module.
+
+    Module initialization follows a strict execution order to ensure
+    correctness:
+    * Initialization points: two types of operations define initialization:
+      - `util.initializer` ops: explicit initialization functions
+      - `util.global` ops with initial values: implicit initialization via
+        attributes
+    * Execution order: initialization proceeds in exact module definition order:
+      - Operations execute sequentially from top to bottom
+      - Each `util.global` with an initial value conceptually materializes its
+        value and stores it before the next initialization point
+      - Each `util.initializer` executes its entire body before proceeding
+    * Dependency rules:
+      - Initializers may only access globals defined before them in module order
+      - Globals with initial values are considered "initialized" at their
+        definition point, not when first accessed
+      - Function calls within initializers observe the current initialization
+        state when the call is made
+    * Transformation guarantees:
+      - Combining passes preserve exact initialization order
+      - Globals with initial values may be converted to explicit initialization
+        while maintaining their position in the initialization sequence
+      - The final initialization state must be identical to sequential execution
+
+    Example execution:
+    ```mlir
+    util.global @A = 1 : i32           // A = 1
+    util.initializer { ... }           // Executes with A = 1
+    util.global @B = 2 : i32           // B = 2
+    util.initializer {
+      %a = util.global.load @A : i32   // Loads 1
+      %b = util.global.load @B : i32   // Loads 2
+    }
+    ```
   }];
 
   let arguments = (ins
@@ -866,6 +859,115 @@ def Util_ReturnOp : Util_Op<"return", [
   let hasVerifier = 1;
 }
 
+def Util_UnreachableOp : Util_Op<"unreachable", [
+  NoMemoryEffect,
+  ReturnLike,
+  Terminator,
+  Util_UnreachableLike
+]> {
+  let summary = [{Unreachable assertion op.}];
+  let description = [{
+    Signals to the compiler that the parent block should not be reachable.
+    This may be converted into a runtime assertion, though ideally they are
+    stripped during translation.
+
+    ```mlir
+    ^bb0:
+      %true = arith.constant true
+      cond_br %true, ^bb2, ^bb1
+    ^bb1:
+      // Indicates that this branch should never be taken.
+      util.unreachable "shouldn't be here"
+    ^bb2:
+      ...
+
+    ```
+  }];
+
+  let arguments = (ins OptionalAttr<StrAttr>:$message);
+
+  let assemblyFormat = "($message^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+def Util_SCFUnreachableOp : Util_Op<"scf.unreachable", [
+  Util_UnreachableLike
+]> {
+  let summary = [{Non-terminator unreachable for use in SCF regions.}];
+  let description = [{
+    Marks a point as unreachable within SCF regions. Unlike `util.unreachable`
+    this is not a terminator and must be followed by appropriate region
+    terminators (e.g. `scf.yield`).
+
+    When not in an SCF region (e.g. `util.func`) this op canonicalizes to an
+    `util.unreachable` terminator that preserves the intended behavior.
+
+    Note that this op has side effects to prevent code motion: reaching this op
+    at runtime is observable indirectly (by way of what ops _don't_ execute). At
+    minimum presence of the op indicates all following ops in the same region
+    are unreachable and depending on the parent op may indicate the entire
+    parent op is unreachable. The behavior is roughly equivalent to having
+    lowered SCF to CFG and used `util.unreachable`.
+
+    Example:
+    ```mlir
+    scf.while (...) {
+      ...
+      scf.condition(%true) ...
+    } do {
+      ...
+      util.scf.unreachable "infinite loop body"
+      scf.yield  // Required terminator with poison values
+    }
+    ```
+  }];
+
+  let arguments = (ins OptionalAttr<StrAttr>:$message);
+
+  let assemblyFormat = "($message^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Creates one `ub.poison` for each type.
+    static SmallVector<Value> createPoisonValues(
+        OpBuilder &builder, Location loc, TypeRange resultTypes);
+
+    // Creates unreachable + poison yields + scf.yield for an SCF region.
+    // Returns the created scf.yield op.
+    static mlir::scf::YieldOp createRegionTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        StringAttr message = {});
+    static mlir::scf::YieldOp createRegionTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        StringRef message);
+
+    // Creates unreachable + poison yields + appropriate terminator if creating
+    // within an scf.region and otherwise creates an unreachable terminator.
+    // Returns the new terminator-like op.
+    static mlir::Operation *createWithTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        mlir::StringAttr message = {});
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 } // OpGroupStructuralOps
 
 //===----------------------------------------------------------------------===//
@@ -888,6 +990,57 @@ def Util_GlobalOp : Util_Op<"global", [
     Declares a global variable that maintains its value across invocations.
     The value is tied to the execution context of the module and different
     contexts will have different variable storage.
+
+    Globals can be initialized with an `initial_value` attribute that specifies
+    their value at module initialization time. This initial value is evaluated
+    in module definition order: a global with an initial value is considered
+    initialized at its definition point in the module, not when first accessed.
+
+    During module initialization:
+    * Globals with `initial_value` attributes conceptually have their value
+      materialized and stored before any subsequent initialization points
+    * Initialization order follows module definition order exactly
+    * Globals are visible to initializers but only after their definition point
+
+    Example:
+    ```mlir
+    // A is initialized to 1 at this point in module initialization.
+    util.global @A = 1 : i32
+
+    // This initializer can read A (it's defined above).
+    util.initializer {
+      %a = util.global.load @A : i32  // Loads 1
+    }
+
+    // B is initialized to 2 here, after the above initializer runs.
+    util.global @B = 2 : i32
+    ```
+
+    Globals marked as mutable can be modified by stores anywhere in the program.
+    Immutable globals have strict initialization rules:
+    * Can only be initialized once - either by `initial_value` or by stores
+      in initializers, never both.
+    * Stores to immutable globals are only allowed in:
+      - `util.initializer` ops directly
+      - Functions that are only called from initializers (initializer-only)
+    * Stores from externally-reachable functions are forbidden.
+    * Initialization must respect module order - initializers can only
+      access globals defined before them.
+
+    Stores to immutable globals inside control flow regions (scf.if, scf.for,
+    scf.while, etc) in initializer-only functions will generate warnings as
+    they may indicate complex initialization patterns that could be fragile:
+    ```mlir
+    util.func private @init_func() {
+      scf.if %cond {
+        // Warning: conditional store in initializer-only function
+        util.global.store %val, @immutable_global : i32
+      }
+    }
+    ```
+    While such patterns are allowed they should be used with caution as the
+    initialization behavior depends on runtime control flow and the compiler
+    may disable optimizations on those globals.
   }];
 
   let arguments = (ins
@@ -1263,6 +1416,20 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
 
   let assemblyFormat = [{
     ($name^)? attr-dict `:` type($result) `=` $value
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Attribute":$value)>,
+    OpBuilder<(ins "StringRef":$value)>,
+    OpBuilder<(ins "ArrayRef<uint8_t>":$value)>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a new buffer op with the given contents unless they are
+    // nullptr/empty in which case returns util.null.
+    static Value createOrNull(OpBuilder &builder, Location loc, Attribute value);
+    static Value createOrNull(OpBuilder &builder, Location loc, StringRef value);
+    static Value createOrNull(OpBuilder &builder, Location loc, ArrayRef<uint8_t> value);
   }];
 
   let hasVerifier = 1;

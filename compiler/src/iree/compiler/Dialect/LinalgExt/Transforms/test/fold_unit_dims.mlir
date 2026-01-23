@@ -78,6 +78,7 @@ util.func public @scatter_batch_and_slice_dims(%slice: tensor<4x1x1x4xf16>, %ind
 //       RESHAPE:   %[[UPDATE_COLLAPSE:.+]] = tensor.collapse_shape %[[UPDATE]]
 //  RESHAPE-SAME:     tensor<4x1x1x4xf16> into tensor<4x4xf16>
 //       RESHAPE:   iree_linalg_ext.scatter
+//  RESHAPE-SAME:     unique_indices(true)
 //  RESHAPE-SAME:     ins(%[[UPDATE_COLLAPSE]], %[[INDICES_COLLAPSE]]
 //  RESHAPE-SAME:     outs(%[[ORIGINAL_COLLAPSE]]
 
@@ -94,6 +95,7 @@ util.func public @scatter_batch_and_slice_dims(%slice: tensor<4x1x1x4xf16>, %ind
 //       SLICE:   %[[UPDATE_SLICE2:.+]] = tensor.extract_slice %[[UPDATE_SLICE]]
 //  SLICE-SAME:     tensor<4x1x4xf16> to tensor<4x4xf16>
 //       SLICE:   iree_linalg_ext.scatter
+//  SLICE-SAME:     unique_indices(true)
 //  SLICE-SAME:     ins(%[[UPDATE_SLICE2]], %[[INDICES_SLICE]]
 //  SLICE-SAME:     outs(%[[ORIGINAL_SLICE]]
 
@@ -101,7 +103,7 @@ util.func public @scatter_batch_and_slice_dims(%slice: tensor<4x1x1x4xf16>, %ind
 
 util.func public @scatter_no_change_output(%slice: tensor<1x2xf16>, %indices: tensor<1x2x2xi64>) -> tensor<2x2xf16> {
   %empty = tensor.empty() : tensor<2x2xf16>
-  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+  %0 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(false)
           ins(%slice, %indices: tensor<1x2xf16>, tensor<1x2x2xi64>)
           outs(%empty: tensor<2x2xf16>){
   ^bb0(%in : f16, %out : f16):
@@ -118,6 +120,7 @@ util.func public @scatter_no_change_output(%slice: tensor<1x2xf16>, %indices: te
 //       RESHAPE:   %[[UPDATE_COLLAPSE:.+]] = tensor.collapse_shape %[[UPDATE]]
 //  RESHAPE-SAME:     tensor<1x2xf16> into tensor<2xf16>
 //       RESHAPE:   iree_linalg_ext.scatter
+//  RESHAPE-SAME:     unique_indices(false)
 //  RESHAPE-SAME:     ins(%[[UPDATE_COLLAPSE]], %[[INDICES_COLLAPSE]]
 //  RESHAPE-SAME:     outs(%[[ORIGINAL]]
 
@@ -130,6 +133,7 @@ util.func public @scatter_no_change_output(%slice: tensor<1x2xf16>, %indices: te
 //       SLICE:   %[[UPDATE_SLICE:.+]] = tensor.extract_slice %[[UPDATE]]
 //  SLICE-SAME:     tensor<1x2xf16> to tensor<2xf16>
 //       SLICE:   iree_linalg_ext.scatter
+//  SLICE-SAME:     unique_indices(false)
 //  SLICE-SAME:     ins(%[[UPDATE_SLICE]], %[[INDICES_SLICE]]
 //  SLICE-SAME:     outs(%[[ORIGINAL]]
 

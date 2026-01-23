@@ -25,6 +25,8 @@
 
 namespace mlir::iree_compiler {
 
+using ForControlFnRef = llvm::function_ref<bool(scf::ForOp)>;
+
 /// Get the `offsets`, `sizes` and `strides` for a `storeOp` (or `loadOp`). This
 /// method clones the operations that generate the `Value`s used for
 /// specifying the offsets, sizesm strides and dynamic dims of the
@@ -100,7 +102,8 @@ using GetMinMaxExprFn =
 
 /// Insert pattern to remove single iteration loop. The pattern will detect
 /// single iteration loops based on the range returned ValueBoundsOpInterface.
-void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
+void populateRemoveSingleIterationLoopPattern(
+    RewritePatternSet &patterns, ForControlFnRef controlFn = nullptr);
 
 // Group of Alloc operations that have overlapping liveranges.
 using AliasGroup = SmallVector<Operation *>;
@@ -121,6 +124,15 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 /// memory across alias groups.
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
+
+/// Materialize the provided slice at the current insertion point. The leaves of
+/// the slice are expected to be `iree_tensor_ext.workload.ordinal` ops that
+/// are mapped to the corresponding `workloadVals`. The `map` is updated with
+/// the mapping from the original ops to the cloned ops.
+LogicalResult materializeSliceFromOrdinals(
+    RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
+    ArrayRef<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals,
+    ArrayRef<Operation *> slice);
 
 /// Materialize the backward slice starting at the values in `workgroupCount`
 /// at the current insertion point of the `rewriter`. The leaves of the slice
@@ -161,6 +173,15 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
+
+/// Creates an `iree_codegen.workgroup_count_hint` op at the current insertion
+/// point with the provided operands. If there are more operands provided than
+/// |maxWorkgroupParallelDims| the outermost sizes are linearized into the
+/// one at the maximum dim. If |reverse| is true, the workgroupCount is added in
+/// reverse order to the hint.
+LogicalResult createWorkgroupCountHint(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> workgroupCount,
+    int maxWorkgroupParallelDims = kNumMaxParallelDims, bool reverse = true);
 
 /// Helper to perform LICM on loops nested within |target| that are guaranteed
 /// to have at least one trip. Additionally LICM on `scf.forall` ops with
@@ -205,10 +226,12 @@ struct LinalgBasePromotionPattern : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op)))
+    if (failed(filter.checkAndNotify(rewriter, op))) {
       return failure();
-    if (failed(promoteSubviewsPrecondition(op, options)))
+    }
+    if (failed(promoteSubviewsPrecondition(op, options))) {
       return failure();
+    }
 
     // TODO: We cannot use root update here. This
     // pattern is creating other ops, so if the

@@ -30,6 +30,20 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
 #define IREE_UK_MMT4D_TILE_riscv_64_v(lhs, rhs, out, m0, k0)
 #endif
 
+#ifdef IREE_UK_BUILD_RISCV_64_ZVFHMIN
+#define IREE_UK_MMT4D_TILE_riscv_64_zvfhmin(lhs, rhs, out, m0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _zvfhmin)
+#else
+#define IREE_UK_MMT4D_TILE_riscv_64_zvfhmin(lhs, rhs, out, m0, k0)
+#endif
+
+#ifdef IREE_UK_BUILD_RISCV_64_ZVFH
+#define IREE_UK_MMT4D_TILE_riscv_64_zvfh(lhs, rhs, out, m0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _zvfh)
+#else
+#define IREE_UK_MMT4D_TILE_riscv_64_zvfh(lhs, rhs, out, m0, k0)
+#endif
+
 #define IREE_UK_MMT4D_TILE(arch, lhs, rhs, out, m0, k0, suffix) \
   IREE_UK_MMT4D_TILE_riscv_64##suffix(lhs, rhs, out, m0, k0)
 

@@ -23,11 +23,12 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "VectorExtAttrs.td",
             "VectorExtBase.td",
-            "VectorExtOps.td",
             "VectorExtInterfaces.td",
+            "VectorExtOps.td",
         ],
         include = ["*.td"],
     ),
@@ -107,11 +108,17 @@ iree_gentbl_cc_library(
     name = "IREEVectorExtEnumsGen",
     tbl_outs = [
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=iree_vector_ext",
+            ],
             "VectorExtEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=iree_vector_ext",
+            ],
             "VectorExtEnums.cpp.inc",
         ),
     ],

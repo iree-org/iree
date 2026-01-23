@@ -47,8 +47,9 @@ struct HloElementwiseConverter : OpRewritePattern<OpTy> {
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const final {
-    if (!opIsShapeComputation(op))
+    if (!opIsShapeComputation(op)) {
       return failure();
+    }
 
     auto resultTy = cast<ShapedType>(op.getType());
 
@@ -86,8 +87,9 @@ struct ConcatenateConverter final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!opIsShapeComputation(op))
+    if (!opIsShapeComputation(op)) {
       return failure();
+    }
 
     Location loc = op.getLoc();
     auto resultTy = cast<ShapedType>(op.getType());
@@ -95,7 +97,7 @@ struct ConcatenateConverter final
     elements.reserve(resultTy.getNumElements());
 
     for (Value operand : op->getOperands()) {
-      ShapedType operandTy = llvm::cast<ShapedType>(operand.getType());
+      ShapedType operandTy = cast<ShapedType>(operand.getType());
       if (operandTy.getRank() == 0) {
         Value extract =
             tensor::ExtractOp::create(rewriter, loc, operand, ValueRange({}));
@@ -144,14 +146,16 @@ struct ReshapeConverter : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
                                 PatternRewriter &rewriter) const override {
     Value operand = op.getOperand();
     auto shapedTy = cast<ShapedType>(operand.getType());
-    if (!shapedTy.hasRank() || shapedTy.getRank() > 1)
+    if (!shapedTy.hasRank() || shapedTy.getRank() > 1) {
       return failure();
+    }
 
     auto resultTy = cast<ShapedType>(op.getType());
 
     auto fromElements = op.getOperand().getDefiningOp<tensor::FromElementsOp>();
-    if (!fromElements)
+    if (!fromElements) {
       return failure();
+    }
 
     rewriter.replaceOpWithNewOp<tensor::FromElementsOp>(
         op, resultTy, fromElements.getOperands());

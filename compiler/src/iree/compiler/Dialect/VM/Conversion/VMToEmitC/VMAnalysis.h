@@ -29,9 +29,15 @@ struct FuncAnalysis {
   FuncAnalysis() = default;
   FuncAnalysis(bool emitAtEnd) : emitAtEnd(emitAtEnd) {}
   FuncAnalysis(IREE::VM::FuncOp funcOp) {
-    Operation *op = funcOp.getOperation();
-    registerAllocation = RegisterAllocation(op);
-    valueLiveness = ValueLiveness(op);
+    // Use default constructor and explicit recalculate to properly check for
+    // failure. The RegisterAllocation(Operation*) constructor ignores the
+    // return value of recalculate().
+    RegisterAllocation regAlloc;
+    if (failed(regAlloc.recalculate(funcOp))) {
+      llvm::report_fatal_error("register allocation failed for emitc");
+    }
+    registerAllocation = std::move(regAlloc);
+    valueLiveness = ValueLiveness(funcOp.getOperation());
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
     refs = DenseMap<int64_t, Value>{};
@@ -99,8 +105,9 @@ struct FuncAnalysis {
   bool isMove(Value ref, Operation *op) {
     assert(isa<IREE::VM::RefType>(ref.getType()));
     assert(valueLiveness.has_value());
-    bool lastUse = valueLiveness.value().isLastValueUse(ref, op);
-    return lastUse && false;
+    // NOTE: EmitC codegen doesn't support MOVE semantics - always use
+    // retain/assign instead of move. The && false disables MOVE intentionally.
+    return valueLiveness.value().isLastValueUse(ref, op) && false;
   }
 
   void cacheLocalRef(int64_t ordinal, Value ref) {
@@ -199,10 +206,11 @@ struct ModuleAnalysis {
   }
 
   void move(mlir::emitc::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {
-    auto &analysis = lookupFunction(oldFunc.getOperation());
-
-    functions[newFunc.getOperation()] = std::move(analysis);
+    // Move to local first - the map insertion below can grow the map and
+    // invalidate references to existing entries.
+    FuncAnalysis analysis = std::move(lookupFunction(oldFunc.getOperation()));
     functions.erase(oldFunc.getOperation());
+    functions[newFunc.getOperation()] = std::move(analysis);
     functionMapping[oldFunc] = newFunc;
   }
 

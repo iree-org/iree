@@ -36,14 +36,16 @@ static SmallVector<int64_t>
 fillInterchangeVector(ArrayRef<unsigned> interchangeVector,
                       size_t iterationDomainSize) {
   SmallVector<int64_t> filledVector;
-  for (auto v : interchangeVector)
+  for (auto v : interchangeVector) {
     filledVector.push_back(v);
+  }
   if (filledVector.size() < iterationDomainSize) {
     auto range = llvm::seq<unsigned>(filledVector.size(), iterationDomainSize);
     filledVector.append(range.begin(), range.end());
   }
-  if (filledVector.size() > iterationDomainSize)
+  if (filledVector.size() > iterationDomainSize) {
     filledVector.resize(iterationDomainSize);
+  }
   return filledVector;
 }
 
@@ -70,7 +72,7 @@ getDistributeLBAndStep(OpBuilder &b, Location loc, OpFoldResult lb,
 static void changeArithCstToI64Attr(OpBuilder &b,
                                     MutableArrayRef<OpFoldResult> constants) {
   for (OpFoldResult &val : constants) {
-    if (auto dyn_cast = llvm::dyn_cast_if_present<Value>(val)) {
+    if (auto dyn_cast = dyn_cast_if_present<Value>(val)) {
       APInt intVal;
       if (matchPattern(dyn_cast, m_ConstantInt(&intVal))) {
         val = b.getI64IntegerAttr(intVal.getSExtValue());
@@ -208,8 +210,9 @@ static LogicalResult replaceStoresWithTiledVersion(
       storeOps.push_back(storeOp);
     }
   }
-  if (storeOps.empty())
+  if (storeOps.empty()) {
     return success();
+  }
   if (storeOps.size() != 1) {
     return rewriter.notifyMatchFailure(untiledValue.getOwner(),
                                        "expected a single store for the op");
@@ -256,9 +259,9 @@ static LogicalResult replaceAllStoresWithTiledVersion(
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
-    if (failed(replaceStoresWithTiledVersion(
-            rewriter, llvm::cast<OpResult>(result), tiledValues[index],
-            resultOffsets, resultSizes, innerLoopBody))) {
+    if (failed(replaceStoresWithTiledVersion(rewriter, cast<OpResult>(result),
+                                             tiledValues[index], resultOffsets,
+                                             resultSizes, innerLoopBody))) {
       return failure();
     }
   }
@@ -398,9 +401,10 @@ tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
     });
 
     // 4. Generate the tiled implementation within the inner most loop.
-    if (!tilingResult.loops.empty())
+    if (!tilingResult.loops.empty()) {
       rewriter.setInsertionPoint(
           tilingResult.loops.back().getBody()->getTerminator());
+    }
     FailureOr<TilingResult> tiledImplementation =
         op.getTiledImplementation(rewriter, offsets, sizes);
     if (failed(tiledImplementation)) {
@@ -456,7 +460,7 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     for (OpOperand &operand : currOp->getOpOperands()) {
       Operation *definingOp = operand.get().getDefiningOp();
       auto tilingInterfaceProducer =
-          dyn_cast_or_null<TilingInterface>(definingOp);
+          dyn_cast_if_present<TilingInterface>(definingOp);
       if (!tilingInterfaceProducer || isa<tensor::PadOp>(definingOp) ||
           producers.count(tilingInterfaceProducer)) {
         continue;
@@ -480,8 +484,9 @@ getAllFusableProducerUses(Operation *untiledOp,
   for (auto tiledOp : llvm::reverse(tiledOps)) {
     for (OpOperand &operand : llvm::reverse(tiledOp->getOpOperands())) {
       auto sliceOp = operand.get().getDefiningOp<tensor::ExtractSliceOp>();
-      if (!sliceOp || sliceOp.getSource().getDefiningOp() != untiledOp)
+      if (!sliceOp || sliceOp.getSource().getDefiningOp() != untiledOp) {
         continue;
+      }
       sliceOps.push_back(sliceOp);
     }
   }
@@ -525,7 +530,7 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
       rewriter.setInsertionPoint(sliceOp);
 
       // Generate the tiled implementation of the producer.
-      OpResult untiledValue = llvm::cast<OpResult>(sliceOp.getSource());
+      OpResult untiledValue = cast<OpResult>(sliceOp.getSource());
       FailureOr<TilingResult> swapSliceResult =
           tensor::replaceExtractSliceWithTiledProducer(rewriter, sliceOp,
                                                        untiledValue);
@@ -572,8 +577,9 @@ struct SwapExtractSliceWithDispatchTensorLoad
                                 PatternRewriter &rewriter) const override {
     auto loadOp = sliceOp.getSource()
                       .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-    if (!loadOp)
+    if (!loadOp) {
       return failure();
+    }
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
     if (failed(affine::mergeOffsetsSizesAndStrides(
@@ -602,8 +608,9 @@ struct SwapExtractSliceWithTensorEmpty
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto emptyTensorOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensorOp)
+    if (!emptyTensorOp) {
       return failure();
+    }
 
     SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();
     if (mixedSizes.size() != sliceOp.getType().getRank()) {
@@ -611,8 +618,9 @@ struct SwapExtractSliceWithTensorEmpty
       rankReducedMixedSizes.reserve(sliceOp.getType().getRank());
       auto droppedDims = sliceOp.getDroppedDims();
       for (auto [index, size] : llvm::enumerate(mixedSizes)) {
-        if (droppedDims.test(index))
+        if (droppedDims.test(index)) {
           continue;
+        }
         rankReducedMixedSizes.push_back(size);
       }
       std::swap(mixedSizes, rankReducedMixedSizes);

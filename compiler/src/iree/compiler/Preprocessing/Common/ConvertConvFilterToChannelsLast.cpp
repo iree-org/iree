@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/MLIRContext.h"
@@ -19,8 +22,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-preprocessing-convert-conv-filter-to-channels-last"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -104,7 +105,8 @@ struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
+/// Transpose the generic form filter layout of `CHWF` or `CFHW` to `FHWC`.
+struct ConvertGenericFilterToFhwc : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
@@ -117,6 +119,13 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
         mlir::linalg::inferConvolutionDims(linalgOp);
     if (failed(convolutionDims)) {
+      return failure();
+    }
+
+    // Require non-empty filter, input and output channel dimensions.
+    if (convolutionDims->outputChannel.empty() ||
+        convolutionDims->inputChannel.empty() ||
+        convolutionDims->filterLoop.empty()) {
       return failure();
     }
 
@@ -133,11 +142,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     Value outputVal = output->get();
 
     ArrayRef<int64_t> inputShape =
-        llvm::cast<ShapedType>(inputVal.getType()).getShape();
+        cast<ShapedType>(inputVal.getType()).getShape();
     ArrayRef<int64_t> filterShape =
-        llvm::cast<ShapedType>(filterVal.getType()).getShape();
+        cast<ShapedType>(filterVal.getType()).getShape();
     ArrayRef<int64_t> outputShape =
-        llvm::cast<ShapedType>(outputVal.getType()).getShape();
+        cast<ShapedType>(outputVal.getType()).getShape();
 
     // TODO(vivian): Once the matmul shape check below is dropped, the
     // dynamic-shape check can also be removed.
@@ -159,15 +168,14 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return positions;
     };
 
-    // Only transpose when the input channel is the last dimension of conv
-    // input.
-    SmallVector<int64_t> cInputPos =
-        getDimPositions(convolutionDims->inputChannel, inputMap);
-    if (cInputPos.back() != inputShape.size() - 1) {
+    // Don't transpose when the input is in not batch-first layout (e.g., CHWN).
+    SmallVector<int64_t> batchInputPos =
+        getDimPositions(convolutionDims->batch, inputMap);
+    if (!batchInputPos.empty() && batchInputPos.front() != 0) {
       return failure();
     }
 
-    // Only transpose when the filter is `CHWF` layout.
+    // Only transpose when the filter is CHWF or CFHW layout.
     SmallVector<int64_t> fFilterPos =
         getDimPositions(convolutionDims->outputChannel, filterMap);
     SmallVector<int64_t> cFilterPos =
@@ -176,8 +184,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
         getDimPositions(convolutionDims->filterLoop, filterMap);
     int64_t fPos = fFilterPos.back();
     int64_t cPos = cFilterPos.back();
-    int64_t kPos = kFilterPos.back();
-    if (cPos > kPos || fPos != filterShape.size() - 1) {
+
+    bool isChwf =
+        (cPos < kFilterPos.front()) && (fPos == filterShape.size() - 1);
+    bool isCfhw = (cPos < fFilterPos.front()) && (fPos < kFilterPos.front());
+    if (!isChwf && !isCfhw) {
       return failure();
     }
 
@@ -191,9 +202,9 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     mPos.append(batchPos.begin(), batchPos.end());
 
     auto getProduct = [](ArrayRef<int64_t> shape, ArrayRef<int64_t> pos) {
-      return std::accumulate(
-          pos.begin(), pos.end(), int64_t{1},
-          [&](int64_t a, int64_t idx) { return a * shape[idx]; });
+      return llvm::accumulate(pos, int64_t{1}, [&](int64_t a, int64_t idx) {
+        return a * shape[idx];
+      });
     };
 
     int64_t mSize = getProduct(outputShape, mPos);
@@ -205,22 +216,39 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    // Swap the input and output channel dimension.
-    SmallVector<int64_t> perm =
-        llvm::to_vector(llvm::seq<int64_t>(0, filterShape.size()));
-    std::swap(perm[cPos], perm[fPos]);
+    // Build permutation to convert to FHWC layout (or GFHWC for grouped conv).
+    llvm::SmallDenseSet<int64_t> processedDims;
+    processedDims.insert(cFilterPos.begin(), cFilterPos.end());
+    processedDims.insert(fFilterPos.begin(), fFilterPos.end());
+    processedDims.insert(kFilterPos.begin(), kFilterPos.end());
+    // First add dimensions that are not C, F, H, W, (e.g., G for grouped conv).
+    SmallVector<int64_t> perm;
+    for (int64_t i = 0; i < filterShape.size(); ++i) {
+      if (!processedDims.contains(i)) {
+        perm.push_back(i);
+      }
+    }
+    // Then append dimensions in the order of F, H, W, C.
+    perm.append(fFilterPos.begin(), fFilterPos.end());
+    perm.append(kFilterPos.begin(), kFilterPos.end());
+    perm.append(cFilterPos.begin(), cFilterPos.end());
 
     Location loc = linalgOp.getLoc();
 
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
     Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
+    // Insert compute_barrier.start to avoid propagation of reshape ops and
+    // undesirable fusion.
+    auto barrierStartOp = IREE::TensorExt::ComputeBarrierStartOp::create(
+        rewriter, loc, transposedFilter);
+
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
         rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, transposedFilter}, outputVal,
+        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
         ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 
@@ -228,7 +256,23 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     rewriter.inlineRegionBefore(linalgOp->getRegion(0), genericOp.getRegion(),
                                 genericOp.getRegion().begin());
 
-    rewriter.replaceOp(linalgOp, genericOp->getResults());
+    // Reorder the indexing dimensions so that the input channel loops appears
+    // after the filter loops.
+    unsigned numParallelLoop = genericOp.getNumParallelLoops();
+    SmallVector<unsigned> interchange =
+        llvm::to_vector(llvm::seq<unsigned>(0, numParallelLoop));
+    interchange.append(convolutionDims->filterLoop.begin(),
+                       convolutionDims->filterLoop.end());
+    interchange.append(convolutionDims->inputChannel.begin(),
+                       convolutionDims->inputChannel.end());
+
+    FailureOr<linalg::GenericOp> reorderOp =
+        linalg::interchangeGenericOp(rewriter, genericOp, interchange);
+    if (failed(reorderOp)) {
+      return failure();
+    }
+
+    rewriter.replaceOp(linalgOp, reorderOp->getResults());
     return success();
   }
 };
@@ -249,15 +293,15 @@ public:
 
     RewritePatternSet patterns(context);
     if (filterLayout == "hwfc") {
-      LDBG("Converting filter layout to hwfc.");
+      LDBG() << "Converting filter layout to hwfc.";
       patterns.add<ConvertHwcfToHwfc>(context);
     } else if (filterLayout == "fhwc") {
-      LDBG("Converting filter layout to fhwc.");
-      patterns.add<ConvertHwcfToFhwc, ConvertGenericChwfToFhwc>(context);
+      LDBG() << "Converting filter layout to fhwc.";
+      patterns.add<ConvertHwcfToFhwc, ConvertGenericFilterToFhwc>(context);
     } else {
-      LDBG("convert-filter-to-channels-last pass didn't apply since an "
-           "unsupported layout is given. Please use hwfc or fhwc as pass "
-           "filter-layout option.");
+      LDBG() << "convert-filter-to-channels-last pass didn't apply since an "
+                "unsupported layout is given. Please use hwfc or fhwc as pass "
+                "filter-layout option.";
       return signalPassFailure();
     }
 

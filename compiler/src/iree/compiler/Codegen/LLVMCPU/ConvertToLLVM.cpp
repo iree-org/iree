@@ -116,8 +116,9 @@ struct ConvertHALEntryPointFuncOp
   LogicalResult
   matchAndRewrite(func::FuncOp stdFuncOp, func::FuncOpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!stdFuncOp.isPublic())
+    if (!stdFuncOp.isPublic()) {
       return failure();
+    }
     FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       stdFuncOp->emitWarning()
@@ -307,7 +308,7 @@ struct ConvertHALInterfaceBindingSubspanOp
                   IREE::HAL::InterfaceBindingSubspanOpAdaptor operands,
                   ConversionPatternRewriter &rewriter) const override {
     MemRefType memRefType =
-        llvm::dyn_cast<MemRefType>(subspanOp->getResult(0).getType());
+        dyn_cast<MemRefType>(subspanOp->getResult(0).getType());
     if (!memRefType) {
       return rewriter.notifyMatchFailure(
           subspanOp,
@@ -336,7 +337,7 @@ static InstrumentationEntry
 acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
                             Value entrySize, OpBuilder &builder) {
   auto i64Type = builder.getI64Type();
-  auto bufferType = llvm::cast<MemRefType>(buffer.getType());
+  auto bufferType = cast<MemRefType>(buffer.getType());
   int64_t totalBufferSize =
       (bufferType.getNumElements() * bufferType.getElementTypeBitWidth()) / 8;
   int64_t headOffset = totalBufferSize - 8;
@@ -393,7 +394,7 @@ static InstrumentationEntry appendInstrumentationEntry(
 }
 
 static int64_t getMemoryAccessByteSize(Type type) {
-  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     return (vectorType.getNumElements() * vectorType.getElementTypeBitWidth()) /
            8;
   } else {
@@ -525,7 +526,7 @@ struct ConvertHALInstrumentValueOp
 
     // Only convert ops we can handle, otherwise warn and discard.
     std::optional<uint64_t> valueType;
-    if (llvm::isa<LLVM::LLVMPointerType>(operands.getOperand().getType())) {
+    if (isa<LLVM::LLVMPointerType>(operands.getOperand().getType())) {
       valueType = IREE_INSTRUMENT_DISPATCH_VALUE_TYPE_POINTER;
     } else {
       valueType = mapValueType(instrumentOp.getType());
@@ -612,7 +613,7 @@ struct ConvertHALInstrumentMemoryLoadOp
             (loadSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_LOAD));
 
     Value loadPtr = getStridedElementPtr(
-        rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
+        rewriter, loc, cast<MemRefType>(instrumentOp.getBase().getType()),
         operands.getBase(), operands.getIndices());
     Value addressI64 =
         LLVM::PtrToIntOp::create(rewriter, loc, i64Type, loadPtr);
@@ -660,7 +661,7 @@ struct ConvertHALInstrumentMemoryStoreOp
             (storeSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_STORE));
 
     Value storePtr = getStridedElementPtr(
-        rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
+        rewriter, loc, cast<MemRefType>(instrumentOp.getBase().getType()),
         operands.getBase(), operands.getIndices());
     Value addressI64 =
         LLVM::PtrToIntOp::create(rewriter, loc, i64Type, storePtr);
@@ -686,7 +687,7 @@ static SmallVector<StringRef> getExtraFields(Operation *forOp) {
           forOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
     extraFields =
         llvm::map_to_vector(extraFieldsAttr.getValue(), [](Attribute attr) {
-          return llvm::cast<StringAttr>(attr).getValue();
+          return cast<StringAttr>(attr).getValue();
         });
   }
   return extraFields;
@@ -743,7 +744,7 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
     SmallVector<DictionaryAttr> argAttrs;
     if (auto currArgAttrs = funcOp.getArgAttrsAttr()) {
       argAttrs = llvm::map_to_vector(currArgAttrs, [](Attribute attr) {
-        return llvm::cast<DictionaryAttr>(attr);
+        return cast<DictionaryAttr>(attr);
       });
     }
     LLVM::LLVMFuncOp::create(
@@ -772,9 +773,10 @@ struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
     auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
-    auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol)
+    auto flatSymbol = dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
+    if (!flatSymbol) {
       return failure();
+    }
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -820,9 +822,10 @@ struct RewriteExternCallOpToDynamicImportCallOp
                                 PatternRewriter &rewriter) const override {
     // Ignore indirect calls (they're probably already converted imports).
     auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
-    auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
-    if (!flatSymbol)
+    auto flatSymbol = dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
+    if (!flatSymbol) {
       return failure();
+    }
 
     // Ensure the target function is extern.
     // To support conversion inserting calls in local patterns that can't add
@@ -852,8 +855,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
     if (auto extraFieldsAttr =
             calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
       for (auto extraFieldAttr : extraFieldsAttr) {
-        extraFields.push_back(
-            llvm::cast<StringAttr>(extraFieldAttr).getValue());
+        extraFields.push_back(cast<StringAttr>(extraFieldAttr).getValue());
       }
     }
 
@@ -901,7 +903,7 @@ public:
     Type wideType = rewriter.getIntegerType(64);
     // Shift amount necessary to extract the high bits from widened result.
     TypedAttr shiftValAttr = rewriter.getI64IntegerAttr(32);
-    if (auto vecTy = llvm::dyn_cast<VectorType>(resultType)) {
+    if (auto vecTy = dyn_cast<VectorType>(resultType)) {
       wideType = VectorType::get(vecTy.getShape(), wideType);
       shiftValAttr =
           SplatElementsAttr::get(cast<ShapedType>(wideType), shiftValAttr);
@@ -1140,8 +1142,9 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     patterns.insert<RewriteExternCallOpToDynamicImportCallOp, RewriteCallOpABI,
                     RewriteFuncOpABI>(abi, typeConverter);
-    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns))))
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
       return signalPassFailure();
+    }
   }
 
   // Post conversion patterns.

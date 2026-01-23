@@ -20,15 +20,17 @@ namespace mlir::iree_compiler {
 namespace {
 
 static Value castToI64(Value value, OpBuilder &builder) {
-  if (value.getType().isInteger(64))
+  if (value.getType().isInteger(64)) {
     return value;
+  }
   return builder.createOrFold<IREE::VM::ExtI32I64UOp>(
       value.getLoc(), builder.getI64Type(), value);
 }
 
 static Value castToIndex(Value value, OpBuilder &builder) {
-  if (value.getType().isIndex())
+  if (value.getType().isIndex()) {
     return value;
+  }
   return builder.createOrFold<arith::IndexCastOp>(
       value.getLoc(), builder.getIndexType(), value);
 }
@@ -161,8 +163,9 @@ struct BufferCompareOpConversion
 
 static Value unscaleOffset(Location loc, Value offset, int64_t scale,
                            OpBuilder &builder) {
-  if (scale == 1)
+  if (scale == 1) {
     return offset;
+  }
   return builder.createOrFold<IREE::VM::DivI64SOp>(
       loc, offset.getType(), offset,
       IREE::VM::ConstI64Op::create(builder, loc, scale));
@@ -176,7 +179,7 @@ struct BufferFillOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = fillOp.getPattern().getType();
     auto newType = adaptor.getPattern().getType();
-    if (llvm::isa<IndexType>(oldType)) {
+    if (isa<IndexType>(oldType)) {
       // Use the actual converted type for IndexType.
       oldType = newType;
     }
@@ -188,7 +191,7 @@ struct BufferFillOpConversion
     auto elementLength =
         unscaleOffset(fillOp.getLoc(), byteLength, elementSize, rewriter);
     auto pattern = adaptor.getPattern();
-    if (auto integerType = llvm::dyn_cast<IntegerType>(oldType)) {
+    if (auto integerType = dyn_cast<IntegerType>(oldType)) {
       if (integerType.isInteger(1) || integerType.isInteger(8)) {
         rewriter.replaceOpWithNewOp<IREE::VM::BufferFillI8Op>(
             fillOp, adaptor.getTarget(), byteOffset, byteLength, pattern);
@@ -227,14 +230,14 @@ struct BufferLoadOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = loadOp.getResult().getType();
     auto newType = getTypeConverter()->convertType(oldType);
-    if (llvm::isa<IndexType>(oldType)) {
+    if (isa<IndexType>(oldType)) {
       oldType = newType;
     }
     auto byteOffset = castToI64(adaptor.getSourceOffset(), rewriter);
     int64_t elementSize = IREE::Util::getRoundedElementByteWidth(oldType);
     auto elementOffset =
         unscaleOffset(loadOp.getLoc(), byteOffset, elementSize, rewriter);
-    if (auto integerType = llvm::dyn_cast<IntegerType>(oldType)) {
+    if (auto integerType = dyn_cast<IntegerType>(oldType)) {
       if (integerType.isInteger(1) || integerType.isInteger(8)) {
         if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI8SOp>(
@@ -283,7 +286,7 @@ struct BufferStoreOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto oldType = storeOp.getSource().getType();
     auto newType = adaptor.getSource().getType();
-    if (llvm::isa<IndexType>(oldType)) {
+    if (isa<IndexType>(oldType)) {
       oldType = newType;
     }
     auto byteOffset = castToI64(adaptor.getTargetOffset(), rewriter);

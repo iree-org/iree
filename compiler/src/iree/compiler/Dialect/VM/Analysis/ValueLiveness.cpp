@@ -19,6 +19,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -65,7 +66,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
     SmallVector<StringAttr, 8> valueNames;
     for (auto value : values) {
       std::string str;
-      if (auto blockArg = llvm::dyn_cast<BlockArgument>(value)) {
+      if (auto blockArg = dyn_cast<BlockArgument>(value)) {
         if (blockArg.getOwner()->isEntryBlock()) {
           str = llvm::formatv("%arg{}", blockArg.getArgNumber());
         } else {
@@ -259,14 +260,17 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values entering the block and dying within.
     for (auto value : blockSets.liveIn) {
-      if (blockSets.liveOut.count(value))
+      if (blockSets.liveOut.contains(value)) {
         continue;
+      }
       Operation *lastUse = &block.front();
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block)
+        if (use.getOwner()->getBlock() != &block) {
           continue;
-        if (lastUse == use.getOwner())
+        }
+        if (lastUse == use.getOwner()) {
           continue;
+        }
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -276,14 +280,16 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
 
     // Handle values defined within the block and not escaping.
     for (auto value : blockSets.defined) {
-      if (blockSets.liveOut.count(value))
+      if (blockSets.liveOut.contains(value)) {
         continue;
+      }
       Operation *firstUse =
           value.getDefiningOp() ? value.getDefiningOp() : &block.front();
       Operation *lastUse = firstUse;
       for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block)
+        if (use.getOwner()->getBlock() != &block) {
           continue;
+        }
         if (lastUse->isBeforeInBlock(use.getOwner())) {
           lastUse = use.getOwner();
         }
@@ -300,9 +306,14 @@ ArrayRef<Value> ValueLiveness::getBlockLiveIns(Block *block) {
   return blockSets.liveIn.getArrayRef();
 }
 
+ArrayRef<Value> ValueLiveness::getBlockLiveOuts(Block *block) {
+  auto &blockSets = blockLiveness_[block];
+  return blockSets.liveOut.getArrayRef();
+}
+
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
-  if (blockSets.liveOut.count(value)) {
+  if (blockSets.liveOut.contains(value)) {
     // Value is escapes the block the useOp is in so it is definitely not the
     // last use.
     return false;
@@ -329,6 +340,96 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
     }
   }
   assert(false && "value not used by operand");
+  return false;
+}
+
+// Determines if an operand is the last "real" use of a ref value.
+//
+// "Real" uses exclude vm.discard_refs operations, which are cleanup markers
+// rather than actual uses. This distinction is critical for MOVE bit logic:
+// - If the only uses after a branch are discard ops, the branch IS the last
+//   real use and should get MOVE semantics.
+// - Without this, we'd incorrectly retain refs that are about to be discarded.
+//
+// Returns true when all conditions are met:
+// 1. useOp is not a discard op (discards are never "real" uses)
+// 2. value is not in the block's live-out set (doesn't escape)
+// 3. No non-discard uses exist after useOp in the same block
+// 4. operandIndex is >= the last operand using this value (handles multi-use)
+//
+// The multi-use check (condition 4) ensures that for ops like:
+//   vm.call @foo(%ref, %ref)  // same ref used twice
+// Only the LAST operand (index 1) is considered the "last use", so MOVE
+// is only applied once.
+bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
+                                       int operandIndex) {
+  // Discards are never "real" uses - they just clean up.
+  if (isa<IREE::VM::DiscardRefsOp>(useOp)) {
+    return false;
+  }
+
+  // Check if value escapes block.
+  auto &blockSets = blockLiveness_[useOp->getBlock()];
+  if (blockSets.liveOut.contains(value)) {
+    // Value is in liveOut. For non-terminators, this means the value has uses
+    // after this block, so it's not at last use.
+    if (!useOp->hasTrait<OpTrait::IsTerminator>()) {
+      return false;
+    }
+    // For branch terminators where the value is forwarded as a successor
+    // operand, discards in successors are just cleanup - they don't count as
+    // "real" uses since the branch transfers ownership. But for other
+    // terminators (like vm.call.yieldable), the value is NOT forwarded -
+    // discards in successors ARE real uses of the original value.
+    bool valueIsSuccessorOperand = false;
+    if (auto branchOp = dyn_cast<BranchOpInterface>(useOp)) {
+      for (unsigned i = 0; i < useOp->getNumSuccessors(); ++i) {
+        SuccessorOperands succOperands = branchOp.getSuccessorOperands(i);
+        for (Value operand : succOperands.getForwardedOperands()) {
+          if (operand == value) {
+            valueIsSuccessorOperand = true;
+            break;
+          }
+        }
+        if (valueIsSuccessorOperand) {
+          break;
+        }
+      }
+    }
+    // Check if the value escapes to any successor blocks.
+    for (auto &use : value.getUses()) {
+      Operation *userOp = use.getOwner();
+      if (userOp->getBlock() != useOp->getBlock()) {
+        // Use is in another block. If it's a discard AND the value was
+        // forwarded as a successor operand, skip it (ownership transferred).
+        // Otherwise, it's a real use and the value escapes.
+        bool isDiscardOfForwardedValue =
+            isa<IREE::VM::DiscardRefsOp>(userOp) && valueIsSuccessorOperand;
+        if (!isDiscardOfForwardedValue) {
+          return false;
+        }
+      }
+    }
+    // All uses in other blocks were discards of forwarded values. Fall through
+    // to check if this is the last use within the block.
+  }
+
+  // Walk forward to see if any non-discard uses exist after this op.
+  for (auto it = ++Block::iterator(useOp); it != useOp->getBlock()->end();
+       ++it) {
+    for (OpOperand &operand : it->getOpOperands()) {
+      if (operand.get() == value && !isa<IREE::VM::DiscardRefsOp>(&*it)) {
+        return false; // Real use found after this op
+      }
+    }
+  }
+
+  // Handle same-value multiple operands (only last operand is "last use").
+  for (auto &operand : llvm::reverse(useOp->getOpOperands())) {
+    if (operand.get() == value) {
+      return operandIndex >= operand.getOperandNumber();
+    }
+  }
   return false;
 }
 

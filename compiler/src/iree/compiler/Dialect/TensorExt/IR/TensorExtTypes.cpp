@@ -47,7 +47,7 @@ Type DispatchTensorType::getBoundElementType() const {
   if (boundType.isIntOrFloat()) {
     return boundType;
   }
-  return llvm::cast<RankedTensorType>(boundType).getElementType();
+  return cast<RankedTensorType>(boundType).getElementType();
 }
 
 unsigned DispatchTensorType::getBoundElementTypeBitWidth() const {
@@ -58,8 +58,9 @@ int64_t DispatchTensorType::getNumElements() const {
   assert(hasStaticShape() && "cannot get element count of dynamic shaped type");
   auto shape = getShape();
   int64_t num = 1;
-  for (auto dim : shape)
+  for (auto dim : shape) {
     num *= dim;
+  }
   return num;
 }
 
@@ -68,7 +69,7 @@ int64_t DispatchTensorType::getRank() const {
   if (boundType.isIntOrIndexOrFloat()) {
     return 0;
   }
-  return llvm::cast<RankedTensorType>(boundType).getRank();
+  return cast<RankedTensorType>(boundType).getRank();
 }
 
 bool DispatchTensorType::hasRank() const { return true; }
@@ -94,7 +95,7 @@ ArrayRef<int64_t> DispatchTensorType::getShape() const {
   if (boundType.isIntOrIndexOrFloat()) {
     return {};
   }
-  return llvm::cast<RankedTensorType>(boundType).getShape();
+  return cast<RankedTensorType>(boundType).getShape();
 }
 
 int64_t DispatchTensorType::getNumDynamicDims() const {
@@ -139,7 +140,7 @@ bool DispatchTensorType::doesSliceSpanWholeTensor(
 LogicalResult
 DispatchTensorType::verify(function_ref<InFlightDiagnostic()> emitError,
                            uint32_t access, Type boundType) {
-  if (!boundType.isIntOrFloat() && !llvm::isa<RankedTensorType>(boundType)) {
+  if (!boundType.isIntOrFloat() && !isa<RankedTensorType>(boundType)) {
     return emitError() << "unhandled bounded type in dispatch. Must by int, "
                           "float or ranked tensor type";
   }
@@ -197,17 +198,19 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p) {
 
 Type IREETensorExtDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
-  if (parser.parseKeyword(&mnemonic))
+  if (parser.parseKeyword(&mnemonic)) {
     return {};
-  if (mnemonic == "dispatch.tensor")
+  }
+  if (mnemonic == "dispatch.tensor") {
     return DispatchTensorType::parse(parser);
+  }
   parser.emitError(parser.getCurrentLocation())
       << "unknown TensorExt type: " << mnemonic;
   return {};
 }
 
 void IREETensorExtDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (auto inputType = llvm::dyn_cast<DispatchTensorType>(type)) {
+  if (auto inputType = dyn_cast<DispatchTensorType>(type)) {
     IREE::TensorExt::printType(inputType, p);
   } else {
     assert(false && "unknown Flow type");

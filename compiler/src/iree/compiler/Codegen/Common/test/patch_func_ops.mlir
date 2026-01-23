@@ -6,7 +6,8 @@ func.func @double_index(%arg0: index) -> index {
   return %0 : index
 }
 // CHECK-LABEL: @double_index
-// CHECK:         arith.addi
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         arith.addi %[[ARG0]], %[[ARG0]]
 
 func.func @no_matching_func_op(%arg0: index) -> index {
   return %arg0 : index
@@ -21,5 +22,6 @@ func.func @index_times_four(%arg0: index) -> index {
   return %0 : index
 }
 // CHECK-LABEL: @index_times_four
-// CHECK:         arith.addi
-// CHECK:         arith.addi
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[V0:.+]] = arith.addi %[[ARG0]], %[[ARG0]]
+// CHECK:         arith.addi %[[V0]], %[[V0]]

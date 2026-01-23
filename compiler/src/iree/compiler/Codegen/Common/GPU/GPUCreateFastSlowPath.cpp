@@ -58,21 +58,24 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
   // Find the anchor tensor.pad op, from which we get the conditions for
   // switching between the fast and slow path.
   auto padOps = llvm::to_vector(body->getOps<tensor::PadOp>());
-  if (llvm::size(padOps) != 1)
+  if (llvm::size(padOps) != 1) {
     return;
+  }
   tensor::PadOp padOp = *padOps.begin();
 
   // If all padding sizes are zero, we don't need to do anything.
   SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
   SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
-  if (llvm::all_of(lowPads, isZero) && llvm::all_of(highPads, isZero))
+  if (llvm::all_of(lowPads, isZero) && llvm::all_of(highPads, isZero)) {
     return;
+  }
 
   IRRewriter rewriter(funcOp.getContext());
   rewriter.setInsertionPoint(body->getTerminator());
   SmallVector<Operation *, 16> allOps;
-  for (Operation &op : body->without_terminator())
+  for (Operation &op : body->without_terminator()) {
     allOps.push_back(&op);
+  }
 
   BackwardSliceOptions options;
   options.filter = [](Operation *op) { return true; };
@@ -96,13 +99,15 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
     }
   }
   Value ifCond = eqZeroCmpVals.front();
-  for (Value cmp : llvm::ArrayRef(eqZeroCmpVals).drop_front())
+  for (Value cmp : llvm::ArrayRef(eqZeroCmpVals).drop_front()) {
     ifCond = arith::AndIOp::create(rewriter, loc, ifCond, cmp);
+  }
 
   SmallVector<Operation *> cloneOps;
   for (Operation *op : allOps) {
-    if (!padSizeOps.contains(op))
+    if (!padSizeOps.contains(op)) {
       cloneOps.push_back(op);
+    }
   }
 
   // Build the scf.if op itself. Clone all ops other than those used for
@@ -122,15 +127,17 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
   };
   auto elseBuilder = [&](OpBuilder &builder, Location loc) {
     IRMapping bvm;
-    for (Operation *op : cloneOps)
+    for (Operation *op : cloneOps) {
       builder.clone(*op, bvm);
+    }
     scf::YieldOp::create(builder, loc);
   };
   scf::IfOp::create(rewriter, padOp.getLoc(), ifCond, thenBuilder, elseBuilder);
 
   // All of these ops have been cloned to both regions. Erease them now.
-  for (Operation *op : llvm::reverse(cloneOps))
+  for (Operation *op : llvm::reverse(cloneOps)) {
     rewriter.eraseOp(op);
+  }
 }
 
 struct GPUCreateFastSlowPathPass final

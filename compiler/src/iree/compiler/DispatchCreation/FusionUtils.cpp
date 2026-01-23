@@ -20,16 +20,19 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
                                 ElementwiseOpsFusabilityOptions options) {
   Operation *producerOp = fusedOperand->get().getDefiningOp();
   Operation *consumerOp = fusedOperand->getOwner();
-  if (!producerOp)
+  if (!producerOp) {
     return false;
+  }
 
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
-        if (t.isInteger(1))
+        if (t.isInteger(1)) {
           return true;
-        if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
-          if (shapedType.getElementType().isInteger(1))
+        }
+        if (auto shapedType = dyn_cast<ShapedType>(t)) {
+          if (shapedType.getElementType().isInteger(1)) {
             return true;
+          }
         }
         return false;
       })) {
@@ -38,8 +41,9 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
 
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
-  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>()) {
     return true;
+  }
 
   auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
   if (!linalgConsumerOp) {
@@ -126,7 +130,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
 }
 
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand) {
+getProducerDispatchValueAndOpChain(Value operand, bool enableAggressiveFusion) {
   auto operandType = dyn_cast<RankedTensorType>(operand.getType());
   if (!operandType || operandType.getRank() == 0) {
     return std::nullopt;
@@ -163,7 +167,8 @@ getProducerDispatchValueAndOpChain(Value operand) {
       !llvm::hasSingleElement(producerDispatch.getBody())) {
     return std::nullopt;
   }
-  if (!llvm::hasSingleElement(producerValue.getUses())) {
+  if (!enableAggressiveFusion &&
+      !llvm::hasSingleElement(producerValue.getUses())) {
     return std::nullopt;
   }
   return std::make_pair(producerValue, opChain);

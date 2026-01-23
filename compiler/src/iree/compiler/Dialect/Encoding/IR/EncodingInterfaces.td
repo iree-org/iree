@@ -69,6 +69,33 @@ def IREEEncoding_LayoutResolverAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a unified encoding attribute given a list of candidate encoding
+        attributes. This is used when multiple encodings are used for the same
+        source data and need to be unified to a single encoding.
+
+        Returns nullptr if it fails to get a unified encoding.
+
+        The resolver implementation can create any encoding based on
+        backend-specific heuristics. The returned encoding does not need to be
+        one of the input encodings - for example, a resolver might return an
+        identity encoding for simplicity, or synthesize a new encoding that
+        introduces less overheads in relayout.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getUnifiedEncoding",
+      /*args=*/(ins
+        "llvm::ArrayRef<::mlir::Attribute>":$encodings
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        // TODO(hanchung): Remove the assertion once we know what to do for the
+        // default implementation.
+        assert(false && "unimplemented interface method");
+        return {};
+      }]
     >
   ];
 }
@@ -163,8 +190,8 @@ def IREEEncoding_SerializableAttr :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         auto attr =
-          llvm::dyn_cast_or_null<SerializableAttr>($_attr);
-        if (!attr) {
+          dyn_cast_if_present<SerializableAttr>($_attr);
+        if (!attr || !other) {
           return false;
         }
         if (attr.isSerialized() && other.isSerialized()) {
@@ -193,6 +220,44 @@ def IREEEncoding_SerializableAttr :
         assert(false && "unimplemented interface method");
         return {};
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the new encoding after collapsing the type from `origShape`
+        to `targetShape`. If the type with this encoding cannot be collapsed,
+        returns `nullptr`.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getCollapsedEncoding",
+      /*args=*/(ins
+        "::llvm::ArrayRef<int64_t>":$origShape,
+        "::llvm::ArrayRef<int64_t>":$targetShape
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Converts the encoding for a bitcast operation. Given the shape and
+        element types, returns the new shape and encoding to maintain the same
+        total bit count.
+        Returns failure if the conversion is not possible (e.g., bits don't
+        divide evenly).
+      }],
+      /*retTy=*/"::llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::BitcastEncodingInfo>",
+      /*methodName=*/"convertForBitcast",
+      /*args=*/(ins
+        "::llvm::ArrayRef<int64_t>":$shape,
+        "::mlir::Type":$original_element_type,
+        "::mlir::Type":$new_element_type
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(false && "unimplemented interface method");
+        return failure();
+      }]
     >
   ];
 
@@ -201,6 +266,18 @@ def IREEEncoding_SerializableAttr :
     /// both attributes implement SerializableAttr interface
     /// and they are compatible with each other.
     static bool areCompatible(Attribute lhs, Attribute rhs);
+
+    /// Derives encoding properties for all operands and results of an operation.
+    /// The operation is the source of truth for determining the encodings
+    /// (e.g., a linalg.matmul determines encodings for its LHS, RHS, and result).
+    ///
+    /// Returns OpEncodingProperties containing encoding properties for operands
+    /// and results. Each EncodingProperties bundles the encoding attribute with
+    /// any dynamic values needed (e.g., M, N, K dimensions).
+    ///
+    /// Returns failure if the operation is not supported for encoding derivation.
+    static FailureOr<IREE::Encoding::OpEncodingProperties>
+    getEncodingProperties(Operation *op);
   }];
 }
 

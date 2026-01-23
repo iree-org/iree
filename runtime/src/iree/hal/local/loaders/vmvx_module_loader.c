@@ -14,6 +14,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/modules/vmvx/module.h"
+#include "iree/vm/bytecode/archive.h"
 #include "iree/vm/bytecode/module.h"
 
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
@@ -229,32 +230,41 @@ static iree_status_t iree_hal_vmvx_executable_create(
   iree_host_size_t entry_count =
       iree_vm_module_signature(bytecode_module).export_function_count;
 
+  // Calculate allocation size with overflow checking. entry_fn_ordinals is a
+  // FAM accessed via executable->entry_fn_ordinals[]; dispatch_attrs alignment
+  // provides padding after entry_fn_ordinals.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t dispatch_attrs_offset = 0;
+  iree_host_size_t worker_states_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(iree_hal_vmvx_executable_t), &total_size,
+              IREE_STRUCT_FIELD_FAM(entry_count, uint16_t),
+              IREE_STRUCT_FIELD_ALIGNED(entry_count,
+                                        iree_hal_executable_dispatch_attrs_v0_t,
+                                        8, &dispatch_attrs_offset),
+              IREE_STRUCT_FIELD_ALIGNED(worker_capacity,
+                                        iree_hal_vmvx_worker_state_t, 8,
+                                        &worker_states_offset)));
+
   iree_hal_vmvx_executable_t* executable = NULL;
-  const iree_host_size_t entry_fn_ordinals_size =
-      iree_host_align(entry_count * sizeof(*executable->entry_fn_ordinals), 8);
-  const iree_host_size_t dispatch_attrs_size = iree_host_align(
-      entry_count * sizeof(*executable->base.dispatch_attrs), 8);
-  const iree_host_size_t worker_states_size =
-      iree_host_align(worker_capacity * sizeof(*executable->worker_states), 8);
-  const iree_host_size_t total_size = sizeof(*executable) +
-                                      entry_fn_ordinals_size +
-                                      dispatch_attrs_size + worker_states_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
   if (iree_status_is_ok(status)) {
-    uint8_t* ptr =
-        (uint8_t*)executable + sizeof(*executable) + entry_fn_ordinals_size;
-    dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
-    memset(dispatch_attrs, 0, dispatch_attrs_size);
-    ptr += dispatch_attrs_size;
+    dispatch_attrs =
+        (iree_hal_executable_dispatch_attrs_v0_t*)((uint8_t*)executable +
+                                                   dispatch_attrs_offset);
+    memset(dispatch_attrs, 0,
+           entry_count * sizeof(iree_hal_executable_dispatch_attrs_v0_t));
     iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
                                          host_allocator, &executable->base);
     executable->base.dispatch_attrs = dispatch_attrs;
 
     executable->worker_capacity = worker_capacity;
-    executable->worker_states = (iree_hal_vmvx_worker_state_t*)ptr;
-    ptr += worker_states_size;
+    executable->worker_states =
+        (iree_hal_vmvx_worker_state_t*)((uint8_t*)executable +
+                                        worker_states_offset);
 
     executable->bytecode_module = bytecode_module;
     executable->entry_fn_count = entry_count;
@@ -747,6 +757,29 @@ static void iree_hal_vmvx_module_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_vmvx_module_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Infer the total size of the bytecode archive, if needed.
+  if (executable_data.data_length == 0) {
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_archive_infer_size(
+        executable_data, out_inferred_size));
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("vmvx-bytecode-fb");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  return iree_ok_status();
+}
+
 static bool iree_hal_vmvx_module_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -787,9 +820,9 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   // we have it) to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      executable_loader->instance, executable_params->executable_data,
-      bytecode_module_allocator, executable_loader->host_allocator,
-      &bytecode_module);
+      executable_loader->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
+      executable_params->executable_data, bytecode_module_allocator,
+      executable_loader->host_allocator, &bytecode_module);
 
   // Executable takes ownership of the entire context (including the bytecode
   // module, which itself may own the underlying allocation).
@@ -822,6 +855,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_vmvx_module_loader_vtable = {
         .destroy = iree_hal_vmvx_module_loader_destroy,
+        .infer_format = iree_hal_vmvx_module_loader_infer_format,
         .query_support = iree_hal_vmvx_module_loader_query_support,
         .try_load = iree_hal_vmvx_module_loader_try_load,
 };

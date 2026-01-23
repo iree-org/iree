@@ -12,8 +12,8 @@
 ]>
 hal.executable @ext_fp8_dispatch {
   hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @ext_fp8_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+    hal.executable.export public @ext_fp8_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -44,11 +44,9 @@ hal.executable @ext_fp8_dispatch {
 
 // ERRORS: F8E5M2 and F8E4M3FN types are not supported on gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ instead.
 
-//   OCP-LABEL: hal.executable public @ext_fp8_dispatch
+//   OCP-LABEL: hal.executable public @ext_fp8_dispatch {
 //         OCP:   hal.executable.variant public @rocm
 // OCP-COUNT-8:     rocdl.cvt.pk.f32.fp8 %{{.*}} : vector<2xf32>
 // OCP-COUNT-8:     rocdl.cvt.pk.f32.bf8 %{{.*}} : vector<2xf32>
 //         OCP:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
 //         OCP:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
-
-// -----

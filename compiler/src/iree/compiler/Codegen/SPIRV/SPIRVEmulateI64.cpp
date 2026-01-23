@@ -55,10 +55,11 @@ struct ConvertHalInterfaceBindingSubspan final
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type newResultTy = getTypeConverter()->convertType(op.getType());
-    if (!newResultTy)
+    if (!newResultTy) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
           llvm::formatv("failed to legalize memref type: {}", op.getType()));
+    }
 
     auto newOp =
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
@@ -111,8 +112,9 @@ struct ConvertUtilAssumeIntOp final
 
       unsigned replacementLoc = 0;
       for (auto result : newOp.getResults()) {
-        while (replacements[replacementLoc] != nullptr)
+        while (replacements[replacementLoc] != nullptr) {
           replacementLoc++;
+        }
         Value replacement = result;
         Type newType = getTypeConverter()->convertType(
             op.getResult(replacementLoc).getType());
@@ -137,12 +139,14 @@ struct ConvertUtilAssumeIntOp final
 
 // Tries to flatten `type` to a 1-D vector type. Returns `nullptr` on failure.
 static VectorType flattenVectorType(Type type) {
-  auto vecTy = llvm::dyn_cast<VectorType>(type);
-  if (!vecTy)
+  auto vecTy = dyn_cast<VectorType>(type);
+  if (!vecTy) {
     return nullptr;
+  }
 
-  if (vecTy.isScalable() || vecTy.getRank() <= 1)
+  if (vecTy.isScalable() || vecTy.getRank() <= 1) {
     return nullptr;
+  }
 
   int64_t totalElements = vecTy.getNumElements();
   return VectorType::get(llvm::ArrayRef(totalElements), vecTy.getElementType());
@@ -167,13 +171,15 @@ struct FlattenElementwisePattern final : RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op))
+    if (!OpTrait::hasElementwiseMappableTraits(op)) {
       return failure();
+    }
 
     auto newResultTypes = llvm::to_vector_of<Type, 2>(
         llvm::map_range(op->getResultTypes(), flattenVectorType));
-    if (llvm::any_of(newResultTypes, [](Type type) { return !type; }))
+    if (llvm::any_of(newResultTypes, [](Type type) { return !type; })) {
       return failure();
+    }
 
     Location loc = op->getLoc();
 
@@ -181,8 +187,9 @@ struct FlattenElementwisePattern final : RewritePattern {
     auto operands = llvm::to_vector_of<Value, 2>(op->getOperands());
     for (Value &operand : operands) {
       VectorType newOperandTy = flattenVectorType(operand.getType());
-      if (!newOperandTy)
+      if (!newOperandTy) {
         return failure();
+      }
 
       operand = rewriter.createOrFold<vector::ShapeCastOp>(loc, newOperandTy,
                                                            operand);
@@ -233,8 +240,9 @@ struct SPIRVEmulateI64Pass final
 
   void runOnOperation() override {
     mlir::FunctionOpInterface op = getOperation();
-    if (supportsI64(op))
+    if (supportsI64(op)) {
       return;
+    }
 
     arith::WideIntEmulationConverter typeConverter(32);
     memref::populateMemRefWideIntEmulationConversions(typeConverter);
@@ -263,8 +271,9 @@ struct SPIRVEmulateI64Pass final
       memref::populateMemRefWideIntEmulationPatterns(typeConverter, patterns);
       populateIreeI64EmulationPatterns(typeConverter, patterns);
 
-      if (failed(applyPartialConversion(op, target, std::move(patterns))))
+      if (failed(applyPartialConversion(op, target, std::move(patterns)))) {
         signalPassFailure();
+      }
     }
 
     // Clean up any new 2-D vectors. We need to do it here because later passed
@@ -279,8 +288,9 @@ struct SPIRVEmulateI64Pass final
       vector::InsertStridedSliceOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
 
-      if (failed(applyPatternsGreedily(op, std::move(patterns))))
+      if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
+      }
     }
   }
 };

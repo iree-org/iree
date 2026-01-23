@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
+#include "iree/compiler/Codegen/Dialect/PCF/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -15,6 +16,7 @@
 // have a better registration mechanism.
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
@@ -46,7 +48,9 @@ namespace mlir::iree_compiler {
 void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
+  registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
+  registerTensorMaskingOpInterface(registry);
   // TODO: Remove this dependency once the transform dialect extensions
   // have a better registration mechanism.
   // TODO: when warranted, move to its own file.

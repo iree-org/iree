@@ -14,8 +14,9 @@
 namespace mlir::iree_compiler {
 
 TypedAttr convertAttributeToStream(TypedAttr attr) {
-  if (!attr)
+  if (!attr) {
     return {};
+  }
   if (auto parameterAttr = dyn_cast<IREE::Flow::NamedParameterAttr>(attr)) {
     return IREE::Stream::NamedParameterAttr::get(
         attr.getContext(), parameterAttr.getType(), parameterAttr.getScope(),
@@ -33,7 +34,7 @@ tryLookupGlobalAffinity(Operation *op,
 IREE::Stream::AffinityAttr
 tryLookupExecutionAffinity(Operation *op,
                            IREE::Stream::AffinityAnalysis *affinityAnalysis) {
-  assert(llvm::isa<IREE::Stream::AffinityOpInterface>(op) &&
+  assert(isa<IREE::Stream::AffinityOpInterface>(op) &&
          "must be an affinity op");
   return affinityAnalysis->lookupExecutionAffinity(op);
 }

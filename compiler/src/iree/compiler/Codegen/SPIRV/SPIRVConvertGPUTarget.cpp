@@ -65,8 +65,9 @@ std::optional<Version> processCapabilities(ArrayRef<StringRef> features,
                                            SetVector<Capability> &caps) {
   for (StringRef feature : features) {
     if (feature.consume_front("cap:")) {
-      if (std::optional<Capability> cap = spirv::symbolizeCapability(feature))
+      if (std::optional<Capability> cap = spirv::symbolizeCapability(feature)) {
         caps.insert(*cap);
+      }
     }
   }
   return std::nullopt;
@@ -78,8 +79,9 @@ std::optional<Version> processExtensions(ArrayRef<StringRef> features,
                                          SetVector<Extension> &exts) {
   for (StringRef feature : features) {
     if (feature.consume_front("ext:")) {
-      if (std::optional<Extension> ext = spirv::symbolizeExtension(feature))
+      if (std::optional<Extension> ext = spirv::symbolizeExtension(feature)) {
         exts.insert(*ext);
+      }
     }
   }
   return std::nullopt;
@@ -99,16 +101,21 @@ ClientAPI deduceClientAPI(StringRef backend) {
 }
 
 Vendor deduceVendor(IREE::GPU::TargetAttr target) {
-  if (target.isAMD())
+  if (target.isAMD()) {
     return Vendor::AMD;
-  if (target.isApple())
+  }
+  if (target.isApple()) {
     return Vendor::Apple;
-  if (target.isARM())
+  }
+  if (target.isARM()) {
     return Vendor::ARM;
-  if (target.isNVIDIA())
+  }
+  if (target.isNVIDIA()) {
     return Vendor::NVIDIA;
-  if (target.isQualcomm())
+  }
+  if (target.isQualcomm()) {
     return Vendor::Qualcomm;
+  }
   return Vendor::Unknown;
 }
 
@@ -118,19 +125,24 @@ Vendor deduceVendor(IREE::GPU::TargetAttr target) {
 
 void addComputeFeatures(ComputeBitwidths compute, SetVector<Capability> &caps,
                         SetVector<Extension> &exts) {
-  if (bitEnumContainsAny(compute, ComputeBitwidths::FP64))
+  if (bitEnumContainsAny(compute, ComputeBitwidths::FP64)) {
     caps.insert(Capability::Float64);
+  }
   // FP32 does not need special capabilities or extensions.
-  if (bitEnumContainsAny(compute, ComputeBitwidths::FP16))
+  if (bitEnumContainsAny(compute, ComputeBitwidths::FP16)) {
     caps.insert(Capability::Float16);
+  }
 
-  if (bitEnumContainsAny(compute, ComputeBitwidths::Int64))
+  if (bitEnumContainsAny(compute, ComputeBitwidths::Int64)) {
     caps.insert(Capability::Int64);
+  }
   // Int32 does not need special capabilities or extensions.
-  if (bitEnumContainsAny(compute, ComputeBitwidths::Int16))
+  if (bitEnumContainsAny(compute, ComputeBitwidths::Int16)) {
     caps.insert(Capability::Int16);
-  if (bitEnumContainsAny(compute, ComputeBitwidths::Int8))
+  }
+  if (bitEnumContainsAny(compute, ComputeBitwidths::Int8)) {
     caps.insert(Capability::Int8);
+  }
 }
 
 void addStorageFeatures(StorageBitwidths storage, SetVector<Capability> &caps,
@@ -280,8 +292,9 @@ struct SPIRVConvertGPUTargetPass final
 
     FailureOr<spirv::TargetEnvAttr> spirvTarget =
         convertGPUTarget(context, variant);
-    if (failed(spirvTarget))
+    if (failed(spirvTarget)) {
       return signalPassFailure();
+    }
 
     moduleOp->setAttr(spirv::getTargetEnvAttrName(), *spirvTarget);
   }

@@ -66,8 +66,9 @@ public:
       return failure();
     }
     auto results = emitCall(op, adaptor, importOp, rewriter);
-    if (!results.has_value())
+    if (!results.has_value()) {
       return failure();
+    }
     rewriter.replaceOp(op, results.value());
     return success();
   }
@@ -91,13 +92,13 @@ protected:
 
   std::string getTypedTypeStr(Type type, bool forceUnsigned = false) const {
     Type elementType = type;
-    auto shapedType = llvm::dyn_cast<ShapedType>(type);
+    auto shapedType = dyn_cast<ShapedType>(type);
     if (shapedType) {
       elementType = shapedType.getElementType();
     }
 
     std::string typePrefix = "x";
-    if (llvm::isa<FloatType>(elementType)) {
+    if (isa<FloatType>(elementType)) {
       typePrefix = "f";
     } else if (elementType.isSignlessInteger()) {
       typePrefix = forceUnsigned ? "u" : "i";

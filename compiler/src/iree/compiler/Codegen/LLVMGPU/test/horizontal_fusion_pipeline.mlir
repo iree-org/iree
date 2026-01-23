@@ -77,7 +77,6 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
     %arg1 : tensor<640x640xf32>, %arg2 : tensor<640x640xf32>,
     %arg3 : tensor<640x640xf32>)
     -> (tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>) {
-  %11 = tensor.empty() : tensor<4096x640xf32>
   %12 = tensor.empty() : tensor<4096x640xf32>
   %cst = arith.constant 0.0: f32
   %13 = linalg.fill ins(%cst : f32)

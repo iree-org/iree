@@ -100,11 +100,10 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
 }
 
 bool isDescendingRelativeMappingIndices(ArrayRef<Attribute> array) {
-  int64_t prev =
-      llvm::cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
+  int64_t prev = cast<DeviceMappingAttrInterface>(array[0]).getRelativeIndex();
   for (Attribute attr : array.drop_front()) {
     int64_t relativeIndex =
-        llvm::cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
+        cast<DeviceMappingAttrInterface>(attr).getRelativeIndex();
     if (relativeIndex != prev - 1) {
       return false;
     }
@@ -123,27 +122,32 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   // Verify that each dimension of the shape can be distributed on the
   // threads
   // For zero dim tensor, consider it's too small to access using all threads.
-  if (shape.size() == 0)
+  if (shape.empty()) {
     return false;
+  }
   int64_t threadsAvailable = threadCount;
   for (const auto &[index, dim] : llvm::enumerate(llvm::reverse(shape))) {
     int64_t numElementPerThread = index == 0 ? vectorSize : 1;
     int64_t numThreads = dim / numElementPerThread;
-    if (numThreads == 0)
+    if (numThreads == 0) {
       return false;
+    }
     if (numThreads > threadsAvailable) {
       // If there are no enough remaining threads to distribute the current
       // dimension, try to use all remaining threads. But we still need to make
       // sure all work can be distributed to these threads evenly.
-      if (numThreads % threadsAvailable != 0)
+      if (numThreads % threadsAvailable != 0) {
         return false;
+      }
       numThreads = threadsAvailable;
     }
-    if (threadsAvailable % numThreads != 0)
+    if (threadsAvailable % numThreads != 0) {
       return false;
+    }
     threadsAvailable = threadsAvailable / numThreads;
-    if (threadsAvailable == 1)
+    if (threadsAvailable == 1) {
       break;
+    }
   }
   return threadsAvailable == 1;
 }
@@ -201,8 +205,9 @@ FailureOr<scf::SCFTileSizeComputationFunction>
 getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   FailureOr<SmallVector<int64_t>> tileSizes =
       getGPUTileSize(funcOp, tilingLevel);
-  if (failed(tileSizes))
+  if (failed(tileSizes)) {
     return failure();
+  }
   scf::SCFTileSizeComputationFunction computeFn =
       [tileSizes](OpBuilder &builder,
                   Operation *op) -> SmallVector<OpFoldResult> {
@@ -231,16 +236,18 @@ std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
 
   mlir::FunctionOpInterface funcOp =
       subview->getParentOfType<mlir::FunctionOpInterface>();
-  if (!funcOp)
+  if (!funcOp) {
     return std::nullopt;
+  }
 
   // The subview size bounds are expected to be constant; they specify the shape
   // of the allocation.
   SmallVector<int64_t, 2> shape;
   for (Value bound : sizeBounds) {
     APInt value;
-    if (!matchPattern(bound, m_ConstantInt(&value)))
+    if (!matchPattern(bound, m_ConstantInt(&value))) {
       return std::nullopt;
+    }
     shape.push_back(value.getSExtValue());
   }
 
@@ -273,10 +280,12 @@ static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
     }
 
     auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
-    if (!fillOp)
+    if (!fillOp) {
       break;
-    if (fillOp.output() != copyOp.getSource())
+    }
+    if (fillOp.output() != copyOp.getSource()) {
       break;
+    }
     // Move the fillOp and change the destination to the copy destination.
     fillOp->moveBefore(copyOp);
     fillOp.getOutputsMutable().assign(copyOp.getTarget());
@@ -328,10 +337,12 @@ propagateCopySourceIntoConsumerGeneric(memref::CopyOp copyOp,
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
     if (!consumer || consumer.getNumDpsInits() != 1 ||
         !consumer.getMatchingIndexingMap(consumer.getDpsInitOperand(0))
-             .isIdentity())
+             .isIdentity()) {
       break;
-    if (*consumer.getOutputs().begin() != copyOp.getTarget())
+    }
+    if (*consumer.getOutputs().begin() != copyOp.getTarget()) {
       break;
+    }
     insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;
@@ -347,12 +358,14 @@ void propagateSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   funcOp.walk([&toDelete](memref::CopyOp copyOp) {
     if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
       if (propagateCopyDestIntoProducerFill(copyOp) ||
-          propagateCopySourceIntoConsumerGeneric(copyOp, toDelete))
+          propagateCopySourceIntoConsumerGeneric(copyOp, toDelete)) {
         toDelete.push_back(copyOp.getOperation());
+      }
     }
   });
-  for (Operation *op : toDelete)
+  for (Operation *op : toDelete) {
     op->erase();
+  }
 }
 
 void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
@@ -430,7 +443,7 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            uint32_t numLaneToReduce,
                            bool expandSubgroupReduce) {
   assert(llvm::isPowerOf2_32(numLaneToReduce));
-  assert((llvm::isa<IntegerType, FloatType>(input.getType())) &&
+  assert((isa<IntegerType, FloatType>(input.getType())) &&
          "Input must be a scalar");
   IntegerType shuffleIntType = builder.getIntegerType(kShuffleBitWidth);
   Type origInputType = input.getType();
@@ -462,16 +475,18 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   // integer type.
   auto unpack = [loc, &builder, needsPacking, equivIntType,
                  origInputType](Value packedVal) -> Value {
-    if (!needsPacking)
+    if (!needsPacking) {
       return packedVal;
+    }
     auto asInt = arith::TruncIOp::create(builder, loc, equivIntType, packedVal);
     return arith::BitcastOp::create(builder, loc, origInputType, asInt);
   };
 
   auto pack = [loc, &builder, needsPacking, equivIntType,
                shuffleIntType](Value unpackedVal) -> Value {
-    if (!needsPacking)
+    if (!needsPacking) {
       return unpackedVal;
+    }
     auto asInt =
         arith::BitcastOp::create(builder, loc, equivIntType, unpackedVal);
     return arith::ExtUIOp::create(builder, loc, shuffleIntType, asInt);
@@ -528,13 +543,13 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
   case vector::CombiningKind::MINIMUMF:
   case vector::CombiningKind::MINNUMF: {
     auto posInfApFloat = APFloat::getInf(
-        llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
+        cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
     return builder.getFloatAttr(type, posInfApFloat);
   }
   case vector::CombiningKind::MAXIMUMF:
   case vector::CombiningKind::MAXNUMF: {
     auto negInfApFloat = APFloat::getInf(
-        llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
+        cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
     return builder.getFloatAttr(type, negInfApFloat);
   }
   }
@@ -544,7 +559,7 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
 /// Emit identity variable.
 Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
                                 vector::CombiningKind kind, Type identityType) {
-  auto vectorType = llvm::dyn_cast<VectorType>(identityType);
+  auto vectorType = dyn_cast<VectorType>(identityType);
   Type elementType = identityType;
   if (vectorType) {
     elementType = vectorType.getElementType();
@@ -668,8 +683,9 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     return nativeSize;
   }
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    if (writeOp.getVectorType().getRank() < 2)
+    if (writeOp.getVectorType().getRank() < 2) {
       return std::nullopt;
+    }
     SmallVector<int64_t> nativeSize(writeOp.getVectorType().getRank() - 2, 1);
     nativeSize.append({m, n});
     return nativeSize;
@@ -680,21 +696,24 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     VectorType sliceType;
     for (Operation *users : op->getUsers()) {
       auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-      if (!extract)
+      if (!extract) {
         return std::nullopt;
-      auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-      if (sliceType && sliceType != vecType)
+      }
+      auto vecType = cast<VectorType>(extract.getResult().getType());
+      if (sliceType && sliceType != vecType) {
         return std::nullopt;
+      }
       sliceType = vecType;
     }
     return llvm::to_vector(sliceType.getShape());
   }
   if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
-    if (auto vecType = llvm::dyn_cast<VectorType>(op->getResultTypes()[0])) {
+    if (auto vecType = dyn_cast<VectorType>(op->getResultTypes()[0])) {
       // TODO: The condition for unrolling elementwise should be restricted
       // only to operations that need unrolling (connected to the contract).
-      if (vecType.getRank() < 2)
+      if (vecType.getRank() < 2) {
         return std::nullopt;
+      }
 
       // First check whether there is a slice to infer the shape from. This is
       // required for cases where the accumulator type differs from the input
@@ -703,15 +722,18 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
       VectorType sliceType;
       for (Operation *users : op->getUsers()) {
         auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-        if (!extract)
+        if (!extract) {
           return std::nullopt;
-        auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-        if (sliceType && sliceType != vecType)
+        }
+        auto vecType = cast<VectorType>(extract.getResult().getType());
+        if (sliceType && sliceType != vecType) {
           return std::nullopt;
+        }
         sliceType = vecType;
       }
-      if (sliceType)
+      if (sliceType) {
         return llvm::to_vector(sliceType.getShape());
+      }
 
       // Else unroll for trailing elementwise.
       SmallVector<int64_t> nativeSize(vecType.getRank() - 2, 1);
@@ -730,12 +752,15 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
 static std::optional<int>
 getVectorContractOpOperandId(vector::ContractionOp contractOp,
                              OpResult result) {
-  if (contractOp.getLhs() == result)
+  if (contractOp.getLhs() == result) {
     return 0;
-  if (contractOp.getRhs() == result)
+  }
+  if (contractOp.getRhs() == result) {
     return 1;
-  if (contractOp.getAcc() == result)
+  }
+  if (contractOp.getAcc() == result) {
     return 2;
+  }
   return std::nullopt;
 }
 
@@ -748,24 +773,30 @@ getVectorContractOpOperandIdForVectorReadOp(Operation *op) {
 
   // Check if the vector::TransferReadOp is consumed directly by
   // vector::ContractionOp.
-  if (op->use_empty())
+  if (op->use_empty()) {
     return std::nullopt;
+  }
   Operation *firstLevelUser = *((op->getUsers()).begin());
-  if (!firstLevelUser)
+  if (!firstLevelUser) {
     return std::nullopt;
-  if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser))
+  }
+  if (auto contractOp = dyn_cast<vector::ContractionOp>(firstLevelUser)) {
     return getVectorContractOpOperandId(contractOp, op->getResult(0));
+  }
 
   // Check if the vector::TransferReadOp is consumed indirectly by
   // vector::ContractionOp. Only check until the second level of use-def chain.
-  if (firstLevelUser->use_empty())
+  if (firstLevelUser->use_empty()) {
     return std::nullopt;
+  }
   Operation *secondLevelUser = *((firstLevelUser->getUsers()).begin());
-  if (!secondLevelUser)
+  if (!secondLevelUser) {
     return std::nullopt;
-  if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser))
+  }
+  if (auto contractOp = dyn_cast<vector::ContractionOp>(secondLevelUser)) {
     return getVectorContractOpOperandId(contractOp,
                                         firstLevelUser->getResult(0));
+  }
   return std::nullopt;
 }
 
@@ -781,15 +812,15 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     Type sourceType = contract.getLhsType().getElementType();
 
     // Set mmaShapeK based on sourceType.
-    if (sourceType.isInteger(4))
+    if (sourceType.isInteger(4)) {
       mmaShapeK = 64;
-    else if (sourceType.isInteger(8))
+    } else if (sourceType.isInteger(8)) {
       mmaShapeK = 32;
-    else if (sourceType.isF16() || sourceType.isBF16())
+    } else if (sourceType.isF16() || sourceType.isBF16()) {
       mmaShapeK = 16;
-    else if (sourceType.isF32())
+    } else if (sourceType.isF32()) {
       mmaShapeK = 8;
-    else {
+    } else {
       LDBG() << "unsupported shape for vector.contract: ";
       return std::nullopt;
     }
@@ -804,8 +835,9 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape of warp-level vector write operation.
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    if (writeOp.getVectorType().getRank() < 2)
+    if (writeOp.getVectorType().getRank() < 2) {
       return std::nullopt;
+    }
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
     LDBG() << "shape for vector.xfer_write: " << llvm::interleaved(outputShape);
@@ -814,8 +846,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
   // Shape of warp-level vector read (load) operation.
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
-    auto resultVectorType =
-        llvm::cast<VectorType>(readOp.getVector().getType());
+    auto resultVectorType = cast<VectorType>(readOp.getVector().getType());
     Type resultElementType = resultVectorType.getElementType();
 
     std::optional<int> operandId =
@@ -894,11 +925,13 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
         VectorType sliceType;
         for (Operation *users : op->getUsers()) {
           auto extract = dyn_cast<vector::ExtractStridedSliceOp>(users);
-          if (!extract)
+          if (!extract) {
             return std::nullopt;
-          auto vecType = llvm::cast<VectorType>(extract.getResult().getType());
-          if (sliceType && sliceType != vecType)
+          }
+          auto vecType = cast<VectorType>(extract.getResult().getType());
+          if (sliceType && sliceType != vecType) {
             return std::nullopt;
+          }
           sliceType = vecType;
         }
         LDBG() << "shape for vector.xfer_read: "
@@ -913,20 +946,25 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
 
 bool hasGlobalMemoryAddressSpace(MemRefType memrefType) {
   Attribute addrSpace = memrefType.getMemorySpace();
-  if (!addrSpace)
+  if (!addrSpace) {
     return true;
-  auto intAttr = llvm::dyn_cast<IntegerAttr>(addrSpace);
+  }
+  auto intAttr = dyn_cast<IntegerAttr>(addrSpace);
   // Accept both default numeric address space and HAL descriptor type address
   // space--the former is used by LLVMGPU while the latter is used by SPIR-V.
-  if (intAttr && intAttr.getInt() == 0)
+  if (intAttr && intAttr.getInt() == 0) {
     return true;
-  auto gpuAttr = llvm::dyn_cast<gpu::AddressSpaceAttr>(addrSpace);
-  if (gpuAttr && gpuAttr.getValue() == gpu::AddressSpace::Global)
+  }
+  auto gpuAttr = dyn_cast<gpu::AddressSpaceAttr>(addrSpace);
+  if (gpuAttr && gpuAttr.getValue() == gpu::AddressSpace::Global) {
     return true;
-  auto amdgpuAttr = llvm::dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
-  if (amdgpuAttr && amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer)
+  }
+  auto amdgpuAttr = dyn_cast<amdgpu::AddressSpaceAttr>(addrSpace);
+  if (amdgpuAttr &&
+      amdgpuAttr.getValue() == amdgpu::AddressSpace::FatRawBuffer) {
     return true;
-  return llvm::isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
+  }
+  return isa<IREE::HAL::DescriptorTypeAttr>(addrSpace);
 }
 
 bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
@@ -943,8 +981,8 @@ bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType) {
 }
 
 bool hasSharedMemoryAddressSpace(MemRefType memrefType) {
-  auto addrSpace = llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
-      memrefType.getMemorySpace());
+  auto addrSpace =
+      dyn_cast_if_present<gpu::AddressSpaceAttr>(memrefType.getMemorySpace());
   return addrSpace &&
          addrSpace.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace();
 }
@@ -972,8 +1010,9 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
 //===----------------------------------------------------------------------===//
 
 IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
-  if (clTestTarget.empty())
+  if (clTestTarget.empty()) {
     return nullptr;
+  }
 
   auto [archAndFeatures, backend] = StringRef(clTestTarget).split("@");
   if (backend.empty()) {
@@ -981,16 +1020,17 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
     // for cases like "ampere" which can be accepted by both CUDA and Vulkan;
     // it's very limited. So it's targeting common cases to make writing tests
     // simpler.
-    if (StringRef(clTestTarget).starts_with("sm_"))
+    if (StringRef(clTestTarget).starts_with("sm_")) {
       backend = "cuda";
-    else if (StringRef(clTestTarget).starts_with("gfx"))
+    } else if (StringRef(clTestTarget).starts_with("gfx")) {
       backend = "hip";
-    else if (StringRef(clTestTarget).starts_with("adreno"))
+    } else if (StringRef(clTestTarget).starts_with("adreno")) {
       backend = "vulkan";
-    else if (StringRef(clTestTarget).starts_with("apple"))
+    } else if (StringRef(clTestTarget).starts_with("apple")) {
       backend = "vulkan";
-    else if (StringRef(clTestTarget).starts_with("valhall"))
+    } else if (StringRef(clTestTarget).starts_with("valhall")) {
       backend = "vulkan";
+    }
   }
   auto [arch, features] = StringRef(archAndFeatures).split(':');
   // Use the target specified in the command line for testing purposes.
@@ -998,7 +1038,7 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
-  return dyn_cast_or_null<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
+  return dyn_cast_if_present<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
@@ -1043,11 +1083,13 @@ void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
   // First try to see if there is a subgroup size chosen in the CodeGen pipeline
   // configuration.
-  if (std::optional<int64_t> subgroupSize = getSubgroupSize(func))
+  if (std::optional<int64_t> subgroupSize = getSubgroupSize(func)) {
     return subgroupSize.value();
+  }
   // Then try to find the subgroup size from the target description.
-  if (IREE::GPU::TargetAttr target = getGPUTargetAttr(func))
+  if (IREE::GPU::TargetAttr target = getGPUTargetAttr(func)) {
     return target.getPreferredSubgroupSize();
+  }
   return std::nullopt;
 }
 

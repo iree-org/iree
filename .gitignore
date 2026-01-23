@@ -15,20 +15,25 @@
 *.user
 *.code-workspace
 
+# Cursor files
+.cursor/
+
 # macOS files
 .DS_Store
 
 # CMake artifacts
-build/
-build-*/
+/build/
+/build-*/
 Testing/
-# Include iree.build package
-!compiler/bindings/python/iree/compiler/build/
+/compiler/build/
+/runtime/build/
+/integrations/tensorflow/python_projects/iree_tf/build/
+/integrations/tensorflow/python_projects/iree_tflite/build/
 
 # Bazel artifacts
 **/bazel-*
-MODULE.bazel
 MODULE.bazel.lock
+.iree-bazel-try/
 
 # Executables
 *.exe
@@ -53,6 +58,7 @@ imgui.ini
 
 # Source indexing files
 compile_commands.json
+tablegen_compile_commands.yml
 .cache/clangd
 
 # Language server configuration files

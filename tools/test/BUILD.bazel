@@ -6,12 +6,19 @@
 
 # Smoke tests for the execution of tool binaries.
 
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+py_binary(
+    name = "python_with_numpy",
+    srcs = ["python_with_numpy.py"],
+    deps = ["@pip//numpy"],
 )
 
 iree_lit_test_suite(
@@ -31,13 +38,19 @@ iree_lit_test_suite(
             "iree-compile-help.txt",
             "iree-benchmark-module.mlir",
             "iree-convert-parameters.txt",
+            "iree-dump-module.mlir",
             "iree-dump-parameters.txt",
+            "iree-link-bundle.mlir",
+            "iree-link.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module-expected.mlir",
             "iree-run-module-inputs.mlir",
             "iree-run-module-multi.mlir",
             "iree-run-module-outputs.mlir",
             "iree-run-module.mlir",
+            "iree-tblgen-json.td",
+            "iree-tokenize.txt",
+            "iree-run-module-in-place.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -48,28 +61,57 @@ iree_lit_test_suite(
         ],
         include = [
             "*.mlir",
+            "*.td",
             "*.txt",
+        ],
+        exclude = [
+            "iree-link-anonymous.mlir",
+            "iree-link-globals-a.mlir",
+            "iree-link-globals-b.mlir",
+            "iree-link-globals-c.mlir",
+            "iree-link-module-a.mlir",
+            "iree-link-module-b.mlir",
+            "iree-link-module-c.mlir",
         ],
     ),
     cfg = "//tools:lit.cfg.py",
     data = [
         "echo_npy.py",
+        "iree-link-anonymous.mlir",
+        "iree-tokenize.json",
+        "iree-link-globals-a.mlir",
+        "iree-link-globals-b.mlir",
+        "iree-link-globals-c.mlir",
+        "iree-link-module-a.mlir",
+        "iree-link-module-b.mlir",
+        "iree-link-module-c.mlir",
         "parameters_a.safetensors",
         "parameters_b.safetensors",
+        # For iree-tblgen tests:
+        "//compiler/src/iree/compiler/Utils:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
+    env = {
+        "PYTHON": "python_with_numpy",
+    },
     tags = [
         "driver=local-task",
         "hostonly",
     ],
     tools = [
+        ":python_with_numpy",
         "//tools:iree-benchmark-executable",
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
         "//tools:iree-convert-parameters",
+        "//tools:iree-dump-module",
         "//tools:iree-dump-parameters",
+        "//tools:iree-link",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
+        "//tools:iree-tblgen",
+        "//tools:iree-tokenize",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",

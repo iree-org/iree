@@ -26,6 +26,9 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.h.inc" // IWYU pragma: export
 
 #define GET_OP_CLASSES
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtPureOps.h.inc" // IWYU pragma: export
+
+#define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
 // clang-format on

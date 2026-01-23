@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "annotate_dispatches.mlir",
             "canonicalize.mlir",
@@ -31,6 +32,7 @@ iree_lit_test_suite(
             "outline_dispatch_externs.mlir",
             "outline_dispatch_regions.mlir",
             "pipeline_tests.mlir",
+            "replicate_globals_per_affinity.mlir",
             "top_level_scf_to_cfg.mlir",
             "verify_input_ir.mlir",
         ],

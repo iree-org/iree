@@ -67,11 +67,13 @@ static void processBufferGlobal(Explorer &explorer,
                                 const Explorer::GlobalInfo *globalInfo,
                                 DenseSet<Operation *> &deadOps) {
   // Ignore indirect/unanalyzable globals.
-  if (globalInfo->isIndirect)
+  if (globalInfo->isIndirect) {
     return;
+  }
   // Ignore mutable globals, as they could be changed to various values.
-  if (globalInfo->op.isGlobalMutable())
+  if (globalInfo->op.isGlobalMutable()) {
     return;
+  }
 
   // If there are no stores to the global then it's always null.
   if (globalInfo->getStores().empty()) {
@@ -90,8 +92,9 @@ static void processBufferGlobal(Explorer &explorer,
   // the program (there may be multiple initializers or control flow that
   // determines the stored value).
   auto rodataOp = findUniformlyStoredRodata(explorer, globalInfo);
-  if (!rodataOp)
+  if (!rodataOp) {
     return;
+  }
 
   // All stores to the global are of the same rodata.
   // Replace all of the loads with direct references to the rodata and then
@@ -127,17 +130,18 @@ class ResolveRodataLoadsPass
     // loads/stores to the globals and leaves the globals for SymbolDCE.
     DenseSet<Operation *> deadOps;
     explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
-      if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(
-              globalInfo->op.getGlobalType())) {
-        if (llvm::isa<IREE::VM::BufferType>(refType.getObjectType())) {
+      if (auto refType =
+              dyn_cast<IREE::VM::RefType>(globalInfo->op.getGlobalType())) {
+        if (isa<IREE::VM::BufferType>(refType.getObjectType())) {
           processBufferGlobal(explorer, globalInfo, deadOps);
         }
       }
     });
 
     // Erase all ops after we're done iterating them.
-    for (auto *deadOp : deadOps)
+    for (auto *deadOp : deadOps) {
       deadOp->erase();
+    }
   }
 };
 

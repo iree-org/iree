@@ -212,10 +212,10 @@ util.func private @FlattenFullFillToSplat(%arg0: index, %arg1: i32) -> !stream.r
 // The target is tied and we cannot avoid the fill.
 
 // CHECK-LABEL: @FlattenFullFillToSplatUnsafe
-util.func private @FlattenFullFillToSplatUnsafe(%arg0: index, %arg1: i32, %arg2: !hal.buffer_view) -> !stream.resource<*> {
+util.func private @FlattenFullFillToSplatUnsafe(%arg0: index, %arg1: i32, %arg2: !util.buffer) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   // CHECK: stream.tensor.import
-  %target = stream.tensor.import %arg2 : !hal.buffer_view -> tensor<8xi32> in !stream.resource<*>{%arg0}
+  %target = stream.tensor.import %arg2 : !util.buffer -> tensor<8xi32> in !stream.resource<*>{%arg0}
   // CHECK: stream.async.fill
   %0 = stream.async.fill %arg1, %target[%c0 to %arg0 for %arg0] : i32 -> %target as !stream.resource<*>{%arg0}
   util.return %0 : !stream.resource<*>
@@ -429,6 +429,7 @@ util.func private @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1
 // CHECK-LABEL: @FoldAsyncTransferOp
 util.func private @FoldAsyncTransferOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<transient> {
   // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
   %0 = stream.async.transfer %arg0 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg1}
   %1 = stream.async.transfer %0 : !stream.resource<staging>{%arg1} -> !stream.resource<transient>{%arg1}
   util.return %1 : !stream.resource<transient>
@@ -436,23 +437,14 @@ util.func private @FoldAsyncTransferOp(%arg0: !stream.resource<transient>, %arg1
 
 // -----
 
-// CHECK-LABEL: @RedundantTransferElision
-util.func private @RedundantTransferElision(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<transient> {
-  // CHECK-NOT: stream.async.transfer
-  %0 = stream.async.transfer %arg0 : !stream.resource<transient>{%arg1} -> !stream.resource<transient>{%arg1}
-  util.return %0 : !stream.resource<transient>
-}
-
-// -----
-
 // CHECK-LABEL: @IntermediateTransferElision
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
 util.func private @IntermediateTransferElision(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
-  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   %transfer0 = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size}
   // CHECK-NOT: stream.async.transfer
   %transfer1 = stream.async.transfer %transfer0 : !stream.resource<staging>{%size} -> !stream.resource<external>{%size}
-  // CHECK-NEXT: util.return %[[TRANSFER]]
+  // CHECK-NEXT: util.return %[[CLONE]]
   util.return %transfer1 : !stream.resource<external>
 }
 
@@ -658,4 +650,38 @@ util.func private @ElideUnusedAsyncConcurrentOp(%arg0: !stream.resource<*>, %arg
     stream.yield %1 : !stream.resource<*>{%arg1}
   } => !stream.timepoint
   util.return %0#0, %0#1 : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// Verifies that splat constants with await timepoints are converted to
+// stream.async.splat ops.
+
+// CHECK-LABEL: @ConvertSplatConstantToSplatWithAwait
+util.func private @ConvertSplatConstantToSplatWithAwait(%await: !stream.timepoint, %size: index) -> !stream.resource<transient> {
+  // CHECK-DAG: %[[SPLAT_VALUE:.+]] = arith.constant 5 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat await(%arg0) %[[SPLAT_VALUE]] : i32 -> !stream.resource<transient>{%arg1}
+  %0 = stream.async.constant await(%await) : !stream.resource<transient>{%size} = dense<5> : tensor<8xi32>
+  // CHECK-NEXT: util.return %[[SPLAT]]
+  util.return %0 : !stream.resource<transient>
+}
+
+// -----
+
+// Verifies that slicing a splat propagates the await and folds the slice away.
+
+// CHECK-LABEL: @PropagateSplatAwaitThroughSlice
+util.func private @PropagateSplatAwaitThroughSlice(%await: !stream.timepoint) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[SLICE_SIZE:.+]] = arith.constant 64 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-DAG: %[[SPLAT_VALUE:.+]] = arith.constant 123 : i32
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[RESULT:.+]] = stream.async.splat await(%arg0) %[[SPLAT_VALUE]] : i32 -> !stream.resource<*>{%[[SLICE_SIZE]]}
+  %0 = stream.async.splat await(%await) %c123_i32 : i32 -> !stream.resource<*>{%c128}
+  // CHECK-NOT: stream.async.slice
+  %1 = stream.async.slice %0[%c0 to %c64] : !stream.resource<*>{%c128} -> !stream.resource<*>{%c64}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
 }

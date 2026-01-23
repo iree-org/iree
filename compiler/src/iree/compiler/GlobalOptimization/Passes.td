@@ -119,6 +119,10 @@ def PropagateLinalgTransposePass :
             /*default=*/"true", "Enable transposition of attention v operand">,
     Option<"enableConvolutionPropagation", "enable-aggressive-propagation-through-conv", "bool",
             /*default=*/"false", "enable propagation through convolutions">,
+    Option<"enableEdgeReshapePropagation", "enable-edge-reshape-propagation", "bool",
+            /*default=*/"false", "Enable propagation of reshapes on the edges of the program">,
+    Option<"enableSinkTransposeThroughPad", "enable-sink-transpose-through-pad", "bool",
+            /*default=*/"false", "Enable sinking transpose through pad operations">,
   ];
 }
 

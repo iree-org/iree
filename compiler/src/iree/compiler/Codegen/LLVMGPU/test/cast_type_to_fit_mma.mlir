@@ -17,7 +17,7 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 //       CHECK:   %[[EXT:.+]] = arith.extf %[[INIT]] : vector<96x64xf16> to vector<96x64xf32>
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
-//  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
 //  CHECK-SAME:     vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>
@@ -82,7 +82,7 @@ func.func @wmmar3_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32
 //       CHECK:   %[[EXT:.+]] = arith.extf %[[INIT]] : vector<48x32xf16> to vector<48x32xf32>
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
-//  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
 //  CHECK-SAME:     vector<48x32xf16>, vector<32x32xf16> into vector<48x32xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<48x32xf32> to vector<48x32xf16>
@@ -136,7 +136,7 @@ func.func @transform_dialect_mfma_matmul_96x64x16(%lhs: vector<96x16xf16>, %rhs:
 //       CHECK:   %[[EXT:.+]] = arith.extf %[[INIT]] : vector<96x64xf16> to vector<96x64xf32>
 //       CHECK:   %[[MM:.+]] = vector.contract
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
-//  CHECK-SAME        iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
 //  CHECK-SAME:     %[[A]], %[[B]], %[[EXT]]
 //  CHECK-SAME:     vector<96x16xf16>, vector<16x64xf16> into vector<96x64xf32>
 //       CHECK:   %[[TRUNC:.+]] = arith.truncf %[[MM]] : vector<96x64xf32> to vector<96x64xf16>

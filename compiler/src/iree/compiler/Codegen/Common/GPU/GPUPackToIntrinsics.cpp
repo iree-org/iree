@@ -131,8 +131,9 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
     // Get the enclosing scf.for op.
     auto parentOp = yieldOp->getParentOp();
     auto forOp = dyn_cast<scf::ForOp>(parentOp);
-    if (!forOp)
+    if (!forOp) {
       return failure();
+    }
 
     linalg::UnPackOp unpackOp;
     linalg::PackOp packOp;

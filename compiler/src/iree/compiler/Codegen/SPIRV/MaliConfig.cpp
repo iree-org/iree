@@ -25,7 +25,7 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
   Type inputType = op.getDpsInputOperand(0)->get().getType();
-  Type elementType = llvm::cast<ShapedType>(inputType).getElementType();
+  Type elementType = cast<ShapedType>(inputType).getElementType();
   if (IREE::Util::getTypeBitWidth(elementType) == 16) {
     threadMNK = {2, 8, 8};
   } else if (elementType.isInteger(8)) {
@@ -45,16 +45,18 @@ LogicalResult setMaliCodeGenConfig(IREE::GPU::TargetAttr target,
   const int subgroupSize = target.getPreferredSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (isMatmulOrBatchMatmul(linalgOp))
+    if (isMatmulOrBatchMatmul(linalgOp)) {
       return setMaliMatmulConfig(linalgOp, target);
+    }
   }
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
     // Use the result type in case of larger bitwidth for accumulators.
     auto type = cast<ShapedType>(convOp->getResult(0).getType());
     const int bitwidth = type.getElementTypeBitWidth();
-    if (bitwidth > 32)
+    if (bitwidth > 32) {
       return failure();
+    }
     const int multipler = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
     const int bestTilingFactor = (hasPaddedInput ? 8 : 16) * multipler;

@@ -10,10 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdint>
+
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+// Maximum number of operands/bindings allowed for a dispatch region.
+// This is constrained by the most restrictive GPU backends (CUDA, HIP/ROCm,
+// Metal) which all have a limit of 16 bindings. See:
+// - IREE_HAL_CUDA_MAX_DISPATCH_BINDING_COUNT = 16
+// - IREE_HAL_HIP_MAX_DISPATCH_BINDING_COUNT = 16
+constexpr int64_t kIreeMaxOperandCount = 16;
 
 /// Return true of the producer and consumer of `operand` are fusable
 /// using elementwise op fusion transformation.
@@ -33,6 +42,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
 /// dispatch. Returns std::nullopt if the dispatch can not be found in the
 /// chain or any op in the chain is not a reshape-like op.
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
-getProducerDispatchValueAndOpChain(Value operand);
+getProducerDispatchValueAndOpChain(Value operand,
+                                   bool enableAggressiveFusion = false);
 
 } // namespace mlir::iree_compiler::DispatchCreation

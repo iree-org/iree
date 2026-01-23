@@ -78,7 +78,7 @@ class Trailer(str, enum.Enum):
 # This is to help prevent typos. For now we hard error on any trailer that
 # starts with this prefix but isn't in our list. We can add known commonly used
 # trailers to our list or we might consider relaxing this.
-RESERVED_TRAILER_PREFIXES = ["ci-", "bewnchmark-", "skip-"]
+RESERVED_TRAILER_PREFIXES = ["ci-", "benchmark-", "skip-"]
 ALL_KEY = "all"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
@@ -118,8 +118,22 @@ CONTROL_JOB_REGEXES = frozenset(
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
-        # None.
         "windows_x64_msvc",
+        "test_torch",
+    ]
+)
+
+# Jobs to only run on schedule or when explicitly requested via ci-extra.
+# These are excluded from both presubmit and postsubmit by default.
+DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
+    [
+        "macos_arm64_clang",
+        "macos_x64_clang",
+        "linux_arm64_clang",
+        "linux_x64_clang_byollvm",
+        "linux_x64_clang_debug",
+        "linux_x64_clang_tsan",
+        "linux_x64_gcc",
     ]
 )
 
@@ -127,11 +141,59 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards. Sample:
 #   ("test_nvidia_a100", ["compiler/plugins/target/CUDA/*"]),
-# Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     (
+        "linux_arm64_clang",
+        [".github/workflows/ci_linux_arm64_clang.yml"],
+    ),
+    (
+        "linux_x64_bazel",
+        [".github/workflows/ci_linux_x64_bazel.yml"],
+    ),
+    (
+        "linux_x64_clang_asan",
+        [".github/workflows/ci_linux_x64_clang_asan.yml"],
+    ),
+    (
+        "linux_x64_clang_byollvm",
+        [".github/workflows/ci_linux_x64_clang_byollvm.yml"],
+    ),
+    (
+        "linux_x64_clang_debug",
+        [".github/workflows/ci_linux_x64_clang_debug.yml"],
+    ),
+    (
+        "linux_x64_clang_tsan",
+        [".github/workflows/ci_linux_x64_clang_tsan.yml"],
+    ),
+    (
+        "linux_x64_clang",
+        [".github/workflows/ci_linux_x64_clang.yml"],
+    ),
+    (
+        "linux_x64_gcc",
+        [".github/workflows/ci_linux_x64_gcc.yml"],
+    ),
+    (
+        "macos_arm64_clang",
+        [".github/workflows/ci_macos_arm64_clang.yml"],
+    ),
+    (
+        "macos_x64_clang",
+        [".github/workflows/ci_macos_x64_clang.yml"],
+    ),
+    (
         "windows_x64_msvc",
-        ["*win32*", "*windows*", "*msvc*"],
+        [
+            "*win32*",
+            "*windows*",
+            "*msvc*",
+            ".github/worklflows/ci_windows_x64_msvc.yml",
+        ],
+    ),
+    (
+        "test_torch",
+        ["tests/external/iree-test-suites/torch*"],
     ),
 ]
 
@@ -403,16 +465,10 @@ def get_enabled_jobs(
     """
     if not is_pr:
         print(
-            "Running all jobs because run was not triggered by a pull request event.",
+            "Running default postsubmit jobs (excluding schedule-only jobs).",
             file=sys.stderr,
         )
-        return all_jobs
-    if is_llvm_integrate_pr:
-        print(
-            "Running all jobs because run was triggered by an LLVM integrate pull request event.",
-            file=sys.stderr,
-        )
-        return all_jobs
+        return all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS
 
     if Trailer.SKIP_CI in trailers:
         if (
@@ -455,7 +511,14 @@ def get_enabled_jobs(
             f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
         )
 
-    enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
+    if is_llvm_integrate_pr:
+        print(
+            "Running all jobs (excluding schedule-only) because run was triggered by an LLVM integrate pull request event.",
+            file=sys.stderr,
+        )
+        return (all_jobs - DEFAULT_SCHEDULE_ONLY_JOBS) | extra_jobs
+
+    enabled_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS - DEFAULT_SCHEDULE_ONLY_JOBS
 
     if not modifies_non_skip_paths(modified_paths):
         print(

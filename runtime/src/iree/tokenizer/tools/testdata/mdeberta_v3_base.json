@@ -1,0 +1,22 @@
+{
+  "model": "microsoft/mdeberta-v3-base",
+  "description": "mDeBERTa v3 Base - Multilingual DeBERTa with Strip normalizer (1M+ downloads)",
+  "tests": [
+    {
+      "name": "simple_ascii",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "whitespace_strip",
+      "input": "  Hello world  "
+    },
+    {
+      "name": "multilingual_chinese",
+      "input": "你好世界"
+    },
+    {
+      "name": "multilingual_mixed",
+      "input": "Hello 世界 Bonjour мир"
+    }
+  ]
+}

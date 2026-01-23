@@ -8,6 +8,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,8 +23,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-preprocessing-convert-conv-to-channels-last"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -217,7 +216,10 @@ createTransposeAsTensorPack(
   SmallVector<AffineExpr> mapResults(inputMap.getResults());
   AffineMap transposedMap;
 
-  Value packedOperand = packedInput;
+  Value packedOperand;
+  if (!packedInput.getResults().empty()) {
+    packedOperand = packedInput.getResult();
+  }
   // Collapse the unit dims created by linalg.pack if the pack is just a
   // transpose.
   if (tilingFactor <= 0) {
@@ -523,10 +525,12 @@ public:
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
-    if (!packOp.getOuterDimsPerm().empty())
+    if (!packOp.getOuterDimsPerm().empty()) {
       return failure();
-    if (packOp.getPaddingValue())
+    }
+    if (packOp.getPaddingValue()) {
       return failure();
+    }
 
     RankedTensorType destType =
         cast<RankedTensorType>(packOp.getDest().getType());
@@ -573,8 +577,9 @@ public:
     int64_t nTiled = 0;
     for (int64_t srcIdx = 0; srcIdx < srcRank; srcIdx++) {
       reassocationIndices.push_back({srcIdx + nTiled});
-      while (innerDims.contains(srcIdx + nTiled))
+      while (innerDims.contains(srcIdx + nTiled)) {
         reassocationIndices.back().push_back(srcIdx + ++nTiled);
+      }
     }
 
     rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
@@ -604,8 +609,9 @@ public:
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
-    if (!unpackOp.getOuterDimsPerm().empty())
+    if (!unpackOp.getOuterDimsPerm().empty()) {
       return failure();
+    }
 
     RankedTensorType srcType =
         cast<RankedTensorType>(unpackOp.getSource().getType());
@@ -672,7 +678,7 @@ public:
       }
     }
 
-    LDBG("after converting convolutions to channels last\n" << *op);
+    LDBG() << "after converting convolutions to channels last\n" << *op;
 
     // Propagate packs introduced by the conversion patterns through adjacent
     // pads. Note that packs introduced by the above patterns will never include
@@ -688,7 +694,7 @@ public:
       }
     }
 
-    LDBG("after propagating packs/unpacks\n" << *op);
+    LDBG() << "after propagating packs/unpacks\n" << *op;
 
     // Run pack/unpack canonicalization to try to cancel any packs.
     {
@@ -701,7 +707,7 @@ public:
       }
     }
 
-    LDBG("after canonicalizing packs/unpacks\n" << *op);
+    LDBG() << "after canonicalizing packs/unpacks\n" << *op;
 
     // Generalize leftover packs and unpacks that are just transposes to allow
     // for transpose propagation and unit dim folding to handle them more
@@ -715,7 +721,7 @@ public:
       }
     }
 
-    LDBG("after generalizing all remaining packs/unpacks\n" << *op);
+    LDBG() << "after generalizing all remaining packs/unpacks\n" << *op;
   }
 };
 

@@ -131,8 +131,9 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   }
 
   if (failed(
-          funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp)))
+          funcOp.replaceAllSymbolUses(builder.getStringAttr(name), moduleOp))) {
     return funcOp.emitError() << "unable to update symbol name in module";
+  }
 
   return success();
 }
@@ -235,7 +236,7 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
             /*callee=*/"iree_vm_make_ref_type_def",
             /*operands=*/ArrayRef<Value>{refType})
             .getResult(0);
-  } else if (llvm::isa<IREE::VM::OpaqueType>(elementType)) {
+  } else if (isa<IREE::VM::OpaqueType>(elementType)) {
     elementTypeValue =
         emitc::CallOpaqueOp::create(
             rewriter,
@@ -1172,8 +1173,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     // Rodata ops.
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-      auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
-          rodataOp.getValue());
+      auto value =
+          dyn_cast<IREE::Util::SerializableAttrInterface>(rodataOp.getValue());
       assert(value && "expected a serializable rodata value");
       SmallVector<char> byteBuffer;
       if (failed(value.serializeToVector(
@@ -1186,8 +1187,9 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
           rodataOp.getAlignment()
               ? static_cast<size_t>(rodataOp.getAlignment().value())
               : 0;
-      if (alignment == 0)
+      if (alignment == 0) {
         alignment = kDefaultRodataAlignment;
+      }
 
       std::string bufferName =
           moduleOp.getName().str() + "_" + rodataOp.getName().str();
@@ -1196,8 +1198,9 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                          ") static const uint8_t " + bufferName + "[] = {";
       size_t index = 0;
       for (char value : byteBuffer) {
-        if (index++ > 0)
+        if (index++ > 0) {
           stmt += ", ";
+        }
         stmt += std::to_string(
             static_cast<unsigned int>(static_cast<unsigned char>(value)));
       }
@@ -1955,7 +1958,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       assert(argumentStruct.value.has_value());
       auto value = argumentStruct.value.value();
 
-      if (llvm::isa<IREE::VM::RefType>(input.value())) {
+      if (isa<IREE::VM::RefType>(input.value())) {
         auto ptrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
         std::string memberName = "arg" + std::to_string(input.index());
@@ -2060,8 +2063,8 @@ private:
                                           OpBuilder &builder) const {
     SetVector<const void *> arities;
 
-    for (auto caller : getCallers(importOp)) {
-      DenseIntElementsAttr segmentSizes = caller.getSegmentSizes();
+    for (DenseIntElementsAttr segmentSizes :
+         getVariadicCallerSegmentSizes(importOp)) {
       const void *p = segmentSizes.getAsOpaquePointer();
       if (arities.insert(p)) {
         if (failed(createImportShim(importOp, segmentSizes, builder))) {
@@ -2202,6 +2205,15 @@ private:
         return importOp.emitError() << "failed to create call";
       }
 
+      // Release refs in argument buffer after call returns. Refs that were
+      // taken by the callee (via assign_ref+memset) will be null and release
+      // will be a no-op.
+      if (failed(releaseArgumentBuffer(
+              flattenInputTypes(importOp, segmentSizes, builder), call.value(),
+              builder, loc))) {
+        return importOp.emitError() << "failed to release argument buffer";
+      }
+
       if (failed(unpackResultBuffer(importOp.getResultTypes(), newFuncOp,
                                     call.value(), builder, loc))) {
         return importOp.emitError() << "failed to unpack result struct";
@@ -2245,6 +2257,24 @@ private:
     return {result};
   }
 
+  // Returns the required alignment for a type (4 or 8 bytes).
+  size_t getTypeAlignment(Type type) const {
+    // 64-bit types and refs require 8-byte alignment.
+    if (auto intType = dyn_cast<IntegerType>(type)) {
+      return intType.getWidth() > 32 ? 8 : 4;
+    }
+    if (isa<Float64Type>(type)) {
+      return 8;
+    }
+    if (auto opaqueType = dyn_cast<emitc::OpaqueType>(type)) {
+      // iree_vm_ref_t contains pointers, so needs 8-byte alignment.
+      if (opaqueType.getValue() == "iree_vm_ref_t") {
+        return 8;
+      }
+    }
+    return 4;
+  }
+
   MaybeZeroValue buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
                                      Location loc) const {
     auto ctx = builder.getContext();
@@ -2258,8 +2288,19 @@ private:
                                   /*value=*/emitc::OpaqueAttr::get(ctx, "0"))
             .getResult();
     bool isZero = true;
+    size_t maxAlignment = 4;
     for (Type type : types) {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
+
+      // Align before adding this element if it requires 8-byte alignment.
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > maxAlignment) {
+        maxAlignment = alignment;
+      }
+      if (alignment > 4) {
+        result = emitc_builders::alignTo(builder, loc, result, alignment);
+      }
+
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2269,6 +2310,12 @@ private:
                                     /*operands=*/ArrayRef<Value>{result, size})
                    .getResult();
       isZero = false;
+    }
+
+    // Add trailing padding to match struct size (sizeof(struct) is always a
+    // multiple of its alignment).
+    if (maxAlignment > 4 && !isZero) {
+      result = emitc_builders::alignTo(builder, loc, result, maxAlignment);
     }
 
     return MaybeZeroValue{result, isZero};
@@ -2383,7 +2430,7 @@ private:
                                 /*type=*/
                                 emitc::LValueType::get(emitc::OpaqueType::get(
                                     ctx, "iree_byte_span_t")),
-                                /*memberName=*/"arguments",
+                                /*member=*/"arguments",
                                 /*operand=*/call)
             .getResult();
 
@@ -2399,6 +2446,13 @@ private:
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
 
+      // Align pointer before accessing types that require 8-byte alignment.
+      Type valueType = typeConverter.convertTypeAsNonPointer(argType);
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2409,10 +2463,14 @@ private:
                                              /*operand=*/uint8Ptr)
                            .getResult();
 
+        // Retain the ref into args_storage. The callee may take ownership via
+        // assign_ref+memset(0), so we must retain (not just assign/borrow).
+        // After the call returns, releaseArgumentBuffer will release any refs
+        // that weren't taken by the callee.
         emitc::CallOpaqueOp::create(builder,
                                     /*location=*/loc,
                                     /*type=*/TypeRange{},
-                                    /*callee=*/"iree_vm_ref_assign",
+                                    /*callee=*/"iree_vm_ref_retain",
                                     /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
         auto argLValue = emitc_builders::asLValue(builder, loc, arg);
@@ -2427,10 +2485,86 @@ private:
 
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
-        Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
+        uint8Ptr =
+            emitc::AddOp::create(builder,
+                                 /*location=*/loc, /*type=*/bytePtrType,
+                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                .getResult();
+      }
+    }
+    return success();
+  }
+
+  // Releases refs in the argument buffer after an import call returns.
+  // This mirrors packArgumentBuffer but releases instead of retaining.
+  // Refs that were taken by the callee (via assign_ref+memset) will be null
+  // and release will be a no-op.
+  LogicalResult releaseArgumentBuffer(ArrayRef<Type> inputTypes,
+                                      TypedValue<emitc::LValueType> call,
+                                      OpBuilder &builder, Location loc) const {
+    // Find the last ref type index. We only need to iterate up to and including
+    // that index to release all refs. This avoids generating unused pointer
+    // arithmetic for trailing non-ref types.
+    std::optional<size_t> lastRefIndex;
+    for (size_t i = 0; i < inputTypes.size(); i++) {
+      if (isa<IREE::VM::RefType>(inputTypes[i])) {
+        lastRefIndex = i;
+      }
+    }
+    if (!lastRefIndex) {
+      return success();
+    }
+
+    MLIRContext *ctx = builder.getContext();
+
+    auto arguments =
+        emitc::MemberOp::create(builder, loc,
+                                /*type=*/
+                                emitc::LValueType::get(emitc::OpaqueType::get(
+                                    ctx, "iree_byte_span_t")),
+                                /*member=*/"arguments",
+                                /*operand=*/call)
+            .getResult();
+
+    Type bytePtrType =
+        emitc::PointerType::get(builder.getIntegerType(8, false));
+    auto uint8Ptr = emitc_builders::structMember(builder, loc,
+                                                 /*type=*/bytePtrType,
+                                                 /*memberName=*/"data",
+                                                 /*operand=*/arguments);
+
+    // Only iterate up to and including the last ref type.
+    for (size_t i = 0; i <= *lastRefIndex; i++) {
+      Type inputType = inputTypes[i];
+
+      // Get the value type and compute alignment (must match packArgumentBuffer
+      // exactly to ensure we're releasing the correct locations).
+      Type valueType = typeConverter.convertTypeAsNonPointer(inputType);
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
+      // Release refs. If the callee took ownership and zeroed the ref,
+      // iree_vm_ref_release on a null ref is a no-op.
+      if (isa<IREE::VM::RefType>(inputType)) {
+        Type refPtrType = emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+        Value refPtr = emitc::CastOp::create(builder,
+                                             /*location=*/loc,
+                                             /*type=*/refPtrType,
+                                             /*operand=*/uint8Ptr)
+                           .getResult();
+        emitc_builders::ireeVmRefRelease(builder, loc, refPtr);
+      }
+
+      // Advance pointer to next element (only if not at the last ref).
+      if (i < *lastRefIndex) {
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr =
             emitc::AddOp::create(builder,
                                  /*location=*/loc, /*type=*/bytePtrType,
@@ -2473,6 +2607,21 @@ private:
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
 
+      // Get the value type and its alignment requirement.
+      Type valueType;
+      if (argType == emitc::PointerType::get(
+                         emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
+        valueType = emitc::OpaqueType::get(ctx, "iree_vm_ref_t");
+      } else {
+        valueType = cast<emitc::PointerType>(argType).getPointee();
+      }
+
+      // Align pointer before accessing types that require 8-byte alignment.
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > 4) {
+        uint8Ptr = emitc_builders::alignPtr(builder, loc, uint8Ptr, alignment);
+      }
+
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
@@ -2489,7 +2638,6 @@ private:
                                     /*callee=*/"iree_vm_ref_move",
                                     /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
@@ -2499,7 +2647,6 @@ private:
 
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
-        Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr =
@@ -2567,7 +2714,7 @@ private:
 
     SmallVector<Type> result;
     auto expandType = [&result](Type type) {
-      if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
+      if (auto tupleType = dyn_cast<TupleType>(type)) {
         for (Type inner : tupleType) {
           result.push_back(inner);
         }
@@ -2597,9 +2744,11 @@ private:
     return result;
   }
 
-  SmallVector<IREE::VM::CallVariadicOp>
-  getCallers(IREE::VM::ImportOp &importOp) const {
-    SmallVector<IREE::VM::CallVariadicOp> result;
+  // Returns segment sizes for all variadic callers of the given import.
+  // Includes both CallVariadicOp and CallVariadicYieldableOp.
+  SmallVector<DenseIntElementsAttr>
+  getVariadicCallerSegmentSizes(IREE::VM::ImportOp &importOp) const {
+    SmallVector<DenseIntElementsAttr> result;
 
     auto moduleOp =
         importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
@@ -2608,7 +2757,13 @@ private:
       if (auto callOp = dyn_cast<IREE::VM::CallVariadicOp>(op)) {
         if (importOp == lookupSymbolRef<IREE::VM::ImportOp>(
                             callOp.getOperation(), "callee")) {
-          result.push_back(callOp);
+          result.push_back(callOp.getSegmentSizes());
+        }
+      } else if (auto callOp =
+                     dyn_cast<IREE::VM::CallVariadicYieldableOp>(op)) {
+        if (importOp == lookupSymbolRef<IREE::VM::ImportOp>(
+                            callOp.getOperation(), "callee")) {
+          result.push_back(callOp.getSegmentSizes());
         }
       }
     });
@@ -2633,11 +2788,13 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     IREE::VM::ImportOp importOp =
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
 
-    if (!funcOp && !importOp)
+    if (!funcOp && !importOp) {
       return op.emitError() << "lookup of callee failed";
+    }
 
-    if (funcOp && importOp)
+    if (funcOp && importOp) {
       return op.emitError() << "lookup of callee ambiguous";
+    }
 
     const bool isImported = importOp != nullptr;
 
@@ -2729,8 +2886,9 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
       return failure();
     }
 
-    if (!funcName.has_value())
+    if (!funcName.has_value()) {
       return op->emitError() << "Couldn't build name to imported function";
+    }
 
     auto callee = moduleOp.lookupSymbol<mlir::emitc::FuncOp>(funcName.value());
     if (callee == nullptr) {
@@ -2773,8 +2931,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         updatedOperands.push_back(segmentSize);
 
         Type type = importOp.getFunctionType().getInput(i);
-        int numOps =
-            llvm::isa<TupleType>(type) ? llvm::cast<TupleType>(type).size() : 1;
+        int numOps = isa<TupleType>(type) ? cast<TupleType>(type).size() : 1;
         for (int i = 0; i < size; i++) {
           for (int j = 0; j < numOps; j++) {
             FailureOr<Value> updatedOperand =
@@ -2800,7 +2957,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     // Create a variable for every result and a pointer to it as output
     // parameter to the call.
     for (OpResult result : op->getResults()) {
-      if (llvm::isa<IREE::VM::RefType>(result.getType())) {
+      if (isa<IREE::VM::RefType>(result.getType())) {
         Value ref = this->getModuleAnalysis().lookupRef(result);
 
         resultOperands.push_back(ref);
@@ -2823,7 +2980,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     assert(operand.getType() != emitc::PointerType::get(emitc::OpaqueType::get(
                                     ctx, "iree_vm_ref_t")));
-    if (!llvm::isa<IREE::VM::RefType>(operand.getType())) {
+    if (!isa<IREE::VM::RefType>(operand.getType())) {
       return operand;
     }
 
@@ -2840,6 +2997,350 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         /*operands=*/ArrayRef<Value>{operandRef, refPtr});
 
     return refPtr;
+  }
+};
+
+// Converts vm.call.yieldable to an import call followed by a branch.
+// The yieldable semantics (BEGIN/RESUME pattern) are not preserved in the
+// EmitC path - the call is made synchronously and then branches to successor.
+class CallYieldableOpConversion
+    : public EmitCConversionPattern<IREE::VM::CallYieldableOp> {
+  using Adaptor = IREE::VM::CallYieldableOp::Adaptor;
+  using EmitCConversionPattern<
+      IREE::VM::CallYieldableOp>::EmitCConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VM::CallYieldableOp op, Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    IREE::VM::ImportOp importOp =
+        lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
+    if (!importOp) {
+      return op.emitError() << "callee must be an import for yieldable call";
+    }
+
+    MLIRContext *ctx = op->getContext();
+    Location loc = op.getLoc();
+
+    auto moduleOp =
+        importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+    int importOrdinal = importOp.getOrdinal()->getZExtValue();
+
+    auto funcOp = op->getParentOfType<mlir::emitc::FuncOp>();
+
+    const BlockArgument stackArg = funcOp.getArgument(CCONV_ARGUMENT_STACK);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+    auto stateArgLValue = emitc_builders::asLValue(rewriter, loc, stateArg);
+
+    auto imports =
+        cast<TypedValue<emitc::PointerType>>(emitc_builders::structPtrMember(
+            rewriter, loc,
+            /*type=*/
+            emitc::PointerType::get(
+                emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
+            /*memberName=*/"imports",
+            /*operand=*/stateArgLValue));
+
+    auto import = emitc_builders::arrayElementAddress(
+        rewriter, loc, /*index=*/importOrdinal, /*operand=*/imports);
+
+    SmallVector<Value> updatedOperands = {stackArg, import};
+    SmallVector<Value> resultOperands;
+    SmallVector<Value> refResultPtrs; // Track ref result pointers for move.
+
+    // Add call arguments.
+    for (Value operand : op.getArguments()) {
+      if (!isa<IREE::VM::RefType>(operand.getType())) {
+        updatedOperands.push_back(operand);
+      } else {
+        Value operandRef = getModuleAnalysis().lookupRef(operand);
+        auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
+            rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+        emitc::CallOpaqueOp::create(rewriter, loc, TypeRange{},
+                                    "iree_vm_ref_assign",
+                                    ArrayRef<Value>{operandRef, refPtr});
+        updatedOperands.push_back(refPtr);
+      }
+    }
+
+    // Create result variables based on result_types attribute.
+    auto resultTypes = op.getResultTypesVec();
+    for (Type resultType : resultTypes) {
+      if (isa<IREE::VM::RefType>(resultType)) {
+        // For refs, we need a ref variable.
+        auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
+            rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+        resultOperands.push_back(ref);
+        refResultPtrs.push_back(refPtr);
+        updatedOperands.push_back(refPtr);
+      } else {
+        auto resultValue =
+            emitc_builders::allocateVariable(rewriter, loc, resultType);
+        Value resultPtr = emitc_builders::addressOf(rewriter, loc, resultValue);
+        resultOperands.push_back(resultValue);
+        updatedOperands.push_back(resultPtr);
+      }
+    }
+
+    // Build the import function name.
+    auto funcName = buildFunctionName(moduleOp, importOp);
+    if (!funcName.has_value()) {
+      return op.emitError() << "couldn't build name for imported function";
+    }
+
+    auto callee = moduleOp.lookupSymbol<mlir::emitc::FuncOp>(funcName.value());
+    if (callee == nullptr) {
+      return op.emitError()
+             << "couldn't find function with name `" << funcName.value() << "`";
+    }
+
+    // Call the import.
+    returnIfError(rewriter, loc, callee, updatedOperands, getModuleAnalysis());
+
+    // Get result values.
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+
+    // Branch to successor with results.
+    Block *dest = op.getDest();
+
+    // Handle ref vs non-ref operands for the branch.
+    auto isNotRefType = [](Type type) { return !isa<IREE::VM::RefType>(type); };
+
+    SmallVector<Value> nonRefResults;
+    for (auto [result, type] : llvm::zip_equal(resultOperands, resultTypes)) {
+      if (isNotRefType(type)) {
+        nonRefResults.push_back(result);
+      }
+    }
+
+    // If all results are non-refs, do a simple branch.
+    if (resultOperands.size() == nonRefResults.size()) {
+      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, dest, nonRefResults);
+      return success();
+    }
+
+    // Handle ref results by assigning to block argument refs.
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
+    auto &signatureConversion = funcAnalysis.lookupBlockConversion(dest);
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    Block *destDispatch = rewriter.createBlock(dest);
+
+    IRMapping refMapping;
+    size_t refIndex = 0;
+    for (auto [index, type] : llvm::enumerate(resultTypes)) {
+      if (isNotRefType(type)) {
+        continue;
+      }
+
+      Value blockArgRef =
+          signatureConversion.getInputMapping(index)->replacementValues[0];
+
+      assert(isa<IREE::VM::RefType>(type));
+      assert(isa<emitc::PointerType>(blockArgRef.getType()));
+
+      refMapping.map(refResultPtrs[refIndex++], blockArgRef);
+    }
+
+    if (failed(retainOrMoveRefs(rewriter, loc, refMapping, /*isMove=*/true))) {
+      return op.emitError() << "moving of refs failed";
+    }
+
+    mlir::cf::BranchOp::create(rewriter, loc, dest, nonRefResults);
+
+    rewriter.setInsertionPoint(op);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, destDispatch);
+
+    return success();
+  }
+};
+
+// Converts vm.call.variadic.yieldable to an import call followed by a branch.
+// Combines variadic argument handling with yieldable semantics. The yieldable
+// semantics (BEGIN/RESUME pattern) are not preserved in the EmitC path - the
+// call is made synchronously and then branches to successor.
+class CallVariadicYieldableOpConversion
+    : public EmitCConversionPattern<IREE::VM::CallVariadicYieldableOp> {
+  using Adaptor = IREE::VM::CallVariadicYieldableOp::Adaptor;
+  using EmitCConversionPattern<
+      IREE::VM::CallVariadicYieldableOp>::EmitCConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VM::CallVariadicYieldableOp op, Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    IREE::VM::ImportOp importOp =
+        lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
+    if (!importOp) {
+      return op.emitError() << "callee must be an import for yieldable call";
+    }
+
+    MLIRContext *ctx = op->getContext();
+    Location loc = op.getLoc();
+
+    auto moduleOp =
+        importOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
+    int importOrdinal = importOp.getOrdinal()->getZExtValue();
+
+    auto funcOp = op->getParentOfType<mlir::emitc::FuncOp>();
+
+    const BlockArgument stackArg = funcOp.getArgument(CCONV_ARGUMENT_STACK);
+    const BlockArgument stateArg =
+        funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
+    auto stateArgLValue = emitc_builders::asLValue(rewriter, loc, stateArg);
+
+    auto imports =
+        cast<TypedValue<emitc::PointerType>>(emitc_builders::structPtrMember(
+            rewriter, loc,
+            /*type=*/
+            emitc::PointerType::get(
+                emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
+            /*memberName=*/"imports",
+            /*operand=*/stateArgLValue));
+
+    auto import = emitc_builders::arrayElementAddress(
+        rewriter, loc, /*index=*/importOrdinal, /*operand=*/imports);
+
+    SmallVector<Value> updatedOperands = {stackArg, import};
+    SmallVector<Value> resultOperands;
+    SmallVector<Value> refResultPtrs;
+
+    // Add variadic call arguments with segment size handling.
+    OperandRange operands = op.getOperands();
+    int operandIndex = 0;
+    int numInputs = importOp.getFunctionType().getNumInputs();
+    for (int i = 0; i < numInputs; i++) {
+      if (importOp.isFuncArgumentVariadic(i)) {
+        APInt segment = *(op.getSegmentSizes().begin() + i);
+        int64_t size = segment.getSExtValue();
+
+        Value segmentSize =
+            emitc::ConstantOp::create(rewriter, loc, rewriter.getI32Type(),
+                                      rewriter.getI32IntegerAttr(size))
+                .getResult();
+        updatedOperands.push_back(segmentSize);
+
+        Type type = importOp.getFunctionType().getInput(i);
+        int numOps = isa<TupleType>(type) ? cast<TupleType>(type).size() : 1;
+        for (int j = 0; j < size; j++) {
+          for (int k = 0; k < numOps; k++) {
+            Value operand = operands[operandIndex++];
+            if (!isa<IREE::VM::RefType>(operand.getType())) {
+              updatedOperands.push_back(operand);
+            } else {
+              Value operandRef = getModuleAnalysis().lookupRef(operand);
+              auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
+                  rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+              emitc::CallOpaqueOp::create(rewriter, loc, TypeRange{},
+                                          "iree_vm_ref_assign",
+                                          ArrayRef<Value>{operandRef, refPtr});
+              updatedOperands.push_back(refPtr);
+            }
+          }
+        }
+      } else {
+        Value operand = operands[operandIndex++];
+        if (!isa<IREE::VM::RefType>(operand.getType())) {
+          updatedOperands.push_back(operand);
+        } else {
+          Value operandRef = getModuleAnalysis().lookupRef(operand);
+          auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
+              rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+          emitc::CallOpaqueOp::create(rewriter, loc, TypeRange{},
+                                      "iree_vm_ref_assign",
+                                      ArrayRef<Value>{operandRef, refPtr});
+          updatedOperands.push_back(refPtr);
+        }
+      }
+    }
+
+    // Create result variables based on result_types attribute.
+    auto resultTypes = op.getResultTypesVec();
+    for (Type resultType : resultTypes) {
+      if (isa<IREE::VM::RefType>(resultType)) {
+        auto [ref, refPtr] = emitc_builders::allocZeroInitializedVar(
+            rewriter, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
+        resultOperands.push_back(ref);
+        refResultPtrs.push_back(refPtr);
+        updatedOperands.push_back(refPtr);
+      } else {
+        auto resultValue =
+            emitc_builders::allocateVariable(rewriter, loc, resultType);
+        Value resultPtr = emitc_builders::addressOf(rewriter, loc, resultValue);
+        resultOperands.push_back(resultValue);
+        updatedOperands.push_back(resultPtr);
+      }
+    }
+
+    // Build the variadic import function name.
+    auto funcName =
+        buildVariadicFunctionName(moduleOp, importOp, op.getSegmentSizes());
+    if (!funcName.has_value()) {
+      return op.emitError() << "couldn't build name for imported function";
+    }
+
+    auto callee = moduleOp.lookupSymbol<mlir::emitc::FuncOp>(funcName.value());
+    if (callee == nullptr) {
+      return op.emitError()
+             << "couldn't find function with name `" << funcName.value() << "`";
+    }
+
+    // Call the import.
+    returnIfError(rewriter, loc, callee, updatedOperands, getModuleAnalysis());
+
+    // Get result values.
+    emitc_builders::asRValues(rewriter, loc, resultOperands);
+
+    // Branch to successor with results.
+    Block *dest = op.getDest();
+
+    auto isNotRefType = [](Type type) { return !isa<IREE::VM::RefType>(type); };
+
+    SmallVector<Value> nonRefResults;
+    for (auto [result, type] : llvm::zip_equal(resultOperands, resultTypes)) {
+      if (isNotRefType(type)) {
+        nonRefResults.push_back(result);
+      }
+    }
+
+    // If all results are non-refs, do a simple branch.
+    if (resultOperands.size() == nonRefResults.size()) {
+      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, dest, nonRefResults);
+      return success();
+    }
+
+    // Handle ref results by assigning to block argument refs.
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
+    auto &signatureConversion = funcAnalysis.lookupBlockConversion(dest);
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    Block *destDispatch = rewriter.createBlock(dest);
+
+    IRMapping refMapping;
+    size_t refIndex = 0;
+    for (auto [index, type] : llvm::enumerate(resultTypes)) {
+      if (isNotRefType(type)) {
+        continue;
+      }
+
+      Value blockArgRef =
+          signatureConversion.getInputMapping(index)->replacementValues[0];
+
+      assert(isa<IREE::VM::RefType>(type));
+      assert(isa<emitc::PointerType>(blockArgRef.getType()));
+
+      refMapping.map(refResultPtrs[refIndex++], blockArgRef);
+    }
+
+    if (failed(retainOrMoveRefs(rewriter, loc, refMapping, /*isMove=*/true))) {
+      return op.emitError() << "moving of refs failed";
+    }
+
+    mlir::cf::BranchOp::create(rewriter, loc, dest, nonRefResults);
+
+    rewriter.setInsertionPoint(op);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, destDispatch);
+
+    return success();
   }
 };
 
@@ -3159,7 +3660,7 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
     assert(op.getOperands().size() == adaptor.getOperands().size());
 
     auto isNotRefOperand = [](Value operand) {
-      return !llvm::isa<IREE::VM::RefType>(operand.getType());
+      return !isa<IREE::VM::RefType>(operand.getType());
     };
 
     SmallVector<Value> nonRefOperands;
@@ -3255,7 +3756,7 @@ class CondBranchOpConversion
     assert(op.getOperands().size() == adaptor.getOperands().size());
 
     auto isNotRefOperand = [](Value operand) {
-      return !llvm::isa<IREE::VM::RefType>(operand.getType());
+      return !isa<IREE::VM::RefType>(operand.getType());
     };
 
     SmallVector<Value> nonRefOperands;
@@ -3328,8 +3829,9 @@ class BranchTableOpConversion
     {
       OpBuilder::InsertionGuard guard(rewriter);
       auto *nextBlock = rewriter.getInsertionBlock()->getNextNode();
-      for (size_t i = 0; i < caseDestinations.size(); ++i)
+      for (size_t i = 0; i < caseDestinations.size(); ++i) {
         caseBlocks.push_back(rewriter.createBlock(nextBlock));
+      }
       caseBlocks.push_back(rewriter.createBlock(nextBlock)); // default
     }
     IREE::VM::BranchOp::create(rewriter, op.getLoc(), caseBlocks.front());
@@ -3373,7 +3875,7 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
       unsigned int argumentIndex = firstOutputArgumentIndex + index;
       BlockArgument resultArgument = funcOp.getArgument(argumentIndex);
 
-      if (llvm::isa<IREE::VM::RefType>(operand.getType())) {
+      if (isa<IREE::VM::RefType>(operand.getType())) {
         assert(operand.getType() !=
                emitc::PointerType::get(
                    emitc::OpaqueType::get(op.getContext(), "iree_vm_ref_t")));
@@ -3807,8 +4309,7 @@ private:
 
         assert(isa<IREE::VM::RefType>(originalType) && "expected ref type");
 
-        Type objectType =
-            llvm::cast<IREE::VM::RefType>(originalType).getObjectType();
+        Type objectType = cast<IREE::VM::RefType>(originalType).getObjectType();
 
         std::optional<std::pair<StringRef, StringRef>> vmNames =
             TypeSwitch<Type, std::optional<std::pair<StringRef, StringRef>>>(
@@ -3893,7 +4394,7 @@ private:
     auto loc = op->getLoc();
 
     for (OpResult result : op->getResults()) {
-      if (llvm::isa<IREE::VM::RefType>(result.getType())) {
+      if (isa<IREE::VM::RefType>(result.getType())) {
         Value ref = this->getModuleAnalysis().lookupRef(result);
 
         results.push_back(ref);
@@ -3938,8 +4439,7 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    Type objectType =
-        llvm::cast<IREE::VM::RefType>(op.getType()).getObjectType();
+    Type objectType = cast<IREE::VM::RefType>(op.getType()).getObjectType();
     std::optional<Type> elementType = extractElementType(ctx, objectType);
     std::optional<CNames> cNames = extractCNames(op);
 
@@ -4009,9 +4509,9 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
   }
 
   std::optional<Type> extractElementType(MLIRContext *ctx, Type t) const {
-    if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(t)) {
+    if (auto listType = dyn_cast<IREE::VM::ListType>(t)) {
       return listType.getElementType();
-    } else if (auto bufferType = llvm::dyn_cast<IREE::VM::BufferType>(t)) {
+    } else if (auto bufferType = dyn_cast<IREE::VM::BufferType>(t)) {
       return NoneType::get(ctx);
     }
     return std::nullopt;
@@ -4491,6 +4991,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
     BranchOpConversion,
     CallOpConversion<IREE::VM::CallOp>,
     CallOpConversion<IREE::VM::CallVariadicOp>,
+    CallYieldableOpConversion,
+    CallVariadicYieldableOpConversion,
     CompareRefNotZeroOpConversion,
     SelectRefOpConversion,
     CondBranchOpConversion,
@@ -4766,6 +5268,12 @@ public:
 
   void runOnOperation() override {
     IREE::VM::ModuleOp moduleOp = getOperation();
+
+    // Erase vm.discard.refs ops before analysis. These are inserted by
+    // MaterializeRefDiscardsPass for the bytecode backend but are not used
+    // by EmitC. Erasing them here avoids inflating register pressure during
+    // the register allocation analysis.
+    moduleOp.walk([](IREE::VM::DiscardRefsOp op) { op.erase(); });
 
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter(moduleOp);

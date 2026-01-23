@@ -27,10 +27,11 @@ public:
 
   LogicalResult matchAndRewrite(Conv2DOpType convOp,
                                 PatternRewriter &rewriter) const override {
-    auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
+    auto filterShapeType = dyn_cast<RankedTensorType>(
         convOp.getDpsInputOperand(1)->get().getType());
-    if (!filterShapeType)
+    if (!filterShapeType) {
       return failure();
+    }
 
     constexpr bool isNCHW =
         std::is_same_v<linalg::Conv2DNchwFchwOp, Conv2DOpType>;
@@ -48,8 +49,9 @@ public:
     constexpr int khLoopIndex = isNHWC ? 4 : 5;
     constexpr int kwLoopIndex = isNHWC ? 5 : 6;
 
-    if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1)
+    if (filterShape[khIndex] != 1 || filterShape[kwIndex] != 1) {
       return failure();
+    }
 
     SmallVector<AffineExpr> dimReplacements;
     for (int i = 0; i < numLoops; i++) {

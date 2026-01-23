@@ -7,9 +7,9 @@ vm.module @comparison_ops_f64 {
   vm.export @test_cmp_lt_0_f64
   vm.func @test_cmp_lt_0_f64() {
     %lhs = vm.const.f64 4.0
-    %lhs_dno = util.optimization_barrier %lhs : f64
+    %lhs_dno = vm.optimization_barrier %lhs : f64
     %rhs = vm.const.f64 -4.0
-    %rhs_dno = util.optimization_barrier %rhs : f64
+    %rhs_dno = vm.optimization_barrier %rhs : f64
     %actual = vm.cmp.lt.f64.o %lhs_dno, %rhs_dno : f64
     %expected = vm.const.i32 0
     vm.check.eq %actual, %expected, "4.0 < -4.0" : i32
@@ -19,9 +19,9 @@ vm.module @comparison_ops_f64 {
   vm.export @test_cmp_lt_1_f64
   vm.func @test_cmp_lt_1_f64() {
     %lhs = vm.const.f64 -4.0
-    %lhs_dno = util.optimization_barrier %lhs : f64
+    %lhs_dno = vm.optimization_barrier %lhs : f64
     %rhs = vm.const.f64 4.0
-    %rhs_dno = util.optimization_barrier %rhs : f64
+    %rhs_dno = vm.optimization_barrier %rhs : f64
     %actual = vm.cmp.lt.f64.o %lhs_dno, %rhs_dno : f64
     %expected = vm.const.i32 1
     vm.check.eq %actual, %expected, "-4.0 < 4.0" : i32
@@ -41,9 +41,9 @@ vm.module @comparison_ops_f64 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f64 -2.0
-    %cn2_dno = util.optimization_barrier %cn2 : f64
+    %cn2_dno = vm.optimization_barrier %cn2 : f64
     %c2 = vm.const.f64 2.0
-    %c2_dno = util.optimization_barrier %c2 : f64
+    %c2_dno = vm.optimization_barrier %c2 : f64
 
     %cmp_0 = vm.cmp.eq.f64.near %cn2_dno, %c2_dno : f64
     vm.check.eq %cmp_0, %false, "-2 !~ 2" : i32
@@ -56,9 +56,9 @@ vm.module @comparison_ops_f64 {
 
     // off by 84 ULPs, arbitrary threshold sets these as "near enough"
     %c1a = vm.const.f64 1.00002
-    %c1a_dno = util.optimization_barrier %c1a : f64
+    %c1a_dno = vm.optimization_barrier %c1a : f64
     %c1b = vm.const.f64 1.00003
-    %c1b_dno = util.optimization_barrier %c1b : f64
+    %c1b_dno = vm.optimization_barrier %c1b : f64
 
     %cmp_4 = vm.cmp.eq.f64.near %c1a_dno, %c1b_dno : f64
     vm.check.eq %cmp_4, %true, "1.00002 ~ 1.00003" : i32
@@ -74,9 +74,9 @@ vm.module @comparison_ops_f64 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f64 -2.0
-    %cn2_dno = util.optimization_barrier %cn2 : f64
+    %cn2_dno = vm.optimization_barrier %cn2 : f64
     %c2 = vm.const.f64 2.0
-    %c2_dno = util.optimization_barrier %c2 : f64
+    %c2_dno = vm.optimization_barrier %c2 : f64
 
     %cmp_0 = vm.cmp.lte.f64.o %cn2_dno, %c2_dno : f64
     vm.check.eq %cmp_0, %true, "-2 <= 2" : i32
@@ -94,9 +94,9 @@ vm.module @comparison_ops_f64 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f64 -2.0
-    %cn2_dno = util.optimization_barrier %cn2 : f64
+    %cn2_dno = vm.optimization_barrier %cn2 : f64
     %c2 = vm.const.f64 2.0
-    %c2_dno = util.optimization_barrier %c2 : f64
+    %c2_dno = vm.optimization_barrier %c2 : f64
 
     %cmp_0 = vm.cmp.gt.f64.o %cn2_dno, %c2_dno : f64
     vm.check.eq %cmp_0, %false, "-2 > 2" : i32
@@ -114,9 +114,9 @@ vm.module @comparison_ops_f64 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f64 -2.0
-    %cn2_dno = util.optimization_barrier %cn2 : f64
+    %cn2_dno = vm.optimization_barrier %cn2 : f64
     %c2 = vm.const.f64 2.0
-    %c2_dno = util.optimization_barrier %c2 : f64
+    %c2_dno = vm.optimization_barrier %c2 : f64
 
     %cmp_0 = vm.cmp.gte.f64.o %cn2_dno, %c2_dno : f64
     vm.check.eq %cmp_0, %false, "-2 >= 2" : i32

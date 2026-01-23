@@ -16,6 +16,7 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "CommonExtensionsOps.td",
         ],
@@ -63,7 +64,6 @@ iree_compiler_cc_library(
     deps = [
         ":CommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/Common:VectorLayoutAnalysis",
         "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/Transforms:GPUTransforms",

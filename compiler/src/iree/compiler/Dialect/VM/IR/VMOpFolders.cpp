@@ -37,15 +37,16 @@ Attribute zeroOfType(Type type) {
 /// Creates a constant one attribute matching the given type.
 Attribute oneOfType(Type type) {
   Builder builder(type.getContext());
-  if (llvm::isa<FloatType>(type)) {
+  if (isa<FloatType>(type)) {
     return builder.getFloatAttr(type, 1.0);
-  } else if (auto integerTy = llvm::dyn_cast<IntegerType>(type)) {
+  } else if (auto integerTy = dyn_cast<IntegerType>(type)) {
     return builder.getIntegerAttr(integerTy, APInt(integerTy.getWidth(), 1));
-  } else if (llvm::isa<RankedTensorType, VectorType>(type)) {
-    auto vtType = llvm::cast<ShapedType>(type);
+  } else if (isa<RankedTensorType, VectorType>(type)) {
+    auto vtType = cast<ShapedType>(type);
     auto element = oneOfType(vtType.getElementType());
-    if (!element)
+    if (!element) {
       return {};
+    }
     return DenseElementsAttr::get(vtType, element);
   }
   return {};
@@ -64,8 +65,9 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getBody().getBlocks().size() != 1)
+    if (op.getBody().getBlocks().size() != 1) {
       return failure();
+    }
     auto &block = op.getBody().front();
     if (block.empty() || isa<ReturnOp>(block.front())) {
       rewriter.eraseOp(op);
@@ -85,12 +87,14 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> deadOps;
     op.walk([&](Operation *op) {
-      if (!isGlobalStoreOp(op))
+      if (!isGlobalStoreOp(op)) {
         return;
+      }
       auto value = op->getOperand(0);
       Attribute valueAttr;
-      if (!matchPattern(value, m_Constant(&valueAttr)))
+      if (!matchPattern(value, m_Constant(&valueAttr))) {
         return;
+      }
       auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
       assert(globalRefAttr);
       auto globalOp =
@@ -100,10 +104,12 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
       deadOps.push_back(op);
     });
-    if (deadOps.empty())
+    if (deadOps.empty()) {
       return failure();
-    for (auto deadOp : deadOps)
+    }
+    for (Operation *deadOp : deadOps) {
       rewriter.eraseOp(deadOp);
+    }
     return success();
   }
 
@@ -135,15 +141,17 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getInitialValue().has_value())
+    if (!op.getInitialValue().has_value()) {
       return failure();
-    if (auto value = llvm::dyn_cast<IntegerAttr>(op.getInitialValueAttr())) {
-      if (value.getValue() != 0)
+    }
+    if (auto value = dyn_cast<IntegerAttr>(op.getInitialValueAttr())) {
+      if (value.getValue() != 0) {
         return failure();
-    } else if (auto value =
-                   llvm::dyn_cast<FloatAttr>(op.getInitialValueAttr())) {
-      if (value.getValue().isNonZero())
+      }
+    } else if (auto value = dyn_cast<FloatAttr>(op.getInitialValueAttr())) {
+      if (value.getValue().isNonZero()) {
         return failure();
+      }
     }
     auto visibility = op.getVisibility();
     auto newOp = rewriter.replaceOpWithNewOp<T>(
@@ -198,8 +206,9 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
-            op.getGlobal().getDefiningOp())) {
+    if (auto addressOp =
+            dyn_cast_if_present<IREE::Util::GlobalAddressOpInterface>(
+                op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(
           op, op.getValue().getType(), addressOp.getGlobalAttr(),
           addressOp.isGlobalImmutable() ? rewriter.getUnitAttr() : UnitAttr{});
@@ -253,8 +262,9 @@ struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
-            op.getGlobal().getDefiningOp())) {
+    if (auto addressOp =
+            dyn_cast_if_present<IREE::Util::GlobalAddressOpInterface>(
+                op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue(),
                                           addressOp.getGlobalAttr());
       return success();
@@ -481,18 +491,18 @@ template <class AttrElementT,
           class CalculationT = std::function<APInt(ElementValueT)>>
 static Attribute constFoldUnaryOp(Attribute rawOperand,
                                   const CalculationT &calculate) {
-  if (auto operand = llvm::dyn_cast_if_present<AttrElementT>(rawOperand)) {
+  if (auto operand = dyn_cast_if_present<AttrElementT>(rawOperand)) {
     return AttrElementT::get(operand.getType(), calculate(operand.getValue()));
   } else if (auto operand =
-                 llvm::dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
+                 dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
     auto elementResult = constFoldUnaryOp<AttrElementT>(
         {operand.getSplatValue<Attribute>()}, calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(operand.getType(), elementResult);
-  } else if (auto operand =
-                 llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
-    return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+  } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
+    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<ElementValueT(const ElementValueT &)>(
             [&](const ElementValueT &value) { return calculate(value); }));
@@ -505,18 +515,18 @@ static Attribute constFoldUnaryOp(Attribute rawOperand,
 static Attribute
 constFoldFloatUnaryOp(Attribute rawOperand,
                       const std::function<APFloat(APFloat)> &calculate) {
-  if (auto operand = llvm::dyn_cast_if_present<FloatAttr>(rawOperand)) {
+  if (auto operand = dyn_cast_if_present<FloatAttr>(rawOperand)) {
     return FloatAttr::get(operand.getType(), calculate(operand.getValue()));
   } else if (auto operand =
-                 llvm::dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
+                 dyn_cast_if_present<SplatElementsAttr>(rawOperand)) {
     auto elementResult =
         constFoldFloatUnaryOp({operand.getSplatValue<Attribute>()}, calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(operand.getType(), elementResult);
-  } else if (auto operand =
-                 llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
-    return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+  } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
+    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<APInt(const APFloat &)>([&](const APFloat &value) {
           return calculate(value).bitcastToAPInt();
@@ -534,35 +544,40 @@ template <class AttrElementT,
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
 static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
                                    const CalculationT &calculate) {
-  if (auto lhs = llvm::dyn_cast_if_present<AttrElementT>(rawLhs)) {
-    auto rhs = llvm::dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+  if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
+    auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
+    if (!rhs) {
       return {};
+    }
     return AttrElementT::get(lhs.getType(),
                              calculate(lhs.getValue(), rhs.getValue()));
-  } else if (auto lhs = llvm::dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
+  } else if (auto lhs = dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
     // TODO(benvanik): handle splat/otherwise.
-    auto rhs = llvm::dyn_cast_if_present<SplatElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    auto rhs = dyn_cast_if_present<SplatElementsAttr>(rawRhs);
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto elementResult = constFoldBinaryOp<AttrElementT>(
         lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(lhs.getType(), elementResult);
-  } else if (auto lhs = llvm::dyn_cast_if_present<ElementsAttr>(rawLhs)) {
-    auto rhs = llvm::dyn_cast_if_present<ElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+  } else if (auto lhs = dyn_cast_if_present<ElementsAttr>(rawLhs)) {
+    auto rhs = dyn_cast_if_present<ElementsAttr>(rawRhs);
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++lhsIt;
       ++rhsIt;
     }
@@ -580,30 +595,31 @@ template <class AttrElementT,
 static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
                                     Attribute rawC,
                                     const CalculationT &calculate) {
-  if (auto a = llvm::dyn_cast_if_present<AttrElementT>(rawA)) {
-    auto b = llvm::dyn_cast_if_present<AttrElementT>(rawB);
-    auto c = llvm::dyn_cast_if_present<AttrElementT>(rawC);
+  if (auto a = dyn_cast_if_present<AttrElementT>(rawA)) {
+    auto b = dyn_cast_if_present<AttrElementT>(rawB);
+    auto c = dyn_cast_if_present<AttrElementT>(rawC);
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
     return AttrElementT::get(
         a.getType(), calculate(a.getValue(), b.getValue(), c.getValue()));
-  } else if (auto a = llvm::dyn_cast_if_present<SplatElementsAttr>(rawA)) {
+  } else if (auto a = dyn_cast_if_present<SplatElementsAttr>(rawA)) {
     // TODO(benvanik): handle splat/otherwise.
-    auto b = llvm::dyn_cast_if_present<SplatElementsAttr>(rawB);
-    auto c = llvm::dyn_cast_if_present<SplatElementsAttr>(rawC);
+    auto b = dyn_cast_if_present<SplatElementsAttr>(rawB);
+    auto c = dyn_cast_if_present<SplatElementsAttr>(rawC);
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
     auto elementResult = constFoldTernaryOp<AttrElementT>(
         a.getSplatValue<Attribute>(), b.getSplatValue<Attribute>(),
         c.getSplatValue<Attribute>(), calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     return DenseElementsAttr::get(a.getType(), elementResult);
-  } else if (auto a = llvm::dyn_cast_if_present<ElementsAttr>(rawA)) {
-    auto b = llvm::dyn_cast_if_present<ElementsAttr>(rawB);
-    auto c = llvm::dyn_cast_if_present<ElementsAttr>(rawC);
+  } else if (auto a = dyn_cast_if_present<ElementsAttr>(rawA)) {
+    auto b = dyn_cast_if_present<ElementsAttr>(rawB);
+    auto c = dyn_cast_if_present<ElementsAttr>(rawC);
     if (!b || !c || a.getType() != b.getType() || a.getType() != c.getType()) {
       return {};
     }
@@ -614,8 +630,9 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
     for (int64_t i = 0; i < a.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldTernaryOp<AttrElementT>(*aIt, *bIt, *cIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++aIt;
       ++bIt;
       ++cIt;
@@ -646,10 +663,11 @@ struct FuseFMAOp : public OpRewritePattern<AddOp> {
                      .getResult());
       return success();
     };
-    if (auto mulOp = dyn_cast_or_null<MulOp>(addOp.getLhs().getDefiningOp())) {
+    if (auto mulOp =
+            dyn_cast_if_present<MulOp>(addOp.getLhs().getDefiningOp())) {
       return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getRhs());
     } else if (auto mulOp =
-                   dyn_cast_or_null<MulOp>(addOp.getRhs().getDefiningOp())) {
+                   dyn_cast_if_present<MulOp>(addOp.getRhs().getDefiningOp())) {
       return fuse(mulOp, mulOp.getLhs(), mulOp.getRhs(), addOp.getLhs());
     }
     return failure();
@@ -666,16 +684,19 @@ static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
     // x + 0 = x or 0 + y = y (commutative)
     return op.getLhs();
   }
-  if (auto subOp = dyn_cast_or_null<SUB>(op.getLhs().getDefiningOp())) {
+  if (auto subOp = dyn_cast_if_present<SUB>(op.getLhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add t, z
-    if (subOp.getRhs() == op.getRhs()) // y == z:
-      return subOp.getLhs();           // (x - y) + y = x
-  } else if (auto subOp = dyn_cast_or_null<SUB>(op.getRhs().getDefiningOp())) {
+    if (subOp.getRhs() == op.getRhs()) { // y == z:
+      return subOp.getLhs();             // (x - y) + y = x
+    }
+  } else if (auto subOp =
+                 dyn_cast_if_present<SUB>(op.getRhs().getDefiningOp())) {
     // t = vm.sub x, y
     //   = vm.add z, t
-    if (subOp.getRhs() == op.getLhs()) // y == z:
-      return subOp.getLhs();           // y + (x - y) = x
+    if (subOp.getRhs() == op.getLhs()) { // y == z:
+      return subOp.getLhs();             // y + (x - y) = x
+    }
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
@@ -712,13 +733,15 @@ static OpFoldResult foldSubOp(SUB op, Attribute lhs, Attribute rhs) {
     // x - 0 = x
     return op.getLhs();
   }
-  if (auto addOp = dyn_cast_or_null<ADD>(op.getLhs().getDefiningOp())) {
+  if (auto addOp = dyn_cast_if_present<ADD>(op.getLhs().getDefiningOp())) {
     // t = vm.add x, y
     //   = vm.sub t, z
-    if (addOp.getLhs() == op.getRhs()) // x == z:
-      return addOp.getRhs();           // (x + y) - x = y
-    if (addOp.getRhs() == op.getRhs()) // y == z:
-      return addOp.getLhs();           // (x + y) - y = x
+    if (addOp.getLhs() == op.getRhs()) { // x == z:
+      return addOp.getRhs();             // (x + y) - x = y
+    }
+    if (addOp.getRhs() == op.getRhs()) { // y == z:
+      return addOp.getLhs();             // (x + y) - y = x
+    }
   }
   return constFoldBinaryOp<AttrElementT>(
       lhs, rhs,
@@ -763,9 +786,10 @@ struct FoldConstantMulOperand : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     AttrElementT c1, c2;
-    if (!matchPattern(op.getRhs(), m_Constant(&c1)))
+    if (!matchPattern(op.getRhs(), m_Constant(&c1))) {
       return failure();
-    if (auto mulOp = dyn_cast_or_null<T>(op.getLhs().getDefiningOp())) {
+    }
+    if (auto mulOp = dyn_cast_if_present<T>(op.getLhs().getDefiningOp())) {
       if (matchPattern(mulOp.getRhs(), m_Constant(&c2))) {
         auto c = rewriter.createOrFold<CONST_OP>(
             rewriter.getFusedLoc({mulOp.getLoc(), op.getLoc()}),
@@ -814,7 +838,7 @@ static OpFoldResult foldDivSOp(DivOpT op, Attribute lhs, Attribute rhs) {
     // x / 1 = x
     return op.getLhs();
   } else if (auto mulOp =
-                 dyn_cast_or_null<MulOpT>(op.getLhs().getDefiningOp())) {
+                 dyn_cast_if_present<MulOpT>(op.getLhs().getDefiningOp())) {
     // Only applies to signed divides (matches LLVM behavior).
     if (mulOp.getRhs() == op.getRhs()) {
       // c = mul a, b
@@ -979,8 +1003,9 @@ OpFoldResult AbsI64Op::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smin(lhs, rhs);
@@ -988,8 +1013,9 @@ OpFoldResult MinI32SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smin(lhs, rhs);
@@ -997,8 +1023,9 @@ OpFoldResult MinI64SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umin(lhs, rhs);
@@ -1006,8 +1033,9 @@ OpFoldResult MinI32UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umin(lhs, rhs);
@@ -1015,8 +1043,9 @@ OpFoldResult MinI64UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smax(lhs, rhs);
@@ -1024,8 +1053,9 @@ OpFoldResult MaxI32SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::smax(lhs, rhs);
@@ -1033,8 +1063,9 @@ OpFoldResult MaxI64SOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umax(lhs, rhs);
@@ -1042,8 +1073,9 @@ OpFoldResult MaxI32UOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxI64UOp::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<IntegerAttr>(operands.getLhs(), operands.getRhs(),
                                         [](const APInt &lhs, const APInt &rhs) {
                                           return llvm::APIntOps::umax(lhs, rhs);
@@ -1273,16 +1305,18 @@ OpFoldResult MinF64Op::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult MaxF32Op::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<FloatAttr>(
       operands.getLhs(), operands.getRhs(),
       [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
 }
 
 OpFoldResult MaxF64Op::fold(FoldAdaptor operands) {
-  if (getLhs() == getRhs())
+  if (getLhs() == getRhs()) {
     return getLhs();
+  }
   return constFoldBinaryOp<FloatAttr>(
       operands.getLhs(), operands.getRhs(),
       [](const APFloat &a, const APFloat &b) { return llvm::maxnum(a, b); });
@@ -1483,7 +1517,7 @@ template <class AttrElementT,
           class CalculationT = std::function<ElementValueT(ElementValueT)>>
 static Attribute constFoldConversionOp(Type resultType, Attribute rawOperand,
                                        const CalculationT &calculate) {
-  if (auto operand = llvm::dyn_cast_if_present<AttrElementT>(rawOperand)) {
+  if (auto operand = dyn_cast_if_present<AttrElementT>(rawOperand)) {
     return AttrElementT::get(resultType, calculate(operand.getValue()));
   }
   return {};
@@ -1663,7 +1697,7 @@ template <
     class CalculationT = std::function<DstElementValueT(SrcElementValueT)>>
 static Attribute constFoldCastOp(Type resultType, Attribute rawOperand,
                                  const CalculationT &calculate) {
-  if (auto operand = llvm::dyn_cast_if_present<SrcAttrElementT>(rawOperand)) {
+  if (auto operand = dyn_cast_if_present<SrcAttrElementT>(rawOperand)) {
     return DstAttrElementT::get(resultType, calculate(operand.getValue()));
   }
   return {};
@@ -1713,7 +1747,7 @@ OpFoldResult CastSI64F64Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float64Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {
-        APFloat b = APFloat(0.0f);
+        APFloat b{0.0};
         b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmNearestTiesToAway);
         return b;
       });
@@ -1723,7 +1757,7 @@ OpFoldResult CastUI64F64Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<IntegerAttr, FloatAttr>(
       Float64Type::get(getContext()), operands.getOperand(),
       [&](const APInt &a) {
-        APFloat b = APFloat(0.0f);
+        APFloat b{0.0};
         b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmNearestTiesToAway);
         return b;
       });
@@ -1807,10 +1841,11 @@ struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
   using OpRewritePattern<CastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
-    auto zeroOp =
-        dyn_cast_or_null<ConstRefZeroOp>(castOp.getOperand().getDefiningOp());
-    if (!zeroOp)
+    auto zeroOp = dyn_cast_if_present<ConstRefZeroOp>(
+        castOp.getOperand().getDefiningOp());
+    if (!zeroOp) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<ConstRefZeroOp>(castOp,
                                                 castOp.getResult().getType());
     return success();
@@ -1820,10 +1855,11 @@ struct FoldCastRefIntoOpResult : public OpRewritePattern<CastOp> {
 } // namespace
 
 OpFoldResult CastAnyRefOp::fold(FoldAdaptor operands) {
-  if (getOperand().getType() == getResult().getType())
+  if (getOperand().getType() == getResult().getType()) {
     return getOperand();
+  }
   if (auto castOp =
-          dyn_cast_or_null<CastRefAnyOp>(getOperand().getDefiningOp())) {
+          dyn_cast_if_present<CastRefAnyOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
       return castOp.getOperand();
     }
@@ -1837,10 +1873,11 @@ void CastAnyRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult CastRefAnyOp::fold(FoldAdaptor operands) {
-  if (getOperand().getType() == getResult().getType())
+  if (getOperand().getType() == getResult().getType()) {
     return getOperand();
+  }
   if (auto castOp =
-          dyn_cast_or_null<CastAnyRefOp>(getOperand().getDefiningOp())) {
+          dyn_cast_if_present<CastAnyRefOp>(getOperand().getDefiningOp())) {
     if (castOp.getOperand().getType() == getResult().getType()) {
       return castOp.getOperand();
     }
@@ -1870,13 +1907,12 @@ template <class AttrElementT,
           class CalculationT = std::function<APInt(ElementValueT)>>
 static Attribute constFoldUnaryCmpOp(Attribute rawOperand,
                                      const CalculationT &calculate) {
-  if (auto operand = llvm::dyn_cast_if_present<AttrElementT>(rawOperand)) {
+  if (auto operand = dyn_cast_if_present<AttrElementT>(rawOperand)) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
     return IntegerAttr::get(boolType, calculate(operand.getValue()));
-  } else if (auto operand =
-                 llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
+  } else if (auto operand = dyn_cast_if_present<ElementsAttr>(rawOperand)) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
-    return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
+    return cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         boolType,
         llvm::function_ref<APInt(const ElementValueT &)>(
             [&](const ElementValueT &value) { return calculate(value); }));
@@ -1892,10 +1928,11 @@ template <class AttrElementT,
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
 static Attribute constFoldBinaryCmpOp(Attribute rawLhs, Attribute rawRhs,
                                       const CalculationT &calculate) {
-  if (auto lhs = llvm::dyn_cast_if_present<AttrElementT>(rawLhs)) {
-    auto rhs = llvm::dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+  if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
+    auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
+    if (!rhs) {
       return {};
+    }
     auto boolType = IntegerType::get(lhs.getContext(), 32);
     return AttrElementT::get(boolType,
                              calculate(lhs.getValue(), rhs.getValue()));
@@ -1915,11 +1952,12 @@ struct SwapInvertedCmpOps : public OpRewritePattern<OP> {
       // Can't change if there are multiple users.
       return failure();
     }
-    if (auto xorOp = dyn_cast_or_null<XorI32Op>(*op.getResult().user_begin())) {
+    if (auto xorOp =
+            dyn_cast_if_present<XorI32Op>(*op.getResult().user_begin())) {
       Attribute rhs;
       if (xorOp.getLhs() == op.getResult() &&
           matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
-          llvm::cast<IntegerAttr>(rhs).getInt() == 1) {
+          cast<IntegerAttr>(rhs).getInt() == 1) {
         auto invValue = rewriter.createOrFold<INV>(
             op.getLoc(), op.getResult().getType(), op.getLhs(), op.getRhs());
         rewriter.replaceOp(op, {invValue});
@@ -2318,37 +2356,42 @@ template <class AttrElementT,
               std::function<ElementValueT(ElementValueT, ElementValueT)>>
 static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
                                        const CalculationT &calculate) {
-  if (auto lhs = llvm::dyn_cast_if_present<AttrElementT>(rawLhs)) {
-    auto rhs = llvm::dyn_cast_if_present<AttrElementT>(rawRhs);
-    if (!rhs)
+  if (auto lhs = dyn_cast_if_present<AttrElementT>(rawLhs)) {
+    auto rhs = dyn_cast_if_present<AttrElementT>(rawRhs);
+    if (!rhs) {
       return {};
+    }
     return IntegerAttr::get(IntegerType::get(lhs.getContext(), 32),
                             calculate(lhs.getValue(), rhs.getValue()));
-  } else if (auto lhs = llvm::dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
+  } else if (auto lhs = dyn_cast_if_present<SplatElementsAttr>(rawLhs)) {
     // TODO(benvanik): handle splat/otherwise.
-    auto rhs = llvm::dyn_cast_if_present<SplatElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+    auto rhs = dyn_cast_if_present<SplatElementsAttr>(rawRhs);
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto elementResult = constFoldBinaryCmpFOp<AttrElementT>(
         lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>(),
         calculate);
-    if (!elementResult)
+    if (!elementResult) {
       return {};
+    }
     auto resultType =
         lhs.getType().clone({}, IntegerType::get(lhs.getContext(), 32));
     return DenseElementsAttr::get(resultType, elementResult);
-  } else if (auto lhs = llvm::dyn_cast_if_present<ElementsAttr>(rawLhs)) {
-    auto rhs = llvm::dyn_cast_if_present<ElementsAttr>(rawRhs);
-    if (!rhs || lhs.getType() != rhs.getType())
+  } else if (auto lhs = dyn_cast_if_present<ElementsAttr>(rawLhs)) {
+    auto rhs = dyn_cast_if_present<ElementsAttr>(rawRhs);
+    if (!rhs || lhs.getType() != rhs.getType()) {
       return {};
+    }
     auto lhsIt = lhs.getValues<AttrElementT>().begin();
     auto rhsIt = rhs.getValues<AttrElementT>().begin();
     SmallVector<Attribute> resultAttrs(lhs.getNumElements());
     for (int64_t i = 0; i < lhs.getNumElements(); ++i) {
       resultAttrs[i] =
           constFoldBinaryCmpFOp<AttrElementT>(*lhsIt, *rhsIt, calculate);
-      if (!resultAttrs[i])
+      if (!resultAttrs[i]) {
         return {};
+      }
       ++lhsIt;
       ++rhsIt;
     }
@@ -2859,8 +2902,7 @@ void CmpNZF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 OpFoldResult CmpNaNF32Op::fold(FoldAdaptor operands) {
-  if (auto operand =
-          llvm::dyn_cast_if_present<FloatAttr>(operands.getOperand())) {
+  if (auto operand = dyn_cast_if_present<FloatAttr>(operands.getOperand())) {
     return operand.getValue().isNaN() ? oneOfType(getType())
                                       : zeroOfType(getType());
   }
@@ -2868,8 +2910,7 @@ OpFoldResult CmpNaNF32Op::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult CmpNaNF64Op::fold(FoldAdaptor operands) {
-  if (auto operand =
-          llvm::dyn_cast_if_present<FloatAttr>(operands.getOperand())) {
+  if (auto operand = dyn_cast_if_present<FloatAttr>(operands.getOperand())) {
     return operand.getValue().isNaN() ? oneOfType(getType())
                                       : zeroOfType(getType());
   }
@@ -2980,22 +3021,27 @@ static LogicalResult collapseBranch(Block *&successor,
     return failure();
   }
   // Check that the successor only contains a unconditional branch.
-  if (std::next(successor->begin()) != successor->end())
+  if (std::next(successor->begin()) != successor->end()) {
     return failure();
+  }
   // Check that the terminator is an unconditional branch.
   BranchOp successorBranch = dyn_cast<BranchOp>(successor->getTerminator());
-  if (!successorBranch)
+  if (!successorBranch) {
     return failure();
+  }
   // Check that the arguments are only used within the terminator.
   for (BlockArgument arg : successor->getArguments()) {
-    for (Operation *user : arg.getUsers())
-      if (user != successorBranch)
+    for (Operation *user : arg.getUsers()) {
+      if (user != successorBranch) {
         return failure();
+      }
+    }
   }
   // Don't try to collapse branches to infinite loops.
   Block *successorDest = successorBranch.getDest();
-  if (successorDest == successor)
+  if (successorDest == successor) {
     return failure();
+  }
 
   // Update the operands to the successor. If the branch parent has no
   // arguments, we can use the branch operands directly.
@@ -3008,11 +3054,12 @@ static LogicalResult collapseBranch(Block *&successor,
 
   // Otherwise, we need to remap any argument operands.
   for (Value operand : operands) {
-    BlockArgument argOperand = llvm::dyn_cast<BlockArgument>(operand);
-    if (argOperand && argOperand.getOwner() == successor)
+    BlockArgument argOperand = dyn_cast<BlockArgument>(operand);
+    if (argOperand && argOperand.getOwner() == successor) {
       argStorage.push_back(successorOperands[argOperand.getArgNumber()]);
-    else
+    } else {
       argStorage.push_back(operand);
+    }
   }
   successor = successorDest;
   successorOperands = argStorage;
@@ -3136,7 +3183,8 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     // We generate xor(cmp(...), 1) to flip conditions, so look for that pattern
     // so that we can do the swap here and remove the xor.
     // auto condValue = op.getCondition();
-    // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
+    // if (auto xorOp =
+    // dyn_cast_if_present<XorI32Op>(condValue.getDefiningOp())) {
     //   Attribute rhs;
     //   if (matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
     //       cast<IntegerAttr>(rhs).getInt() == 1) {
@@ -3238,7 +3286,7 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
     Type condType = rewriter.getI32Type();
     Value condValue;
     Type operandType = op.getOperation()->getOperand(0).getType();
-    if (llvm::isa<RefType>(operandType)) {
+    if (isa<RefType>(operandType)) {
       condValue = rewriter.template createOrFold<CmpRefOp>(
           op.getLoc(), ArrayRef<Type>{condType},
           op.getOperation()->getOperands());
@@ -3312,8 +3360,9 @@ struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
                                 PatternRewriter &rewriter) const override {
     auto importOp = SymbolTable::lookupNearestSymbolFrom<IREE::VM::ImportOp>(
         op, op.getImportAttr());
-    if (!importOp || importOp.getIsOptional())
+    if (!importOp || importOp.getIsOptional()) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(op, 1);
     return success();
   }

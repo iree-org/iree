@@ -180,6 +180,11 @@ macro(iree_llvm_set_bundled_cmake_options)
   # that in IREE as a super-project.
   set(MLIR_DISABLE_CONFIGURE_PYTHON_DEV_PACKAGES ON CACHE BOOL "" FORCE)
 
+  # Enable reverse iteration over LLVM unordered maps/sets.
+  if(IREE_REVERSE_ITERATION)
+    set(LLVM_ENABLE_REVERSE_ITERATION ON CACHE BOOL "" FORCE)
+  endif()
+
   # If we are building clang/lld/etc, these will be the targets.
   # Otherwise, empty so scripts can detect unavailability.
   set(IREE_CLANG_TARGET)
@@ -254,6 +259,10 @@ macro(iree_llvm_set_bundled_cmake_options)
     list(APPEND LLVM_ENABLE_PROJECTS lld)
   endif()
 
+  if(IREE_BUILD_CLANG_TOOLS_EXTRA)
+    list(APPEND LLVM_ENABLE_PROJECTS clang-tools-extra)
+  endif()
+
   list(REMOVE_DUPLICATES LLVM_ENABLE_PROJECTS)
   list(REMOVE_DUPLICATES LLVM_TARGETS_TO_BUILD)
 
@@ -261,17 +270,37 @@ macro(iree_llvm_set_bundled_cmake_options)
   message(VERBOSE "Building LLVM Projects: ${LLVM_ENABLE_PROJECTS}")
 endmacro()
 
-# iree_add_llvm_external_project(name location)
+# iree_add_llvm_external_project(name location [SILENCE_DEPRECATIONS])
 # Adds a project as if by appending to the LLVM_EXTERNAL_PROJECTS CMake
 # variable. This is done by setting the same top-level variables that the LLVM
 # machinery is expected to export and including the sub directory explicitly.
 # The project binary dir will be llvm-external-projects/${name}
 # Call this after appropriate LLVM/MLIR packages have been loaded.
+#
+# Options:
+#   SILENCE_DEPRECATIONS:
+#     Suppresses all deprecation warnings for this external project. Useful for
+#     third-party dependencies that use deprecated APIs and are slow to update.
 function(iree_llvm_add_external_project name location)
+  cmake_parse_arguments(_RULE "SILENCE_DEPRECATIONS" "" "" ${ARGN})
+
   message(STATUS "Adding LLVM external project ${name} -> ${location}")
   if(NOT EXISTS "${location}/CMakeLists.txt")
     message(FATAL_ERROR "External project location ${location} is not valid")
   endif()
+
+  # Optionally silence warnings for this external project.
+  # Modification is in function scope only, so parent scope is unaffected.
+  if(_RULE_SILENCE_DEPRECATIONS)
+    if(MSVC)
+      # MSVC: C4996 is the deprecation warning.
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4996")
+    else()
+      # GCC/Clang: Use standard deprecation warning flag.
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+    endif()
+  endif()
+
   add_subdirectory(${location} "llvm-external-projects/${name}" EXCLUDE_FROM_ALL)
 endfunction()
 

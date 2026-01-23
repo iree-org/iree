@@ -94,7 +94,7 @@ convertStreamableFunc(mlir::ModuleOp moduleOp, IREE::Util::FuncOp funcOp,
   // Because streamable ops are asynchronous they must be able to declare their
   // result shapes before they execute so memory can be allocated.
   for (auto resultType : functionType.getResults()) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
+    if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
       streamableFunc.requiredResultDims += shapedType.getNumDynamicDims();
     }
   }
@@ -161,7 +161,7 @@ convertStreamableFunc(mlir::ModuleOp moduleOp, IREE::Util::FuncOp funcOp,
     // arbitrarily complex (up to and including calling a function to compute
     // dims).
     SmallVector<int64_t> dynamicDimArgs;
-    auto shapedType = llvm::dyn_cast<ShapedType>(resultType);
+    auto shapedType = dyn_cast<ShapedType>(resultType);
     if (shapedType) {
       // Initialize dynamic dim args - we'll verify that they all get covered.
       dynamicDimArgs.resize(shapedType.getNumDynamicDims(), kUnspecifiedDim);
@@ -256,7 +256,7 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
   // Capture all argument dynamic dimensions.
   SmallVector<Value> argDims;
   for (auto arg : callOp.getOperands()) {
-    if (llvm::isa<ShapedType>(arg.getType())) {
+    if (isa<ShapedType>(arg.getType())) {
       llvm::append_range(argDims, IREE::Util::buildDynamicDimsForValue(
                                       callOp.getLoc(), arg, builder));
     }
@@ -278,10 +278,11 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
   } else {
     // Get the shape dimensions from existing call arguments or tied operands.
     for (auto [i, resultType] : llvm::enumerate(callOp.getResultTypes())) {
-      if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
+      if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
         const auto &resultDimArgs = streamableFunc.resultDimArgs[i];
-        if (resultDimArgs.empty())
+        if (resultDimArgs.empty()) {
           continue;
+        }
         if (resultDimArgs.front() == kTiedDim) {
           // Source from a tied operand. Types must match exactly.
           assert(streamableFunc.tiedOperands[i] !=
@@ -360,8 +361,9 @@ public:
     for (auto originalFuncOp : originalFuncOps) {
       auto streamableFuncOr =
           convertStreamableFunc(moduleOp, originalFuncOp, symbolTable);
-      if (!streamableFuncOr.has_value())
+      if (!streamableFuncOr.has_value()) {
         return signalPassFailure();
+      }
       auto streamableFunc = std::move(streamableFuncOr).value();
       streamableFuncs[streamableFunc.funcOp.getName()] =
           std::move(streamableFunc);

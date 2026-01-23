@@ -1,0 +1,28 @@
+{
+  "config_name": "gpu_hip_gfx942",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=hip",
+    "--iree-hip-target=gfx942",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias"
+  ],
+  "skip_run_tests": [
+    "ATB/64x64xf16"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "AB/8192x8192xf32_bench": 10.345919956763586,
+    "AB/1024x1024xf32_bench": 0.12306747736492638,
+    "AB/256x256xf32_bench": 0.06101156551354003,
+    "AB/128x128xf32_bench": 0.052202587451140196,
+    "AB/2048x2048xf32_bench": 0.2345012331137894,
+    "AB/4096x4096xf32_bench": 1.423236482683913,
+    "AB/512x512xf32_bench": 0.07336693902980182
+  }
+}

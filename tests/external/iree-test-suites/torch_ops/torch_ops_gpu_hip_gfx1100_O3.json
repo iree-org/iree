@@ -1,0 +1,29 @@
+{
+  "config_name": "gpu_hip_gfx1100",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=hip",
+    "--iree-hip-target=gfx1100",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias"
+  ],
+  "skip_run_tests": [
+    "ABPlusC/64x64xf16",
+    "ATB/64x64xf16"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": [],
+  "golden_times_ms": {
+    "AB/8192x8192xf32_bench": 211.36675303181013,
+    "AB/1024x1024xf32_bench": 0.473261977629155,
+    "AB/256x256xf32_bench": 0.13523232175050667,
+    "AB/128x128xf32_bench": 0.10226182854380102,
+    "AB/2048x2048xf32_bench": 3.35047472617589,
+    "AB/4096x4096xf32_bench": 26.499415814344378,
+    "AB/512x512xf32_bench": 0.16945170770798412
+  }
+}

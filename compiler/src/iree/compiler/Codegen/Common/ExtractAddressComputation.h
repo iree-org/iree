@@ -11,8 +11,6 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
-using namespace mlir;
-
 namespace mlir::iree_compiler {
 
 /// Rewrite a store/load-like op so that all its indices are zeros.
@@ -42,8 +40,9 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
     auto ldTy = cast<MemRefType>(srcMemRef.getType());
     unsigned storeLoadRank = ldTy.getRank();
     // Don't waste compile time if there is nothing to rewrite.
-    if (storeLoadRank == 0)
+    if (storeLoadRank == 0) {
       return failure();
+    }
 
     // If our load already has only zeros as indices there is nothing
     // to do.

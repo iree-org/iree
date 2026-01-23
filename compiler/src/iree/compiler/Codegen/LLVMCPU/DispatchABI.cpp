@@ -57,10 +57,10 @@ namespace mlir::iree_compiler {
 
 // Returns the size, in bits, of |typeAttr|.
 static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
-  if (auto basicTypeAttr = llvm::dyn_cast<LLVM::DIBasicTypeAttr>(typeAttr)) {
+  if (auto basicTypeAttr = dyn_cast<LLVM::DIBasicTypeAttr>(typeAttr)) {
     return basicTypeAttr.getSizeInBits();
   } else if (auto derivedTypeAttr =
-                 llvm::dyn_cast<LLVM::DIDerivedTypeAttr>(typeAttr)) {
+                 dyn_cast<LLVM::DIDerivedTypeAttr>(typeAttr)) {
     if (unsigned derivedSize = derivedTypeAttr.getSizeInBits()) {
       return derivedSize;
     } else {
@@ -339,8 +339,9 @@ HALDispatchABI::getProcessorType(MLIRContext *context,
   llvm::sys::ScopedLock lock(sMutex);
   auto structType =
       LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
-  if (structType.isInitialized())
+  if (structType.isInitialized()) {
     return structType;
+  }
 
   auto uint64Type = IntegerType::get(context, 64);
   SmallVector<Type> fieldTypes;
@@ -365,8 +366,9 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_environment_v0_t");
-  if (structType.isInitialized())
+  if (structType.isInitialized()) {
     return structType;
+  }
 
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type> fieldTypes;
@@ -399,8 +401,9 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_dispatch_state_v0_t");
-  if (structType.isInitialized())
+  if (structType.isInitialized()) {
     return structType;
+  }
 
   auto uint8Type = IntegerType::get(context, 8);
   auto uint16Type = IntegerType::get(context, 16);
@@ -453,8 +456,9 @@ HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_workgroup_state_v0_t");
-  if (structType.isInitialized())
+  if (structType.isInitialized()) {
     return structType;
+  }
 
   auto uint16Type = IntegerType::get(context, 16);
   auto uint32Type = IntegerType::get(context, 32);
@@ -513,7 +517,7 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
   Builder builder(context);
 
   std::string inputFilePath("-");
-  if (auto fileLoc = llvm::dyn_cast<mlir::FileLineColLoc>(moduleOp.getLoc())) {
+  if (auto fileLoc = dyn_cast<mlir::FileLineColLoc>(moduleOp.getLoc())) {
     inputFilePath = fileLoc.getFilename().getValue();
   }
 
@@ -583,20 +587,21 @@ static StringRef getDimName(int32_t dim) {
 // the ops if MLIR or LLVM is likely to reject them.
 static bool isLocationValidForDI(Location loc) {
   // Unknown locations are passed as null and DI doesn't like that.
-  if (llvm::isa<UnknownLoc>(loc))
+  if (isa<UnknownLoc>(loc)) {
     return false;
+  }
   // MLIR currently can't handle name-only locations. We do this check to ensure
   // there's at least one real location MLIR can pass along.
-  if (auto callLoc = llvm::dyn_cast<CallSiteLoc>(loc)) {
+  if (auto callLoc = dyn_cast<CallSiteLoc>(loc)) {
     return isLocationValidForDI(callLoc.getCaller()) &&
            isLocationValidForDI(callLoc.getCallee());
-  } else if (auto fileLoc = llvm::dyn_cast<FileLineColLoc>(loc)) {
+  } else if (auto fileLoc = dyn_cast<FileLineColLoc>(loc)) {
     return true;
-  } else if (auto fusedLoc = llvm::dyn_cast<FusedLoc>(loc)) {
+  } else if (auto fusedLoc = dyn_cast<FusedLoc>(loc)) {
     return llvm::all_of(fusedLoc.getLocations(), isLocationValidForDI);
-  } else if (auto namedLoc = llvm::dyn_cast<NameLoc>(loc)) {
+  } else if (auto namedLoc = dyn_cast<NameLoc>(loc)) {
     return isLocationValidForDI(namedLoc.getChildLoc());
-  } else if (auto opaqueLoc = llvm::dyn_cast<OpaqueLoc>(loc)) {
+  } else if (auto opaqueLoc = dyn_cast<OpaqueLoc>(loc)) {
     return isLocationValidForDI(opaqueLoc.getFallbackLocation());
   }
   return false;
@@ -604,11 +609,13 @@ static bool isLocationValidForDI(Location loc) {
 
 static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
                         LLVM::DITypeAttr type, OpBuilder &builder) {
-  if (!clVerboseDebugInfo)
+  if (!clVerboseDebugInfo) {
     return value;
+  }
   auto loc = forOp->getLoc();
-  if (!isLocationValidForDI(loc))
+  if (!isLocationValidForDI(loc)) {
     return value;
+  }
   auto scopeAttr = getLocalScopeAttr(forOp);
   LLVM::DbgValueOp::create(builder, loc, value,
                            LLVM::DILocalVariableAttr::get(
@@ -621,11 +628,13 @@ static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
 
 static Value buildValueDI(Operation *forOp, Value value, Twine name,
                           LLVM::DITypeAttr type, OpBuilder &builder) {
-  if (!clVerboseDebugInfo)
+  if (!clVerboseDebugInfo) {
     return value;
+  }
   auto loc = forOp->getLoc();
-  if (!isLocationValidForDI(loc))
+  if (!isLocationValidForDI(loc)) {
     return value;
+  }
   auto scopeAttr = getLocalScopeAttr(forOp);
   LLVM::DbgValueOp::create(builder, loc, value,
                            LLVM::DILocalVariableAttr::get(
@@ -789,7 +798,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
   // requested range is valid.
   auto [strides, offset] = memRefType.getStridesAndOffset();
   if (memRefType.hasStaticShape() &&
-      !llvm::any_of(strides, ShapedType::isDynamic) &&
+      llvm::none_of(strides, ShapedType::isDynamic) &&
       ShapedType::isStatic(offset)) {
     return MemRefDescriptor::fromStaticShape(builder, loc, *typeConverter,
                                              memRefType, basePtrValue);
@@ -1216,8 +1225,8 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
                      [](auto it) {
                        auto lhsType = std::get<0>(it);
                        auto rhsType = std::get<1>(it);
-                       return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
-                               llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
+                       return (isa<LLVM::LLVMPointerType>(lhsType) &&
+                               isa<LLVM::LLVMPointerType>(rhsType)) ||
                               std::get<0>(it) == std::get<1>(it);
                      })) {
       // Extra fields already added. Drop them.
@@ -1255,8 +1264,8 @@ bool HALDispatchABI::hasCompatibleFunctionSignature(
   if (!llvm::all_of(llvm::zip(funcParamTypes, paramTypes), [](auto it) {
         auto lhsType = std::get<0>(it);
         auto rhsType = std::get<1>(it);
-        return (llvm::isa<LLVM::LLVMPointerType>(lhsType) &&
-                llvm::isa<LLVM::LLVMPointerType>(rhsType)) ||
+        return (isa<LLVM::LLVMPointerType>(lhsType) &&
+                isa<LLVM::LLVMPointerType>(rhsType)) ||
                std::get<0>(it) == std::get<1>(it);
       })) {
     return false;
@@ -1379,8 +1388,9 @@ Value HALDispatchABI::getIndexValue(Location loc, int64_t value,
 Value HALDispatchABI::castValueToType(Location loc, Value value,
                                       Type resultType, OpBuilder &builder) {
   // NOTE: we should handle more cases here (and proper sign extension).
-  if (value.getType() == resultType)
+  if (value.getType() == resultType) {
     return value;
+  }
   return builder.createOrFold<LLVM::ZExtOp>(loc, resultType, value);
 }
 

@@ -20,8 +20,11 @@ iree_cc_library(
     "LinalgExtInterfaces.h"
     "LinalgExtInterfaces.h.inc"
     "LinalgExtOps.h"
-    "LinalgExtOps.h.inc"
+    "LinalgExtPureOps.h.inc"
     "LinalgExtTypes.h.inc"
+  TEXTUAL_HDRS
+    "LinalgExtOps.cpp.inc"
+    "LinalgExtOps.h.inc"
   SRCS
     "AggregatedOpInterfaceImpl.cpp"
     "LinalgExtAttrs.cpp.inc"
@@ -30,16 +33,18 @@ iree_cc_library(
     "LinalgExtInterfaces.cpp"
     "LinalgExtInterfaces.cpp.inc"
     "LinalgExtOps.cpp"
-    "LinalgExtOps.cpp.inc"
+    "LinalgExtPureOps.cpp.inc"
     "LinalgExtTypes.cpp.inc"
     "TilingInterfaceImpl.cpp"
   DEPS
     ::LinalgExtInterfacesIncGen
     ::LinalgExtOpsIncGen
+    ::LinalgExtPureOpsIncGen
     ::LinalgExtTypesGen
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
@@ -60,6 +65,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTilingInterface
+    MLIRValueBoundsOpInterface
     MLIRViewLikeInterface
     iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC
@@ -73,6 +79,16 @@ iree_tablegen_library(
   OUTS
     --gen-op-interface-decls LinalgExtInterfaces.h.inc
     --gen-op-interface-defs LinalgExtInterfaces.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    LinalgExtPureOpsIncGen
+  TD_FILE
+    "LinalgExtPureOps.td"
+  OUTS
+    --gen-op-decls LinalgExtPureOps.h.inc
+    --gen-op-defs LinalgExtPureOps.cpp.inc
 )
 
 iree_tablegen_library(

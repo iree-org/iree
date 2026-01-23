@@ -39,7 +39,7 @@ namespace {
 struct BindingRange {
   BindingRange() = default;
   BindingRange(IREE::Stream::CmdDispatchOp dispatchOp, unsigned idx)
-      : idx(idx), access(llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+      : idx(idx), access(cast<IREE::Stream::ResourceAccessBitfieldAttr>(
                              dispatchOp.getResourceAccesses()[idx])
                              .getValue()),
         resource(dispatchOp.getResources()[idx]),
@@ -92,8 +92,7 @@ findCorrelatedBindings(unsigned bindingCount,
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.
       auto resourceAccess =
-          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
-              resourceAccessAttr);
+          cast<IREE::Stream::ResourceAccessBitfieldAttr>(resourceAccessAttr);
       if (!aliasMutableBindings &&
           bitEnumContainsAll(resourceAccess.getValue(),
                              IREE::Stream::ResourceAccessBitfield::Write)) {
@@ -149,8 +148,9 @@ findCorrelatedBindings(unsigned bindingCount,
   llvm::BitVector handledBindings(bindingCount, /*t=*/false);
   for (unsigned i = 0; i < bindingCount; ++i) {
     // Ignore bindings we've already covered earlier during iteration.
-    if (handledBindings.test(i))
+    if (handledBindings.test(i)) {
       continue;
+    }
 
     // Build new binding.
     Binding binding;
@@ -180,7 +180,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   // Gather old bindings (in order).
   SmallVector<BlockArgument> oldBindingArgs;
   for (auto arg : entryBlock.getArguments()) {
-    if (llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+    if (isa<IREE::Stream::BindingType>(arg.getType())) {
       oldBindingArgs.push_back(arg);
     }
   }
@@ -246,8 +246,8 @@ struct MemoizedCmdZeros {
     if (it != parentZeros.end()) {
       return it->second;
     }
-    auto zero =
-        OpBuilder(parentOp).create<arith::ConstantIndexOp>(op->getLoc(), 0);
+    OpBuilder builder(parentOp);
+    auto zero = arith::ConstantIndexOp::create(builder, op->getLoc(), 0);
     parentZeros[parentOp] = zero;
     return zero;
   }
@@ -317,8 +317,9 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
                      IREE::Stream::ExecutableExportOp exportOp,
                      ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
                      MemoizedCmdZeros &memoizedZeros) {
-  if (dispatchOps.empty())
+  if (dispatchOps.empty()) {
     return; // no-op if no dispatches
+  }
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.getResources().size();
 
@@ -444,8 +445,9 @@ struct FuseDispatchBindingsPass
     MemoizedCmdZeros memoizedZeros;
     for (auto executableOp :
          getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
-      if (!executableOp.getInnerModule())
+      if (!executableOp.getInnerModule()) {
         continue;
+      }
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],

@@ -63,11 +63,13 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
         hasDispatchStore = true;
         return success(isReadOnly(storeOp.getValue()));
       });
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
     return;
+  }
   // The function is just a copy and is not yet bufferized.
-  if (!hasDispatchStore)
+  if (!hasDispatchStore) {
     return;
+  }
 
   // Apply the bufferization passes.
   std::optional<OpPassManager> maybeBufferizationPipeline =

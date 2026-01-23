@@ -22,9 +22,6 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
-    FLOW_Op<mnemonic, !listconcat(traits, [Pure])>;
-
 //===----------------------------------------------------------------------===//
 // Partitioned regions
 //===----------------------------------------------------------------------===//
@@ -37,7 +34,7 @@ def OpGroupPartitionedRegionOps : OpDocGroup {
 let opDocGroup = OpGroupPartitionedRegionOps in {
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
-    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
     Util_ShapeAwareOp,
     AttrSizedOperandSegments]> {
   let summary = [{A grouping of ops with implicit capture.}];
@@ -356,7 +353,7 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
 def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   AllTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Ties a runtime shape to a dispatch I/O argument.}];
@@ -516,7 +513,7 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
       "FlatSymbolRefAttr":$function_ref)>,
   ];
 
-  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
 }
 
 } // OpGroupExecutableOps
@@ -886,7 +883,7 @@ def FLOW_TensorDynamicConstantOp : FLOW_Op<"tensor.dynamic_constant"> {
 
 def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
   AllTypesMatch<["operand", "result"]>,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Ties a runtime shape to a tensor value.}];

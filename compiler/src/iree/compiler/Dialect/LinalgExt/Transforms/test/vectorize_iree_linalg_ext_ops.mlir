@@ -33,3 +33,109 @@ func.func @no_vectorize_map_scatter_dynamic(
 }
 // CHECK-LABEL: @no_vectorize_map_scatter_dynamic
 //   CHECK-NOT:   vector
+
+// -----
+
+func.func @map_scatter_f4_multiple_of_byte(
+    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x2xf4E2M1FN>
+) -> tensor<2x2xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : tensor<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
+  return %0 : tensor<2x2xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_multiple_of_byte
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//  CHECK-SAME:     %[[READ]] into %[[OUTPUT]]
+//       CHECK:     : vector<2x2xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
+//       CHECK:   return %[[MAP_SCATTER]] : tensor<2x2xf4E2M1FN>
+
+// -----
+
+func.func @map_scatter_f4_not_multiple_of_byte(
+    %input: tensor<2x1xf4E2M1FN>, %output: tensor<2x2xf4E2M1FN>
+) -> tensor<2x2xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : tensor<2x1xf4E2M1FN> into tensor<2x2xf4E2M1FN> -> tensor<2x2xf4E2M1FN>
+  return %0 : tensor<2x2xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_not_multiple_of_byte
+//   CHECK-NOT:   vector
+
+// -----
+
+func.func @map_scatter_f4_unit_stride(
+    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
+) -> tensor<2x4xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      %1 = affine.apply affine_map<(d0) -> (d0 + 2)>(%idx1)
+      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
+  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+  return %0 : tensor<2x4xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_unit_stride
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//  CHECK-SAME:     %[[READ]] into %[[OUTPUT]]
+//       CHECK:     : vector<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+//       CHECK:   return %[[MAP_SCATTER]] : tensor<2x4xf4E2M1FN>
+
+// -----
+
+func.func @map_scatter_f4_not_unit_stride(
+    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
+) -> tensor<2x4xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      %1 = affine.apply affine_map<(d0) -> (d0 * 2)>(%idx1)
+      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
+  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+  return %0 : tensor<2x4xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_not_unit_stride
+//   CHECK-NOT:   vector
+
+// -----
+
+func.func @map_scatter_f4_not_index_applied_multiple_times(
+    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
+) -> tensor<2x4xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      %1 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%idx1, %idx1)
+      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
+  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+  return %0 : tensor<2x4xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_not_index_applied_multiple_times
+//   CHECK-NOT:   vector
+
+// -----
+
+func.func @map_scatter_f4_mask_depends_on_inner_index(
+    %input: tensor<2x2xf4E2M1FN>, %output: tensor<2x4xf4E2M1FN>
+) -> tensor<2x4xf4E2M1FN> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %c1 = arith.constant 1 : index
+      %mask = arith.cmpi uge, %idx1, %c1 : index
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : tensor<2x2xf4E2M1FN> into tensor<2x4xf4E2M1FN> -> tensor<2x4xf4E2M1FN>
+  return %0 : tensor<2x4xf4E2M1FN>
+}
+// CHECK-LABEL: @map_scatter_f4_mask_depends_on_inner_index
+//   CHECK-NOT:   vector

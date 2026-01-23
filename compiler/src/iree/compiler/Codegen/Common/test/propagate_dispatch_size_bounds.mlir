@@ -35,16 +35,16 @@ hal.executable private @static {
         %thread_id_y = gpu.thread_id y
         %thread_id_z = gpu.thread_id z
 
-// CHECK-NEXT: arith.constant 64
-// CHECK-NEXT: arith.constant 2
-// CHECK-NEXT: arith.constant 1
+// CHECK-NEXT: arith.constant 64 : index
+// CHECK-NEXT: arith.constant 2 : index
+// CHECK-NEXT: arith.constant 1 : index
         %block_dim_x = gpu.block_dim x
         %block_dim_y = gpu.block_dim y
         %block_dim_z = gpu.block_dim z
 
-// CHECK-NEXT: arith.constant 64
-// CHECK-NEXT: arith.constant 2
-// CHECK-NEXT: arith.constant 1
+// CHECK-NEXT: arith.constant 64 : index
+// CHECK-NEXT: arith.constant 2 : index
+// CHECK-NEXT: arith.constant 1 : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -56,9 +56,9 @@ hal.executable private @static {
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
 
-// CHECK-NEXT: arith.constant 32
-// CHECK-NEXT: arith.constant 8
-// CHECK-NEXT: arith.constant 1
+// CHECK-NEXT: arith.constant 32 : index
+// CHECK-NEXT: arith.constant 8 : index
+// CHECK-NEXT: arith.constant 1 : index
         %workgroup_conut_x = hal.interface.workgroup.count[0] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
@@ -96,6 +96,9 @@ hal.executable private @manual_subgroup_size {
       func.func @manual_subgroup_size() {
 // CHECK-NEXT: gpu.lane_id upper_bound 64
         %lane_id = gpu.lane_id
+
+// CHECK-NEXT: arith.constant 64 : index
+        %subgroup_size = gpu.subgroup_size : index
 
         return
       }
@@ -158,7 +161,7 @@ hal.executable private @dynamic {
 
 // CHECK-NEXT: hal.interface.workgroup.count[0] upper_bound 2147483647
 // CHECK-NEXT: hal.interface.workgroup.count[1] upper_bound 2147483647
-// CHECK-NEXT: arith.constant 1
+// CHECK-NEXT: arith.constant 1 : index
         %workgroup_conut_x = hal.interface.workgroup.count[0] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
@@ -192,9 +195,9 @@ hal.executable private @static_cpu {
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
 
-// CHECK-NEXT: arith.constant 32
-// CHECK-NEXT: arith.constant 8
-// CHECK-NEXT: arith.constant 1
+// CHECK-NEXT: arith.constant 32 : index
+// CHECK-NEXT: arith.constant 8 : index
+// CHECK-NEXT: arith.constant 1 : index
         %workgroup_conut_x = hal.interface.workgroup.count[0] : index
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
@@ -219,7 +222,7 @@ hal.executable private @dynamic_cpu {
       hal.return %count_x, %count_y, %count_z : index, index, index
     }
     builtin.module {
-// CHECK-LABEL: @dynamic_cpu()
+// CHECK-LABEL: func.func @dynamic_cpu()
       func.func @dynamic_cpu() {
 // CHECK-NEXT: hal.interface.workgroup.id[0] : index
 // CHECK-NEXT: hal.interface.workgroup.id[1] : index

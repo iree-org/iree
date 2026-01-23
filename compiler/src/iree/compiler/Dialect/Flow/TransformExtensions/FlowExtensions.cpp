@@ -34,8 +34,9 @@ void registerTransformDialectFlowExtension(DialectRegistry &registry) {
 static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
   int64_t numDynamicDims = t.getNumDynamicDims();
   SmallVector<int64_t> res(numDynamicDims);
-  for (int64_t dim = 0; dim != numDynamicDims; ++dim)
+  for (int64_t dim = 0; dim != numDynamicDims; ++dim) {
     res[dim] = t.getDynamicDimIndex(dim);
+  }
   return res;
 }
 
@@ -60,9 +61,10 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   // For now, this assumes that we only pull in constants.
   // TODO: Iteratively pull operations that are only consuming IndexType.
   for (Value v : forallOp.getUpperBound(rewriter)) {
-    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
-    if (!op)
+    auto op = dyn_cast_if_present<arith::ConstantIndexOp>(v.getDefiningOp());
+    if (!op) {
       return failure();
+    }
     results.push_back(
         cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
   }
@@ -94,8 +96,7 @@ static void rewriteParallelInsertSlices(RewriterBase &rewriter,
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = IREE::Util::findDynamicDimsInList(
         resultIndex, resultTensorOperands, resultTensorsDynamicDims);
-    BlockArgument destBbArg =
-        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
+    BlockArgument destBbArg = cast<BlockArgument>(parallelInsertOp.getDest());
     assert(destBbArg.getOwner()->getParentOp() == forallOp &&
            "expected that dest is an output bbArg");
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
@@ -125,17 +126,21 @@ static void rewriteExtractSlices(RewriterBase &rewriter, scf::ForallOp forallOp,
                                  IRMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.getSource();
-    if (auto sourceBbArg = llvm::dyn_cast<BlockArgument>(source))
-      if (sourceBbArg.getOwner()->getParentOp() == forallOp.getOperation())
+    if (auto sourceBbArg = dyn_cast<BlockArgument>(source)) {
+      if (sourceBbArg.getOwner()->getParentOp() == forallOp.getOperation()) {
         source = forallOp.getTiedOpOperand(sourceBbArg)->get();
+      }
+    }
 
     auto it = llvm::find(tensorOperands, source);
-    if (it == tensorOperands.end())
+    if (it == tensorOperands.end()) {
       return;
+    }
     int64_t index = std::distance(tensorOperands.begin(), it);
     Value sourceFlow = tensorToFlowBvm.lookupOrNull(source);
-    if (!sourceFlow)
+    if (!sourceFlow) {
       return;
+    }
 
     Location loc = extractSliceOp.getLoc();
     OpBuilder::InsertionGuard g(rewriter);
@@ -163,22 +168,26 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
   // Add all ops who's results are used inside the ForallOp to the
   // worklist.
   llvm::SetVector<Operation *> worklist;
-  for (Value v : valuesDefinedAbove)
-    if (Operation *op = v.getDefiningOp())
+  for (Value v : valuesDefinedAbove) {
+    if (Operation *op = v.getDefiningOp()) {
       worklist.insert(op);
+    }
+  }
   llvm::SmallVector<Operation *> opsToClone;
   llvm::DenseSet<Operation *> visited;
 
   // Process all ops in the worklist.
   while (!worklist.empty()) {
     Operation *op = worklist.pop_back_val();
-    if (visited.contains(op))
+    if (visited.contains(op)) {
       continue;
+    }
     visited.insert(op);
 
     // Do not clone ops that are not clonable.
-    if (!IREE::Flow::isClonableIntoDispatchOp(op))
+    if (!IREE::Flow::isClonableIntoDispatchOp(op)) {
       continue;
+    }
 
     // Do not clone ParallelInsertSliceOp destinations.
     bool isDestination = any_of(
@@ -187,16 +196,18 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
                      .getDest()
                      .getDefiningOp() == op;
         });
-    if (isDestination)
+    if (isDestination) {
       continue;
+    }
 
     opsToClone.push_back(op);
 
     // Add all operands to the worklist.
     for (Value operand : op->getOperands()) {
       Operation *operandOp = operand.getDefiningOp();
-      if (!operandOp)
+      if (!operandOp) {
         continue;
+      }
       worklist.insert(operandOp);
     }
   }
@@ -207,11 +218,13 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
   for (Operation *op : llvm::reverse(opsToClone)) {
     Operation *cloned = rewriter.clone(*op);
     SmallVector<OpOperand *> uses;
-    for (OpOperand &use : op->getUses())
-      if (forallOp->isProperAncestor(use.getOwner()))
+    for (OpOperand &use : op->getUses()) {
+      if (forallOp->isProperAncestor(use.getOwner())) {
         uses.push_back(&use);
+      }
+    }
     for (OpOperand *use : uses) {
-      unsigned resultNum = llvm::cast<OpResult>(use->get()).getResultNumber();
+      unsigned resultNum = cast<OpResult>(use->get()).getResultNumber();
       rewriter.modifyOpInPlace(
           use->getOwner(), [&]() { use->set(cloned->getOpResult(resultNum)); });
     }
@@ -262,17 +275,18 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
   for (const Operation &yieldingOp : InParallelOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-    BlockArgument destBbArg =
-        llvm::cast<BlockArgument>(parallelInsertOp.getDest());
+    BlockArgument destBbArg = cast<BlockArgument>(parallelInsertOp.getDest());
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     bool inserted = resultTensorOperands.insert(dest);
-    if (!inserted)
+    if (!inserted) {
       continue;
+    }
     auto dynamicDims =
-        getIndicesOfDynamicDims(llvm::cast<ShapedType>(dest.getType()));
-    for (int64_t dim : dynamicDims)
+        getIndicesOfDynamicDims(cast<ShapedType>(dest.getType()));
+    for (int64_t dim : dynamicDims) {
       resultTensorsDynamicDims.insert(
           tensor::DimOp::create(rewriter, loc, dest, dim));
+    }
   }
   assert(resultTensorOperands.size() == forallOp.getNumResults() &&
          "Expected as many resultTensorOperands as results of forallOp");
@@ -286,26 +300,30 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
 
   SmallVector<Value> nonTensorOperands, tensorOperands, tensorDynamicDims;
   for (Value v : valuesDefinedAbove) {
-    auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType());
+    auto tensorType = dyn_cast<RankedTensorType>(v.getType());
     if (!tensorType) {
       nonTensorOperands.push_back(v);
       continue;
     }
-    if (resultTensorOperands.contains(v))
+    if (resultTensorOperands.contains(v)) {
       continue;
+    }
     tensorOperands.push_back(v);
-    for (int64_t dim : getIndicesOfDynamicDims(tensorType))
+    for (int64_t dim : getIndicesOfDynamicDims(tensorType)) {
       tensorDynamicDims.push_back(tensor::DimOp::create(rewriter, loc, v, dim));
+    }
   }
   // Also add shared outputs. (These are usually already added as result
   // tensor operands.)
   for (Value v : forallOp.getOutputs()) {
-    auto tensorType = llvm::cast<RankedTensorType>(v.getType());
-    if (resultTensorOperands.contains(v))
+    auto tensorType = cast<RankedTensorType>(v.getType());
+    if (resultTensorOperands.contains(v)) {
       continue;
+    }
     tensorOperands.push_back(v);
-    for (int64_t dim : getIndicesOfDynamicDims(tensorType))
+    for (int64_t dim : getIndicesOfDynamicDims(tensorType)) {
       tensorDynamicDims.push_back(tensor::DimOp::create(rewriter, loc, v, dim));
+    }
   }
 
   // Step 3. Create ordered vectors of operands to pass to the builder and
@@ -342,10 +360,11 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   // Step 4. Outline the compute workload region and set up the workload
   // operands.
   if (failed(populateWorkgroupCountComputingRegion(rewriter, forallOp,
-                                                   dispatchOp)))
+                                                   dispatchOp))) {
     return forallOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << dispatchOp;
+  }
 
   // Step 5. Fixup dispatchOp bbArgs and terminator.
   // TODO: Ideally the builder would have created the proper bbArgs and the
@@ -411,7 +430,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
     auto dynamicDims = IREE::Util::findDynamicDimsInList(
         en.index(), allTensorOperands, allTensorDimsBBArgs);
     auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
-        rewriter, loc, llvm::cast<RankedTensorType>(en.value().getType()),
+        rewriter, loc, cast<RankedTensorType>(en.value().getType()),
         tensorToFlowBvm.lookup(en.value()), dynamicDims);
     // Replace the tensor -> iree_tensor_ext.dispatch.tensor entry by a
     // tensor -> iree_tensor_ext.dispatch.tensor.load entry.
@@ -467,8 +486,9 @@ IREE::transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
   IRRewriter patternRewriter(target->getContext());
   FailureOr<IREE::Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, patternRewriter);
-  if (failed(result))
+  if (failed(result)) {
     return emitDefaultDefiniteFailure(target);
+  }
   results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }
@@ -486,8 +506,9 @@ IREE::transform_dialect::RegionToWorkgroupsOp::applyToOne(
     transform::ApplyToEachResultList &results, transform::TransformState &) {
   FailureOr<IREE::Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
-  if (failed(result))
+  if (failed(result)) {
     return emitDefaultDefiniteFailure(target);
+  }
   results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }

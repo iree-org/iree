@@ -85,8 +85,9 @@ public:
       IREE::Stream::AffinityAttr executionAffinityAttr,
       ConversionPatternRewriter &rewriter) const override {
     auto attrType = dyn_cast<RankedTensorType>(constantOp.getValue().getType());
-    if (!attrType)
+    if (!attrType) {
       return failure();
+    }
     auto resultType = constantOp.getType();
 
     // If the op is acting as a dynamic value then preserve that behavior by
@@ -355,13 +356,16 @@ struct ConvertTensorUpdateOp
 };
 
 static bool isScalarTensor(RankedTensorType type) {
-  if (type.getRank() == 0)
+  if (type.getRank() == 0) {
     return true; // tensor<i32>
-  if (!type.hasStaticShape())
+  }
+  if (!type.hasStaticShape()) {
     return false; // tensor<...?...xi32>
+  }
   int64_t elementCount = 1;
-  for (int64_t dim : type.getShape())
+  for (int64_t dim : type.getShape()) {
     elementCount *= dim;
+  }
   return elementCount == 1; // tensor<1xi32> or tensor<1x1x1xi32>
 }
 
@@ -816,7 +820,7 @@ struct ConvertDispatchOp
     for (auto [oldOperand, convertedOperands] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
-      if (llvm::isa<ShapedType>(oldOperand.getType())) {
+      if (isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperands,
                                    executionAffinityAttr, rewriter);
@@ -840,7 +844,7 @@ struct ConvertDispatchOp
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!llvm::isa<ShapedType>(oldResultType)) {
+      if (!isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         resultEncodings.push_back(rewriter.getType<IREE::Util::UnusedType>());
         continue;
@@ -890,7 +894,7 @@ struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
   matchAndRewrite(IREE::Flow::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto convertType = [&](Type type) -> Type {
-      if (llvm::isa<TensorType>(type)) {
+      if (isa<TensorType>(type)) {
         // Tensors become resources without sizes. The default type converter
         // adds the size so we bypass that here. We may want to allow the user
         // to override the lifetime with attributes, too.
@@ -938,7 +942,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
     for (auto [oldOperand, convertedOperand] :
          llvm::zip_equal(op.getArguments(), adaptor.getArguments())) {
       Value newOperand;
-      if (llvm::isa<ShapedType>(oldOperand.getType())) {
+      if (isa<ShapedType>(oldOperand.getType())) {
         auto newOperandCast =
             transferTensorOperands(op.getLoc(), oldOperand, convertedOperand,
                                    executionAffinityAttr, rewriter);
@@ -962,7 +966,7 @@ struct ConvertCallOp : public AffinityOpConversionPattern<IREE::Flow::CallOp> {
     auto tiedOperandBase = op.getTiedOperandsIndexAndLength().first;
     for (auto result : llvm::enumerate(op.getResults())) {
       auto oldResultType = result.value().getType();
-      if (!llvm::isa<ShapedType>(oldResultType)) {
+      if (!isa<ShapedType>(oldResultType)) {
         resultTypes.push_back(getTypeConverter()->convertType(oldResultType));
         resultSizes.push_back(nullptr);
         continue;
@@ -1002,8 +1006,9 @@ static bool insertBindingOp(BlockArgument arg,
                             IREE::TensorExt::DispatchTensorType tensorType,
                             Value zero, OpBuilder &builder) {
   // No uses: don't need a binding op.
-  if (arg.use_empty())
+  if (arg.use_empty()) {
     return true;
+  }
 
   // Find the dynamic dimension SSA values of the argument within the region.
   // If the flow dialect properly modeled dimension associations we wouldn't
@@ -1018,8 +1023,9 @@ static bool insertBindingOp(BlockArgument arg,
     IREE::Flow::DispatchTieShapeOp tieShapeOp;
     for (auto user : arg.getUsers()) {
       tieShapeOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(user);
-      if (tieShapeOp)
+      if (tieShapeOp) {
         break;
+      }
     }
     if (tieShapeOp) {
       // Found a tie shape op - we'll insert ourselves there.
@@ -1062,8 +1068,9 @@ static bool insertBindingOp(BlockArgument arg,
 // this.
 static void convertReturnOps(Region &region) {
   region.walk([](IREE::Flow::ReturnOp oldOp) {
-    OpBuilder(oldOp).create<IREE::Stream::ReturnOp>(oldOp.getLoc(),
-                                                    oldOp.getOperands());
+    OpBuilder builder(oldOp);
+    IREE::Stream::ReturnOp::create(builder, oldOp.getLoc(),
+                                   oldOp.getOperands());
     oldOp.erase();
   });
 }
@@ -1124,8 +1131,9 @@ struct ConvertExecutableOp
       // Dispatch tensor arguments become bindings and all others are preserved
       // as adaptor. Note that we only touch public (exported) functions.
       for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-        if (!funcOp.isPublic())
+        if (!funcOp.isPublic()) {
           continue;
+        }
 
         SmallVector<Type> newTypes;
         newTypes.reserve(funcOp.getNumArguments());
@@ -1138,8 +1146,7 @@ struct ConvertExecutableOp
         for (auto arg : funcOp.front().getArguments()) {
           auto oldType = arg.getType();
           if (auto tensorType =
-                  llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
-                      oldType)) {
+                  dyn_cast<IREE::TensorExt::DispatchTensorType>(oldType)) {
             // Now a binding - insert the stream.binding.subspan op to slice it.
             auto newType = rewriter.getType<IREE::Stream::BindingType>();
             newTypes.push_back(newType);

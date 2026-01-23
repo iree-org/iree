@@ -142,11 +142,12 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   if (sourceType != destinationType) {
     if (sourceType.getEncoding()) {
       value = IREE::Encoding::UnsetEncodingOp::create(
-          builder, loc, sourceType.dropEncoding(), value, sourceDynamicDims);
+          builder, loc, sourceType.dropEncoding(), value, sourceDynamicDims,
+          /*encoding_dims=*/ValueRange{});
     }
     if (destinationType.getEncoding()) {
-      value = IREE::Encoding::SetEncodingOp::create(builder, loc,
-                                                    destinationType, value);
+      value = IREE::Encoding::SetEncodingOp::create(
+          builder, loc, destinationType, value, /*encoding_dims=*/ValueRange{});
     }
   }
 
@@ -167,7 +168,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
   SmallVector<Location> workloadLocs;
   for (auto argument : encodeOp.getSourceEncodingDims()) {
     Type argumentType = argument.getType();
-    if (!llvm::isa<IndexType>(argumentType)) {
+    if (!isa<IndexType>(argumentType)) {
       continue;
     }
     workloadTypes.push_back(argumentType);
@@ -175,7 +176,7 @@ createExportOp(RewriterBase &rewriter, Location loc,
   }
   for (auto argument : encodeOp.getResultEncodingDims()) {
     Type argumentType = argument.getType();
-    if (!llvm::isa<IndexType>(argumentType)) {
+    if (!isa<IndexType>(argumentType)) {
       continue;
     }
     workloadTypes.push_back(argumentType);

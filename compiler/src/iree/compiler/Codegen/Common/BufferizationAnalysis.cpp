@@ -70,7 +70,7 @@ static bool canUsersHandleSubviews(Operation *op) {
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp) {
-    auto arg = llvm::cast<BlockArgument>(v);
+    auto arg = cast<BlockArgument>(v);
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           Value initOperand = forOp.getTiedLoopInit(arg)->get();
@@ -88,8 +88,9 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
 /// here).
 static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
                                        BufferizationPlan &plan) {
-  if (!llvm::isa<ShapedType>(constantOp.getResult().getType()))
+  if (!isa<ShapedType>(constantOp.getResult().getType())) {
     return success();
+  }
   plan.insert(constantOp.getResult());
   return success();
 }
@@ -112,12 +113,14 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
   SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
   for (auto v : mappedTensors) {
     auto definingOp = v.getDefiningOp<OpType>();
-    if (!definingOp)
+    if (!definingOp) {
       continue;
+    }
     assert((!equivalentOp || equivalentOp == definingOp) &&
            "found two interface binding ops marked as equivalent");
-    if (!equivalentOp)
+    if (!equivalentOp) {
       equivalentOp = definingOp;
+    }
   }
   return equivalentOp;
 }
@@ -173,7 +176,7 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   }
   // If the binding and offsets are the same, make sure that the
   // !iree_tensor_ext.dispatch.tensor is read-write.
-  auto sourceType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+  auto sourceType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
       valueInterfaceBinding.getType());
   return sourceType &&
          sourceType.getAccess() == IREE::TensorExt::TensorAccess::ReadWrite;
@@ -252,12 +255,14 @@ getTiedOperandsForDPSOps(DestinationStyleOpInterface dpsOp,
 /// same equivalence class.
 static LogicalResult analyseDPSOps(DestinationStyleOpInterface dpsOp,
                                    BufferizationPlan &plan) {
-  if (!dpsOp.hasPureTensorSemantics())
+  if (!dpsOp.hasPureTensorSemantics()) {
     return success();
+  }
   auto results = dpsOp->getResults();
   auto tiedOperands = getTiedOperandsForDPSOps(dpsOp, plan);
-  if (tiedOperands.empty())
+  if (tiedOperands.empty()) {
     return failure();
+  }
   for (auto [index, resultTensor, tiedOperand] : llvm::zip_equal(
            llvm::seq<int64_t>(0, results.size()), results, tiedOperands)) {
     if (tiedOperand) {
@@ -328,13 +333,15 @@ static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
 }
 
 static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
-  if (!ifOp.getNumResults())
+  if (!ifOp.getNumResults()) {
     return success();
+  }
   for (auto [result, thenOperand, elseOperand] :
        llvm::zip_equal(ifOp.getResults(), ifOp.thenYield().getOperands(),
                        ifOp.elseYield().getOperands())) {
-    if (!llvm::isa<RankedTensorType>(result.getType()))
+    if (!isa<RankedTensorType>(result.getType())) {
       continue;
+    }
     // All results and yields of the if-then-else are tied together.
     plan.unionSets(result, thenOperand);
     plan.unionSets(result, elseOperand);
@@ -344,10 +351,11 @@ static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
 
 static LogicalResult analyseScfForOp(scf::ForOp forOp,
                                      BufferizationPlan &plan) {
-  if (forOp.getResults().empty())
+  if (forOp.getResults().empty()) {
     return success();
+  }
   if (!llvm::all_of(forOp->getResultTypes(), [](Type resultType) {
-        return llvm::isa<RankedTensorType>(resultType);
+        return isa<RankedTensorType>(resultType);
       })) {
     return success();
   }
@@ -406,8 +414,9 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   for (OpOperand &use : source.getUses()) {
     auto user = use.getOwner();
     // Process only update ops uses here.
-    if (!isUpdateOp(user))
+    if (!isUpdateOp(user)) {
       continue;
+    }
     // If this is not the first use in a tensor::InsertSliceOp abort.
     if (updateOp) {
       return;
@@ -432,8 +441,9 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   Block *updateOpBlock = updateOp->getBlock();
   for (OpOperand &use : source.getUses()) {
     Operation *user = use.getOwner();
-    if (user == updateOp)
+    if (user == updateOp) {
       continue;
+    }
     if (isReadOp(user)) {
       Value source = getSource(user);
       assert(source && "unable to find source from read op");
@@ -494,8 +504,9 @@ void BufferizationPlan::dump() {
   unsigned numSets = 0;
   for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
        ++it) {
-    if (!(*it)->isLeader())
+    if (!(*it)->isLeader()) {
       continue;
+    }
     llvm::dbgs() << "\tSet " << numSets;
     if (storeLeaders.count(
             getLeaderValue(getValue(*mappedTensors.member_begin(**it))))) {
@@ -584,16 +595,14 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
-              if (llvm::isa<RankedTensorType>(
-                      transferReadOp.getBase().getType())) {
+              if (isa<RankedTensorType>(transferReadOp.getBase().getType())) {
                 plan.insert(transferReadOp.getBase());
               }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!llvm::isa<RankedTensorType>(
-                      transferWriteOp.getBase().getType())) {
+              if (!isa<RankedTensorType>(transferWriteOp.getBase().getType())) {
                 return success();
               }
               return analyseDestructiveUpdateOp(

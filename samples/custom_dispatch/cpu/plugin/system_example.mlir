@@ -93,11 +93,11 @@ module @example {
         %memref1 = stream.binding.subspan %binding1[%c0] : !stream.binding -> memref<?xf32>{%dim}
         %memref2 = stream.binding.subspan %binding2[%c0] : !stream.binding -> memref<?xf32>{%dim}
 
-        %base0, %offset0, %size0, %stride0 = memref.extract_strided_metadata %memref0
+        %base0, %offset0, %size0, %stride0 = iree_codegen.extract_strided_metadata %memref0
             : memref<?xf32> -> memref<f32>, index, index, index
-        %base1, %offset1, %size1, %stride1 = memref.extract_strided_metadata %memref1
+        %base1, %offset1, %size1, %stride1 = iree_codegen.extract_strided_metadata %memref1
             : memref<?xf32> -> memref<f32>, index, index, index
-        %base2, %offset2, %size2, %stride2 = memref.extract_strided_metadata %memref2
+        %base2, %offset2, %size2, %stride2 = iree_codegen.extract_strided_metadata %memref2
             : memref<?xf32> -> memref<f32>, index, index, index
 
 

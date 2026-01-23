@@ -7,24 +7,17 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=PAD-CONV-GFX942
 
-func.func @nhwc_conv_mfma() {
+func.func @nhwc_conv_mfma(%3: tensor<2x34x34x128xf32>, %4: tensor<3x3x128x64xf32>) -> tensor<2x32x32x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf32>> -> tensor<2x34x34x128xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>> -> tensor<3x3x128x64xf32>
   %5 = tensor.empty() : tensor<2x32x32x64xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
   %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x34x34x128xf32>, tensor<3x3x128x64xf32>) outs(%6 : tensor<2x32x32x64xf32>) -> tensor<2x32x32x64xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 32, 32, 64], strides = [1, 1, 1, 1] : tensor<2x32x32x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x32x64xf32>>
-  return
+  return %7 : tensor<2x32x32x64xf32>
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -41,24 +34,17 @@ func.func @nhwc_conv_mfma() {
 
 // -----
 
-func.func @nchw_conv_mfma() {
+func.func @nchw_conv_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<64x128x3x3xf32>) -> tensor<2x64x32x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x128x3x3xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 34, 34], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>> -> tensor<2x128x34x34xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [64, 128, 3, 3], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x128x3x3xf32>> -> tensor<64x128x3x3xf32>
   %5 = tensor.empty() : tensor<2x64x32x32xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
   %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x128x34x34xf32>, tensor<64x128x3x3xf32>) outs(%6 : tensor<2x64x32x32xf32>) -> tensor<2x64x32x32xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 64, 32, 32], strides = [1, 1, 1, 1] : tensor<2x64x32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x64x32x32xf32>>
-  return
+  return %7 : tensor<2x64x32x32xf32>
 }
 
 // CHECK-LABEL: func.func @nchw_conv_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -75,24 +61,17 @@ func.func @nchw_conv_mfma() {
 
 // -----
 
-func.func @nhwc_conv_unaligned_mfma() {
+func.func @nhwc_conv_unaligned_mfma(%3: tensor<2x33x33x128xf32>, %4: tensor<3x3x128x64xf32>) -> tensor<2x31x31x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x33x33x128xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x31x31x64xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 33, 33, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x33x33x128xf32>> -> tensor<2x33x33x128xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 128, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x128x64xf32>> -> tensor<3x3x128x64xf32>
   %5 = tensor.empty() : tensor<2x31x31x64xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x31x31x64xf32>) -> tensor<2x31x31x64xf32>
   %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x33x33x128xf32>, tensor<3x3x128x64xf32>) outs(%6 : tensor<2x31x31x64xf32>) -> tensor<2x31x31x64xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 31, 31, 64], strides = [1, 1, 1, 1] : tensor<2x31x31x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x31x31x64xf32>>
-  return
+  return %7 : tensor<2x31x31x64xf32>
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -114,24 +93,17 @@ func.func @nhwc_conv_unaligned_mfma() {
 
 // -----
 
-func.func @nchw_conv_unaligned_mfma() {
+func.func @nchw_conv_unaligned_mfma(%3: tensor<2x128x34x34xf32>, %4: tensor<63x128x3x3xf32>) -> tensor<2x63x32x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<63x128x3x3xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x63x32x32xf32>>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 34, 34], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x34x34xf32>> -> tensor<2x128x34x34xf32>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [63, 128, 3, 3], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<63x128x3x3xf32>> -> tensor<63x128x3x3xf32>
   %5 = tensor.empty() : tensor<2x63x32x32xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x63x32x32xf32>) -> tensor<2x63x32x32xf32>
   %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x128x34x34xf32>, tensor<63x128x3x3xf32>) outs(%6 : tensor<2x63x32x32xf32>) -> tensor<2x63x32x32xf32>
-  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 63, 32, 32], strides = [1, 1, 1, 1] : tensor<2x63x32x32xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x63x32x32xf32>>
-  return
+  return %7 : tensor<2x63x32x32xf32>
 }
 
 // CHECK-LABEL: func.func @nchw_conv_unaligned_mfma
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -149,7 +121,7 @@ func.func @nchw_conv_unaligned_mfma() {
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
 // MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 64, 4, 32, 0, 0, 0]
+// PAD-CONV-GFX942-NOT:     padding_conv
 
 // -----
 
@@ -170,7 +142,7 @@ func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %ar
 
 // CHECK-LABEL: func.func @conv_nhwc_fhwc_unaligned_channel
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -209,7 +181,7 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 
 // CHECK-LABEL: func.func @conv_chwn_chwf_unaligned_batch
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -220,7 +192,7 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 //  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
 //  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
 
-// PAD-CONV-GFX942:     padding_conv =  [16, 1, 1, 16, 0, 0, 0]
+// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 16, 0, 0, 0]
 
 // -----
 
@@ -241,7 +213,7 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x55xbf16>, %arg
 
 // CHECK-LABEL: func.func @group_conv_hwgc_gfhwc_unaligned
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -281,7 +253,7 @@ module {
 
 // CHECK-LABEL: func.func @conv_nhwc_filter_5x1_unaligned
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -305,19 +277,19 @@ module {
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x40xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
+func.func @conv_chwn_chwf_aligned_batch(%arg0: tensor<2x192x128x48xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x48xf32>) -> tensor<40x3x3x48xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x48xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x48xf32>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):
     %1 = arith.extf %in : bf16 to f32
     %2 = arith.extf %in_0 : bf16 to f32
     %3 = arith.mulf %1, %2 : f32
     %4 = arith.addf %out, %3 : f32
     linalg.yield %4 : f32
-  } -> tensor<40x3x3x40xf32>
-  return %0 : tensor<40x3x3x40xf32>
+  } -> tensor<40x3x3x48xf32>
+  return %0 : tensor<40x3x3x48xf32>
 }
 
-//         CHECK-LABEL:  func.func @conv_chwn_chwf_no_pad_conv
+//         CHECK-LABEL:  func.func @conv_chwn_chwf_aligned_batch
 //     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
 // PAD-CONV-GFX942-NOT:     padding_conv
 
@@ -326,7 +298,7 @@ func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: t
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %arg1: tensor<287x3x3x3xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
+func.func @conv_nhwc_small_channel_size(%arg0: tensor<16x26x19x3xf16>, %arg1: tensor<287x3x3x3xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x19x3xf16>, tensor<287x3x3x3xf16>) outs(%arg2 : tensor<16x24x17x287xf32>) {
   ^bb0(%in: f16, %in_0: f16, %out: f32):
     %1 = arith.extf %in : f16 to f32
@@ -338,6 +310,82 @@ func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %a
   return %0 : tensor<16x24x17x287xf32>
 }
 
-//         CHECK-LABEL:  func.func @conv_nhwc_small_channel_no_pad_conv
-//     PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
-// PAD-CONV-GFX942-NOT:     padding_conv
+//     CHECK-LABEL:  func.func @conv_nhwc_small_channel_size
+// PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0, 0]
+
+// -----
+// This test is to check that we c promote in such cases since we have codegen issues with this case
+// see https://github.com/iree-org/iree/issues/23038
+func.func @nhwc_conv_mfma_biasadd(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x33x33x64xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x35x35x128xf32>, tensor<3x3x128x64xf32>) outs(%empty : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%7, %5 : tensor<2x33x33x64xf32>, tensor<2x33x33x64xf32>) outs(%empty : tensor<2x33x33x64xf32>)   {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %18 = arith.addf %in, %in_0 : f32
+        linalg.yield %18 : f32
+      }  -> tensor<2x33x33x64xf32>
+  return %7 : tensor<2x33x33x64xf32>
+}
+
+//     CHECK-LABEL: nhwc_conv_mfma_biasadd
+//           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+// Check that we dont c promote if there is no additonal operand
+func.func @nhwc_conv_mfma_truncf(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x33x33x64xf32>
+  %empty2 = tensor.empty() : tensor<2x33x33x64xf16>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%3, %4 : tensor<2x35x35x128xf32>, tensor<3x3x128x64xf32>) outs(%empty : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+       ins(%7 : tensor<2x33x33x64xf32>) outs(%empty2 : tensor<2x33x33x64xf16>)   {
+       ^bb0(%in: f32, %out: f16):
+         %18 = arith.truncf %in : f32 to f16
+        linalg.yield %18 : f16
+       }  -> tensor<2x33x33x64xf16>
+  return %8 : tensor<2x33x33x64xf16>
+}
+
+//     CHECK-LABEL: nhwc_conv_mfma_truncf
+//           CHECK: promote_operands = [0, 1]
+
+// -----
+
+func.func @conv_with_dps_init_producer(
+    %lhs: tensor<2x64x58x58xf32>, %rhs: tensor<2x64x64x3x3xf32>,
+    %init: tensor<2x64xf32>) -> tensor<2x64x28x28xf32> {
+  %0 = tensor.empty() : tensor<2x64x28x28xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%init : tensor<2x64xf32>) outs(%0 : tensor<2x64x28x28xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<2x64x28x28xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 * 2 + d5, d3 * 2 + d6)>,
+                     affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5, d6)>,
+                     affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+    ins(%lhs, %rhs : tensor<2x64x58x58xf32>, tensor<2x64x64x3x3xf32>) outs(%1 : tensor<2x64x28x28xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<2x64x28x28xf32>
+  return %2 : tensor<2x64x28x28xf32>
+}
+
+//     CHECK-LABEL: conv_with_dps_init_producer
+//           CHECK: promote_operands = [0, 1, 2]

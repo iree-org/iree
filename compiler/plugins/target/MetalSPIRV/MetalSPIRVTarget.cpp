@@ -56,7 +56,7 @@ struct MetalSPIRVOptions {
 // TODO: MetalOptions for choosing the Metal version.
 class MetalTargetDevice : public TargetDevice {
 public:
-  MetalTargetDevice(const MetalSPIRVOptions &options) : options(options) {}
+  MetalTargetDevice(const MetalSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -74,9 +74,6 @@ public:
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
                                             configAttr, executableTargetAttrs);
   }
-
-private:
-  const MetalSPIRVOptions &options;
 };
 
 class MetalSPIRVTargetBackend : public TargetBackend {
@@ -311,7 +308,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_metal_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 

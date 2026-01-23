@@ -42,6 +42,16 @@ struct ImplicitlyCaptured
 };
 
 template <typename ConcreteType>
+struct UnreachableLike
+    : public OpTrait::TraitBase<ConcreteType, UnreachableLike> {
+  static LogicalResult verifyTrait(Operation *op) {
+    // Unreachable ops mark code as not reachable at runtime.
+    // No specific verification needed at this time.
+    return success();
+  }
+};
+
+template <typename ConcreteType>
 struct ObjectLike : public OpTrait::TraitBase<ConcreteType, ObjectLike> {
   static LogicalResult verifyTrait(Operation *op) {
     if (!op->hasTrait<OpTrait::SymbolTable>() ||

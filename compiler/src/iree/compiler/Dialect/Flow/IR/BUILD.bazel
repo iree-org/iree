@@ -16,6 +16,7 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "FlowBase.td",
             "FlowInterfaces.td",
@@ -26,6 +27,7 @@ iree_td_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR:td_files",
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
@@ -96,11 +98,17 @@ iree_gentbl_cc_library(
     name = "FlowEnumsGen",
     tbl_outs = [
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=flow",
+            ],
             "FlowEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=flow",
+            ],
             "FlowEnums.cpp.inc",
         ),
     ],

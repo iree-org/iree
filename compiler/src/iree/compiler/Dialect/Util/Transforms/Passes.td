@@ -17,8 +17,24 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
   let summary = "Applies some risky/IREE-specific canonicalization patterns.";
 }
 
+def AttributeCallGraphPass : Pass<"iree-util-attribute-call-graph", "mlir::ModuleOp"> {
+  let summary = "Propagates attributes from callees to call sites.";
+  let description = [{
+    Walks all call operations and propagates relevant attributes from the
+    called functions to the call sites. This includes:
+    * Attributes implementing CallAnnotationAttrInterface
+    * nosideeffects (for side-effect analysis)
+
+    This allows subsequent passes to check attributes directly on call sites
+    without expensive symbol table lookups during analysis.
+  }];
+}
+
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
 }
 
 def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
@@ -73,6 +89,97 @@ def IPOPass : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
   ];
 }
 
+def LiftCFGToSCFPass : Pass<"iree-util-lift-cfg-to-scf", "mlir::ModuleOp"> {
+  let summary = "Lift unstructured control flow to SCF/Util dialect for callable ops.";
+  let description = [{
+    Transforms unstructured control flow (CFG) in `util.initializer`/`util.func`
+    ops to structured control flow (SCF) operations. All CFG terminator ops like
+    `cf.br` and `cf.cond_br` along with non-terminator ops like `cf.switch` are
+    converted to their structured equivalents like `scf.if`, `scf.while`, and
+    `scf.index_switch` ops.
+
+    Limitations:
+    * Irreducible control flow (loops with multiple entry points) will cause
+      the transformation to fail. This is rare in practice as most high-level
+      languages and ML frameworks generate reducible control flow.
+    * Operations with side-effecting branches are not supported.
+    * Operations that produce successor operands dynamically are not supported.
+    * Infinite loops require the insertion of `util.unreachable` terminators.
+
+    The algorithm handles:
+    * Simple if/else patterns -> `scf.if`
+    * Loops with single entry -> `scf.while`
+    * Switch statements -> `scf.index_switch`
+    * Multiple returns -> exit block combining
+    * Unreachable code -> `util.unreachable` insertion
+
+    Based on the algorithm from:
+    Bahmann et al. 2015. Perfect Reconstructability of Control Flow from
+    Demand Dependence Graphs. ACM TACO. https://dl.acm.org/doi/10.1145/2693261
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
+def LinkModulesPass : Pass<"iree-util-link-modules", "mlir::ModuleOp"> {
+  let summary = "Links external functions from source modules into the target module.";
+  let description = [{
+    Resolves external function declarations by loading definitions from source
+    modules. This pass enables composing programs from multiple MLIR modules
+    where functions can reference implementations from separately compiled
+    modules using dotted name scoping (e.g., `@module_a.compute`).
+
+    For each external function in the target module:
+
+    1. Searches for the definition in explicitly provided source modules
+    2. If not found and the symbol has a module prefix (`@prefix.name`) attempts
+       to automatically load `prefix.mlir` or `prefix.mlirbc` from library paths
+    3. Clones the function definition along with transitive dependencies
+       (including `IREE::Util::ObjectLike` operations like `flow.executable`)
+    4. Detects and resolves conflicts between private symbols from different
+       source modules or with existing target module definitions by renaming
+       conflicting symbols (e.g., `@scale_factor`, `@scale_factor_0`)
+    5. Renames imported symbols to match the external declaration name
+    6. Forces all imported symbols to private visibility
+
+    ObjectLike operations (such as `flow.executable`) are treated as
+    self-contained units: their internal structure is preserved but not scanned
+    for additional dependencies, preventing nested symbols from being treated as
+    external references.
+
+    Module name scoping: Source modules with `module @foo { util.func @bar }`
+    export public symbols as `@foo.bar`. Private symbols keep their local names.
+    Internal references within the module use the simple name `@bar`, while
+    external references use the dotted notation.
+
+    Supports both text (`.mlir`) and bytecode (`.mlirbc`) formats for all
+    modules.
+  }];
+
+  let options = [
+    ListOption<
+      "linkModules", "link-module",
+      "std::string",
+      "Explicit paths to source modules to link from."
+    >,
+    ListOption<
+      "libraryPaths", "library-path",
+      "std::string",
+      "Directories to search for modules during automatic discovery."
+    >,
+  ];
+
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
+}
+
 def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
   let summary = "Optimizes integer arithmetic using a variety of dataflow analysis and patterns.";
   let dependentDialects = [
@@ -106,6 +213,36 @@ def StripAndSplatConstantsPass :
 
 def StripDebugOpsPass : Pass<"iree-util-strip-debug-ops", ""> {
   let summary = "Strips debug ops, like assertions.";
+}
+
+def VerifyInitializationOrderPass :
+    Pass<"iree-util-verify-initialization-order", "mlir::ModuleOp"> {
+  let summary = "Verifies module initialization order constraints.";
+  let description = [{
+    Verifies that module initialization follows the rules documented in the
+    util.initializer and util.global operations:
+
+    1. Initializers can only access globals defined before them in module order.
+    2. Immutable globals can only be initialized once (either by initial_value
+       OR by stores in initializers, never both).
+    3. Globals with initial values cannot be modified by initializers that
+       precede them in module order.
+    4. Stores to immutable globals must occur in initializers or functions
+       only reachable from initializers.
+
+    The pass uses conservative analysis and emits warnings for patterns it
+    cannot definitively verify (e.g. conditional stores in initializer-only
+    functions).
+  }];
+}
+
+def VerifyStructuredControlFlowPass :
+    InterfacePass<"iree-util-verify-structured-control-flow", "mlir::FunctionOpInterface"> {
+  let summary = "Verifies that functions contain only structured control flow.";
+  let description = [{
+    Verifies that functions contain only structured control flow (no ops
+    implementing `BranchOpInterface` like `cf.br` or `cf.cond_br`).
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,6 +343,16 @@ def TestFloatRangeAnalysisPass : Pass<"iree-util-test-float-range-analysis", "">
   let description = [{
     Tests floating point range analysis by evaluating any
     'iree_unregistered.test_fprange' op and setting the results on an attribute.
+  }];
+}
+
+def TestIntegerDivisibilityAnalysisPass :
+    Pass<"iree-util-test-integer-divisibility-analysis", ""> {
+  let summary = "Tests integer divisibility analysis.";
+  let description = [{
+    Tests integer divisibility analysis by evaluating any
+    'iree_unregistered.test_int_divisibility' op and setting the results on an
+    attribute.
   }];
 }
 

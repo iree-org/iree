@@ -60,10 +60,11 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @step_2
-// CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9, 16, 17]> : vector<6xindex>
+// CHECK-DAG: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9, 16, 17]> : vector<6xindex>
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[TID:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 2)
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c2 : index
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %[[C2]] : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<6xindex>
 // CHECK: %[[OFFSET:.+]] = arith.addi %[[TID_STRIDEV]], %[[CST]] : vector<6xindex>
 
@@ -95,14 +96,16 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @step_3
-// CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9]> : vector<4xindex>
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant dense<[0, 1, 8, 9]> : vector<4xindex>
 // CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[WID:.+]]:4 = affine.delinearize_index %[[IDX]] into (3, 8, 64)
 // CHECK: %[[TID:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 2)
-// CHECK: %[[WID_STRIDE:.+]] = arith.muli %[[WID]]#1, %c16 : index
+// CHECK: %[[WID_STRIDE:.+]] = arith.muli %[[WID]]#1, %[[C16]] : index
 // CHECK: %[[WID_STRIDEV:.+]] = vector.broadcast %[[WID_STRIDE]] : index to vector<4xindex>
 // CHECK: %[[OFFSET0:.+]] = arith.addi %[[WID_STRIDEV]], %[[CST]] : vector<4xindex>
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c2 : index
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %[[C2]] : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<4xindex>
 // CHECK: %[[OFFSET1:.+]] = arith.addi %[[OFFSET0]], %[[TID_STRIDEV]] : vector<4xindex>
 
@@ -134,9 +137,10 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @step_4
-// CHECK: %[[CST:.+]] = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7]> : vector<8xindex>
+// CHECK-DAG: %[[CST:.+]] = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7]> : vector<8xindex>
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
 // CHECK: %[[IDX:.+]] = gpu.thread_id x
 // CHECK: %[[TID:.+]]:2 = affine.delinearize_index %[[IDX]] into (16)
-// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %c8 : index
+// CHECK: %[[TID_STRIDE:.+]] = arith.muli %[[TID]]#1, %[[C8]] : index
 // CHECK: %[[TID_STRIDEV:.+]] = vector.broadcast %[[TID_STRIDE]] : index to vector<8xindex>
 // CHECK: %[[OFFSET:.+]] = arith.addi %[[TID_STRIDEV]], %[[CST]] : vector<8xindex>

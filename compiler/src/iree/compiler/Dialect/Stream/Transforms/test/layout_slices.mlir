@@ -50,11 +50,10 @@ util.func public @layoutDynamic(%size_a: index, %size_b: index) -> (index, index
   // CHECK-DAG: %c0 = arith.constant 0 : index
   // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %0 = util.align %[[SIZE_A]], %c16 : index
-  // CHECK-DAG: %1 = arith.addi %0, %c0 : index
-  // CHECK-DAG: %2 = util.align %[[SIZE_B]], %c16 : index
-  // CHECK-DAG: %3 = arith.addi %1, %2 : index
+  // CHECK-DAG: %1 = util.align %[[SIZE_B]], %c16 : index
+  // CHECK-DAG: %2 = arith.addi %0, %1 : index
 
-  // CHECK: util.return %3, %c0, %1, %c0
+  // CHECK: util.return %2, %c0, %0, %c0
   util.return %t#0, %t#1, %t#2, %t#3 : index, index, index, index
 }
 
@@ -82,8 +81,8 @@ util.func public @layoutMixedStaticDynamic(%size_a: index, %size_b: index) -> (i
   }) : index
 
   // CHECK-DAG: %c0 = arith.constant 0 : index
-  // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %c208 = arith.constant 208 : index
+  // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %0 = util.align %[[SIZE_A]], %c16 : index
   // CHECK-DAG: %1 = arith.addi %0, %c208 : index
   // CHECK-DAG: %2 = util.align %[[SIZE_B]], %c16 : index

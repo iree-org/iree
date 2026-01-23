@@ -508,7 +508,7 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
             DFX::Resolution::REQUIRED);
         newState ^= parentUsage.getState();
         if (auto whileOp =
-                dyn_cast_or_null<mlir::scf::WhileOp>(op->getParentOp())) {
+                dyn_cast_if_present<mlir::scf::WhileOp>(op->getParentOp())) {
           auto value = Position::forValue(
               whileOp.getAfter().getArgument(operand.getOperandNumber() - 1));
           auto &valueUsage = solver.getElementFor<ValueConsumerAffinityPVS>(

@@ -106,8 +106,9 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
   for (auto loopId : llvm::seq<unsigned>(0, tileSizes.size())) {
-    if (partitionableLoopsSet.count(loopId))
+    if (partitionableLoopsSet.contains(loopId)) {
       continue;
+    }
     tileSizes[loopId] = 0;
   }
 
@@ -181,10 +182,12 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   // slowest varying.
   SmallVector<Value> numWorkgroups;
   for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
-    if (partitionedLoop >= tileSizes.size())
+    if (partitionedLoop >= tileSizes.size()) {
       continue;
-    if (isZeroInteger(tileSizes[partitionedLoop]))
+    }
+    if (isZeroInteger(tileSizes[partitionedLoop])) {
       continue;
+    }
     Value numTileAlongDim = getValueOrCreateConstantIndexOp(
         rewriter, loc, numTiles[partitionedLoop]);
     if (numWorkgroups.size() == maxWorkgroupParallelDims) {
@@ -374,9 +377,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       linalg::LinalgTilingOptions()
           .setDistributionOptions(getIREELinalgLoopDistributionOptions(
               distributionMethodValue, maxWorkgroupParallelDims))
-          .setInterchange(llvm::map_to_vector(
-              interchange,
-              [](int64_t v) -> unsigned { return static_cast<unsigned>(v); }))
+          .setInterchange(
+              llvm::map_to_vector(interchange, llvm::StaticCastTo<unsigned>))
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(tileSizeFn);
 

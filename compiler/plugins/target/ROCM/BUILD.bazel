@@ -42,6 +42,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Utils:ExecutableDebugInfoUtils",
         "//compiler/src/iree/compiler/Dialect/HAL/Utils:LLVMLinkerUtils",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/PluginAPI",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/schemas:amdgpu_executable_def_c_fbs",

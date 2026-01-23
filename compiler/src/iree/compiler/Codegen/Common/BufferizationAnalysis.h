@@ -62,8 +62,9 @@ public:
   /// the dispatch region.
   bool isInStoreSet(Value v) {
     Value leader = getLeaderValue(v);
-    if (!leader)
+    if (!leader) {
       return false;
+    }
     return storeLeaders.count(leader);
   }
 

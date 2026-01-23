@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "HALDialect.h"
     "HALOps.h"
+    "HALTraits.h"
     "HALTypes.h"
   TEXTUAL_HDRS
     "HALAttrInterfaces.cpp.inc"
@@ -97,8 +98,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls --attrdefs-dialect=hal HALAttrs.h.inc
     --gen-attrdef-defs --attrdefs-dialect=hal HALAttrs.cpp.inc
-    --gen-enum-decls HALEnums.h.inc
-    --gen-enum-defs HALEnums.cpp.inc
+    --gen-enum-decls --dialect=hal HALEnums.h.inc
+    --gen-enum-defs --dialect=hal HALEnums.cpp.inc
 )
 
 iree_tablegen_library(

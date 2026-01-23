@@ -16,14 +16,18 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
+            "TensorExtAttrs.td",
             "TensorExtBase.td",
+            "TensorExtInterfaces.td",
             "TensorExtOps.td",
         ],
         include = ["*.td"],
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -33,34 +37,110 @@ iree_td_library(
 iree_compiler_cc_library(
     name = "IR",
     srcs = [
+        "TensorExtAttrInterfaces.cpp",
+        "TensorExtAttrInterfaces.cpp.inc",
+        "TensorExtAttrs.cpp",
+        "TensorExtAttrs.cpp.inc",
         "TensorExtDialect.cpp",
         "TensorExtDialect.cpp.inc",
         "TensorExtOpFolders.cpp",
+        "TensorExtOpInterfaces.cpp",
+        "TensorExtOpInterfaces.cpp.inc",
         "TensorExtOps.cpp",
         "TensorExtOps.cpp.inc",
         "TensorExtTypes.cpp",
     ],
     hdrs = [
+        "TensorExtAttrInterfaces.h",
+        "TensorExtAttrInterfaces.h.inc",
+        "TensorExtAttrs.h",
+        "TensorExtAttrs.h.inc",
         "TensorExtDialect.h",
         "TensorExtDialect.h.inc",
+        "TensorExtOpInterfaces.h",
+        "TensorExtOpInterfaces.h.inc",
         "TensorExtOps.h",
         "TensorExtOps.h.inc",
         "TensorExtTypes.h",
     ],
     deps = [
+        ":TensorExtAttrInterfacesGen",
+        ":TensorExtAttrsGen",
+        ":TensorExtOpInterfacesGen",
         ":TensorExtOpsGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:InliningUtils",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
     ],
+)
+
+iree_gentbl_cc_library(
+    name = "TensorExtAttrsGen",
+    tbl_outs = [
+        (
+            [
+                "--dialect=iree_tensor_ext",
+                "--gen-attrdef-decls",
+            ],
+            "TensorExtAttrs.h.inc",
+        ),
+        (
+            [
+                "--dialect=iree_tensor_ext",
+                "--gen-attrdef-defs",
+            ],
+            "TensorExtAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TensorExtAttrs.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "TensorExtAttrInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "TensorExtAttrInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "TensorExtAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TensorExtInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "TensorExtOpInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "TensorExtOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "TensorExtOpInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TensorExtInterfaces.td",
+    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(

@@ -1,0 +1,193 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Torch Tests
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  test_torch_ops:
+    name: "test_torch_ops :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_task
+            markers: "cpu"
+            config-file: torch_ops_cpu_llvm_sync.json
+            runs-on: ubuntu-24.04
+          - name: amdgpu_hip_gfx1100_O3
+            config-file:  torch_ops_gpu_hip_gfx1100_O3.json
+            runs-on: [Linux, X64, gfx1100]
+          - name: amdgpu_hip_gfx1201_O3
+            config-file: torch_ops_gpu_hip_gfx1201_O3.json
+            runs-on: [Linux, X64, gfx1201]
+          - name: amdgpu_vulkan_O3
+            config-file: torch_ops_gpu_vulkan_O3.json
+            # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
+            runs-on: [Linux, X64, rdna3, shark10-ci]
+          - name: amdgpu_rocm_mi300_gfx942_O3
+            config-file: torch_ops_gpu_hip_gfx942_O3.json
+            runs-on: linux-mi325-1gpu-ossci-iree-org
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
+      VENV_DIR: ${{ github.workspace }}/venv
+      GH_TOKEN: ${{ github.token }}
+      CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: false
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
+          path: iree-test-suites
+      - name: Install Torch ops test suite requirements
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install -r iree-test-suites/torch_ops/requirements.txt
+      - name: Run Torch ops test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest iree-test-suites/torch_ops/ \
+              -rpfE \
+              --timeout=30 \
+              --durations=20 \
+              --report-log=${LOG_FILE_PATH} \
+              --config-files=${CONFIG_FILE_PATH}
+
+  tests:
+    name: "torch_models tests :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_task
+            markers: "cpu"
+            cache-dir: /home/nod/iree_tests_cache
+            summary-file: torch_models_cpu_task_summary.json
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
+              - threadripper
+          # MI325
+          - name: amdgpu_mi325_gfx942
+            markers: "gfx942 or mi325"
+            cache-dir: /shark-cache/data/iree-regression-cache
+            summary-file: torch_models_amdgpu_mi325_summary.json
+            runs-on: linux-mi325-1gpu-ossci-iree-org
+    env:
+      VENV_DIR: ${{ github.workspace }}/.venv
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v5.4.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
+          path: iree-test-suites
+          # Don't need lfs for torch models yet.
+          lfs: false
+
+      - name: Setup Python virtual environment
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -r ${{ github.workspace }}/iree-test-suites/torch_models/requirements.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Torch Model tests
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest \
+            iree-test-suites/torch_models \
+            -rpFe \
+            --log-cli-level=info \
+            -o log_cli=True \
+            --durations=0 \
+            --timeout=1200 \
+            --capture=no \
+            --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files \
+            --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
+            --job-summary-path=${{ github.workspace }}/iree-test-suites \
+            -m "${{ matrix.markers }}"
+
+      - name: Upload Torch Model Job Summary
+        if: always()
+        run: |
+          cat ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Torch Models JSON Summary
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ${{ matrix.summary-file }}
+          path: ${{ github.workspace }}/iree-test-suites/job_summary.json

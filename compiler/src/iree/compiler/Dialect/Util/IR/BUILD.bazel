@@ -18,6 +18,7 @@ exports_files(["UtilBase.td"])
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "UtilAttrs.td",
             "UtilBase.td",
@@ -28,6 +29,7 @@ iree_td_library(
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
@@ -91,11 +93,13 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:InliningUtils",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:UBDialect",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
@@ -112,11 +116,17 @@ iree_gentbl_cc_library(
             "UtilAttrs.cpp.inc",
         ),
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=util",
+            ],
             "UtilEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=util",
+            ],
             "UtilEnums.cpp.inc",
         ),
     ],

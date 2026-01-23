@@ -120,8 +120,9 @@ void iree_task_worker_await_exit(iree_task_worker_t* worker) {
 void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Must have called request_exit/await_exit.
-  IREE_ASSERT_TRUE(iree_task_worker_is_zombie(worker));
+  // Must have called request_exit/await_exit, OR thread creation failed during
+  // initialization.
+  IREE_ASSERT_TRUE(!worker->thread || iree_task_worker_is_zombie(worker));
 
   iree_thread_release(worker->thread);
   worker->thread = NULL;

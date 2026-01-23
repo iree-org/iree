@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_op_ordinals.mlir"
+    "attribute_call_graph.mlir"
     "combine_initializers.mlir"
     "drop_compiler_hints.mlir"
     "fold_globals.mlir"
@@ -24,18 +25,30 @@ iree_lit_test_suite(
     "import_resources.mlir"
     "integer_divisibility.mlir"
     "ipo.mlir"
+    "lift_cfg_to_scf.mlir"
+    "link_modules.mlir"
+    "link_modules_auto.mlir"
+    "link_modules_error.mlir"
     "optimize_int_arithmetic.mlir"
     "optimize_int_arithmetic_narrowing.mlir"
     "patterns.mlir"
+    "patterns_unreachable.mlir"
     "propagate_subranges.mlir"
     "simplify_global_accesses.mlir"
     "strip_and_splat_constants.mlir"
     "strip_debug_ops.mlir"
     "test_float_range_analysis.mlir"
     "test_float_range_analysis_linalg.mlir"
+    "test_integer_divisibility_analysis.mlir"
+    "verify_initialization_order.mlir"
+    "verify_structured_control_flow.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    link_module_a.mlir
+    link_module_b.mlir
+    link_modules_bundle.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

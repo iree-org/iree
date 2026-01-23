@@ -67,6 +67,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRParser
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
@@ -74,8 +75,10 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRVectorInterfaces
     MLIRViewLikeInterface
+    iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
@@ -117,8 +120,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls IREECodegenAttrs.h.inc
     --gen-attrdef-defs IREECodegenAttrs.cpp.inc
-    --gen-enum-decls IREECodegenEnums.h.inc
-    --gen-enum-defs IREECodegenEnums.cpp.inc
+    --gen-enum-decls --dialect=iree_codegen IREECodegenEnums.h.inc
+    --gen-enum-defs --dialect=iree_codegen IREECodegenEnums.cpp.inc
 )
 
 iree_tablegen_library(

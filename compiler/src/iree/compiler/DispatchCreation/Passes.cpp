@@ -40,25 +40,21 @@ static llvm::cl::opt<bool> clEnableEarlyTruncFusion(
         "consumers before forming dispatch regions"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
-    "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     "iree-dispatch-creation-enable-fuse-padding-into-linalg-producer-ops",
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnablePadHandling(
-    "iree-flow-enable-pad-handling",
-    llvm::cl::desc("Enable native handling of tensor.pad operations."),
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
     "iree-dispatch-creation-enable-fuse-horizontal-contractions",
     llvm::cl::desc(
         "Enables horizontal fusion of contractions with one common operand"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
+    "iree-dispatch-creation-experimental-multi-use-encoding-fusion",
+    llvm::cl::desc(
+        "Enable encoding op fusion if the producer has more than one use"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
@@ -125,7 +121,13 @@ static void addDispatchRegionCreationPreprocessingPasses(
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
-      .addPass(DispatchCreation::createBubbleUpExpandShapesPass)
+      .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
+      .addPass([&]() {
+        return DispatchCreation::createBubbleUpExpandShapesPass(
+            DispatchCreation::BubbleUpExpandShapesPassOptions{
+                /*enableReshapeMovementAcrossReductions=*/
+                dispatchOptions.enableAggressiveReshapeMovement});
+      })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
@@ -175,9 +177,10 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //        - Split reduction using partial reduction tiling.
       .addPredicatedPass(dispatchOptions.enableSplitReduction,
                          DispatchCreation::createSetSplitReductionSizesPass)
-      .addPass([]() {
+      .addPass([&]() {
         FormSplitReductionDispatchesPassOptions options;
-        options.enableFusePad = clEnableFusePaddingIntoLinalgConsumerOps;
+        options.enableFusePad =
+            dispatchOptions.enableFusePaddingIntoLinalgConsumerOps;
         return DispatchCreation::createFormSplitReductionDispatchesPass(
             options);
       })
@@ -190,12 +193,15 @@ static void addDispatchRegionCreationPreprocessingPasses(
   // Run constant expression hoisting just before dispatch creation in case
   // there are any new hoisting opportunities (e.g. transpose generics or
   // horizontal fusion).
-  IREE::Util::ExprHoistingOptions options;
-  options.maxSizeIncreaseThreshold = 0;
-  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
-  };
-  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  if (dispatchOptions.constExprHoisting) {
+    IREE::Util::ExprHoistingOptions options;
+    options.maxSizeIncreaseThreshold =
+        dispatchOptions.constExprMaxSizeIncreaseThreshold;
+    options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+      registry.insert<IREE::TensorExt::IREETensorExtDialect>();
+    };
+    passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  }
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
@@ -217,7 +223,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
         return DispatchCreation::createFormDispatchRegionsPass(
             FormDispatchRegionsPassOptions{
                 options.enableAggressiveFusion,
-                clEnableFusePaddingIntoLinalgConsumerOps,
+                options.enableFusePaddingIntoLinalgConsumerOps,
                 clEnableFusePaddingIntoLinalgProducerOps});
       })
       // Elementwise fuse operations that are iside a dispatch if possible.
@@ -233,6 +239,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass([] {
         FuseMultiUseElementwiseProducerPassOptions options;
         options.intraDispatch = true;
+        options.numIterations = 32;
         return DispatchCreation::createFuseMultiUseElementwiseProducerPass(
             options);
       })
@@ -279,15 +286,30 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
   }
   FunctionLikeNest(passManager)
-      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
+      .addPass([&]() {
+        FuseEncodingOpsIntoDispatchRegionsPassOptions passOptions;
+        passOptions.enableAggressiveFusion =
+            clExperimentalMultiUseEncodingFusion;
+        return DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass(
+            passOptions);
+      })
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
-  IREE::Util::ExprHoistingOptions hoistingOptions;
-  hoistingOptions.maxSizeIncreaseThreshold = 0;
-  hoistingOptions.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
-  };
-  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
+  if (options.constExprHoisting) {
+    IREE::Util::ExprHoistingOptions hoistingOptions;
+    hoistingOptions.maxSizeIncreaseThreshold =
+        options.constExprMaxSizeIncreaseThreshold;
+    hoistingOptions.registerDependentDialectsFn =
+        [](DialectRegistry &registry) {
+          registry.insert<IREE::TensorExt::IREETensorExtDialect>();
+        };
+    passManager.addPass(
+        IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
+  }
+
+  // Remove tensor compute_barriers at the end of dispatch region creation.
+  FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createRemoveTensorBarriersPass);
 }
 
 // Apply preprocessing and form dispatch regions
@@ -301,12 +323,13 @@ void buildDispatchCreationPassPipeline(
 
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.
-  if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
+  if (!transformOptions.enablePadHandling &&
+      !clEnableFusePaddingIntoLinalgProducerOps) {
     passManager.addPass(
         DispatchCreation::createTensorPadToTensorInsertSlicePass(
             TensorPadToTensorInsertSlicePassOptions{
                 /*skipSingleLinalgOpUses=*/
-                clEnableFusePaddingIntoLinalgConsumerOps}));
+                transformOptions.enableFusePaddingIntoLinalgConsumerOps}));
   }
 
   {

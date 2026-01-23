@@ -23,3 +23,17 @@ iree_compiler_cc_test(
         "@llvm-project//llvm:Support",
     ],
 )
+
+iree_compiler_cc_test(
+    name = "IndexingTest",
+    testonly = True,
+    srcs = ["IndexingTest.cpp"],
+    deps = [
+        "//compiler/src/iree/compiler/Utils",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//llvm:Passes",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)

@@ -20,7 +20,7 @@ namespace mlir::iree_compiler {
 static std::optional<IREE::Codegen::MaterializeEncodingInfo>
 getEncodingInfoFromType(RankedTensorType type) {
   auto layoutAttr =
-      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+      dyn_cast_if_present<IREE::Encoding::LayoutAttr>(type.getEncoding());
   if (!layoutAttr) {
     return std::nullopt;
   }
@@ -57,8 +57,9 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
   if (ShapedType::isStaticShape(staticTileSizes)) {
     if (!materializeEncodingInfo.scalableTiles ||
         llvm::none_of(materializeEncodingInfo.scalableTiles.value(),
-                      [](bool scalable) { return scalable; }))
+                      [](bool scalable) { return scalable; })) {
       return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
+    }
     // In this case, we have scalable tiles present and we have to generate the
     // necessary vscale operation and the corresponding static_size * vscale
     // values.
@@ -110,7 +111,7 @@ FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensorImpl(
     ValueRange dynamicDims, IREE::Encoding::LayoutMaterializerAttr layoutAttr,
     IREE::Codegen::MaterializeEncodingInfo encodingInfo) {
   auto boundTensorType =
-      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+      dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
   if (!boundTensorType) {
     return failure();
   }

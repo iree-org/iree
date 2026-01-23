@@ -36,8 +36,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
       return srcOp.emitError() << "could not convert type: " << srcOp.getType()
                                << " (check -iree-vm-target-* options)";
     }
-    if (llvm::isa<IntegerType>(targetType)) {
-      auto integerAttr = llvm::dyn_cast<IntegerAttr>(srcOp.getValue());
+    if (isa<IntegerType>(targetType)) {
+      auto integerAttr = dyn_cast<IntegerAttr>(srcOp.getValue());
       if (!integerAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -64,8 +64,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
         return srcOp.emitRemark()
                << "unsupported const integer bit width for dialect";
       }
-    } else if (llvm::isa<FloatType>(targetType)) {
-      auto floatAttr = llvm::dyn_cast<FloatAttr>(srcOp.getValue());
+    } else if (isa<FloatType>(targetType)) {
+      auto floatAttr = dyn_cast<FloatAttr>(srcOp.getValue());
       if (!floatAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -100,8 +100,9 @@ struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(32))
+    if (!adaptor.getLhs().getType().isInteger(32)) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpIPredicate::eq:
@@ -155,8 +156,9 @@ struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isInteger(64))
+    if (!adaptor.getLhs().getType().isInteger(64)) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpIPredicate::eq:
@@ -210,8 +212,9 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isF32())
+    if (!adaptor.getLhs().getType().isF32()) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpFPredicate::AlwaysFalse: // 0
@@ -300,8 +303,9 @@ struct CmpF64OpConversion : public OpConversionPattern<arith::CmpFOp> {
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getLhs().getType().isF64())
+    if (!adaptor.getLhs().getType().isF64()) {
       return failure();
+    }
     auto returnType = rewriter.getIntegerType(32);
     switch (srcOp.getPredicate()) {
     case arith::CmpFPredicate::AlwaysFalse: // 0
@@ -621,15 +625,17 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
   LogicalResult
   matchAndRewrite(arith::ExtFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto srcType = dyn_cast_or_null<FloatType>(srcOp.getIn().getType());
-    auto resultType = dyn_cast_or_null<FloatType>(srcOp.getType());
-    if (!srcType || !resultType)
+    auto srcType = dyn_cast_if_present<FloatType>(srcOp.getIn().getType());
+    auto resultType = dyn_cast_if_present<FloatType>(srcOp.getType());
+    if (!srcType || !resultType) {
       return failure();
+    }
     auto dstType = getTypeConverter()->convertType(resultType);
     auto srcBits = srcType.getWidth();
     auto resultBits = resultType.getWidth();
-    if (srcBits != 32 || resultBits != 64)
+    if (srcBits != 32 || resultBits != 64) {
       return rewriter.notifyMatchFailure(srcOp, "unsupported extf conversion");
+    }
     rewriter.replaceOpWithNewOp<IREE::VM::ExtF32F64Op>(srcOp, dstType,
                                                        adaptor.getIn());
     return success();
@@ -835,7 +841,7 @@ struct SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());
       return success();
-    } else if (llvm::isa<IREE::VM::RefType>(valueType)) {
+    } else if (isa<IREE::VM::RefType>(valueType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::SelectRefOp>(
           srcOp, valueType, adaptor.getCondition(), adaptor.getTrueValue(),
           adaptor.getFalseValue());

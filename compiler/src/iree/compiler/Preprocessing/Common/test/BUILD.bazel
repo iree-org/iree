@@ -15,6 +15,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "attr_based_pipeline.mlir",
             "conv2d_to_img2col.mlir",
@@ -29,7 +30,6 @@ iree_lit_test_suite(
             "pdl_example.mlir",
             "preprocessing_match_ops.mlir",
             "transform_symbol_importing.mlir",
-            "sink_transpose_through_pad.mlir",
             "transpose_matmul.mlir",
         ],
         include = ["*.mlir"],

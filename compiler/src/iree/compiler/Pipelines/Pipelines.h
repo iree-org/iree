@@ -101,8 +101,9 @@ struct IREEVMPipelineHooks {
 // Builds a pass pipeline to perform pre-compilation global optimizations.
 void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
-    BindingOptions bindingOptions, InputDialectOptions inputOptions,
-    PreprocessingOptions preprocessingOptions,
+    GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -118,8 +119,9 @@ void buildIREEPrecompileTransformPassPipeline(
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
-    BindingOptions bindingOptions, InputDialectOptions inputOptions,
-    PreprocessingOptions preprocessingOptions,
+    GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,

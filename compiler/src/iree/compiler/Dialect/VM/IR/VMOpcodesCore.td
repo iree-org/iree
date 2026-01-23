@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x85
+// Next available opcode: 0x89
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -70,6 +70,10 @@ def VM_OPC_ConstI64Zero          : VM_OPC<0x0E, "ConstI64Zero">;
 def VM_OPC_ConstI64              : VM_OPC<0x0F, "ConstI64">;
 def VM_OPC_ConstRefZero          : VM_OPC<0x10, "ConstRefZero">;
 def VM_OPC_ConstRefRodata        : VM_OPC<0x11, "ConstRefRodata">;
+
+// Ref discard and assignment:
+def VM_OPC_DiscardRefs           : VM_OPC<0x85, "DiscardRefs">;
+def VM_OPC_AssignRef             : VM_OPC<0x86, "AssignRef">;
 
 // List operations:
 def VM_OPC_ListAlloc             : VM_OPC<0x12, "ListAlloc">;
@@ -193,6 +197,8 @@ def VM_OPC_ImportResolved        : VM_OPC<0x5C, "ImportResolved">;
 
 // Async/fiber ops:
 def VM_OPC_Yield                 : VM_OPC<0x5D, "Yield">;
+def VM_OPC_CallYieldable         : VM_OPC<0x87, "CallYieldable">;
+def VM_OPC_CallVariadicYieldable : VM_OPC<0x88, "CallVariadicYieldable">;
 
 // Debugging:
 def VM_OPC_Trace                 : VM_OPC<0x5E, "Trace">;
@@ -255,6 +261,9 @@ def VM_CoreOpcodeAttr :
     VM_OPC_ConstI64,
     VM_OPC_ConstRefZero,
     VM_OPC_ConstRefRodata,
+
+    VM_OPC_DiscardRefs,
+    VM_OPC_AssignRef,
 
     VM_OPC_ListAlloc,
     VM_OPC_ListReserve,
@@ -356,6 +365,8 @@ def VM_CoreOpcodeAttr :
     VM_OPC_Fail,
     VM_OPC_ImportResolved,
     VM_OPC_Yield,
+    VM_OPC_CallYieldable,
+    VM_OPC_CallVariadicYieldable,
     VM_OPC_Trace,
     VM_OPC_Print,
     VM_OPC_CondBreak,

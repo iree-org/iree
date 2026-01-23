@@ -70,15 +70,6 @@ def GPUDistributeCopyUsingForallPass :
   ];
 }
 
-def GPULowerToGlobalLoadsPass :
-    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
-  let summary = "Emit direct global loads instructions.";
-  let dependentDialects = [
-    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
-  ];
-}
-
 def GPUConvertToCoalescedDMAPass :
     InterfacePass<"iree-codegen-gpu-convert-to-coalesced-dma", "mlir::FunctionOpInterface"> {
   let summary = "Convert operations to coalesced DMA operations.";
@@ -87,6 +78,18 @@ def GPUConvertToCoalescedDMAPass :
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
     "::mlir::tensor::TensorDialect"
+  ];
+}
+
+def AMDGPULowerCoalescedDMAToGatherLDSPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds", "mlir::FunctionOpInterface"> {
+  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
@@ -259,6 +262,7 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -345,6 +349,8 @@ def GPUApplyTilingLevelPass :
                          "Tile and fuse all annotated ops to serial loops"),
               clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
                          "Tile and fuse all annotated ops to partial reduuction loops"),
+              clEnumValN(IREE::GPU::TilingLevel::Serial, "serial",
+                         "Tile and fuse all annotated ops to serial loops"),
               clEnumValN(IREE::GPU::TilingLevel::Thread, "thread",
                          "Tile and fuse all annotated ops to threads"),
               clEnumValN(IREE::GPU::TilingLevel::Subgroup, "subgroup",
@@ -354,7 +360,9 @@ def GPUApplyTilingLevelPass :
            /*default=*/"true",
            "Allow pad fusion to generate zero size slices">,
     Option<"normalizeLoops", "normalize-loops", "bool", "false",
-           "Enable normalization for scf loops">
+           "Enable normalization for scf loops">,
+    Option<"fuseConsumers", "fuse-consumers", "bool", /*default=*/"true",
+           "Enable fusing consumers into scf.forall during tiling">
   ];
 }
 
@@ -372,6 +380,14 @@ def GPUApplyPaddingLevelPass :
               clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
                          "Tile and fuse all annotated ops to partial reduuction loops")
            )}]>
+  ];
+}
+
+def GPUExpandDimensionsPass :
+    InterfacePass<"iree-codegen-gpu-expand-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to expand tensor op dims based on `expand_dims` lowering_config";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
   ];
 }
 

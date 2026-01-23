@@ -115,8 +115,8 @@ static bool matchMMT(vector::ContractionOp contractionOp, int64_t mSize,
   if (!isMatrixTimesMatrixTransposed(contractionOp)) {
     return false;
   }
-  VectorType lhsType = llvm::cast<VectorType>(contractionOp.getLhs().getType());
-  VectorType rhsType = llvm::cast<VectorType>(contractionOp.getRhs().getType());
+  VectorType lhsType = cast<VectorType>(contractionOp.getLhs().getType());
+  VectorType rhsType = cast<VectorType>(contractionOp.getRhs().getType());
   auto lhsShape = lhsType.getShape();
   auto rhsShape = rhsType.getShape();
   if (lhsShape[1] != kSize || rhsShape[1] != kSize) {
@@ -146,7 +146,7 @@ static bool matchMMT(vector::ContractionOp contractionOp, int64_t mSize,
 static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
                                 Value promotedResult) {
   VectorType promotedResultVectorType =
-      llvm::cast<VectorType>(promotedResult.getType());
+      cast<VectorType>(promotedResult.getType());
   if (promotedResultVectorType.getElementType() != promotedType) {
     return nullptr;
   }
@@ -160,8 +160,7 @@ static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
     return nullptr;
   }
   Value extInput = extSIOp.getIn();
-  if (llvm::cast<VectorType>(extInput.getType()).getElementType() !=
-      unpromotedType) {
+  if (cast<VectorType>(extInput.getType()).getElementType() != unpromotedType) {
     return nullptr;
   }
   return extInput;
@@ -181,7 +180,7 @@ static Value extract1DSlice(PatternRewriter &rewriter, Location loc,
 // Helper to extract an element of a 1D vector.
 static Value extract(PatternRewriter &rewriter, Location loc, Value input,
                      int position) {
-  VectorType vectorType = llvm::cast<VectorType>(input.getType());
+  VectorType vectorType = cast<VectorType>(input.getType());
   assert(vectorType.getRank() == 1);
   (void)vectorType;
   std::array<int64_t, 1> offsets{position};
@@ -190,7 +189,7 @@ static Value extract(PatternRewriter &rewriter, Location loc, Value input,
 
 // Helper to flatten a N-dimensional vector to a 1D vector.
 static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
-  VectorType inputVecType = llvm::cast<VectorType>(vector.getType());
+  VectorType inputVecType = cast<VectorType>(vector.getType());
   VectorType dstType = VectorType::get(inputVecType.getNumElements(),
                                        inputVecType.getElementType());
   return vector::ShapeCastOp::create(rewriter, loc, dstType, vector);
@@ -854,10 +853,11 @@ private:
     // the constraints string. Not confusing at all!
     inputs.append(lhs.begin(), lhs.end());
     for (const auto &v : rhs) {
-      if (llvm::cast<VectorType>(v.getType()).getNumElements() == 1)
+      if (cast<VectorType>(v.getType()).getNumElements() == 1) {
         inputs.push_back(extract(rewriter, loc, v, 0));
-      else
+      } else {
         inputs.push_back(v);
+      }
     }
     inputs.append(acc.begin(), acc.end());
     // Create the inline asm op.
@@ -924,8 +924,7 @@ public:
     Type lhsElemType = generator.getLhsType();
     Type rhsElemType = generator.getRhsType();
     Type accElemType = generator.getAccType();
-    VectorType accType =
-        llvm::cast<VectorType>(contractionOp.getAcc().getType());
+    VectorType accType = cast<VectorType>(contractionOp.getAcc().getType());
     if (accType.getElementType() != accElemType) {
       return failure();
     }
@@ -1034,15 +1033,16 @@ public:
     auto acc = contractionOp.getAcc();
     auto lhs = contractionOp.getLhs();
     auto rhs = contractionOp.getRhs();
-    if (llvm::cast<VectorType>(acc.getType()).getElementType() != I32Type) {
+    if (cast<VectorType>(acc.getType()).getElementType() != I32Type) {
       return failure();
     }
 
     Value inLhs = getUnpromotedInput(I8Type, I32Type, lhs);
     Value inRhs = getUnpromotedInput(I8Type, I32Type, rhs);
 
-    if (!inLhs || !inRhs)
+    if (!inLhs || !inRhs) {
       return failure();
+    }
 
     auto loc = contractionOp.getLoc();
 

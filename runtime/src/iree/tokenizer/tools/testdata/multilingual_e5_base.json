@@ -1,0 +1,10 @@
+{
+  "model": "intfloat/multilingual-e5-base",
+  "description": "Multilingual E5 embeddings (1.8M+ downloads)",
+  "tests": [
+    {"name": "english", "input": "Hello, how are you?"},
+    {"name": "german", "input": "Guten Tag, wie geht es Ihnen?"},
+    {"name": "chinese", "input": "query: What is deep learning?"},
+    {"name": "no_special", "input": "passage: Neural networks", "add_special_tokens": false}
+  ]
+}

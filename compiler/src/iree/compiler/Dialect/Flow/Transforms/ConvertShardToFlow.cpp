@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/ShardToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Utils/Folding.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/OpVisitor.h"
 #include "iree/compiler/Utils/Permutation.h"
@@ -26,6 +25,20 @@ namespace mlir::iree_compiler::IREE::Flow {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
+
+// Convert a `Value` or an `Attribute` range to a range of `OpFoldResult`.
+template <typename Range, typename OutIt>
+static void toOpFoldResults(Range &&range, OutIt outIt) {
+  llvm::transform(std::forward<Range>(range), outIt,
+                  [](auto v) { return OpFoldResult(v); });
+}
+
+template <typename Range>
+static SmallVector<OpFoldResult> toOpFoldResults(Range &&range) {
+  SmallVector<OpFoldResult> res;
+  toOpFoldResults(std::forward<Range>(range), std::back_inserter(res));
+  return res;
+}
 
 static bool hasMoreThanOneShard(Operation *op) {
   int shardCount = 0;
@@ -126,11 +139,12 @@ static bool isDefaultChannel(shard::GridOp grid,
 static Value getDefaultChannel(Location loc, shard::GridOp grid,
                                bool useNamedDefaultChannels,
                                OpBuilder &builder) {
-  if (useNamedDefaultChannels)
+  if (useNamedDefaultChannels) {
     return IREE::Flow::ChannelDefaultOp::create(builder, loc,
                                                 grid.getSymName());
-  else
+  } else {
     return IREE::Flow::ChannelDefaultOp::create(builder, loc);
+  }
 }
 
 static Value buildCachedChannelLoading(Location loc, shard::GridOp grid,
@@ -219,10 +233,12 @@ static void buildGlobalChannelCreation(shard::GridOp grid,
   builder.setInsertionPointToStart(&module.getBodyRegion().getBlocks().front());
 
   auto channelName = getGridChannelName(grid, gridAxes);
-  IREE::Util::GlobalOp::create(
+  auto globalOp = IREE::Util::GlobalOp::create(
       builder, builder.getStringAttr("private"), channelName,
       builder.getType<IREE::Flow::ChannelType>(), false, TypedAttr(),
       builder.getAttr<IREE::Util::InlineNeverAttr>());
+  // Ensure initializer comes after the global.
+  builder.setInsertionPointAfter(globalOp);
   buildChannelInitializer(grid, gridAxes, useNamedDefaultChannels, builder);
 }
 
@@ -239,8 +255,9 @@ static void createChannels(ModuleOp moduleOp,
   llvm::sort(gridAndAxesSetSorted, [](auto &a, auto &b) {
     int nameCompareRes =
         std::get<0>(a).getSymName().compare(std::get<0>(b).getSymName());
-    if (nameCompareRes == 0)
+    if (nameCompareRes == 0) {
       return std::get<1>(a) < std::get<1>(b);
+    }
     return nameCompareRes < 0;
   });
   for (auto &[shard, shardAxes] : llvm::make_range(
@@ -277,8 +294,9 @@ static void removeShardOps(GridAndAxesSet &gridAndAxesSet) {
   DenseSet<shard::GridOp> gridOpsSet(std::begin(gridRange),
                                      std::end(gridRange));
   for (shard::GridOp op : gridOpsSet) {
-    if (op)
+    if (op) {
       op.erase();
+    }
   }
 }
 

@@ -1,0 +1,46 @@
+{
+  "model": {
+    "type": "WordPiece",
+    "vocab": {
+      "[CLS]": 0, "[SEP]": 1, "[UNK]": 2, "[PAD]": 3, "[MASK]": 4,
+      "hello": 5, "world": 6, "test": 7, "##ing": 8,
+      "日": 9, "本": 10, "語": 11, "テスト": 12
+    },
+    "unk_token": "[UNK]",
+    "continuing_subword_prefix": "##"
+  },
+  "added_tokens": [
+    {"id": 0, "content": "[CLS]", "special": true},
+    {"id": 1, "content": "[SEP]", "special": true},
+    {"id": 2, "content": "[UNK]", "special": true},
+    {"id": 3, "content": "[PAD]", "special": true},
+    {"id": 4, "content": "[MASK]", "special": true}
+  ],
+  "pre_tokenizer": {
+    "type": "BertPreTokenizer"
+  },
+  "decoder": {
+    "type": "WordPiece",
+    "prefix": "##",
+    "cleanup": true
+  },
+  "post_processor": {
+    "type": "TemplateProcessing",
+    "single": [
+      {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+      {"Sequence": {"id": "A", "type_id": 0}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 0}}
+    ],
+    "pair": [
+      {"SpecialToken": {"id": "[CLS]", "type_id": 0}},
+      {"Sequence": {"id": "A", "type_id": 0}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 0}},
+      {"Sequence": {"id": "B", "type_id": 1}},
+      {"SpecialToken": {"id": "[SEP]", "type_id": 1}}
+    ],
+    "special_tokens": {
+      "[CLS]": {"id": "[CLS]", "ids": [0], "tokens": ["[CLS]"]},
+      "[SEP]": {"id": "[SEP]", "ids": [1], "tokens": ["[SEP]"]}
+    }
+  }
+}

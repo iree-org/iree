@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
@@ -89,8 +88,9 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 //===---------------------------------------------------------------------===//
 
 static void addOperands(Operation *op, SetVector<Value> &operandSet) {
-  if (!op)
+  if (!op) {
     return;
+  }
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
         SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
@@ -104,12 +104,14 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
 template <int limit = 3>
 static bool setFusedOpOperandLimit(OpOperand *fusedOperand) {
   Operation *producer = fusedOperand->get().getDefiningOp();
-  if (!producer)
+  if (!producer) {
     return false;
+  }
   Operation *consumer = fusedOperand->getOwner();
   SetVector<Value> fusedOpOperands;
-  if (producer->getNumResults() != 1)
+  if (producer->getNumResults() != 1) {
     return false;
+  }
   addOperands(consumer, fusedOpOperands);
   fusedOpOperands.remove(producer->getResult(0));
   addOperands(producer, fusedOpOperands);
@@ -149,8 +151,9 @@ void transform_dialect::ApplyUnrollVectorsGpuMmaSyncPatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract)
+    if (!contract) {
       return std::nullopt;
+    }
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -172,8 +175,9 @@ void transform_dialect::ApplyUnrollVectorsGpuWmmaSyncPatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
   auto unrollOrder = [](Operation *op) -> std::optional<SmallVector<int64_t>> {
     auto contract = dyn_cast<vector::ContractionOp>(op);
-    if (!contract)
+    if (!contract) {
       return std::nullopt;
+    }
     return mlir::iree_compiler::gpuMmaUnrollOrder(contract);
   };
   vector::populateVectorUnrollPatterns(
@@ -281,8 +285,9 @@ static bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
 
 static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
                                                 scf::ForallOp forallOp) {
-  if (!forallOp.getMapping().has_value())
+  if (!forallOp.getMapping().has_value()) {
     return forallOp->emitError("mapping must be present");
+  }
   SmallVector<Attribute> mapping =
       llvm::to_vector(forallOp.getMapping()->getValue());
   if (!(llvm::all_of(mapping, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
@@ -404,20 +409,21 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimX);
   Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimY);
   Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimZ);
-  if (forallOp.getNumResults() > 0)
+  if (forallOp.getNumResults() > 0) {
     return forallOp->emitError(
         "only bufferized scf.forall lowers to workgroup");
-  if (forallOp.getRank() > 3)
+  }
+  if (forallOp.getRank() > 3) {
     return forallOp->emitError(
         "scf.forall with rank > 3 does not lower to workgroup");
+  }
 
-  if (!forallOp.getMapping().has_value())
+  if (!forallOp.getMapping().has_value()) {
     return forallOp->emitError("mapping must be present");
+  }
   SmallVector<Attribute> blockMapping =
       llvm::to_vector(forallOp.getMapping()->getValue());
-  if (llvm::any_of(blockMapping, [](Attribute map) {
-        return !llvm::isa<gpu::GPUBlockMappingAttr>(map);
-      })) {
+  if (!llvm::all_of(blockMapping, llvm::IsaPred<gpu::GPUBlockMappingAttr>)) {
     return forallOp->emitError("mapping must be #gpu.block<x/y/z/>");
   }
 
@@ -436,10 +442,8 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   }
   // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
   auto comparator = [](Attribute a, Attribute b) -> bool {
-    return static_cast<int64_t>(
-               llvm::cast<gpu::GPUBlockMappingAttr>(a).getBlock()) <
-           static_cast<int64_t>(
-               llvm::cast<gpu::GPUBlockMappingAttr>(b).getBlock());
+    return static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(a).getBlock()) <
+           static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(b).getBlock());
   };
   SmallVector<Value> gridDimValues =
       getValuesSortedByKey(blockMapping, numBlocks, comparator);
@@ -448,8 +452,8 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   IRMapping bvm;
   SmallVector<Value> workgroupIdOps, workgroupCountOps;
   for (Attribute attr : blockMapping) {
-    auto idx = static_cast<int64_t>(
-        llvm::cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
+    auto idx =
+        static_cast<int64_t>(cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
     workgroupIdOps.push_back(
         HAL::InterfaceWorkgroupIDOp::create(rewriter, loc, idx));
     workgroupCountOps.push_back(
@@ -495,10 +499,12 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 
   scf::ForallOp topLevelForallOp;
   auto walkResult = target->walk([&](scf::ForallOp forallOp) {
-    if (forallOp->getParentOfType<scf::ForallOp>())
+    if (forallOp->getParentOfType<scf::ForallOp>()) {
       return WalkResult::advance();
-    if (topLevelForallOp)
+    }
+    if (topLevelForallOp) {
       return WalkResult::interrupt();
+    }
     topLevelForallOp = forallOp;
     return WalkResult::advance();
   });
@@ -509,8 +515,9 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   }
 
   rewriter.setInsertionPoint(topLevelForallOp);
-  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp)))
+  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp))) {
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
+  }
 
   return DiagnosedSilenceableFailure::success();
 }
@@ -534,29 +541,34 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
   // Look for ops that move to workgroup memory and mark as copies for
   // distribution.
   target.walk([&](linalg::GenericOp copyOp) {
-    if (copyOp.getNumDpsInputs() != 1 || copyOp.getNumDpsInits() != 1)
+    if (copyOp.getNumDpsInputs() != 1 || copyOp.getNumDpsInits() != 1) {
       return;
+    }
     auto dest =
         dyn_cast<TypedValue<MemRefType>>(copyOp.getDpsInitOperand(0)->get());
-    if (!dest)
+    if (!dest) {
       return;
+    }
 
     MemRefType destType = dest.getType();
 
     // Check if the only operation in the possible copy op region is a
     // terminator.
     Block &body = copyOp.getRegion().front();
-    if (!std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+    if (!std::begin(body)->hasTrait<OpTrait::IsTerminator>()) {
       return;
+    }
 
     auto destSpace =
-        dyn_cast_or_null<gpu::AddressSpaceAttr>(destType.getMemorySpace());
-    if (!destSpace)
+        dyn_cast_if_present<gpu::AddressSpaceAttr>(destType.getMemorySpace());
+    if (!destSpace) {
       return;
+    }
 
     // The destination space must be shared memory.
-    if (destSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+    if (destSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace()) {
       return;
+    }
 
     // Mark this copy operation as a copy to workgroup memory.
     setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
@@ -644,8 +656,7 @@ transform_dialect::PopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
     // Get the mapping IDs.
     auto mappingIds = llvm::map_to_vector(
         blockMapping.value(), [](Attribute mappingAttr) -> int {
-          return llvm::cast<DeviceMappingAttrInterface>(mappingAttr)
-              .getMappingId();
+          return cast<DeviceMappingAttrInterface>(mappingAttr).getMappingId();
         });
     int maxId = 0;
     for (auto id : mappingIds) {
@@ -686,8 +697,9 @@ transform_dialect::IREEApplyLoopIndependentCodeMotionOp::applyToOne(
       // Do not hoist from scf.forall ops. These capture isolated computations
       // that will be mapped to a certain level in the GPU hierarchy (e.g.,
       // GPU blocks), so hoisting is not desired.
-      if (!isa<scf::ForallOp>(loopLike.getOperation()))
+      if (!isa<scf::ForallOp>(loopLike.getOperation())) {
         moveLoopInvariantCode(loopLike);
+      }
     });
     // For now, put single loop promotion as part of licm. Underlying
     // implementations perform splice operations which shouldn't need
@@ -803,20 +815,22 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Value to) {
   // Insert barriers for copies from and to shared memory.
   bool needsBarrier = false;
-  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(from.getType())) !=
-      hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
+  if (hasSharedMemoryAddressSpace(cast<MemRefType>(from.getType())) !=
+      hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
   // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
-  if (needsBarrier)
+  if (needsBarrier) {
     gpu::BarrierOp::create(builder, loc);
+  }
   return success();
 }
 
@@ -893,8 +907,9 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
       return mlir::emitDefiniteFailure(target,
                                        "greedy pattern application failed");
     }
-    if (listener.failed())
+    if (listener.failed()) {
       return listener.checkAndResetError();
+    }
   }
 
   //   2. Run one-shot-bufferize, without the pass baggage.
@@ -937,9 +952,10 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
     ::mlir::transform::ApplyToEachResultList &results,
     ::mlir::transform::TransformState &state) {
   if (failed(
-          eliminateEmptyTensors(rewriter, target, getBufferizationOptions())))
+          eliminateEmptyTensors(rewriter, target, getBufferizationOptions()))) {
     return emitDefaultDefiniteFailure(target)
            << "failed to eliminate tensor.empty ops";
+  }
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -987,8 +1003,9 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
         llvm::to_vector(llvm::seq<int64_t>(0, forallOp.getOutputs().size()));
   }
   for (int64_t outputIdx : getShareOperands()) {
-    if (outputIdx < 0 || outputIdx >= forallOp.getOutputs().size())
+    if (outputIdx < 0 || outputIdx >= forallOp.getOutputs().size()) {
       return mlir::emitDefiniteFailure(forallOp, "operand idx overflow");
+    }
     Value toShare = forallOp.getOutputs()[outputIdx];
     if (std::distance(toShare.getUses().begin(), toShare.getUses().end()) !=
         2) {
@@ -1001,8 +1018,9 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
     tensor::ExtractSliceOp extractSliceOp;
     for (Operation *user : toShare.getUsers()) {
       extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
-      if (extractSliceOp)
+      if (extractSliceOp) {
         break;
+      }
     }
     if (!extractSliceOp) {
       /*return mlir::emitSilenceableFailure(
@@ -1017,10 +1035,12 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
     // (i.e., same source/target, offsets, sizes and strides).
     auto isMatchingParallelInsertSlice = [&](Operation &op) {
       auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
-      if (!insertSlice)
+      if (!insertSlice) {
         return false;
-      if (insertSlice.getDest() != bbArg)
+      }
+      if (insertSlice.getDest() != bbArg) {
         return false;
+      }
       return llvm::equal(insertSlice.getMixedOffsets(),
                          extractSliceOp.getMixedOffsets()) &&
              llvm::equal(insertSlice.getMixedSizes(),
@@ -1080,9 +1100,11 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   Value laneId =
       gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
+  ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
@@ -1091,52 +1113,6 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
 }
 
 void transform_dialect::TestGpuVectorDistribution::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTargetMutable(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===----------------------------------------------------------------------===//
-// TestVectorLayoutAnalysisOp
-//===----------------------------------------------------------------------===//
-
-static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
-                              mlir::FunctionOpInterface funcOp) {
-  funcOp.walk([&](Operation *op) {
-    // Do not emit remarks for conflict operations.
-    if (isa<VectorExt::ToLayoutOp>(op)) {
-      return;
-    }
-
-    for (OpResult result : op->getOpResults()) {
-      if (auto layout = analysis.getLayout<Attribute>(result)) {
-        // Print layout attr to a string.
-        std::string layoutStr;
-        llvm::raw_string_ostream s(layoutStr);
-        s << layout;
-        // Emit remark.
-        op->emitRemark("layout of result #" + Twine(result.getResultNumber()) +
-                       " is " + s.str());
-      }
-    }
-  });
-}
-
-DiagnosedSilenceableFailure
-transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
-    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  VectorLayoutAnalysis analysis(target);
-  if (failed(analysis.run())) {
-    target.emitError("layout analysis failed");
-    return emitDefaultSilenceableFailure(target);
-  }
-  emitLayoutRemarks(analysis, target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
@@ -1163,8 +1139,9 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
         scf::tileAndFuseConsumerOfSlices(rewriter, target, loops);
 
-    if (failed(fuseConsumerResults))
+    if (failed(fuseConsumerResults)) {
       return failure();
+    }
 
     // Report back the relevant handles to the transform op.
     originalConsumerOps.push_back(

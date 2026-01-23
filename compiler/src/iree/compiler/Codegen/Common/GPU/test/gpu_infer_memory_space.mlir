@@ -14,7 +14,7 @@ func.func @write_in_lane_forall(%dest : tensor<4x3xi32>) -> tensor<4x3xi32> {
   return %res : tensor<4x3xi32>
 }
 
-// CHECK: func @write_in_lane_forall
+// CHECK-LABEL: func @write_in_lane_forall
 // CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<private>}
 // CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
 
@@ -30,7 +30,7 @@ func.func @forall_shared_dest(%w : tensor<2x3xi32>) -> tensor<4x3xi32> {
   return %res : tensor<4x3xi32>
 }
 
-// CHECK: func @forall_shared_dest
+// CHECK-LABEL: func @forall_shared_dest
 // CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>}
 // CHECK:   scf.forall {{.*}} shared_outs(%{{.*}} = %[[ALLOC]])
 
@@ -41,7 +41,7 @@ func.func @already_annotated_alloc() -> tensor<2x3xi32> {
   return %alloc : tensor<2x3xi32>
 }
 
-// CHECK: func @already_annotated_alloc
+// CHECK-LABEL: func @already_annotated_alloc
 // CHECK:   bufferization.alloc_tensor() {memory_space = #gpu.address_space<private>}
 
 // -----

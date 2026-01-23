@@ -26,7 +26,6 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToArmSME/VectorToArmSME.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
-#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -228,12 +227,11 @@ void addMultiTilingExpertPassPipeline(
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
     const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  for (int i = 0, e = IREE::CPU::TilingLevel::MaxNumTileLevels; i < e; ++i) {
-    auto level = static_cast<IREE::CPU::TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(level)) {
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
+    if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
-
+    auto level = static_cast<IREE::CPU::TilingLevel>(i);
     switch (level) {
     case IREE::CPU::TilingLevel::CacheParallelTiles:
     case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
@@ -391,6 +389,12 @@ void addMmt4dTilingExpertPassPipeline(
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
+  // `VectorInnerParallelTiles` level models the tiling and fusion for the
+  // dimensions that are not captured in root op. I.e., root op may not have the
+  // config for the level. Thus, we use the last operation that has the tiling
+  // level as anchor.
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorInnerParallelTiles));
   funcPassManager.addPass(iree_compiler::createForallToForPass());
   funcPassManager.addPass(createLLVMCPUTileToVectorSizePass());
 
@@ -614,7 +618,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
       .addPass([&]() {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
@@ -626,7 +630,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPredicatedPass(clInstrumentMemoryAccesses,
-                         createInstrumentMemoryAccessesPass);
+                         createInstrumentMemoryAccessesPass)
+      .addPass(createConvertUnsupportedFloatArithPass);
 
   if (enableAArch64SME) {
     FunctionLikeNest(modulePassManager).addPass([&] {
@@ -697,7 +702,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createLowerAffinePass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
+  variantPassManager.addPass(createIREECodegenLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Run conversion to LLVM at `ModuleOp` granularity.

@@ -80,6 +80,10 @@ struct OptionalOpAffinityAttrExternalModel
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
   }
+
+  void removeAffinityAttrs(Operation *op) const {
+    op->removeAttr("stream.affinity");
+  }
 };
 
 struct FlowBarrierTargetAffinityAttrExternalModel
@@ -108,6 +112,8 @@ struct FlowBarrierTargetAffinityAttrExternalModel
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
   }
+
+  void removeAffinityAttrs(Operation *op) const { op->removeAttr("target"); }
 };
 
 struct FlowTransferTargetAffinityAttrExternalModel
@@ -132,6 +138,8 @@ struct FlowTransferTargetAffinityAttrExternalModel
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
   }
+
+  void removeAffinityAttrs(Operation *op) const { op->removeAttr("target"); }
 };
 
 template <typename OpT>
@@ -164,6 +172,8 @@ struct HALTensorAffinityAttrExternalModel
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
   }
+
+  void removeAffinityAttrs(Operation *op) const { op->removeAttr("affinity"); }
 };
 
 template <typename OpT>
@@ -197,6 +207,10 @@ struct GlobalOpAffinityAttrExternalModel
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
   }
+
+  void removeAffinityAttrs(Operation *op) const {
+    op->removeAttr("stream.affinity");
+  }
 };
 
 template <typename OpT, bool kRequiresAffinity = true>
@@ -226,6 +240,10 @@ struct AffinityOpAttrExternalModel
 
   IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
     return getAffinityAttr(op);
+  }
+
+  void removeAffinityAttrs(Operation *op) const {
+    op->removeAttr("stream.affinity");
   }
 };
 
@@ -298,6 +316,8 @@ void registerStreamExternalModels(DialectRegistry &registry) {
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorImportOp>::add(context);
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorExportOp>::add(context);
     HALTensorAffinityAttrExternalModel<IREE::HAL::TensorAliasOp>::add(context);
+    HALTensorAffinityAttrExternalModel<IREE::HAL::TensorTransientsOp>::add(
+        context);
   });
 
   registry.insert<IREE::Util::UtilDialect>();

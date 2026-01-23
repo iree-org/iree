@@ -439,8 +439,8 @@ func.func @pack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?xf32>, %arg1 
 
 // Check that linalg.pack is not lowered to a microkernel by default - it should
 // only be on VMVX.
-// CHECK: func @unpack_f16f16_default
-// CHECK: linalg.unpack
+// CHECK-LABEL: func @unpack_f16f16_default(
+//       CHECK:   linalg.unpack
 func.func @unpack_f16f16_default(%arg0 : tensor<?x?x7x8xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf16> {
   %result = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?x7x8xf16> -> tensor<?x?xf16>
@@ -527,12 +527,12 @@ func.func @unpack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?x7x8xf32>, 
 
 // -----
 
-//     CHECK: func @query_tile_sizes_2d(
-// CHECK-DAG: %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
-// CHECK-DAG: %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
-// CHECK:     %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
-// CHECK-SAME: ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
-// CHECK:     return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
+// CHECK-LABEL: func @query_tile_sizes_2d(
+//   CHECK-DAG:   %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
+//   CHECK-DAG:   %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
+//       CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
+//  CHECK-SAME:     ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -545,12 +545,12 @@ func.func @query_tile_sizes_2d() -> (index, index)  attributes {
 
 // -----
 
-//     CHECK: func @query_tile_sizes_2d_with_layouts(
-// CHECK-DAG: %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
-// CHECK-DAG: %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
-// CHECK:     %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
-// CHECK-SAME: ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
-// CHECK:     return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
+// CHECK-LABEL: func @query_tile_sizes_2d_with_layouts(
+//   CHECK-DAG:   %[[DYNAMIC:.+]] = arith.constant -9223372036854775808 : index
+//   CHECK-DAG:   %[[FLAGS:.+]] = arith.constant {{[0-9]+}} : i32
+//       CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic "vmvx.query_tile_sizes.2d"
+//  CHECK-SAME:     ins(%[[DYNAMIC]], %[[DYNAMIC]], %[[FLAGS]] : index, index, i32)
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : index, index
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

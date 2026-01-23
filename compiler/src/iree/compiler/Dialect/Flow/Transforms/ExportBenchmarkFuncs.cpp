@@ -70,6 +70,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   // Create an initializer that allocates the buffer storage.
   // We do this by splatting and exporting to a buffer so that it looks like it
   // was created by the user.
+  // Ensure initializer comes after the global.
+  moduleBuilder.setInsertionPointAfter(globalOp);
   auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto initializerBuilder =
       OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
@@ -121,7 +123,7 @@ createImportBufferViewGlobalOp(std::string name, BlockArgument arg,
 
   // Extract the type, which must be a static tensor.
   auto targetType = importOp.getTarget().getType();
-  auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType);
+  auto tensorType = dyn_cast<RankedTensorType>(targetType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view import tensor type on "
                          << arg << " used as " << targetType;
@@ -167,7 +169,7 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
   }
 
   // The type must be a static tensor for this pass to work.
-  auto tensorType = llvm::dyn_cast<RankedTensorType>(sourceType);
+  auto tensorType = dyn_cast<RankedTensorType>(sourceType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view export tensor type on "
                          << arg << " used as " << sourceType;
@@ -223,8 +225,9 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
   for (auto arg : entryFuncOp.getArguments()) {
     auto dummyVar =
         createDummyInput(funcName, arg, symbolTable, moduleBuilder, explorer);
-    if (!dummyVar)
+    if (!dummyVar) {
       return failure();
+    }
     dummyInputVariableOps.push_back(dummyVar);
   }
 

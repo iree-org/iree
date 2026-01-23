@@ -16,9 +16,9 @@ iree_cc_library(
   HDRS
     "ConversionUtils.h"
     "EmbeddedDataDirectory.h"
+    "EncodingUtils.h"
     "EquivalenceUtils.h"
     "FlatbufferUtils.h"
-    "Folding.h"
     "Indexing.h"
     "IntegerSet.h"
     "ModuleUtils.h"
@@ -28,12 +28,14 @@ iree_cc_library(
     "PatternUtils.h"
     "Permutation.h"
     "RegionOpUtils.h"
+    "RewriteUtils.h"
     "ShapeUtils.h"
     "StringUtils.h"
     "ToolUtils.h"
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
+    "EncodingUtils.cpp"
     "EquivalenceUtils.cpp"
     "FlatbufferUtils.cpp"
     "Indexing.cpp"
@@ -51,6 +53,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
+    MLIRBytecodeWriter
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

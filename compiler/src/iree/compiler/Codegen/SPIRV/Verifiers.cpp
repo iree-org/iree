@@ -34,8 +34,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
            << stringifyEnum(CodeGenPipeline::SPIRVMatmulPromoteVectorize);
   }
 
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op))
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
     return success();
+  }
 
   LLVM_DEBUG(llvm::dbgs() << "verifying op: " << *op << "\n"
                           << "chosen workgroup size: "
@@ -55,8 +56,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
-  if (!subgroupSize)
+  if (!subgroupSize) {
     return funcOp->emitError("failed to query subgroup size");
+  }
   const int maxThreads = target.getWgp().getMaxThreadCountPerWorkgroup();
   const auto maxWorkGroupSize =
       target.getWgp().getMaxWorkgroupSizes().asArrayRef();
@@ -100,9 +102,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
+      cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
+      cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   if (loweringConfig.getTilingLevels().size() != 1) {
     return op->emitOpError("expected 1 levels of tiling sizes, got ")
@@ -164,8 +166,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
 
   auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   std::optional<int> subgroupSize = getGPUSubgroupSize(funcOp);
-  if (!subgroupSize)
+  if (!subgroupSize) {
     return funcOp->emitError("failed to query subgroup size");
+  }
   const int maxThreads = target.getWgp().getMaxThreadCountPerWorkgroup();
   const auto maxWorkGroupSize =
       target.getWgp().getMaxWorkgroupSizes().asArrayRef();
@@ -209,9 +212,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> lhsShape =
-      llvm::cast<ShapedType>(op->getOperand(0).getType()).getShape();
+      cast<ShapedType>(op->getOperand(0).getType()).getShape();
   ArrayRef<int64_t> rhsShape =
-      llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
+      cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
@@ -233,7 +236,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   auto getElementType = [](Value v) {
-    return llvm::cast<ShapedType>(v.getType()).getElementType();
+    return cast<ShapedType>(v.getType()).getElementType();
   };
 
   Type lhsType = getElementType(op->getOperand(0));
@@ -324,7 +327,7 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
   }
 
   ArrayRef<int64_t> outputShape =
-      llvm::cast<ShapedType>(op->getOperand(2).getType()).getShape();
+      cast<ShapedType>(op->getOperand(2).getType()).getShape();
   const int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
 
   // Verify the first level tile size divides the Convolution

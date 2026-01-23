@@ -1,0 +1,23 @@
+{
+  "model": "microsoft/deberta-v3-large",
+  "description": "DeBERTa v3 Large - Larger variant with Strip normalizer (500k+ downloads)",
+  "tests": [
+    {
+      "name": "simple_ascii",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "whitespace_strip",
+      "input": "  trimmed whitespace  "
+    },
+    {
+      "name": "sentence",
+      "input": "The quick brown fox jumps over the lazy dog."
+    },
+    {
+      "name": "no_special_tokens",
+      "input": "Hello world",
+      "add_special_tokens": false
+    }
+  ]
+}

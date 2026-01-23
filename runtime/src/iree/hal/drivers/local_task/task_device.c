@@ -100,55 +100,55 @@ iree_status_t iree_hal_task_device_create(
       z0, iree_hal_task_device_check_params(params, queue_count));
 
   iree_hal_task_device_t* device = NULL;
-  iree_host_size_t struct_size = sizeof(*device) +
-                                 queue_count * sizeof(*device->queues) +
-                                 loader_count * sizeof(*device->loaders);
-  iree_host_size_t total_size = struct_size + identifier.size;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, total_size, (void**)&device);
-  if (iree_status_is_ok(status)) {
-    memset(device, 0, total_size);
-    iree_hal_resource_initialize(&iree_hal_task_device_vtable,
-                                 &device->resource);
-    iree_string_view_append_to_buffer(identifier, &device->identifier,
-                                      (char*)device + struct_size);
-    device->host_allocator = host_allocator;
-    device->device_allocator = device_allocator;
-    iree_hal_allocator_retain(device_allocator);
+  iree_host_size_t total_size = 0;
+  iree_host_size_t loaders_offset = 0;
+  iree_host_size_t identifier_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(sizeof(*device), &total_size,
+                             IREE_STRUCT_FIELD_ALIGNED(
+                                 queue_count, iree_hal_task_queue_t, 1, NULL),
+                             IREE_STRUCT_FIELD_ALIGNED(
+                                 loader_count, iree_hal_executable_loader_t*, 1,
+                                 &loaders_offset),
+                             IREE_STRUCT_FIELD_ALIGNED(identifier.size, char, 1,
+                                                       &identifier_offset)));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&device));
+  memset(device, 0, total_size);
+  iree_hal_resource_initialize(&iree_hal_task_device_vtable, &device->resource);
+  iree_string_view_append_to_buffer(identifier, &device->identifier,
+                                    (char*)device + identifier_offset);
+  device->host_allocator = host_allocator;
+  device->device_allocator = device_allocator;
+  iree_hal_allocator_retain(device_allocator);
 
-    iree_arena_block_pool_initialize(4096, host_allocator,
-                                     &device->small_block_pool);
-    iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
-                                     &device->large_block_pool);
+  iree_arena_block_pool_initialize(4096, host_allocator,
+                                   &device->small_block_pool);
+  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                   &device->large_block_pool);
 
-    device->loader_count = loader_count;
-    device->loaders =
-        (iree_hal_executable_loader_t**)((uint8_t*)device + sizeof(*device) +
-                                         queue_count * sizeof(*device->queues));
-    for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
-      device->loaders[i] = loaders[i];
-      iree_hal_executable_loader_retain(device->loaders[i]);
-    }
-
-    device->queue_count = queue_count;
-    for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-      // TODO(benvanik): add a number to each queue ID.
-      iree_hal_queue_affinity_t queue_affinity = 1ull << i;
-      iree_hal_task_queue_initialize(
-          device->identifier, queue_affinity, params->queue_scope_flags,
-          queue_executors[i], &device->small_block_pool,
-          &device->large_block_pool, device->device_allocator,
-          &device->queues[i]);
-    }
+  device->loader_count = loader_count;
+  device->loaders =
+      (iree_hal_executable_loader_t**)((uint8_t*)device + loaders_offset);
+  for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
+    device->loaders[i] = loaders[i];
+    iree_hal_executable_loader_retain(device->loaders[i]);
   }
 
-  if (iree_status_is_ok(status)) {
-    *out_device = (iree_hal_device_t*)device;
-  } else {
-    iree_hal_device_release((iree_hal_device_t*)device);
+  device->queue_count = queue_count;
+  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+    // TODO(benvanik): add a number to each queue ID.
+    iree_hal_queue_affinity_t queue_affinity = 1ull << i;
+    iree_hal_task_queue_initialize(
+        device->identifier, queue_affinity, params->queue_scope_flags,
+        queue_executors[i], &device->small_block_pool,
+        &device->large_block_pool, device->device_allocator,
+        &device->queues[i]);
   }
+
+  *out_device = (iree_hal_device_t*)device;
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {

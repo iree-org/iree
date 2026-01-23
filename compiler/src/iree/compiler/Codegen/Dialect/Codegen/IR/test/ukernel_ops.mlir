@@ -63,7 +63,7 @@ func.func @ukernel_generic_optional_input(
   return %0#0, %0#1 : tensor<?xf32>, tensor<?x?xf32>
 }
 //      CHECK: func @ukernel_generic_optional_input(
-//      CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic
+//      CHECK:   %{{.+}}:2 = iree_codegen.ukernel.generic
 //  CHECK-NOT:       ins
 
 // -----
@@ -92,14 +92,14 @@ func.func @ukernel_generic_optional_other_operands(
   return %0#0, %0#1 : tensor<?xf32>, tensor<?x?xf32>
 }
 //      CHECK: func @ukernel_generic_optional_other_operands(
-//      CHECK:   %[[RESULT:.+]]:2 = iree_codegen.ukernel.generic
+//      CHECK:   %{{.+}}:2 = iree_codegen.ukernel.generic
 // CHECK-SAME:       outs(%{{.+}}, %{{.+}} : tensor<?xf32>, tensor<?x?xf32>) ->
 
 // -----
 
 func.func @ukernel_generic_non_tensor_memref_outs(
    %out0 : f32) -> f32 {
-  // expected-error @+1 {{operand #0 must be variadic of ranked tensor of any type values or memref of any type values, but got 'f32'}}
+  // expected-error @+1 {{'iree_codegen.ukernel.generic' op operand #0 must be variadic of ranked tensor or memref of any type, but got 'f32'}}
   %0 = iree_codegen.ukernel.generic "foo"
       outs(%out0 : f32) -> f32
   return %0 : f32

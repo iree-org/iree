@@ -72,6 +72,11 @@ void IREELinalgExtDialect::initialize() {
   addOperations<
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
+
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtPureOps.cpp.inc"
+      >();
 }
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
@@ -123,7 +128,7 @@ SplitReductionMappingAttr::verifyAttrList(MLIRContext *context, Location loc,
   SmallVector<SplitReductionMappingAttr> mappingAttrs;
   llvm::SmallDenseSet<SplitReductionMappingAttr> attrSet;
   for (auto attr : attrs) {
-    auto typedAttr = dyn_cast_or_null<SplitReductionMappingAttr>(attr);
+    auto typedAttr = dyn_cast_if_present<SplitReductionMappingAttr>(attr);
     if (!typedAttr) {
       return emitError("expected all the mapping attribute to be of "
                        "`SplitReductionMappingAttr` type");

@@ -91,8 +91,9 @@ public:
 };
 
 static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(op))
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     return isLinalgGeneric2DTranspose(genericOp);
+  }
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 
@@ -105,11 +106,11 @@ static IREE::CPU::LoweringConfigAttr getLoweringConfigWithNewVectorSizes(
   using TilingLevel = IREE::CPU::TilingLevel;
   MLIRContext *ctx = loweringConfig.getContext();
   SmallVector<NamedAttribute> items;
-  for (unsigned i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
-    auto level = static_cast<TilingLevel>(i);
-    if (!loweringConfig.hasTilingLevel(level)) {
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
+    if (!loweringConfig.hasTilingLevel(i)) {
       continue;
     }
+    auto level = static_cast<TilingLevel>(i);
     switch (level) {
     case TilingLevel::DistributionTiles:
     case TilingLevel::CacheParallelTiles:
@@ -206,16 +207,18 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
     scf::SCFTilingOptions options;
     setSCFTileSizes(options, tilingOp, loopTileSizes, /*tileScalableFlags=*/{});
     auto tilingResult = scf::tileUsingSCF(rewriter, tilingOp, options);
-    if (failed(tilingResult))
+    if (failed(tilingResult)) {
       return failure();
+    }
 
     // Update the lowering config of the new tiled operations.
     IREE::CPU::LoweringConfigAttr newLoweringConfig =
         getLoweringConfigWithNewVectorSizes(loweringConfigAttr, *vectorSizes,
                                             newScalableFlags);
     for (auto *newOp : tilingResult->tiledOps) {
-      if (isa<TilingInterface>(newOp))
+      if (isa<TilingInterface>(newOp)) {
         setLoweringConfig(newOp, newLoweringConfig);
+      }
     }
 
     rewriter.replaceOp(tilingOp, tilingResult->replacements);
@@ -225,8 +228,9 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
 
 void LLVMCPU2DScalableTo1DScalablePass::runOnOperation() {
   if (failed(dropScalabilityFromUnsupportedOperations(getOperation(),
-                                                      assumeArmSME)))
+                                                      assumeArmSME))) {
     signalPassFailure();
+  }
 }
 
 } // namespace

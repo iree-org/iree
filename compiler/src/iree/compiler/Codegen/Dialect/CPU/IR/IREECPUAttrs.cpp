@@ -29,24 +29,29 @@ constexpr StringLiteral kVectorCommonParallelConfigKey =
 constexpr StringLiteral kVectorReductionConfigKey = "vector_reduction";
 constexpr StringLiteral kVectorInnerParallelConfigKey = "vector_inner_parallel";
 
+SmallVector<int> getTilingLevelsAsInts() {
+  return llvm::to_vector(
+      llvm::seq<int>(0, llvm::to_underlying(TilingLevel::MaxNumTileLevels)));
+}
+
 /// Returns the entry key for the config in IREE::CPU::LoweringConfigAttr.
 /// Returns null if `level` is invalid.
 StringRef getTilingLevelName(TilingLevel level) {
   switch (level) {
-  case DistributionTiles:
+  case TilingLevel::DistributionTiles:
     return kDistributionConfigKey;
-  case CacheParallelTiles:
+  case TilingLevel::CacheParallelTiles:
     return kCacheParallelConfigKey;
-  case CacheReductionTiles:
+  case TilingLevel::CacheReductionTiles:
     return kCacheReductionConfigKey;
-  case VectorCommonParallelTiles:
+  case TilingLevel::VectorCommonParallelTiles:
     return kVectorCommonParallelConfigKey;
-  case VectorReductionTiles:
+  case TilingLevel::VectorReductionTiles:
     return kVectorReductionConfigKey;
-  case VectorInnerParallelTiles:
+  case TilingLevel::VectorInnerParallelTiles:
     return kVectorInnerParallelConfigKey;
-  case MaxNumTileLevels:
-  case InvalidLevel:
+  case TilingLevel::MaxNumTileLevels:
+  case TilingLevel::InvalidLevel:
   default:
     return StringRef();
   }
@@ -161,7 +166,7 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
 SmallVector<LoweringConfigLevelInfo>
 LoweringConfigAttr::getAvailableTilingInfo() {
   SmallVector<LoweringConfigLevelInfo> result;
-  for (unsigned i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
     if (!hasTilingLevel(i)) {
       continue;
     }
@@ -177,7 +182,7 @@ LoweringConfigAttr::getAvailableTilingInfo() {
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
-  return getTileSizes(getConfig(), DistributionTiles);
+  return getTileSizes(getConfig(), TilingLevel::DistributionTiles);
 }
 
 SmallVector<OpFoldResult>
@@ -231,12 +236,12 @@ constexpr std::array vectorTilingLevels{TilingLevel::VectorCommonParallelTiles,
 
 std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
   SmallVector<int64_t> result;
-  for (auto level : vectorTilingLevels) {
-    if (!hasTilingLevel(level)) {
+  for (TilingLevel level : vectorTilingLevels) {
+    if (!hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getTilingLevelAttr(level));
+        getTilingLevelAttr(llvm::to_underlying(level)));
     if (result.empty()) {
       result.resize(attr.getSizes().size(), 0);
     }
@@ -255,12 +260,12 @@ std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
 
 SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
   SmallVector<bool> result;
-  for (auto level : vectorTilingLevels) {
-    if (!hasTilingLevel(level)) {
+  for (TilingLevel level : vectorTilingLevels) {
+    if (!hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
     auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getTilingLevelAttr(level));
+        getTilingLevelAttr(llvm::to_underlying(level)));
     ArrayRef<bool> scalableFlags = attr.getScalableFlags();
     if (result.empty() && !scalableFlags.empty()) {
       result.resize(attr.getSizes().size(), false);

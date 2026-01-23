@@ -56,8 +56,9 @@ Artifact Artifact::createVariant(StringRef basePath, StringRef suffix) {
 }
 
 void Artifact::keep() const {
-  if (outputFile)
+  if (outputFile) {
     outputFile->keep();
+  }
 }
 
 std::optional<std::vector<int8_t>> Artifact::read() const {
@@ -129,8 +130,9 @@ LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
     commandLine = escapeCommandLineComponent(commandLine);
   }
   int exitCode = system(commandLine.c_str());
-  if (exitCode == 0)
+  if (exitCode == 0) {
     return success();
+  }
   llvm::errs() << "Linking failed; escaped command line returned exit code "
                << exitCode << ":\n\n"
                << commandLine << "\n\n";

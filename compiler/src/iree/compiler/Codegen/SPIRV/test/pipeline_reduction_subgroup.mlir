@@ -35,7 +35,7 @@ hal.executable private @subgroup_reduce {
   }
 }
 
-// CHECK-LABEL: spirv.func @subgroup_reduce()
+// CHECK-LABEL: spirv.func @subgroup_reduce
 
 // CHECK-DAG:   %[[C0:.+]] = spirv.Constant 0 : i32
 // CHECK-DAG:   %[[C1:.+]] = spirv.Constant 1 : i32
@@ -49,7 +49,7 @@ hal.executable private @subgroup_reduce {
 // CHECK:   %[[ADDV0:.+]] = spirv.FAdd %[[LD]], %[[FV0]] : vector<4xf32>
 // CHECK:   %[[ADD2:.+]] = spirv.Dot %[[ADDV0]], %[[FV1]] : vector<4xf32> -> f32
 
-// CHECK:   %[[S0:.+]] = spirv.GroupNonUniformFAdd <Subgroup> <Reduce> %[[ADD2:.+]] : f32 -> f32
+// CHECK:   %[[S0:.+]] = spirv.GroupNonUniformFAdd <Subgroup> <Reduce> %[[ADD2]] : f32 -> f32
 
 // CHECK:   spirv.Store "Workgroup" %{{.+}}, %[[S0]] : f32
 
@@ -78,7 +78,7 @@ hal.executable private @subgroup_reduce {
 
 // CHECK: spirv.ExecutionMode @{{.+}} "LocalSize", 128, 1, 1
 
-// NOSHUFFLE-LABEL: spirv.func @subgroup_reduce()
+// NOSHUFFLE-LABEL: spirv.func @subgroup_reduce
 // NOSHUFFLE-NOT: spirv.GroupNonUniformShuffleXor
 
 // -----
@@ -123,5 +123,5 @@ hal.executable public @softmax{
   }
 }
 
-// CHECK-LABEL: spirv.func @softmax()
+// CHECK-LABEL: spirv.func @softmax
 //       CHECK:   %{{.*}} = spirv.FAdd {{.*}} : vector<4xf32>

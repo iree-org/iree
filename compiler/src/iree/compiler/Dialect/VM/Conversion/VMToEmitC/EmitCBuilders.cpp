@@ -90,7 +90,7 @@ Value asRValue(OpBuilder builder, Location loc,
 void asRValues(OpBuilder builder, Location location,
                SmallVector<Value> &values) {
   for (auto &value : values) {
-    if (auto lvalue = llvm::dyn_cast<TypedValue<emitc::LValueType>>(value)) {
+    if (auto lvalue = dyn_cast<TypedValue<emitc::LValueType>>(value)) {
       value = emitc_builders::asRValue(builder, location, lvalue);
     }
   }
@@ -122,7 +122,7 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
   return emitc::ApplyOp::create(
              builder,
              /*location=*/location,
-             /*result=*/llvm::cast<emitc::PointerType>(type).getPointee(),
+             /*result=*/cast<emitc::PointerType>(type).getPointee(),
              /*applicableOperator=*/StringAttr::get(ctx, "*"),
              /*operand=*/operand)
       .getResult();
@@ -175,6 +175,45 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
                       builder.getIndexAttr(1)}));
 }
 
+Value alignTo(OpBuilder builder, Location location, Value size,
+              size_t alignment) {
+  auto ctx = builder.getContext();
+  Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value alignValue = emitc::LiteralOp::create(builder, location, hostSizeType,
+                                              std::to_string(alignment));
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/location,
+             /*type=*/hostSizeType,
+             /*callee=*/"iree_host_align",
+             /*operands=*/ArrayRef<Value>{size, alignValue})
+      .getResult(0);
+}
+
+Value alignPtr(OpBuilder builder, Location location, Value ptr,
+               size_t alignment) {
+  auto ctx = builder.getContext();
+  Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Type uintptrType = emitc::OpaqueType::get(ctx, "uintptr_t");
+  Type bytePtrType = emitc::PointerType::get(builder.getIntegerType(8, false));
+
+  // Cast ptr to uintptr_t.
+  Value ptrAsInt =
+      emitc::CastOp::create(builder, location, uintptrType, ptr).getResult();
+
+  // Align.
+  Value alignValue = emitc::LiteralOp::create(builder, location, hostSizeType,
+                                              std::to_string(alignment));
+  Value aligned = emitc::CallOpaqueOp::create(
+                      builder, location, uintptrType, "iree_host_align",
+                      ArrayRef<Value>{ptrAsInt, alignValue})
+                      .getResult(0);
+
+  // Cast back to uint8_t*.
+  return emitc::CastOp::create(builder, location, bytePtrType, aligned)
+      .getResult();
+}
+
 Value arrayElement(OpBuilder builder, Location location, size_t index,
                    TypedValue<emitc::PointerType> operand) {
   auto ctx = builder.getContext();
@@ -222,8 +261,9 @@ void structDefinition(OpBuilder builder, Location location,
   std::string decl = std::string("struct ") + structName.str() + " {";
   for (auto &field : fields) {
     decl += field.type + " " + field.name;
-    if (field.isArray())
+    if (field.isArray()) {
       decl += "[" + std::to_string(field.arraySize.value()) + "]";
+    }
     decl += ";";
   }
   decl += "};";
@@ -246,9 +286,8 @@ structMemberAddress(OpBuilder builder, Location location,
                     TypedValue<emitc::LValueType> operand) {
   auto member = emitc::MemberOp::create(builder, location, type.getPointee(),
                                         memberName, operand);
-  return addressOf(
-      builder, location,
-      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
+  return addressOf(builder, location,
+                   cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structMemberAssign(OpBuilder builder, Location location,
@@ -275,9 +314,8 @@ structPtrMemberAddress(OpBuilder builder, Location location,
   auto member = emitc::MemberOfPtrOp::create(
       builder, location, emitc::LValueType::get(type.getPointee()), memberName,
       operand);
-  return addressOf(
-      builder, location,
-      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
+  return addressOf(builder, location,
+                   cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structPtrMemberAssign(OpBuilder builder, Location location,

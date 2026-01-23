@@ -15,8 +15,10 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "AnnotateAffinities.cpp"
+    "AnnotateConstantTransientSize.cpp"
     "AnnotateDispatchArguments.cpp"
     "AnnotateDispatchAssumptions.cpp"
     "AutomaticReferenceCounting.cpp"
@@ -24,9 +26,9 @@ iree_cc_library(
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
-    "ElideAsyncTransfers.cpp"
     "ElideTimepoints.cpp"
     "EmplaceAllocations.cpp"
+    "EmplaceTransients.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
@@ -34,6 +36,7 @@ iree_cc_library(
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
     "MaterializeEncodings.cpp"
+    "MaterializeTransientSizeQueries.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
     "Passes.cpp"
@@ -46,7 +49,10 @@ iree_cc_library(
     "ScheduleExecution.cpp"
     "SpecializeDispatches.cpp"
     "SpecializeEncodings.cpp"
+    "SplitParameterEncoder.cpp"
     "SyncInitializers.cpp"
+    "UnifyEncodingForGlobals.cpp"
+    "Utils.cpp"
     "VerifyAffinities.cpp"
     "VerifyAsyncAccessRanges.cpp"
     "VerifyLowerings.cpp"
@@ -58,6 +64,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -66,6 +73,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils

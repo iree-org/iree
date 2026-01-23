@@ -1,0 +1,67 @@
+{
+  "model": "Qwen/Qwen2-0.5B",
+  "description": "Qwen2 0.5B - BPE tokenizer (primary target)",
+  "tests": [
+    {
+      "name": "simple_ascii",
+      "input": "Hello, world!"
+    },
+    {
+      "name": "unicode_accents",
+      "input": "Héllo wörld! café résumé"
+    },
+    {
+      "name": "unicode_cjk",
+      "input": "Hello 你好世界 こんにちは"
+    },
+    {
+      "name": "unicode_cjk_only",
+      "input": "你好，世界！"
+    },
+    {
+      "name": "unicode_emoji",
+      "input": "Hello world! 🌍🚀"
+    },
+    {
+      "name": "special_chars",
+      "input": "Code: `x = 1` and $100"
+    },
+    {
+      "name": "code_snippet",
+      "input": "def hello():\n    print('Hello, world!')"
+    },
+    {
+      "name": "json_string",
+      "input": "{\"key\": \"value\", \"count\": 42}"
+    },
+    {
+      "name": "punctuation",
+      "input": "Wait... Really?! Yes: it's true."
+    },
+    {
+      "name": "numbers",
+      "input": "The year 2026 has 365 days."
+    },
+    {
+      "name": "empty_string",
+      "input": ""
+    },
+    {
+      "name": "whitespace_variations",
+      "input": "hello   world\ttab\nnewline"
+    },
+    {
+      "name": "no_special_tokens",
+      "input": "hello world",
+      "add_special_tokens": false
+    },
+    {
+      "name": "long_text",
+      "input": "The quick brown fox jumps over the lazy dog. This is a longer piece of text to test tokenization of multiple sentences and words."
+    },
+    {
+      "name": "markdown",
+      "input": "# Title\n\n**bold** and *italic* text with `code`"
+    }
+  ]
+}

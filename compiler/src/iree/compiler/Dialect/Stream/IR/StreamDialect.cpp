@@ -69,8 +69,9 @@ struct StripResourceConversionCastPattern
   LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto result = castOp.getResult(0);
-    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
       return failure();
+    }
     assert(castOp.getNumOperands() == 2 &&
            "expect resource, index -> resource");
     auto resourceValue = castOp.getOperand(0);
@@ -118,11 +119,11 @@ Operation *StreamDialect::materializeConstant(OpBuilder &builder,
                                               Location loc) {
   if (mlir::func::ConstantOp::isBuildableWith(value, type)) {
     return mlir::func::ConstantOp::create(builder, loc, type,
-                                          llvm::cast<FlatSymbolRefAttr>(value));
+                                          cast<FlatSymbolRefAttr>(value));
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
     return arith::ConstantOp::create(builder, loc, type,
                                      cast<TypedAttr>(value));
-  } else if (llvm::isa<IREE::Stream::TimepointAttr>(value)) {
+  } else if (isa<IREE::Stream::TimepointAttr>(value)) {
     return IREE::Stream::TimepointImmediateOp::create(builder, loc);
   }
   return nullptr;

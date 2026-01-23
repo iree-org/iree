@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/Transforms/StructuralTypeConversions.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -42,8 +43,9 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
                          Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type))) {
     return nullptr;
+  }
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
     return arith::TruncFOp::create(builder, loc, type, inputs[0]);
@@ -60,8 +62,9 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
                            Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
-  if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))
+  if (!isa<FloatType>(getElementTypeOrSelf(type))) {
     return nullptr;
+  }
   bool isUnsigned = eTy.isUnsignedInteger();
 
   int64_t inBitwidth = inputETy.getIntOrFloatBitWidth();
@@ -88,8 +91,9 @@ struct PrimitiveTypeConverter : public TypeConverter {
   explicit PrimitiveTypeConverter() {
     addConversion([](Type type) { return type; });
     addConversion([&](SourceType type) -> Type {
-      if (!isSourceType(type))
+      if (!isSourceType(type)) {
         return type;
+      }
       return getTargetType(type);
     });
     addConversion([&](ComplexType type) {
@@ -292,6 +296,8 @@ struct ConvertTypesPass : public Base {
         patterns, typeConverter);
     populateFunctionOpInterfaceTypeConversionPattern<IREE::Util::FuncOp>(
         patterns, typeConverter);
+    cf::populateCFStructuralTypeConversionsAndLegality(typeConverter, patterns,
+                                                       target);
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
@@ -299,25 +305,25 @@ struct ConvertTypesPass : public Base {
         return typeConverter.isLegal(globalOp.getGlobalType());
       } else if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
         for (Type type : funcOp.getArgumentTypes()) {
-          if (!typeConverter.isLegal(type))
+          if (!typeConverter.isLegal(type)) {
             return false;
+          }
         }
         for (Type type : funcOp.getResultTypes()) {
-          if (!typeConverter.isLegal(type))
+          if (!typeConverter.isLegal(type)) {
             return false;
+          }
         }
       }
       for (Type type : op->getResultTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
+        }
       }
       for (Type type : op->getOperandTypes()) {
-        if (!typeConverter.isLegal(type))
+        if (!typeConverter.isLegal(type)) {
           return false;
-      }
-      for (auto &region : op->getRegions()) {
-        if (!typeConverter.isLegal(&region))
-          return false;
+        }
       }
       return true;
     });

@@ -50,15 +50,17 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = transferReadOp.getLoc();
     Value vector = transferReadOp.getVector();
-    VectorType vectorType = llvm::cast<VectorType>(vector.getType());
+    VectorType vectorType = cast<VectorType>(vector.getType());
     Value source = transferReadOp.getBase();
-    MemRefType sourceType = llvm::dyn_cast<MemRefType>(source.getType());
+    MemRefType sourceType = dyn_cast<MemRefType>(source.getType());
     // Contiguity check is valid on tensors only.
-    if (!sourceType)
+    if (!sourceType) {
       return failure();
+    }
     // Already 2D or lower nothing to do.
-    if (vectorType.getRank() < 3)
+    if (vectorType.getRank() < 3) {
       return failure();
+    }
     // The innermost dim is always considered non-unit as it wont be dropped
     // Therefore, we initialize `numberOfNonUnitDims` to 1 and not 0
     int numberOfNonUnitDims = 1;
@@ -86,12 +88,15 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     }
     int rankOfCollapsedVector = 2;
     // TODO: generalize this pattern, relax the requirements here.
-    if (transferReadOp.hasOutOfBoundsDim())
+    if (transferReadOp.hasOutOfBoundsDim()) {
       return failure();
-    if (!transferReadOp.getPermutationMap().isMinorIdentity())
+    }
+    if (!transferReadOp.getPermutationMap().isMinorIdentity()) {
       return failure();
-    if (transferReadOp.getMask())
+    }
+    if (transferReadOp.getMask()) {
       return failure();
+    }
     ArrayAttr newInBoundsAttr = rewriter.getBoolArrayAttr(
         SmallVector<bool>(rankOfCollapsedVector, true));
     auto newidentityMap =
@@ -113,14 +118,15 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     SmallVector<OpFoldResult> subViewOffsets, subViewSizes, subViewStrides;
     subViewSizes.append(sourceType.getRank() - vectorType.getRank(),
                         rewriter.getIndexAttr(1));
-    for (int64_t dim : vectorType.getShape())
+    for (int64_t dim : vectorType.getShape()) {
       subViewSizes.push_back(rewriter.getIndexAttr(dim));
+    }
     for (int i = 0; i < sourceType.getRank(); i++) {
       subViewOffsets.push_back(transferReadOp.getIndices()[i]);
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
     MemRefType resultType =
-        llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
+        cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
             vectorShapeCollapse, sourceType, subViewOffsets, subViewSizes,
             subViewStrides));
     Value subView =
@@ -136,8 +142,9 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
         rewriter, loc, vectorTypeBroadcast, readCollapse);
     SmallVector<int64_t> transposePermutation;
     for (int i = 0; i < vectorType.getRank(); i++) {
-      if (i == vectorType.getRank() - 2)
+      if (i == vectorType.getRank() - 2) {
         continue;
+      }
       transposePermutation.push_back(i);
     }
     transposePermutation.insert(transposePermutation.begin() +
@@ -186,8 +193,9 @@ struct CombineTransferReadOpBroadcast final
 /// Returns true if op is appropriate contract for promotion.
 static LogicalResult contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp)
+  if (!linalgOp) {
     return failure();
+  }
   // Limit promotion to matmul and batch matmul, there may be generic
   // ops with more batch dimensions we didn't distribute and therefore
   // cannot find a higher bound.
@@ -206,8 +214,9 @@ struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {
     if (!hasSharedMemoryAddressSpace(
-            llvm::cast<MemRefType>(op.getMemref().getType())))
+            cast<MemRefType>(op.getMemref().getType()))) {
       return failure();
+    }
     rewriter.eraseOp(op);
     return success();
   }

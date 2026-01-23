@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -20,6 +21,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -37,8 +39,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-hoist-encoding-ops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
@@ -97,6 +97,21 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
         "output map numDims do not match last encoding map numResults");
   }
 
+  // Get encoding_dims from the original SetEncodingOp and try to rematerialize
+  // them at the new insertion point (before the genericOp).
+  // For identity output map, we can remap tensor.dim from output to inputs.
+  Value genericOutput = encodingOp.getSource();
+  Value firstInput = genericOp.getDpsInputOperand(0)->get();
+  FailureOr<SmallVector<Value>> rematerializedDims =
+      IREE::Encoding::rematerializeEncodingDims(rewriter, genericOp,
+                                                encodingOp.getEncodingDims(),
+                                                genericOutput, firstInput);
+  if (failed(rematerializedDims)) {
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "cannot rematerialize encoding_dims");
+  }
+  ValueRange encodingDims = *rematerializedDims;
+
   // Set encodings on each input
   Location loc = genericOp->getLoc();
   SmallVector<Value> encodedOperands;
@@ -111,7 +126,7 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
     Value encodedInput = IREE::Encoding::SetEncodingOp::create(
-        rewriter, loc, resType, operand->get());
+        rewriter, loc, resType, operand->get(), encodingDims);
     encodedOperands.push_back(encodedInput);
   }
 
@@ -236,6 +251,9 @@ struct SinkUnsetEncodingOp
                                          "not able to determine propagation "
                                          "attributes for operands and results");
     }
+    // Carry the encoding dims from the original unset_encoding op.
+    propagationEncodings->encodingDims =
+        llvm::to_vector(encodingOp.getEncodingDims());
     auto propagationResult =
         dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(consumer);
     if (!propagationResult) {
@@ -308,12 +326,18 @@ void HoistEncodingOpsPass::runOnOperation() {
       Operation *op = worklist.front();
       worklist.pop();
       opsWithinDispatch.insert(op);
-      for (auto input : op->getOperands()) {
+      // For SetEncodingOp, the encoding_dims operands are metadata and should
+      // not block hoistability. We still add their defining ops to the worklist
+      // so they get hoisted, but only the source operand affects hoistability.
+      auto setEnc = dyn_cast<IREE::Encoding::SetEncodingOp>(op);
+      for (Value input : op->getOperands()) {
         auto inputOp = input.getDefiningOp();
         if (inputOp &&
             inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
             !seen.contains(inputOp)) {
-          if (!isHoistableOp(inputOp)) {
+          // For SetEncodingOp, only the source operand affects hoistability.
+          bool affectsHoistability = !setEnc || input == setEnc.getSource();
+          if (affectsHoistability && !isHoistableOp(inputOp)) {
             isHoistable = false;
           }
           worklist.push(inputOp);
@@ -330,7 +354,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     const IREE::Util::ConstExprAnalysis::ConstValueInfo *constInfo =
         constExprs.lookup(setEncodingOp.getSource());
     if (!constInfo) {
-      LDBG("Non-hoistable op (failed to get constInfo): " << setEncodingOp);
+      LDBG() << "Non-hoistable op (failed to get constInfo): " << setEncodingOp;
       return;
     }
     if (policy.getDecision(constInfo)->getOutcome() ==
@@ -338,12 +362,12 @@ void HoistEncodingOpsPass::runOnOperation() {
       candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
       return;
     }
-    LDBG("Non-hoistable op: " << setEncodingOp);
+    LDBG() << "Non-hoistable op: " << setEncodingOp;
   });
 
   IRRewriter rewriter(ctx);
   for (ArrayRef<Operation *> hoistableOps : candidates) {
-    LDBG("Hoisting the ops for " << *hoistableOps.back());
+    LDBG() << "Hoisting the ops for " << *hoistableOps.back();
     for (Operation *op : hoistableOps) {
       if (failed(IREE::Flow::hoistOutOfDispatch(rewriter, op))) {
         op->emitOpError("failed to hoist the op out of dispatch");

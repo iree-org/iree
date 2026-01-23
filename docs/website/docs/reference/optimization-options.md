@@ -102,6 +102,8 @@ The layout changes can be propagated as far as possible across the workload, so
 the entire workload can use the updated layouts, as opposed to having to perform
 layout transformations at runtime. This may involve fusions or
 constant-evaluation that can amortize or remove layout-transformation overheads.
+See the [blog post](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
+to learn more about details.
 
 Data-tiling is an optional optimization technique, and it is not supported by
 all backends. Any backend does not develop data-tiling may result in worse
@@ -113,13 +115,36 @@ performance if it is enabled. The targets that support data-tiling are:
 * GPU (ROCm)
 * VMVX
 
-See the [blog post](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
-to learn more about details.
+There are two paths in data-tiling:
+
+* `--iree-dispatch-creation-data-tiling` (off): Starts data-tiling from dispatch
+  creation phase. This is the current default path, if the flag is on. This is
+  still under development and some features are missing. The main benefit from
+  the path is that it enables more fusion opportunities and supports
+  multi-devices.
+* `--iree-global-opt-data-tiling` (off): Starts data-tiling from global
+  optimization phase. The path will be deprecated in the future, because it
+  breaks the core IREE concept in terms of retargetability and modularity. Any
+  features built on top of the path may be deprecated.
+
+Note that the flag will override the other two flags if it is explicitly set,
+because it has higher priority. You have to disable the flag to use a specific
+path.
+
+| Feature             | GlobalOptimization path | DispatchCreation path |
+|---------------------|-------------------------|-----------------------|
+| ConstExpr Hoisting  | ✔️                      | ✔️                    |
+| Constant Evaluation | ✔️                      | ❌                    |
+| Matmul Fusion       | ❌                      | ✔️                    |
+| Multi-device        | ❌                      | ✔️                    |
+
+Note: Constant Evaluation is not yet implemented in the dispatch creation path.
+It is a planned feature.
 
 !!! question - "Something missing or broken?"
 
-    Don't see the target here that you think should be? Reach out to [our
-    data-tiling Discord channel](https://discord.com/channels/689900678990135345/1254843174111678555);
+    Don't see the target or the feature here that you think should be? Reach out
+    to [our data-tiling Discord channel](https://discord.com/channels/689900678990135345/1254843174111678555);
     we welcome contributions on
     [our GitHub page](https://github.com/iree-org/iree)!
 

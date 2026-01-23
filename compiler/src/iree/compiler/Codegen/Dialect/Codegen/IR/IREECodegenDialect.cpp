@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -22,13 +23,13 @@ namespace mlir::iree_compiler::IREE::Codegen {
 struct IREECodegenDialectOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<TranslationInfoAttr>(attr)) {
+    if (isa<TranslationInfoAttr>(attr)) {
       os << "translation";
       return AliasResult::OverridableAlias;
-    } else if (llvm::isa<CompilationInfoAttr>(attr)) {
+    } else if (isa<CompilationInfoAttr>(attr)) {
       os << "compilation";
       return AliasResult::OverridableAlias;
-    } else if (llvm::isa<LoweringConfigAttr>(attr)) {
+    } else if (isa<LoweringConfigAttr>(attr)) {
       os << "config";
       return AliasResult::OverridableAlias;
     }
@@ -50,6 +51,8 @@ void IREECodegenDialect::initialize() {
       >();
 
   addTypes<IREE::Codegen::NullPointerType>();
+
+  declarePromisedInterface<PCF::ScopeAttrInterface, WorkgroupScopeAttr>();
 }
 
 static LogicalResult
@@ -208,8 +211,9 @@ IREECodegenDialect::verifyOperationAttribute(Operation *op,
     }
   }
 
-  if (symbol != kTuningSpecEntrypointAttrName)
+  if (symbol != kTuningSpecEntrypointAttrName) {
     return success();
+  }
 
   const std::string requiredByEntrypointMessage =
       " (required by '" + std::string(kTuningSpecEntrypointAttrName) + "')";

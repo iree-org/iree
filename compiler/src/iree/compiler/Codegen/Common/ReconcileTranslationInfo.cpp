@@ -61,9 +61,8 @@ verifyWorkgroupMappingAttrArray(scf::ForallOp forallOp) {
     return failure();
   }
   SmallVector<IREE::Codegen::WorkgroupMappingAttr> workgroupMappingAttrs =
-      llvm::map_to_vector(mappingAttr.value(), [](Attribute attr) {
-        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
-      });
+      llvm::map_to_vector(mappingAttr.value(),
+                          llvm::CastTo<IREE::Codegen::WorkgroupMappingAttr>);
   return workgroupMappingAttrs;
 }
 
@@ -162,10 +161,9 @@ collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
   SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
   SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
-  auto mapping = llvm::map_to_vector(
-      forallOp.getMapping()->getValue(), [](Attribute attr) {
-        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
-      });
+  auto mapping =
+      llvm::map_to_vector(forallOp.getMapping()->getValue(),
+                          llvm::CastTo<IREE::Codegen::WorkgroupMappingAttr>);
 
   // Collect all dimensions that are to be collapsed.
   auto delinearizeFromAttr = IREE::Codegen::WorkgroupMappingAttr::get(
@@ -390,12 +388,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   });
 
   if (workgroupForAllOps.empty()) {
-    // If there are no workgroup distribution loops, set the default
-    // number of workgroups to {1, 1, 1}. Note: that this only kicks
-    // in if the export op region has
-    // `iree_tensor_ext.dispatch.workgroup_count_from_slice
-    return lowerWorkgroupCountFromSliceOp(rewriter, funcOp,
-                                          ArrayRef<OpFoldResult>{});
+    // If there are no workgroup distribution loops, nothing to do.
+    // if the export op region has `workgroup_count_from_slice` it will be
+    // resolved to {1, 1, 1} when resolving hints.
+    return success();
   }
 
   if (!llvm::hasSingleElement(body)) {
@@ -437,9 +433,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
               .getResult();
     }
   }
-  if (failed(lowerWorkgroupCountFromSliceOp(
-          rewriter, funcOp, maxNumWorkgroups,
-          llvm::to_underlying(deLinearizeFrom) + 1))) {
+
+  if (failed(createWorkgroupCountHint(rewriter, loc, maxNumWorkgroups,
+                                      llvm::to_underlying(deLinearizeFrom) + 1,
+                                      /*reverse=*/true))) {
     return failure();
   }
   return success();
@@ -493,7 +490,7 @@ lowerSplitReductionModifierOp(RewriterBase &rewriter,
 
   SmallVector<OpFoldResult> replacement =
       llvm::map_to_vector(splitReduceModifier.getSourceWorkgroupCount(),
-                          [](Value v) -> OpFoldResult { return v; });
+                          llvm::StaticCastTo<OpFoldResult>);
   replacement[static_cast<uint64_t>(delinearizeFrom)] =
       IREE::LinalgExt::mulOfrs(
           rewriter, splitReduceModifier.getLoc(),
@@ -641,13 +638,11 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     return failure();
   }
 
-  auto splitReduceOpProcIds =
-      llvm::map_to_vector(delinearizeOp.getResults().drop_back(),
-                          [](Value v) -> OpFoldResult { return v; });
+  auto splitReduceOpProcIds = llvm::map_to_vector(
+      delinearizeOp.getResults().drop_back(), llvm::StaticCastTo<OpFoldResult>);
   auto splitReduceMapping = llvm::map_to_vector(
-      forallOp.getMapping()->getValue(), [](Attribute attr) {
-        return cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr);
-      });
+      forallOp.getMapping()->getValue(),
+      llvm::CastTo<IREE::LinalgExt::SplitReductionMappingAttr>);
 
   SmallVector<int64_t> mappingPermutation =
       getMappingPermutation<IREE::LinalgExt::SplitReductionMappingAttr>(
@@ -740,7 +735,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   for (auto exportOp : exportOps) {
     SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
-    auto rootFuncOp = llvm::dyn_cast_if_present<FunctionOpInterface>(
+    auto rootFuncOp = dyn_cast_if_present<FunctionOpInterface>(
         symbolTable.lookup(exportOp.getSymNameAttr()));
     if (!rootFuncOp || rootFuncOp.isExternal()) {
       // Skip external functions.
@@ -849,22 +844,12 @@ void ReconcileTranslationInfoPass::runOnOperation() {
 
   // Erase all the lowering configs and translation infos after we have finished
   // processing all exported functions.
-  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
-  innerModuleOp->walk([&ordinalOps](Operation *op) {
+  innerModuleOp->walk([](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       eraseTranslationInfo(funcOp);
     }
     eraseLoweringConfig(op);
-    if (auto ordinalOp =
-            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
-      ordinalOps.push_back(ordinalOp);
-    }
   });
-
-  // Discard all ordinal ops.
-  for (auto ordinalOp : ordinalOps) {
-    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
-  }
 }
 
 } // namespace mlir::iree_compiler

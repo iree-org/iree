@@ -235,6 +235,99 @@ TEST_F(VMListTest, UsageRef) {
   iree_vm_list_release(list);
 }
 
+TEST_F(VMListTest, GetRefRetainOrMove) {
+  iree_vm_type_def_t element_type = iree_vm_make_ref_type_def(test_a_type());
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/1,
+                                     iree_allocator_system(), &list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 1));
+
+  // Retain path keeps the element intact.
+  {
+    iree_vm_ref_t ref_a = MakeRef<A>(1.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+    iree_vm_ref_t retained{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain_or_move(
+        list, 0, /*is_move=*/false, &retained));
+    EXPECT_TRUE(test_a_isa(retained));
+    iree_vm_ref_release(&retained);
+    iree_vm_ref_t still_there{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, 0, &still_there));
+    EXPECT_TRUE(test_a_isa(still_there));
+  }
+
+  // Move path transfers ownership and clears the element.
+  {
+    iree_vm_ref_t ref_a = MakeRef<A>(2.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+    iree_vm_ref_t moved{0};
+    IREE_ASSERT_OK(
+        iree_vm_list_get_ref_retain_or_move(list, 0, /*is_move=*/true, &moved));
+    EXPECT_TRUE(test_a_isa(moved));
+    iree_vm_ref_release(&moved);
+    iree_vm_ref_t cleared{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(list, 0, &cleared));
+    EXPECT_EQ(IREE_VM_REF_TYPE_NULL, cleared.type);
+  }
+
+  iree_vm_list_release(list);
+}
+
+// Tests that moving a ref from a variant list properly marks the slot as empty.
+TEST_F(VMListTest, VariantListRefMoveMarksSlotEmpty) {
+  // Create a variant list (stores any type).
+  iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/1,
+                                     iree_allocator_system(), &list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 1));
+
+  // Set a ref into the variant slot.
+  iree_vm_ref_t ref_a = MakeRef<A>(1.0f);
+  IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_a));
+
+  // Verify the slot contains a ref.
+  {
+    iree_vm_variant_t variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &variant));
+    EXPECT_TRUE(iree_vm_variant_is_ref(variant));
+    EXPECT_FALSE(iree_vm_variant_is_empty(variant));
+  }
+
+  // Move the ref out of the variant list.
+  iree_vm_ref_t moved{0};
+  IREE_ASSERT_OK(
+      iree_vm_list_get_ref_retain_or_move(list, 0, /*is_move=*/true, &moved));
+  EXPECT_TRUE(test_a_isa(moved));
+  iree_vm_ref_release(&moved);
+
+  // Verify the slot is now empty (type should be undefined/variant).
+  {
+    iree_vm_variant_t variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &variant));
+    EXPECT_TRUE(iree_vm_variant_is_empty(variant))
+        << "After move, variant slot should be empty";
+  }
+
+  // Also test get_variant_move marks the slot empty.
+  {
+    iree_vm_ref_t ref_b = MakeRef<A>(2.0f);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(list, 0, &ref_b));
+
+    iree_vm_variant_t moved_variant;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_move(list, 0, &moved_variant));
+    EXPECT_TRUE(iree_vm_variant_is_ref(moved_variant));
+    iree_vm_ref_release(&moved_variant.ref);
+
+    iree_vm_variant_t after_move;
+    IREE_ASSERT_OK(iree_vm_list_get_variant_assign(list, 0, &after_move));
+    EXPECT_TRUE(iree_vm_variant_is_empty(after_move))
+        << "After get_variant_move, slot should be empty";
+  }
+
+  iree_vm_list_release(list);
+}
+
 // Tests simple variant list usage, mainly just for demonstration.
 // Stores any heterogeneous element type, equivalent to `!vm.list<?>`.
 TEST_F(VMListTest, UsageVariant) {
@@ -495,6 +588,49 @@ TEST_F(VMListTest, Reserve) {
   // Reserving <= the current capacity should be a no-op.
   IREE_ASSERT_OK(iree_vm_list_reserve(list, current_capacity));
   EXPECT_EQ(current_capacity, iree_vm_list_capacity(list));
+
+  iree_vm_list_release(list);
+}
+
+// Tests that reserving extremely large capacities fails gracefully.
+// This verifies the overflow checking in reserve().
+TEST_F(VMListTest, ReserveOverflow) {
+  iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/0,
+                                     iree_allocator_system(), &list));
+
+  // Request a capacity that would overflow when aligned to 64-element boundary.
+  // IREE_HOST_SIZE_MAX - 32 when aligned up to 64 would overflow.
+  iree_host_size_t overflow_capacity = IREE_HOST_SIZE_MAX - 32;
+  EXPECT_THAT(Status(iree_vm_list_reserve(list, overflow_capacity)),
+              StatusIs(StatusCode::kOutOfRange));
+
+  // List should still be usable after failed reserve.
+  EXPECT_EQ(0, iree_vm_list_size(list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 10));
+  EXPECT_EQ(10, iree_vm_list_size(list));
+
+  iree_vm_list_release(list);
+}
+
+// Tests that resizing to extremely large sizes fails gracefully.
+TEST_F(VMListTest, ResizeOverflow) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/4,
+                                     iree_allocator_system(), &list));
+
+  // Request a size that would overflow when computing storage requirements.
+  iree_host_size_t overflow_size = IREE_HOST_SIZE_MAX / 2;
+  EXPECT_THAT(Status(iree_vm_list_resize(list, overflow_size)),
+              StatusIs(StatusCode::kOutOfRange));
+
+  // List should still be usable after failed resize.
+  EXPECT_EQ(0, iree_vm_list_size(list));
+  IREE_ASSERT_OK(iree_vm_list_resize(list, 10));
+  EXPECT_EQ(10, iree_vm_list_size(list));
 
   iree_vm_list_release(list);
 }
@@ -1256,5 +1392,56 @@ TEST_F(VMListTest, PushPopRef) {
 // TODO(benvanik): test primitive variant get/set.
 
 // TODO(benvanik): test ref variant get/set.
+
+// Test that F64 values (eg Python floats) can be converted to F32 values
+// when pushed to a VM list expecting F32 values.
+TEST_F(VMListTest, F64ToF32Conversion) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*capacity=*/10,
+                                     iree_allocator_system(), &list));
+
+  // Python passes floats as F64 (double)
+  double python_value = 0.7;
+  iree_vm_value_t f64_value = iree_vm_value_make_f64(python_value);
+
+  // Push the F64 value to a list expecting F32
+  // This internally calls iree_vm_list_convert_value_type(F64 -> F32)
+  IREE_ASSERT_OK(iree_vm_list_push_value(list, &f64_value));
+
+  // Retrieve the value and verify it was converted correctly
+  iree_vm_value_t retrieved_value;
+  IREE_ASSERT_OK(iree_vm_list_get_value(list, 0, &retrieved_value));
+  EXPECT_EQ(retrieved_value.type, IREE_VM_VALUE_TYPE_F32);
+  float expected_f32 = (float)python_value;
+  EXPECT_NEAR(retrieved_value.f32, expected_f32, 1e-6f);
+  EXPECT_NE(retrieved_value.f32, 0.0f);
+
+  iree_vm_list_release(list);
+}
+
+// Test F32 to F64 conversion
+TEST_F(VMListTest, F32ToF64Conversion) {
+  iree_vm_type_def_t element_type =
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, /*capacity=*/10,
+                                     iree_allocator_system(), &list));
+
+  // Push an F32 value to a list expecting F64
+  float f32_value = 3.14159f;
+  iree_vm_value_t value = iree_vm_value_make_f32(f32_value);
+  IREE_ASSERT_OK(iree_vm_list_push_value(list, &value));
+
+  // Retrieve and verify
+  iree_vm_value_t retrieved_value;
+  IREE_ASSERT_OK(iree_vm_list_get_value(list, 0, &retrieved_value));
+  EXPECT_EQ(retrieved_value.type, IREE_VM_VALUE_TYPE_F64);
+  EXPECT_NEAR(retrieved_value.f64, (double)f32_value, 1e-6);
+  EXPECT_NE(retrieved_value.f64, 0.0);
+
+  iree_vm_list_release(list);
+}
 
 }  // namespace

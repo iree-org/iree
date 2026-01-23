@@ -191,8 +191,9 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
 
   // Walk callee arguments.
   for (auto [i, value] : llvm::enumerate(funcOp.getArguments())) {
-    if (value.use_empty())
+    if (value.use_empty()) {
       analysis.calleeUsedArgs.reset(i);
+    }
   }
 
   // Walk all return sites in the function.
@@ -242,7 +243,7 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
 
       // If the result value is an argument track that here.
       // We'll only use this value if all return sites are uniform.
-      if (auto arg = llvm::dyn_cast<BlockArgument>(value)) {
+      if (auto arg = dyn_cast<BlockArgument>(value)) {
         if (arg.getParentBlock()->isEntryBlock()) {
           analysis.passthroughResultArgs[i] =
               static_cast<int>(arg.getArgNumber());
@@ -327,8 +328,9 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
     // Note that we need to track unused results as an AND such that all callers
     // need to not use them. We'll flip the bits below so that `used = true`.
     for (auto [i, value] : llvm::enumerate(callOp.getResults())) {
-      if (!value.use_empty())
+      if (!value.use_empty()) {
         callerUnusedResults.reset(i);
+      }
     }
   }
   if (!analysis.callOps.empty()) {
@@ -376,12 +378,13 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
   // we know all callers will stop passing them.
   for (unsigned i = 0; i < resultCount; ++i) {
     int argIndex = analysis.passthroughResultArgs[i];
-    if (argIndex == kUnassigned)
+    if (argIndex == kUnassigned) {
       continue;
+    }
     auto arg = funcOp.getArgument(argIndex);
     bool onlyReturnUsers = true;
     for (auto user : arg.getUsers()) {
-      if (!isa<IREE::Util::ReturnOp>(user)) {
+      if (!user->hasTrait<OpTrait::ReturnLike>()) {
         onlyReturnUsers = false;
         break;
       }
@@ -518,14 +521,16 @@ static bool applyFuncChanges(FuncAnalysis &analysis,
   }
 
   // Early out if no changes.
-  if (deadArgs.none() && deadResults.none())
+  if (deadArgs.none() && deadResults.none()) {
     return false;
+  }
 
   // Erase dead results from all return sites.
   funcOp.walk([&](IREE::Util::ReturnOp returnOp) {
     for (int i = deadResults.size() - 1; i >= 0; --i) {
-      if (deadResults.test(i))
+      if (deadResults.test(i)) {
         returnOp.getOperandsMutable().erase(i);
+      }
     }
   });
 
@@ -612,13 +617,16 @@ static bool applyCallChanges(FuncAnalysis &analysis,
   }
 
   // Early out if no changes.
-  if (deadOperands.none() && deadResults.none())
+  if (deadOperands.none() && deadResults.none()) {
     return false;
+  }
 
   // Fully replace call op because we may have changed result count.
   // TODO(benvanik): update tied operands, arg_attrs, and res_attrs.
-  auto newCallOp = OpBuilder(callOp).create<IREE::Util::CallOp>(
-      callOp.getLoc(), newResultTypes, callOp.getCalleeAttr(), newOperands,
+  OpBuilder newCallBuilder(callOp);
+  auto newCallOp = IREE::Util::CallOp::create(
+      newCallBuilder, callOp.getLoc(), newResultTypes, callOp.getCalleeAttr(),
+      newOperands,
       /*tied_operands=*/ArrayAttr{},
       /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
   newCallOp->setDialectAttrs(callOp->getDialectAttrs());

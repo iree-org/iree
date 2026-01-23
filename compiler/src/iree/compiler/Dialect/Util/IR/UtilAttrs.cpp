@@ -181,17 +181,17 @@ LogicalResult SerializableAttrInterface::serializeSplatValue(
     llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
-  if (auto attr = llvm::dyn_cast<SerializableAttrInterface>(elementAttr)) {
+  if (auto attr = dyn_cast<SerializableAttrInterface>(elementAttr)) {
     if (failed(attr.serializeToVector(loc, endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = llvm::dyn_cast<IntegerAttr>(elementAttr)) {
+  } else if (auto attr = dyn_cast<IntegerAttr>(elementAttr)) {
     if (failed(serializeAPIntRawData(loc, attr.getValue(),
                                      attr.getType().getIntOrFloatBitWidth(),
                                      endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = llvm::dyn_cast<FloatAttr>(elementAttr)) {
+  } else if (auto attr = dyn_cast<FloatAttr>(elementAttr)) {
     if (failed(serializeAPFloatRawData(loc, attr.getValue(),
                                        attr.getType().getIntOrFloatBitWidth(),
                                        endian, elementBuffer))) {
@@ -258,15 +258,17 @@ public:
       : logicalBitWidth(logicalBitWidth), endian(endian), os(os) {}
 
   void write(const uint64_t value) {
-    if (bitOffset + logicalBitWidth > physicalBitWidth)
+    if (bitOffset + logicalBitWidth > physicalBitWidth) {
       flush();
+    }
     physicalBuffer |= value << bitOffset;
     bitOffset += logicalBitWidth;
   }
 
   void flush() {
-    if (bitOffset == 0)
+    if (bitOffset == 0) {
       return;
+    }
     physicalType physicalValue =
         llvm::support::endian::byte_swap<physicalType>(physicalBuffer, endian);
     os.write((const char *)&physicalValue, sizeof(physicalValue));
@@ -382,7 +384,7 @@ static LogicalResult serializeGenericElementData(Location loc,
                                                  DenseElementsAttr elementsAttr,
                                                  llvm::endianness endian,
                                                  llvm::raw_ostream &os) {
-  if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
+  if (auto attr = dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
     unsigned bitWidth = attr.getType().getElementTypeBitWidth();
@@ -415,7 +417,7 @@ static LogicalResult serializeGenericElementData(Location loc,
              << "unhandled integer element bit width " << bitWidth
              << " for type " << elementsAttr.getType();
     }
-  } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
+  } else if (auto attr = dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
     unsigned bitWidth = attr.getType().getElementTypeBitWidth();
@@ -450,10 +452,10 @@ static LogicalResult serializeGenericResourceElementData(
   // For complex resource types, we can just serialize based on the bit width of
   // the underlying integer or floating point type.
   Type elementType = resourceElementsAttr.getType().getElementType();
-  if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
+  if (auto complexType = dyn_cast<ComplexType>(elementType)) {
     elementType = complexType.getElementType();
   }
-  if (auto integerType = llvm::dyn_cast<IntegerType>(elementType)) {
+  if (auto integerType = dyn_cast<IntegerType>(elementType)) {
     // At the time of writing, DenseResourceElementsAttr byte aligned physical
     // element types only with the exception of i1, which is stored as a full
     // byte. This is in contrast to DenseElementsAttr which has an exception for
@@ -475,7 +477,7 @@ static LogicalResult serializeGenericResourceElementData(
              << "unhandled integer element bit width " << bitWidth
              << " for type " << resourceElementsAttr.getType();
     }
-  } else if (auto floatType = llvm::dyn_cast<FloatType>(elementType)) {
+  } else if (auto floatType = dyn_cast<FloatType>(elementType)) {
     unsigned bitWidth = floatType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 16:
@@ -498,7 +500,7 @@ static LogicalResult serializeGenericResourceElementData(
 //===----------------------------------------------------------------------===//
 
 int64_t BytePatternAttr::getStorageSize() const {
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
+  if (auto shapedType = dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());
@@ -533,8 +535,9 @@ LogicalResult BytePatternAttr::serializeToStream(Location loc,
 //===----------------------------------------------------------------------===//
 
 Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess()))
+  if (failed(p.parseLess())) {
     return {};
+  }
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
   // with it though by checking for proper []/() nesting.
@@ -573,8 +576,9 @@ Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
     return {};
   }
 
-  if (failed(p.parseGreater()))
+  if (failed(p.parseGreater())) {
     return {};
+  }
 
   start = startInclusive ? start : start + 1;
   end = endInclusive ? end : end - 1;
@@ -602,7 +606,7 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
                                  ArrayRef<Attribute> valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+    if (auto storageAttr = dyn_cast<SizedStorageAttr>(valueAttr)) {
       calculatedLength += storageAttr.getStorageSize();
     } else {
       return {};
@@ -617,7 +621,7 @@ CompositeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                       int64_t totalLength, ArrayAttr valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+    if (auto storageAttr = dyn_cast<SizedStorageAttr>(valueAttr)) {
       calculatedLength += storageAttr.getStorageSize();
     } else {
       return emitError() << "value is not serializable: " << valueAttr;
@@ -703,8 +707,7 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
                                                llvm::endianness endian,
                                                llvm::raw_ostream &os) const {
   for (auto valueAttr : getValues()) {
-    auto serializableAttr =
-        llvm::dyn_cast<SerializableAttrInterface>(valueAttr);
+    auto serializableAttr = dyn_cast<SerializableAttrInterface>(valueAttr);
     if (!serializableAttr) {
       return emitError(loc)
              << "unable to serialize a non-serializable attribute: "
@@ -722,7 +725,7 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 //===----------------------------------------------------------------------===//
 
 int64_t UninitializedAttr::getStorageSize() const {
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
+  if (auto shapedType = dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());
@@ -737,7 +740,7 @@ struct SizedStorageDenseElementsAttrModel
     : public SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
                                              DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<ElementsAttr>(baseAttr);
+    auto attr = cast<ElementsAttr>(baseAttr);
     return IREE::Util::getRoundedPhysicalStorageSize(
         attr.getNumElements(),
         cast<ShapedType>(attr.getType()).getElementType());
@@ -749,7 +752,7 @@ struct SizedStorageDenseResourceElementsAttrModel
           SizedStorageDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
+    auto attr = cast<DenseResourceElementsAttr>(baseAttr);
     return IREE::Util::getRoundedPhysicalStorageSize(
         attr.getNumElements(), attr.getType().getElementType());
   }
@@ -760,7 +763,7 @@ struct SizedStorageStringAttrModel
     : public SizedStorageAttr::ExternalModel<SizedStorageStringAttrModel,
                                              StringAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<StringAttr>(baseAttr);
+    auto attr = cast<StringAttr>(baseAttr);
     return attr.getValue().size();
   }
 };
@@ -795,7 +798,7 @@ struct SerializableDenseElementsAttrModel
     // it can really help.
     os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
 
-    auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
+    auto elementsAttr = cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
       return IREE::Util::SerializableAttrInterface::serializeSplatValue(
@@ -838,7 +841,7 @@ struct SerializableDenseResourceElementsAttrModel
   LogicalResult serializeToStream(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   llvm::raw_ostream &os) const {
-    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
+    auto attr = cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
 
     // Special testing path for elided attributes. We want this to be an
@@ -888,7 +891,7 @@ struct SerializableStringAttrModel
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
     os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
-    auto stringAttr = llvm::cast<StringAttr>(baseAttr);
+    auto stringAttr = cast<StringAttr>(baseAttr);
     os.write(stringAttr.data(), stringAttr.size());
     return success();
   }
@@ -905,16 +908,17 @@ struct SerializableStringAttrModel
 void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
                                                   NamedAttrList &dialectAttrs) {
   for (auto attr : fromOp->getDialectAttrs()) {
-    if (auto hoistableAttr = llvm::dyn_cast<IREE::Util::HoistableAttrInterface>(
-            attr.getValue())) {
+    if (auto hoistableAttr =
+            dyn_cast<IREE::Util::HoistableAttrInterface>(attr.getValue())) {
       if (hoistableAttr.shouldAttachToHoistedOps() &&
           !dialectAttrs.get(attr.getName())) {
         dialectAttrs.push_back(attr);
       }
     }
   }
-  if (auto *parentOp = fromOp->getParentOp())
+  if (auto *parentOp = fromOp->getParentOp()) {
     gatherHoistableAttrs(parentOp, dialectAttrs);
+  }
 }
 
 // static
@@ -924,8 +928,9 @@ void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
   // precedence over any from ancestors. We also want to preserve any
   // non-hoistable attrs when we reassign the dialect attrs.
   NamedAttrList dialectAttrs;
-  for (auto attr : toOp->getDialectAttrs())
+  for (auto attr : toOp->getDialectAttrs()) {
     dialectAttrs.push_back(attr);
+  }
 
   // Gather attributes from the op and its parents, only adding ones not already
   // set on the op.

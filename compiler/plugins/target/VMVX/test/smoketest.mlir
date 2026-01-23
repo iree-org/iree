@@ -9,8 +9,8 @@ module attributes {
 } {
 
 stream.executable public @add_dispatch_0 {
-  stream.executable.export @add_dispatch_0 workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @add_dispatch_0 workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module  {
@@ -52,9 +52,11 @@ stream.executable public @add_dispatch_0 {
 //   CHECK-DAG:           %[[C1_I32:.+]] = vm.const.i32 1
 //   CHECK-DAG:           %[[C1_I64:.+]] = vm.const.i64 1
 //   CHECK-DAG:           %[[C2_I32:.+]] = vm.const.i32 2
+//       CHECK:           vm.discard.refs %[[SCRATCHPAD]], %[[CONSTANTS]]
 //  CHECK-NEXT:           %[[LHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C0_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C1_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RET_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C2_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
+//  CHECK-NEXT:           vm.discard.refs %[[BINDINGS]]
 //       CHECK:           vm.br ^bb1(%[[C0_I64]] : i64)
 //  CHECK-NEXT:         ^bb1(%[[IDX:.+]]: i64):
 //  CHECK-NEXT:           %slt = vm.cmp.lt.i64.s %[[IDX]], %{{.+}} : i64
@@ -68,6 +70,7 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:           %[[NEXT_IDX:.+]] = vm.add.i64 %[[IDX]], %[[C1_I64]] : i64
 //  CHECK-NEXT:           vm.br ^bb1(%[[NEXT_IDX]] : i64)
 //  CHECK-NEXT:         ^bb3:
+//       CHECK:           vm.discard.refs %[[LHS_BUF]], %[[RHS_BUF]], %[[RET_BUF]]
 //  CHECK-NEXT:           vm.return
 //  CHECK-NEXT:         }
 //  CHECK-NEXT:         vm.export @add_dispatch_0

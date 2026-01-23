@@ -63,7 +63,7 @@ hal.executable private @pooling_nhwc_sum_f32 {
 // CHECK: vector.transfer_read
 // CHECK: arith.addf %{{.+}}, %{{.+}} : vector<4xf32>
 
-// CHECK-OUNT-2: scf.yield
+// CHECK-COUNT-2: scf.yield
 
 // For linalg.conv_2d_nhwc_hwcf
 // CHECK: vector.transfer_write

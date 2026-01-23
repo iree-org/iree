@@ -11,13 +11,12 @@
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
+  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @add_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
@@ -42,9 +41,6 @@ hal.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -52,16 +48,13 @@ hal.executable @simpleMath_ex_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c1 = arith.constant 1 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
@@ -87,16 +80,13 @@ hal.executable @dot_dispatch_0 {
 //            CHECK:   llvm.br
 //            CHECK:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<32xf32>
 //   CHECK-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<16xf32>
-//   CHECK-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//   CHECK-COUNT-512:  llvm.call @__nv_fmaf({{.*}}) : (f32, f32, f32) -> f32
 //            CHECK:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
 
 // -----
 
 // Check that a generic op representing a matmul is getting the same
 // configuration as the matmul op.
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #matmul_trait = {
   args_in = 2,
   args_out = 1,
@@ -114,16 +104,13 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+    hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
       func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c1 = arith.constant 1 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024xf32>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
@@ -151,7 +138,7 @@ hal.executable @dot_dispatch_0 {
 //   CHECK-LABEL: hal.executable public @dot_dispatch_0
 //            CHECK:   hal.executable.variant public @cuda
 //            CHECK:  llvm.br
-//   CHECK-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//   CHECK-COUNT-512:  llvm.call @__nv_fmaf({{.*}}) : (f32, f32, f32) -> f32
 //            CHECK:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
 
 // -----
@@ -163,17 +150,13 @@ hal.executable @dot_dispatch_0 {
 ]>
 hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @conv2d_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7)
+  hal.executable.export public @conv2d_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @conv2d_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
-      %c2 = arith.constant 2 : index
-      %c3 = arith.constant 3 : index
-      %c1 = arith.constant 1 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x4x4x2xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x2x2x1xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x2x3x1xf32>>
@@ -208,13 +191,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
+  hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @add_dispatch_0() {
-      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
       %3 = tensor.empty() : tensor<16xf32>
@@ -245,15 +227,13 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @reduction layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
+  hal.executable.export public @reduction layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @reduction() {
-      %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
-      %c96 = arith.constant 96 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<14x14x96xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<96xf32>>
       %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [14, 14, 96], strides = [1, 1, 1]
@@ -289,14 +269,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @vector_add_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
+  hal.executable.export public @vector_add_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @vector_add_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c16384 = arith.constant 16384 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16384xf32>>
       %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16384xf32>>
@@ -328,9 +306,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d1, d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -339,14 +314,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @vector_reduction_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+  hal.executable.export public @vector_reduction_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @vector_reduction_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c16384 = arith.constant 16384 : index
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x16384xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16384xf32>>
@@ -383,17 +356,16 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
   hal.executable public @pooling_dynamic {
     hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
-      hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
+      hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1)
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
         func.func @pooling_dynamic() {
-          %c1_i64 = arith.constant 1 : i64
-          %c2_i64 = arith.constant 2 : i64
           %cst = arith.constant 0.000000e+00 : f32
           %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-          %s = arith.index_cast %0 : i32 to index
+          %cast = arith.index_cast %0 : i32 to index
+          %s = iree_tensor_ext.dispatch.workload.ordinal %cast, 0 : index
           %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%s) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048x?x?xf32>>{%s, %s, %s}
           %15 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%s) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x2048x1x1xf32>>{%s}
           %16 = iree_tensor_ext.dispatch.tensor.load %14, offsets = [0, 0, 0, 0], sizes = [%s, 2048, %s, %s], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048x?x?xf32>>{%s, %s, %s} -> tensor<?x2048x?x?xf32>
@@ -414,9 +386,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 16384)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -425,14 +394,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @vector_distribute_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @vector_distribute_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+  hal.executable.export public @vector_distribute_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @vector_distribute_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c1024 = arith.constant 1024 : index
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512xf32>>
@@ -466,7 +433,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -475,14 +441,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable @vector_distribution_broadcast_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
-  hal.executable.export public @vector_distribution_broadcast_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+  hal.executable.export public @vector_distribution_broadcast_dispatch layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
     func.func @vector_distribution_broadcast_dispatch() {
-      %c0 = arith.constant 0 : index
-      %c1024 = arith.constant 1024 : index
       %cst_0 = arith.constant 3.840000e+02 : f32
       %cst = arith.constant 1.000000e+00 : f32
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>
@@ -533,8 +497,8 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 ]>
 hal.executable private @generalized_pool {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @generalized_pool ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5)
+    hal.executable.export public @generalized_pool ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -567,8 +531,6 @@ hal.executable private @generalized_pool {
 
 // -----
 
-
-#config = #iree_codegen.lowering_config<tile_sizes = [[32,32]]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -578,8 +540,8 @@ hal.executable private @generalized_pool {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable private @shared_mem_transpose  {
   hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
-    hal.executable.export public @shared_mem_transpose layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+    hal.executable.export public @shared_mem_transpose layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
         hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

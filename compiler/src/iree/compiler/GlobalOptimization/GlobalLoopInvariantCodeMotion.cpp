@@ -39,8 +39,9 @@ static bool isHoistableOp(LoopLikeOpInterface loopOp, Operation *op,
   for (OpOperand &operand : op->getOpOperands()) {
     Value value = operand.get();
     // Ignore values defined outside the loop.
-    if (loopOp.isDefinedOutsideOfLoop(value))
+    if (loopOp.isDefinedOutsideOfLoop(value)) {
       continue;
+    }
 
     Operation *producer = value.getDefiningOp();
     // If the producer is not an operation, can't hoist it.
@@ -61,8 +62,9 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
   llvm::SetVector<Operation *> hoistableOps;
   for (Region *region : loopOp.getLoopRegions()) {
     // Skip loops with multi-block regions to simplify op's dependency.
-    if (!region->hasOneBlock())
+    if (!region->hasOneBlock()) {
       return failure();
+    }
 
     // Consider only the top-level ops in the region. The forward visiting in a
     // single block ensures we are check and add ops in topological order.
@@ -73,8 +75,9 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
       }
     }
   }
-  if (hoistableOps.empty())
+  if (hoistableOps.empty()) {
     return success();
+  }
 
   // Wrap the loop in zero-trip-check so the hoisted ops will only run when the
   // loop condition is ever satisfied.
@@ -87,8 +90,9 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
             return scf::wrapWhileLoopInZeroTripCheck(op, rewriter);
           })
           .Default([&](Operation *op) { return failure(); });
-  if (failed(wrappedLoop))
+  if (failed(wrappedLoop)) {
     return failure();
+  }
 
   // Hoist ops out of the loop in topological order.
   for (Operation *op : hoistableOps) {
@@ -118,15 +122,17 @@ struct GlobalLoopInvariantCodeMotionPass
     // to move across multiple loop levels.
     funcOp.walk([&](LoopLikeOpInterface op) {
       // Check if the loop type is supported.
-      if (isa<scf::WhileOp>(op))
+      if (isa<scf::WhileOp>(op)) {
         candidateLoops.push_back(op);
+      }
       return;
     });
 
     IRRewriter rewriter(context);
     for (auto loopOp : candidateLoops) {
-      if (failed(hoistLoopInvariants(loopOp, rewriter)))
+      if (failed(hoistLoopInvariants(loopOp, rewriter))) {
         return signalPassFailure();
+      }
     }
   }
 };

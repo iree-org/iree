@@ -76,7 +76,7 @@ public:
       bool updated = false;
       SmallVector<NamedAttribute> attrs(op->getAttrs());
       for (auto &attr : attrs) {
-        if (auto elements = llvm::dyn_cast<ElementsAttr>(attr.getValue())) {
+        if (auto elements = dyn_cast<ElementsAttr>(attr.getValue())) {
           // Already seen?
           auto it = replacements.find(elements);
           if (it != replacements.end()) {
@@ -102,14 +102,15 @@ public:
           }
         }
       }
-      if (updated)
+      if (updated) {
         op->setAttrs(attrs);
+      }
     });
     LLVM_DEBUG(llvm::dbgs() << "DONE CONVERTING RESOURCES\n");
   }
 
   static bool shouldConvertElements(ElementsAttr attr) {
-    if (llvm::isa<DenseElementsAttr>(attr)) {
+    if (isa<DenseElementsAttr>(attr)) {
       // DenseElementsAttr encodes arbitrary dimension
       // splats whereas DenseResourceElementsAttr does not.
       return !attr.isSplat();
@@ -119,12 +120,12 @@ public:
   }
 
   static ElementsAttr convertElementsAttr(ElementsAttr elementsAttr) {
-    auto st = llvm::cast<ShapedType>(elementsAttr.getType());
+    auto st = cast<ShapedType>(elementsAttr.getType());
     auto elementType = st.getElementType();
     auto numElements = elementsAttr.getNumElements();
     auto bitWidth = elementType.getIntOrFloatBitWidth();
     AsmResourceBlob blob;
-    if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
+    if (auto attr = dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
       switch (bitWidth) {
       case 1:
         blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
@@ -159,7 +160,7 @@ public:
       default:
         return {};
       }
-    } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
+    } else if (auto attr = dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
       AsmResourceBlob blob;
       switch (bitWidth) {
       case 8:

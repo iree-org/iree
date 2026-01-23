@@ -14,30 +14,79 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "TensorExtAttrInterfaces.h"
+    "TensorExtAttrInterfaces.h.inc"
+    "TensorExtAttrs.h"
+    "TensorExtAttrs.h.inc"
     "TensorExtDialect.h"
     "TensorExtDialect.h.inc"
+    "TensorExtOpInterfaces.h"
+    "TensorExtOpInterfaces.h.inc"
     "TensorExtOps.h"
     "TensorExtOps.h.inc"
     "TensorExtTypes.h"
   SRCS
+    "TensorExtAttrInterfaces.cpp"
+    "TensorExtAttrInterfaces.cpp.inc"
+    "TensorExtAttrs.cpp"
+    "TensorExtAttrs.cpp.inc"
     "TensorExtDialect.cpp"
     "TensorExtDialect.cpp.inc"
     "TensorExtOpFolders.cpp"
+    "TensorExtOpInterfaces.cpp"
+    "TensorExtOpInterfaces.cpp.inc"
     "TensorExtOps.cpp"
     "TensorExtOps.cpp.inc"
     "TensorExtTypes.cpp"
   DEPS
+    ::TensorExtAttrInterfacesGen
+    ::TensorExtAttrsGen
+    ::TensorExtOpInterfacesGen
     ::TensorExtOpsGen
     LLVMSupport
+    MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRIR
     MLIRInferTypeOpInterface
+    MLIRMemRefDialect
+    MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    TensorExtAttrsGen
+  TD_FILE
+    "TensorExtAttrs.td"
+  OUTS
+    --dialect=iree_tensor_ext --gen-attrdef-decls TensorExtAttrs.h.inc
+    --dialect=iree_tensor_ext --gen-attrdef-defs TensorExtAttrs.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    TensorExtAttrInterfacesGen
+  TD_FILE
+    "TensorExtInterfaces.td"
+  OUTS
+    --gen-attr-interface-decls TensorExtAttrInterfaces.h.inc
+    --gen-attr-interface-defs TensorExtAttrInterfaces.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    TensorExtOpInterfacesGen
+  TD_FILE
+    "TensorExtInterfaces.td"
+  OUTS
+    --gen-op-interface-decls TensorExtOpInterfaces.h.inc
+    --gen-op-interface-defs TensorExtOpInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

@@ -4,11 +4,10 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
     %arg1: tensor<10x64x640xf16>, %arg2: tensor<10x64x640xf16>,
     %arg3: tensor<10x64x640xf16>)
     -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>) {
-    %0 = tensor.empty() : tensor<2x10x4096x64xf16>
-    %1 = tensor.empty() : tensor<2x10x4096x64xf32>
+    %0 = tensor.empty() : tensor<2x10x4096x64xf32>
     %cst = arith.constant 0.000000e+00 : f32
-    %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
-    %3:3 = linalg.generic {
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
+    %2:3 = linalg.generic {
         indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
                          affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
                          affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>,
@@ -18,7 +17,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
         iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
         ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x4096x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>, tensor<10x64x640xf16>)
-        outs(%2, %2, %2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
+        outs(%1, %1, %1 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
         attrs = {
             lowering_config = #iree_gpu.lowering_config<{
                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [0, 1, 2, 3],
@@ -36,7 +35,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
       %16 = arith.addf %out_4, %15 : f32
       linalg.yield %10, %13, %16 : f32, f32, f32
   } -> (tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>)
-  return %3#0, %3#1, %3#2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>
+  return %2#0, %2#1, %2#2 : tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>, tensor<2x10x4096x64xf32>
 }
 // CHECK-LABEL: func @fused_contraction_1
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x4096x640xf16>
@@ -106,10 +105,9 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
     %arg1: tensor<640x640xf32>, %arg2: tensor<640x640xf32>, %arg3: tensor<640x640xf32>)
     -> (tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>) {
     %0 = tensor.empty() : tensor<4096x640xf32>
-    %1 = tensor.empty() : tensor<4096x640xf32>
     %cst = arith.constant 0.000000e+00 : f32
-    %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<4096x640xf32>) -> tensor<4096x640xf32>
-    %3:3 = linalg.generic {
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4096x640xf32>) -> tensor<4096x640xf32>
+    %2:3 = linalg.generic {
         indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                          affine_map<(d0, d1, d2) -> (d2, d1)>,
                          affine_map<(d0, d1, d2) -> (d2, d1)>,
@@ -119,7 +117,7 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
                          affine_map<(d0, d1, d2) -> (d0, d1)>],
         iterator_types = ["parallel", "parallel", "reduction"]}
         ins(%arg0, %arg1, %arg2, %arg3 : tensor<4096x640xf32>, tensor<640x640xf32>, tensor<640x640xf32>, tensor<640x640xf32>)
-        outs(%2, %2, %2 : tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>)
+        outs(%1, %1, %1 : tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>)
         attrs = {
             lowering_config = #iree_gpu.lowering_config<{
                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, promote_operands = [0, 1, 2, 3],
@@ -133,13 +131,9 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
       %9 = arith.addf %out_4, %8 : f32
       linalg.yield %5, %7, %9 : f32, f32, f32
   } -> (tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>)
-  return %3#0, %3#1, %3#2 : tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>
+  return %2#0, %2#1, %2#2 : tensor<4096x640xf32>, tensor<4096x640xf32>, tensor<4096x640xf32>
 }
 // CHECK-LABEL: func @fused_contraction_2
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<4096x640xf32>
-//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<640x640xf32>
-//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640x640xf32>
-//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<640x640xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
 //       CHECK:     ^bb0(%[[B0_0:[a-zA-Z0-9_]+]]: f32, %[[B1_0:[a-zA-Z0-9_]+]]: f32, %[[B2_0:[a-zA-Z0-9_]+]]: f32

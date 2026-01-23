@@ -24,11 +24,11 @@ func.func @matmul_f8_gfx942(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<
 // GFX942:         linalg.generic
 // GFX942-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX942-SAME:      lowering_config =
+// GFX942-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // GFX950-LABEL: @matmul_f8_gfx942
 // GFX950:         linalg.generic
-// GFX950-NOT:      compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // -----
 
@@ -110,6 +110,7 @@ func.func @matmul_f8_dynamic_gfx942(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX942:         linalg.generic
 // GFX942-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX942-SAME:      lowering_config =
+// GFX942-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // GFX950-LABEL: @matmul_f8_dynamic_gfx942
@@ -226,6 +227,7 @@ func.func @matmul_f8_gfx950(%arg0: tensor<1x128x4096xf8E4M3FN>, %arg1: tensor<10
 // GFX950:         linalg.generic
 // GFX950-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX950-SAME:      lowering_config =
+// GFX950-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 32>
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // GFX942-LABEL: @matmul_f8_gfx950
@@ -311,6 +313,7 @@ func.func @matmul_f8_dynamic_gfx950(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX950:         linalg.generic
 // GFX950-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX950-SAME:      lowering_config =
+// GFX950-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 32>
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // GFX942-LABEL: @matmul_f8_dynamic_gfx950
@@ -640,3 +643,41 @@ func.func @negative_matmul_bf16_expanded_large_no_zero_fill(%arg0: tensor<1x256x
 // GFX950-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+
+// -----
+
+// Test that `load_from_buffer` propagates constraints for dynamic dimensions.
+
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+func.func @matmul_f8_load_from_buffer(%arg0: index) -> tensor<1x128x1024xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = util.assume.int %arg0<umin = 512, udiv = 128> : index
+  %1 = memref.alloc(%0) : memref<1x128x?xf8E4M3FNUZ>
+  %2 = memref.alloc(%0) : memref<1024x?xf8E4M3FNUZ>
+  %3 = iree_codegen.load_from_buffer %1 : memref<1x128x?xf8E4M3FNUZ> -> tensor<1x128x?xf8E4M3FNUZ>
+  %4 = iree_codegen.load_from_buffer %2 : memref<1024x?xf8E4M3FNUZ> -> tensor<1024x?xf8E4M3FNUZ>
+  %5 = tensor.empty() : tensor<1x128x1024xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x128x1024xf32>) -> tensor<1x128x1024xf32>
+  %7 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<1x128x?xf8E4M3FNUZ>, tensor<1024x?xf8E4M3FNUZ>) outs(%6 : tensor<1x128x1024xf32>) {
+  ^bb0(%in: f8E4M3FNUZ, %in_0: f8E4M3FNUZ, %out: f32):
+    %8 = arith.extf %in : f8E4M3FNUZ to f32
+    %9 = arith.extf %in_0 : f8E4M3FNUZ to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %out, %10 : f32
+    linalg.yield %11 : f32
+  } -> tensor<1x128x1024xf32>
+  return %7 : tensor<1x128x1024xf32>
+}
+// GFX942-LABEL: @matmul_f8_load_from_buffer
+// GFX942:         linalg.generic
+// GFX942-SAME:      compilation_info = #iree_codegen.compilation_info
+// GFX942-SAME:      lowering_config =
+// GFX942-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>
+// GFX942-SAME:      translation_info =
+// GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-LABEL: @matmul_f8_load_from_buffer
+// GFX950:         linalg.generic
+// GFX950-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>

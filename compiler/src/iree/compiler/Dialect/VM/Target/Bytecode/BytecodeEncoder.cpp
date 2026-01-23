@@ -24,8 +24,10 @@ namespace {
 class V0BytecodeEncoder : public BytecodeEncoder {
 public:
   V0BytecodeEncoder(llvm::DenseMap<Type, int> *typeTable,
-                    RegisterAllocation *registerAllocation)
-      : typeTable_(typeTable), registerAllocation_(registerAllocation) {}
+                    RegisterAllocation *registerAllocation,
+                    const OrdinalAnalysis *ordinalAnalysis)
+      : typeTable_(typeTable), registerAllocation_(registerAllocation),
+        ordinalAnalysis_(ordinalAnalysis) {}
   ~V0BytecodeEncoder() = default;
 
   LogicalResult beginBlock(Block *block) override {
@@ -59,11 +61,7 @@ public:
     if (!symbolOp) {
       return currentOp_->emitOpError() << "target symbol not found: " << name;
     }
-    auto ordinalAttr = symbolOp->getAttrOfType<IntegerAttr>("ordinal");
-    if (!ordinalAttr) {
-      return symbolOp->emitOpError() << "missing ordinal";
-    }
-    int32_t ordinal = ordinalAttr.getInt();
+    int32_t ordinal = ordinalAnalysis_->getOrdinal(symbolOp);
     if (isa<IREE::VM::ImportOp>(symbolOp)) {
       // Imported functions have their MSB set.
       ordinal |= 0x80000000u;
@@ -72,7 +70,7 @@ public:
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(value.getType());
+    auto refPtrType = dyn_cast<IREE::VM::RefType>(value.getType());
     if (!refPtrType) {
       return currentOp_->emitOpError()
              << "type " << value.getType()
@@ -83,8 +81,8 @@ public:
 
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
-    if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
-      if (llvm::isa<IREE::VM::ListType>(refType.getObjectType())) {
+    if (auto refType = dyn_cast<IREE::VM::RefType>(type)) {
+      if (isa<IREE::VM::ListType>(refType.getObjectType())) {
         type = refType.getObjectType();
       }
     }
@@ -100,7 +98,7 @@ public:
 
   LogicalResult encodePrimitiveAttr(TypedAttr attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
-    if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
+    if (auto integerAttr = dyn_cast<IntegerAttr>(attr)) {
       uint64_t limitedValue =
           integerAttr.getValue().extractBitsAsZExtValue(bitWidth, 0);
       switch (bitWidth) {
@@ -116,7 +114,7 @@ public:
         return currentOp_->emitOpError()
                << "attribute of bitwidth " << bitWidth << " not supported";
       }
-    } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+    } else if (auto floatAttr = dyn_cast<FloatAttr>(attr)) {
       switch (bitWidth) {
       case 32: {
         union {
@@ -177,7 +175,7 @@ public:
                              int successorIndex) override {
     // Reserve space for the block offset. It will get fixed up when we are all
     // done and know all of the block offsets.
-    blockOffsetFixups_.push_back({targetBlock, bytecode_.size()});
+    blockOffsetFixups_.emplace_back(targetBlock, bytecode_.size());
     bytecode_.resize(bytecode_.size() + sizeof(int32_t));
 
     // Compute required remappings - we only need to emit them when the source
@@ -213,15 +211,25 @@ public:
     return success();
   }
 
+  LogicalResult encodeBranchTarget(Block *targetBlock) override {
+    // Reserve space for the block offset. It will get fixed up when we are all
+    // done and know all of the block offsets.
+    blockOffsetFixups_.emplace_back(targetBlock, bytecode_.size());
+    bytecode_.resize(bytecode_.size() + sizeof(int32_t));
+    return success();
+  }
+
   LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
                                   OperandRangeRange caseOperands,
                                   int baseSuccessorIndex) override {
-    if (failed(writeUint16(caseSuccessors.size())))
+    if (failed(writeUint16(caseSuccessors.size()))) {
       return failure();
+    }
     for (auto [successor, operands] :
          llvm::zip_equal(caseSuccessors, caseOperands)) {
-      if (failed(encodeBranch(successor, operands, ++baseSuccessorIndex)))
+      if (failed(encodeBranch(successor, operands, ++baseSuccessorIndex))) {
         return failure();
+      }
     }
     return success();
   }
@@ -249,6 +257,23 @@ public:
     return success();
   }
 
+  LogicalResult
+  encodeOperands(ArrayRef<std::pair<Value, int>> valuesWithIndices) override {
+    if (failed(ensureAlignment(2)) ||
+        failed(writeUint16(valuesWithIndices.size()))) {
+      return failure();
+    }
+    for (auto [value, operandIndex] : valuesWithIndices) {
+      uint16_t reg =
+          registerAllocation_->mapUseToRegister(value, currentOp_, operandIndex)
+              .encode();
+      if (failed(writeUint16(reg))) {
+        return failure();
+      }
+    }
+    return success();
+  }
+
   LogicalResult encodeResult(Value value) override {
     uint16_t reg = registerAllocation_->mapToRegister(value).encode();
     return writeUint16(reg);
@@ -268,6 +293,20 @@ public:
     return success();
   }
 
+  LogicalResult encodeBlockArgResults(Block *targetBlock) override {
+    auto blockArgs = targetBlock->getArguments();
+    if (failed(ensureAlignment(2)) || failed(writeUint16(blockArgs.size()))) {
+      return failure();
+    }
+    for (auto arg : blockArgs) {
+      uint16_t reg = registerAllocation_->mapToRegister(arg).encode();
+      if (failed(writeUint16(reg))) {
+        return failure();
+      }
+    }
+    return success();
+  }
+
   std::optional<std::vector<uint8_t>> finish() {
     if (failed(fixupOffsets())) {
       return std::nullopt;
@@ -277,14 +316,20 @@ public:
 
   size_t getOffset() const { return bytecode_.size(); }
 
+  const RegisterAllocation *getRegisterAllocation() const override {
+    return registerAllocation_;
+  }
+
   LogicalResult ensureAlignment(size_t alignment) {
     size_t paddedSize = (bytecode_.size() + (alignment - 1)) & ~(alignment - 1);
     size_t padding = paddedSize - bytecode_.size();
-    if (padding == 0)
+    if (padding == 0) {
       return success();
+    }
     static const uint8_t kZeros[32] = {0};
-    if (padding > sizeof(kZeros))
+    if (padding > sizeof(kZeros)) {
       return failure();
+    }
     return writeBytes(kZeros, padding);
   }
 
@@ -344,6 +389,7 @@ private:
 
   llvm::DenseMap<Type, int> *typeTable_;
   RegisterAllocation *registerAllocation_;
+  const OrdinalAnalysis *ordinalAnalysis_;
 
   Operation *currentOp_ = nullptr;
 
@@ -357,7 +403,8 @@ private:
 // static
 std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-    SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase) {
+    SymbolTable &symbolTable, const OrdinalAnalysis &ordinalAnalysis,
+    DebugDatabaseBuilder &debugDatabase) {
   EncodedBytecodeFunction result;
 
   // Perform register allocation first so that we can quickly lookup values as
@@ -371,7 +418,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   FunctionSourceMap sourceMap;
   sourceMap.localName = funcOp.getName().str();
 
-  V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
+  V0BytecodeEncoder encoder(&typeTable, &registerAllocation, &ordinalAnalysis);
   for (auto &block : funcOp.getBlocks()) {
     size_t blockStart = encoder.getOffset();
 
@@ -383,20 +430,25 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     for (auto &op : block.getOperations()) {
       auto serializableOp = dyn_cast<IREE::VM::VMSerializableOp>(op);
       if (!serializableOp) {
-        if (op.hasTrait<OpTrait::IREE::VM::AssignmentOp>()) {
-          // Assignment ops are ok to not be serializable.
-          continue;
-        }
         op.emitOpError() << "is not serializable";
         return std::nullopt;
       }
-      sourceMap.locations.push_back(
-          {static_cast<int32_t>(encoder.getOffset()), op.getLoc()});
-      if (failed(encoder.beginOp(&op)) ||
-          failed(serializableOp.encode(symbolTable, encoder)) ||
-          failed(encoder.endOp(&op))) {
+      const int32_t bytecodeOffset = static_cast<int32_t>(encoder.getOffset());
+      if (failed(encoder.beginOp(&op))) {
         op.emitOpError() << "failed to encode";
         return std::nullopt;
+      }
+      auto encodeResult = serializableOp.encode(symbolTable, encoder);
+      if (failed(encodeResult)) {
+        op.emitOpError() << "failed to encode";
+        return std::nullopt;
+      }
+      if (failed(encoder.endOp(&op))) {
+        op.emitOpError() << "failed to encode";
+        return std::nullopt;
+      }
+      if (*encodeResult) {
+        sourceMap.locations.push_back({bytecodeOffset, op.getLoc()});
       }
     }
 
@@ -405,7 +457,7 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
       return std::nullopt;
     }
 
-    // From isa.h: IREE_VM_PC_BLOCK_MAX
+    // From isa.h: IREE_VM_ISA_PC_BLOCK_MAX
     static const size_t kVMMaxBlockSize = 0x00FFFFFFu;
     size_t blockLength = encoder.getOffset() - blockStart;
     if (blockLength > kVMMaxBlockSize) {

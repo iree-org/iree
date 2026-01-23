@@ -19,7 +19,9 @@
 #include "iree/base/internal/flags.h"
 #include "iree/io/file_contents.h"
 #include "iree/io/stdio_util.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode/archive.h"
+#include "iree/vm/bytecode/module.h"
 
 // NOTE: include order matters:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -334,6 +336,23 @@ static void iree_tooling_print_rwdata_segment_defs(
   }
 }
 
+// Returns the first export name for the given internal ordinal, or empty if not
+// exported.
+static iree_string_view_t iree_tooling_lookup_export_name(
+    iree_host_size_t internal_ordinal,
+    iree_vm_ExportFunctionDef_vec_t export_defs) {
+  for (size_t j = 0; j < iree_vm_ExportFunctionDef_vec_len(export_defs); ++j) {
+    iree_vm_ExportFunctionDef_table_t export_def =
+        iree_vm_ExportFunctionDef_vec_at(export_defs, j);
+    if (iree_vm_ExportFunctionDef_internal_ordinal(export_def) ==
+        internal_ordinal) {
+      const char* name = iree_vm_ExportFunctionDef_local_name(export_def);
+      return iree_make_string_view(name, strlen(name));
+    }
+  }
+  return iree_string_view_empty();
+}
+
 static void iree_tooling_print_function_descriptors(
     iree_vm_FunctionDescriptor_vec_t descriptors,
     iree_vm_ExportFunctionDef_vec_t export_defs) {
@@ -490,7 +509,6 @@ static iree_status_t iree_tooling_dump_module_metadata(
     fprintf(stdout, "Locations: %zu\n",
             flatbuffers_generic_vec_len(
                 iree_vm_DebugDatabaseDef_location_table(database_def)));
-
     fprintf(stdout, "\n");
   }
 
@@ -512,13 +530,14 @@ static iree_status_t iree_tooling_dump_module_flatbuffer_binary(
 // --output=flatbuffer-json
 //===----------------------------------------------------------------------===//
 
-IREE_FLAG(bool, flatbuffer_pretty, false, "Pretty print flatbuffer JSON.");
+IREE_FLAG(bool, pretty, false,
+          "Enable indentation when outputting flatbuffer JSON.");
 
 static iree_status_t iree_tooling_dump_module_flatbuffer_json(
     iree_const_byte_span_t flatbuffer_contents) {
   flatcc_json_printer_t printer;
   flatcc_json_printer_init(&printer, NULL);
-  if (FLAG_flatbuffer_pretty) {
+  if (FLAG_pretty) {
     flatcc_json_printer_set_flags(&printer, flatcc_json_printer_f_pretty);
   }
   flatcc_json_printer_set_skip_default(&printer, true);
@@ -531,14 +550,117 @@ static iree_status_t iree_tooling_dump_module_flatbuffer_json(
 }
 
 //===----------------------------------------------------------------------===//
+// --output=disassembly
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_tooling_dump_module_disassembly(
+    iree_const_byte_span_t archive_contents, iree_string_view_t function_filter,
+    iree_allocator_t host_allocator) {
+  // Create a VM instance for type registration.
+  iree_vm_instance_t* instance = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                               host_allocator, &instance));
+
+  // Load module with placeholder types (for disassembly, we don't need real
+  // type registrations).
+  iree_vm_module_t* module = NULL;
+  iree_status_t status = iree_vm_bytecode_module_create(
+      instance, IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES,
+      archive_contents, iree_allocator_null(), host_allocator, &module);
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_host_size_t rodata_offset = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_bytecode_archive_parse_header(
+        archive_contents, &flatbuffer_contents, &rodata_offset);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_string_builder_t builder;
+    iree_string_builder_initialize(host_allocator, &builder);
+
+    // Extract export names from the flatbuffer module definition.
+    iree_vm_BytecodeModuleDef_table_t module_def =
+        iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
+    iree_vm_ExportFunctionDef_vec_t export_defs =
+        iree_vm_BytecodeModuleDef_exported_functions(module_def);
+
+    // Iterate over internal functions and build the disassembly output.
+    iree_vm_module_signature_t signature = iree_vm_module_signature(module);
+    for (iree_host_size_t i = 0; i < signature.internal_function_count; ++i) {
+      iree_vm_function_t function;
+      status = iree_vm_module_lookup_function_by_ordinal(
+          module, IREE_VM_FUNCTION_LINKAGE_INTERNAL, i, &function);
+      if (!iree_status_is_ok(status)) break;
+
+      // Get function name from exports if available, otherwise use internal
+      // name.
+      iree_string_view_t export_name =
+          iree_tooling_lookup_export_name(i, export_defs);
+      iree_string_view_t function_name = iree_string_view_is_empty(export_name)
+                                             ? iree_vm_function_name(&function)
+                                             : export_name;
+
+      // Apply filter (ordinal or name) if provided.
+      if (!iree_string_view_is_empty(function_filter)) {
+        uint32_t filter_ordinal = -1;
+        if (iree_string_view_atoi_uint32(function_filter, &filter_ordinal)) {
+          if (i != filter_ordinal) continue;
+        } else if (!iree_string_view_equal(function_name, function_filter)) {
+          continue;
+        }
+      }
+
+      // Print function header.
+      status = iree_string_builder_append_string(
+          &builder, IREE_SV("//"
+                            "===-----------------------------------------------"
+                            "-----------------------===//\n"));
+      if (!iree_status_is_ok(status)) break;
+      iree_string_view_t module_name = iree_vm_module_name(module);
+      status = iree_string_builder_append_format(
+          &builder, "// Disassembly: %.*s.%.*s (#%" PRIhsz ")\n",
+          (int)module_name.size, module_name.data, (int)function_name.size,
+          function_name.data, i);
+      if (!iree_status_is_ok(status)) break;
+      status = iree_string_builder_append_string(
+          &builder, IREE_SV("//"
+                            "===-----------------------------------------------"
+                            "-----------------------===//\n"));
+      if (!iree_status_is_ok(status)) break;
+
+      // Disassemble the function.
+      status =
+          iree_vm_bytecode_module_disassemble_function(module, i, &builder);
+      if (!iree_status_is_ok(status)) break;
+
+      // Flush output to stdout.
+      fprintf(stdout, "%.*s\n", (int)iree_string_builder_size(&builder),
+              iree_string_builder_buffer(&builder));
+      iree_string_builder_reset(&builder);
+    }
+
+    iree_string_builder_deinitialize(&builder);
+  }
+
+  iree_vm_module_release(module);
+  iree_vm_instance_release(instance);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // main
 //===----------------------------------------------------------------------===//
 
-IREE_FLAG(string, output, "metadata",
+IREE_FLAG(string, output, "all",
           "Output mode:\n"
+          "  'all': metadata and disassembly.\n"
           "  'metadata': module metadata and size breakdown.\n"
+          "  'disassembly': bytecode disassembly of all functions.\n"
           "  'flatbuffer-binary': module flatbuffer in binary format.\n"
           "  'flatbuffer-json': module flatbuffer in JSON format.\n");
+
+IREE_FLAG(string, function, "",
+          "Filter disassembly to a specific function name (exact match).\n"
+          "Only used with --output=disassembly.");
 
 int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
@@ -547,9 +669,30 @@ int main(int argc, char** argv) {
   int exit_code = EXIT_SUCCESS;
 
   // Parse command line flags.
-  iree_flags_set_usage("iree-dump-module",
-                       "Dumps IREE VM module details to stdout.\n"
-                       "$ iree-dump-module [--output=...] module.vmfb\n");
+  iree_flags_set_usage(
+      "iree-dump-module",
+      "Dumps IREE VM module details to stdout.\n"
+      "$ iree-dump-module [--output=...] module.vmfb\n"
+      "\n"
+      "Example dumping all information (metadata + disassembly):\n"
+      "  iree-dump-module module.vmfb\n"
+      "  (or)\n"
+      "  iree-dump-module --output=all module.vmfb\n"
+      "\n"
+      "Example dumping metadata (types, imports, exports, custom attributes):\n"
+      "  iree-dump-module --output=metadata module.vmfb\n"
+      "\n"
+      "Example dumping VM ISA disassembly for all functions:\n"
+      "  iree-dump-module --output=disassembly module.vmfb\n"
+      "\n"
+      "Example dumping VM ISA disassembly for a single function by name:\n"
+      "  iree-dump-module --output=disassembly --function=fn2 module.vmfb\n"
+      "And internal function ordinal:\n"
+      "  iree-dump-module --output=disassembly --function=24 module.vmfb\n"
+      "\n"
+      "Dump flatbuffer binary or JSON:\n"
+      "  iree-dump-module --output=flatbuffer-binary module.vmfb\n"
+      "  iree-dump-module --output=flatbuffer-json --pretty module.vmfb\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
   if (argc < 2) {
@@ -583,9 +726,22 @@ int main(int argc, char** argv) {
     }
   }
   if (iree_status_is_ok(status)) {
-    if (strcmp(FLAG_output, "metadata") == 0) {
+    if (strcmp(FLAG_output, "all") == 0) {
       status = iree_tooling_dump_module_metadata(flatbuffer_contents,
                                                  rodata_contents);
+      if (iree_status_is_ok(status)) {
+        fprintf(stdout, "\n");
+        status = iree_tooling_dump_module_disassembly(
+            file_contents->const_buffer, iree_make_cstring_view(FLAG_function),
+            host_allocator);
+      }
+    } else if (strcmp(FLAG_output, "metadata") == 0) {
+      status = iree_tooling_dump_module_metadata(flatbuffer_contents,
+                                                 rodata_contents);
+    } else if (strcmp(FLAG_output, "disassembly") == 0) {
+      status = iree_tooling_dump_module_disassembly(
+          file_contents->const_buffer, iree_make_cstring_view(FLAG_function),
+          host_allocator);
     } else if (strcmp(FLAG_output, "flatbuffer-binary") == 0) {
       status = iree_tooling_dump_module_flatbuffer_binary(flatbuffer_contents);
     } else if (strcmp(FLAG_output, "flatbuffer-json") == 0) {

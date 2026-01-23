@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass{enable-aggressive-fusion}))" --split-input-file %s | FileCheck %s --check-prefix=MULTI-USE
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #encoding = #iree_encoding.testing<>
@@ -228,8 +229,8 @@ util.func public @move_dependencies_before_dispatch(%arg0: tensor<?xf32>, %arg1:
 
 // -----
 
-#encoding0 = #iree_encoding.testing<[#iree_encoding.specialized<0>]>
-#encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<1>]>
+#encoding0 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<0>]>
+#encoding1 = #iree_encoding.testing<layouts = [#iree_encoding.specialized<1>]>
 util.func public @encoding_fusion(%arg0: tensor<128xf32, #encoding0>) -> tensor<128xf32, #encoding1> {
   %1 = flow.dispatch.region -> (tensor<128xf32>) {
     %3 = iree_encoding.unset_encoding %arg0 : tensor<128xf32, #encoding0> -> tensor<128xf32>
@@ -347,3 +348,44 @@ util.func public @multi_result_fusion(%arg0: tensor<123x456xf32>) -> (tensor<123
 // CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ELEM]]#1
 // CHECK:         flow.return %[[ELEM]]#0, %[[SET_ENCODING]]
 // CHECK:       util.return %[[DISPATCH0]]#0, %[[DISPATCH0]]#1
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#encoding = #iree_encoding.testing<>
+util.func public @multi_use_producer_fusion(%arg0: tensor<2x11008x128xf32>) -> (tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #encoding>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<2x11008x128xf32>
+  %1 = flow.dispatch.region -> (tensor<2x11008x128xf32>) {
+    %3 = linalg.generic {
+        indexing_maps = [#map, #map, #map],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%arg0, %arg0 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32>)
+        outs(%0 : tensor<2x11008x128xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<2x11008x128xf32>
+    flow.return %3 : tensor<2x11008x128xf32>
+  }
+  %2 = iree_encoding.set_encoding %1 : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+  util.return %1, %2 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #encoding>
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @multi_use_producer_fusion
+// CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<2x11008x128xf32>)
+// CHECK:         %[[ADD:.+]] = linalg.generic
+// CHECK:         flow.return %[[ADD]] :
+// CHECK:       }
+// CHECK:       %[[ENCODING:.+]] = iree_encoding.set_encoding %[[DISPATCH0]]
+// CHECK:       util.return %[[DISPATCH0]], %[[ENCODING:.+]] : tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #[[$ENCODING]]>
+
+// MULTI-USE-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// MULTI-USE-LABEL: @multi_use_producer_fusion
+// MULTI-USE:       %[[DISPATCH:.+]]:2 = flow.dispatch.region -> (tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #[[$ENCODING]]>)
+// MULTI-USE:         %[[ADD:.+]] = linalg.generic
+// MULTI-USE:         %[[ENCODING:.+]] = iree_encoding.set_encoding %[[ADD]]
+// MULTI-USE:         flow.return %[[ADD]], %[[ENCODING]] :
+// MULTI-USE:       }
+// MULTI-USE-NOT:   iree_encoding.set_encoding
+// MULTI-USE:       util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1 : tensor<2x11008x128xf32>, tensor<2x11008x128xf32, #[[$ENCODING]]>

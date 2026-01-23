@@ -41,16 +41,14 @@ cc_library(
         "include/flatcc/flatcc_json_parser.h",
         "include/flatcc/flatcc_json_printer.h",
     ],
-    copts = [
-        "-Iexternal/com_github_dvidelabs_flatcc/config/",
-        "-Iexternal/com_github_dvidelabs_flatcc/include/",
-    ] + select({
+    copts = select({
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": [
             "-Wno-implicit-fallthrough",
         ],
     }),
     includes = [
+        "config/",
         "include/",
     ],
     deps = [
@@ -82,16 +80,14 @@ cc_library(
         "include/flatcc/flatcc_verifier.h",
         "include/flatcc/reflection/flatbuffers_common_reader.h",
     ] + glob(["include/flatcc/portable/**/*.h"]),
-    copts = [
-        "-Iexternal/com_github_dvidelabs_flatcc/config/",
-        "-Iexternal/com_github_dvidelabs_flatcc/include/",
-    ] + select({
+    copts = select({
         "@bazel_tools//src/conditions:windows": [],
         "//conditions:default": [
             "-Wno-implicit-fallthrough",
         ],
     }),
     includes = [
+        "config/",
         "include/",
     ],
     strip_include_prefix = "include",
@@ -117,10 +113,10 @@ cc_library(
     ] + glob([
         "external/**/*.h",
     ]),
-    copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/external/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    includes = [
+      "config/",
+      "external/",
+      "include/",
     ],
 )
 
@@ -133,9 +129,9 @@ cc_binary(
         ":compiler",
         ":runtime",
     ],
-    copts = [
-      "-Iexternal/com_github_dvidelabs_flatcc/config/",
-      "-Iexternal/com_github_dvidelabs_flatcc/external/",
-      "-Iexternal/com_github_dvidelabs_flatcc/include/",
+    includes = [
+      "config/",
+      "external/",
+      "include/",
     ],
 )

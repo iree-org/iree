@@ -6,6 +6,7 @@
 
 #include "iree/compiler/GlobalOptimization/Interfaces/HoistableTypeInterface.h"
 
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/MathExtras.h"
@@ -32,13 +33,13 @@ struct HoistableTensorTypeInterface
     : public IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
   bool isHoistableType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     unsigned bitWidth =
         IREE::Util::getTypeBitWidth(tensorType.getElementType());
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
   bool isHoistableLeafType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     unsigned bitWidth =
         IREE::Util::getTypeBitWidth(tensorType.getElementType());
     // Never hoist boolean values; IREE still does implicit extension of
@@ -46,27 +47,51 @@ struct HoistableTensorTypeInterface
     return bitWidth != 1;
   }
   Type getPreferredStorageType(Type type) const {
-    auto tensorType = llvm::cast<RankedTensorType>(type);
+    auto tensorType = cast<RankedTensorType>(type);
     // Constant data should be statically shaped.
     if (!tensorType.hasStaticShape()) {
       return type;
     }
+
     unsigned elementBitWidth =
         IREE::Util::getTypeBitWidth(tensorType.getElementType());
-    // Bit cast sub-byte and non-byte aligned tensor types as MLIR cannot store
-    // them packed at the moment. Also bools continue getting special treatment.
-    if (elementBitWidth == 1 ||
-        (llvm::isPowerOf2_32(elementBitWidth) && elementBitWidth >= 8)) {
+    // Bools get special treatment - don't pack them.
+    if (elementBitWidth == 1) {
       return type;
     }
+    // Byte-aligned types (8, 16, 32, 64 bits) don't need conversion.
+    if (llvm::isPowerOf2_32(elementBitWidth) && elementBitWidth >= 8) {
+      return type;
+    }
+
+    // Sub-byte types need to be packed into bytes for storage - use i8 storage.
+    Type i8Type = Builder(type.getContext()).getIntegerType(8);
+
+    // If the tensor has an encoding, let it handle the conversion.
+    if (auto serializableAttr =
+            dyn_cast_if_present<IREE::Encoding::SerializableAttr>(
+                tensorType.getEncoding())) {
+      FailureOr<IREE::Encoding::BitcastEncodingInfo> result =
+          serializableAttr.convertForBitcast(
+              tensorType.getShape(), tensorType.getElementType(), i8Type);
+      if (succeeded(result)) {
+        return RankedTensorType::get(result->newShape, i8Type,
+                                     result->encoding);
+      }
+      // Encoding couldn't handle conversion, so return the original type.
+      return type;
+    }
+
+    // In case of no encoding, convert to flat i8 storage.
     int64_t numElements = ShapedType::getNumElements(tensorType.getShape());
+    int64_t totalBits = numElements * elementBitWidth;
     // Bail out if the data can't be aligned on bytes.
-    if (numElements * elementBitWidth % 8 != 0) {
+    if (totalBits % 8 != 0) {
       return type;
     }
-    return RankedTensorType::get({numElements * elementBitWidth / 8},
-                                 Builder(type.getContext()).getIntegerType(8));
+    return RankedTensorType::get({totalBits / 8}, i8Type);
   }
+
   static Value encodeStorageType(OpBuilder &builder, Location loc,
                                  Type storageType, Value init) {
     auto storageTensorType = dyn_cast<RankedTensorType>(storageType);

@@ -14,8 +14,7 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Interfaces/DestinationStyleOpInterface.h"
-#include "mlir/Interfaces/ParallelCombiningOpInterface.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -60,7 +59,7 @@ LogicalResult BarrierRegionOp::verifyRegions() {
   }
 
   // Ensure that the region yields an element of the right type.
-  auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
+  auto yieldOp = cast<GPU::YieldOp>(block.getTerminator());
   if (yieldOp->getNumOperands() != getNumResults()) {
     return emitOpError(
         "expected body to yield same number of values as results");
@@ -187,11 +186,6 @@ void BufferResourceCastOp::getCanonicalizationPatterns(
 // CoalescedGatherDMAOp
 //===----------------------------------------------------------------------===//
 
-// DestinationStyleOpInterface implementation
-MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
-  return getInitMutable();
-}
-
 // ParallelCombiningOpInterface implementation
 MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
   // Only relevant for tensor operands
@@ -212,40 +206,107 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 }
 
 LogicalResult CoalescedGatherDMAOp::verify() {
-  auto initType = getInit().getType();
-  auto resultType = getResult().getType();
+  TypedValue<ShapedType> init = getInit();
+  auto initType = init.getType();
 
-  // Verify that this op is nested within an InParallelOpInterface op
-  // Note: This constraint only applies when working with tensors
-  if (isa<RankedTensorType>(initType)) {
-    if (!isa_and_nonnull<InParallelOpInterface>(
-            getOperation()->getParentOp())) {
-      return emitOpError("must be nested within an operation implementing "
-                         "InParallelOpInterface when using tensor operands");
-    }
-  }
-
-  if (initType != resultType) {
-    return emitOpError("init and result must have the same type and shape");
-  }
-
-  // Ensure all operands are either all tensors or all memrefs
   bool hasTensor = isa<RankedTensorType>(initType);
   bool hasMemRef = isa<MemRefType>(initType);
 
   if (!hasTensor && !hasMemRef) {
-    return emitOpError("input type must either be a tensor or a memref");
+    return emitOpError("init type must either be a tensor or a memref");
   }
 
-  if (hasTensor) {
-    if (!isa<RankedTensorType>(getIndices().getType()) ||
-        !isa<RankedTensorType>(getSource().getType())) {
-      return emitOpError("all operands must be tensors when init is a tensor");
+  auto initShapedType = cast<ShapedType>(initType);
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  ArrayRef<int64_t> initShape = initShapedType.getShape();
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+
+  if (hasTensor && !isa<RankedTensorType>(sourceType)) {
+    return emitOpError("source must be tensor when init is tensor");
+  }
+  if (hasMemRef && !isa<MemRefType>(sourceType)) {
+    return emitOpError("source must be memref when init is memref");
+  }
+
+  OperandRange indices = getIndices();
+
+  if (indices.size() > initShape.size()) {
+    return emitOpError("number of indices (")
+           << indices.size() << ") cannot exceed destination rank ("
+           << initShape.size() << ")";
+  }
+
+  if (indices.size() > sourceShape.size()) {
+    return emitOpError("number of indices (")
+           << indices.size() << ") cannot exceed source rank ("
+           << sourceShape.size() << ")";
+  }
+
+  // Make sure indices have no dynamic shapes.
+  for (auto [i, indexVal] : llvm::enumerate(indices)) {
+    auto indexType = cast<ShapedType>(indexVal.getType());
+    for (auto dim : indexType.getShape()) {
+      if (ShapedType::isDynamic(dim)) {
+        return emitOpError("expected index ") << i << " to have static shape";
+      }
     }
-  } else if (hasMemRef) {
-    if (!isa<MemRefType>(getIndices().getType()) ||
-        !isa<MemRefType>(getSource().getType())) {
-      return emitOpError("all operands must be memrefs when init is a memref");
+  }
+
+  // For gather operations with indices, all index vectors should have the same
+  // length equal to the batch size (first dimension of destination). This is
+  // validated here so that lowering passes can rely on these constraints
+  // without duplicating the checks.
+  if (!indices.empty()) {
+    // Verify all index vectors are 1D and have the same length.
+    auto firstIndexShape = cast<ShapedType>(indices[0].getType()).getShape();
+    if (firstIndexShape.size() != 1) {
+      return emitOpError("expected index 0 to be a 1-D tensor or vector");
+    }
+    int64_t batchSize = firstIndexShape.front();
+
+    for (auto [i, indexVal] : llvm::enumerate(indices)) {
+      auto indexShape = cast<ShapedType>(indexVal.getType()).getShape();
+      if (indexShape.size() != 1) {
+        return emitOpError("expected index ")
+               << i << " to be a 1-D tensor or vector";
+      }
+      if (indexShape.front() != batchSize) {
+        return emitOpError(
+                   "expected all index vectors to have the same length; ")
+               << "index " << i << " has length " << indexShape.front()
+               << " but expected " << batchSize;
+      }
+    }
+
+    // The batch size should match the first dimension of the destination.
+    if (!initShape.empty() && batchSize != initShape[0]) {
+      return emitOpError("expected batch size (length of index vectors: ")
+             << batchSize << ") to match first destination dimension ("
+             << initShape[0] << ")";
+    }
+  }
+
+  // Verify the contiguous (non-indexed) dimensions match between source and
+  // dest.
+  for (auto [dim, size] : llvm::enumerate(initShape)) {
+    if (dim >= sourceShape.size()) {
+      return emitOpError("expected source to have at least ")
+             << (dim + 1) << " dimensions when destination has rank "
+             << initShape.size();
+    }
+
+    // Skip indexed dimensions - they're validated above.
+    if (dim < indices.size()) {
+      continue;
+    }
+
+    // Check the suffix (hidden) gathering dimensions are the same in `source`
+    // and `init`.
+    int64_t sourceDim = sourceShape[dim];
+    if (sourceDim != size) {
+      return emitOpError("expected unindexed dimension ")
+             << dim << " to have same length in source (" << sourceDim
+             << ") and destination (" << size << ')';
     }
   }
 

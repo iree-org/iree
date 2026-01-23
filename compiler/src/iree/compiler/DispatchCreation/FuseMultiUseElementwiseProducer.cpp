@@ -168,7 +168,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(
         for (OpOperand &operand : genericOp->getOpOperands()) {
           // 2. Only fuse with `linalg.generic` producers that arent
           //    already part of another fusion group.
-          auto producer = dyn_cast_or_null<linalg::GenericOp>(
+          auto producer = dyn_cast_if_present<linalg::GenericOp>(
               operand.get().getDefiningOp());
           if (!producer || opToRootMap.count(producer)) {
             continue;
@@ -287,8 +287,9 @@ void FuseMultiUseElementwiseProducerPass::runOnOperation() {
       funcOp->emitError("failed to fuse multi-use producers");
       return signalPassFailure();
     }
-    if (numOfFusableCandidates.value() == 0)
+    if (numOfFusableCandidates.value() == 0) {
       break;
+    }
   }
 }
 

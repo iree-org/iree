@@ -65,10 +65,10 @@ iree_tablegen_library(
   NAME
     StreamEnumsGen
   TD_FILE
-    "StreamBase.td"
+    "StreamTypes.td"
   OUTS
-    --gen-enum-decls StreamEnums.h.inc
-    --gen-enum-defs StreamEnums.cpp.inc
+    --gen-enum-decls --dialect=stream StreamEnums.h.inc
+    --gen-enum-defs --dialect=stream StreamEnums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -99,7 +99,7 @@ iree_tablegen_library(
   NAME
     StreamTypesGen
   TD_FILE
-    "StreamBase.td"
+    "StreamTypes.td"
   OUTS
     --gen-attrdef-decls --attrdefs-dialect=stream StreamAttrs.h.inc
     --gen-attrdef-defs --attrdefs-dialect=stream StreamAttrs.cpp.inc

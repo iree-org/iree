@@ -68,14 +68,16 @@ public:
     };
     auto modesValue = detail::rewriteAttrToOperands(
         op.getLoc(), adaptor.getModesAttr(), rewriter.getI32Type(), rewriter);
-    if (!modesValue.has_value())
+    if (!modesValue.has_value()) {
       return failure();
+    }
     callOperands.append(modesValue.value());
     auto categoriesValue = detail::rewriteAttrToOperands(
         op.getLoc(), adaptor.getCommandCategoriesAttr(), rewriter.getI32Type(),
         rewriter);
-    if (!categoriesValue.has_value())
+    if (!categoriesValue.has_value()) {
       return failure();
+    }
     callOperands.append(categoriesValue.value());
     callOperands.push_back(adaptor.getQueueAffinity());
     if (adaptor.getBindingCapacity()) {

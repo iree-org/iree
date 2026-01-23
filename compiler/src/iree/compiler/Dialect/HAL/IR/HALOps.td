@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
@@ -23,11 +24,6 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
-    HAL_Op<mnemonic, !listconcat(traits, [Pure])>;
-
-class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
-    HAL_PureOp<mnemonic, traits>;
 
 //===----------------------------------------------------------------------===//
 // Magic temporary hacks
@@ -306,6 +302,73 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
   let hasVerifier = 1;
 }
 
+def HAL_TensorTransientsOp : HAL_PureOp<"tensor.transients", [
+  AllTypesMatch<["source", "result"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{Annotates a tensor to use transient storage from a provided buffer.}];
+  let description = [{
+    Annotates that any transient memory used in the production of the given
+    tensor should be suballocated from the provided storage buffer. This allows
+    users to control transient allocations by providing their own storage,
+    enabling zero-allocation execution in steady state.
+
+    The storage buffer provided must have sufficient space for all transient
+    allocations required to produce the tensor. Unless otherwise overridden the
+    compiler will verify that all allocation sizes are computable and generate
+    size query functions to allow users to query the required buffer size. If
+    size checks are disabled then the user must ensure they pass in a buffer
+    with sufficient capacity.
+
+    The storage buffer is assumed to be immediately usable (i.e., any previous
+    work using it has completed). Users must ensure proper synchronization if
+    reusing storage across multiple operations. Future work may add explicit
+    wait semantics to enable pipelining, but for now synchronization is the
+    caller's responsibility.
+
+    This operation preserves SSA use-def chains by returning the same tensor
+    value it receives. It exists purely for annotation purposes and will be
+    lowered away during compilation.
+
+    Example:
+    ```mlir
+    %result = some.operation(%input) : tensor<?xf32>
+    %annotated = hal.tensor.transients %result : tensor<?xf32>{%dim} from %storage : !hal.buffer
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
+    OptionalAttr<AnyAttr>:$affinity
+  );
+  let results = (outs
+    AnyTensor:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `:` type($source) (`{` $source_dims^ `}`)?
+    `from`
+    $storage `:` type($storage)
+    attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getSourceDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasCanonicalizer = 1;
+}
+
 def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   AllTypesMatch<["sources", "results"]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -508,7 +571,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
 
 def HAL_DeviceMemoizeOp : HAL_Op<"device.memoize", [
   RecursiveMemoryEffects,
-  DeclareOpInterfaceMethods<RegionBranchOpInterface>,
+  DeclareOpInterfaceMethods<RegionBranchOpInterface, ["getSuccessorInputs"]>,
   SingleBlockImplicitTerminator<"IREE::HAL::ReturnOp">,
 ]> {
   let summary = [{Memoizes resources for a particular device and queue affinity.}];
@@ -3377,6 +3440,7 @@ let opDocGroup = OpGroupInterfaceOps in {
 
 class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
   : HAL_PureOp<mnemonic, !listconcat(traits, [
+      HAL_ExecutableInterfaceOp,
       DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
       DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>])> {
   let arguments = (ins
@@ -3451,7 +3515,9 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_InterfaceWorkgroupOp<"interface.workgroup
   }];
 }
 
-def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
+def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load", [
+    HAL_ExecutableInterfaceOp,
+]> {
   let summary = [{Loads a constant value from the interface constant block.}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.
@@ -3493,7 +3559,8 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
 
 def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  HAL_ExecutableInterfaceOp,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{Returns an alias to a subspan of interface binding data.}];

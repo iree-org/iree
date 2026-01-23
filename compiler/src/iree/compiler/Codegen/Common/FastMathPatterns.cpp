@@ -22,9 +22,9 @@ static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
                                RewriterBase &rewriter, Location loc) {
   Value acc = coeffs[0];
   for (size_t i = 1; i < coeffs.size(); ++i) {
-    acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
+    acc = math::FmaOp::create(rewriter, loc, t, acc, coeffs[i]);
   }
-  return rewriter.create<math::FmaOp>(loc, x, acc, x);
+  return math::FmaOp::create(rewriter, loc, x, acc, x);
 }
 
 // Pattern to lower math.erf to its device lib implementation
@@ -39,7 +39,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value input = op.getOperand();
     Type resultType = op.getType();
 
-    VectorType resVecType = llvm::dyn_cast<VectorType>(resultType);
+    VectorType resVecType = dyn_cast<VectorType>(resultType);
     if (!(resultType.isF32() ||
           (resVecType && resVecType.getElementType().isF32()))) {
       return rewriter.notifyMatchFailure(
@@ -51,18 +51,19 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       if (resVecType) {
         SmallVector<Attribute> values(resVecType.getNumElements(),
                                       rewriter.getF32FloatAttr(v));
-        return rewriter.create<arith::ConstantOp>(
-            loc, resVecType, DenseElementsAttr::get(resVecType, values));
+        return arith::ConstantOp::create(
+            rewriter, loc, resVecType,
+            DenseElementsAttr::get(resVecType, values));
       } else {
-        return rewriter.create<arith::ConstantOp>(loc, rewriter.getF32Type(),
-                                                  rewriter.getF32FloatAttr(v));
+        return arith::ConstantOp::create(rewriter, loc, rewriter.getF32Type(),
+                                         rewriter.getF32FloatAttr(v));
       }
     };
 
     Value one = createConst(1.0f);
-    Value ax = rewriter.create<math::AbsFOp>(loc, input);
-    Value cmp =
-        rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, ax, one);
+    Value ax = math::AbsFOp::create(rewriter, loc, input);
+    Value cmp = arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT,
+                                      ax, one);
 
     // Coefficients for |x| < 1.0.
     const SmallVector<Value, 6> coeffs1 = {
@@ -80,23 +81,23 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value result;
     if (resultType.isF32()) {
       // For scalar types, use scf.if.
-      auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp,
-                                             /*withElseRegion=*/true);
+      auto ifOp = scf::IfOp::create(rewriter, loc, resultType, cmp,
+                                    /*withElseRegion=*/true);
 
       // Then region: |x| < 1.0 - evaluate polynomial.
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
+      Value t = arith::MulFOp::create(rewriter, loc, ax, ax);
       Value result1 = evalErfPolynomial(ax, t, coeffs1, rewriter, loc);
-      rewriter.create<scf::YieldOp>(loc, result1);
+      scf::YieldOp::create(rewriter, loc, result1);
 
       // Else region: |x| >= 1.0 - evaluate different polynomial and
       // post-processing.
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
       Value p2 = evalErfPolynomial(ax, ax, coeffs2, rewriter, loc);
-      Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
-      Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
-      Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
-      rewriter.create<scf::YieldOp>(loc, result2);
+      Value negP2 = arith::NegFOp::create(rewriter, loc, p2);
+      Value expNegP2 = math::ExpOp::create(rewriter, loc, negP2);
+      Value result2 = arith::SubFOp::create(rewriter, loc, one, expNegP2);
+      scf::YieldOp::create(rewriter, loc, result2);
 
       rewriter.setInsertionPointAfter(ifOp);
       result = ifOp.getResult(0);
@@ -107,23 +108,23 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       // the conditional logic element-wise.
 
       // Compute t = ax * ax for the first polynomial.
-      Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
+      Value t = arith::MulFOp::create(rewriter, loc, ax, ax);
 
       // Compute first polynomial (for |x| < 1.0).
       Value result1 = evalErfPolynomial(ax, t, coeffs1, rewriter, loc);
 
       // Compute second polynomial (for |x| >= 1.0).
       Value p2 = evalErfPolynomial(ax, ax, coeffs2, rewriter, loc);
-      Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
-      Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
-      Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
+      Value negP2 = arith::NegFOp::create(rewriter, loc, p2);
+      Value expNegP2 = math::ExpOp::create(rewriter, loc, negP2);
+      Value result2 = arith::SubFOp::create(rewriter, loc, one, expNegP2);
 
       // Select between the two results based on the condition.
-      result = rewriter.create<arith::SelectOp>(loc, cmp, result1, result2);
+      result = arith::SelectOp::create(rewriter, loc, cmp, result1, result2);
     }
 
     // Restore the sign.
-    Value finalResult = rewriter.create<math::CopySignOp>(loc, result, input);
+    Value finalResult = math::CopySignOp::create(rewriter, loc, result, input);
     rewriter.replaceOp(op, finalResult);
     return success();
   }

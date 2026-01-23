@@ -60,8 +60,12 @@ struct VerifyAffinitiesPass
                          ? WalkResult::skip()
                          : WalkResult::advance();
             })
-            .wasInterrupted())
+            .wasInterrupted()) {
       return signalPassFailure();
+    }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 

@@ -8,9 +8,11 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MD5.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -31,7 +33,7 @@ template <typename NameTy>
 void setResultName(OpAsmSetValueNameFn &setNameFn, Value result, NameTy name) {
   SmallString<32> osBuffer;
   llvm::raw_svector_ostream os(osBuffer);
-  if (llvm::isa<VectorType>(result.getType())) {
+  if (isa<VectorType>(result.getType())) {
     os << "v";
   }
   os << name;
@@ -42,7 +44,7 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
                           IntegerAttr value) {
   SmallString<32> osBuffer;
   llvm::raw_svector_ostream os(osBuffer);
-  if (llvm::isa<VectorType>(result.getType())) {
+  if (isa<VectorType>(result.getType())) {
     os << "v";
   }
   if (!value) {
@@ -56,6 +58,43 @@ void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
 }
 
 } // namespace
+
+//===----------------------------------------------------------------------===//
+// custom<ResultTypeList>
+//===----------------------------------------------------------------------===//
+// (type, type, ...)
+
+ParseResult parseResultTypeList(OpAsmParser &parser, ArrayAttr &resultTypes) {
+  if (failed(parser.parseLParen())) {
+    return failure();
+  }
+  SmallVector<Attribute> typeAttrs;
+  if (succeeded(parser.parseOptionalRParen())) {
+    goto done; // empty list
+  }
+  do {
+    Type type;
+    if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    typeAttrs.push_back(TypeAttr::get(type));
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen())) {
+    return failure();
+  }
+done:
+  resultTypes = parser.getBuilder().getArrayAttr(typeAttrs);
+  return success();
+}
+
+void printResultTypeList(OpAsmPrinter &p, Operation *op,
+                         ArrayAttr resultTypes) {
+  p << '(';
+  llvm::interleaveComma(resultTypes, p.getStream(), [&](Attribute attr) {
+    p.printType(cast<TypeAttr>(attr).getValue());
+  });
+  p << ')';
+}
 
 //===----------------------------------------------------------------------===//
 // Structural ops
@@ -137,9 +176,10 @@ Block *FuncOp::addEntryBlock() {
 
 LogicalResult FuncOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!llvm::isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -369,9 +409,10 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
 LogicalResult ImportOp::verifyType() {
   auto type = getFunctionTypeAttr().getValue();
-  if (!llvm::isa<FunctionType>(type))
+  if (!isa<FunctionType>(type)) {
     return emitOpError("requires '" + getFunctionTypeAttrName().getValue() +
                        "' attribute of function type");
+  }
   return success();
 }
 
@@ -541,18 +582,18 @@ void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 template <int SZ>
 static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
-  if (llvm::isa<FlatSymbolRefAttr>(value)) {
+  if (isa<FlatSymbolRefAttr>(value)) {
     return false;
   }
   // Otherwise, the attribute must have the same type as 'type'.
   if (value.getType() != type) {
     return false;
   }
-  if (llvm::isa<UnitAttr>(value)) {
+  if (isa<UnitAttr>(value)) {
     return SZ == 32; // Conditions/bools are always i32
-  } else if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value)) {
+  } else if (auto intAttr = dyn_cast<IntegerAttr>(value)) {
     return intAttr.getType().isInteger(SZ);
-  } else if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
+  } else if (auto elementsAttr = dyn_cast<ElementsAttr>(value)) {
     return elementsAttr.getShapedType().getElementType().isInteger(SZ);
   }
   return false;
@@ -561,7 +602,7 @@ static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
 template <int SZ>
 static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
-  if (llvm::isa<FlatSymbolRefAttr>(value)) {
+  if (isa<FlatSymbolRefAttr>(value)) {
     return false;
   }
   // Otherwise, the attribute must have the same type as 'type'.
@@ -569,13 +610,14 @@ static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
     return false;
   }
   Type elementType;
-  if (auto floatAttr = llvm::dyn_cast<FloatAttr>(value)) {
+  if (auto floatAttr = dyn_cast<FloatAttr>(value)) {
     elementType = floatAttr.getType();
-  } else if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
+  } else if (auto elementsAttr = dyn_cast<ElementsAttr>(value)) {
     elementType = elementsAttr.getShapedType().getElementType();
   }
-  if (!elementType)
+  if (!elementType) {
     return false;
+  }
   return elementType.getIntOrFloatBitWidth() == SZ;
 }
 
@@ -585,18 +627,18 @@ static TypedAttr convertConstIntegerValue(TypedAttr value) {
   Builder builder(value.getContext());
   auto integerType = builder.getIntegerType(SZ);
   int32_t dims = 1;
-  if (llvm::isa<UnitAttr>(value)) {
+  if (isa<UnitAttr>(value)) {
     return IntegerAttr::get(integerType, APInt(SZ, 1));
-  } else if (auto v = llvm::dyn_cast<BoolAttr>(value)) {
+  } else if (auto v = dyn_cast<BoolAttr>(value)) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue() ? 1 : 0, false));
-  } else if (auto v = llvm::dyn_cast<IntegerAttr>(value)) {
+  } else if (auto v = dyn_cast<IntegerAttr>(value)) {
     return IntegerAttr::get(integerType,
                             APInt(SZ, v.getValue().getLimitedValue()));
-  } else if (auto v = llvm::dyn_cast<ElementsAttr>(value)) {
+  } else if (auto v = dyn_cast<ElementsAttr>(value)) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, integerType);
-    if (auto elements = llvm::dyn_cast<SplatElementsAttr>(v)) {
+    if (auto elements = dyn_cast<SplatElementsAttr>(v)) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
@@ -628,12 +670,12 @@ static TypedAttr convertConstFloatValue(TypedAttr value) {
   Builder builder(value.getContext());
   auto floatType = getFloatType(SZ, value.getContext());
   int32_t dims = 1;
-  if (auto v = llvm::dyn_cast<FloatAttr>(value)) {
+  if (auto v = dyn_cast<FloatAttr>(value)) {
     return FloatAttr::get(floatType, v.getValue());
-  } else if (auto v = llvm::dyn_cast<ElementsAttr>(value)) {
+  } else if (auto v = dyn_cast<ElementsAttr>(value)) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, floatType);
-    if (auto elements = llvm::dyn_cast<SplatElementsAttr>(v)) {
+    if (auto elements = dyn_cast<SplatElementsAttr>(v)) {
       return SplatElementsAttr::get(adjustedType,
                                     elements.getSplatValue<Attribute>());
     } else {
@@ -664,7 +706,7 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
 
 void ConstI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultIntegerName(setNameFn, getResult(),
-                       llvm::dyn_cast<IntegerAttr>(getValue()));
+                       dyn_cast<IntegerAttr>(getValue()));
 }
 
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
@@ -696,7 +738,7 @@ void ConstI64Op::build(OpBuilder &builder, OperationState &result,
 
 void ConstI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultIntegerName(setNameFn, getResult(),
-                       llvm::dyn_cast<IntegerAttr>(getValue()));
+                       dyn_cast<IntegerAttr>(getValue()));
 }
 
 // static
@@ -784,6 +826,55 @@ void ConstRefZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), "null");
 }
 
+FailureOr<bool> DiscardRefsOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Collect non-elidable operands. An operand is elidable if it was already
+  // released via MOVE on a preceding operation.
+  SmallVector<std::pair<Value, int>> toEncode;
+  for (auto [idx, ref] : llvm::enumerate(getRefs())) {
+    bool elidable = regAlloc && regAlloc->isDiscardOperandElidable(
+                                    getOperation(), static_cast<unsigned>(idx));
+    if (!elidable) {
+      toEncode.push_back({ref, static_cast<int>(idx)});
+    }
+  }
+
+  // Skip entirely if all operands are elidable.
+  if (toEncode.empty()) {
+    return false;
+  }
+
+  // Encode opcode + filtered operands.
+  if (failed(e.encodeOpcode("DiscardRefs",
+                            static_cast<int>(Opcode::DiscardRefs))) ||
+      failed(e.encodeOperands(toEncode))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
+
+FailureOr<bool> AssignRefOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when source and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getSource());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getSource(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
+
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      Attribute value, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("sym_name", builder.getStringAttr(name));
@@ -826,16 +917,19 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // This is not uniqued and may need uniquing before being added to the symbol
 // table.
 //
+// Uses MD5 to ensure the hash suffix is stable across builds.
+//
 // For example:
-//   'Some string!' -> '_utf8_some_string'
-//   'I'm a really long'... -> '_utf8_im_a_really_long'
+//   'Some string!' -> '_utf8_some_string_<MD5>'
+//   'I'm a really long'... -> '_utf8_im_a_really_long_<MD5>'
 static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   std::string result = "_utf8_";
   llvm::raw_string_ostream os(result);
   bool lastUnderscore = true;
   for (char c : unsafeIdentifier) {
-    if (!llvm::isPrint(c))
+    if (!llvm::isPrint(c)) {
       continue;
+    }
     if (llvm::isAlnum(c)) {
       os << llvm::toLower(c);
       lastUnderscore = false;
@@ -848,8 +942,11 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   if (!StringRef(prefix).ends_with("_")) {
     prefix += "_";
   }
-  return prefix + llvm::utohexstr(static_cast<uint64_t>(
-                      llvm::hash_value(unsafeIdentifier)));
+  // Use MD5 for a stable hash across builds.
+  llvm::MD5 hasher;
+  hasher.update(unsafeIdentifier);
+  llvm::MD5::MD5Result hash = hasher.final();
+  return prefix + llvm::utohexstr(hash.low());
 }
 
 void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
@@ -898,19 +995,19 @@ void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
 
 LogicalResult ListGetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = llvm::cast<IREE::VM::ListType>(
+  auto listType = cast<IREE::VM::ListType>(
       cast<IREE::VM::RefType>(getList().getType()).getObjectType());
   auto elementType = listType.getElementType();
   auto resultType = getResult().getType();
-  if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {
-    if (llvm::isa<IREE::VM::RefType>(elementType) !=
-        llvm::isa<IREE::VM::RefType>(resultType)) {
+  if (!isa<IREE::VM::OpaqueType>(elementType)) {
+    if (isa<IREE::VM::RefType>(elementType) !=
+        isa<IREE::VM::RefType>(resultType)) {
       // Attempting to go between a primitive type and ref type.
       return op->emitError()
              << "cannot convert between list type " << elementType
              << " and result type " << resultType;
-    } else if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(elementType)) {
-      if (!llvm::isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
+    } else if (auto refType = dyn_cast<IREE::VM::RefType>(elementType)) {
+      if (!isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
           elementType != resultType) {
         // List has a concrete type, verify it matches.
         return op->emitError() << "list contains " << elementType
@@ -923,18 +1020,18 @@ LogicalResult ListGetRefOp::verify() {
 
 LogicalResult ListSetRefOp::verify() {
   Operation *op = getOperation();
-  auto listType = llvm::cast<IREE::VM::ListType>(
+  auto listType = cast<IREE::VM::ListType>(
       cast<IREE::VM::RefType>(getList().getType()).getObjectType());
   auto elementType = listType.getElementType();
   auto valueType = getValue().getType();
-  if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {
-    if (llvm::isa<IREE::VM::RefType>(elementType) !=
-        llvm::isa<IREE::VM::RefType>(valueType)) {
+  if (!isa<IREE::VM::OpaqueType>(elementType)) {
+    if (isa<IREE::VM::RefType>(elementType) !=
+        isa<IREE::VM::RefType>(valueType)) {
       // Attempting to go between a primitive type and ref type.
       return op->emitError() << "cannot convert between list type "
                              << elementType << " and value type " << valueType;
-    } else if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(elementType)) {
-      if (!llvm::isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
+    } else if (auto refType = dyn_cast<IREE::VM::RefType>(elementType)) {
+      if (!isa<IREE::VM::OpaqueType>(refType.getObjectType()) &&
           elementType != valueType) {
         // List has a concrete type, verify it matches.
         return op->emitError() << "list contains " << elementType
@@ -989,6 +1086,28 @@ ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void SwitchRefOp::print(OpAsmPrinter &p) { printSwitchOp(p, *this); }
+
+FailureOr<bool> CastRefAnyOp::encode(SymbolTable &syms, VMFuncEncoder &e) {
+  const auto *regAlloc = e.getRegisterAllocation();
+
+  // Elide when operand and result are the same register.
+  if (regAlloc) {
+    int srcOrdinal = regAlloc->mapValueToRegisterOrdinal(getOperand());
+    int dstOrdinal = regAlloc->mapValueToRegisterOrdinal(getResult());
+    if (srcOrdinal == dstOrdinal) {
+      return false;
+    }
+  }
+
+  // Uses same encoding as AssignRef since widening casts are no-ops at runtime.
+  if (failed(
+          e.encodeOpcode("AssignRef", static_cast<int>(Opcode::AssignRef))) ||
+      failed(e.encodeOperand(getOperand(), 0)) ||
+      failed(e.encodeResult(getResult()))) {
+    return emitOpError() << "failed to encode (internal)";
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Comparison ops
@@ -1223,7 +1342,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
     bool isVariadic = succeeded(parser.parseOptionalEllipsis());
     if (isVariadic) {
       int flatSegmentSize = flatSegmentSizes[segmentIndex];
-      if (auto tupleType = llvm::dyn_cast<TupleType>(operandType)) {
+      if (auto tupleType = dyn_cast<TupleType>(operandType)) {
         for (int i = 0; i < flatSegmentSize / tupleType.size(); ++i) {
           for (auto type : tupleType) {
             flatOperandTypes.push_back(type);
@@ -1265,7 +1384,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addAttribute("segment_types",
                       parser.getBuilder().getArrayAttr(
                           llvm::map_to_vector(segmentTypes, [&](Type type) {
-                            return llvm::cast<Attribute>(TypeAttr::get(type));
+                            return cast<Attribute>(TypeAttr::get(type));
                           })));
 
   if (failed(parser.parseOptionalArrowTypeList(result.types))) {
@@ -1285,12 +1404,12 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
-            llvm::cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
+            cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
         if (segmentSize == -1) {
           p.printOperand(getOperand(operand++));
         } else {
           p << '[';
-          if (auto tupleType = llvm::dyn_cast<TupleType>(segmentType)) {
+          if (auto tupleType = dyn_cast<TupleType>(segmentType)) {
             for (size_t i = 0; i < segmentSize; ++i) {
               p << '(';
               SmallVector<Value> tupleOperands;
@@ -1299,8 +1418,9 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
               }
               p << tupleOperands;
               p << ')';
-              if (i < segmentSize - 1)
+              if (i < segmentSize - 1) {
                 p << ", ";
+              }
             }
           } else {
             SmallVector<Value> segmentOperands;
@@ -1324,7 +1444,7 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
-            llvm::cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
+            cast<TypeAttr>(std::get<1>(segmentSizeType)).getValue();
         if (segmentSize == -1) {
           p.printType(segmentType);
         } else {
@@ -1338,6 +1458,103 @@ void CallVariadicOp::print(OpAsmPrinter &p) {
   } else if (getNumResults() > 1) {
     p << " -> (" << getResultTypes() << ")";
   }
+}
+
+void CallYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands CallYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// vm.call.variadic.yieldable
+//===----------------------------------------------------------------------===//
+
+void CallVariadicYieldableOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+SuccessorOperands
+CallVariadicYieldableOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  // Results are produced by the callee at runtime and passed to the successor
+  // block arguments. Use produced operand count to tell MLIR about this.
+  unsigned producedCount = getResultTypes().size();
+  return SuccessorOperands(producedCount,
+                           MutableOperandRange(getOperation(), 0, 0));
+}
+
+void CallVariadicYieldableOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  // Yieldable calls always have side effects (the yield itself).
+  effects.emplace_back(MemoryEffects::Read::get());
+  effects.emplace_back(MemoryEffects::Write::get());
+}
+
+LogicalResult CallVariadicYieldableOp::verify() {
+  // Verify that the result types count matches the destination block arguments.
+  Block *destBlock = getDest();
+  size_t resultCount = getResultTypes().size();
+  size_t destArgCount = destBlock->getNumArguments();
+  if (resultCount != destArgCount) {
+    return emitOpError() << "result type count (" << resultCount
+                         << ") must match successor block argument count ("
+                         << destArgCount << ")";
+  }
+
+  // Verify result types match destination block argument types.
+  for (auto [i, pair] : llvm::enumerate(
+           llvm::zip_equal(getResultTypes(), destBlock->getArguments()))) {
+    Type resultType = cast<TypeAttr>(std::get<0>(pair)).getValue();
+    Type argType = std::get<1>(pair).getType();
+    if (resultType != argType) {
+      return emitOpError() << "result type #" << i << " (" << resultType
+                           << ") must match successor block argument type ("
+                           << argType << ")";
+    }
+  }
+
+  return success();
 }
 
 SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
@@ -1354,32 +1571,39 @@ static ParseResult parseBranchTableCases(
     SmallVectorImpl<SmallVector<OpAsmParser::UnresolvedOperand>> &caseOperands,
     SmallVectorImpl<SmallVector<Type>> &caseOperandTypes) {
   if (parser.parseKeyword("default") || parser.parseColon() ||
-      parser.parseSuccessor(defaultDestination))
+      parser.parseSuccessor(defaultDestination)) {
     return failure();
+  }
   if (succeeded(parser.parseOptionalLParen())) {
     if (parser.parseOperandList(defaultOperands, OpAsmParser::Delimiter::None,
                                 /*allowResultNumber=*/false) ||
-        parser.parseColonTypeList(defaultOperandTypes) || parser.parseRParen())
+        parser.parseColonTypeList(defaultOperandTypes) ||
+        parser.parseRParen()) {
       return failure();
+    }
   }
   while (succeeded(parser.parseOptionalComma())) {
     int64_t index = 0;
-    if (failed(parser.parseInteger(index)))
+    if (failed(parser.parseInteger(index))) {
       return failure();
-    if (index != caseDestinations.size())
+    }
+    if (index != caseDestinations.size()) {
       return failure();
+    }
     Block *destination;
     SmallVector<OpAsmParser::UnresolvedOperand> operands;
     SmallVector<Type> operandTypes;
     if (failed(parser.parseColon()) ||
-        failed(parser.parseSuccessor(destination)))
+        failed(parser.parseSuccessor(destination))) {
       return failure();
+    }
     if (succeeded(parser.parseOptionalLParen())) {
       if (failed(parser.parseOperandList(operands, OpAsmParser::Delimiter::None,
                                          /*allowResultNumber=*/false)) ||
           failed(parser.parseColonTypeList(operandTypes)) ||
-          failed(parser.parseRParen()))
+          failed(parser.parseRParen())) {
         return failure();
+      }
     }
     caseDestinations.push_back(destination);
     caseOperands.emplace_back(operands);
@@ -1418,10 +1642,11 @@ SuccessorOperands BranchTableOp::getSuccessorOperands(unsigned index) {
 
 Block *BranchTableOp::getSuccessorForOperands(ArrayRef<Attribute> operands) {
   SuccessorRange caseDestinations = getCaseDestinations();
-  if (auto valueAttr = llvm::dyn_cast_or_null<IntegerAttr>(operands.front())) {
+  if (auto valueAttr = dyn_cast_if_present<IntegerAttr>(operands.front())) {
     int64_t value = valueAttr.getValue().getSExtValue();
-    if (value < 0 || value >= caseDestinations.size())
+    if (value < 0 || value >= caseDestinations.size()) {
       return getDefaultDestination();
+    }
     return caseDestinations[value];
   }
   return nullptr;
@@ -1532,6 +1757,18 @@ void CondBreakOp::eraseOperand(unsigned index) {
 SuccessorOperands CondBreakOp::getSuccessorOperands(unsigned index) {
   assert(index == 0 && "invalid successor index");
   return SuccessorOperands(getDestOperandsMutable());
+}
+
+//===----------------------------------------------------------------------===//
+// vm.optimization_barrier
+//===----------------------------------------------------------------------===//
+
+void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
+                                  ValueRange operands,
+                                  ArrayRef<NamedAttribute> attributes) {
+  state.addOperands(operands);
+  state.addTypes(llvm::to_vector(operands.getTypes()));
+  state.addAttributes(attributes);
 }
 
 } // namespace mlir::iree_compiler::IREE::VM

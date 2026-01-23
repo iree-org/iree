@@ -30,8 +30,9 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (llvm::isa<VectorType>(srcOp.getResult().getType()))
+    if (isa<VectorType>(srcOp.getResult().getType())) {
       return failure();
+    }
 
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
     case 32:
@@ -57,8 +58,9 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): support vectors.
-    if (llvm::isa<VectorType>(srcOp.getResult().getType()))
+    if (isa<VectorType>(srcOp.getResult().getType())) {
       return failure();
+    }
 
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
     case 32:

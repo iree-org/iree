@@ -45,11 +45,13 @@ namespace mlir::iree_compiler {
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
   for (auto val : nonIndexComputationOperands) {
-    if (op == val.getDefiningOp())
+    if (op == val.getDefiningOp()) {
       return false;
+    }
   }
-  if (op->isProperAncestor(baseOp))
+  if (op->isProperAncestor(baseOp)) {
     return false;
+  }
   return !isa<IREE::HAL::InterfaceConstantLoadOp>(op);
 }
 
@@ -154,16 +156,18 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
           vector::ScalableValueBoundsConstraintSet::computeScalableBound(
               value, std::nullopt, vscaleRange->vscaleMin,
               vscaleRange->vscaleMax, presburger::BoundType::UB);
-      if (failed(ub))
+      if (failed(ub)) {
         return failure();
+      }
 
       if (ub->map.isSingleConstant()) {
         auto constantBound = ub->map.getSingleConstantResult();
         return OpFoldResult(builder.getIndexAttr(constantBound));
       }
 
-      if (!vscale)
+      if (!vscale) {
         vscale = vector::VectorScaleOp::create(builder, loc);
+      }
       return affine::materializeComputedBound(
           builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
     }
@@ -172,8 +176,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
         presburger::BoundType::UB, {value, std::nullopt},
         /*stopCondition=*/nullptr,
         /*closedUB=*/true);
-    if (failed(ub))
+    if (failed(ub)) {
       return failure();
+    }
 
     return OpFoldResult(builder.getIndexAttr(*ub));
   };
@@ -202,8 +207,9 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
       Value dynamicSize = dynamicSizes[index++];
       auto ub = computeAllocationBound(dynamicSize);
-      if (failed(ub))
+      if (failed(ub)) {
         return std::nullopt;
+      }
 
       allocSizes.push_back(*ub);
       subviewSizes.push_back(dynamicSize);
@@ -270,8 +276,9 @@ void hoistStaticallyBoundAllocationsInFunc(
 
   // Collect all allocLikes that are hoistable.
   funcOp.walk([&](AllocLikeOpType allocLikeOp) {
-    if (allocLikeOp->getBlock() == &funcOp.getFunctionBody().front())
+    if (allocLikeOp->getBlock() == &funcOp.getFunctionBody().front()) {
       return;
+    }
     if (allocLikeOp.getDynamicSizes().empty()) {
       allocLikeOps.push_back(allocLikeOp);
       return;
@@ -290,8 +297,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     SmallVector<memref::DeallocOp> deallocOps;
     for (Operation *user : allocLikeOp->getUsers()) {
       auto dealloc = dyn_cast<memref::DeallocOp>(user);
-      if (dealloc)
+      if (dealloc) {
         deallocOps.push_back(dealloc);
+      }
     }
 
     LLVM_DEBUG({
@@ -303,8 +311,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     });
     std::optional<Value> replacement = hoistOneStaticallyBoundAllocation(
         funcOp, rewriter, allocLikeOp, vscaleRange);
-    if (!replacement)
+    if (!replacement) {
       continue;
+    }
     LLVM_DEBUG({
       llvm::dbgs() << "Replacement : ";
       replacement->dump();
@@ -312,8 +321,9 @@ void hoistStaticallyBoundAllocationsInFunc(
     Value replacementVal = replacement.value();
     rewriter.replaceOp(allocLikeOp, replacementVal);
 
-    for (memref::DeallocOp deallocOp : deallocOps)
+    for (memref::DeallocOp deallocOp : deallocOps) {
       rewriter.eraseOp(deallocOp);
+    }
   }
 }
 
@@ -352,6 +362,38 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
 // Lowering `iree_tensor_ext.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
+LogicalResult materializeSliceFromOrdinals(
+    RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
+    ArrayRef<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals,
+    ArrayRef<Operation *> slice) {
+  for (auto ordinalOp : ordinals) {
+    // Map `tensor_ext.dispatch.workload.ordinal` op with the corresponding
+    // workload value.
+    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
+    if (ordinal >= static_cast<int64_t>(workloadVals.size())) {
+      return ordinalOp.emitOpError(
+          "ordinal number is higher than the number of workloads captured in "
+          "the workgroup count region");
+    }
+    map.map(ordinalOp.getResult(), workloadVals[ordinal]);
+  }
+  for (auto op : slice) {
+    // TODO(#13038) This is a WAR for these ops ending up in workgroup count
+    // computation. They should not. Some pre-processing at MaterializeEncoding
+    // time might make these go away.
+    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
+      Value constVal =
+          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
+      for (auto result : op->getResults()) {
+        map.map(result, constVal);
+      }
+      continue;
+    }
+    rewriter.clone(*op, map);
+  }
+  return success();
+}
+
 FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals) {
@@ -379,35 +421,12 @@ FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
   auto slicedOps = llvm::to_vector(slice);
   mlir::computeTopologicalSorting(slicedOps);
 
-  // Insert the slice into workgroup count region with all `hal.constant.index`
-  // operations replaced with arguments (drop the front argument since that is
-  // `hal.device`).
+  // Insert the slice into workgroup count region with all ordinal operations
+  // replaced with the corresponding workload values.
   IRMapping map;
-  for (auto ordinalOp : leaves) {
-    // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
-    // the `flow.dispatch.workgroup_count_default` operation.
-    int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
-    if (ordinal >= workloadVals.size()) {
-      return ordinalOp.emitOpError(
-          "ordinal number is higher than the number of workloads captured in "
-          "the workgroup count region");
-    }
-    map.map(ordinalOp.getResult(),
-            workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
-  }
-  for (auto op : slice) {
-    // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
-    // computation. They should not. Some pre-processing at MaterializeEncoding
-    // time might make these go away.
-    if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
-      Value constVal =
-          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
-      for (auto result : op->getResults()) {
-        map.map(result, constVal);
-      }
-      continue;
-    }
-    rewriter.clone(*op, map);
+  if (failed(materializeSliceFromOrdinals(rewriter, map, workloadVals, leaves,
+                                          slicedOps))) {
+    return failure();
   }
   SmallVector<OpFoldResult> results;
   // Since the workgroup count at HAL level is in x, y, z form, process the
@@ -501,6 +520,36 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
                                         entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
+}
+
+LogicalResult createWorkgroupCountHint(RewriterBase &rewriter, Location loc,
+                                       ArrayRef<OpFoldResult> workgroupCount,
+                                       int maxWorkgroupParallelDims,
+                                       bool reverse) {
+  SmallVector<OpFoldResult> results =
+      llvm::to_vector(llvm::reverse_conditionally(workgroupCount, reverse));
+  if (results.size() > maxWorkgroupParallelDims) {
+    MutableArrayRef<OpFoldResult> resultsRef =
+        llvm::MutableArrayRef<OpFoldResult>(results);
+    assert(maxWorkgroupParallelDims != 0 &&
+           "unexpected max parallel dimensions being 0");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineMap foldMap = AffineMap::get(0, 2, s0 * s1);
+    for (auto [index, foldedResult] : llvm::enumerate(
+             resultsRef.take_back(results.size() - maxWorkgroupParallelDims))) {
+      resultsRef[maxWorkgroupParallelDims - 1] =
+          affine::makeComposedFoldedAffineApply(
+              rewriter, loc, foldMap,
+              {resultsRef[maxWorkgroupParallelDims - 1],
+               resultsRef[maxWorkgroupParallelDims + index]});
+    }
+    results.resize(maxWorkgroupParallelDims);
+  }
+
+  // Hint resolution pads the list of counts with 1s, no need to do this here.
+  IREE::Codegen::WorkgroupCountHintOp::create(rewriter, loc, results);
+  return success();
 }
 
 /// Pattern to fold `scf.forall` created from split reduction with an
@@ -612,9 +661,8 @@ struct FoldSplitReductionForallWithWorkgroupForall
     }
     std::optional<ArrayAttr> workgroupMapping = workgroupLoop.getMapping();
     if (!workgroupMapping ||
-        llvm::any_of(workgroupMapping->getValue(), [](Attribute attr) {
-          return !isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
-        })) {
+        !llvm::all_of(workgroupMapping->getValue(),
+                      llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
       return rewriter.notifyMatchFailure(
           workgroupLoop, "nested loop is not a workgroup mapping loop");
     }
@@ -712,10 +760,12 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
         // like scf.for, since the value bounds interface requires index types.
         auto maybeLb = getConstantIntValue(lb);
         auto maybeUb = getConstantIntValue(ub);
-        if (!maybeLb || !maybeUb)
+        if (!maybeLb || !maybeUb) {
           return;
-        if (*maybeLb >= *maybeUb)
+        }
+        if (*maybeLb >= *maybeUb) {
           return;
+        }
       }
     }
 
@@ -773,8 +823,9 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
         // Skip the whole analysis if any user is a subview.
         // TODO: This could be extended if needed by recursively merging
         // liveness.
-        if (isa<memref::SubViewOp>(user))
+        if (isa<memref::SubViewOp>(user)) {
           return;
+        }
         if (group.liveness.count(user)) {
           aliasGroups.push_back(i);
           break;
@@ -812,14 +863,16 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
   LLVM_DEBUG({
     for (size_t i = 0; i < groups.size(); i++) {
       llvm::dbgs() << "Alias group " << i << ":\n";
-      for (Operation *op : groups[i].allocs)
+      for (Operation *op : groups[i].allocs) {
         op->dump();
+      }
     }
   });
 
   for (size_t i = 0; i < groups.size(); i++) {
-    if (groups[i].allocs.empty())
+    if (groups[i].allocs.empty()) {
       continue;
+    }
     aliasGroups.push_back(std::move(groups[i].allocs));
   }
 }
@@ -834,8 +887,9 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
 
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups) {
-  if (aliasGroups.empty())
+  if (aliasGroups.empty()) {
     return;
+  }
   DataLayout dataLayout = DataLayout::closest(funcOp);
   builder.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
   int64_t maxAlloc = 0;
@@ -847,8 +901,7 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
     maxAlloc = std::max(maxAlloc, allocSize);
   }
   Attribute memorySpace =
-      llvm::cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0])
-          .getMemorySpace();
+      cast<MemRefType>(aliasGroups[0][0]->getResultTypes()[0]).getMemorySpace();
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
@@ -1020,12 +1073,12 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
     int64_t numInductionVars = forallOp.getInductionVars().size();
     for (auto &yieldingOp : parallelTerminator.getYieldingOps()) {
       auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-      BlockArgument destBbArg =
-          llvm::cast<BlockArgument>(parallelInsert.getDest());
+      BlockArgument destBbArg = cast<BlockArgument>(parallelInsert.getDest());
       tensor::ExtractSliceOp destSlice;
       for (auto user : destBbArg.getUsers()) {
-        if (user == parallelInsert)
+        if (user == parallelInsert) {
           continue;
+        }
         auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(user);
         if (!maybeSlice) {
           // Fail if the destination has more users than a direct insert and
@@ -1062,8 +1115,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
             for (auto [dim, size] : llvm::enumerate(insert.getMixedSizes())) {
               FailureOr<bool> equalDimSize = ValueBoundsConstraintSet::areEqual(
                   {size}, {insert.getDest(), static_cast<int64_t>(dim)});
-              if (failed(equalDimSize) || !*equalDimSize)
+              if (failed(equalDimSize) || !*equalDimSize) {
                 return false;
+              }
             }
             return true;
           };
@@ -1258,12 +1312,13 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
                                 PatternRewriter &rewriter) const final {
     Operation *currentOp = padOp.getSource().getDefiningOp();
     auto maybeExtractSlice =
-        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+        dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
     while (currentOp && maybeExtractSlice) {
       currentOp = maybeExtractSlice.getSource().getDefiningOp();
-      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+      maybeExtractSlice =
+          dyn_cast_if_present<tensor::ExtractSliceOp>(currentOp);
     }
-    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
+    auto fillOp = dyn_cast_if_present<linalg::FillOp>(currentOp);
     if (!fillOp) {
       return rewriter.notifyMatchFailure(
           padOp, "not coming from a linalg.fill op via tensor.extract_slice*");

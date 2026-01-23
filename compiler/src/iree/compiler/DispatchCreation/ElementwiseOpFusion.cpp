@@ -60,9 +60,9 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if extractOp is inside a generic op
+    // Check if extractOp is inside a generic op.
     auto consumerOp =
-        dyn_cast_or_null<linalg::GenericOp>(extractOp->getParentOp());
+        dyn_cast_if_present<linalg::GenericOp>(extractOp->getParentOp());
     if (!consumerOp) {
       return rewriter.notifyMatchFailure(
           extractOp, "expected extract op to be inside a generic op");
@@ -74,9 +74,12 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
           consumerOp, "expected extract operand to be a generic op");
     }
 
-    // Check if the producerOp is fusible
+    // Check if the producerOp is fusible.
+    // Allow bit extend ops or transpose ops.
+    bool isBitExtend = IREE::LinalgExt::isBitExtendOp(producerOp);
+    bool isTranspose = IREE::LinalgExt::isaTransposeOpInterface(producerOp);
     if (producerOp.getNumResults() != 1 || !isElementwise(producerOp) ||
-        !IREE::LinalgExt::isBitExtendOp(producerOp)) {
+        (!isBitExtend && !isTranspose)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
@@ -149,10 +152,8 @@ void ElementwiseOpFusionPass::runOnOperation() {
           return false;
         }
 
-        // Limit the number of operands. We have hard limit (32) of bindings
-        // passing down to HAL. Set the number to be as same as the limit --
-        // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
-        constexpr int64_t kIreeMaxOperandCount = 32;
+        // Limit the number of operands to avoid exceeding backend binding
+        // limits.
         DenseSet<Value> operands;
         operands.insert(producer->operand_begin(), producer->operand_end());
         operands.insert(consumer->operand_begin(),
@@ -161,8 +162,9 @@ void ElementwiseOpFusionPass::runOnOperation() {
         operands.insert(std::next(consumer->operand_begin(),
                                   fusedOperand->getOperandNumber() + 1),
                         consumer->operand_end());
-        if (operands.size() >= kIreeMaxOperandCount)
+        if (operands.size() >= kIreeMaxOperandCount) {
           return false;
+        }
 
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;

@@ -32,8 +32,9 @@ namespace {
 /// Flatten the given value ranges into a single vector of values.
 static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
   SmallVector<Value> result;
-  for (const auto &vals : values)
+  for (const auto &vals : values) {
     llvm::append_range(result, vals);
+  }
   return result;
 }
 
@@ -46,7 +47,7 @@ struct ConvertTensorConstantOp
       ConversionPatternRewriter &rewriter) const override {
     // Only handle tensor types - other arith.constant types (like i32) are
     // ignored.
-    if (!llvm::isa<TensorType>(constantOp.getType())) {
+    if (!isa<TensorType>(constantOp.getType())) {
       return failure();
     }
 
@@ -130,8 +131,9 @@ struct SelectOpConversion
   matchAndRewrite(mlir::arith::SelectOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
-    if (!llvm::isa<TensorType>(op.getTrueValue().getType()))
+    if (!isa<TensorType>(op.getTrueValue().getType())) {
       return failure();
+    }
     auto trueOperand = resolveTensorOperands(op.getLoc(), op.getTrueValue(),
                                              adaptor.getTrueValue(), rewriter);
     auto falseOperand = resolveTensorOperands(
@@ -193,7 +195,7 @@ struct ScfIfOpConversion
     SmallVector<Value> results;
     SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
-      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+      if (isa<IREE::Stream::ResourceType>(result.newType)) {
         auto resource = ifOp.getResult(result.newIndex + 0);
         auto resourceSize = ifOp.getResult(result.newIndex + 1);
         results.push_back(resource);
@@ -270,7 +272,7 @@ struct ScfForOpConversion
     SmallVector<Value> results;
     SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
-      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+      if (isa<IREE::Stream::ResourceType>(result.newType)) {
         auto resource = forOp.getResult(result.newIndex + 0);
         auto resourceSize = forOp.getResult(result.newIndex + 1);
         results.push_back(resource);
@@ -353,7 +355,7 @@ struct ScfWhileOpConversion
     SmallVector<Value> results;
     SmallVector<Value> resultSizes;
     for (auto result : resultMap) {
-      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+      if (isa<IREE::Stream::ResourceType>(result.newType)) {
         auto resource = whileOp.getResult(result.newIndex + 0);
         auto resourceSize = whileOp.getResult(result.newIndex + 1);
         results.push_back(resource);
@@ -425,9 +427,7 @@ void populateStandardToStreamConversionPatterns(
                                 tensor::RankOp>();
 
   conversionTarget.addDynamicallyLegalOp<arith::ConstantOp>(
-      [](arith::ConstantOp op) {
-        return !llvm::isa<TensorType>(op.getType());
-      });
+      [](arith::ConstantOp op) { return !isa<TensorType>(op.getType()); });
   patterns.insert<ConvertTensorConstantOp>(typeConverter, context,
                                            affinityAnalysis);
 

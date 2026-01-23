@@ -7,13 +7,19 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Utils/Indexing.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-decompose-map-scatter"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -44,39 +50,50 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
     if (!subViewOp) {
       return failure();
     }
-    if (subViewOp.getSourceType().getRank() != subViewOp.getType().getRank()) {
-      return rewriter.notifyMatchFailure(subViewOp,
-                                         "subview op is rank reducing");
+    MemRefType subViewType = subViewOp.getType();
+    bool isRankReducing =
+        subViewOp.getSourceType().getRank() != subViewType.getRank();
+    std::optional<llvm::SmallDenseSet<unsigned int>> rankReductionMask =
+        computeRankReductionMask(subViewOp.getStaticSizes(),
+                                 subViewType.getShape());
+    if (isRankReducing && !rankReductionMask.has_value()) {
+      return rewriter.notifyMatchFailure(
+          subViewOp, "could not compute rank reduction mask");
     }
     SmallVector<OpFoldResult> strides = subViewOp.getMixedStrides();
     if (!areAllConstantIntValue(strides, 1)) {
       return rewriter.notifyMatchFailure(subViewOp,
                                          "subview op has non-unit strides");
     }
-    MemRefType subViewType = subViewOp.getType();
     SmallVector<ReassociationIndices> reassociations;
     reassociations.push_back(
         llvm::to_vector(llvm::seq<int64_t>(subViewType.getRank())));
-    if (memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
+    if (subViewType.getStridesAndOffset().first.back() == 1 &&
+        memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
                                                          reassociations)) {
-      return rewriter.notifyMatchFailure(subViewOp,
-                                         "subview op is collapsible");
+      return rewriter.notifyMatchFailure(
+          subViewOp, "subview op is non-strided and collapsible");
     }
     auto mapScatterBodyYield = cast<IREE::LinalgExt::YieldOp>(
         mapScatterOp.getTransformationRegion().front().getTerminator());
+    rewriter.setInsertionPoint(mapScatterBodyYield);
+    SmallVector<Value> newYieldedIndices;
+    for (OpFoldResult subViewOffset : subViewOp.getMixedOffsets()) {
+      newYieldedIndices.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, subViewOp.getLoc(), subViewOffset));
+    }
     SmallVector<Value> yieldedIndices = mapScatterBodyYield.getOperands();
     Value yieldedMask = yieldedIndices.pop_back_val();
-    rewriter.setInsertionPoint(mapScatterBodyYield);
-    for (auto [yieldedIdx, subViewOffset] :
-         llvm::zip_equal(yieldedIndices, subViewOp.getMixedOffsets())) {
-      Value subViewOffsetVal = getValueOrCreateConstantIndexOp(
-          rewriter, subViewOp.getLoc(), subViewOffset);
-      Value yieldedIdxVal = getValueOrCreateConstantIndexOp(
-          rewriter, mapScatterBodyYield.getLoc(), yieldedIdx);
-      yieldedIdx = arith::AddIOp::create(rewriter, subViewOp.getLoc(),
-                                         yieldedIdxVal, subViewOffsetVal);
+    size_t rankReducedIdx = 0;
+    for (auto [idx, yieldedIdx] : llvm::enumerate(newYieldedIndices)) {
+      if (isRankReducing && rankReductionMask->contains(idx)) {
+        continue;
+      }
+      yieldedIdx =
+          arith::AddIOp::create(rewriter, subViewOp.getLoc(), yieldedIdx,
+                                yieldedIndices[rankReducedIdx++]);
     }
-    SmallVector<Value> newYieldedValues(yieldedIndices);
+    SmallVector<Value> newYieldedValues(newYieldedIndices);
     newYieldedValues.push_back(yieldedMask);
     rewriter.modifyOpInPlace(mapScatterBodyYield, [&]() {
       mapScatterBodyYield.getOperandsMutable().assign(newYieldedValues);
@@ -85,6 +102,134 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
     rewriter.modifyOpInPlace(subViewOp, [&]() {
       mapScatterOp.getOutputMutable().assign(subViewSource);
     });
+    return success();
+  }
+};
+
+/// Simplify linearize→delinearize pairs where dimension products match.
+///
+/// When a delinearize directly consumes a linearize, we can group linearize
+/// dimensions and match them to delinearize dimensions when their products
+/// are equal. This breaks down the original operations into smaller chunks that
+/// will avoid long multiply-add and divide-remainder chains when these
+/// linearize→delinearize are further lowered.
+///
+/// This optimization currently handles one-to-one matches (a single linearize
+/// dimension matches a single delinearize dimension) and many-to-one matches
+/// (multiple linearize dimensions grouped together match a single delinearize
+/// dimension).
+///
+/// Example:
+///   %lin = affine.linearize_index [%a, %b, %c, %d, %e] by (%dyn0, 64, 4, 8, 8)
+///   %delin:3 = affine.delinearize_index %lin into (%dyn1, 256, 64)
+///
+/// If %dyn0 == %dyn1, 64*4 == 256, and 8*8 == 64, then we can simplify to:
+///   %delin#0 = %a  (direct passthrough)
+///   %delin#1 = affine.linearize_index [%b, %c] by (64, 4)
+///   %delin#2 = affine.linearize_index [%d, %e] by (8, 8)
+struct SimplifyLinearizeDelinearizePairs final
+    : OpRewritePattern<affine::AffineDelinearizeIndexOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(affine::AffineDelinearizeIndexOp delinearizeOp,
+                                PatternRewriter &rewriter) const override {
+    // Find the linearize op that produces the input to this delinearize.
+    auto linearizeOp = delinearizeOp.getLinearIndex()
+                           .getDefiningOp<affine::AffineLinearizeIndexOp>();
+    if (!linearizeOp) {
+      return rewriter.notifyMatchFailure(
+          delinearizeOp, "delinearize op does not consume a linearize op");
+    }
+    // We only handle disjoint linearizations.
+    if (!linearizeOp.getDisjoint()) {
+      return rewriter.notifyMatchFailure(delinearizeOp,
+                                         "linearize op is not disjoint");
+    }
+    SmallVector<OpFoldResult> linearizeBases = linearizeOp.getMixedBasis();
+    SmallVector<OpFoldResult> delinearizeBases = delinearizeOp.getMixedBasis();
+    ValueRange linearizeInputs = linearizeOp.getMultiIndex();
+
+    Location loc = delinearizeOp.getLoc();
+    MLIRContext *ctx = rewriter.getContext();
+
+    // Structure to store the inputs and bases for new linearize ops.
+    struct LinearizeInfo {
+      SmallVector<Value> inputs;
+      SmallVector<OpFoldResult> bases;
+    };
+    SmallVector<LinearizeInfo> newLinearizeInfos;
+
+    // For each delinearize output dimension, try to match it with a product of
+    // one or more linearize dimensions. We build up the product incrementally
+    // and check for equality using value bounds analysis, which works for both
+    // static and dynamic dimensions.
+    // TODO(#23032): Consider separating bounds checking from transformation
+    // patterns into a shared utility for better organization of index analysis.
+    size_t linIdx = 0;
+    for (size_t delinIdx = 0;
+         delinIdx < delinearizeBases.size() && linIdx < linearizeBases.size();
+         ++delinIdx) {
+      LinearizeInfo newLinearizeInfo;
+      // Track operands for the AffineMap-based product expression.
+      SmallVector<Value> productOperands;
+      // Accumulate dimensions from the linearize op until we find a match.
+      while (linIdx < linearizeBases.size()) {
+        newLinearizeInfo.inputs.push_back(linearizeInputs[linIdx]);
+        newLinearizeInfo.bases.push_back(linearizeBases[linIdx]);
+
+        // Build up the product of basis dimension using affine expressions.
+        AffineExpr productExpr = getAffineConstantExpr(1, ctx);
+        productOperands.clear();
+        for (OpFoldResult basis : newLinearizeInfo.bases) {
+          if (auto attr = dyn_cast<Attribute>(basis)) {
+            // Handle the static basis as a constant expression.
+            int64_t val = cast<IntegerAttr>(attr).getInt();
+            productExpr = productExpr * getAffineConstantExpr(val, ctx);
+          } else {
+            // Handle the dynamic basis as a symbol expression.
+            Value val = cast<Value>(basis);
+            productOperands.push_back(val);
+            productExpr = productExpr *
+                          getAffineSymbolExpr(productOperands.size() - 1, ctx);
+          }
+        }
+        ++linIdx;
+        // Create Variable from the product expression.
+        AffineMap productMap =
+            AffineMap::get(0, productOperands.size(), productExpr, ctx);
+        ValueBoundsConstraintSet::Variable productVar(productMap,
+                                                      productOperands);
+        ValueBoundsConstraintSet::Variable delinearizeVar(
+            delinearizeBases[delinIdx]);
+
+        FailureOr<bool> areEqual =
+            ValueBoundsConstraintSet::areEqual(productVar, delinearizeVar);
+        if (succeeded(areEqual) && *areEqual) {
+          newLinearizeInfos.push_back(newLinearizeInfo);
+          break;
+        }
+      }
+    }
+
+    if (newLinearizeInfos.size() != delinearizeOp.getNumResults()) {
+      return rewriter.notifyMatchFailure(
+          delinearizeOp, "could not match all delinearize outputs");
+    }
+
+    SmallVector<Value> newResults;
+    for (const auto &info : newLinearizeInfos) {
+      if (info.inputs.size() == 1) {
+        // If there is a one-to-one match between linearize and delinearize
+        // dimensions, just pass through the linearize input.
+        newResults.push_back(info.inputs[0]);
+      } else {
+        // Otherwise, for a many-to-one match, create a new linearize op.
+        Value newLinearized = affine::AffineLinearizeIndexOp::create(
+            rewriter, loc, info.inputs, info.bases,
+            /*disjoint=*/true);
+        newResults.push_back(newLinearized);
+      }
+    }
+    rewriter.replaceOp(delinearizeOp, newResults);
     return success();
   }
 };
@@ -119,15 +264,29 @@ static Value createFlatOutputBuffer(RewriterBase &rewriter, Location loc,
                                            collapsedShape, collapsedStrides);
 }
 
-/// Decompose an iree_linalg_ext.map_scatter op with a vector input, and a
-/// memref output. The map_scatter op is lowered into a sequence of vector ops
-/// to compute a vector of indices for the elements of the map_scatter input,
-/// and then a vector.scatter op to scatter the input vector to the output
-/// buffer at the indices in the computed index vector. The output buffer is
-/// also flattened to a 1D memref. If the collapse is not possible due to non
-/// collapsible strides, then the decomposition will fail.
-static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
-                                         RewriterBase &rewriter) {
+/// Result of performIndexAndMaskVectorization containing the vectorized
+/// index computation, mask, and the flattened output buffer.
+struct VectorizationResult {
+  /// The vectorized linear indices for scatter destinations.
+  Value indexVector;
+  /// The vectorized mask values for conditional stores.
+  Value maskVector;
+  /// The flattened 1D output buffer.
+  Value flatOutputBuffer;
+};
+
+/// Vectorize the index computation and mask evaluation for a `map_scatter` op.
+/// This creates a `linalg.generic` op that computes linearized output indices
+/// and mask values for all elements of the input vector, then vectorizes it
+/// to produce vector operations. Returns the computed index vector, mask
+/// vector, and flattened output buffer. If `disregardInnerDimension` is true,
+/// the innermost dimension is treated as size 1 for vectorization. This is used
+/// by `decomposeToLoadStore` to decompose the `map_scatter` op into a sequence
+/// of `vector.extract` and `vector.store` operations.
+static FailureOr<VectorizationResult>
+performIndexAndMaskVectorization(MapScatterOp mapScatterOp,
+                                 RewriterBase &rewriter,
+                                 bool disregardInnerDimension = false) {
   Location loc = mapScatterOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(mapScatterOp);
@@ -136,7 +295,6 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   SmallVector<Value> strides;
   Value flatOutputBuffer = createFlatOutputBuffer(
       rewriter, loc, mapScatterOp.getOutput(), outputSizes, strides);
-
   auto inputType = cast<VectorType>(mapScatterOp.getInputType());
   auto bodyBuilder = [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
     auto inlineBodyBuilder = [&](OpBuilder inlineBuilder, Location inlineLoc,
@@ -170,10 +328,14 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
         });
     mapScatterOp.inlineMapScatterBody(b, nestedLoc, indices, inlineBodyBuilder);
   };
-  auto idxInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
-                                         rewriter.getIndexType());
-  auto maskInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
-                                          rewriter.getIntegerType(1));
+  SmallVector<int64_t> shape(inputType.getShape());
+  if (disregardInnerDimension) {
+    shape[shape.size() - 1] = 1;
+  }
+  auto idxInit =
+      tensor::EmptyOp::create(rewriter, loc, shape, rewriter.getIndexType());
+  auto maskInit =
+      tensor::EmptyOp::create(rewriter, loc, shape, rewriter.getIntegerType(1));
   SmallVector<AffineMap> maps(
       2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
   SmallVector<utils::IteratorType> iterTypes(inputType.getRank(),
@@ -184,7 +346,7 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
                                 outs, maps, iterTypes, bodyBuilder);
 
   // Lower linearize and delinearize ops before vectorizing, because the
-  // vectorizer can't hendle them.
+  // vectorizer can't handle them.
   SmallVector<affine::AffineLinearizeIndexOp> linearizeOps(
       genericOp.getBody()->getOps<affine::AffineLinearizeIndexOp>());
   for (auto linearizeOp : linearizeOps) {
@@ -216,7 +378,7 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
       result->replacements[0].getDefiningOp<vector::TransferWriteOp>();
   auto maskWriteOp =
       result->replacements[1].getDefiningOp<vector::TransferWriteOp>();
-  if (!indexWriteOp || !maskWriteOp) {
+  if (!indexWriteOp) {
     return failure();
   }
   Value indexVector = indexWriteOp.getVector();
@@ -225,12 +387,89 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   rewriter.eraseOp(indexWriteOp);
   rewriter.eraseOp(maskWriteOp);
   rewriter.eraseOp(genericOp);
+  return VectorizationResult{indexVector, maskVector, flatOutputBuffer};
+}
+
+/// Decompose the `map_scatter` into a sequence of `vector.extract` and
+/// `vector.store` operations.
+static LogicalResult decomposeToLoadStore(MapScatterOp mapScatterOp,
+                                          RewriterBase &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(mapScatterOp);
+  FailureOr<VectorizationResult> vectorizationResult =
+      performIndexAndMaskVectorization(mapScatterOp, rewriter,
+                                       /*disregardInnerDimension=*/true);
+  if (failed(vectorizationResult)) {
+    return failure();
+  }
+  Value indexVector = vectorizationResult->indexVector;
+  Value maskVector = vectorizationResult->maskVector;
+  Value flatOutputBuffer = vectorizationResult->flatOutputBuffer;
+
+  // Flatten all the index and mask vectors, since the scatter op lowering
+  // expects 1D vectors.
+  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
+  const int64_t flatIndexSize =
+      llvm::product_of(inputType.getShape().drop_back());
+  const int64_t flatVectorSize = llvm::product_of(inputType.getShape());
+  Location loc = mapScatterOp.getLoc();
+  auto flatIndexType =
+      VectorType::get({flatIndexSize}, rewriter.getIndexType());
+  indexVector =
+      vector::ShapeCastOp::create(rewriter, loc, flatIndexType, indexVector);
+  auto flatMaskType =
+      VectorType::get({flatIndexSize}, rewriter.getIntegerType(1));
+  maskVector =
+      vector::ShapeCastOp::create(rewriter, loc, flatMaskType, maskVector);
+  auto flatInputType =
+      VectorType::get({flatIndexSize, flatVectorSize / flatIndexSize},
+                      inputType.getElementType());
+  Value inputVector = vector::ShapeCastOp::create(rewriter, loc, flatInputType,
+                                                  mapScatterOp.getInput());
+  for (int64_t i = 0; i < flatIndexSize; ++i) {
+    Value index = arith::ConstantIndexOp::create(rewriter, loc, i);
+    auto extractMask =
+        vector::ExtractOp::create(rewriter, loc, maskVector, index);
+    auto extractIndex =
+        vector::ExtractOp::create(rewriter, loc, indexVector, index);
+    auto extractValue =
+        vector::ExtractOp::create(rewriter, loc, inputVector, index);
+
+    // Only store if mask is true.
+    auto ifOp = scf::IfOp::create(rewriter, loc, extractMask.getResult(),
+                                  /*withElseRegion=*/false);
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(ifOp.thenBlock());
+    vector::StoreOp::create(rewriter, loc, extractValue.getResult(),
+                            flatOutputBuffer, {extractIndex});
+  }
+  rewriter.eraseOp(mapScatterOp);
+  return success();
+}
+
+/// Decompose a map_scatter op into a single `vector.scatter` operation.
+///
+/// The function uses `performIndexAndMaskVectorization` to compute vectorized
+/// indices and masks, then flattens all vectors to 1D and replaces the
+/// `map_scatter` with a single `vector.scatter` operation.
+static LogicalResult decomposeToScatter(MapScatterOp mapScatterOp,
+                                        RewriterBase &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(mapScatterOp);
+  FailureOr<VectorizationResult> vectorizationResult =
+      performIndexAndMaskVectorization(mapScatterOp, rewriter,
+                                       /*disregardInnerDimension=*/false);
+  if (failed(vectorizationResult)) {
+    return failure();
+  }
+  Value indexVector = vectorizationResult->indexVector;
+  Value maskVector = vectorizationResult->maskVector;
+  Value flatOutputBuffer = vectorizationResult->flatOutputBuffer;
 
   // Flatten all the vectors, since the scatter op lowering expects 1D vectors.
-  int64_t flatVectorSize =
-      std::reduce(inputType.getShape().begin(), inputType.getShape().end(), 1,
-                  std::multiplies<int64_t>());
-  rewriter.setInsertionPoint(mapScatterOp);
+  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
+  const int64_t flatVectorSize = llvm::product_of(inputType.getShape());
+  Location loc = mapScatterOp.getLoc();
   auto flatIndexType =
       VectorType::get({flatVectorSize}, rewriter.getIndexType());
   indexVector =
@@ -246,10 +485,57 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
 
   SmallVector<Value> offsets = {
       arith::ConstantIndexOp::create(rewriter, loc, 0)};
-  rewriter.replaceOpWithNewOp<vector::ScatterOp>(mapScatterOp, flatOutputBuffer,
-                                                 offsets, indexVector,
-                                                 maskVector, inputVector);
+  SmallVector<Value> operands = {flatOutputBuffer, offsets[0], indexVector,
+                                 maskVector, inputVector};
+  rewriter.replaceOpWithNewOp<vector::ScatterOp>(
+      mapScatterOp, /*resultTypes=*/TypeRange{}, operands);
   return success();
+}
+
+/// Decompose an `iree_linalg_ext.map_scatter` op with vector input and memref
+/// output. This is the main dispatch function that analyzes the `map_scatter`
+/// operation and chooses the most appropriate decomposition strategy.
+///
+/// Decomposition strategies (in order of preference):
+/// 1. `decomposeToLoadStore`: Used when the innermost dimension mapping is unit
+///    (identity) function from input to output and the mask doesn't depend on
+///    the innermost input index. This vectorizes the index and mask
+///    computations and generates a sequence of `vector.extract`
+///    and `vector.store` operations.
+/// 2. `decomposeToScatter`: The fallback. Used for regular scatter patterns
+///    with types that are >= 8 bits. This vectorizes the index and mask
+///    computations and generates a single `vector.scatter` operation.
+static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
+                                         RewriterBase &rewriter) {
+  Value innermostInputIdx =
+      mapScatterOp.getInputIndex(mapScatterOp.getInputRank() - 1);
+  Value innermostOutputIdx =
+      mapScatterOp.getOutputIndex(mapScatterOp.getOutputRank() - 1);
+  SetVector<Operation *> slice;
+  getForwardSlice(innermostInputIdx, &slice);
+  Operation *maskOp = mapScatterOp.getMask().getDefiningOp();
+  const bool isMaskForwardSlice = maskOp && slice.contains(maskOp);
+  const bool isUnitFunctionOfInnermostInputIdx =
+      isUnitFunctionOf(innermostOutputIdx, innermostInputIdx);
+  if (!isMaskForwardSlice && isUnitFunctionOfInnermostInputIdx) {
+    return decomposeToLoadStore(mapScatterOp, rewriter);
+  }
+  // In case of a sub-byte map_scatter that hasn't been decomposed into a
+  // sequence of extract/store ops above, there is a potential non-contiguous
+  // copy on the inner dimension that is not a multiple of a byte size through a
+  // stride or mask and the map_scatter can't be vectorized, so fail.
+  const int64_t bitWidth = mapScatterOp.getInputType().getElementTypeBitWidth();
+  if (bitWidth < 8) {
+    if (!isUnitFunctionOfInnermostInputIdx) {
+      return mapScatterOp.emitOpError() << "with an access on a sub-byte type "
+                                           "that is not a multiple of the byte "
+                                           "size can't be vectorized";
+    }
+    return mapScatterOp.emitOpError()
+           << "map_scatter on sub-byte type with potentially non "
+              "byte aligned transformation";
+  }
+  return decomposeToScatter(mapScatterOp, rewriter);
 }
 
 namespace {
@@ -262,7 +548,8 @@ struct DecomposeMapScatterPass final
     mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
-    patterns.add<FoldSubViewIntoMapScatter>(context);
+    patterns.add<FoldSubViewIntoMapScatter, SimplifyLinearizeDelinearizePairs>(
+        context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

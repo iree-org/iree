@@ -107,13 +107,14 @@ Value createGenericElementwiseCastOp(
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction) {
   auto context = val.getContext();
-  RankedTensorType ty = llvm::cast<RankedTensorType>(val.getType());
+  RankedTensorType ty = cast<RankedTensorType>(val.getType());
 
   llvm::SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynSizes;
   for (int i = 0, s = is_reduction.size(); i < s; i++) {
-    if (is_reduction[i])
+    if (is_reduction[i]) {
       continue;
+    }
 
     staticSizes.push_back(ty.getDimSize(i));
     if (ty.isDynamicDim(i)) {

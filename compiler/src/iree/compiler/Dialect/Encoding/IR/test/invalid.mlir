@@ -193,3 +193,26 @@ func.func @illegal_layout_encoding_with_invalid_layouts(%arg0: tensor<?x?xf32, #
 func.func @negative_layout_encoding(%arg0: tensor<?x?x?xf32, #encoding>) -> tensor<?x?x?xf32, #encoding> {
   return %arg0 : tensor<?x?x?xf32, #encoding>
 }
+
+// -----
+
+// expected-error @+1 {{bit-width of the element type is 12 but packed_storage is currently only supported for sub-byte types}}
+func.func @negative_packed_storage_superbyte(%arg0: tensor<?x4xi12, #iree_encoding.packed_storage>) -> tensor<?x4xi12, #iree_encoding.packed_storage> {
+  return %arg0 : tensor<?x4xi12, #iree_encoding.packed_storage>
+}
+
+// -----
+
+// expected-error @+1 {{bit-width of the element type is 3 but packed_storage currently only supports types with power-of-two bitwidth}}
+func.func @negative_packed_storage_non_po2(%arg0: tensor<?x4xi3, #iree_encoding.packed_storage>) -> tensor<?x4xi3, #iree_encoding.packed_storage> {
+  return %arg0 : tensor<?x4xi3, #iree_encoding.packed_storage>
+}
+
+// -----
+
+// Test the verification of `#iree_encoding.layout`. `packed_storage` is just used as a utility here to check that the error gets propagated.
+
+// expected-error @+1 {{bit-width of the element type is 32 but packed_storage is currently only supported for sub-byte types}}
+func.func @negative_layout_packed_storage_superbyte(%arg0: tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>) -> tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>> {
+  return %arg0 : tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>
+}

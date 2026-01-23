@@ -27,10 +27,10 @@
 // CHECK-LABEL:    func.func @main_0
 
 
-// CHECK that the user-provided tuning spec is materized without linking when default tuing spec
+// Check that the user-provided tuning spec is materialized without linking when default tuning spec
 // is missing and the user-provided tuning spec is marked the default attribute.
 
-// SKIPLINK-LABEL: module  @user_spec
+// SKIPLINK-LABEL: module @user_spec
 // SKIPLINK-SAME:    iree_codegen.tuning_spec_with_default_entrypoint
 // SKIPLINK-SAME:    transform.with_named_sequence
 // SKIPLINK:         transform.print  {name = "Hello Tuning Spec"}

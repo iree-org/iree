@@ -93,8 +93,9 @@ mergeModuleInto(Operation *sourceModuleOp, Operation *targetModuleOp,
       llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
 
   for (auto &sourceOp : allOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>())
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) {
       continue;
+    }
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
@@ -172,26 +173,28 @@ replaceEntryPointUses(mlir::ModuleOp moduleOp,
   auto replaceSymbolRefs = [](Operation *rootOp,
                               const DenseMap<Attribute, Attribute> &map) {
     auto allUses = SymbolTable::getSymbolUses(rootOp);
-    if (!allUses)
+    if (!allUses) {
       return;
+    }
     for (auto use : *allUses) {
       auto oldAttr = use.getSymbolRef();
       auto newAttr = map.lookup(oldAttr);
-      if (!newAttr)
+      if (!newAttr) {
         continue;
+      }
       auto newDict = use.getUser()->getAttrDictionary().replace(
           [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
             if (attr == oldAttr) {
               // Found old->new replacement.
               return {newAttr, WalkResult::skip()};
-            } else if (llvm::isa<SymbolRefAttr>(attr)) {
+            } else if (isa<SymbolRefAttr>(attr)) {
               // Don't recurse into symbol refs - we only want to match roots.
               return {attr, WalkResult::skip()};
             }
             // Non-symbol ref attr.
             return {attr, WalkResult::advance()};
           });
-      use.getUser()->setAttrs(llvm::cast<DictionaryAttr>(newDict));
+      use.getUser()->setAttrs(cast<DictionaryAttr>(newDict));
     }
   };
   replaceSymbolRefs(moduleOp, symbolReplacements.exportRefs);
@@ -267,8 +270,9 @@ LogicalResult linkExecutablesInto(
 
       // Merge sources into the linked source listing.
       if (auto sourcesAttr = variantOp.getSourcesAttr()) {
-        for (auto sourceAttr : sourcesAttr.getValue())
+        for (auto sourceAttr : sourcesAttr.getValue()) {
           linkedSourceAttrs.set(sourceAttr.getName(), sourceAttr.getValue());
+        }
       }
 
       // Remap variant refs.

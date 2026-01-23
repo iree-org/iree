@@ -47,10 +47,10 @@ struct ListTypeStorage : public TypeStorage {
 
 // static
 bool ListType::isCompatible(Type type) {
-  if (llvm::isa<OpaqueType>(type)) {
+  if (isa<OpaqueType>(type)) {
     // Allow all types (variant).
     return true;
-  } else if (llvm::isa<RefType>(type)) {
+  } else if (isa<RefType>(type)) {
     // Allow all ref types.
     return true;
   } else if (type.isIntOrFloat()) {
@@ -83,7 +83,7 @@ Type ListType::getElementType() { return getImpl()->elementType; }
 namespace detail {
 
 struct RefTypeStorage : public TypeStorage {
-  RefTypeStorage(Type objectType) : objectType(llvm::cast<Type>(objectType)) {}
+  RefTypeStorage(Type objectType) : objectType(cast<Type>(objectType)) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
@@ -102,11 +102,10 @@ struct RefTypeStorage : public TypeStorage {
 
 // static
 bool RefType::isCompatible(Type type) {
-  if (llvm::isa<RefType>(type)) {
+  if (isa<RefType>(type)) {
     // Already a ref - don't double-wrap.
     return false;
-  } else if (type.isSignlessIntOrIndexOrFloat() ||
-             llvm::isa<ComplexType>(type)) {
+  } else if (type.isSignlessIntOrIndexOrFloat() || isa<ComplexType>(type)) {
     // Ignore known primitive types.
     return false;
   }
@@ -153,8 +152,9 @@ Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.has_value())
+  if (parseResult.has_value()) {
     return genAttr;
+  }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};

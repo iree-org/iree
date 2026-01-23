@@ -303,9 +303,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
                                       ArrayRef<AffineMap> maps,
                                       AffineMap resultMap) {
   constexpr int64_t kInvalid = -1;
-  if (llvm::any_of(layouts, [](VectorLayoutInterface layout) {
-        return !mlir::isa<NestedLayoutAttr>(layout);
-      })) {
+  if (!llvm::all_of(layouts, llvm::IsaPred<NestedLayoutAttr>)) {
     return NestedLayoutAttr();
   }
   MLIRContext *context = resultMap.getContext();
@@ -313,7 +311,7 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
   SmallVector<NestedLayoutAttr> nestedLayouts;
   llvm::transform(layouts, std::back_inserter(nestedLayouts),
                   [&](VectorLayoutInterface layout) {
-                    return mlir::cast<NestedLayoutAttr>(layout);
+                    return cast<NestedLayoutAttr>(layout);
                   });
 
   int64_t resRank = resultMap.getNumResults();
@@ -435,11 +433,13 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
   SmallVector<size_t> subgroupDimToResult, threadDimToResult;
 
   if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
-                                   subgroupBasis, subgroupDimToResult)))
+                                   subgroupBasis, subgroupDimToResult))) {
     return {};
+  }
   if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
-                                   threadBasis, threadDimToResult)))
+                                   threadBasis, threadDimToResult))) {
     return {};
+  }
 
   // Add the subgroup_size to the end of the subgroup delinearization basis.
   subgroupBasis.push_back(subgroupSize);

@@ -16,14 +16,17 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "LinalgExtBase.td",
             "LinalgExtInterfaces.td",
             "LinalgExtOps.td",
+            "LinalgExtPureOps.td",
         ],
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
@@ -51,7 +54,7 @@ iree_compiler_cc_library(
         "LinalgExtInterfaces.cpp",
         "LinalgExtInterfaces.cpp.inc",
         "LinalgExtOps.cpp",
-        "LinalgExtOps.cpp.inc",
+        "LinalgExtPureOps.cpp.inc",
         "LinalgExtTypes.cpp.inc",
         "TilingInterfaceImpl.cpp",
     ],
@@ -62,17 +65,23 @@ iree_compiler_cc_library(
         "LinalgExtInterfaces.h",
         "LinalgExtInterfaces.h.inc",
         "LinalgExtOps.h",
-        "LinalgExtOps.h.inc",
+        "LinalgExtPureOps.h.inc",
         "LinalgExtTypes.h.inc",
+    ],
+    textual_hdrs = [
+        "LinalgExtOps.cpp.inc",
+        "LinalgExtOps.h.inc",
     ],
     deps = [
         ":LinalgExtInterfacesIncGen",
         ":LinalgExtOpsIncGen",
+        ":LinalgExtPureOpsIncGen",
         ":LinalgExtTypesGen",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -95,6 +104,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
@@ -114,6 +124,25 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtInterfaces.td",
     deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtPureOpsIncGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "LinalgExtPureOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "LinalgExtPureOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtPureOps.td",
+    deps = [
+        ":td_files",
+    ],
 )
 
 iree_gentbl_cc_library(

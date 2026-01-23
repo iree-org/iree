@@ -40,4 +40,7 @@ def HALInline_Dialect : Dialect {
 class HALInline_Op<string mnemonic, list<Trait> traits = []> :
     Op<HALInline_Dialect, mnemonic, !listconcat(traits, [])> {}
 
+class HALInline_PureOp<string mnemonic, list<Trait> traits = []> :
+    HALInline_Op<mnemonic, !listconcat(traits, [Pure])>;
+
 #endif  // IREE_DIALECT_MODULES_HAL_INLINE_BASE

@@ -146,9 +146,6 @@ def build_main_dist():
             f"-DIREE_BUILD_COMPILER=ON",
             f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
             f"-DIREE_BUILD_SAMPLES=OFF",
-            # cpuinfo is set to be removed and is problematic from an
-            # installed/bundled library perspective.
-            f"-DIREE_ENABLE_CPUINFO=OFF",
         ],
         check=True,
     )

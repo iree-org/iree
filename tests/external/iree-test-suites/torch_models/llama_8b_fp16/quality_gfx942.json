@@ -1,0 +1,22 @@
+{
+    "type": "quality",
+    "markers": [
+        "hip",
+        "gfx942"
+    ],
+    "modules": [
+        "llama_8b_fp16/modules/llama_gfx942",
+        "llama_8b_fp16/modules/scheduler_gfx942"
+    ],
+    "weights": [
+        {
+            "type": "url",
+            "scope": "model",
+            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp16/8b_fp16.irpa"
+        }
+    ],
+    "run_args": [
+        "--function=test_greedy_decoder",
+        "--device=hip"
+    ]
+}

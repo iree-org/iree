@@ -18,8 +18,6 @@
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-global-opt-generalize-linalg-named-ops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::GlobalOptimization {
 

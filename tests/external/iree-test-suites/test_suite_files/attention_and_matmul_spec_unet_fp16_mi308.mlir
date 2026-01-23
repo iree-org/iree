@@ -46,27 +46,6 @@ transform.named_sequence @match_attention_f16(%attention: !transform.any_op {tra
   transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
 }
 
-transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-  transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
-  // transform.print %root {name = "Generic"} : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%lhs: tensor<?x?xf16>, %rhs: tensor<?x?xf16>, %out: tensor<?x?xf32>):
-    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d1, d2)>,
-                                          affine_map<(d0, d1, d2) -> (d0, d1)>],
-                         iterator_types = ["parallel", "parallel", "reduction"]}
-        ins(%lhs, %rhs : tensor<?x?xf16>, tensor<?x?xf16>) outs(%out : tensor<?x?xf32>) {
-      ^bb0(%in: f16, %in_0: f16, %acc: f32):
-        %18 = arith.extf %in : f16 to f32
-        %19 = arith.extf %in_0 : f16 to f32
-        %20 = arith.mulf %18, %19 : f32
-        %21 = arith.addf %acc, %20 : f32
-        linalg.yield %21 : f32
-      } -> tensor<?x?xf32>
-  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-  transform.yield %root : !transform.any_op
-}
-
 // TUNING_SPEC_BEGIN DO NOT REMOVE
 
 //===----------------------------------------------------------------------===//
@@ -76,11 +55,14 @@ transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transf
 transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<1920x1280xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<10240x1280xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [10240] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -89,7 +71,7 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [128, 4, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -98,11 +80,14 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
 transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<1920x1280xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x1280xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -111,7 +96,7 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [128, 4, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -120,11 +105,14 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
 transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<1920x5120xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x5120xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [5120] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -133,7 +121,7 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [128, 4, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -142,11 +130,14 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
 transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<7680x640xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<5120x640xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [5120] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -155,7 +146,7 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
                                                 workgroup = [128, 256, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [256, 2, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -164,11 +155,14 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
 transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<1280x2048xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<1280x2048xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [128] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [2048] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
@@ -177,7 +171,7 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
                                                 workgroup = [64, 16, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [64, 2, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -186,11 +180,14 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
 transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<7680x640xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<640x640xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
@@ -199,7 +196,7 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
                                                 workgroup = [256, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [256, 1, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
@@ -208,11 +205,14 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
 transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
 
-  %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
-  %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
-  %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
-  transform.iree.match.cast_compatible_type %lhs = tensor<7680x2560xf16> : !transform.any_value
-  transform.iree.match.cast_compatible_type %rhs = tensor<640x2560xf16> : !transform.any_value
+  %batch, %m, %n, %k = transform.iree.match.contraction %matmul,
+    lhs_type = f16, rhs_type = f16, output_type = f32,
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>] : !transform.any_op -> !transform.param<i64>
+  transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
+  transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
+  transform.iree.match.dims_equal %k, [2560] : !transform.param<i64>
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
@@ -221,7 +221,7 @@ transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {tr
                                                 workgroup = [256, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
     workgroup_size = [128, 4, 1] subgroup_size = 64,
-    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2>,
      llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}
     }>> -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param

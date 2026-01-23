@@ -2,7 +2,7 @@
 
 // This can be matched by "reduction_partial" but not by "reduction".
 
-func.func @reduction_with_extra_op_in_func(%arg0: tensor<8x479xf32>, %arg1: tensor<32x32xf32>) -> (tensor<8xf32>, tensor<32xf32>) {
+func.func @reduction_with_extra_op_in_func(%arg0: tensor<8x479xf32>) -> (tensor<8xf32>, tensor<32xf32>) {
   %cst = arith.constant 0.0 : f32
   %empty = tensor.empty() : tensor<8xf32>
   // expected-remark @below {{fill}}

@@ -21,8 +21,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 //===----------------------------------------------------------------------===//
 
 llvm::MaybeAlign commonAlignment(llvm::MaybeAlign lhs, llvm::MaybeAlign rhs) {
-  if (!lhs.has_value() || !rhs.has_value())
+  if (!lhs.has_value() || !rhs.has_value()) {
     return std::nullopt;
+  }
   return llvm::MaybeAlign(
       llvm::MinAlign(lhs.value().value(), rhs.value().value()));
 }
@@ -37,8 +38,9 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (!op)
+  if (!op) {
     return std::nullopt;
+  }
   if (auto alignmentAttr = op->getAttrOfType<IntegerAttr>("stream.alignment")) {
     // The op has an alignment tagged on it we can use directly.
     return alignmentAttr.getValue().getZExtValue();
@@ -107,8 +109,9 @@ void HALDialect::registerTypes() {
 
 Type HALDialect::parseType(DialectAsmParser &parser) const {
   StringRef typeKind;
-  if (parser.parseKeyword(&typeKind))
+  if (parser.parseKeyword(&typeKind)) {
     return {};
+  }
   auto type = llvm::StringSwitch<Type>(typeKind)
                   .Case("allocator", AllocatorType::get(getContext()))
                   .Case("buffer", BufferType::get(getContext()))
@@ -130,27 +133,27 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (llvm::isa<AllocatorType>(type)) {
+  if (isa<AllocatorType>(type)) {
     p << "allocator";
-  } else if (llvm::isa<BufferType>(type)) {
+  } else if (isa<BufferType>(type)) {
     p << "buffer";
-  } else if (llvm::isa<BufferViewType>(type)) {
+  } else if (isa<BufferViewType>(type)) {
     p << "buffer_view";
-  } else if (llvm::isa<ChannelType>(type)) {
+  } else if (isa<ChannelType>(type)) {
     p << "channel";
-  } else if (llvm::isa<CommandBufferType>(type)) {
+  } else if (isa<CommandBufferType>(type)) {
     p << "command_buffer";
-  } else if (llvm::isa<DeviceType>(type)) {
+  } else if (isa<DeviceType>(type)) {
     p << "device";
-  } else if (llvm::isa<EventType>(type)) {
+  } else if (isa<EventType>(type)) {
     p << "event";
-  } else if (llvm::isa<ExecutableType>(type)) {
+  } else if (isa<ExecutableType>(type)) {
     p << "executable";
-  } else if (llvm::isa<FenceType>(type)) {
+  } else if (isa<FenceType>(type)) {
     p << "fence";
-  } else if (llvm::isa<FileType>(type)) {
+  } else if (isa<FileType>(type)) {
     p << "file";
-  } else if (llvm::isa<SemaphoreType>(type)) {
+  } else if (isa<SemaphoreType>(type)) {
     p << "semaphore";
   } else {
     assert(false && "unknown HAL type");

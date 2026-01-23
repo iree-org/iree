@@ -60,6 +60,7 @@ class TargetConverter:
                 "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
                 "@llvm-project//mlir:ArithOpsIncGen": ["MLIRArithDialect"],
                 "@llvm-project//mlir:BufferizationInterfaces": [""],
+                "@llvm-project//mlir:BuiltinTypesIncGen": [""],
                 "@llvm-project//mlir:CommonFolders": [""],
                 "@llvm-project//mlir:ConversionPasses": [""],
                 "@llvm-project//mlir:DialectUtils": [""],
@@ -74,6 +75,7 @@ class TargetConverter:
                     "MLIRLinalgStructuredOpsIncGenLib"
                 ],
                 "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
+                "@llvm-project//mlir:FromLLVMIRTranslation": ["MLIRTargetLLVMIRImport"],
                 "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
                 "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
@@ -118,9 +120,12 @@ class TargetConverter:
                 "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
-                "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
+                "@libbacktrace": ["libbacktrace::libbacktrace"],
                 "@webgpu_headers": [],
+                # py_binary targets have no CMake equivalent.
+                # This is the only target bazel needs to execute the lit tests.
+                ":python_with_numpy": [],
             }
         )
 
@@ -202,6 +207,9 @@ class TargetConverter:
             return self._convert_mlir_target(target)
         if target.startswith("@iree_cuda//"):
             return self._convert_iree_cuda_target(target)
+        # pip dependencies don't exist in CMake (system Python is used).
+        if target.startswith("@pip//"):
+            return []
         if target.startswith(f"{iree_core_repo}//"):
             return self._convert_iree_core_target(target)
         if target.startswith("@"):

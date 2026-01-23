@@ -71,8 +71,9 @@ static SmallVector<DimSize> getDimSizes(Value v) {
 static bool
 isIdentityReassoc(const SmallVector<ReassociationIndices> &indices) {
   for (auto &index : indices) {
-    if (index.size() != 1)
+    if (index.size() != 1) {
       return false;
+    }
   }
   return true;
 };
@@ -240,8 +241,9 @@ LogicalResult ExpansionInfo::compute(
     SmallVector<ReshapeOperandInfo> infos, SmallVector<int64_t> loopRanges,
     OpOperand *fusableOpOperand, ArrayRef<ReassociationIndices> operandReassoc,
     ArrayRef<DimSize> expandedShape) {
-  if (operandReassoc.empty())
+  if (operandReassoc.empty()) {
     return failure();
+  }
 
   // Check that the operand dim size matches the iteration space dim size. This
   // can fail when one is static and the other is dynamic.
@@ -307,28 +309,33 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   llvm::SmallDenseSet<int64_t, 4> processedDims;
   // Find all the dims that are folded.
   for (ReassociationIndicesRef foldedIterationDim : foldedIterationDims) {
-    if (foldedIterationDim.empty())
+    if (foldedIterationDim.empty()) {
       continue;
+    }
     // If the folded dims contain dims already folded, that's illegal
     // specification. Repetition within a list is also illegal.
     for (auto dim : foldedIterationDim) {
-      if (dim >= origNumLoops)
+      if (dim >= origNumLoops) {
         return failure();
-      if (processedDims.count(dim))
+      }
+      if (processedDims.contains(dim)) {
         return failure();
+      }
       processedDims.insert(dim);
     }
     collapsedOpToOrigOpIterationDim.emplace_back(foldedIterationDim.begin(),
                                                  foldedIterationDim.end());
   }
-  if (processedDims.size() > origNumLoops)
+  if (processedDims.size() > origNumLoops) {
     return failure();
+  }
 
   // Add all the preserved dims of the original op as single
   // elements to `collapsedOpToOrigOpIterationDim`.
   for (auto dim : llvm::seq<int64_t>(0, origNumLoops)) {
-    if (processedDims.count(dim))
+    if (processedDims.contains(dim)) {
       continue;
+    }
     collapsedOpToOrigOpIterationDim.emplace_back(ReassociationIndices{dim});
   }
 
@@ -339,9 +346,10 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   origOpToCollapsedOpIterationDim.resize(origNumLoops);
   for (const auto &foldedDims :
        llvm::enumerate(collapsedOpToOrigOpIterationDim)) {
-    for (const auto &dim : enumerate(foldedDims.value()))
+    for (const auto &dim : enumerate(foldedDims.value())) {
       origOpToCollapsedOpIterationDim[dim.value()] =
           std::make_pair<int64_t, unsigned>(foldedDims.index(), dim.index());
+    }
   }
   return success();
 }
@@ -387,9 +395,10 @@ getReshapeInfo(LinalgExt::ScatterOp scatterOp) {
   indicesInfo.originalShape = getDimSizes(scatterOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
                      llvm::seq<int64_t>(0, scatterOp.getBatchRank()));
-  if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank())
+  if (scatterOp.getBatchRank() != scatterOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
+  }
   infos.push_back(std::move(indicesInfo));
 
   ReshapeOperandInfo originalInfo;
@@ -420,9 +429,10 @@ getReshapeInfo(LinalgExt::GatherOp gatherOp) {
   indicesInfo.originalShape = getDimSizes(gatherOp.getIndices());
   llvm::append_range(indicesInfo.operandToIterationSpace,
                      llvm::seq<int64_t>(0, gatherOp.getBatchRank()));
-  if (gatherOp.getBatchRank() != gatherOp.getIndicesType().getRank())
+  if (gatherOp.getBatchRank() != gatherOp.getIndicesType().getRank()) {
     indicesInfo.operandToIterationSpace.push_back(
         ReshapeOperandInfo::kNoMapping);
+  }
   infos.push_back(std::move(indicesInfo));
 
   ReshapeOperandInfo outputInfo;
@@ -815,7 +825,7 @@ struct DropScatterUnitDims final : public OpRewritePattern<ScatterOp> {
     auto newScatter = ScatterOp::create(
         rewriter, scatterOp.getLoc(), TypeRange{original.getType()},
         ValueRange{updates, indices}, ValueRange{original},
-        scatterOp.getDimensionMap());
+        scatterOp.getDimensionMap(), scatterOp.getUniqueIndices());
     rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                                 newScatter.getRegion().begin());
     rewriter.replaceOp(scatterOp,
@@ -846,10 +856,12 @@ struct FoldWithProducerReshapeByExpansion final
     for (OpOperand &opOperand : op->getOpOperands()) {
       tensor::CollapseShapeOp reshapeOp =
           opOperand.get().getDefiningOp<tensor::CollapseShapeOp>();
-      if (!reshapeOp)
+      if (!reshapeOp) {
         continue;
-      if (!controlFoldingReshapes(&opOperand))
+      }
+      if (!controlFoldingReshapes(&opOperand)) {
         continue;
+      }
 
       std::optional<Value> replacementValue =
           fuseWithReshapeByExpansion(op, reshapeOp, &opOperand, rewriter);
@@ -893,8 +905,9 @@ struct FoldWithConsumerReshapeByExpansion final
 
     std::optional<Value> replacementValue = fuseWithReshapeByExpansion(
         op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
-    if (!replacementValue)
+    if (!replacementValue) {
       return failure();
+    }
     rewriter.replaceOp(op, *replacementValue);
     return success();
   }
@@ -946,8 +959,9 @@ static Value getCollapsedOpOperand(Location loc, AttentionOp op,
   // the number of results of the indexing map, then nothing to do for this
   // operand.
   Value operand = opOperand->get();
-  if (operandReassociation.size() == indexingMap.getNumResults())
+  if (operandReassociation.size() == indexingMap.getNumResults()) {
     return operand;
+  }
 
   // Insert a reshape to collapse the dimensions.
   if (isa<MemRefType>(operand.getType())) {
@@ -982,8 +996,9 @@ static void collapseOperandsAndResults(AttentionOp op,
     outputOperands.push_back(newOutput);
     // If the op has "buffer semantics", then the init operands are ranked
     // memrefs and the op has no results.
-    if (!op.hasPureBufferSemantics())
+    if (!op.hasPureBufferSemantics()) {
       resultTypes.push_back(newOutput.getType());
+    }
   }
 }
 
@@ -1001,8 +1016,9 @@ getCollapsedOpIndexingMap(AffineMap indexingMap,
   for (auto expr : indexingMap.getResults()) {
     unsigned dim = cast<AffineDimExpr>(expr).getPosition();
     // If the dim is not the first of the collapsed dim, do nothing.
-    if (origOpToCollapsedOpMapping[dim].second != 0)
+    if (origOpToCollapsedOpMapping[dim].second != 0) {
       continue;
+    }
     // The next n-dims are guaranteed to be collapsed. So just use the
     // iteration dimension of the collapsed op.
     resultExprs.push_back(
@@ -1067,8 +1083,9 @@ collapseOpIterationDims(AttentionOp op,
   if (op.getNumLoops() <= 1 || foldedIterationDims.empty() ||
       llvm::all_of(foldedIterationDims, [](ReassociationIndicesRef foldedDims) {
         return foldedDims.size() <= 1;
-      }))
+      })) {
     return failure();
+  }
 
   CollapsingInfo collapsingInfo;
   if (failed(

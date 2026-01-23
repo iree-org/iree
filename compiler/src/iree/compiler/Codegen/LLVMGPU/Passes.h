@@ -43,10 +43,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint);
 
-/// Lowering transpose using shared memory.
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const GPUPipelineOptions &options);
-
 /// Lowering calling vectorization patterns. Expects pass manager to be a
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager);
@@ -80,7 +76,7 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the structured ops path. The pass manager `pm` in here should operate on
 /// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
-                                     bool useROCM);
+                                     bool useROCM, bool preserveDebugInfo);
 
 /// Verify configuration set for the LLVMGPUVectorDistribute pass pipeline.
 LogicalResult verifyLLVMGPUVectorDistributePipeline(

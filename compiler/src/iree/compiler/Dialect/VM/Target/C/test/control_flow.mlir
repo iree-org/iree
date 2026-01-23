@@ -18,12 +18,10 @@ vm.module @control_flow_module {
   // CHECK-NEXT: int32_t [[V0:[^ ]*]];
   // CHECK-NEXT: iree_status_t [[STATUS:[^ ]*]];
   // CHECK-NEXT: int32_t [[C:[^ ]*]];
-  // CHECK-NEXT: int32_t [[D:[^ ]*]];
   // CHECK-NEXT: [[COND_NZ]] = vm_cmp_nz_i32([[COND]]);
   // CHECK-NEXT: [[COND_BOOL]] = (bool) [[COND_NZ]];
   // CHECK-NEXT: if ([[COND_BOOL]]) {
   // CHECK-NEXT: [[C]] = [[A]];
-  // CHECK-NEXT: [[D]] = [[A]];
   // CHECK-NEXT: goto [[BB2:[^ ]*]];
   // CHECK-NEXT: } else {
   // CHECK-NEXT: goto [[BB1:[^ ]*]];
@@ -31,10 +29,9 @@ vm.module @control_flow_module {
   // CHECK-NEXT: [[BB1]]:
   // CHECK-NEXT: [[B]] = vm_add_i32([[A]], [[A]]);
   // CHECK-NEXT: [[C]] = [[B]];
-  // CHECK-NEXT: [[D]] = [[A]];
   // CHECK-NEXT: goto [[BB2:[^ ]*]];
   // CHECK-NEXT: [[BB2]]:
-  // CHECK-NEXT: [[V0]] = vm_add_i32([[C]], [[D]]);
+  // CHECK-NEXT: [[V0]] = vm_add_i32([[C]], [[A]]);
   // CHECK-NEXT: EMITC_DEREF_ASSIGN_VALUE([[RESULT]], [[V0]]);
   // CHECK-NEXT: [[STATUS]] = iree_ok_status();
   // CHECK-NEXT: return [[STATUS]];

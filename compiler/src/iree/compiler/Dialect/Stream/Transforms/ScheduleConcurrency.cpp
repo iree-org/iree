@@ -54,10 +54,12 @@ struct WavePartitionBuilder {
     Operation *insertionPt = nullptr;
     for (auto in : partition->ins) {
       auto *definingOp = in.getDefiningOp();
-      if (!definingOp)
+      if (!definingOp) {
         continue;
-      if (definingOp->getBlock() != parentBlock)
+      }
+      if (definingOp->getBlock() != parentBlock) {
         continue;
+      }
       if (!insertionPt) {
         insertionPt = definingOp; // first defining op
       } else if (insertionPt->isBeforeInBlock(definingOp)) {
@@ -83,8 +85,9 @@ struct WavePartitionBuilder {
       resultTypes.push_back(out.getType());
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, out, parentBuilder);
-      if (resultSize)
+      if (resultSize) {
         resultSizes.push_back(resultSize);
+      }
     }
     SmallVector<Value> operands;
     SmallVector<Type> operandTypes;
@@ -93,14 +96,16 @@ struct WavePartitionBuilder {
     operandTypes.reserve(partition->ins.size());
     operandSizes.reserve(partition->ins.size());
     for (auto in : partition->ins) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(in.getType()))
+      if (!isa<IREE::Stream::ResourceType>(in.getType())) {
         continue;
+      }
       operands.push_back(in);
       operandTypes.push_back(in.getType());
       auto operandSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           fusedLoc, in, parentBuilder);
-      if (operandSize)
+      if (operandSize) {
         operandSizes.push_back(operandSize);
+      }
     }
 
     // TODO(benvanik): tie operands, or leave to canonicalization.
@@ -134,8 +139,9 @@ struct WavePartitionBuilder {
   //
   // Returns true if the operation was cloned into the partition.
   bool visit(Operation *op) {
-    if (!partition->ops.contains(op))
+    if (!partition->ops.contains(op)) {
       return false;
+    }
 
     // Clone the op into the partition and remap it.
     auto *clonedOp = builder.clone(*op, mapping);
@@ -159,8 +165,9 @@ struct WavePartitionBuilder {
       results.push_back(newResult);
       auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
           concurrentOp.getLoc(), newResult, builder);
-      if (resultSize)
+      if (resultSize) {
         resultSizes.push_back(resultSize);
+      }
     }
     IREE::Stream::YieldOp::create(builder, concurrentOp.getLoc(), results,
                                   resultSizes);
@@ -188,8 +195,9 @@ struct ScheduleConcurrencyPass
     }
     for (auto executeOp :
          parentOp.getCallableRegion()->getOps<IREE::Stream::AsyncExecuteOp>()) {
-      if (failed(runOnRegion(executeOp)))
+      if (failed(runOnRegion(executeOp))) {
         return signalPassFailure();
+      }
     }
   }
 
@@ -205,10 +213,12 @@ struct ScheduleConcurrencyPass
     // Compute a set of partitions covering all of the streamable ops in the
     // execution region.
     auto waveSet = partitionRegionConcurrency(configAttr, block);
-    if (waveSet.empty())
+    if (waveSet.empty()) {
       return success();
-    if (failed(waveSet.verify(parentOp.getLoc())))
+    }
+    if (failed(waveSet.verify(parentOp.getLoc()))) {
       return failure();
+    }
 
     // Create partition builders for each partition.
     // We'll clone ops into each and insert them into the block at the
@@ -217,8 +227,9 @@ struct ScheduleConcurrencyPass
     SmallVector<WavePartitionBuilder> partitionBuilders;
     partitionBuilders.reserve(waveSet.size());
     for (auto partition : llvm::enumerate(waveSet.partitions)) {
-      if (partition.value().ops.size() == 1)
+      if (partition.value().ops.size() == 1) {
         continue;
+      }
       partitionBuilders.push_back(WavePartitionBuilder(block, partition.index(),
                                                        &partition.value(),
                                                        mapping, &getContext()));
@@ -231,8 +242,9 @@ struct ScheduleConcurrencyPass
     // creates a lot of new IR (up to O(op*partitions)).
     SetVector<Operation *> deadOps;
     for (auto &op : *block) {
-      if (op.hasTrait<OpTrait::IsTerminator>())
+      if (op.hasTrait<OpTrait::IsTerminator>()) {
         continue;
+      }
       bool handled = false;
       for (auto &partitionBuilder : partitionBuilders) {
         handled = partitionBuilder.visit(&op) || handled;

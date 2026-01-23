@@ -12,17 +12,13 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
-#include "mlir/Interfaces/ValueBoundsOpInterface.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
@@ -60,6 +56,17 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           return std::nullopt;
         }
       }
+      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+        std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+            getVectorInputSizesFromUnpackedDomain(packOp, *vectorSizes,
+                                                  scalableFlags);
+        if (maybeInputVectorSizes) {
+          std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
+        } else {
+          LDBG() << "Failed to get input vector sizes for pack op";
+          return std::nullopt;
+        }
+      }
       // Replace zeros in canonical vector shape to turn it into a valid shape.
       std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
       return std::make_pair(*vectorSizes, scalableFlags);
@@ -89,8 +96,9 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
         // maskedVectorize method allows dynamic result shapes.
-        if (!ty.hasStaticShape())
+        if (!ty.hasStaticShape()) {
           return;
+        }
         vectorSizes = SmallVector<int64_t>(ty.getShape());
       })
       .Case<IREE::LinalgExt::GatherOp>([&](IREE::LinalgExt::GatherOp gatherOp) {
@@ -113,11 +121,13 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
                                              int64_t maxVectorSize) {
   int64_t maxFlatVecSize = 1;
   for (OpOperand &operand : linalgOp->getOpOperands()) {
-    auto type = llvm::dyn_cast<ShapedType>(operand.get().getType());
-    if (!type)
+    auto type = dyn_cast<ShapedType>(operand.get().getType());
+    if (!type) {
       continue;
-    if (!type.hasStaticShape())
+    }
+    if (!type.hasStaticShape()) {
       return failure();
+    }
     maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
   }
   return success(maxFlatVecSize < maxVectorSize);
@@ -176,12 +186,13 @@ void GenericVectorizationPass::runOnOperation() {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1LL,
-                            std::multiplies<int64_t>()) >= maxVectorSize)
+        if (llvm::product_of(vectorSizes) >= maxVectorSize) {
           continue;
+        }
       } else {
-        if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize)))
+        if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize))) {
           continue;
+        }
       }
     }
     // Pad scalable dims with `false` to match the vector sizes.

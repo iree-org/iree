@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -27,9 +28,6 @@ namespace {
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
 //====---------------------------------------------------------------------===//
-
-// For optimal performance we always want to copy 128 bits
-static constexpr int kPreferredCopyNumBits = 128;
 
 // Moves the copy into a single threaded forall.
 static void distributeCopyToSingleThread(RewriterBase &rewriter,
@@ -111,20 +109,6 @@ static void distributeCopyToThreads(RewriterBase &rewriter, memref::CopyOp copy,
   Value targetTile = memref::SubViewOp::create(rewriter, loc, copy.getTarget(),
                                                offsets, sizes, strides);
   rewriter.replaceOpWithNewOp<memref::CopyOp>(copy, sourceTile, targetTile);
-}
-
-static SmallVector<OpFoldResult> getCopyTileSizes(Builder &b,
-                                                  memref::CopyOp copy) {
-  int64_t rank = copy.getTarget().getType().getRank();
-  if (rank == 0) {
-    return {};
-  }
-
-  SmallVector<OpFoldResult> tileSizes(rank - 1, b.getIndexAttr(1));
-  int64_t elementBitWidth = llvm::cast<MemRefType>(copy.getTarget().getType())
-                                .getElementTypeBitWidth();
-  tileSizes.push_back(b.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
-  return tileSizes;
 }
 
 } // namespace

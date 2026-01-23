@@ -5,7 +5,8 @@ icon: octicons/bug-16
 # Integration test debugging
 
 This document includes tips for triaging integration test correctness issues.
-Feel free to reach out to @hanhanW or ask questions on Discord for more help.
+Feel free to reach out to @hanhanW or @newling, or ask questions on Discord
+for more help.
 
 ## General tips
 
@@ -14,7 +15,9 @@ Feel free to reach out to @hanhanW or ask questions on Discord for more help.
 * Models themselves can be large, and IREE breaks models into dispatches/kernels
 and then launches those individually. Program outputs could diverge starting
 from any individual launch. To get a smaller reproducer, you can use
-[--iree-flow-trace-dispatch-tensors](../general/developer-overview.md#-iree-flow-trace-dispatch-tensors).
+[--iree-flow-trace-dispatch-tensors](../general/developer-overview.md#-iree-flow-trace-dispatch-tensors),
+especially powerful when combined with debug sink callbacks, as described
+[here](https://github.com/iree-org/iree/blob/main/samples/sink_callback/README.md).
 * You can compare the logs between builds/backends to get an idea about which
 dispatch results in wrong outputs. The dumped inputs can be reused in a
 flagfile.

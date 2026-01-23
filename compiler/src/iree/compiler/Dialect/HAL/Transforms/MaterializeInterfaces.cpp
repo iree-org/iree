@@ -246,7 +246,7 @@ static void materializeExecutableFromSourceOp(
 static LogicalResult
 verifyEntryPointTypes(mlir::FunctionOpInterface entryFuncOp) {
   for (auto inputType : llvm::enumerate(entryFuncOp.getArgumentTypes())) {
-    if (llvm::isa<IREE::Stream::BindingType>(inputType.value()) ||
+    if (isa<IREE::Stream::BindingType>(inputType.value()) ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
     } else {
@@ -295,8 +295,9 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
                     IREE::HAL::PipelineLayoutAttr pipelineLayoutAttr,
                     int64_t bindingOrdinal,
                     IREE::HAL::PipelineBindingAttr bindingAttr) {
-  if (arg.use_empty())
+  if (arg.use_empty()) {
     return; // no-op
+  }
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
     assert(oldOp && "bindings are only usable by stream.binding.subspan");
@@ -332,14 +333,14 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
   // for use by the binding accessors.
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
       convertOperandUsage(sourceFuncOp, arg, layoutAttr, operandIdx++,
                           entryBuilder);
     }
   }
   unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (!llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+    if (!isa<IREE::Stream::BindingType>(arg.getType())) {
       continue; // unhandled arg type (primitive/etc)
     }
     auto binding = resourceMap[resourceIdx++];

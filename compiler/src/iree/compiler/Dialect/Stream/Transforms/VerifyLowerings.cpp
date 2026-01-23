@@ -91,9 +91,7 @@ public:
 
   template <typename TypeT>
   void addTypeVerifier(std::function<Legality(TypeT)> fn) {
-    auto wrapperFn = [=](Type baseType) {
-      return fn(llvm::cast<TypeT>(baseType));
-    };
+    auto wrapperFn = [=](Type baseType) { return fn(cast<TypeT>(baseType)); };
     if (typeVerifiers.insert({TypeID::get<TypeT>(), wrapperFn}).second ==
         false) {
       assert(false && "already registered for this type");
@@ -124,15 +122,17 @@ public:
 
       // Check types for operands/results.
       for (auto operandType : llvm::enumerate(op->getOperandTypes())) {
-        if (isTypeLegal(operandType.value()))
+        if (isTypeLegal(operandType.value())) {
           continue;
+        }
         emitIllegalTypeError(op, "operand", operandType.index(),
                              operandType.value());
         foundAnyIllegal = true;
       }
       for (auto resultType : llvm::enumerate(op->getResultTypes())) {
-        if (isTypeLegal(resultType.value()))
+        if (isTypeLegal(resultType.value())) {
           continue;
+        }
         emitIllegalTypeError(op, "result", resultType.index(),
                              resultType.value());
         foundAnyIllegal = true;
@@ -259,6 +259,9 @@ struct VerifyInputPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -294,6 +297,9 @@ struct VerifyLoweringToTensorsPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -315,6 +321,9 @@ struct VerifyLoweringToAsyncResourcesPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -351,8 +360,9 @@ struct VerifyLoweringToAsyncPass
           }
 
           // Allow metadata ops outside of execution regions.
-          if (op.isMetadata())
+          if (op.isMetadata()) {
             return Verifier::Legality::LEGAL;
+          }
 
           // TODO(benvanik): execution region interface to make this generic.
           if (!op->template getParentOfType<IREE::Stream::AsyncExecuteOp>()) {
@@ -366,6 +376,9 @@ struct VerifyLoweringToAsyncPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -394,6 +407,9 @@ struct VerifyLoweringToCmdPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 

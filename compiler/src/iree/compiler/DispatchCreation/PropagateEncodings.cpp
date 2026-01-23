@@ -46,6 +46,9 @@ bubbleUpSetEncodingOp(RewriterBase &rewriter, OpOperand *propagationSource,
                                        "not able to determine propagation "
                                        "attributes for operands and results");
   }
+  // Carry through the encoding dims from the original set_encoding op.
+  propagationEncodings->encodingDims =
+      llvm::to_vector(encodingOp.getEncodingDims());
   Operation *targetOp = target.getOwner();
   if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
       !IREE::Flow::isNonNullAndOutsideDispatch(targetOp)) {

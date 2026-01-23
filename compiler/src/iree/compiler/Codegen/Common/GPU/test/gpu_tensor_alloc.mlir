@@ -254,6 +254,8 @@ func.func @conv() attributes {translation_info = #iree_codegen.translation_info<
 // COALESCE_LOOPS-NOT:   scf.for
 //     COALESCE_LOOPS:   return
 
+// -----
+
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>

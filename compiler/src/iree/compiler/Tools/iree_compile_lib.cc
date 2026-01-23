@@ -52,9 +52,10 @@ struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
   bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
              std::optional<int64_t> &v) {
     long long w;
-    if (llvm::getAsSignedInteger(arg, 10, w))
+    if (llvm::getAsSignedInteger(arg, 10, w)) {
       return O.error("Invalid argument '" + arg +
                      "', only integer is supported.");
+    }
     v = w;
     return false;
   }
@@ -152,6 +153,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                          "generating compile-to or VM MLIR output."),
           llvm::cl::init(std::nullopt));
 
+  // Remark options.
+  llvm::cl::opt<std::string> remarksFilter(
+      "remarks-filter",
+      llvm::cl::desc("Emit all remarks whose category matches the given regex "
+                     "pattern. If empty, no remarks are emitted."),
+      llvm::cl::init(""));
+
+  llvm::cl::opt<std::string> remarksOutputFile(
+      "remarks-output-file",
+      llvm::cl::desc("Output file for remarks in YAML format."),
+      llvm::cl::init("mlir-remarks.yaml"));
+
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
       "split-input-file",
@@ -245,30 +258,44 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     ireeCompilerInvocationSetDumpCompilationPhasesTo(
         r.inv, dumpCompilationPhasesTo.c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
-    if (!ireeCompilerInvocationParseSource(r.inv, source))
+
+    // Setup remarks.
+    if (!remarksFilter.empty()) {
+      ireeCompilerInvocationSetupRemarks(r.inv, remarksFilter.c_str(),
+                                         remarksOutputFile.c_str());
+    }
+
+    if (!ireeCompilerInvocationParseSource(r.inv, source)) {
       return false;
+    }
 
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
     case CompileMode::std:
-      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD)) {
         return false;
+      }
       break;
     case CompileMode::vm:
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_VM)) {
+        return false;
+      }
       break;
     case CompileMode::hal_executable: {
       // Compiling a HAL executable, it is only valid to output in that form.
       outputFormat = OutputFormat::hal_executable;
       if (!ireeCompilerInvocationPipeline(
-              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE)) {
         return false;
+      }
       break;
     }
     case CompileMode::precompile: {
       outputFormat = OutputFormat::precompile;
       if (!ireeCompilerInvocationPipeline(r.inv,
-                                          IREE_COMPILER_PIPELINE_PRECOMPILE))
+                                          IREE_COMPILER_PIPELINE_PRECOMPILE)) {
         return false;
+      }
       break;
     }
     default:
@@ -352,8 +379,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return 1;
     }
   } else {
-    if (!processBuffer(s.source))
+    if (!processBuffer(s.source)) {
       return 1;
+    }
   }
 
   ireeCompilerOutputKeep(s.output);

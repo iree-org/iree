@@ -24,15 +24,15 @@ bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
 }
 
 MlirAttribute
-ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,
+ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, int64_t *prefetchNumStages,
                               bool *noReduceSharedMemoryBankConflicts,
                               bool *useIgemmConvolution,
                               MlirAttribute *reorderWorkgroupsStrategy) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   mlir::Builder b(ctx);
-  auto prefetchSharedMemoryAttr = mlir::BoolAttr();
-  if (prefetchSharedMemory) {
-    prefetchSharedMemoryAttr = b.getBoolAttr(*prefetchSharedMemory);
+  std::optional<int64_t> prefetchNumStagesOpt;
+  if (prefetchNumStages) {
+    prefetchNumStagesOpt = *prefetchNumStages;
   }
   auto noReduceSharedMemoryBankConflictsAttr = mlir::BoolAttr();
   if (noReduceSharedMemoryBankConflicts) {
@@ -51,16 +51,21 @@ ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,
         unwrap(*reorderWorkgroupsStrategy));
   }
   return wrap(mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::get(
-      ctx, prefetchSharedMemoryAttr, noReduceSharedMemoryBankConflictsAttr,
+      ctx, prefetchNumStagesOpt, noReduceSharedMemoryBankConflictsAttr,
       useIgemmConvolutionAttr, strategyAttr));
 }
 
 MlirAttribute
-ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory(MlirAttribute attr) {
+ireeGPUPipelineOptionsAttrGetPrefetchNumStages(MlirAttribute attr) {
   auto gpuAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
           unwrap(attr));
-  return wrap(gpuAttr.getPrefetchSharedMemory());
+  std::optional<int64_t> value = gpuAttr.getPrefetchNumStages();
+  if (!value) {
+    return {nullptr};
+  }
+  mlir::Builder b(unwrap(attr).getContext());
+  return wrap(b.getI64IntegerAttr(*value));
 }
 
 MlirAttribute ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts(
@@ -250,13 +255,9 @@ MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
   llvm::SmallVector<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
       virtualIntrinsics = mma.getVirtualIntrinsics();
 
-  llvm::SmallVector<int64_t> rawValues;
-  for (auto v : virtualIntrinsics) {
-    rawValues.push_back(static_cast<int64_t>(v));
-  }
-
-  mlir::MLIRContext *ctx = mma.getContext();
-  mlir::Builder builder(ctx);
+  auto rawValues =
+      llvm::map_to_vector(virtualIntrinsics, llvm::StaticCastTo<int64_t>);
+  mlir::Builder builder(mma.getContext());
   return wrap(builder.getI64ArrayAttr(rawValues));
 }
 
@@ -320,26 +321,24 @@ MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
 }
 
 ireeGPUMMASingleSubgroupLayout
-ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
+ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t operandIndex) {
   assert((ireeAttributeIsAGPUMMAIntrinsicAttr(attr) ||
           ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr)) &&
          "Expected MMA or VirtualMMA Intrinsic");
 
   mlir::Attribute baseAttr = unwrap(attr);
   mlir::iree_compiler::IREE::GPU::MMASingleSubgroupLayout layout;
-  mlir::iree_compiler::IREE::GPU::MMAFragment frag =
-      static_cast<mlir::iree_compiler::IREE::GPU::MMAFragment>(fragment);
 
   if (auto intrinsicAttr =
           llvm::dyn_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
               baseAttr)) {
     layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
-        intrinsicAttr.getValue(), frag);
+        intrinsicAttr.getValue(), operandIndex);
   } else if (auto virtualIntrinsicAttr = llvm::dyn_cast<
                  mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
                  baseAttr)) {
     layout = mlir::iree_compiler::IREE::GPU::getSingleSubgroupLayout(
-        virtualIntrinsicAttr.getValue(), frag);
+        virtualIntrinsicAttr.getValue(), operandIndex);
   } else {
     assert(false &&
            "Unreachable: attribute must be MMA or VirtualMMA intrinsic");
@@ -412,6 +411,12 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   targetInfo.maxThreadCountPerWorkgroup =
       wgpAttr.getMaxThreadCountPerWorkgroup();
   targetInfo.maxWorkgroupMemoryBytes = wgpAttr.getMaxWorkgroupMemoryBytes();
+  targetInfo.simdsPerWgp = wgpAttr.getSimdsPerWgp().value_or(0);
+
+  if (mlir::iree_compiler::IREE::GPU::TargetChipAttr chipAttr =
+          gpuTargetAttr.getChip()) {
+    targetInfo.wgpCount = chipAttr.getWgpCount();
+  }
 
   targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr({}));
   mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr mmaOpsArray =
@@ -443,6 +448,7 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
     MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
     size_t numSubgroupChoices, const int32_t *workgroupSizes,
     size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    uint32_t wgpCount, int32_t simdsPerWgp,
     const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics) {
   assert(!mlirContextIsNull(mlirCtx) && "mlirCtx cannot be null");
   assert(arch && "arch cannot be null");
@@ -464,6 +470,8 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
 
   targetInfo.maxThreadCountPerWorkgroup = threadCount;
   targetInfo.maxWorkgroupMemoryBytes = memoryBytes;
+  targetInfo.wgpCount = wgpCount;
+  targetInfo.simdsPerWgp = simdsPerWgp;
 
   std::vector<mlir::Attribute> mmaIntrinsicAttrs;
   mmaIntrinsicAttrs.reserve(numMmaIntrinsics);

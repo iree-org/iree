@@ -46,7 +46,7 @@ struct WebGPUSPIRVOptions {
 // TODO: WebGPUOptions for choosing the version/extensions/etc.
 class WebGPUTargetDevice : public TargetDevice {
 public:
-  WebGPUTargetDevice(const WebGPUSPIRVOptions &options) : options(options) {}
+  WebGPUTargetDevice(const WebGPUSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -64,9 +64,6 @@ public:
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
                                             configAttr, executableTargetAttrs);
   }
-
-private:
-  const WebGPUSPIRVOptions &options;
 };
 
 class WebGPUSPIRVTargetBackend : public TargetBackend {
@@ -252,7 +249,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_webgpu_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 

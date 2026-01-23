@@ -6,7 +6,7 @@
 
 # Testing utilities for IREE.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -62,5 +62,43 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "@com_google_googletest//:gtest",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "gtest_harness",
+    testonly = True,
+    hdrs = ["gtest_harness.h"],
+    deps = [
+        ":gtest",
+        ":gtest_main",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "gbenchmark_harness",
+    testonly = True,
+    hdrs = ["gbenchmark_harness.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+        "@com_google_benchmark//:benchmark_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "gtest_harness_demo",
+    srcs = ["gtest_harness_demo.cc"],
+    deps = [
+        ":gtest_harness",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "gbenchmark_harness_demo",
+    srcs = ["gbenchmark_harness_demo.cc"],
+    deps = [
+        ":gbenchmark_harness",
     ],
 )

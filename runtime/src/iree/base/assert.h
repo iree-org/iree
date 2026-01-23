@@ -80,6 +80,9 @@ IREE_ATTRIBUTE_NORETURN static inline void iree_abort(void) { abort(); }
 #define IREE_ASSERT_GE(x, y, ...) _IREE_ASSERT_CMP(x, >=, y, __VA_ARGS__)
 #define IREE_ASSERT_GT(x, y, ...) _IREE_ASSERT_CMP(x, >, y, __VA_ARGS__)
 
+#define IREE_ASSERT_ALIGNED(x, alignment, ...) \
+  IREE_ASSERT_EQ((uintptr_t)(x) % (alignment), 0, __VA_ARGS__)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

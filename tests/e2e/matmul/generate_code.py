@@ -56,7 +56,7 @@ def generate_function(
     mx_block_size: int,
     shape: TestShape,
     transpose_rhs: bool,
-    dynamicity: Dynamicity,
+    dynamicities: tuple[Dynamicity, Dynamicity, Dynamicity],
     compilation_info: Optional[CompilationInfo] = None,
 ):
     if mx_scale_type:
@@ -67,11 +67,11 @@ def generate_function(
             mx_block_size=mx_block_size,
             shape=shape,
             transpose_rhs=transpose_rhs,
-            dynamicity=dynamicity,
+            dynamicities=dynamicities,
             compilation_info=compilation_info,
         )
 
-    shapes = generate_shapes(shape, transpose_rhs, dynamicity)
+    shapes = generate_shapes(shape, transpose_rhs, dynamicities)
     func_name = generate_function_name(
         lhs_rhs_type=lhs_rhs_type,
         acc_type=acc_type,
@@ -107,13 +107,25 @@ def generate_function(
 
     if not shape.accumulate:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
-        if acc_r == "?":
+        if acc_r == "?" and acc_c == "?":
             func_definition += (
                 f"  %c0 = arith.constant 0 : index\n"
                 f"  %c1 = arith.constant 1 : index\n"
                 f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
                 f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
                 f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
+            )
+        elif acc_r == "?":
+            func_definition += (
+                f"  %c0 = arith.constant 0 : index\n"
+                f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
+                f"  %init_acc = tensor.empty(%acc_dim0) : {acc_tensor_type}\n"
+            )
+        elif acc_c == "?":
+            func_definition += (
+                f"  %c1 = arith.constant 1 : index\n"
+                f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
+                f"  %init_acc = tensor.empty(%acc_dim1) : {acc_tensor_type}\n"
             )
         else:
             func_definition += f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"

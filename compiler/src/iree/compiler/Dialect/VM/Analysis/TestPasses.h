@@ -24,6 +24,8 @@ std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createValueLivenessTestPass();
 std::unique_ptr<OperationPass<IREE::VM::FuncOp>>
 createRegisterAllocationTestPass();
 
+std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createLiveIntervalsTestPass();
+
 //===----------------------------------------------------------------------===//
 // Register all analysis passes
 //===----------------------------------------------------------------------===//
@@ -31,6 +33,7 @@ createRegisterAllocationTestPass();
 inline void registerVMAnalysisTestPasses() {
   createValueLivenessTestPass();
   createRegisterAllocationTestPass();
+  createLiveIntervalsTestPass();
 }
 
 } // namespace mlir::iree_compiler::IREE::VM

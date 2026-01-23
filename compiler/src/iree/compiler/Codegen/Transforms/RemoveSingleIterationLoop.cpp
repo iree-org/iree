@@ -60,17 +60,22 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
 namespace {
 /// Rewriting pattern that replaces single-iteration loops with their bodies.
 struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
-  using Base::Base;
+
+  SimplifyTrivialLoops(MLIRContext *context, ForControlFnRef controlFn)
+      : OpRewritePattern(context), controlFn(controlFn) {}
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!(neverRunsSecondIteration(op))) {
-      return failure();
+    if (controlFn && !controlFn(op)) {
+      return rewriter.notifyMatchFailure(
+          op, "doesn't match according to the the control function");
     }
-
-    // The second iteration is never run
-    // so the loop atmost can have 1 iteration. Inline its body and remove the
-    // loop.
+    if (!neverRunsSecondIteration(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "is not a single-iteration for loop");
+    }
+    // The second iteration is never run so the loop atmost can have 1
+    // iteration. Inline its body and remove the loop.
     SmallVector<Value> blockArgs;
     blockArgs.reserve(op.getInitArgs().size() + 1);
     blockArgs.push_back(op.getLowerBound());
@@ -82,12 +87,16 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     }
     return success();
   }
+
+private:
+  ForControlFnRef controlFn;
 };
 
 } // namespace
 
-void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns) {
-  patterns.add<SimplifyTrivialLoops>(patterns.getContext());
+void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
+                                              ForControlFnRef controlFn) {
+  patterns.add<SimplifyTrivialLoops>(patterns.getContext(), controlFn);
 }
 
 } // namespace mlir::iree_compiler

@@ -29,12 +29,12 @@ static int shapedTypeStaticSize(
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
   int allocSize = 1;
   for (auto dimSize : shapedType.getShape()) {
-    if (ShapedType::isDynamic(dimSize))
+    if (ShapedType::isDynamic(dimSize)) {
       continue;
+    }
     allocSize *= dimSize;
   }
-  if (auto elementType =
-          llvm::dyn_cast<ShapedType>(shapedType.getElementType())) {
+  if (auto elementType = dyn_cast<ShapedType>(shapedType.getElementType())) {
     allocSize *= shapedTypeStaticSize(allocOp, elementType, getIndexBitwidth);
   } else {
     auto eltTy = shapedType.getElementType();
@@ -43,8 +43,9 @@ static int shapedTypeStaticSize(
       assert(getIndexBitwidth &&
              "getIndexBitwidth should have been set earlier");
       allocSize *= getIndexBitwidth(func);
-    } else
+    } else {
       allocSize *= IREE::Util::getTypeBitWidth(shapedType.getElementType());
+    }
   }
   return allocSize;
 }
@@ -54,19 +55,22 @@ static int shapedTypeStaticSize(
 static LogicalResult checkGPUAllocationSize(
     mlir::FunctionOpInterface funcOp, unsigned limit,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
-  if (funcOp.getFunctionBody().empty())
+  if (funcOp.getFunctionBody().empty()) {
     return success();
+  }
 
   SmallVector<memref::AllocOp> allocOps;
   funcOp.walk([&](memref::AllocOp allocOp) { allocOps.push_back(allocOp); });
-  if (allocOps.empty())
+  if (allocOps.empty()) {
     return success();
+  }
 
   int cumSize = 0;
   for (auto allocOp : allocOps) {
-    auto allocType = llvm::cast<MemRefType>(allocOp.getType());
-    if (!hasSharedMemoryAddressSpace(allocType))
+    auto allocType = cast<MemRefType>(allocOp.getType());
+    if (!hasSharedMemoryAddressSpace(allocType)) {
       continue;
+    }
 
     if (!allocOp.getDynamicSizes().empty()) {
       return allocOp.emitOpError(

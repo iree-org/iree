@@ -45,7 +45,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
   MemRefType memrefType;
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType(),
                         MemRefLayoutAttrInterface{}, addressSpaceAttr);
@@ -62,14 +62,18 @@ static bool isUniformLoad(Operation *op) {
   using namespace IREE::HAL;
 
   auto loadOp = dyn_cast<memref::LoadOp>(op);
-  if (!loadOp)
+  if (!loadOp) {
     return false;
-  if (!hasGlobalMemoryAddressSpace(loadOp.getMemRefType()))
+  }
+  if (!hasGlobalMemoryAddressSpace(loadOp.getMemRefType())) {
     return false;
+  }
   auto space = loadOp.getMemRefType().getMemorySpace();
-  auto descTypeAttr = llvm::dyn_cast_if_present<DescriptorTypeAttr>(space);
-  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
+  auto descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(space);
+  if (descTypeAttr &&
+      descTypeAttr.getValue() == DescriptorType::UniformBuffer) {
     return true;
+  }
 
   auto subspan = loadOp.getMemRef().getDefiningOp<InterfaceBindingSubspanOp>();
   if (auto fatBufferCast =
@@ -77,16 +81,20 @@ static bool isUniformLoad(Operation *op) {
     subspan =
         fatBufferCast.getSource().getDefiningOp<InterfaceBindingSubspanOp>();
   }
-  if (!subspan)
+  if (!subspan) {
     return false;
+  }
 
   descTypeAttr = dyn_cast_if_present<DescriptorTypeAttr>(
       cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
-  if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
+  if (descTypeAttr &&
+      descTypeAttr.getValue() == DescriptorType::UniformBuffer) {
     return true;
+  }
   if (auto flags = subspan.getDescriptorFlags()) {
-    if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
+    if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly)) {
       return true;
+    }
   }
   return false;
 }
@@ -97,18 +105,24 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
   /// Hoist ops without side effect as well as special binding ops.
   auto canBeHoisted = [](Operation *op,
                          function_ref<bool(Value)> definedOutside) {
-    if (op->getNumRegions() != 0)
+    if (op->getNumRegions() != 0) {
       return false;
-    if (!llvm::all_of(op->getOperands(), definedOutside))
+    }
+    if (!llvm::all_of(op->getOperands(), definedOutside)) {
       return false;
-    if (isMemoryEffectFree(op))
+    }
+    if (isMemoryEffectFree(op)) {
       return true;
+    }
 
     if (isa<IREE::HAL::InterfaceBindingSubspanOp,
-            IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(op))
+            IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(
+            op)) {
       return true;
-    if (isUniformLoad(op))
+    }
+    if (isUniformLoad(op)) {
       return true;
+    }
     // Shared memory is already scoped to the workgroup and can safely be
     // hoisted out of the the warp op.
     if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
@@ -135,7 +149,7 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
   // operations from there.
   for (auto &op : body->without_terminator()) {
     bool hasVectorResult = llvm::any_of(op.getResults(), [](Value result) {
-      return llvm::isa<VectorType>(result.getType());
+      return isa<VectorType>(result.getType());
     });
     if ((!hasVectorResult || isUniformLoad(&op)) &&
         canBeHoisted(&op, isDefinedOutsideOfBody)) {
@@ -144,8 +158,9 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
   }
 
   // Move all the ops marked as uniform outside of the region.
-  for (Operation *op : opsToMove)
+  for (Operation *op : opsToMove) {
     op->moveBefore(warpOp);
+  }
 }
 
 /// Pattern to convert single element vector.insert to broadcast, this is a
@@ -155,8 +170,9 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
 
   LogicalResult matchAndRewrite(vector::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1)
+    if (insertOp.getDestVectorType().getNumElements() != 1) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         insertOp, insertOp.getDestVectorType(), insertOp.getValueToStore());
     return success();
@@ -172,9 +188,10 @@ struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
     auto yield = cast<gpu::YieldOp>(
         warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
     Operation *lastNode = yield->getPrevNode();
-    auto barrierOp = dyn_cast_or_null<gpu::BarrierOp>(lastNode);
-    if (!barrierOp)
+    auto barrierOp = dyn_cast_if_present<gpu::BarrierOp>(lastNode);
+    if (!barrierOp) {
       return failure();
+    }
 
     rewriter.setInsertionPointAfter(warpOp);
     (void)gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
@@ -273,9 +290,10 @@ struct VectorReductionToGPUPass final
                                      *subgroupSize, expandSubgroupReduction);
       };
       auto distributionFn = [](Value val) {
-        auto vecType = llvm::dyn_cast<VectorType>(val.getType());
-        if (!vecType)
+        auto vecType = dyn_cast<VectorType>(val.getType());
+        if (!vecType) {
           return AffineMap::get(val.getContext());
+        }
         // Create an identity dim map of rank |vecRank|. This greedily divides
         // threads along the outermost vector dimensions to the innermost ones.
         int64_t vecRank = vecType.getRank();

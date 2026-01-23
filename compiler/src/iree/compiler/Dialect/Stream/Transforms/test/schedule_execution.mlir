@@ -435,7 +435,7 @@ util.func public @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external
   %upload = stream.async.transfer %updated : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.dispatch
   %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload[%c0 to %c1 for %c1], %splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
-  // CHECK-NEXT: stream.async.transfer
+  // CHECK-NEXT: stream.async.clone
   %result = stream.async.transfer %dispatch1 : !stream.resource<transient>{%c1} -> !stream.resource<external>{%c1}
   // CHECK: %[[PARTITION1:.+]] = stream.timepoint.await
 
@@ -513,4 +513,118 @@ util.func public @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: in
     scf.yield %0 : !stream.resource<*>
   }
   util.return %sum, %arg1 : !stream.resource<*>, index
+}
+
+// -----
+
+// Tests clones that span multiple partitions separated by a load barrier do not
+// create a circular dependency when the clone is used on both sides of the
+// barrier. The clone is duplicated into both partitions.
+
+// CHECK-LABEL: @cloneAcrossLoadBarrier
+util.func public @cloneAcrossLoadBarrier(%arg0: !stream.resource<external>) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+  %c24 = arith.constant 24 : index
+
+  // First partition: clone + dispatch0 + transfer (before load barrier).
+  // CHECK: %[[RESULTS0:.+]]:2, %[[TP0:.+]] = stream.async.execute
+  // CHECK-SAME: with({{.+}} as %[[ARG0:.+]]: !stream.resource<external>{%c24})
+  // CHECK-SAME: -> (!stream.resource<transient>{%c16}, !stream.resource<staging>{%c16})
+  // CHECK-NEXT: %[[CLONE0:.+]] = stream.async.clone %[[ARG0]]
+  %clone = stream.async.clone %arg0 : !stream.resource<external>{%c24} -> !stream.resource<external>{%c24}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0(%[[CLONE0]]
+  %dispatch0 = stream.async.dispatch @ex::@dispatch_0(%clone[%c0 to %c24 for %c24]) : (!stream.resource<external>{%c24}) -> !stream.resource<transient>{%c16}
+  // CHECK-NEXT: %[[TRANSFER:.+]] = stream.async.transfer %[[DISPATCH0]]
+  %transfer = stream.async.transfer %dispatch0 : !stream.resource<transient>{%c16} -> !stream.resource<staging>{%c16}
+  // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[TRANSFER]]
+
+  // CHECK: stream.timepoint.await %[[TP0]] => %[[RESULTS0]]#1
+  // CHECK: %[[LOADED:.+]] = stream.async.load
+  %loaded = stream.async.load %transfer[%c0] : !stream.resource<staging>{%c16} -> i64
+  // Second partition: clone (duplicated) + splat + dispatch1 + dispatch2 (after load barrier).
+  // CHECK: %[[RESULTS1:.+]]:2, %[[TP1:.+]] = stream.async.execute
+  // CHECK-SAME: await(%[[TP0]])
+  // CHECK-SAME: with({{.+}} as %[[ARG1:.+]]: !stream.resource<external>{%c24},
+  // CHECK-SAME:      %[[RESULTS0]]#0 as %[[DISPATCH0_IN:.+]]: !stream.resource<transient>{%c16})
+  // CHECK-SAME: -> (!stream.resource<transient>{%c8}, !stream.resource<transient>{%c8})
+  // CHECK-NEXT: %[[CLONE1:.+]] = stream.async.clone %[[ARG1]]
+  // CHECK-NEXT: %[[SPLAT:.+]] = stream.async.splat %[[LOADED]]
+  %filled = stream.async.splat %loaded : i64 -> !stream.resource<transient>{%c24}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1(%[[DISPATCH0_IN]]{{.+}}, %[[SPLAT]]
+  %dispatch1 = stream.async.dispatch @ex::@dispatch_1(%dispatch0[%c0 to %c16 for %c16], %filled[%c0 to %c24 for %c24]) : (!stream.resource<transient>{%c16}, !stream.resource<transient>{%c24}) -> !stream.resource<transient>{%c8}
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2(%[[CLONE1]]
+  %dispatch2 = stream.async.dispatch @ex::@dispatch_2(%clone[%c0 to %c24 for %c24]) : (!stream.resource<external>{%c24}) -> !stream.resource<transient>{%c8}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]], %[[DISPATCH2]]
+
+  // CHECK: stream.timepoint.await %[[TP1]] => %[[RESULTS1]]
+  util.return %dispatch1, %dispatch2 : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
+// Tests that await timepoints on splat ops are collected and become the
+// execute's await.
+
+// CHECK-LABEL: @partitionSplatWithAwait
+//  CHECK-SAME: (%[[AWAIT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func public @partitionSplatWithAwait(%await: !stream.timepoint, %size: index) -> !stream.resource<transient> {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[SPLAT_VALUE:.+]] = arith.constant 123 : i32
+  %splat_value = arith.constant 123 : i32
+
+  // CHECK: %[[RESULT:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: await(%[[AWAIT]])
+  // CHECK-SAME: with() -> !stream.resource<transient>{%[[SIZE]]} {
+
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat
+  // CHECK-SAME: %[[SPLAT_VALUE]] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+  %splat = stream.async.splat await(%await) %splat_value : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @ex::@dispatch0
+  // CHECK-SAME: (%[[SPLAT]][%[[C0]] to %[[SIZE]] for %[[SIZE]]])
+  %dispatch = stream.async.dispatch @ex::@dispatch0(%splat[%c0 to %size for %size]) : (!stream.resource<transient>{%size}) -> !stream.resource<transient>{%size}
+  // CHECK: stream.yield %[[DISPATCH]] : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT]] => %[[RESULT]] : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %dispatch : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that multiple await timepoints are joined before becoming the
+// execute's await.
+
+// CHECK-LABEL: @partitionMultipleAwaits
+//  CHECK-SAME: (%[[AWAIT0:.+]]: !stream.timepoint, %[[AWAIT1:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func public @partitionMultipleAwaits(%await0: !stream.timepoint, %await1: !stream.timepoint, %size: index) -> !stream.resource<transient> {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[VALUE0:.+]] = arith.constant 123 : i32
+  %value0 = arith.constant 123 : i32
+  // CHECK-DAG: %[[VALUE1:.+]] = arith.constant 456 : i32
+  %value1 = arith.constant 456 : i32
+
+  // CHECK: %[[JOINED:.+]] = stream.timepoint.join max(%[[AWAIT1]], %[[AWAIT0]]) => !stream.timepoint
+  // CHECK: %[[RESULT:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: await(%[[JOINED]])
+  // CHECK-SAME: with() -> !stream.resource<transient>{%[[SIZE]]} {
+  // CHECK: %[[SPLAT0:.+]] = stream.async.splat
+  // CHECK-SAME: %[[VALUE0]] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+  %splat0 = stream.async.splat await(%await0) %value0 : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[SPLAT1:.+]] = stream.async.splat
+  // CHECK-SAME: %[[VALUE1]] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+  %splat1 = stream.async.splat await(%await1) %value1 : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @ex::@dispatch0
+  // CHECK-SAME: (%[[SPLAT0]][%[[C0]] to %[[SIZE]] for %[[SIZE]]], %[[SPLAT1]][%[[C0]] to %[[SIZE]] for %[[SIZE]]])
+  %dispatch = stream.async.dispatch @ex::@dispatch0(%splat0[%c0 to %size for %size], %splat1[%c0 to %size for %size]) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> !stream.resource<transient>{%size}
+  // CHECK: stream.yield %[[DISPATCH]] : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT]] => %[[RESULT]] : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %dispatch : !stream.resource<transient>
 }

@@ -40,8 +40,9 @@ struct LLVMCPUCheckIRBeforeLLVMConversionPass
 /// defined for HAL LLVMCPU target).
 static LogicalResult
 checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
-  if (funcOp.getFunctionBody().empty())
+  if (funcOp.getFunctionBody().empty()) {
     return success();
+  }
 
   // In rare cases where the attribute is not present in the module, a value of
   // 32KB will be taken.
@@ -71,10 +72,11 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           "function");
     }
     int allocaSize = 1;
-    auto allocaType = llvm::cast<ShapedType>(allocaOp.getType());
+    auto allocaType = cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
-      if (ShapedType::isDynamic(dimSize))
+      if (ShapedType::isDynamic(dimSize)) {
         continue;
+      }
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {

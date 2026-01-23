@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --verify-diagnostics %s | FileCheck %s
 
 // Today all memory control operations are ignored and we're just left with
 // the normal sequential execution barriers.
@@ -519,5 +519,30 @@ util.func public @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1
   %0 = stream.cmd.execute once on(#hal.device.affinity<@device, [0, 1]>) await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
     stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
   } => !stream.timepoint
+  util.return %0 : !stream.timepoint
+}
+
+// -----
+
+// Test that no memory leak occurs if the conversion eventually fails due to an
+// illegal operation. Detecting the memory leak requires an ASAN build.
+// This is a regression test for https://github.com/iree-org/iree/issues/22972.
+
+util.global private @device : !hal.device
+
+util.func public @cmdFill(%res0: !stream.resource<constant>, %res1: !stream.resource<constant>, %res2: !stream.resource<external>, %tp : !stream.timepoint) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %c255_i32 = arith.constant 255 : i32
+  %signal = stream.cmd.execute await(%tp) => with(%res0 as %arg0: !stream.resource<constant>{%c4}, %res1 as %arg1: !stream.resource<constant>{%c128}, %res2 as %arg2: !stream.resource<external>{%c128}) {
+    stream.cmd.concurrent {
+      stream.cmd.copy %arg0[%c0], %arg2[%c0], %c4 : !stream.resource<constant>{%c4} -> !stream.resource<external>{%c128}
+      stream.cmd.copy %arg1[%c0], %arg2[%c64], %c4 : !stream.resource<constant>{%c128} -> !stream.resource<external>{%c128}
+    }
+  } => !stream.timepoint
+  // expected-error @+1 {{ailed to legalize operation 'some.op' that was explicitly marked illegal}}
+  %0 = "some.op"(%signal, %c255_i32) : (!stream.timepoint, i32) -> (!stream.timepoint)
   util.return %0 : !stream.timepoint
 }

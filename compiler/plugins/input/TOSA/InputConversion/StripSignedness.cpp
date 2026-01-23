@@ -26,7 +26,7 @@ public:
 class IntegerTypeConverter : public TypeConverter {
 public:
   static Type convertType(Type type) {
-    if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
+    if (auto iType = dyn_cast<IntegerType>(type)) {
       if (!iType.isSignless()) {
         return IntegerType::get(type.getContext(),
                                 iType.getIntOrFloatBitWidth());
@@ -78,9 +78,10 @@ public:
 };
 
 static bool isIllegalType(Type type) {
-  if (IntegerType ity = llvm::dyn_cast<IntegerType>(type))
+  if (IntegerType ity = dyn_cast<IntegerType>(type)) {
     return !ity.isSignless();
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+  }
+  if (auto shapedType = dyn_cast<ShapedType>(type)) {
     return isIllegalType(shapedType.getElementType());
   }
   return false;
@@ -94,21 +95,25 @@ void StripSignednessPass::runOnOperation() {
   target.markUnknownOpDynamicallyLegal([](Operation *op) {
     if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
       for (Type type : funcOp.getArgumentTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
       for (Type type : funcOp.getResultTypes()) {
-        if (isIllegalType(type))
+        if (isIllegalType(type)) {
           return false;
+        }
       }
     }
     for (Type type : op->getResultTypes()) {
-      if (type && isIllegalType(type))
+      if (type && isIllegalType(type)) {
         return false;
+      }
     }
     for (Type type : op->getOperandTypes()) {
-      if (type && isIllegalType(type))
+      if (type && isIllegalType(type)) {
         return false;
+      }
     }
     return true;
   });

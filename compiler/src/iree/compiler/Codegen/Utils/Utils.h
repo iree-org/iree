@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -24,6 +25,10 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
+
+namespace mlir {
+class DataFlowSolver;
+} // namespace mlir
 
 namespace mlir::iree_compiler {
 
@@ -185,9 +190,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
                      ArrayRef<int64_t> tileSizes,
                      ArrayRef<bool> tileScalableFlags);
 
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
-                              ArrayRef<NamedAttribute> attributes = {});
-
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
@@ -212,6 +214,17 @@ int getReductionTilingFactor(int64_t dimSize);
 // Returns the minimal element bitwidth used in the operands and results of the
 // given Linalg op.
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
+
+//===---------------------------------------------------------------------===//
+// Integer range analysis utility functions.
+//===---------------------------------------------------------------------===//
+
+/// Get the upper bound of a dynamic value. First tries IntegerRangeAnalysis
+/// (cached, efficient), then falls back to ValueBoundsConstraintSet for complex
+/// cases like affine.apply. The solver should have IntegerRangeAnalysis loaded
+/// and initialized before calling this function.
+FailureOr<int64_t> getDynamicUpperBound(Value value,
+                                        const DataFlowSolver &solver);
 
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
@@ -281,8 +294,43 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
+/// Retrieves the DenormalFpMathAttr for F32 values from the given target
+/// configuration. This attribute specifies how denormal floating-point values
+/// are handled in F32 operations.
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
+/// Adds a denormal floating-point math configuration for F32 values to the
+/// configuration list. This configures how denormal floating-point values are
+/// handled in F32 operations.
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
+
+// Utility to make sure we are storing the full incoming subspan. Otherwise we
+// cannot simply adjust the subspan's resultant type later.
+bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
+                 IREE::TensorExt::DispatchTensorType tensorType,
+                 ValueRange dynamicDims);
+
+//===---------------------------------------------------------------------===//
+// Scalable size utility functions
+//===---------------------------------------------------------------------===//
+
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
+// This function takes a vector of mixed sizes and returns the static tile sizes
+// and scalable tile flags. For scalable inner tiles, it returns the static
+// counterpart and the corresponding flag. E.g. for [8, [8]] it returns [8, 8]
+// and [false, true].
+std::optional<SizesAndScalableFlags>
+getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedSizes);
 
 using DimBound = vector::ConstantOrScalableBound;
 using DimBoundSize = DimBound::BoundSize;
@@ -299,33 +347,9 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
                      std::optional<vector::VscaleRange> vscaleRange,
                      RoundUpVscaleMultiple = RoundUpVscaleMultiple::No);
 
-// Utility to make sure we are storing the full incoming subspan. Otherwise we
-// cannot simply adjust the subspan's resultant type later.
-bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::TensorExt::DispatchTensorType tensorType,
-                 ValueRange dynamicDims);
-
-/// Retrieves the DenormalFpMathAttr for F32 values from the given target
-/// configuration. This attribute specifies how denormal floating-point values
-/// are handled in F32 operations.
-IREE::Codegen::DenormalFpMathAttr
-getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
-std::optional<IREE::Codegen::DenormalFpMath>
-getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
-
-/// Adds a denormal floating-point math configuration for F32 values to the
-/// configuration list. This configures how denormal floating-point values are
-/// handled in F32 operations.
-void addConfigDenormalFpMathF32(MLIRContext *context,
-                                IREE::Codegen::DenormalFpMath mode,
-                                SmallVectorImpl<NamedAttribute> &config);
-
 //===----------------------------------------------------------------------===//
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
-
-using SizesAndScalableFlags =
-    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
@@ -337,6 +361,15 @@ struct VectorizationTileSizes {
 /// shape and vector input sizes. This is useful to infer the sizes from a
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
+
+/// Returns the inferred input-vector-sizes for the `op`, given the provided
+/// vector sizes for the read operation of the outer dimensions.
+/// Returns std::nullopt, if it fails to compute the sizes.
+/// For now, it only supports non-scalable vectors.
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromUnpackedDomain(linalg::PackOp op,
+                                      ArrayRef<int64_t> readVectorSizes,
+                                      ArrayRef<bool> scalableFlags);
 
 /// Returns the inferred input-vector-sizes for the `op` (for read + write
 /// operations), given the provided vector sizes for the write operation.
@@ -368,6 +401,12 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
                                                        OpResult opResult);
 
+/// Returns the result sizes and vector input sizes of the ukernel.generic op.
+/// The inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+std::optional<VectorizationTileSizes>
+inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult);
+
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);
 
@@ -393,6 +432,37 @@ bool neverRunsSecondIteration(scf::ForOp op);
 ///  Here %4 is an external capture used via tensor.extract inside
 ///  linalg.generic hence the above `genericOp` has an external capture.
 bool hasExternalCapture(linalg::GenericOp genericOp);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for accumulating operations
+//===----------------------------------------------------------------------===//
+
+/// Check if the init value of the DPS operation is read/write from the same
+/// buffer. This determines whether the operation is a valid in-place
+/// accumulating op. For GEMMs:
+/// - Returns true: The GEMM reads and writes to the same buffer
+/// (matmul_accumulate)
+///   The accumulator needs to be loaded from global memory.
+/// - Returns false: The GEMM will be converted to a non-accumulating GEMM + add
+///   by ConvertAccGEMMToGEMMPass, and the accumulator can be zero-initialized
+///   in registers.
+bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for copy operations
+//===----------------------------------------------------------------------===//
+
+/// Create a linalg::GenericOp version of an n-D copy that can further tile,
+/// lower to loops or vectorize, unlike the current implementation of
+/// memref::CopyOp.
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes = {});
+
+/// Returns the tile sizes for tiling a `memref.copy` operation.
+SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy);
+
+/// Returns the tile sizes for tiling a `linalg.copy` operation.
+std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp);
 
 } // namespace mlir::iree_compiler
 

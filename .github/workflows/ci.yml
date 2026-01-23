@@ -76,8 +76,8 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
           python-version: "3.11"
 
@@ -100,7 +100,7 @@ jobs:
       - name: Install Python requirements
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: ccache
-        uses: hendrikmuhs/ccache-action@bfa03e1de4d7f7c3e80ad9109feedd05c4f5a716 # v1.2.19
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -132,13 +132,13 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@bfa03e1de4d7f7c3e80ad9109feedd05c4f5a716 # v1.2.19
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -174,7 +174,7 @@ jobs:
     env:
       BUILD_DIR: build-tracing
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: (Linux) Install requirements
         if: contains(matrix.runs-on, 'ubuntu')
@@ -200,7 +200,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@bfa03e1de4d7f7c3e80ad9109feedd05c4f5a716 # v1.2.19
+        uses: hendrikmuhs/ccache-action@5ebbd400eff9e74630f759d94ddd7b6c26299639 # v1.2.20
         with:
           key: ${{ github.job }}-${{ matrix.runs-on}}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -235,10 +235,58 @@ jobs:
     uses: ./.github/workflows/ci_linux_x64_clang.yml
     secrets: inherit
 
+  linux_x64_gcc:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_gcc')
+    uses: ./.github/workflows/ci_linux_x64_gcc.yml
+    secrets: inherit
+
+  linux_arm64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_arm64_clang')
+    uses: ./.github/workflows/ci_linux_arm64_clang.yml
+    secrets: inherit
+
+  linux_x64_clang_debug:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_debug')
+    uses: ./.github/workflows/ci_linux_x64_clang_debug.yml
+    secrets: inherit
+
   linux_x64_clang_asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
     uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
+    secrets: inherit
+
+  linux_x64_clang_ubsan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_ubsan')
+    uses: ./.github/workflows/ci_linux_x64_clang_ubsan.yml
+    secrets: inherit
+
+  linux_x64_clang_tsan:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_tsan')
+    uses: ./.github/workflows/ci_linux_x64_clang_tsan.yml
+    secrets: inherit
+
+  linux_x64_clang_byollvm:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_byollvm')
+    uses: ./.github/workflows/ci_linux_x64_clang_byollvm.yml
+    secrets: inherit
+
+  macos_arm64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'macos_arm64_clang')
+    uses: ./.github/workflows/ci_macos_arm64_clang.yml
+    secrets: inherit
+
+  macos_x64_clang:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'macos_x64_clang')
+    uses: ./.github/workflows/ci_macos_x64_clang.yml
     secrets: inherit
 
   windows_x64_msvc:
@@ -263,7 +311,15 @@ jobs:
       # Full project builds.
       - linux_x64_bazel
       - linux_x64_clang
+      - linux_x64_gcc
+      - linux_arm64_clang
+      - linux_x64_clang_debug
       - linux_x64_clang_asan
+      - linux_x64_clang_ubsan
+      - linux_x64_clang_tsan
+      - linux_x64_clang_byollvm
+      - macos_arm64_clang
+      - macos_x64_clang
       - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit

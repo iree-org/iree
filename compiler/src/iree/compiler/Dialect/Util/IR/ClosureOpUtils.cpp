@@ -47,9 +47,9 @@ void excludeClosureOperandsAndResults(
   for (auto it : llvm::enumerate(oldOperandValues)) {
     unsigned numDynamicDims = 0;
     auto type = it.value().getType();
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedOperandIndices, it.index())) {
@@ -69,9 +69,9 @@ void excludeClosureOperandsAndResults(
   for (auto it : llvm::enumerate(oldResultTypes)) {
     unsigned numDynamicDims = 0;
     auto type = it.value();
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedResultIndices, it.index())) {
@@ -155,8 +155,9 @@ static SmallVector<unsigned> findDuplicateRegionResults(Region &region) {
   auto uniformDupeIndexMap =
       llvm::to_vector(llvm::seq(0u, resultCount)); // old -> new
   for (unsigned idx = 0; idx < resultCount; ++idx) {
-    if (deadResultsMap.test(idx))
+    if (deadResultsMap.test(idx)) {
       continue;
+    }
     // Each bit represents a result that duplicates the result at idx.
     // We walk all the sites and AND their masks together to get the safe
     // set of duplicate results.
@@ -207,14 +208,14 @@ static bool isConstantInlinable(const ClosureOptimizationOptions &options,
 
   auto constantValueAttr = constantOp.getValue();
   auto constantType = constantOp.getType();
-  if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
+  if (isa<SplatElementsAttr>(constantValueAttr)) {
     // Splats are always small and can often have special handling when we
     // know they are a splat - which is why it's so important we inline them
     // here so we know when they are used that's the case.
     return true;
-  } else if (auto attr = llvm::dyn_cast<ElementsAttr>(constantValueAttr)) {
+  } else if (auto attr = dyn_cast<ElementsAttr>(constantValueAttr)) {
     // Smallish constants are worth moving inside.
-    auto shapedType = llvm::cast<ShapedType>(constantType);
+    auto shapedType = cast<ShapedType>(constantType);
     uint64_t estimatedByteLength =
         IREE::Util::getRoundedPhysicalStorageSize(shapedType);
     return attr.isSplat() || estimatedByteLength <= maxInlinedConstantBytes;
@@ -257,15 +258,17 @@ static void inlineClosureOperands(const ClosureOptimizationOptions &options,
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
-    if (!sourceOp)
+    if (!sourceOp) {
       continue; // can't clone block arguments into closures
+    }
 
     // We cannot just simply inline and replace all users if this is an
     // argument that can be written; for example, the region might perform
     // work after loading a initial constant from the argument and then
     // write back.
-    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly())
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) {
       continue;
+    }
 
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(options, outerValue)) {

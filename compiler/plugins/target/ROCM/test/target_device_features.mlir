@@ -27,6 +27,24 @@
 // RUN:   --iree-hip-target=w7700 %s | FileCheck %s --check-prefix=GFX1101
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=phoenix %s | FileCheck %s --check-prefix=GFX1103
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1103 %s | FileCheck %s --check-prefix=GFX1103
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=strix-point %s | FileCheck %s --check-prefix=GFX1150
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1150 %s | FileCheck %s --check-prefix=GFX1150
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=strix-halo %s | FileCheck %s --check-prefix=GFX1151
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1151 %s | FileCheck %s --check-prefix=GFX1151
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1200 %s | FileCheck %s --check-prefix=GFX1200
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
@@ -75,6 +93,18 @@
 // GFX1101-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
 // GFX1101-SAME:        subgroup_size_choices = [32, 64]
 
+// GFX1103: target_info = #iree_gpu.target<arch = "gfx1103",
+// GFX1103-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1103-SAME:        subgroup_size_choices = [32, 64]
+
+// GFX1150: target_info = #iree_gpu.target<arch = "gfx1150",
+// GFX1150-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1150-SAME:        subgroup_size_choices = [32, 64]
+
+// GFX1151: target_info = #iree_gpu.target<arch = "gfx1151",
+// GFX1151-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1151-SAME:        subgroup_size_choices = [32, 64]
+
 // GFX1200: target_info = #iree_gpu.target<arch = "gfx1200",
 // GFX1200-SAME:        mma = [<WMMAR4_F32_16x16x16_F16>, <WMMAR4_F16_16x16x16_F16>, <WMMAR4_F32_16x16x16_BF16>, <WMMAR4_BF16_16x16x16_BF16>, <WMMAR4_F32_16x16x16_F8E5M2>, <WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2>,  <WMMAR4_I32_16x16x16_I8>]
 // GFX1200-SAME:        subgroup_size_choices = [32, 64]
@@ -91,12 +121,19 @@
 
 // Note: The gfx1250 target is experimental and contains placeholder values.
 // GFX1250: target_info = #iree_gpu.target<arch = "gfx1250",
+// GFX1250-SAME:        mma = [<WMMA_F32_16x16x4_F32>,
+// GFX1250-SAME:               <WMMA_F32_16x16x32_F16>, <WMMA_F32_16x16x32_BF16>, <WMMA_F16_16x16x32_F16>, <WMMA_BF16_16x16x32_BF16>,
+// GFX1250-SAME:               <WMMA_F32_16x16x64_F8E4M3FN>, <WMMA_F32_16x16x64_F8E4M3FN_F8E5M2>, <WMMA_F32_16x16x64_F8E5M2>, <WMMA_F32_16x16x64_F8E5M2_F8E4M3FN>,
+// GFX1250-SAME:               <WMMA_F16_16x16x64_F8E4M3FN>, <WMMA_F16_16x16x64_F8E4M3FN_F8E5M2>, <WMMA_F16_16x16x64_F8E5M2>, <WMMA_F16_16x16x64_F8E5M2_F8E4M3FN>,
+// GFX1250-SAME:               <WMMA_I32_16x16x64_I8>,
+// GFX1250-SAME:               <WMMA_F32_16x16x128_F8E5M2>, <WMMA_F32_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN_F8E5M2>,
+// GFX1250-SAME:               <WMMA_F16_16x16x128_F8E5M2>, <WMMA_F16_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN_F8E5M2>]
 // GFX1250-SAME:        subgroup_size_choices = [32]
 // GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4
 
 stream.executable public @reduce_dispatch {
-  stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
+  stream.executable.export @reduce_dispatch workgroups() -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

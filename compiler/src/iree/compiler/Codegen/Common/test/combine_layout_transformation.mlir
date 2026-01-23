@@ -366,7 +366,7 @@ func.func @no_insert_in_non_workgroup_forall(%2 : tensor<32xbf16>, %9 : tensor<1
   return %6 : tensor<32xbf16>
 }
 // WORKGROUP-SCOPE-LABEL: @no_insert_in_non_workgroup_forall
-//   WORKGROUP-SCOPE-NOT:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
 
 // -----
 
@@ -432,3 +432,64 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 //       DISPATCH-SCOPE:     scf.forall.in_parallel
 //       DISPATCH-SCOPE:       tensor.parallel_insert_slice
 //       DISPATCH-SCOPE:   linalg.generic
+
+// -----
+
+// Test that unpack without padding, so map_scatter doesn't need masking.
+func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf32>) {
+  %assumed = util.assume.int %dim<umin = 1024, umax = 16384, udiv = 128> : index
+  %workload = iree_tensor_ext.dispatch.workload.ordinal %assumed, 0 : index
+  %tiled_dim = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%workload]
+  %source = tensor.empty(%tiled_dim) : tensor<?x64x128x256xf32>
+  %dest = tensor.empty(%workload) : tensor<?x16384xf32>
+  %unpack = linalg.unpack %source outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 256] into %dest : tensor<?x64x128x256xf32> -> tensor<?x16384xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<?x16384xf32> into memref<?x16384xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: func @unpack_no_padding_no_masking
+// DISPATCH-SCOPE: iree_linalg_ext.map_scatter
+// DISPATCH-SCOPE-NOT: arith.cmpi ult
+
+// -----
+
+// Tests that no padding scf.forall loops are emitted when
+// padding in linalg.pack is effectively a no-op.
+
+func.func @pack_dynamic_dim_tile_size_1_no_pad_loop(%source : tensor<16x?x128xf16>, %result : memref<16x8x?x16x1xf16>) {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 1 : index
+  %dim = tensor.dim %source, %cst_1 : tensor<16x?x128xf16>
+  %dest = tensor.empty(%dim) : tensor<16x8x?x16x1xf16>
+  %pack = linalg.pack %source padding_value(%cst : f16)
+    outer_dims_perm = [0, 2, 1]
+    inner_dims_pos = [2, 1]
+    inner_tiles = [16, 1]
+    into %dest : tensor<16x?x128xf16> -> tensor<16x8x?x16x1xf16>
+  iree_codegen.store_to_buffer %pack, %result : tensor<16x8x?x16x1xf16> into memref<16x8x?x16x1xf16>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @pack_dynamic_dim_tile_size_1_no_pad_loop
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+// Verify no padding loops are generated.
+//   DISPATCH-SCOPE-NOT:   scf.forall
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
+
+// -----
+
+func.func @pack_divisible_static_dim_tile_size_8_no_pad_loop(%source : tensor<16x?xf16>, %result : memref<2x?x8x1xf16>) {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 1 : index
+  %dim = tensor.dim %source, %cst_1 : tensor<16x?xf16>
+  %dest = tensor.empty(%dim) : tensor<2x?x8x1xf16>
+  %pack = linalg.pack %source padding_value(%cst : f16)
+    inner_dims_pos = [0, 1]
+    inner_tiles = [8, 1]
+    into %dest : tensor<16x?xf16> -> tensor<2x?x8x1xf16>
+  iree_codegen.store_to_buffer %pack, %result : tensor<2x?x8x1xf16> into memref<2x?x8x1xf16>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @pack_divisible_static_dim_tile_size_8_no_pad_loop
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+// Verify no padding loops are generated.
+//   DISPATCH-SCOPE-NOT:   scf.forall
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer

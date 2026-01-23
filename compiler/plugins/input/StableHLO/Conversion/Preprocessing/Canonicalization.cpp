@@ -23,6 +23,7 @@
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -53,8 +54,9 @@ static bool isIotaRange(ArrayRef<int64_t> dims) {
 
 static bool isIotaRange(ElementsAttr attr) {
   auto elems = attr.tryGetValues<APInt>();
-  if (!elems)
+  if (!elems) {
     return false;
+  }
 
   for (auto [idx, value] : llvm::enumerate(*elems)) {
     if (idx != value) {
@@ -118,8 +120,9 @@ struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::AddOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
@@ -165,8 +168,9 @@ struct SubtractOpCanon final : OpRewritePattern<mlir::stablehlo::SubtractOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::SubtractOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
@@ -207,8 +211,9 @@ struct MulOpCanon final : OpRewritePattern<mlir::stablehlo::MulOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
@@ -333,8 +338,9 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::CompareOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     // Bail out on non-integer comparison.
     // TODO: Support more comparison types.
@@ -409,8 +415,9 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::SelectOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     Value trueVal = op.getOnTrue();
     Value falseVal = op.getOnFalse();
@@ -436,16 +443,19 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
 
     // Handle elementwise selection when both outcomes are also constants. This
     // will create a new, likely non-splat constant.
-    if (cond.getNumElements() > kFoldOpEltLimit)
+    if (cond.getNumElements() > kFoldOpEltLimit) {
       return failure();
+    }
 
     ElementsAttr trueAttr;
-    if (!matchPattern(trueVal, m_Constant(&trueAttr)))
+    if (!matchPattern(trueVal, m_Constant(&trueAttr))) {
       return failure();
+    }
 
     ElementsAttr falseAttr;
-    if (!matchPattern(falseVal, m_Constant(&falseAttr)))
+    if (!matchPattern(falseVal, m_Constant(&falseAttr))) {
       return failure();
+    }
 
     SmallVector<Attribute> newValues;
     newValues.reserve(cond.getNumElements());
@@ -468,13 +478,15 @@ struct BroadcastInDimOpCanon final
   LogicalResult matchAndRewrite(mlir::stablehlo::BroadcastInDimOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type)
+    if (!type) {
       return failure();
+    }
 
     Value operand = op.getOperand();
     auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
-    if (!operandTy)
+    if (!operandTy) {
       return failure();
+    }
 
     // Fold when broadcast is a noop.
     auto dims = op.getBroadcastDimensions();
@@ -533,12 +545,14 @@ struct ConcatenateOpCanon final
   LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
                                 PatternRewriter &rewriter) const override {
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type || !type.hasStaticShape())
+    if (!type || !type.hasStaticShape()) {
       return failure();
+    }
 
     size_t numElems = type.getNumElements();
-    if (numElems > kFoldOpEltLimit)
+    if (numElems > kFoldOpEltLimit) {
       return failure();
+    }
 
     // Fold concatenate when all inputs are constants.
     OperandRange inputs = op.getInputs();
@@ -551,8 +565,7 @@ struct ConcatenateOpCanon final
 
     uint64_t axis = op.getDimension();
     ArrayRef<int64_t> shape = type.getShape();
-    int64_t topSize = std::accumulate(shape.begin(), shape.begin() + axis,
-                                      int64_t{1}, std::multiplies<>{});
+    int64_t topSize = llvm::product_of(shape.take_front(axis));
 
     SmallVector<Attribute> newElems;
     newElems.reserve(numElems);
@@ -578,8 +591,9 @@ struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvertOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if this convert is a noop.
-    if (op.getOperand().getType() != op.getType())
+    if (op.getOperand().getType() != op.getType()) {
       return failure();
+    }
 
     rewriter.replaceOp(op, op.getOperand());
     return success();
@@ -673,8 +687,9 @@ struct ChainedDynamicBroadcastInDimCanonicalization final
     auto precedingBcast =
         bcast.getOperand()
             .getDefiningOp<mlir::stablehlo::DynamicBroadcastInDimOp>();
-    if (!precedingBcast)
+    if (!precedingBcast) {
       return failure();
+    }
 
     // Compose broadcast dimensions.
     SmallVector<int64_t> composition;
@@ -759,8 +774,9 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
                                          "unranked input unsupported");
     }
 
-    if (!llvm::is_contained(elemTy.getShape(), 0))
+    if (!llvm::is_contained(elemTy.getShape(), 0)) {
       return failure();
+    }
 
     Location loc = op.getLoc();
     DenseI64ArrayAttr empty = rewriter.getDenseI64ArrayAttr({});
@@ -799,8 +815,9 @@ struct DynamicReshapeOpCanon final
                                 PatternRewriter &rewriter) const override {
     // This is a noop when the output type is already a static shape.
     auto type = dyn_cast<RankedTensorType>(op.getType());
-    if (!type || !type.hasStaticShape())
+    if (!type || !type.hasStaticShape()) {
       return failure();
+    }
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, type,
                                                             op.getOperand());
@@ -816,8 +833,9 @@ struct GetTupleElementOpCanon final
                                 PatternRewriter &rewriter) const override {
     auto constructor =
         op.getOperand().getDefiningOp<mlir::stablehlo::TupleOp>();
-    if (!constructor)
+    if (!constructor) {
       return failure();
+    }
 
     Value result = constructor.getOperand(op.getIndex());
     rewriter.replaceOp(op, result);
@@ -831,8 +849,9 @@ struct RealOpCanon final : OpRewritePattern<mlir::stablehlo::RealOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::RealOp op,
                                 PatternRewriter &rewriter) const override {
     auto complex = op.getOperand().getDefiningOp<mlir::stablehlo::ComplexOp>();
-    if (!complex)
+    if (!complex) {
       return failure();
+    }
 
     rewriter.replaceOp(op, complex.getLhs());
     return success();
@@ -845,8 +864,9 @@ struct ImagOpCanon final : OpRewritePattern<mlir::stablehlo::ImagOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::ImagOp op,
                                 PatternRewriter &rewriter) const override {
     auto complex = op.getOperand().getDefiningOp<mlir::stablehlo::ComplexOp>();
-    if (!complex)
+    if (!complex) {
       return failure();
+    }
 
     rewriter.replaceOp(op, complex.getRhs());
     return success();
@@ -861,12 +881,14 @@ struct GetDimensionSizeOpCanon final
                                 PatternRewriter &rewriter) const override {
     // Fold get_dimension_size when the queried dim is statically known.
     auto tensorTy = dyn_cast<RankedTensorType>(op.getOperand().getType());
-    if (!tensorTy)
+    if (!tensorTy) {
       return failure();
+    }
 
     int64_t dimSize = tensorTy.getDimSize(op.getDimension());
-    if (dimSize < 0)
+    if (dimSize < 0) {
       return failure();
+    }
 
     auto elemTy = cast<IntegerType>(op.getType().getElementType());
     IntegerAttr elemVal = rewriter.getIntegerAttr(elemTy, dimSize);
@@ -903,8 +925,9 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
 
     auto operandType =
         dyn_cast<RankedTensorType>(gather->getOperand(0).getType());
-    if (!operandType || !operandType.hasStaticShape())
+    if (!operandType || !operandType.hasStaticShape()) {
       return failure();
+    }
 
     auto sliceEnd = llvm::to_vector(gather.getSliceSizes());
     SmallVector<int64_t> sliceStart(sliceEnd.size(), 0);
@@ -976,6 +999,13 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
       return success();
     }
 
+    if (auto denseResourceAttr = dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, DenseResourceElementsAttr::get(op.getType(),
+                                             denseResourceAttr.getRawHandle()));
+      return success();
+    }
+
     auto elements =
         llvm::to_vector_of<Attribute>(cstAttr.getValues<Attribute>());
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
@@ -1037,13 +1067,16 @@ struct TransposeIsReshape final
     nonZeroPerms.reserve(permValues.size());
     for (auto idx : permValues) {
       auto sz = inputTy.getDimSize(idx);
-      if (sz != 1)
+      if (sz != 1) {
         nonZeroPerms.push_back(idx);
+      }
     }
 
-    for (int i = 1, s = nonZeroPerms.size(); i < s; ++i)
-      if (nonZeroPerms[i - 1] > nonZeroPerms[i])
+    for (int i = 1, s = nonZeroPerms.size(); i < s; ++i) {
+      if (nonZeroPerms[i - 1] > nonZeroPerms[i]) {
         return rewriter.notifyMatchFailure(op, "memory layout change");
+      }
+    }
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, op.getType(),
                                                             input);

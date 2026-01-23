@@ -17,7 +17,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
@@ -27,7 +26,6 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
@@ -62,7 +60,7 @@ struct DispatchTensorLoadOpInterface
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
-    auto shapedType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
+    auto shapedType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
         loadOp.getSource().getType());
     assert(shapedType && "unexpected source type");
     return shapedType.getAccess() != IREE::TensorExt::TensorAccess::ReadOnly;
@@ -79,7 +77,7 @@ struct DispatchTensorLoadOpInterface
     Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
     if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
-                         llvm::cast<IREE::TensorExt::DispatchTensorType>(
+                         cast<IREE::TensorExt::DispatchTensorType>(
                              loadOp.getSource().getType()),
                          loadOp.getSourceDims())) {
       // The entire tensor is loaded.
@@ -89,11 +87,11 @@ struct DispatchTensorLoadOpInterface
 
     // Bufferize to subview.
     auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getShape(), llvm::cast<MemRefType>(source.getType()),
+        loadOp.getType().getShape(), cast<MemRefType>(source.getType()),
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
-        rewriter, op, llvm::cast<MemRefType>(subviewMemRefType), source,
+        rewriter, op, cast<MemRefType>(subviewMemRefType), source,
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 
@@ -131,15 +129,14 @@ struct DispatchTensorStoreOpInterface
     assert(tensorSubspanOp && "expected that target is a SubspanOp");
     Value target = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (!equalTensorShape(
-            llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
-            storeOp.getSizes(),
-            llvm::cast<IREE::TensorExt::DispatchTensorType>(
-                storeOp.getTarget().getType()),
-            storeOp.getTargetDims())) {
+    if (!equalTensorShape(cast<RankedTensorType>(storeOp.getValue().getType()),
+                          storeOp.getSizes(),
+                          cast<IREE::TensorExt::DispatchTensorType>(
+                              storeOp.getTarget().getType()),
+                          storeOp.getTargetDims())) {
       // Writing to a part of the tensor.
       auto subviewMemRefType =
-          llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
+          cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
               cast<ShapedType>(storeOp.getValue().getType()).getShape(),
               cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
@@ -152,15 +149,17 @@ struct DispatchTensorStoreOpInterface
 
     auto maybeBuffer =
         getBuffer(rewriter, storeOp->getOpOperand(0).get(), options, state);
-    if (failed(maybeBuffer))
+    if (failed(maybeBuffer)) {
       return failure();
+    }
     Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
-                                    target)))
+                                    target))) {
       return failure();
+    }
 
     rewriter.eraseOp(storeOp);
     return success();
@@ -179,8 +178,9 @@ struct LoadFromBufferOpInterface
         getSourceSubspanMemref(
             cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
     // Conservatively return false if the subspan is not found.
-    if (!subspanOp)
+    if (!subspanOp) {
       return false;
+    }
     std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
         subspanOp->getDescriptorFlags();
     return !descriptorFlags.has_value() ||
@@ -222,17 +222,57 @@ struct StoreToBufferOpInterface
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
     FailureOr<Value> maybeBuffer =
         getBuffer(rewriter, storeOp.getTensor(), options, state);
-    if (failed(maybeBuffer))
+    if (failed(maybeBuffer)) {
       return failure();
+    }
     Value srcMemref = *maybeBuffer;
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
     if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
-                                    storeOp.getBuffer())))
+                                    storeOp.getBuffer()))) {
       return failure();
+    }
 
     rewriter.eraseOp(storeOp);
+    return success();
+  }
+};
+
+struct SwizzleHintOpInterface final
+    : BufferizableOpInterface::ExternalModel<SwizzleHintOpInterface,
+                                             IREE::Codegen::SwizzleHintOp> {
+  bool bufferizesToMemoryRead(Operation *, OpOperand &,
+                              const AnalysisState &) const {
+    return false;
+  }
+
+  bool bufferizesToMemoryWrite(Operation *, OpOperand &,
+                               const AnalysisState &) const {
+    return false;
+  }
+
+  bool mustBufferizeInPlace(Operation *, OpOperand &,
+                            const AnalysisState &) const {
+    return true;
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &, const AnalysisState &) const {
+    return {{op->getResult(0), BufferRelation::Equivalent, /*definite=*/true}};
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
+    auto hintOp = cast<IREE::Codegen::SwizzleHintOp>(op);
+    FailureOr<Value> maybeBuffer =
+        getBuffer(rewriter, hintOp.getOperand(), options, state);
+    if (failed(maybeBuffer)) {
+      return failure();
+    }
+    replaceOpWithNewBufferizedOp<IREE::Codegen::SwizzleHintOp>(
+        rewriter, op, *maybeBuffer, hintOp.getSwizzle());
     return success();
   }
 };
@@ -250,13 +290,15 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   rewriter.setInsertionPoint(op);
 
   // Nothing to do. This op is already bufferized.
-  if (dspOp.hasPureBufferSemantics())
+  if (dspOp.hasPureBufferSemantics()) {
     return success();
+  }
 
   // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
   // basis.
-  if (!dspOp.hasPureTensorSemantics())
+  if (!dspOp.hasPureTensorSemantics()) {
     return op->emitError() << "op does not have tensor semantics";
+  }
 
   // New input operands for the cloned op.
   SmallVector<Value> newOperands, newOutputBuffers;
@@ -270,8 +312,9 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     }
     if (!dspOp.isDpsInit(&opOperand)) {
       auto maybeBuffer = getBuffer(rewriter, opOperand.get(), options, state);
-      if (failed(maybeBuffer))
+      if (failed(maybeBuffer)) {
         return failure();
+      }
       // Input operands are never written to.
       newOperands.push_back(*maybeBuffer);
       continue;
@@ -284,8 +327,9 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     FailureOr<Value> resultBuffer = getBuffer(
         rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
         options, state);
-    if (failed(resultBuffer))
+    if (failed(resultBuffer)) {
       return failure();
+    }
     newOperands.push_back(*resultBuffer);
     newOutputBuffers.push_back(*resultBuffer);
   }
@@ -331,6 +375,15 @@ struct LinalgExtOpInterface
   }
 };
 
+template <typename... Ops>
+struct LinalgExtOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (void)std::initializer_list<int>{
+        0, (Ops::template attachInterface<LinalgExtOpInterface<Ops>>(*context),
+            0)...};
+  }
+};
+
 /// Returns the buffers of the source and destination for pack and unpack ops.
 /// Returns a failure if the buffers can not be found.
 template <typename OpTy>
@@ -341,8 +394,9 @@ getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
   static_assert(llvm::is_one_of<OpTy, linalg::PackOp, linalg::UnPackOp>::value);
   Value source;
   auto maybeBuffer = getBuffer(rewriter, op.getSource(), options, state);
-  if (failed(maybeBuffer))
+  if (failed(maybeBuffer)) {
     return failure();
+  }
   source = *maybeBuffer;
 
   Value dest;
@@ -353,8 +407,9 @@ getSourceAndDestFromPackUnPackOp(RewriterBase &rewriter, OpTy op,
   FailureOr<Value> resultBuffer = getBuffer(
       rewriter, aliasingOpOperands.getAliases().front().opOperand->get(),
       options, state);
-  if (failed(resultBuffer))
+  if (failed(resultBuffer)) {
     return failure();
+  }
   dest = *resultBuffer;
   return std::make_pair(source, dest);
 }
@@ -368,8 +423,9 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options, state);
-  if (failed(maybeSrcAndDest))
+  if (failed(maybeSrcAndDest)) {
     return failure();
+  }
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -394,8 +450,9 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   auto maybeSrcAndDest =
       getSourceAndDestFromPackUnPackOp(rewriter, op, options, state);
-  if (failed(maybeSrcAndDest))
+  if (failed(maybeSrcAndDest)) {
     return failure();
+  }
   auto [source, dest] = *maybeSrcAndDest;
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -438,8 +495,9 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand))
+    if (dspOp.isDpsInit(&opOperand)) {
       return {dspOp.getTiedOpResult(&opOperand)};
+    }
     return {};
   }
 
@@ -449,10 +507,11 @@ struct PackUnPackOpInterface
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand))
+    if (dspOp.isDpsInit(&opOperand)) {
       return {AliasingValue(dspOp.getTiedOpResult(&opOperand),
                             BufferRelation::Equivalent,
                             /*isDefinite=*/false)};
+    }
     return {};
   }
 
@@ -487,8 +546,9 @@ struct DispatchTensorLoadOpSubsetInterface
     // DispatchTensorStoreOp result that bufferizes inplace.
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     auto storeOp = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
-    if (!storeOp)
+    if (!storeOp) {
       return false;
+    }
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
   }
 
@@ -512,8 +572,9 @@ struct DispatchTensorStoreOpSubsetInterface
     // DispatchTensorLoadOp result that bufferizes inplace.
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
-    if (!loadOp)
+    if (!loadOp) {
       return false;
+    }
     return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
   }
 
@@ -542,8 +603,7 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
                               Location loc) const {
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
     auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
-        builder, loc,
-        llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+        builder, loc, cast<RankedTensorType>(storeOp.getValue().getType()),
         storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
     return loadOp.getResult();
@@ -678,45 +738,22 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         IREE::TensorExt::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
       });
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
-        IREE::Codegen::LoadFromBufferOp::attachInterface<
-            LoadFromBufferOpInterface, LoadFromBufferOpSubsetInterface>(*ctx);
-        IREE::Codegen::StoreToBufferOp::attachInterface<
-            StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
-            StoreToBufferOpSubsetInsertionInterface>(*ctx);
-      });
   registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    IREE::LinalgExt::ArgCompareOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ArgCompareOp>>(*ctx);
-    IREE::LinalgExt::FftOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-    IREE::LinalgExt::PackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
-    IREE::LinalgExt::UnPackOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
-    IREE::LinalgExt::ScanOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
-    IREE::LinalgExt::ScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
-    IREE::LinalgExt::GatherOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::GatherOp>>(*ctx);
-    IREE::LinalgExt::SortOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
-    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(*ctx);
-    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
-    IREE::LinalgExt::AttentionOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
-    IREE::LinalgExt::MapScatterOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::MapScatterOp>>(*ctx);
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::LoadFromBufferOp::attachInterface<
+        LoadFromBufferOpInterface, LoadFromBufferOpSubsetInterface>(*ctx);
+    IREE::Codegen::StoreToBufferOp::attachInterface<
+        StoreToBufferOpInterface, StoreToBufferOpSubsetInterface,
+        StoreToBufferOpSubsetInsertionInterface>(*ctx);
+    IREE::Codegen::SwizzleHintOp::attachInterface<SwizzleHintOpInterface>(*ctx);
   });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        LinalgExtOpInterfaceHelper<
+#define GET_OP_LIST
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+            >::registerOpInterface(ctx);
+      });
   registry.insert<linalg::LinalgDialect>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(

@@ -97,8 +97,9 @@ findPermutationsIndexingOperand(AffineMap indexingMap,
       if (iterators[d.getPosition()] == iter &&
           llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
             return e.isFunctionOfDim(d.getPosition());
-          }) == 1)
+          }) == 1) {
         res.insert(d.getPosition());
+      }
     }
   }
   return res;
@@ -122,7 +123,7 @@ inferIteratorsFromOutMap(AffineMap map) {
   return iterators;
 }
 
-bool isScaledContractionBody(Block &block) {
+static bool isScaledContractionBody(Block &block) {
   if (block.empty() || !block.back().mightHaveTrait<OpTrait::IsTerminator>()) {
     LDBG() << "no terminator in the block";
     return false;

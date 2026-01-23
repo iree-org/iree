@@ -23,10 +23,10 @@ namespace mlir::iree_compiler::IREE::VM {
 //  tuple<i32, i64>  -> iI
 LogicalResult encodeCallingConventionType(Operation *op, Type type,
                                           SmallVectorImpl<char> &s) {
-  if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
+  if (auto refPtrType = dyn_cast<IREE::VM::RefType>(type)) {
     s.push_back('r');
     return success();
-  } else if (auto integerType = llvm::dyn_cast<IntegerType>(type)) {
+  } else if (auto integerType = dyn_cast<IntegerType>(type)) {
     switch (integerType.getIntOrFloatBitWidth()) {
     default:
     case 32:
@@ -36,7 +36,7 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
       s.push_back('I');
       return success();
     }
-  } else if (auto floatType = llvm::dyn_cast<FloatType>(type)) {
+  } else if (auto floatType = dyn_cast<FloatType>(type)) {
     switch (floatType.getIntOrFloatBitWidth()) {
     default:
     case 32:
@@ -46,7 +46,7 @@ LogicalResult encodeCallingConventionType(Operation *op, Type type,
       s.push_back('F');
       return success();
     }
-  } else if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
+  } else if (auto tupleType = dyn_cast<TupleType>(type)) {
     // Flatten tuple (so tuple<i32, i64> -> `...iI...`).
     SmallVector<Type> flattenedTypes;
     tupleType.getFlattenedTypes(flattenedTypes);

@@ -62,8 +62,9 @@ func.func @propagate_constant_offsets_through_linearize(%id0: index, %id1: index
 // CHECK-SAME:    %[[ID1:[A-Za-z0-9]+]]: index
 
 // Total constant offset = 1 * 5 * 7 * 11 + 2 * 11 + 13 = 420
-// CHECK:         %[[C420:.+]] = arith.constant 420 : index
-// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index [%[[ID0]], %c0, %[[ID1]], %c0] by (3, 5, 7, 11) : index
+// CHECK-DAG:     %[[C420:.+]] = arith.constant 420 : index
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index [%[[ID0]], %[[C0]], %[[ID1]], %[[C0]]] by (3, 5, 7, 11) : index
 // CHECK:         %[[ADD:.+]] = arith.addi %[[LINEARIZE]], %[[C420]] overflow<nsw> : index
 // CHECK:         return %[[ADD]]
 
@@ -81,8 +82,9 @@ func.func @propagate_constant_offsets_unbounded(%id: index) -> index {
 // CHECK-SAME:    %[[ID:[A-Za-z0-9]+]]: index
 
 // Total constant offset = 2 * 11 + 13 = 35
-// CHECK:         %[[C35:.+]] = arith.constant 35 : index
-// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index [%[[ID]], %c0] by (11) : index
+// CHECK-DAG:     %[[C35:.+]] = arith.constant 35 : index
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index [%[[ID]], %[[C0]]] by (11) : index
 // CHECK:         %[[ADD:.+]] = arith.addi %[[LINEARIZE]], %[[C35]] overflow<nsw> : index
 // CHECK:         return %[[ADD]]
 
@@ -105,9 +107,11 @@ func.func @propagate_constant_offsets_stop_dynamic(%id0: index, %id1: index, %s1
 // CHECK-SAME:    %[[S1:[A-Za-z0-9]+]]: index
 
 // Total constant offset before dynamic = 2 * 11 + 13 = 35
-// CHECK:         %[[C35:.+]] = arith.constant 35 : index
-// CHECK:         %[[ADD0:.+]] = arith.addi %[[ID0]], %c1 overflow<nsw> : index
-// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index disjoint [%[[ADD0]], %c0, %[[ID1]], %c0] by (3, %[[S1]], 7, 11) : index
+// CHECK-DAG:     %[[C35:.+]] = arith.constant 35 : index
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         %[[ADD0:.+]] = arith.addi %[[ID0]], %[[C1]] overflow<nsw> : index
+// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index disjoint [%[[ADD0]], %[[C0]], %[[ID1]], %[[C0]]] by (3, %[[S1]], 7, 11) : index
 // CHECK:         %[[ADD:.+]] = arith.addi %[[LINEARIZE]], %[[C35]] overflow<nsw> : index
 // CHECK:         return %[[ADD]]
 
@@ -125,7 +129,8 @@ func.func @fold_mul_into_linearize(%id0: index, %id1: index) -> index {
 // CHECK-LABEL: func @fold_mul_into_linearize
 // CHECK-SAME:    %[[ID0:[A-Za-z0-9]+]]: index
 // CHECK-SAME:    %[[ID1:[A-Za-z0-9]+]]: index
-// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index disjoint [%[[ID0]], %c0, %[[ID1]], %c0] by (2, 4, 4) : index
+// CHECK:         %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]], %[[ID1]], %[[C0]]] by (2, 4, 4) : index
 // CHECK:         return %[[LINEARIZE]]
 
 // -----
@@ -140,6 +145,7 @@ func.func @nofold_mul_indivisible(%id0: index, %id1: index) -> index {
 // CHECK-LABEL: func @nofold_mul_indivisible
 // CHECK-SAME:    %[[ID0:[A-Za-z0-9]+]]: index
 // CHECK-SAME:    %[[ID1:[A-Za-z0-9]+]]: index
-// CHECK:         %[[MUL:.+]] = arith.muli %[[ID1]], %c7 overflow<nsw> : index
+// CHECK:         %[[C7:.+]] = arith.constant 7 : index
+// CHECK:         %[[MUL:.+]] = arith.muli %[[ID1]], %[[C7]] overflow<nsw> : index
 // CHECK:         %[[LINEARIZE:.+]] = affine.linearize_index [%[[ID0]], %[[MUL]]] by (16) : index
 // CHECK:         return %[[LINEARIZE]]

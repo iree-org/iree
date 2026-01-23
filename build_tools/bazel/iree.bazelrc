@@ -8,6 +8,10 @@
 # Common flags that apply to all configurations.
 # Use sparingly for things common to all compilers and platforms.
 ###############################################################################
+
+# Enable bzlmod (required for LLVM integration as of Nov 2025)
+common --enable_bzlmod
+
 # Prevent invalid caching if input files are modified during a build.
 build --experimental_guard_against_concurrent_changes
 # Default to optimized builds
@@ -46,6 +50,23 @@ build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:li
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
 # Builds the runtime with tracing support enabled.
 build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:tracing_provider
+
+###############################################################################
+# Local development configuration.
+# Use with: bazel build --config=localdev //...
+#
+# Combines several optimizations for faster local iteration:
+# - Skymeld (merged analysis/execution for faster multi-target builds)
+# - Ramdisk sandbox on Linux (reduces I/O bottleneck with many cores)
+#
+# Note: Disk cache is configured in user.bazelrc (created by iree-bazel-configure).
+###############################################################################
+
+build:localdev --experimental_merged_skyframe_analysis_execution
+
+# Linux: use ramdisk for sandbox to reduce I/O with many cores.
+# This is a no-op on other platforms.
+build:localdev --sandbox_base=/dev/shm
 
 ###############################################################################
 # Options for "generic_gcc" builds
@@ -106,30 +127,11 @@ build:generic_clang --copt=-Wall
 # Disable warnings we don't care about or that generally have a low signal/noise
 # ratio.
 build:generic_clang --copt=-Wno-ambiguous-member-template
-build:generic_clang --copt=-Wno-char-subscripts
 build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
-build:generic_clang --copt=-Wno-gnu-alignof-expression
-build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
-build:generic_clang --copt=-Wno-ignored-optimization-argument
 build:generic_clang --copt=-Wno-invalid-offsetof # Technically UB but needed for intrusive ptrs
-build:generic_clang --copt=-Wno-invalid-source-encoding
-build:generic_clang --copt=-Wno-mismatched-tags
-build:generic_clang --copt=-Wno-pointer-sign
-build:generic_clang --copt=-Wno-reserved-user-defined-literal
-build:generic_clang --copt=-Wno-return-type-c-linkage
-build:generic_clang --copt=-Wno-self-assign-overloaded
-build:generic_clang --copt=-Wno-sign-compare
-build:generic_clang --copt=-Wno-signed-unsigned-wchar
-build:generic_clang --copt=-Wno-strict-overflow
-build:generic_clang --copt=-Wno-trigraphs
-build:generic_clang --copt=-Wno-unknown-pragmas
-build:generic_clang --copt=-Wno-unknown-warning-option
-build:generic_clang --copt=-Wno-unused-command-line-argument
 build:generic_clang --copt=-Wno-unused-const-variable
 build:generic_clang --copt=-Wno-unused-function
-build:generic_clang --copt=-Wno-unused-local-typedef
 build:generic_clang --copt=-Wno-unused-private-field
-build:generic_clang --copt=-Wno-user-defined-warnings
 
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings
@@ -154,9 +156,24 @@ build:generic_clang --copt=-Wthread-safety-beta
 build:generic_clang --copt=-Wunused-comparison
 build:generic_clang --copt=-Wvla
 
-# Treat backrefs during linking as errors.
-build:generic_clang --linkopt=-Wl,--warn-backrefs
+###############################################################################
+# Linker options.
+###############################################################################
+
+# Treat linker warnings as errors (supported by all linkers).
 build:generic_clang --linkopt=-Wl,--fatal-warnings
+
+# Mold linker (faster linking for local development).
+build:mold --linkopt=-fuse-ld=mold
+
+###############################################################################
+# CI configuration.
+# Use --config=generic_clang_ci to replicate CI builds locally.
+###############################################################################
+
+build:generic_clang_ci --config=generic_clang
+# Warn on link order issues (not supported by all linkers, so CI-only).
+build:generic_clang_ci --linkopt=-Wl,--warn-backrefs
 
 ###############################################################################
 # Additional options for MacOS based clang builds.
@@ -192,6 +209,17 @@ build:msvc_release --compilation_mode=opt
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################
+
+# Don't strip debug info
+build:sanitizer --strip=never
+# Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
+# We don't use this in IREE (that's what linkstatic is for), but it could show
+# up in dependencies.
+build:sanitizer --force_ignore_dash_static
+# sanitizer tests tend to take longer, so increase the timeouts
+build:sanitizer --test_timeout=120,600,1800,-1
+# Get better stack traces
+build:sanitizer --copt=-fno-omit-frame-pointer
 
 # ASAN (address sanitizer)
 # https://clang.llvm.org/docs/AddressSanitizer.html
@@ -231,16 +259,14 @@ build:ubsan --linkopt=-fsanitize=undefined
 build:ubsan --linkopt=-lubsan
 build:ubsan --cc_output_directory_tag=ubsan
 
-# Don't strip debug info
-build:sanitizer --strip=never
-# Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
-# We don't use this in IREE (that's what linkstatic is for), but it could show
-# up in dependencies.
-build:sanitizer --force_ignore_dash_static
-# sanitizer tests tend to take longer, so increase the timeouts
-build:sanitizer --test_timeout=120,600,1800,-1
-# Get better stack traces
-build:sanitizer --copt=-fno-omit-frame-pointer
+# Fuzzer (libFuzzer) configuration
+# https://llvm.org/docs/LibFuzzer.html
+# Includes ASAN by default - there's no reason to fuzz without memory sanitization.
+build:fuzzer --config=asan
+build:fuzzer --copt=-fsanitize=fuzzer-no-link
+build:fuzzer --linkopt=-fsanitize=fuzzer-no-link
+build:fuzzer --cc_output_directory_tag=asan-fuzzer
+build:fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
 ###############################################################################
 # Architecture specific options

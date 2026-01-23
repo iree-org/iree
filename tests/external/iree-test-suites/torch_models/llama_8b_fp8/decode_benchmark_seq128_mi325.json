@@ -1,0 +1,43 @@
+{
+    "type": "benchmark",
+    "markers": [
+        "hip",
+        "mi325"
+    ],
+    "modules": [
+        "llama_8b_fp8/modules/llama_gfx942"
+    ],
+    "weights": [
+        {
+            "type": "random",
+            "scope": "model",
+            "module": "llama_8b_fp8/modules/llama_gfx942",
+            "seed": 42
+        }
+    ],
+    "run_args": [
+        "--function=decode_bs4",
+        "--device=hip",
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0"
+    ],
+
+    "inputs": [
+      {
+        "value": "4x1xi64"
+      },
+      {
+        "value": "4xi64"
+      },
+      {
+        "value": "4xi64"
+      },
+      {
+        "value": "4x4xi64"
+      },
+      {
+        "value": "34x2097152xf8E4M3FNUZ"
+      }
+    ],
+    "golden_time_ms": 7.7
+}

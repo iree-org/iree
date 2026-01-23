@@ -40,8 +40,9 @@ struct DetachElementwisePattern
         !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
       return failure();
     }
-    if (!linalgOp.hasPureTensorSemantics())
+    if (!linalgOp.hasPureTensorSemantics()) {
       return failure();
+    }
 
     // Nothing to do if the output tensor operand is already a fill op.
     SmallVector<OpOperand *> outputOperands;
@@ -52,8 +53,9 @@ struct DetachElementwisePattern
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
-    if (outputOperands.size() != 1)
+    if (outputOperands.size() != 1) {
       return failure();
+    }
     Value outputOperand = outputOperands.front()->get();
 
     auto outsDefiningOp = outputOperand.getDefiningOp<linalg::LinalgOp>();
@@ -61,9 +63,10 @@ struct DetachElementwisePattern
       // If not linalg op, or is a fill op, do nothing.
       return failure();
     }
-    auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
-    if (!outputType.getElementType().isIntOrFloat())
+    auto outputType = cast<RankedTensorType>(outputOperand.getType());
+    if (!outputType.getElementType().isIntOrFloat()) {
       return failure();
+    }
     auto elementType = outputType.getElementType();
 
     Location loc = linalgOp.getLoc();
@@ -102,7 +105,7 @@ struct DetachElementwisePattern
         ValueRange{linalgOp->getResult(0), outputOperand}, fill, maps,
         iterators, [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
           Value result;
-          if (llvm::isa<FloatType>(elementType)) {
+          if (isa<FloatType>(elementType)) {
             result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
           } else {
             result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);
@@ -139,24 +142,27 @@ struct DetachSplatConstantOutsOperands
     for (auto outOperand : llvm::enumerate(dpsInterfaceOp.getDpsInits())) {
       auto constOp =
           outOperand.value().template getDefiningOp<arith::ConstantOp>();
-      if (!constOp)
+      if (!constOp) {
         continue;
+      }
 
       auto resultType =
-          llvm::dyn_cast<RankedTensorType>(constOp.getResult().getType());
-      if (!resultType || !resultType.getElementType().isIntOrFloat())
+          dyn_cast<RankedTensorType>(constOp.getResult().getType());
+      if (!resultType || !resultType.getElementType().isIntOrFloat()) {
         continue;
+      }
 
-      auto attr = llvm::dyn_cast<ElementsAttr>(constOp.getValue());
-      if (!attr || !attr.isSplat())
+      auto attr = dyn_cast<ElementsAttr>(constOp.getValue());
+      if (!attr || !attr.isSplat()) {
         continue;
+      }
 
       Location loc = constOp.getLoc();
       Type elementType = resultType.getElementType();
       Value emptyTensorOp = tensor::EmptyOp::create(
           rewriter, loc, resultType.getShape(), elementType);
       TypedAttr constValue;
-      if (llvm::isa<IntegerType>(elementType)) {
+      if (isa<IntegerType>(elementType)) {
         constValue = rewriter.getIntegerAttr(
             elementType, attr.template getSplatValue<APInt>());
       } else {

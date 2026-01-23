@@ -1,0 +1,10 @@
+{
+  "model": "distilbert/distilroberta-base",
+  "description": "Distilled RoBERTa - smaller and faster (1.7M+ downloads)",
+  "tests": [
+    {"name": "simple", "input": "Hello, world!"},
+    {"name": "sentence", "input": "The quick brown fox jumps over the lazy dog."},
+    {"name": "masked", "input": "Paris is the <mask> of France."},
+    {"name": "no_special", "input": "test input", "add_special_tokens": false}
+  ]
+}

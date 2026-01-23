@@ -58,11 +58,13 @@ iree_cc_library(
     MLIRInferTypeOpInterface
     MLIRMemRefDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRViewLikeInterface
   PUBLIC
 )
@@ -75,8 +77,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls UtilAttrs.h.inc
     --gen-attrdef-defs UtilAttrs.cpp.inc
-    --gen-enum-decls UtilEnums.h.inc
-    --gen-enum-defs UtilEnums.cpp.inc
+    --gen-enum-decls --dialect=util UtilEnums.h.inc
+    --gen-enum-defs --dialect=util UtilEnums.cpp.inc
 )
 
 iree_tablegen_library(

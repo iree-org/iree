@@ -21,18 +21,21 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "HALAttrs.td",
             "HALBase.td",
             "HALDialect.td",
             "HALInterfaces.td",
             "HALOps.td",
+            "HALTypes.td",
         ],
         include = ["*.td"],
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Stream/IR:td_files",
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:FuncTdFiles",
         "@llvm-project//mlir:InferIntRangeInterfaceTdFiles",
@@ -53,6 +56,7 @@ iree_compiler_cc_library(
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
+        "HALTraits.h",
         "HALTypes.h",
     ],
     textual_hdrs = [
@@ -139,11 +143,17 @@ iree_gentbl_cc_library(
             "HALAttrs.cpp.inc",
         ),
         (
-            ["--gen-enum-decls"],
+            [
+                "--gen-enum-decls",
+                "--dialect=hal",
+            ],
             "HALEnums.h.inc",
         ),
         (
-            ["--gen-enum-defs"],
+            [
+                "--gen-enum-defs",
+                "--dialect=hal",
+            ],
             "HALEnums.cpp.inc",
         ),
     ],

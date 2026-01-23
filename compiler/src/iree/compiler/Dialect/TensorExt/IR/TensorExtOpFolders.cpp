@@ -8,6 +8,7 @@
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -21,9 +22,10 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
-        dyn_cast_or_null<tensor::EmptyOp>(op.getSource().getDefiningOp());
-    if (!emptyOp)
+        dyn_cast_if_present<tensor::EmptyOp>(op.getSource().getDefiningOp());
+    if (!emptyOp) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<tensor::EmptyOp>(op, op.getResult().getType(),
                                                  op.getResultDims());
     return success();
@@ -36,8 +38,9 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const final {
     auto tensorCastOp = bitcastOp.getSource().getDefiningOp<tensor::CastOp>();
-    if (!tensorCastOp)
+    if (!tensorCastOp) {
       return failure();
+    }
     auto tensorCastSrcType =
         dyn_cast<RankedTensorType>(tensorCastOp.getOperand().getType());
     if (!tensorCastSrcType) {
@@ -50,37 +53,64 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
       return failure();
     }
 
-    // TODO: Support partial static info incorporation.
-    if (bitcastOp.getSourceDims() != bitcastOp.getResultDims()) {
+    // All dims except last must match (last dim can differ due to element type
+    // size change). This check also filters out rank mismatches.
+    if (!compareMixedShapesEqualExceptLast(
+            bitcastOp.getSource().getType(), bitcastOp.getSourceDims(),
+            bitcastOp.getResult().getType(), bitcastOp.getResultDims())) {
       return failure();
     }
 
     RankedTensorType intermediateTensorType = bitcastOp.getSource().getType();
     RankedTensorType resTensorType = bitcastOp.getResult().getType();
-    ArrayRef<int64_t> resShape = resTensorType.getShape();
 
-    SmallVector<Value> newDynamicDims;
-    int64_t intermediateDynamicDim = 0;
-    int64_t resDynamicDim = 0;
-    SmallVector<int64_t> newResultSizes(resShape);
-    // Drop the dynamic dims that become static after incorporating the cast.
-    for (auto [castSize, sourceSize] : llvm::zip_equal(
-             tensorCastSrcType.getShape(), intermediateTensorType.getShape())) {
-      if (!ShapedType::isDynamic(sourceSize))
+    MLIRContext *ctx = bitcastOp.getContext();
+    SmallVector<OpFoldResult> resultMixed = getMixedValues(
+        resTensorType.getShape(), bitcastOp.getResultDims(), ctx);
+
+    // Build new result shape by propagating static information.
+    SmallVector<OpFoldResult> newResultMixed;
+    int64_t rank = resTensorType.getRank();
+    for (int64_t i = 0; i < rank - 1; ++i) {
+      // Try cast source static info first.
+      int64_t castSize = tensorCastSrcType.getShape()[i];
+      if (!ShapedType::isDynamic(castSize)) {
+        newResultMixed.push_back(rewriter.getIndexAttr(castSize));
         continue;
-
-      while (!ShapedType::isDynamic(resShape[resDynamicDim])) {
-        ++resDynamicDim;
       }
-
-      if (ShapedType::isDynamic(castSize)) {
-        newDynamicDims.push_back(
-            bitcastOp.getSourceDims()[intermediateDynamicDim]);
-      } else {
-        newResultSizes[resDynamicDim] = castSize;
+      // Try result constant.
+      OpFoldResult resOfr = resultMixed[i];
+      if (std::optional<int64_t> resConst = getConstantIntValue(resOfr)) {
+        newResultMixed.push_back(rewriter.getIndexAttr(*resConst));
+        continue;
       }
-      ++intermediateDynamicDim;
-      ++resDynamicDim;
+      // Keep dynamic.
+      newResultMixed.push_back(resOfr);
+    }
+
+    // Last dim: only use result info.
+    OpFoldResult lastResOfr = resultMixed.back();
+    if (std::optional<int64_t> resConst = getConstantIntValue(lastResOfr)) {
+      newResultMixed.push_back(rewriter.getIndexAttr(*resConst));
+    } else {
+      newResultMixed.push_back(lastResOfr);
+    }
+
+    // Decompose into static shape and dynamic values.
+    auto [newResultSizes, newDynDestDims] =
+        decomposeMixedValues(newResultMixed);
+
+    // Build new source dynamic dims from the cast source type.
+    SmallVector<Value> newDynSrcDims;
+    int64_t intermediateDynIdx = 0;
+    for (int64_t i = 0; i < tensorCastSrcType.getRank(); ++i) {
+      if (!intermediateTensorType.isDynamicDim(i)) {
+        continue;
+      }
+      if (tensorCastSrcType.isDynamicDim(i)) {
+        newDynSrcDims.push_back(bitcastOp.getSourceDims()[intermediateDynIdx]);
+      }
+      ++intermediateDynIdx;
     }
 
     auto newType =
@@ -88,7 +118,7 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
                               resTensorType.getEncoding());
     Value newBitcast = BitCastOp::create(rewriter, bitcastOp.getLoc(), newType,
                                          tensorCastOp.getOperand(),
-                                         newDynamicDims, newDynamicDims);
+                                         newDynSrcDims, newDynDestDims);
     // We create a new cast to continue propagating static information.
     rewriter.replaceOpWithNewOp<tensor::CastOp>(bitcastOp, resTensorType,
                                                 newBitcast);
@@ -100,8 +130,8 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
 }; // namespace
 
 OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
-  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
-  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultType = cast<ShapedType>(getResult().getType());
   if (sourceType.getElementType() != resultType.getElementType()) {
     // Element type mismatch, this is a bitcast.
     return {};
@@ -135,8 +165,9 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
                                MutableOperandRange mutableDimValues) {
   auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
                                                    Block::iterator(op));
-  if (!dynamicDimsOr.has_value())
+  if (!dynamicDimsOr.has_value()) {
     return false;
+  }
   auto dynamicDims = dynamicDimsOr.value();
   bool anyChanged = false;
   OperandRange oldValueRange = mutableDimValues;
@@ -177,7 +208,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    if (!llvm::isa<RankedTensorType>(loadOp.getSource().getType())) {
+    if (!isa<RankedTensorType>(loadOp.getSource().getType())) {
       return failure();
     }
     // If the offsets are empty rely on folding to take care of it.
@@ -235,8 +266,9 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
   llvm::SmallVector<int64_t> newShape;
   llvm::SmallBitVector droppedDims = op.getDroppedDims();
   for (auto size : llvm::enumerate(mixedSizes)) {
-    if (droppedDims.test(size.index()))
+    if (droppedDims.test(size.index())) {
       continue;
+    }
     std::optional<int64_t> staticSize = getConstantIntValue(size.value());
     newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
   }
@@ -256,8 +288,9 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     RankedTensorType resultType = loadOp.getType();
     auto newResultType = canonicalizeSubViewParts(
         loadOp, resultType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newResultType))
+    if (failed(newResultType)) {
       return failure();
+    }
 
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
@@ -289,8 +322,7 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 // verification. Fold such uses of the offsets, size and strides are emtpy.
 // i.e, flow.dispatch.input.load %v -> %v
 OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
-  if (getSource().getType() &&
-      llvm::isa<RankedTensorType>(getSource().getType()) &&
+  if (getSource().getType() && isa<RankedTensorType>(getSource().getType()) &&
       getMixedOffsets().empty() && getMixedSizes().empty() &&
       getMixedStrides().empty()) {
     return getSource();
@@ -356,8 +388,9 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     RankedTensorType valueType = storeOp.getValueType();
     auto newValueType = canonicalizeSubViewParts(
         storeOp, valueType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newValueType))
+    if (failed(newValueType)) {
       return failure();
+    }
 
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();
@@ -437,7 +470,7 @@ OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
   //   %2 = iree_tensor_ext.dispatch.workload.ordinal %1, 2
   //
   // This can happen when the operands get deduped.
-  if (auto producerOrdinalOp = dyn_cast_or_null<DispatchWorkloadOrdinalOp>(
+  if (auto producerOrdinalOp = dyn_cast_if_present<DispatchWorkloadOrdinalOp>(
           getOperand().getDefiningOp())) {
     if (producerOrdinalOp.getOrdinal() == getOrdinal()) {
       return producerOrdinalOp.getOperand();
@@ -450,6 +483,32 @@ OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
 void DispatchWorkloadOrdinalOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<BubbleUpOrdinalOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.compute_barrier.start
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ComputeBarrierStartOp::fold(FoldAdaptor adaptor) {
+  // Fold duplicate barriers in a chain:
+  // compute_barrier.start(compute_barrier.start(x)) -> compute_barrier.start(x)
+  if (auto producer = getValue().getDefiningOp<ComputeBarrierStartOp>()) {
+    return producer.getResult();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.compute_barrier.end
+//===----------------------------------------------------------------------===//
+
+OpFoldResult ComputeBarrierEndOp::fold(FoldAdaptor adaptor) {
+  // Fold duplicate barriers in a chain:
+  // compute_barrier.end(compute_barrier.end(x)) -> compute_barrier.end(x)
+  if (auto producer = getValue().getDefiningOp<ComputeBarrierEndOp>()) {
+    return producer.getResult();
+  }
+  return {};
 }
 
 } // namespace mlir::iree_compiler::IREE::TensorExt

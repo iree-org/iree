@@ -1,0 +1,12 @@
+{
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlir",
+    "compiler_flags": [
+        "--iree-hal-target-device=hip",
+        "--iree-hip-target=gfx942",
+        "--iree-opt-level=O3",
+        "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
+        "--iree-llvmgpu-enable-prefetch",
+        "--iree-execution-model=async-external",
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
+    ]
+}

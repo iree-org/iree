@@ -24,19 +24,21 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
         "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "large_linalg_matmul.mlir",
-        "index.mlir",
         "argmax.mlir",
+        "index.mlir",
+        "large_linalg_matmul.mlir",
     ],
 )
 
@@ -72,7 +74,10 @@ iree_check_single_backend_test_suite(
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "conv2d.mlir",
+        "gather_like_ops.mlir",
+        "index.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -85,9 +90,8 @@ VMVX_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
+        "small_float_arith.mlir",
         "subbyte_to_fp.mlir",
-        "index.mlir",
-        "argmax.mlir",
     ],
 )
 
@@ -122,7 +126,10 @@ iree_check_single_backend_test_suite(
 VULKAN_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "conv2d.mlir",
+        "gather_like_ops.mlir",
+        "index.mlir",
         "narrow_n_matmuls.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
@@ -131,13 +138,12 @@ VULKAN_SRCS = enforce_glob(
     exclude = [
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
-        "index.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "unpack.mlir",
-        "argmax.mlir",
     ],
 )
 
@@ -188,13 +194,15 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "argmax.mlir",
         "fp4_f32_conversion.mlir",
+        "gather_like_ops.mlir",
         "index.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "argmax.mlir",
+        "small_float_arith.mlir",
     ],
 )
 
@@ -217,23 +225,25 @@ ROCM_SRCS = enforce_glob(
     # keep sorted
     [
         "argmax.mlir",
+        "conv2d.mlir",
+        "fp4_f32_conversion.mlir",
+        "fp_to_subbyte.mlir",
+        "gather_like_ops.mlir",
+        "index.mlir",
+        "narrow_n_matmuls.mlir",
         "pack_i8.mlir",
         "softmax.mlir",
+        "subbyte_to_fp.mlir",
         "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "conv2d.mlir",
-        "fp_to_subbyte.mlir",
-        "fp4_f32_conversion.mlir",
-        "index.mlir",
         "large_linalg_matmul.mlir",
-        "narrow_n_matmuls.mlir",
-        "subbyte_to_fp.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "small_float_arith.mlir",
     ],
 )
 

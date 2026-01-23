@@ -12,5 +12,5 @@ module attributes { transform.with_named_sequence } {
     transform.iree.emit_remark "convolution" at %convolution : !transform.any_op
     transform.iree.emit_remark "trailing" at %trailing : !transform.any_op
     transform.yield
-  } // @__transform_main
-} // module
+  }
+}

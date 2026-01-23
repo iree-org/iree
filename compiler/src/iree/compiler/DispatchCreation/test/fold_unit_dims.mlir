@@ -344,3 +344,208 @@ util.func @collapse_of_expand_preserved_trailing_unit_dims(%arg0: tensor<1x23040
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
 //  CHECK-SAME:     tensor<1x4x5760x1xbf16> into tensor<4x5760x1xbf16>
 //       CHECK:   util.return %[[COLLAPSE]] : tensor<4x5760x1xbf16>
+
+// -----
+
+// This test considers the case where we have no shape at all on the source for the expand,
+// but still need one unit dim for the output.
+util.func @collapse_of_expand_no_source_shape(%arg0: tensor<f32>) -> tensor<1xf32> {
+  %expanded = tensor.expand_shape %arg0 [] output_shape[1, 1] : tensor<f32> into tensor<1x1xf32>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1]] : tensor<1x1xf32> into tensor<1xf32>
+  util.return %collapsed : tensor<1xf32>
+}
+// CHECK-LABEL:   util.func public @collapse_of_expand_no_source_shape
+// CHECK-SAME:      %[[ARG0:.+]]: tensor<f32>
+// CHECK:           %[[EXPAND:.*]] = tensor.expand_shape %[[ARG0]]
+// CHECK-SAME:        tensor<f32> into tensor<1xf32>
+// CHECK:           util.return %[[EXPAND]] : tensor<1xf32>
+
+// -----
+
+util.func @fold_unit_dims_from_extract_leading(%arg0: tensor<1x4x8xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x4x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_leading
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2]{{\]}}
+//  CHECK-SAME:     tensor<1x4x8xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX1]], %[[IDX2]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_trailing(%arg0: tensor<4x8x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<4x8x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_trailing
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x8x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]{{\]}}
+//  CHECK-SAME:     tensor<4x8x1xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX0]], %[[IDX1]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_middle(%arg0: tensor<4x1x8xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<4x1x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_middle
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x1x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]{{\]}}
+//  CHECK-SAME:     tensor<4x1x8xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX0]], %[[IDX2]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_multiple(%arg0: tensor<1x4x1x8x1xf32>, %idx0: index, %idx1: index, %idx2: index, %idx3: index, %idx4: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2, %idx3, %idx4] : tensor<1x4x1x8x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_multiple
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x1x8x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX3:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX4:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2, 3, 4]{{\]}}
+//  CHECK-SAME:     tensor<1x4x1x8x1xf32> into tensor<4x8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+// Test folding consecutive unit dims from tensor.extract
+util.func @fold_unit_dims_from_extract_consecutive(%arg0: tensor<1x1x1x8xf32>, %idx0: index, %idx1: index, %idx2: index, %idx3: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2, %idx3] : tensor<1x1x1x8xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_consecutive
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x1x8xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX2:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX3:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2, 3]{{\]}}
+//  CHECK-SAME:     tensor<1x1x1x8xf32> into tensor<8xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX3]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+// Test folding unit dims with dynamic dimensions
+util.func @fold_unit_dims_from_extract_dynamic(%arg0: tensor<1x?x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x?x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_dynamic
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?x1xf32>
+//  CHECK-SAME:   %[[IDX0:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:   %[[IDX1:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2]{{\]}}
+//  CHECK-SAME:     tensor<1x?x1xf32> into tensor<?xf32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]][%[[IDX1]]]
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_from_extract_all_unit(%arg0: tensor<1x1x1xf32>, %idx0: index, %idx1: index, %idx2: index) -> f32 {
+  %extracted = tensor.extract %arg0[%idx0, %idx1, %idx2] : tensor<1x1x1xf32>
+  util.return %extracted : f32
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_from_extract_all_unit
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x1x1xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]] []
+//  CHECK-SAME:     tensor<1x1x1xf32> into tensor<f32>
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract %[[COLLAPSED]]
+//  CHECK-SAME:     tensor<f32>
+//       CHECK:   util.return %[[EXTRACT]] : f32
+
+// -----
+
+util.func @fold_unit_dims_with_encoding(%arg0: tensor<1x1x4x8xi1, #iree_encoding.packed_storage>, %arg1: tensor<4xi8>) -> tensor<1x1x4x8xi1, #iree_encoding.packed_storage> {
+  %arg1_encoded = flow.tensor.bitcast %arg1 : tensor<4xi8> -> tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+  %0 = tensor.empty() : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+  %result = linalg.generic{
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%arg0, %arg1_encoded : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>, tensor<1x1x4x8xi1, #iree_encoding.packed_storage>)
+    outs(%0 : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>) {
+  ^bb0(%in_0: i1, %in_1: i1, %out: i1):
+    %1 = arith.ori %in_0, %in_1 : i1
+    linalg.yield %1 : i1
+  } -> tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+  util.return %result : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+}
+
+// CHECK-LABEL:   util.func public @fold_unit_dims_with_encoding(
+// CHECK-SAME:      %[[ARG0:.*]]: tensor<1x1x4x8xi1, #iree_encoding.packed_storage>,
+// CHECK-SAME:      %[[ARG1:.*]]: tensor<4xi8>) -> tensor<1x1x4x8xi1, #iree_encoding.packed_storage> {
+// CHECK:           %[[TENSOR_0:.*]] = flow.tensor.bitcast %[[ARG1]] : tensor<4xi8> -> tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[COLLAPSE_SHAPE_0:.*]] = tensor.collapse_shape %[[ARG0]] {{\[\[}}0, 1, 2], [3]] : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+// CHECK-SAME:        into tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[COLLAPSE_SHAPE_1:.*]] = tensor.collapse_shape %[[TENSOR_0]] {{\[\[}}0, 1, 2], [3]] : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+// CHECK-SAME:        into tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[EMPTY_0:.*]] = tensor.empty() : tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[GENERIC_0:.*]] = linalg.generic
+// CHECK-SAME:        {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>]
+// CHECK-SAME:        iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:        ins(%[[COLLAPSE_SHAPE_0]], %[[COLLAPSE_SHAPE_1]] : tensor<4x8xi1, #iree_encoding.packed_storage>, tensor<4x8xi1, #iree_encoding.packed_storage>)
+// CHECK-SAME:        outs(%[[EMPTY_0]] : tensor<4x8xi1, #iree_encoding.packed_storage>) {
+// CHECK:           ^bb0(%[[VAL_0:.*]]: i1, %[[VAL_1:.*]]: i1, %[[VAL_2:.*]]: i1):
+// CHECK:             %[[ORI_0:.*]] = arith.ori %[[VAL_0]], %[[VAL_1]] : i1
+// CHECK:             linalg.yield %[[ORI_0]] : i1
+// CHECK:           } -> tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           %[[EXPAND_SHAPE_0:.*]] = tensor.expand_shape %[[GENERIC_0]] {{\[\[}}0, 1, 2], [3]] output_shape [1, 1, 4, 8] : tensor<4x8xi1, #iree_encoding.packed_storage>
+// CHECK-SAME:        into tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+// CHECK:           util.return %[[EXPAND_SHAPE_0]] : tensor<1x1x4x8xi1, #iree_encoding.packed_storage>
+
+// -----
+
+util.func public @no_fold_attention_with_non_collapsible_encoding(%arg0 : tensor<1x32x128xf16>, %arg1 : tensor<32x?x128xf16>, %arg2 : tensor<32x128x?xf16>, %arg3 : f16, %arg4 : tensor<1x32x?xf16, #iree_encoding.testing<>>) -> tensor<1x32x128xf16> {
+  %0 = tensor.empty() : tensor<1x32x128xf16>
+  %1 = iree_linalg_ext.attention {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+    ins(%arg0, %arg1, %arg2, %arg3, %arg4 : tensor<1x32x128xf16>, tensor<32x?x128xf16>, tensor<32x128x?xf16>, f16, tensor<1x32x?xf16, #iree_encoding.testing<>>)
+    outs(%0 : tensor<1x32x128xf16>) {
+  ^bb0(%arg7: f32):
+    iree_linalg_ext.yield %arg7 : f32
+  } -> tensor<1x32x128xf16>
+  util.return %1 : tensor<1x32x128xf16>
+}
+// CHECK-LABEL: func public @no_fold_attention_with_non_collapsible_encoding
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x32x128xf16>
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<32x?x128xf16>
+//  CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<32x128x?xf16>
+//  CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]: f16
+//  CHECK-SAME:    %[[ARG4:[a-zA-Z0-9]+]]: tensor<1x32x?xf16, #iree_encoding.testing<>>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x32x128xf16>
+//       CHECK:   %[[ATTN:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> ()>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]], %[[ARG4]]
+//  CHECK-SAME:     outs(%[[EMPTY]]
+//       CHECK:   util.return %[[ATTN]]

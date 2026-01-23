@@ -31,6 +31,7 @@ iree_cc_library(
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::Interfaces
     iree::compiler::ConstEval
@@ -44,6 +45,8 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::TransformOps
     iree::compiler::Dialect::Util::Transforms

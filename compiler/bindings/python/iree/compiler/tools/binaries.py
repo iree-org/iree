@@ -30,6 +30,7 @@ __all__ = [
 
 _BUILTIN_TOOLS = [
     "iree-compile",
+    "iree-link",
     "iree-lld",
     "iree-opt",
 ]
@@ -43,6 +44,7 @@ _TOOL_MODULE_MAP = {
     # options.
     "iree-compile": "iree.tools.core",
     "iree-lld": "iree.tools.core",
+    "iree-link": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-tf": "iree.tools.tf",
 }

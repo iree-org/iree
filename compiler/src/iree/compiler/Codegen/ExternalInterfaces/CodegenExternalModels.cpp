@@ -1,4 +1,4 @@
-// Copyright 2025 The IREE Authors
+// Copyright 2026 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,81 +8,134 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCFInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/ConversionDialectInterface.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
-using IREE::TensorExt::DispatchTensorType;
+//===----------------------------------------------------------------------===//
+// PCF Models
+//===----------------------------------------------------------------------===//
 
-struct EncodingNopLayoutMaterializerAttr final
-    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
-          EncodingNopLayoutMaterializerAttr, EncodingNopLayoutAttr> {
-  Type convertType(Attribute attr, Type type) const {
-    return TypeSwitch<Type, Type>(type)
-        .Case<RankedTensorType>([&](auto rankedTensorType) {
-          return rankedTensorType.dropEncoding();
-        })
-        .Case<DispatchTensorType>([&](auto dispatchTensorType) {
-          auto boundType =
-              dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
-          if (!boundType || !boundType.getEncoding()) {
-            return dispatchTensorType;
-          }
-          Type convertedBoundType = convertType(attr, boundType);
-          return DispatchTensorType::get(dispatchTensorType.getAccess(),
-                                         convertedBoundType);
-        })
-        .Default([&](auto concreteType) { return concreteType; });
-  }
+struct WorkgroupScopeAttrModel final
+    : IREE::PCF::ScopeAttrInterface::ExternalModel<
+          WorkgroupScopeAttrModel, Codegen::WorkgroupScopeAttr> {
+  SmallVector<Value> getWorkerCounts(Attribute attr, OpBuilder &builder,
+                                     Location loc, int64_t numIds) const {
+    auto workgroupScopeAttr = cast<Codegen::WorkgroupScopeAttr>(attr);
+    bool linearize = workgroupScopeAttr.getLinearize();
 
-  LogicalResult getOffsetsSizesStrides(
-      Attribute attr, OpBuilder &builder, Location loc,
-      IREE::TensorExt::DispatchTensorType type, ValueRange dynamicDims,
-      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-      ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
-      SmallVectorImpl<OpFoldResult> &newSizes,
-      SmallVectorImpl<OpFoldResult> &newStrides) const {
-    // Only handle cases where the slice spans the whole
-    // `!iree_tensor_ext.dispatch.tensor` type.
-    // TODO(jornt): Enable partial slices.
-    if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
-      return failure();
+    int64_t numIdsToQuery = linearize ? 3 : std::min<int64_t>(3, numIds);
+
+    SmallVector<Value> counts;
+    for (int64_t i = 0, e = numIdsToQuery; i < e; ++i) {
+      counts.push_back(
+          IREE::HAL::InterfaceWorkgroupCountOp::create(builder, loc, i)
+              .getResult());
     }
-    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
-    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
-    newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
-    newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
-    return success();
+
+    // If linearize is true, compute the product of all counts and replace the
+    // first ID with that.
+    if (linearize && !counts.empty()) {
+      Value one = counts.size() > 1
+                      ? arith::ConstantIndexOp::create(builder, loc, 1)
+                      : Value();
+      Value linearizedCount = counts[0];
+      for (Value &count : llvm::drop_begin(counts)) {
+        linearizedCount =
+            arith::MulIOp::create(builder, loc, linearizedCount, count)
+                .getResult();
+        count = one;
+      }
+      counts.front() = linearizedCount;
+      counts.resize(numIds > 3 ? 3 : numIds);
+    }
+
+    // Pad the outer most sizes with 1.
+    if (numIds > 3) {
+      Value one = arith::ConstantIndexOp::create(builder, loc, 1);
+      counts.append(numIds - 3, one);
+    }
+
+    return counts;
   }
 
-  Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
-                     TypeRange convertedResTypes,
-                     ValueRange convertedOperands) const {
-    return clone(b, op, convertedResTypes, convertedOperands);
+  SmallVector<Value> getWorkerIDs(Attribute attr, OpBuilder &builder,
+                                  Location loc, int64_t numIds) const {
+    auto workgroupScopeAttr = cast<Codegen::WorkgroupScopeAttr>(attr);
+    bool linearize = workgroupScopeAttr.getLinearize();
+
+    SmallVector<Value> ids;
+    for (int64_t i = 0, e = std::min<int64_t>(3, numIds); i < e; ++i) {
+      ids.push_back(IREE::HAL::InterfaceWorkgroupIDOp::create(builder, loc, i)
+                        .getResult());
+    }
+    if (numIds > 3) {
+      Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+      ids.append(numIds - 3, zero);
+    }
+
+    // If linearize is true, flatten to a single ID and pad with `0` until
+    // numIds.
+    if (linearize && numIds > 1) {
+      // First, get the counts to use as the delinearization shape. Construct
+      // them in reverse because thats the expected input order for
+      // linearize_index.
+      SmallVector<Value> dynamicCounts;
+      Value one = arith::ConstantIndexOp::create(builder, loc, 1);
+      if (numIds > 3) {
+        dynamicCounts.append(numIds - 3, one);
+      }
+      for (int64_t i = std::min<int64_t>(3, numIds) - 1, e = 0; i >= e; --i) {
+        dynamicCounts.push_back(
+            IREE::HAL::InterfaceWorkgroupCountOp::create(builder, loc, i)
+                .getResult());
+      }
+
+      // Linearize. IDs need to be reversed to match the counts and the builder
+      // can't take iterators.
+      SmallVector<Value> reverseIds(llvm::reverse(ids));
+      auto linearizeOp = affine::AffineLinearizeIndexOp::create(
+          builder, loc, reverseIds, dynamicCounts);
+
+      ids.front() = linearizeOp.getResult();
+      llvm::fill(llvm::drop_begin(ids), one);
+    }
+
+    return ids;
+  }
+  FailureOr<Attribute> getAllocMemSpace(Attribute, MLIRContext *) const {
+    // Allocating workgroup memory unsupported.
+    return failure();
   }
 };
 
-struct EncodingNopLayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          EncodingNopLayoutResolverAttr, EncodingNopLayoutAttr> {
-  Attribute cloneWithSimplifiedConfig(Attribute attr,
-                                      DictionaryAttr config) const {
-    return attr;
-  }
-
-  Attribute getLayout(Attribute attr, RankedTensorType type) const {
-    return attr;
+class CodegenPCFConversionInterface : public PCFConversionDialectInterface {
+public:
+  using PCFConversionDialectInterface::PCFConversionDialectInterface;
+  void
+  loadStructuralLoweringDependentDialects(MLIRContext *context) const override {
+    // HAL For workgroup ID/Counts.
+    context->loadDialect<IREE::HAL::HALDialect>();
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Registration
+//===----------------------------------------------------------------------===//
 
 void registerCodegenExternalModels(DialectRegistry &registry) {
-  registry.addExtension(+[](MLIRContext *ctx,
-                            IREE::Codegen::IREECodegenDialect *dialect) {
-    EncodingNopLayoutAttr::attachInterface<EncodingNopLayoutResolverAttr,
-                                           EncodingNopLayoutMaterializerAttr>(
-        *ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::Codegen::IREECodegenDialect *dialect) {
+        WorkgroupScopeAttr::attachInterface<WorkgroupScopeAttrModel>(*ctx);
+        // Attach the dialect interface needed for LowerStructuralPCF to load
+        // the HAL dialect on conversion.
+        dialect->addInterface<CodegenPCFConversionInterface>();
+      });
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen

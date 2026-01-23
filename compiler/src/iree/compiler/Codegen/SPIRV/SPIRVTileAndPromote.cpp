@@ -132,16 +132,19 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
-  if (failed(threadTileComputeFn))
+  if (failed(threadTileComputeFn)) {
     return signalPassFailure();
+  }
   auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
-  if (failed(reductionTileComputeFn))
+  if (failed(reductionTileComputeFn)) {
     return signalPassFailure();
+  }
 
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
-  if (failed(doPromoteCMatrix(funcOp)))
+  if (failed(doPromoteCMatrix(funcOp))) {
     return signalPassFailure();
+  }
 
   StringLiteral markerAttrName = LinalgTransforms::kLinalgTransformMarker;
   auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
@@ -219,10 +222,12 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     // that there are no subview ops), clear markers to enable following steps.
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       auto marker = linalgOp->getAttrOfType<StringAttr>(markerAttrName);
-      if (!marker)
+      if (!marker) {
         return WalkResult::advance();
-      if (marker.getValue() == promoteBothMarker)
+      }
+      if (marker.getValue() == promoteBothMarker) {
         linalgOp->removeAttr(markerAttrName);
+      }
       return WalkResult::advance();
     });
   }
@@ -271,14 +276,16 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
     mlir::FunctionOpInterface funcOp) const {
   MLIRContext *context = funcOp.getContext();
-  if (!promoteCMatrix)
+  if (!promoteCMatrix) {
     return success();
+  }
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   SmallVector<Operation *> linalgOps;
   for (Operation *op : computeOps) {
-    if (isa<linalg::FillOp>(op))
+    if (isa<linalg::FillOp>(op)) {
       continue; // Don't care
+    }
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       linalgOps.push_back(linalgOp);
     } else {
@@ -291,14 +298,15 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
   }
 
   // If there are no fused elementwise ops, we can avoid promoting C matrix.
-  if (linalgOps.size() <= 1)
+  if (linalgOps.size() <= 1) {
     return success();
+  }
 
   auto matmulOp = cast<linalg::LinalgOp>(linalgOps.front());
   auto genericOp = cast<linalg::GenericOp>(*linalgOps.back());
 
   auto matmulType =
-      llvm::cast<MemRefType>(matmulOp.getDpsInitOperand(0)->get().getType());
+      cast<MemRefType>(matmulOp.getDpsInitOperand(0)->get().getType());
   if (hasSharedMemoryAddressSpace(matmulType)) {
     // The matmul output is already in shared memory. This can happen when
     // bufferization decides an allocation is needed, e.g., matmul + arith.extf,
@@ -311,8 +319,9 @@ LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
 
   // If the fused elementwise ops are allowed to use cooperative types, we can
   // also avoid promoting C matrix.
-  if (isCooperativeMatrixFusable(genericOp))
+  if (isCooperativeMatrixFusable(genericOp)) {
     return success();
+  }
 
   // Finally do promote C matrix.
   RewritePatternSet patterns(context);

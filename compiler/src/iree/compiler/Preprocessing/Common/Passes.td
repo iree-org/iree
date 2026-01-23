@@ -59,6 +59,7 @@ def ConvertConvFilterToChannelsLastPass:
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 
@@ -168,15 +169,6 @@ def GeneralizeLinalgMatMulPass :
   let summary = "Convert linalg matmul ops to linalg.generics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
-  ];
-}
-
-def SinkTransposeThroughPadPass :
-    InterfacePass<"iree-preprocessing-sink-transpose-through-pad", "mlir::FunctionOpInterface"> {
-  let summary = "Sink linalg transpose ops through tensor pad ops";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
   ];
 }
 

@@ -30,7 +30,7 @@ func.func @batch_matmul_dynamic_reduction_size_B32_M1_N128_K3() {
 
 // Batched matmul where B=2 M=1 N=3 K=dynamic.
 // Tested with K=5 and operands with varying values.
-func.func @dynamic_matmul_dynamic_reduction_size_B2_M1_N3_K5() {
+func.func @batch_matmul_dynamic_reduction_size_B2_M1_N3_K5() {
   %lhs = flow.tensor.dynamic_constant dense<[[[1.0, 2.0, 3.0, 4.0, 5.0]],
                                              [[6.0, 7.0, 8.0, 9.0, 10.0]]]>
      : tensor<2x1x5xf16> -> tensor<2x1x?xf16>
@@ -128,5 +128,41 @@ func.func @softmax_dynamic_reduction_N65_K1531(){
                                        outs(%output : tensor<65x?xf32>) -> tensor<65x?xf32>
 
   check.expect_almost_eq(%sm, %expected, atol 1.0e-04) : tensor<65x?xf32>
+  return
+}
+
+// Batch matmul with:
+//
+// B = 1  <- dynamic, chosen at runtime
+// M = 1  <- dynamic, chosen at runtime
+// N = 32
+// K = 64
+//
+// Followed by an erf non-linearity.
+// This previously failed with compilation error, see issue
+// https://github.com/iree-org/iree/issues/21813
+func.func @batch_matmul_B1_M1_N32_K64_followed_by_erf() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c0_f32 = arith.constant 0.0 : f32
+
+  %lhs = flow.tensor.dynamic_constant dense<0.125> : tensor<1x1x64xf32> -> tensor<?x?x64xf32>
+  %rhs = flow.tensor.dynamic_constant dense<0.125> : tensor<1x64x32xf32> -> tensor<?x64x32xf32>
+  %B = tensor.dim %lhs, %c0 : tensor<?x?x64xf32>
+  %M = tensor.dim %lhs, %c1 : tensor<?x?x64xf32>
+
+  %empty = tensor.empty(%B, %M) : tensor<?x?x32xf32>
+  %filled = linalg.fill ins(%c0_f32: f32) outs(%empty : tensor<?x?x32xf32>) -> tensor<?x?x32xf32>
+  %bmm = linalg.batch_matmul ins(%lhs, %rhs : tensor<?x?x64xf32>, tensor<?x64x32xf32>)
+                                    outs(%filled : tensor<?x?x32xf32>) -> tensor<?x?x32xf32>
+
+  %erfed = math.erf %bmm : tensor<?x?x32xf32>
+
+  // The reduction size K=64, and the values in the LHS and RHS tensors are constants
+  // 1/8 and 1/8. So the result of the batched matmul is 32 * (1/4) * (1/8) = 1.0.
+  //
+  // erf(1.0) =  0.8427007929497149 (check with python `math.erf(1.0)`)
+  %expected = flow.tensor.dynamic_constant dense<0.84270079> : tensor<1x1x32xf32> -> tensor<?x?x32xf32>
+  check.expect_almost_eq(%erfed, %expected, atol 1.0e-02) : tensor<?x?x32xf32>
   return
 }
