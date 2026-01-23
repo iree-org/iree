@@ -236,7 +236,7 @@ synchronization.
 
 ---
 
-##### `expand_dims`
+#### Dimension Expansion (`expand_dims`)
 
 **Applies to:** Reduction dimensions only.
 
