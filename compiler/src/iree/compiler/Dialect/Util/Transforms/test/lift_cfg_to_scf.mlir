@@ -880,3 +880,31 @@ util.func public @multi_entry_loop(%cond: i1) {
 // CHECK: }
 // CHECK: util.call @process(%{{.*}}#1)
 // CHECK: util.return
+
+// -----
+
+// Tests function declarations (getCallableRegion() returns nullptr).
+// This ensures the pass handles functions where getCallableRegion() returns
+// nullptr without crashing.
+
+util.func private @empty_region_declaration(%arg: i32) -> i32
+
+// Declarations are preserved in the output
+// CHECK-LABEL: module {
+// CHECK: util.func private @empty_region_declaration
+// CHECK: }
+
+// -----
+
+// Tests flow.func with empty region (getCallableRegion() returns nullptr).
+// This is the specific case that caused the crash.
+// flow.func's getCallableRegion() returns nullptr, which should be handled
+// gracefully by the pass.
+
+"builtin.module"() ({
+  "flow.func"() <{function_type = () -> (), sym_name = "test", sym_visibility = "private"}> ({
+  }) : () -> ()
+}) : () -> ()
+// CHECK-LABEL: module {
+// CHECK: flow.func private @test()
+// CHECK: }
