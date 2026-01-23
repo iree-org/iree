@@ -251,6 +251,9 @@ struct SinkUnsetEncodingOp
                                          "not able to determine propagation "
                                          "attributes for operands and results");
     }
+    // Carry the encoding dims from the original unset_encoding op.
+    propagationEncodings->encodingDims =
+        llvm::to_vector(encodingOp.getEncodingDims());
     auto propagationResult =
         dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(consumer);
     if (!propagationResult) {
