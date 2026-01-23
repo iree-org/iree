@@ -18,13 +18,14 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Analysis/Liveness.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -57,6 +58,128 @@ static IREE::Stream::AffinityAttr tryLookupDefaultAffinity(Operation *fromOp) {
     fromOp = fromOp->getParentOp();
   }
   return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// Effective position analysis for last-user detection
+//===----------------------------------------------------------------------===//
+
+// Returns the outermost ancestor of |op| that is a direct child of
+// |targetRegion|, effectively projecting |op| to |targetRegion|'s scope.
+static Operation *projectToRegion(Operation *op, Region *targetRegion) {
+  while (op && op->getParentRegion() != targetRegion) {
+    op = op->getParentOp();
+  }
+  return op;
+}
+
+// Returns true if |from| can reach |to| via inter-region transitions within
+// |op|. Only follows region-to-region successors, not exits to the parent.
+static bool canReachRegion(RegionBranchOpInterface op, Region *from,
+                           Region *to) {
+  SmallVector<Region *, 4> worklist;
+  llvm::SmallPtrSet<Region *, 4> visited;
+  worklist.push_back(from);
+  visited.insert(from);
+  while (!worklist.empty()) {
+    Region *current = worklist.pop_back_val();
+    SmallVector<RegionSuccessor, 2> successors;
+    op.getSuccessorRegions(*current, successors);
+    for (auto &successor : successors) {
+      if (successor.isParent()) {
+        continue;
+      }
+      Region *target = successor.getSuccessor();
+      if (target == to) {
+        return true;
+      }
+      if (visited.insert(target).second) {
+        worklist.push_back(target);
+      }
+    }
+  }
+  return false;
+}
+
+// Returns true if |a| and |b| are in mutually exclusive regions of
+// |container|. Two regions are exclusive if neither can reach the other via
+// inter-region transitions (e.g. scf.if then/else, scf.index_switch cases).
+static bool areInExclusiveRegions(Operation *a, Operation *b,
+                                  Operation *container) {
+  auto regionBranchOp = dyn_cast<RegionBranchOpInterface>(container);
+  if (!regionBranchOp) {
+    return false;
+  }
+
+  // Find the direct child region of the container that contains each op.
+  auto findRegionOf = [&](Operation *op) -> Region * {
+    Region *r = op->getParentRegion();
+    while (r && r->getParentOp() != container) {
+      r = r->getParentOp()->getParentRegion();
+    }
+    return r;
+  };
+
+  Region *aRegion = findRegionOf(a);
+  Region *bRegion = findRegionOf(b);
+  if (!aRegion || !bRegion || aRegion == bRegion) {
+    return false;
+  }
+
+  // Exclusive iff neither region can reach the other.
+  return !canReachRegion(regionBranchOp, aRegion, bRegion) &&
+         !canReachRegion(regionBranchOp, bRegion, aRegion);
+}
+
+// Returns true if |opA| might execute after |opB| in the same region.
+// Uses block ordering for same-block; conservatively returns true for
+// different blocks.
+static bool mightExecuteAfter(Operation *opA, Operation *opB) {
+  if (opA->getBlock() == opB->getBlock()) {
+    return opB->isBeforeInBlock(opA);
+  }
+  // Different blocks - be conservative (could use liveness for better results).
+  return true;
+}
+
+// Returns true if |candidate| is effectively the last user of |value|,
+// accounting for region structure. Uses are projected to the value's defining
+// region and compared with awareness of loops and exclusive branches.
+static bool isEffectivelyLastUser(Value value, Operation *candidate) {
+  Region *valueRegion = value.getParentRegion();
+  Operation *candidatePos = projectToRegion(candidate, valueRegion);
+  if (!candidatePos) {
+    return false;
+  }
+
+  for (Operation *user : value.getUsers()) {
+    if (user == candidate) {
+      continue;
+    }
+
+    Operation *userPos = projectToRegion(user, valueRegion);
+    if (!userPos) {
+      continue;
+    }
+
+    if (candidatePos == userPos) {
+      // Same container - check for hazards.
+      if (isa<LoopLikeOpInterface>(candidatePos)) {
+        // Loop: cross-iteration uses come after this one.
+        return false;
+      }
+      // Non-loop: check if uses are in mutually exclusive regions.
+      if (!areInExclusiveRegions(candidate, user, candidatePos)) {
+        return false;
+      }
+    } else {
+      // Different containers - check ordering.
+      if (mightExecuteAfter(userPos, candidatePos)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 // TODO(benvanik): change this to just be an AbstractState - there's no real
@@ -95,19 +218,12 @@ private:
   explicit LastUsers(const Position &pos) : BaseType(pos) {}
 
   void initializeValue(Value value, DFX::Solver &solver) override {
-    // NOTE: this is only for the local region; we don't touch transitive users.
-    // TODO(benvanik): touch transitive users? We could evaluate with
-    //     solver.getExplorer().walkTransitiveUsers() and ensure all tied uses
-    //     go out of scope at the right time. For now we assume that the SSA
-    //     value last users are all we care about.
-    auto parentOp =
-        value.getParentRegion()->getParentOfType<mlir::CallableOpInterface>();
-    auto liveness = solver.getExplorer()
-                        .getAnalysisManager()
-                        .nest(parentOp)
-                        .getAnalysis<Liveness>();
-    for (auto user : value.getUsers()) {
-      if (liveness.isDeadAfter(value, user)) {
+    // Use effective position analysis to determine last users. This properly
+    // handles SCF region structure by projecting uses to the value's defining
+    // region and accounting for control flow semantics (loops, parallel ops,
+    // exclusive branches).
+    for (Operation *user : value.getUsers()) {
+      if (isEffectivelyLastUser(value, user)) {
         unionAssumed(user);
       }
     }
@@ -189,13 +305,8 @@ private:
   // Returns true if |operand| is tied to a result on its owner indicating an
   // in-place operation.
   static bool isTiedUse(OpOperand &operand) {
-    if (auto tiedOp =
-            dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
-      if (tiedOp.isOperandTied(operand.getOperandNumber())) {
-        return true;
-      }
-    }
-    return false;
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner());
+    return tiedOp && tiedOp.isOperandTied(operand.getOperandNumber());
   }
 
   // Starts analysis of the |value| with known bits based on IR structure.
@@ -438,10 +549,10 @@ private:
         });
 
     if (traversalResult == TraversalResult::INCOMPLETE) {
-      // For constants, even if analysis is incomplete (e.g., returned from
-      // public functions), they maintain immutability guarantees.
       auto resourceType =
           llvm::cast<IREE::Stream::ResourceType>(value.getType());
+      // For constants, even if analysis is incomplete (e.g., returned from
+      // public functions), they maintain immutability guarantees.
       if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
         LLVM_DEBUG(
             llvm::dbgs()
@@ -476,19 +587,14 @@ private:
       }
     });
 
-    // Don't call indicateOptimisticFixpoint() here - let the solver iterate.
+    // analyzeMutation only inspects static IR structure (tied uses, resource
+    // access ops) without querying other DFX elements, so the result is
+    // deterministic from the first call.
+    indicateOptimisticFixpoint();
   }
 
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override {
-    // Perform the same analysis as initialization to allow iterative
-    // refinement. This enables the solver to detect mutations that appear
-    // through control flow joins and tied operation chains.
-    auto assumedBits = getAssumed();
-
-    analyzeMutation(value, solver);
-
-    return assumedBits == getAssumed() ? ChangeStatus::UNCHANGED
-                                       : ChangeStatus::CHANGED;
+    return ChangeStatus::UNCHANGED;
   }
 
   friend class DFX::Solver;
@@ -539,14 +645,25 @@ public:
       });
     }
 
-    // Seed ResourceMutationSemantics for all Stream resource values.
-    // This ensures they participate in the fixed-point iteration.
+    // Seed ResourceMutationSemantics for all Stream resource values
+    // (both block arguments and op results). This ensures they participate in
+    // the fixed-point iteration rather than being pessimized when queried after
+    // the solver completes.
     int seedCount = 0;
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
       if (!region) {
         continue;
       }
+      region->walk([&](Block *block) {
+        for (auto arg : block->getArguments()) {
+          if (llvm::isa<IREE::Stream::ResourceType>(arg.getType())) {
+            solver.getOrCreateElementFor<ResourceMutationSemantics>(
+                Position::forValue(arg));
+            ++seedCount;
+          }
+        }
+      });
       region->walk([&](Operation *op) {
         for (auto result : op->getResults()) {
           if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
@@ -591,8 +708,6 @@ public:
   // Returns true if |value| is never mutated anywhere in the program.
   // This uses whole-program transitive use analysis.
   bool isNeverMutated(Value value) {
-    // Get or create the element. It will be initialized with the current
-    // solver state if created after the solver has run.
     auto &mutationSemantics =
         solver.getOrCreateElementFor<ResourceMutationSemantics>(
             Position::forValue(value));
@@ -690,9 +805,13 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
     llvm::dbgs() << "\n";
   });
 
-  // If this clone is performing a lifetime conversion we need to preserve it.
-  // Clones can change resource lifetime (e.g., * -> variable, external -> *)
-  // and these conversions are semantically meaningful and must be preserved.
+  // If this clone is performing a lifetime conversion we cannot safely elide
+  // it here - lifetimes encode allocation/ownership semantics that differ by
+  // type (external vs transient vs constant). Cross-lifetime clones that are
+  // purely read-only type casts are instead handled by ResourceUsageAnalysis
+  // propagating source usage through the clone, which causes RefineUsage to
+  // unify the types. The second ElideAsyncCopies invocation then elides the
+  // now-same-type clone.
   auto sourceType =
       cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
@@ -700,7 +819,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   if (sourceType.getLifetime() != targetType.getLifetime()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - clone is a resource type cast (" << sourceType << " to "
-               << targetType << "); cannot elide\n");
+               << targetType << "); cannot elide in this pass\n");
     return false;
   }
 
@@ -747,8 +866,21 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                << "  ? clone source is a by-value arg; may elide\n");
   }
 
+  // If neither source nor result is ever mutated anywhere in the program,
+  // we can safely elide the clone because sharing the underlying buffer has no
+  // observable effect. This extends the constant-to-constant analysis above to
+  // all lifetime types - if no writes occur, reads can safely share buffers.
+  bool sourceSafe = analysis.isNeverMutated(cloneOp.getSource());
+  bool resultSafe = analysis.isNeverMutated(cloneOp.getResult());
+  if (sourceSafe && resultSafe) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + source and result never mutated; can elide\n");
+    return true;
+  }
+
   // If there's only one user of the source we know it's this clone and can
-  // bypass all the more expensive liveness analysis.
+  // bypass all the more expensive liveness analysis. This is safe even with
+  // mutation because no other code can observe the source.
   if (cloneOp.getSource().hasOneUse()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  + clone source SSA value has one use; can elide\n");

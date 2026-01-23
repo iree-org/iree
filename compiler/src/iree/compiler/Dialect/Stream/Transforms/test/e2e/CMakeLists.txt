@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "async_copies.mlir"
     "async_parameters.mlir"
   TOOLS
     FileCheck
