@@ -513,7 +513,7 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
       "FlatSymbolRefAttr":$function_ref)>,
   ];
 
-  let hasVerifier = 1;
+  let hasRegionVerifier = 1;
 }
 
 } // OpGroupExecutableOps

@@ -1199,7 +1199,7 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-LogicalResult ExecutableExportOp::verify() {
+LogicalResult ExecutableExportOp::verifyRegions() {
   // Workgroup count region is optional.
   if (!getWorkgroupCount().empty()) {
     // Verify the return ops all provide XYZ values.
