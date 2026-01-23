@@ -40,7 +40,7 @@ struct TorchOptions {
                      llvm::cl::cat(category),
                      llvm::cl::desc("Decompose complex torch operations."));
     binder.opt<bool>(
-        "iree-externalize-transients", externalizeTransients,
+        "iree-torch-externalize-transients", externalizeTransients,
         llvm::cl::cat(category),
         llvm::cl::desc("If enabled, an external hal buffer will be appended to "
                        "program inputs when converting torch functions to IREE "

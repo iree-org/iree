@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-externalize-transients --compile-to=input --split-input-file %s | FileCheck %s
+// RUN: iree-compile --iree-torch-externalize-transients --compile-to=input --split-input-file %s | FileCheck %s
 
 // Check that the auto input conversion respects the driver option to externalize transients.
 
