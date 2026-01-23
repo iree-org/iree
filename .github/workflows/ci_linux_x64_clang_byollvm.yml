@@ -25,7 +25,10 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          submodules: true
+          submodules: false
+      - name: Fetch submodules with depth 1
+        run: |
+          git submodule update --init --depth 1
       - name: "Building and testing with bring-your-own-LLVM"
         run: ./build_tools/cmake/build_and_test_byo_llvm.sh
 

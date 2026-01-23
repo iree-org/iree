@@ -28,7 +28,10 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          submodules: true
+          submodules: false
+      - name: Fetch submodules with depth 1
+        run: |
+          git submodule update --init --depth 1
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: Build IREE

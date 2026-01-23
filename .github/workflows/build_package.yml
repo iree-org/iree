@@ -183,8 +183,12 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           path: "c" # Windows can hit path length limits, so use a short path.
-          submodules: true
+          submodules: false
           ref: ${{ github.event.inputs.commit }}
+      - name: Fetch submodules with depth 1
+        run: |
+          cd c
+          git submodule update --init --depth 1
 
       ##########################################################################
       # OS specific setup
