@@ -6,8 +6,8 @@
 //       CHECK: util.func public @main$async(
 //  CHECK-SAME:     %[[INPUT:.+]]: !hal.buffer_view, %[[EXTERNAL_BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:     %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence) -> !hal.buffer_view
-//       CHECK: %[[TRANSIENTS_CALL:.+]] = hal.tensor.transients %[[COMPUTATION:.+]] : tensor<5x4xf32> from %[[EXTERNAL_BUFFER]] : !hal.buffer
-//       CHECK: %[[BARRIER:.+]] = hal.tensor.barrier join(%[[TRANSIENTS_CALL]] : tensor<5x4xf32>)
+//       CHECK: %[[TRANSIENTS:.+]] = hal.tensor.transients %[[COMPUTATION:.+]] : tensor<5x4xf32> from %[[EXTERNAL_BUFFER]] : !hal.buffer
+//       CHECK: %[[BARRIER:.+]] = hal.tensor.barrier join(%[[TRANSIENTS]] : tensor<5x4xf32>)
 
 //       CHECK: util.func public @main(%arg0: !hal.buffer_view, %arg1: !hal.buffer) -> !hal.buffer_view
 builtin.module @check_transients_generation{

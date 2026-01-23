@@ -5,7 +5,7 @@
 // CHECK-LABEL: @immutable_import_export
 //       CHECK: util.func public @main$async(
 //  CHECK-SAME:     %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view,
-//  CHECK-SAME:     %[[TRANSIENT_STORAGE:.+]]: !hal.buffer,
+//  CHECK-SAME:     %[[EXTERNAL_BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:     %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence) ->
 //  CHECK-SAME:     (!hal.buffer_view, !hal.buffer_view)
 //  CHECK-SAME:     iree.abi.model = "coarse-fences"
@@ -18,9 +18,9 @@
 //   CHECK-DAG:   %[[TORCH_RESULT1:.+]] = torch.operator "foobar1"(%[[TORCH_ARG1]])
 //   CHECK-DAG:   %[[TENSOR_RESULT0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
 //   CHECK-DAG:   %[[TENSOR_RESULT1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
-//   CHECK-DAG:   %[[TRANSIENT_CALL0:.+]] = hal.tensor.transients %[[TENSOR_RESULT0]] : tensor<4x5xi32> from %[[TRANSIENT_STORAGE]] : !hal.buffer
-//   CHECK-DAG:   %[[TRANSIENT_CALL1:.+]] = hal.tensor.transients %[[TENSOR_RESULT1]] : tensor<5x4xf32> from %[[TRANSIENT_STORAGE]] : !hal.buffer
-//       CHECK:   %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[TRANSIENT_CALL0]], %[[TRANSIENT_CALL1]] : tensor<4x5xi32>, tensor<5x4xf32>) => %[[SIGNAL]]
+//   CHECK-DAG:   %[[TRANSIENTS0:.+]] = hal.tensor.transients %[[TENSOR_RESULT0]] : tensor<4x5xi32> from %[[EXTERNAL_BUFFER]] : !hal.buffer
+//   CHECK-DAG:   %[[TRANSIENTS1:.+]] = hal.tensor.transients %[[TENSOR_RESULT1]] : tensor<5x4xf32> from %[[EXTERNAL_BUFFER]] : !hal.buffer
+//       CHECK:   %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[TRANSIENTS0]], %[[TRANSIENTS1]] : tensor<4x5xi32>, tensor<5x4xf32>) => %[[SIGNAL]]
 //   CHECK-DAG:   %[[FUNC_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0
 //   CHECK-DAG:   %[[FUNC_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1
 //       CHECK:   util.return %[[FUNC_RESULT0]], %[[FUNC_RESULT1]]
