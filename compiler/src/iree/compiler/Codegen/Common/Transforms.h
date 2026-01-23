@@ -190,8 +190,10 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
 /// Populate pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
-/// `tensor.expand_shape(tensor.extract_slice)`.
-void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
+/// `tensor.expand_shape(tensor.extract_slice)`. The optional `controlFn` can be
+/// used to restrict when the pattern applies.
+void populateSwapExtractWithExpandPattern(
+    RewritePatternSet &patterns, linalg::ControlFusionFn controlFn = nullptr);
 
 /// Populate pattern to fold `tensor.extract_slice(linalg.broadcast)` into the
 /// broadcast input when the extract_slice undoes the broadcast.
