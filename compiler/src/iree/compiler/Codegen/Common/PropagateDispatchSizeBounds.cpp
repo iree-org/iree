@@ -24,7 +24,8 @@ namespace {
 static void foldConstantBounds(
     FunctionOpInterface funcOp,
     const std::optional<SmallVector<int64_t>> &staticWorkgroupSizes,
-    ArrayRef<int64_t> staticWorkgroupCounts) {
+    ArrayRef<int64_t> staticWorkgroupCounts,
+    std::optional<uint64_t> subgroupSize) {
   IRRewriter rewriter(funcOp->getContext());
   auto rewriteToConstant = [&](Operation *op, int64_t constant) {
     rewriter.setInsertionPoint(op);
@@ -39,6 +40,11 @@ static void foldConstantBounds(
           if (staticWorkgroupSizes.has_value() &&
               staticWorkgroupSizes->size() > dim) {
             rewriteToConstant(blockDimOp, (*staticWorkgroupSizes)[dim]);
+          }
+        })
+        .Case([&](gpu::SubgroupSizeOp subgroupSizeOp) {
+          if (subgroupSize.has_value()) {
+            rewriteToConstant(subgroupSizeOp, *subgroupSize);
           }
         })
         .Case([&](IREE::HAL::InterfaceWorkgroupSizeOp wgSizeOp) {
@@ -173,7 +179,8 @@ struct PropagateDispatchSizeBoundsPass final
       }
     }
 
-    foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts);
+    foldConstantBounds(funcOp, staticWorkgroupSize, staticWorkgroupCounts,
+                       subgroupSize);
     applyBounds(funcOp, workgroupSizes, workgroupCounts, subgroupSize);
   }
 };
