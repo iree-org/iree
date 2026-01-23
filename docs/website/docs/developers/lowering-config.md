@@ -240,24 +240,36 @@ synchronization.
 
 **Applies to:** Reduction dimensions only.
 
-If the extent of a reduction dimension is evenly divisible by the number of elements that each lane loads, the `expand_dims` attribute may be applied to achieve an optimization. For the reduction dimension d, may be expanded to d0, d1 where d0 has partial_reduction[d]/number of elements loaded and d1 is the number of elements. The synax and semantics of the `expand_dims` attribute is inspired by the reassociation list used for tensor reshape, in particular expand, operations.
+**Purpose:** Expand (split) a reduction dimension into multiple dimensions in
+the iteration space so threads can accumulate at a finer granularity across
+the reduction loop. Without `expand_dims`, each thread typically keeps a full
+vector accumulator across the entire reduction (e.g., `vector<8xf16>`) and
+reduces it at the end; with `expand_dims`, the reduction is split so each
+thread can reduce per inner chunk (e.g., `vector<1xf16>`), reducing register
+pressure while preserving the same logical result.
 
-The reassociations parameter specifies the mapping from original dimensions to expanded dimensions. For example, [[0], [1], [2, 3]] means:
-    - Original dimension 0 maps to output dimension 0
-    - Original dimension 1 maps to output dimension 1
-    - Original dimension 2 is split into output dimensions 2 and 3
+**Semantics:** The attribute follows the same reassociation model as
+`tensor.expand_shape`, with two parameters:
 
-The output_shape parameter specifies the sizes of the expanded dimensions.
-If the size is ShapedType::kDynamic, the size is determined from the product
-of the rest of the static tile sizes in the respective reassociation group.
-There can be at most one dynamic size per reassociation group.
+* `reassociations`: Maps original iterator dimensions to expanded dimensions.
+  For example, `[[0], [1], [2, 3]]` keeps dimensions 0 and 1 unchanged and
+  splits dimension 2 into dimensions 2 and 3.
+* `output_shape`: Sizes of the expanded dimensions. Use `?` to indicate a
+  dynamic size, which is inferred from the original dimension and the other
+  static factors in the same reassociation group (at most one `?` per group).
+
+**Applicability:** Expansion is only performed when it is statically valid
+(e.g., the original size is known and divisible by the static factors).
+Otherwise, it is ignored.
 
 **Example:**
 
+```mlir
 #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>
-Means that the iteration space that d2 indexed is expanded into two, d2, d3 respectively. d3 is 8 and d2 is extent(d2)/8.
+```
 
-When the expand_dims attribute is in place, an optimization is applied where rather than merging the result of the per-thread accumulator after traversing the entire reduction dimension, it is summed per iteration of instead, reducing register pressure.
+This keeps `d0` and `d1` unchanged and splits `d2` into `d2` and `d3`, where
+`d3 = 8` and `d2 = extent(d2) / 8`.
 
 ---
 
@@ -270,3 +282,4 @@ When the expand_dims attribute is in place, an optimization is applied where rat
 | `partial_reduction` | Tile size of the reduction dimension(s) processed by the workgroup    |
 | `lane_basis`        | Distribution of threads within a subgroup onto the iteration space    |
 | `subgroup_basis`    | Distribution of subgroups within a workgroup onto the iteration space |
+| `expand_dims`       | Split reduction dimensions to enable finer-grain accumulation         |
