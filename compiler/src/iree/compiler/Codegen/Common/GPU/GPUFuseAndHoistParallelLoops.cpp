@@ -383,7 +383,17 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     populateFuseTilableForallConsumersPattern(patterns);
     patterns.add<FuseCollapseShapeConsumers>(context);
     patterns.add<FuseExtractSliceConsumers>(context);
-    populateSwapExtractWithExpandPattern(patterns);
+    // Only swap expand_shape with extract_slice when they are in different
+    // blocks. This acts as a fusion pattern for the expand_shape, which should
+    // only apply when they are in different blocks (i.e., one inside a loop,
+    // and one outside). Swapping in other cases can interfere with later
+    // optimizations that fold the slice into consumer load operations.
+    auto swapControlFn = [](OpOperand *operand) {
+      Operation *producer = operand->get().getDefiningOp();
+      Operation *consumer = operand->getOwner();
+      return producer->getBlock() != consumer->getBlock();
+    };
+    populateSwapExtractWithExpandPattern(patterns, swapControlFn);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
