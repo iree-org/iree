@@ -167,11 +167,11 @@ func.func @mfma_gemm_with_split_k(%arg0: tensor<9216x480xbf16>, %arg1: tensor<92
 // CHECK-LABEL: func.func @mfma_gemm_with_split_k(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+//  CHECK-SAME:     padding = [128, 64, 128]
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 8]
-//  CHECK-SAME:     subgroup = [2, 1, 0]
-//  CHECK-SAME:     workgroup = [64, 32, 0]
-
+//  CHECK-SAME:     subgroup = [4, 2, 0]
+//  CHECK-SAME:     workgroup = [128, 64, 0]
 // -----
 
 // This tests the mfma lowering intrinsic K alignment. Since gemmK = 360, and will
@@ -187,7 +187,12 @@ func.func @mfma_matmul_k_aligned_intrinsic(%lhs: tensor<1024x360xf16>, %rhs: ten
 // CHECK-LABEL: func.func @mfma_matmul_k_aligned_intrinsic(
 // CHECK:         pipeline = LLVMGPUTileAndFuse
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+// CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+// CHECK-SAME:    padding = [64, 128, 128]
+// CHECK-SAME:    promote_operands = [0, 1]
+// CHECK-SAME:    reduction = [0, 0, 8]
+// CHECK-SAME:    subgroup = [2, 4, 0]
+// CHECK-SAME:    workgroup = [64, 128, 0]
 
 // -----
 
@@ -324,7 +329,8 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x8x577xf32>, %r
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
 // CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:     reduction = [0, 0, 0, 1]
+// CHECK-SAME:     padding = [1, 16, 64, 32]
+// CHECK-SAME:     reduction = [0, 0, 0, 8]
 // CHECK-SAME:     subgroup = [0, 1, 2, 0]
 // CHECK-SAME:     workgroup = [1, 16, 64, 0]
 
@@ -421,9 +427,9 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 // CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:      padding = [1, 64, 128, 4]
+// CHECK-SAME:      padding = [1, 64, 128, 32]
 // CHECK-SAME:      promote_operands = [0, 1]
-// CHECK-SAME:      reduction = [0, 0, 0, 1]
+// CHECK-SAME:      reduction = [0, 0, 0, 8]
 // CHECK-SAME:      subgroup = [0, 2, 4, 0]
 // CHECK-SAME:      workgroup = [1, 64, 128, 0]
 
@@ -445,9 +451,9 @@ func.func @unaligned_matmul_nn_layout(%lhs : tensor<513x513xf16>, %rhs : tensor<
 // CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-// CHECK-SAME:      padding = [64, 128, 16]
+// CHECK-SAME:      padding = [64, 128, 32]
 // CHECK-SAME:      promote_operands = [0, 1]
-// CHECK-SAME:      reduction = [0, 0, 1]
+// CHECK-SAME:      reduction = [0, 0, 2]
 // CHECK-SAME:      subgroup = [2, 4, 0]
 // CHECK-SAME:      workgroup = [64, 128, 0]
 

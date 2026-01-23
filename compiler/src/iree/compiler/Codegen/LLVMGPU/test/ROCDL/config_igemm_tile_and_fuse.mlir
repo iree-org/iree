@@ -180,19 +180,22 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 }
 
 // CHECK-LABEL: func.func @conv_chwn_chwf_unaligned_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-//  CHECK-SAME:     padding = [16, 1, 1, 16, 128]
+//  GFX942-SAME:    padding = [64, 1, 1, 64, 128]
+//  MI300X-SAME:    padding = [32, 1, 1, 64, 128]
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
-//  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
+//  GFX942-SAME:    subgroup = [2, 1, 1, 1, 0]
+//  MI300X-SAME:    subgroup = [1, 1, 1, 1, 0]
+//  GFX942-SAME:    workgroup = [64, 1, 1, 64, 0]
+//  MI300X-SAME:    workgroup = [32, 1, 1, 64, 0]
 
-// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 16, 0, 0, 0]
+// PAD-CONV-GFX942:     padding_conv =  [0, 0, 0, 64, 0, 0, 0]
 
 // -----
 
@@ -277,20 +280,20 @@ module {
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_chwn_chwf_aligned_batch(%arg0: tensor<2x192x128x48xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x48xf32>) -> tensor<40x3x3x48xf32> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x48xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x48xf32>) {
+func.func @conv_chwn_chwf_aligned_batch(%arg0: tensor<2x192x128x64xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x64xf32>) -> tensor<40x3x3x64xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x64xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x64xf32>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):
     %1 = arith.extf %in : bf16 to f32
     %2 = arith.extf %in_0 : bf16 to f32
     %3 = arith.mulf %1, %2 : f32
     %4 = arith.addf %out, %3 : f32
     linalg.yield %4 : f32
-  } -> tensor<40x3x3x48xf32>
-  return %0 : tensor<40x3x3x48xf32>
+  } -> tensor<40x3x3x64xf32>
+  return %0 : tensor<40x3x3x64xf32>
 }
 
 //         CHECK-LABEL:  func.func @conv_chwn_chwf_aligned_batch
-//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
+//     PAD-CONV-GFX942:     padding = [64, 1, 1, 64, 16]
 // PAD-CONV-GFX942-NOT:     padding_conv
 
 // -----
