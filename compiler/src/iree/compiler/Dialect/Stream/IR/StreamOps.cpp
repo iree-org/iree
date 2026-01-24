@@ -3413,15 +3413,20 @@ AsyncExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange AsyncExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange(getResults())
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void AsyncExecuteOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getOperation(), getResults()));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -3570,15 +3575,20 @@ AsyncConcurrentOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange AsyncConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange(getResults())
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void AsyncConcurrentOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getOperation(), getResults()));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4619,16 +4629,20 @@ CmdExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange CmdExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange()
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void CmdExecuteOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4692,16 +4706,19 @@ LogicalResult CmdSerialOp::verify() {
   return success();
 }
 
+ValueRange CmdSerialOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+}
+
 void CmdSerialOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), {}));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4719,16 +4736,19 @@ LogicalResult CmdConcurrentOp::verify() {
   return success();
 }
 
+ValueRange CmdConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+}
+
 void CmdConcurrentOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), {}));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 

@@ -35,6 +35,16 @@ public:
   visitOperation(Operation *op,
                  ArrayRef<const IntegerDivisibilityLattice *> operands,
                  ArrayRef<IntegerDivisibilityLattice *> results) override;
+
+  /// Visit block arguments or operation results of an operation with region
+  /// control-flow for which values are not defined by region control-flow. This
+  /// function tries to infer the divisibility of loop induction variables based
+  /// on known loop bounds and steps.
+  void visitNonControlFlowArguments(
+      Operation *op, const RegionSuccessor &successor,
+      ValueRange successorInputs,
+      ArrayRef<IntegerDivisibilityLattice *> argLattices,
+      unsigned firstIndex) override;
 };
 
 } // namespace mlir::iree_compiler::IREE::Util

@@ -1749,6 +1749,14 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   tiledOperands.push_back(inputSlice->getResult(0));
   slices.push_back(inputSlice);
 
+  bool isExplicitIndexMode = hasExplicitIndexInput();
+  if (isExplicitIndexMode) {
+    Operation *inputIndexSlice =
+        getSlice(b, loc, getInputIndex(), offsets, sizes, strides);
+    tiledOperands.push_back(inputIndexSlice->getResult(0));
+    slices.push_back(inputIndexSlice);
+  }
+
   // Extract slices of the init operands (partial results). For split-reduction,
   // slice along the reduction dimension to get extra parallelism.
   SmallVector<OpFoldResult> initOffsets, initSizes, initStrides;
@@ -1770,15 +1778,9 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
       continue;
     }
 
-    if (auto sizeAttr = dyn_cast<Attribute>(initSizes[i])) {
-      int64_t size = (cast<IntegerAttr>(sizeAttr)).getInt();
-      resultValShape.push_back(size);
-      resultIdxShape.push_back(size);
-      continue;
-    }
-
-    resultValShape.push_back(ShapedType::kDynamic);
-    resultIdxShape.push_back(ShapedType::kDynamic);
+    std::optional<int64_t> size = getConstantIntValue(initSizes[i]);
+    resultValShape.push_back(size.value_or(ShapedType::kDynamic));
+    resultIdxShape.push_back(size.value_or(ShapedType::kDynamic));
   }
 
   RankedTensorType sliceValResultType =
@@ -1796,36 +1798,47 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   tiledOperands.push_back(initIdxSlice.getResult());
   slices.push_back(initIdxSlice);
 
-  // Create index_base for this chunk.
-  Value tileIndex =
-      getValueOrCreateConstantIndexOp(b, loc, splitReductionIvs[0]);
-  Value tileSize = getValueOrCreateConstantIndexOp(b, loc, sizes[reductionDim]);
-  Value tileStartIndex = arith::MulIOp::create(b, loc, tileIndex, tileSize);
-
-  Value newIndexBase;
-  if (Value globalIndexBase = getIndexBase()) {
-    // Add chunk start to existing index_base.
-    newIndexBase =
-        arith::AddIOp::create(b, loc, globalIndexBase, tileStartIndex);
-  } else {
-    // Use chunk start as index_base.
-    newIndexBase = tileStartIndex;
-  }
-
   SmallVector<Type, 2> resultTypes;
   if (hasPureTensorSemantics()) {
     resultTypes = {initValSlice->getResult(0).getType(),
                    initIdxSlice->getResult(0).getType()};
   }
 
-  // Create the tiled operation with adjusted index_base.
-  SmallVector<Value> operands = std::move(tiledOperands);
-  operands.push_back(newIndexBase);
-  Operation *tiledArgmaxOp = ArgCompareOp::create(
-      b, loc, resultTypes,
-      /*inputs=*/operands[0],
-      /*outputs=*/ValueRange{operands[1], operands[2]},
-      /*indexBase=*/operands[3], /*dimension=*/reductionDim);
+  ArgCompareOp tiledArgmaxOp;
+  if (isExplicitIndexMode) {
+    // Explicit-index mode: 2 inputs (value + index), no index_base.
+    // tiledOperands layout: [value_slice, index_slice, init_val, init_idx].
+    tiledArgmaxOp = ArgCompareOp::create(
+        b, loc, resultTypes,
+        /*inputs=*/ValueRange{tiledOperands[0], tiledOperands[1]},
+        /*outputs=*/ValueRange{tiledOperands[2], tiledOperands[3]},
+        /*indexBase=*/nullptr, /*dimension=*/reductionDim);
+  } else {
+    // Implicit-index mode: 1 input (value) + index_base.
+    // Create index_base for this chunk.
+    Value tileIndex =
+        getValueOrCreateConstantIndexOp(b, loc, splitReductionIvs[0]);
+    Value tileSize =
+        getValueOrCreateConstantIndexOp(b, loc, sizes[reductionDim]);
+    Value tileStartIndex = arith::MulIOp::create(b, loc, tileIndex, tileSize);
+
+    Value newIndexBase;
+    if (Value globalIndexBase = getIndexBase()) {
+      // Add chunk start to existing index_base.
+      newIndexBase =
+          arith::AddIOp::create(b, loc, globalIndexBase, tileStartIndex);
+    } else {
+      // Use chunk start as index_base.
+      newIndexBase = tileStartIndex;
+    }
+
+    // tiledOperands layout: [value_slice, init_val, init_idx].
+    tiledArgmaxOp = ArgCompareOp::create(
+        b, loc, resultTypes,
+        /*inputs=*/tiledOperands[0],
+        /*outputs=*/ValueRange{tiledOperands[1], tiledOperands[2]},
+        /*indexBase=*/newIndexBase, /*dimension=*/reductionDim);
+  }
 
   // Copy the region.
   Region &targetRegion = tiledArgmaxOp->getRegion(0);
@@ -1841,37 +1854,27 @@ FailureOr<MergeResult>
 ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
                               ValueRange partialReduce,
                               const llvm::SetVector<unsigned> &reductionDims) {
-  auto mergeReductionDims = llvm::to_vector_of<int64_t>(reductionDims);
-  // Create linalg.reduce to perform final merge of partial results.
-  auto reduction = linalg::ReduceOp::create(
-      b, loc, partialReduce, getDpsInits(), mergeReductionDims,
-      [this](OpBuilder &b, Location loc, ValueRange inputs) {
-        Block &originalBlock = getRegion().front();
-        IRMapping mapper;
+  int64_t reductionDim = reductionDims.front();
 
-        // Map the original block arguments to the new inputs.
-        mapper.map(originalBlock.getArgument(0), inputs[0]);
-        mapper.map(originalBlock.getArgument(1), inputs[2]);
-        for (Operation &op : originalBlock) {
-          if (op.hasTrait<OpTrait::IsTerminator>()) {
-            break;
-          }
-          b.clone(op, mapper);
-        }
+  // Create arg_compare in explicit-index mode to merge the partial results.
+  // Explicit-index mode: 2 inputs (value + index), no index_base.
+  ArgCompareOp mergeOp = ArgCompareOp::create(
+      b, loc,
+      hasPureTensorSemantics() ? TypeRange(getDpsInits().getTypes())
+                               : TypeRange{},
+      /*inputs=*/partialReduce,
+      /*outputs=*/getDpsInits(),
+      /*indexBase=*/nullptr,
+      /*dimension=*/reductionDim);
 
-        // The verifier from ArgCompareOp ensures the region block ends with
-        // iree_linalg_ext.yield i1, so we can safely extract the predicate.
-        Value predicate =
-            mapper.lookup(originalBlock.getTerminator()->getOperand(0));
-        Value selectedVal =
-            arith::SelectOp::create(b, loc, predicate, inputs[0], inputs[2]);
-        Value selectedIdx =
-            arith::SelectOp::create(b, loc, predicate, inputs[1], inputs[3]);
-        linalg::YieldOp::create(b, loc, ValueRange{selectedVal, selectedIdx});
-      });
+  // Clone the comparator region from the original operation.
+  Region &targetRegion = mergeOp.getRegion();
+  Region &sourceRegion = getRegion();
+  IRMapping mapper;
+  sourceRegion.cloneInto(&targetRegion, mapper);
 
-  return MergeResult{{reduction},
-                     {reduction->getResult(0), reduction->getResult(1)}};
+  return MergeResult{{mergeOp.getOperation()},
+                     {mergeOp.getResult(0), mergeOp.getResult(1)}};
 }
 
 LogicalResult ArgCompareOp::getPartialResultTilePosition(

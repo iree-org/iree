@@ -10,7 +10,10 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -49,6 +52,23 @@ static Type getContractionInputTypeWithSignedness(OpBuilder &builder,
   return elemType;
 }
 
+/// Extract dynamic dimension values for a linalg operation in loop order.
+/// Returns values only for dimensions that are dynamic.
+static SmallVector<Value> getDynamicLoopDims(OpBuilder &builder,
+                                             linalg::LinalgOp linalgOp) {
+  SmallVector<Range> loopRanges =
+      linalgOp.createLoopRanges(builder, linalgOp.getLoc());
+
+  SmallVector<Value> dynamicDims;
+  for (Range &range : loopRanges) {
+    // OpFoldResult is either Value (dynamic) or Attribute (static).
+    if (auto value = dyn_cast<Value>(range.size)) {
+      dynamicDims.push_back(value);
+    }
+  }
+  return dynamicDims;
+}
+
 FailureOr<OpEncodingProperties>
 SerializableAttr::getEncodingProperties(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
@@ -57,7 +77,7 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   }
 
   MLIRContext *ctx = op->getContext();
-  OpBuilder builder(ctx);
+  OpBuilder builder(op);
 
   OpEncodingProperties props;
   SmallVector<Type> elemTypes;
@@ -65,11 +85,14 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   SmallVector<int64_t> iterationSizes = linalgOp.getStaticLoopRanges();
   EncodingOpType opType;
 
+  // Extract dynamic loop dimensions.
+  SmallVector<Value> dynamicDims = getDynamicLoopDims(builder, linalgOp);
+
   auto addEncoding = [&](int64_t operandIndex) {
-    return EncodingProperties{EncodingAttr::get(ctx, operandIndex, opType,
-                                                elemTypes, maps,
-                                                iterationSizes),
-                              /*dynamicValues=*/{}};
+    return EncodingProperties{
+        EncodingAttr::get(ctx, operandIndex, opType, elemTypes,
+                          /*originalElementType=*/{}, maps, iterationSizes),
+        dynamicDims};
   };
 
   // Return encoding properties for contraction operations.

@@ -159,6 +159,7 @@ void buildGlobalOptimizationPassPipeline(
                          DispatchCreation::createInsertTensorBarriersPass);
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
+      .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);

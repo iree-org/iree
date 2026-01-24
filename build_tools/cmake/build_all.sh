@@ -32,6 +32,8 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-${OFF_IF_DARWIN}}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
+# If set to 1, exit after CMake configure (useful for generating compile_commands.json).
+IREE_CONFIGURE_ONLY="${IREE_CONFIGURE_ONLY:-0}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -44,6 +46,7 @@ declare -a CMAKE_ARGS=(
   "-B" "${BUILD_DIR}"
 
   "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 
@@ -72,6 +75,12 @@ declare -a CMAKE_ARGS=(
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
+
+if (( IREE_CONFIGURE_ONLY == 1 )); then
+  echo "IREE_CONFIGURE_ONLY=1, exiting after configure"
+  exit 0
+fi
+
 echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0

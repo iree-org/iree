@@ -102,16 +102,17 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   tileAndFuseOptions.setFusionControlFn(fusionControlFn);
   tileAndFuseOptions.setTilingOptions(std::move(options));
 
+  MLIRContext *context = rewriter.getContext();
+  RewritePatternSet cleanupPatterns(context);
+  populateFoldExtractSliceOfBroadcastPattern(cleanupPatterns);
   if (fusePad) {
-    MLIRContext *context = rewriter.getContext();
-    RewritePatternSet cleanupPatterns(context);
     // When fusing pads we do not want to generate zeroSliceGuards.
     cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
         context,
         [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
-    tileAndFuseOptions.cleanupPatterns =
-        FrozenRewritePatternSet(std::move(cleanupPatterns));
   }
+  tileAndFuseOptions.cleanupPatterns =
+      FrozenRewritePatternSet(std::move(cleanupPatterns));
 
   FailureOr<scf::SCFTileAndFuseResult> result =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, op,
@@ -208,7 +209,6 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   RewritePatternSet patterns(context);
   linalg::populateSwapExtractSliceWithFillPatterns(patterns);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-  populateFoldExtractSliceOfBroadcastPattern(patterns);
   GreedyRewriteConfig config;
   config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {

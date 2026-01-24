@@ -186,3 +186,34 @@ util.func public @with_tensor_ext_bitcast(%arg0: tensor<512x32xf4E2M1FN>) -> ten
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[BITCAST]]
 //       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
 //       CHECK:   util.return %[[END]]
+
+// -----
+
+util.func public @with_hal_alias(%arg0: !hal.buffer_view, %arg1: !hal.fence) {
+  %0 = hal.tensor.import wait(%arg1) => %arg0 : !hal.buffer_view -> tensor<4x8xf32>
+  %empty = tensor.empty() : tensor<4x8xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%0 : tensor<4x8xf32>) outs(%empty : tensor<4x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<4x8xf32>
+  %expanded = tensor.expand_shape %1 [[0, 1], [2]] output_shape [2, 2, 8] : tensor<4x8xf32> into tensor<2x2x8xf32>
+  %2 = hal.tensor.alias wait(%arg1) => %expanded : tensor<2x2x8xf32> to %arg0 : !hal.buffer_view
+  %3 = hal.tensor.barrier join(%2 : tensor<2x2x8xf32>) => %arg1 : !hal.fence
+  util.return
+}
+// CHECK-LABEL: util.func public @with_hal_alias
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.fence
+//       CHECK:   %[[IMPORT:.+]] = hal.tensor.import wait(%[[ARG1]]) => %[[ARG0]]
+//       CHECK:   %[[START:.+]] = iree_tensor_ext.compute_barrier.start %[[IMPORT]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[START]] :
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[GENERIC]]
+//       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[EXPANDED]]
+//       CHECK:   %[[ALIAS:.+]] = hal.tensor.alias wait(%[[ARG1]]) => %[[END]]
+//       CHECK:   %[[BARRIER:.+]] = hal.tensor.barrier join(%[[ALIAS]]
+//       CHECK:   util.return

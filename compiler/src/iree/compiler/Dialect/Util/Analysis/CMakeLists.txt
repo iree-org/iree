@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRControlFlowInterfaces
     MLIRIR
+    MLIRLoopLikeInterface
     MLIRPass
     MLIRSCFDialect
     MLIRSupport
