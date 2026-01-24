@@ -102,6 +102,36 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "atomic_freelist",
+    hdrs = ["atomic_freelist.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "atomic_freelist_test",
+    srcs = ["atomic_freelist_test.cc"],
+    deps = [
+        ":atomic_freelist",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "atomic_freelist_benchmark",
+    srcs = ["atomic_freelist_benchmark.cc"],
+    deps = [
+        ":atomic_freelist",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "bitmap",
     srcs = ["bitmap.c"],
     hdrs = ["bitmap.h"],
@@ -159,6 +189,7 @@ iree_runtime_cc_library(
         "//build_tools:dl",
         "//build_tools:pthreads",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -306,19 +337,8 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_library(
     name = "synchronization",
-    srcs = [
-        "synchronization.c",
-    ],
-    hdrs = [
-        "call_once.h",
-        "synchronization.h",
-    ],
-    deps = [
-        ":internal",
-        "//build_tools:pthreads",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-    ],
+    hdrs = ["synchronization.h"],
+    deps = ["//runtime/src/iree/base/threading"],
 )
 
 cc_binary_benchmark(
@@ -405,6 +425,7 @@ iree_runtime_cc_library(
         ":synchronization",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -446,35 +467,20 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_library(
     name = "threading",
-    srcs = [
-        "threading.c",
-        "threading_darwin.c",
+    hdrs = [
+        "threading.h",
         "threading_impl.h",
-        "threading_pthreads.c",
-        "threading_win32.c",
     ],
-    hdrs = ["threading.h"],
-    deps = [
-        ":internal",
-        ":synchronization",
-        "//build_tools:dl",
-        "//build_tools:pthreads",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-    ],
+    deps = ["//runtime/src/iree/base/threading:thread"],
 )
 
 iree_runtime_cc_test(
     name = "threading_test",
-    srcs = [
-        "threading_impl.h",
-        "threading_test.cc",
-    ],
+    srcs = ["threading_test.cc"],
     deps = [
         ":internal",
         ":synchronization",
         ":threading",
-        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

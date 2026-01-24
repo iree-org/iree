@@ -12,9 +12,9 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/math.h"
+#include "iree/base/threading/call_once.h"
 #include "iree/schemas/cpu_data.h"
 
 // Implementation of iree_uk_assert_fail failure is deferred to users code, i.e.

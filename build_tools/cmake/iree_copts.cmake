@@ -364,6 +364,13 @@ if(IREE_ENABLE_THREADING)
   )
 endif()
 
+if(IREE_SYNCHRONIZATION_DISABLE_UNSAFE)
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    ALL
+      "-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1"
+  )
+endif()
+
 # Find and add threads as dependency.
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
   set(CMAKE_THREAD_PREFER_PTHREAD TRUE)

@@ -65,6 +65,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::path
     iree::base::internal::synchronization
+    iree::base::threading
     iree::io::file_handle
   PUBLIC
 )

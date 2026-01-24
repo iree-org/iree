@@ -93,6 +93,41 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    atomic_freelist
+  HDRS
+    "atomic_freelist.h"
+  DEPS
+    ::internal
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    atomic_freelist_test
+  SRCS
+    "atomic_freelist_test.cc"
+  DEPS
+    ::atomic_freelist
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    atomic_freelist_benchmark
+  SRCS
+    "atomic_freelist_benchmark.cc"
+  DEPS
+    ::atomic_freelist
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     bitmap
   HDRS
     "bitmap.h"
@@ -158,6 +193,7 @@ iree_cc_library(
     ::path
     ::synchronization
     iree::base
+    iree::base::threading
   PUBLIC
 )
 
@@ -336,14 +372,9 @@ iree_cc_library(
   NAME
     synchronization
   HDRS
-    "call_once.h"
     "synchronization.h"
-  SRCS
-    "synchronization.c"
   DEPS
-    ::internal
-    iree::base
-    iree::base::core_headers
+    iree::base::threading
   PUBLIC
 )
 
@@ -436,6 +467,7 @@ iree_cc_library(
     ::synchronization
     iree::base
     iree::base::core_headers
+    iree::base::threading
   PUBLIC
 )
 
@@ -475,18 +507,9 @@ iree_cc_library(
     threading
   HDRS
     "threading.h"
-  SRCS
-    "threading.c"
-    "threading_darwin.c"
     "threading_impl.h"
-    "threading_pthreads.c"
-    "threading_win32.c"
   DEPS
-    ${CMAKE_DL_LIBS}
-    ::internal
-    ::synchronization
-    iree::base
-    iree::base::core_headers
+    iree::base::threading::thread
   PUBLIC
 )
 
@@ -494,13 +517,11 @@ iree_cc_test(
   NAME
     threading_test
   SRCS
-    "threading_impl.h"
     "threading_test.cc"
   DEPS
     ::internal
     ::synchronization
     ::threading
-    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

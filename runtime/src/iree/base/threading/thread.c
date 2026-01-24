@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <string.h>
 
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading_impl.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/thread_impl.h"
 
 int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
                    const char* IREE_RESTRICT src, size_t count) {
@@ -34,8 +33,6 @@ int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
 //==============================================================================
 // iree_thread_affinity_t
 //==============================================================================
-
-// TODO(benvanik): add more helpers and possibly move cpuinfo usage into here.
 
 void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity) {
   memset(out_thread_affinity, 0x00, sizeof(*out_thread_affinity));
