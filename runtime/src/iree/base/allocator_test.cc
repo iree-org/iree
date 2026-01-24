@@ -417,18 +417,18 @@ TEST(StructLayout, ZeroCountField) {
 
 TEST(StructLayout, OverflowOnMultiply) {
   iree_host_size_t total = 0;
-  iree_status_t status = IREE_STRUCT_LAYOUT(
-      0, &total, IREE_STRUCT_FIELD(SIZE_MAX, TestElement, NULL));
-  EXPECT_TRUE(iree_status_is_out_of_range(status));
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      IREE_STRUCT_LAYOUT(0, &total,
+                         IREE_STRUCT_FIELD(SIZE_MAX, TestElement, NULL)));
 }
 
 TEST(StructLayout, OverflowOnAdd) {
   iree_host_size_t total = 0;
-  iree_status_t status = IREE_STRUCT_LAYOUT(
-      SIZE_MAX - 10, &total, IREE_STRUCT_FIELD(100, uint8_t, NULL));
-  EXPECT_TRUE(iree_status_is_out_of_range(status));
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      IREE_STRUCT_LAYOUT(SIZE_MAX - 10, &total,
+                         IREE_STRUCT_FIELD(100, uint8_t, NULL)));
 }
 
 TEST(StructLayout, SingleField) {

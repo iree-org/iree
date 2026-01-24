@@ -278,6 +278,7 @@ class CTSTestBase : public BaseType, public CTSTestResources {
   // Check that a contains b.
   // That is the codes of a and b are equal and the message of b is contained
   // in the message of a.
+  // Takes ownership of both statuses.
   void CheckStatusContains(iree_status_t a, iree_status_t b) {
     EXPECT_EQ(iree_status_code(a), iree_status_code(b));
     iree_allocator_t allocator = iree_allocator_system();
@@ -291,6 +292,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
                 std::string_view::npos);
     iree_allocator_free(allocator, a_str);
     iree_allocator_free(allocator, b_str);
+    iree_status_ignore(a);
+    iree_status_ignore(b);
   }
 };
 

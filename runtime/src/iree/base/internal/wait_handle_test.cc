@@ -249,10 +249,10 @@ TEST(WaitSet, Lifetime) {
 
 TEST(WaitSet, UnreasonableCapacity) {
   iree_wait_set_t* wait_set = NULL;
-  iree_status_t status = iree_wait_set_allocate(
-      1 * 1024 * 1024, iree_allocator_system(), &wait_set);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_wait_set_allocate(1 * 1024 * 1024, iree_allocator_system(),
+                             &wait_set));
 }
 
 // Tests that inserting the same handles multiple times is tracked correctly.
