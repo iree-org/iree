@@ -81,22 +81,20 @@ static llvm::cl::opt<int>
 static llvm::cl::opt<int> clMatmulTileBytes(
     "iree-llvmcpu-matmul-tile-bytes",
     llvm::cl::desc(
-        "target distribution tile size for matrix operands of general matmuls, "
-        "expressed in bytes. Currently only used in data-tiled matmuls "
-        "(mmt4d). The default value 0 lets the compiler choose some vaguely "
-        "reasonable size based on the target architecture, however that is "
-        "insufficient information, thus it is expected that users who care "
-        "about performance will provide a value more suitable for their target "
-        "CPU. Note that in case multiple worker threads are used, they will "
-        "each use tiles of that size. One may therefore need to pass a smaller "
-        "value when aiming to use multiple worker threads. This should "
-        "typically be sized between L2 and L3 data cache size, where L2 is the "
-        "last core-local cache, however this could vary from one CPU to "
-        "another. Use a smaller value to help L1/L2 cache locality on CPUs "
-        "with simpler prefetching. Use a smaller value to help scaling to "
-        "higher numbers of worker threads. Use a larger value to utilize more "
-        "L3 cache. Use a larger value to hide more dispatch overhead."),
-    llvm::cl::init(0));
+        "default target distribution tile size for matrix operands of general "
+        "matmuls, in bytes, when tuning is not used. Currently only used in "
+        "data-tiled matmuls. Users are encouraged to look into "
+        "tuning instead: iree.dev/reference/tuning. Otherwise, this value can "
+        "be used for coarse tuning. Lower values can help use more threads, "
+        "can improve codegen in fusions and can help fit into smaller caches. "
+        "Larger values can help utilize larger caches. There is no universal "
+        "rule linking the optimal value to the size of a particular cache. "
+        "Even on one particular system, the ideal value will be sometimes "
+        "smaller than L2 cache size, sometimes larger than L2 cache size, "
+        "depending on the whole workload, with isolated large matmuls more "
+        "likely to benefit from a larger value, which is why ultimately only "
+        "tuning can find optimal values."),
+    llvm::cl::init(256 * 1024));
 
 static llvm::cl::opt<float> clMatmulTileUndercountWholeMatrix(
     "iree-llvmcpu-matmul-tile-undercount-whole-matrix",
@@ -2011,31 +2009,6 @@ static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
   return divisors;
 }
 
-static int getMatmulTileBytes(Operation *op) {
-  if (clMatmulTileBytes) {
-    return clMatmulTileBytes;
-  }
-  // Generally we want to return a value that is between L2 and L3 cache sizes.
-  // We don't have that information at compile time, so we have to make a
-  // reasonable guess.
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
-    if (DictionaryAttr config = target.getConfiguration()) {
-      if (isX86_64(config) && hasFeature(config, "+avx512f")) {
-        // Recent or server X86.  This value was manually tuned in benchmarks on
-        // EPYC 9575F on single-threaded bf16 matmuls.
-        return 4 * 1024 * 1024;
-      }
-      if (isAArch64(config) &&
-          (hasFeature(config, "+sve") || hasFeature(config, "+i8mm"))) {
-        // Recent Arm64. Value set from looking up some recent SoC specs.
-        return 4 * 1024 * 1024;
-      }
-    }
-  }
-
-  // Default, low-ish value.
-  return 1 * 1024 * 1024;
-}
 static IREE::Codegen::LoweringConfigAttrInterface
 getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   Value lhs = op.getDpsInputs()[0];
@@ -2144,7 +2117,6 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   int64_t selectedTileM = 1;
   int64_t selectedTileN = 1;
   int64_t selectedCost = evalTraversalCost(M1, N1);
-  const int matmulTileBytes = getMatmulTileBytes(op);
 
   // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
   for (auto [tileM, numTilesM] : divisorsOfM1) {
@@ -2164,7 +2136,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
         accBytes *= clMatmulTileUndercountWholeMatrix;
       }
       // Filter out too-large tiles.
-      if (lhsBytes + rhsBytes + accBytes > matmulTileBytes) {
+      if (lhsBytes + rhsBytes + accBytes > clMatmulTileBytes) {
         continue;
       }
       // Evaluate the cost model and retain the better candidate.
