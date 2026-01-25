@@ -76,8 +76,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16>
 // CHECK:       %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x8xf16>
 // Verify LHS transpose sequence for mma.sync column-major ordering
-// VectorDistribute produces 2x2x1x2 -> reshape to 2x2x2 -> transpose [1,0,2] -> reshape to 4x2
-// CHECK:       %[[LHS_RESHAPE:.+]] = vector.shape_cast {{.*}} : vector<2x2x1x2xf16> to vector<2x2x2xf16>
+// VectorDistribute produces 1x1x2x2x1x2 -> reshape to 2x2x2 -> transpose [1,0,2] -> reshape to 4x2
+// CHECK:       %[[LHS_RESHAPE:.+]] = vector.shape_cast {{.*}} : vector<1x1x2x2x1x2xf16> to vector<2x2x2xf16>
 // CHECK:       %[[LHS_TRANSPOSE:.+]] = vector.transpose %[[LHS_RESHAPE]], [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 // CHECK:       %[[LHS_FINAL:.+]] = vector.shape_cast %[[LHS_TRANSPOSE]] : vector<2x2x2xf16> to vector<4x2xf16>
 // Verify nvgpu.mma.sync is generated with correct shape and transposed LHS
@@ -155,7 +155,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16>
 // CHECK:       %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x8xf16>
 // Verify LHS transpose sequence for mma.sync column-major ordering
-// CHECK:       %[[LHS_RESHAPE:.+]] = vector.shape_cast {{.*}} : vector<2x2x1x2xf16> to vector<2x2x2xf16>
+// CHECK:       %[[LHS_RESHAPE:.+]] = vector.shape_cast {{.*}} : vector<1x1x2x2x1x2xf16> to vector<2x2x2xf16>
 // CHECK:       %[[LHS_TRANSPOSE:.+]] = vector.transpose %[[LHS_RESHAPE]], [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 // CHECK:       %[[LHS_FINAL:.+]] = vector.shape_cast %[[LHS_TRANSPOSE]] : vector<2x2x2xf16> to vector<4x2xf16>
 // Verify nvgpu.mma.sync is generated with correct shape, transposed LHS, and f16 output
