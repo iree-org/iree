@@ -193,9 +193,8 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
   iree_vm_stack_frame_t* frame_a = nullptr;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INTERNAL,
-      iree_vm_stack_function_enter(stack, &function_a,
-                                   IREE_VM_STACK_FRAME_NATIVE, 0, NULL,
-                                   &frame_a));
+      iree_vm_stack_function_enter(
+          stack, &function_a, IREE_VM_STACK_FRAME_NATIVE, 0, NULL, &frame_a));
   iree_vm_stack_deinitialize(stack);
 }
 

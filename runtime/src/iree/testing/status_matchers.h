@@ -345,36 +345,20 @@ inline internal::IsOkMatcherGenerator IsOk() {
 // iree::Status, or iree::StatusOr<T>. These macros take ownership of raw
 // iree_status_t values and free them automatically via the Status destructor,
 // preventing leaks on test failure.
-#define IREE_EXPECT_OK(rexpr)                                                \
-  do {                                                                       \
-    ::iree::Status iree_status_for_test_ =                                   \
-        ::iree::internal::ConsumeForTest(rexpr);                             \
-    EXPECT_THAT(iree_status_for_test_,                                       \
-                ::iree::testing::status::StatusIs(::iree::StatusCode::kOk)); \
-  } while (false)
-#define IREE_ASSERT_OK(rexpr)                                                \
-  do {                                                                       \
-    ::iree::Status iree_status_for_test_ =                                   \
-        ::iree::internal::ConsumeForTest(rexpr);                             \
-    ASSERT_THAT(iree_status_for_test_,                                       \
-                ::iree::testing::status::StatusIs(::iree::StatusCode::kOk)); \
-  } while (false)
-#define IREE_EXPECT_STATUS_IS(expected_code, expr)                    \
-  do {                                                                \
-    ::iree::Status iree_status_for_test_ =                            \
-        ::iree::internal::ConsumeForTest(expr);                       \
-    EXPECT_THAT(iree_status_for_test_,                                \
-                ::iree::testing::status::StatusIs(                    \
-                    static_cast<::iree::StatusCode>(expected_code))); \
-  } while (false)
-#define IREE_ASSERT_STATUS_IS(expected_code, expr)                    \
-  do {                                                                \
-    ::iree::Status iree_status_for_test_ =                            \
-        ::iree::internal::ConsumeForTest(expr);                       \
-    ASSERT_THAT(iree_status_for_test_,                                \
-                ::iree::testing::status::StatusIs(                    \
-                    static_cast<::iree::StatusCode>(expected_code))); \
-  } while (false)
+#define IREE_EXPECT_OK(rexpr)                          \
+  EXPECT_THAT(::iree::internal::ConsumeForTest(rexpr), \
+              ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
+#define IREE_ASSERT_OK(rexpr)                          \
+  ASSERT_THAT(::iree::internal::ConsumeForTest(rexpr), \
+              ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
+#define IREE_EXPECT_STATUS_IS(expected_code, expr)    \
+  EXPECT_THAT(::iree::internal::ConsumeForTest(expr), \
+              ::iree::testing::status::StatusIs(      \
+                  static_cast<::iree::StatusCode>(expected_code)))
+#define IREE_ASSERT_STATUS_IS(expected_code, expr)    \
+  ASSERT_THAT(::iree::internal::ConsumeForTest(expr), \
+              ::iree::testing::status::StatusIs(      \
+                  static_cast<::iree::StatusCode>(expected_code)))
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.
