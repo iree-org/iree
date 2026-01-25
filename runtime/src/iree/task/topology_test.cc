@@ -85,9 +85,8 @@ TEST(TopologyTest, MaxCapacity) {
   // Try adding one more - it should it fail because we are at capacity.
   iree_task_topology_group_t extra_group;
   iree_task_topology_group_initialize(UINT8_MAX, &extra_group);
-  iree_status_t status = iree_task_topology_push_group(&topology, &extra_group);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_task_topology_push_group(&topology, &extra_group));
 
   // Confirm that the only groups we have are the valid ones we added above.
   for (iree_host_size_t i = 0; i < 8; ++i) {

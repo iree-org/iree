@@ -904,7 +904,7 @@ TEST_F(SemaphoreSubmissionTest, PropagateFailSignal) {
       iree_hal_semaphore_wait(semaphore2, semaphore2_signal_value,
                               iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
                               IREE_HAL_WAIT_FLAG_DEFAULT);
-  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore2, &value);
   EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
@@ -914,9 +914,6 @@ TEST_F(SemaphoreSubmissionTest, PropagateFailSignal) {
   iree_hal_semaphore_release(semaphore1);
   iree_hal_semaphore_release(semaphore2);
   iree_hal_command_buffer_release(command_buffer);
-  iree_status_ignore(status);
-  iree_status_ignore(wait_status);
-  iree_status_ignore(query_status);
 }
 
 // Submit an invalid dispatch and check that the wait semaphore fails.

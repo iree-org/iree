@@ -12,6 +12,7 @@
 #include "iree/task/submission.h"
 #include "iree/task/task_impl.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace {
 
@@ -45,9 +46,8 @@ TEST(ScopeTest, AbortEmpty) {
 
   // Enter aborted state.
   iree_task_scope_abort(&scope);
-  iree_status_t consumed_status = iree_task_scope_consume_status(&scope);
-  EXPECT_TRUE(iree_status_is_aborted(consumed_status));
-  iree_status_ignore(consumed_status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED,
+                        iree_task_scope_consume_status(&scope));
 
   // Ensure aborted state is sticky.
   EXPECT_TRUE(iree_status_is_aborted(iree_task_scope_consume_status(&scope)));
@@ -69,9 +69,8 @@ TEST(ScopeTest, FailEmpty) {
   failed_task.scope = &scope;
   iree_task_scope_fail(failed_task.scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!"));
-  iree_status_t consumed_status = iree_task_scope_consume_status(&scope);
-  EXPECT_TRUE(iree_status_is_data_loss(consumed_status));
-  iree_status_ignore(consumed_status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_task_scope_consume_status(&scope));
 
   // Ensure failure state is sticky.
   EXPECT_TRUE(iree_status_is_data_loss(iree_task_scope_consume_status(&scope)));
@@ -95,9 +94,8 @@ TEST(ScopeTest, FailAgain) {
   failed_task_a.scope = &scope;
   iree_task_scope_fail(failed_task_a.scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops 1"));
-  iree_status_t consumed_status_a = iree_task_scope_consume_status(&scope);
-  EXPECT_TRUE(iree_status_is_data_loss(consumed_status_a));
-  iree_status_ignore(consumed_status_a);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_task_scope_consume_status(&scope));
 
   // Ensure failure s tate is sticky.
   EXPECT_TRUE(iree_status_is_data_loss(iree_task_scope_consume_status(&scope)));
@@ -108,9 +106,8 @@ TEST(ScopeTest, FailAgain) {
   iree_task_scope_fail(
       failed_task_b.scope,
       iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops 2"));
-  iree_status_t consumed_status_b = iree_task_scope_consume_status(&scope);
-  EXPECT_TRUE(iree_status_is_data_loss(consumed_status_b));
-  iree_status_ignore(consumed_status_b);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS,
+                        iree_task_scope_consume_status(&scope));
 
   // Still the first failure status.
   EXPECT_TRUE(iree_status_is_data_loss(iree_task_scope_consume_status(&scope)));

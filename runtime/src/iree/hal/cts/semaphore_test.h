@@ -443,16 +443,13 @@ TEST_F(SemaphoreTest, FailThenWait) {
   iree_status_t wait_status = iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
       IREE_HAL_WAIT_FLAG_DEFAULT);
-  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
   EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
   CheckStatusContains(query_status, status);
 
   iree_hal_semaphore_release(semaphore);
-  iree_status_ignore(status);
-  iree_status_ignore(wait_status);
-  iree_status_ignore(query_status);
 }
 
 // Wait on a semaphore that is then failed.
@@ -469,7 +466,7 @@ TEST_F(SemaphoreTest, WaitThenFail) {
   iree_status_t wait_status = iree_hal_semaphore_wait(
       semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
       IREE_HAL_WAIT_FLAG_DEFAULT);
-  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
   uint64_t value = 1234;
   iree_status_t query_status = iree_hal_semaphore_query(semaphore, &value);
   EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
@@ -477,9 +474,6 @@ TEST_F(SemaphoreTest, WaitThenFail) {
 
   signal_thread.join();
   iree_hal_semaphore_release(semaphore);
-  iree_status_ignore(status);
-  iree_status_ignore(wait_status);
-  iree_status_ignore(query_status);
 }
 
 // Wait 2 semaphores then fail one of them.
@@ -505,7 +499,7 @@ TEST_F(SemaphoreTest, MultiWaitThenFail) {
   iree_status_t wait_status = iree_hal_semaphore_list_wait(
       semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
       IREE_HAL_WAIT_FLAG_DEFAULT);
-  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
   uint64_t value = 1234;
   iree_status_t semaphore1_query_status =
       iree_hal_semaphore_query(semaphore1, &value);
@@ -520,9 +514,6 @@ TEST_F(SemaphoreTest, MultiWaitThenFail) {
   signal_thread.join();
   iree_hal_semaphore_release(semaphore1);
   iree_hal_semaphore_release(semaphore2);
-  iree_status_ignore(status);
-  iree_status_ignore(wait_status);
-  iree_status_ignore(semaphore1_query_status);
 }
 
 // Wait 2 semaphores using iree_hal_device_wait_semaphores then fail
@@ -550,7 +541,7 @@ TEST_F(SemaphoreTest, DeviceMultiWaitThenFail) {
       device_, IREE_HAL_WAIT_MODE_ANY, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
       IREE_HAL_WAIT_FLAG_DEFAULT);
-  EXPECT_EQ(iree_status_code(wait_status), IREE_STATUS_ABORTED);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, wait_status);
   uint64_t value = 1234;
   iree_status_t semaphore1_query_status =
       iree_hal_semaphore_query(semaphore1, &value);
@@ -565,9 +556,6 @@ TEST_F(SemaphoreTest, DeviceMultiWaitThenFail) {
   signal_thread.join();
   iree_hal_semaphore_release(semaphore1);
   iree_hal_semaphore_release(semaphore2);
-  iree_status_ignore(status);
-  iree_status_ignore(wait_status);
-  iree_status_ignore(semaphore1_query_status);
 }
 
 }  // namespace iree::hal::cts

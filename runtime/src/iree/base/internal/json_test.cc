@@ -61,44 +61,39 @@ TEST(JsonConsumeStringTest, WithUnicodeEscape) {
 TEST(JsonConsumeStringTest, Unterminated) {
   iree_string_view_t str = IREE_SV("\"hello");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_string(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_string(&str, &value));
 }
 
 TEST(JsonConsumeStringTest, MissingPrefix) {
   iree_string_view_t str = IREE_SV("hello\"");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_string(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_string(&str, &value));
 }
 
 TEST(JsonConsumeStringTest, ControlCharacter) {
   // Control characters (0x00-0x1F) must be escaped per RFC 8259.
   iree_string_view_t str = IREE_SV("\"hello\tworld\"");  // Tab is 0x09.
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_string(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_string(&str, &value));
 }
 
 TEST(JsonConsumeStringTest, ControlCharacterNewline) {
   // Unescaped newline is invalid.
   iree_string_view_t str = IREE_SV("\"hello\nworld\"");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_string(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_string(&str, &value));
 }
 
 TEST(JsonConsumeStringTest, InvalidHexDigitInUnicode) {
   // \uNNNN requires valid hex digits.
   iree_string_view_t str = IREE_SV("\"\\u00GX\"");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_string(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_string(&str, &value));
 }
 
 TEST(JsonConsumeStringTest, TrailingContent) {
@@ -180,17 +175,15 @@ TEST(JsonConsumeNumberTest, TrailingContent) {
 TEST(JsonConsumeNumberTest, Empty) {
   iree_string_view_t str = IREE_SV("");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_number(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_number(&str, &value));
 }
 
 TEST(JsonConsumeNumberTest, JustMinus) {
   iree_string_view_t str = IREE_SV("-");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_number(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_number(&str, &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -221,10 +214,9 @@ TEST(JsonConsumeKeywordTest, Null) {
 TEST(JsonConsumeKeywordTest, WrongKeyword) {
   iree_string_view_t str = IREE_SV("false");
   iree_string_view_t value;
-  iree_status_t status =
-      iree_json_consume_keyword(&str, IREE_SV("true"), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_consume_keyword(&str, IREE_SV("true"), &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -262,9 +254,8 @@ TEST(JsonConsumeObjectTest, Nested) {
 TEST(JsonConsumeObjectTest, MissingBrace) {
   iree_string_view_t str = IREE_SV("{\"key\": 123");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_object(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_object(&str, &value));
 }
 
 TEST(JsonConsumeObjectTest, TrailingComma) {
@@ -319,9 +310,8 @@ TEST(JsonConsumeObjectTest, UnterminatedComment) {
   // Unterminated multi-line comments should error.
   iree_string_view_t str = IREE_SV("{/* unterminated \"key\": 123}");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_object(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_object(&str, &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -366,9 +356,8 @@ TEST(JsonConsumeArrayTest, Nested) {
 TEST(JsonConsumeArrayTest, MissingBracket) {
   iree_string_view_t str = IREE_SV("[1, 2, 3");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_array(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_array(&str, &value));
 }
 
 TEST(JsonConsumeArrayTest, TrailingComma) {
@@ -492,18 +481,16 @@ TEST(JsonConsumeValueTest, Empty) {
   // Empty input should return an error.
   iree_string_view_t str = IREE_SV("");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_value(&str, &value));
 }
 
 TEST(JsonConsumeValueTest, WhitespaceOnly) {
   // Whitespace-only input should return an error (no actual value).
   iree_string_view_t str = IREE_SV("   \n\t  ");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_value(&str, &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -614,8 +601,7 @@ TEST(JsonLookupObjectValueTest, NotFound) {
   iree_string_view_t value;
   iree_status_t status = iree_json_lookup_object_value(
       IREE_SV("{\"key\": 123}"), IREE_SV("missing"), &value);
-  EXPECT_TRUE(iree_status_is_not_found(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
   EXPECT_EQ(value.size, 0);
 }
 
@@ -736,11 +722,11 @@ TEST(JsonTryLookupStringTest, EmptyString) {
 TEST(JsonTryLookupStringTest, NumberValueReturnsError) {
   char buffer[32];
   iree_host_size_t length = 0;
-  iree_status_t status = iree_json_try_lookup_string(
-      IREE_SV("{\"key\": 123}"), IREE_SV("key"), iree_string_view_empty(),
-      buffer, sizeof(buffer), &length);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_try_lookup_string(IREE_SV("{\"key\": 123}"), IREE_SV("key"),
+                                  iree_string_view_empty(), buffer,
+                                  sizeof(buffer), &length));
 }
 
 TEST(JsonTryLookupStringTest, BufferTooSmall) {
@@ -749,10 +735,9 @@ TEST(JsonTryLookupStringTest, BufferTooSmall) {
   iree_status_t status = iree_json_try_lookup_string(
       IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), iree_string_view_empty(),
       buffer, sizeof(buffer), &length);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
   // Length should still indicate required size.
   EXPECT_EQ(length, 5);
-  iree_status_ignore(status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1095,17 +1080,15 @@ TEST(JsonArrayGetTest, LastElement) {
 
 TEST(JsonArrayGetTest, OutOfRange) {
   iree_string_view_t value;
-  iree_status_t status =
-      iree_json_array_get(IREE_SV("[10, 20, 30]"), 3, &value);
-  EXPECT_TRUE(iree_status_is_out_of_range(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_json_array_get(IREE_SV("[10, 20, 30]"), 3, &value));
 }
 
 TEST(JsonArrayGetTest, EmptyArrayOutOfRange) {
   iree_string_view_t value;
-  iree_status_t status = iree_json_array_get(IREE_SV("[]"), 0, &value);
-  EXPECT_TRUE(iree_status_is_out_of_range(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_OUT_OF_RANGE,
+                        iree_json_array_get(IREE_SV("[]"), 0, &value));
 }
 
 TEST(JsonArrayGetTest, StringElement) {
@@ -1281,10 +1264,10 @@ TEST(JsonEnumerateLinesTest, MixedLineEndings) {
 TEST(JsonEnumerateLinesTest, TrailingContentOnLine) {
   std::vector<LineEntry> entries;
   // After parsing "123", there's " extra" remaining on the line.
-  iree_status_t status = iree_json_enumerate_lines(
-      IREE_SV("123 extra\n456"), CollectLineEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_enumerate_lines(IREE_SV("123 extra\n456"), CollectLineEntries,
+                                &entries));
 }
 
 TEST(JsonEnumerateLinesTest, EarlyTermination) {
@@ -1296,11 +1279,11 @@ TEST(JsonEnumerateLinesTest, EarlyTermination) {
 
 TEST(JsonEnumerateLinesTest, InvalidJson) {
   std::vector<LineEntry> entries;
-  iree_status_t status = iree_json_enumerate_lines(
-      IREE_SV("{\"valid\": 1}\ninvalid json\n{\"also\": 2}"),
-      CollectLineEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_enumerate_lines(
+          IREE_SV("{\"valid\": 1}\ninvalid json\n{\"also\": 2}"),
+          CollectLineEntries, &entries));
 }
 
 TEST(JsonEnumerateLinesTest, CommentLinesSkipped) {
@@ -1434,8 +1417,7 @@ TEST(JsonUnescapeStringTest, BufferTooSmall) {
   iree_host_size_t len;
   iree_status_t status =
       iree_json_unescape_string(IREE_SV("hello"), sizeof(buf), buf, &len);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
   EXPECT_EQ(len, 5);  // Required size.
 }
 
@@ -1449,39 +1431,35 @@ TEST(JsonUnescapeStringTest, LengthOnly) {
 TEST(JsonUnescapeStringTest, InvalidEscape) {
   char buf[64];
   iree_host_size_t len;
-  iree_status_t status =
-      iree_json_unescape_string(IREE_SV("\\x"), sizeof(buf), buf, &len);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_unescape_string(IREE_SV("\\x"), sizeof(buf), buf, &len));
 }
 
 TEST(JsonUnescapeStringTest, TruncatedUnicode) {
   char buf[64];
   iree_host_size_t len;
-  iree_status_t status =
-      iree_json_unescape_string(IREE_SV("\\u00"), sizeof(buf), buf, &len);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_unescape_string(IREE_SV("\\u00"), sizeof(buf), buf, &len));
 }
 
 TEST(JsonUnescapeStringTest, LoneSurrogate) {
   char buf[64];
   iree_host_size_t len;
   // High surrogate without low surrogate.
-  iree_status_t status =
-      iree_json_unescape_string(IREE_SV("\\uD83D"), sizeof(buf), buf, &len);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_unescape_string(IREE_SV("\\uD83D"), sizeof(buf), buf, &len));
 }
 
 TEST(JsonUnescapeStringTest, InvalidHexDigit) {
   char buf[64];
   iree_host_size_t len;
   // 'G' is not a valid hex digit.
-  iree_status_t status =
-      iree_json_unescape_string(IREE_SV("\\u00GX"), sizeof(buf), buf, &len);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_unescape_string(IREE_SV("\\u00GX"), sizeof(buf), buf, &len));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1521,17 +1499,15 @@ TEST(JsonParseInt64Test, Min) {
 
 TEST(JsonParseInt64Test, Overflow) {
   int64_t value;
-  iree_status_t status =
-      iree_json_parse_int64(IREE_SV("9223372036854775808"), &value);
-  EXPECT_TRUE(iree_status_is_out_of_range(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_json_parse_int64(IREE_SV("9223372036854775808"), &value));
 }
 
 TEST(JsonParseInt64Test, Float) {
   int64_t value;
-  iree_status_t status = iree_json_parse_int64(IREE_SV("3.14"), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_parse_int64(IREE_SV("3.14"), &value));
 }
 
 TEST(JsonParseUint64Test, Zero) {
@@ -1555,9 +1531,8 @@ TEST(JsonParseUint64Test, Max) {
 
 TEST(JsonParseUint64Test, Negative) {
   uint64_t value;
-  iree_status_t status = iree_json_parse_uint64(IREE_SV("-1"), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_parse_uint64(IREE_SV("-1"), &value));
 }
 
 TEST(JsonParseDoubleTest, Integer) {
@@ -1608,23 +1583,20 @@ TEST(JsonParseBoolTest, False) {
 
 TEST(JsonParseBoolTest, Null) {
   bool value;
-  iree_status_t status = iree_json_parse_bool(IREE_SV("null"), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_parse_bool(IREE_SV("null"), &value));
 }
 
 TEST(JsonParseBoolTest, Number) {
   bool value;
-  iree_status_t status = iree_json_parse_bool(IREE_SV("1"), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_parse_bool(IREE_SV("1"), &value));
 }
 
 TEST(JsonParseBoolTest, String) {
   bool value;
-  iree_status_t status = iree_json_parse_bool(IREE_SV("\"true\""), &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_parse_bool(IREE_SV("\"true\""), &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1670,18 +1642,18 @@ TEST(JsonTryLookupBoolTest, InvalidValueReturnsError) {
   bool value;
   // Note: JSON string values have quotes stripped by lookup, so "yes" becomes
   // just "yes" which is not a valid boolean.
-  iree_status_t status = iree_json_try_lookup_bool(
-      IREE_SV("{\"key\": \"yes\"}"), IREE_SV("key"), false, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_try_lookup_bool(IREE_SV("{\"key\": \"yes\"}"), IREE_SV("key"),
+                                false, &value));
 }
 
 TEST(JsonTryLookupBoolTest, NumberValueReturnsError) {
   bool value;
-  iree_status_t status = iree_json_try_lookup_bool(
-      IREE_SV("{\"key\": 1}"), IREE_SV("key"), false, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_try_lookup_bool(IREE_SV("{\"key\": 1}"), IREE_SV("key"), false,
+                                &value));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1732,20 +1704,19 @@ TEST(JsonTryLookupInt64Test, EmptyObjectUsesDefault) {
 
 TEST(JsonTryLookupInt64Test, FloatValueReturnsError) {
   int64_t value;
-  iree_status_t status = iree_json_try_lookup_int64(IREE_SV("{\"key\": 3.14}"),
-                                                    IREE_SV("key"), 0, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_try_lookup_int64(IREE_SV("{\"key\": 3.14}"),
+                                                   IREE_SV("key"), 0, &value));
 }
 
 TEST(JsonTryLookupInt64Test, NonNumericStringValueReturnsError) {
   // Note: JSON strings have quotes stripped by lookup, so "123" becomes "123"
   // which parses as a valid int. Use a truly non-numeric string.
   int64_t value;
-  iree_status_t status = iree_json_try_lookup_int64(
-      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), 0, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_try_lookup_int64(IREE_SV("{\"key\": \"hello\"}"),
+                                 IREE_SV("key"), 0, &value));
 }
 
 TEST(JsonTryLookupInt64Test, LargePositiveValue) {
@@ -1831,9 +1802,8 @@ TEST(JsonDepthTest, DeeplyNestedArrays) {
   iree_string_view_t str =
       iree_make_string_view(deep_json.data(), deep_json.size());
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_json_consume_value(&str, &value));
 }
 
 TEST(JsonDepthTest, DeeplyNestedObjects) {
@@ -1846,9 +1816,8 @@ TEST(JsonDepthTest, DeeplyNestedObjects) {
   iree_string_view_t str =
       iree_make_string_view(deep_json.data(), deep_json.size());
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_json_consume_value(&str, &value));
 }
 
 TEST(JsonDepthTest, MixedNestedStructures) {
@@ -1865,9 +1834,8 @@ TEST(JsonDepthTest, MixedNestedStructures) {
   iree_string_view_t str =
       iree_make_string_view(deep_json.data(), deep_json.size());
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_resource_exhausted(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED,
+                        iree_json_consume_value(&str, &value));
 }
 
 TEST(JsonDepthTest, AcceptableDepth) {
@@ -1925,28 +1893,28 @@ TEST(JsonEnumerateLinesTest, MultiLineBlockCommentOnSameLine) {
 
 TEST(JsonEnumerateLinesTest, UnterminatedMultiLineComment) {
   std::vector<LineEntry> entries;
-  iree_status_t status = iree_json_enumerate_lines(
-      IREE_SV("/* unterminated\ncomment\n123"), CollectLineEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_enumerate_lines(IREE_SV("/* unterminated\ncomment\n123"),
+                                CollectLineEntries, &entries));
 }
 
 TEST(JsonEnumerateLinesTest, MultipleValuesOnSameLine) {
   // JSONL requires one value per line - multiple values should fail.
   std::vector<LineEntry> entries;
-  iree_status_t status = iree_json_enumerate_lines(
-      IREE_SV("123 456\n789"), CollectLineEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_enumerate_lines(IREE_SV("123 456\n789"), CollectLineEntries,
+                                &entries));
 }
 
 TEST(JsonEnumerateLinesTest, MultipleValuesWithCommentBetween) {
   // Even with a comment between, multiple values on same line should fail.
   std::vector<LineEntry> entries;
-  iree_status_t status = iree_json_enumerate_lines(
-      IREE_SV("123 /* comment */ 456"), CollectLineEntries, &entries);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_enumerate_lines(IREE_SV("123 /* comment */ 456"),
+                                CollectLineEntries, &entries));
 }
 
 TEST(JsonEnumerateLinesTest, CROnlyLineEndings) {
@@ -2084,9 +2052,8 @@ TEST(JsonConsumeValueTest, CommentOnly) {
   // Input with only comments should fail (no value).
   iree_string_view_t str = IREE_SV("// just a comment\n/* another */");
   iree_string_view_t value;
-  iree_status_t status = iree_json_consume_value(&str, &value);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_consume_value(&str, &value));
 }
 
 TEST(JsonConsumeObjectTest, CommentInsideString) {
@@ -2130,22 +2097,20 @@ TEST(JsonValidateObjectKeysTest, SingleUnknownKey) {
       IREE_SVL("type"),
       IREE_SVL("value"),
   };
-  iree_status_t status = iree_json_validate_object_keys(
-      IREE_SV("{\"type\": \"foo\", \"unknown\": 123}"), kAllowedKeys,
-      IREE_ARRAYSIZE(kAllowedKeys));
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_validate_object_keys(
+                            IREE_SV("{\"type\": \"foo\", \"unknown\": 123}"),
+                            kAllowedKeys, IREE_ARRAYSIZE(kAllowedKeys)));
 }
 
 TEST(JsonValidateObjectKeysTest, MultipleUnknownKeys) {
   static const iree_string_view_t kAllowedKeys[] = {
       IREE_SVL("type"),
   };
-  iree_status_t status = iree_json_validate_object_keys(
-      IREE_SV("{\"foo\": 1, \"bar\": 2, \"type\": 3}"), kAllowedKeys,
-      IREE_ARRAYSIZE(kAllowedKeys));
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_json_validate_object_keys(
+                            IREE_SV("{\"foo\": 1, \"bar\": 2, \"type\": 3}"),
+                            kAllowedKeys, IREE_ARRAYSIZE(kAllowedKeys)));
 }
 
 TEST(JsonValidateObjectKeysTest, NestedObjectsNotValidated) {
@@ -2160,10 +2125,9 @@ TEST(JsonValidateObjectKeysTest, NestedObjectsNotValidated) {
 
 TEST(JsonValidateObjectKeysTest, NoAllowedKeys) {
   // With no allowed keys, any key is unknown.
-  iree_status_t status =
-      iree_json_validate_object_keys(IREE_SV("{\"key\": 123}"), NULL, 0);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_validate_object_keys(IREE_SV("{\"key\": 123}"), NULL, 0));
 }
 
 TEST(JsonValidateObjectKeysTest, EmptyObjectNoAllowedKeys) {
