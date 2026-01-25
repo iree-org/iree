@@ -295,8 +295,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       continue;
     }
     // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind())
+    if (!mma.getDistributionMappingKind()) {
       continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Skip adding any virtual intrinsics since they are not tested for
     // convolutions.
@@ -534,8 +535,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       continue;
     }
     // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind())
+    if (!mma.getDistributionMappingKind()) {
       continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Skip adding any virtual intrinsics since they are not tested for matmuls.
   }
@@ -788,8 +790,9 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
       continue;
     }
     // Intrinsics without distribution mapping cannot be distributed.
-    if (!mma.getDistributionMappingKind())
+    if (!mma.getDistributionMappingKind()) {
       continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
