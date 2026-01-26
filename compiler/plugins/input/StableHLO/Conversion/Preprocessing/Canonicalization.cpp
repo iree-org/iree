@@ -1107,45 +1107,52 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       return rewriter.notifyMatchFailure(op, "not stablehlo");
     }
 
-    // If the result is a zero-extent tensor, replace the whole op with an empty
-    // tensor.
-    bool didUpdate = false;
-    llvm::BitVector updatedResults(op->getNumResults(), false);
-    for (auto [index, result] : llvm::enumerate(op->getResults())) {
-      auto resultType = isZeroExtent(result.getType());
-      if (!resultType || result.use_empty()) {
-        continue;
-      }
-      rewriter.replaceAllUsesWith(
-          result, tensor::EmptyOp::create(rewriter, loc, resultType->getShape(),
-                                          resultType->getElementType()));
-      didUpdate = true;
-      updatedResults.set(index);
+    auto needsOperandUpdate = [](OperandRange operands) {
+      return llvm::any_of(operands, [](Value operand) -> bool {
+        return isZeroExtent(operand.getType()) &&
+               !operand.getDefiningOp<tensor::EmptyOp>();
+      });
+    };
+
+    auto needsResultUpdate = [](ResultRange results) {
+      return llvm::any_of(results, [](OpResult result) -> bool {
+        return isZeroExtent(result.getType()) && !result.use_empty();
+      });
+    };
+
+    if (!needsOperandUpdate(op->getOperands()) &&
+        !needsResultUpdate(op->getResults())) {
+      return rewriter.notifyMatchFailure(op, "no update necessary");
     }
 
-    if (didUpdate && updatedResults.all()) {
-      // If we have replaced all results with a tensor.empty, there is no need
-      // to update the operation in the next step.
-      return success();
-    }
-
-    // If one of the operands is a zero-extent tensor, replace the operand with
-    // an empty tensor.
+    IRMapping operandMapping;
     for (OpOperand &operand : op->getOpOperands()) {
       auto operandType = isZeroExtent(operand.get().getType());
       if (!operandType || operand.get().getDefiningOp<tensor::EmptyOp>()) {
         continue;
       }
-      Operation *owner = operand.getOwner();
-      int operandNum = operand.getOperandNumber();
       auto emptyTensorOp =
           tensor::EmptyOp::create(rewriter, loc, operandType->getShape(),
                                   operandType->getElementType());
-      rewriter.modifyOpInPlace(
-          owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
-      didUpdate = true;
+      operandMapping.map(operand.get(), emptyTensorOp.getResult());
     }
-    return success(didUpdate);
+
+    Operation *newOp = rewriter.clone(*op, operandMapping);
+
+    SmallVector<Value> newResults;
+    for (auto [index, result] : llvm::enumerate(op->getResults())) {
+      auto resultType = isZeroExtent(result.getType());
+      if (!resultType || result.use_empty()) {
+        newResults.push_back(newOp->getResult(index));
+        continue;
+      }
+      newResults.push_back(tensor::EmptyOp::create(rewriter, loc,
+                                                   resultType->getShape(),
+                                                   resultType->getElementType())
+                               ->getResult(0));
+    }
+    rewriter.replaceOp(op, newResults);
+    return success();
   }
 };
 
