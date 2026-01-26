@@ -32,7 +32,7 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
                    reassociateFpReductions,
                    {initAtOpt(llvm::OptimizationLevel::O0, false),
-                    initAtOpt(llvm::OptimizationLevel::O1, true)},
+                    initAtOpt(llvm::OptimizationLevel::O2, true)},
                    llvm::cl::desc("Enables reassociation for FP reductions."),
                    llvm::cl::cat(category));
 }
