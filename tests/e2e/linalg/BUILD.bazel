@@ -249,6 +249,8 @@ ROCM_SRCS = enforce_glob(
 
 iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
+    # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+    timeout = "moderate",
     srcs = ROCM_SRCS,
     driver = "hip",
     target_backend = "rocm",

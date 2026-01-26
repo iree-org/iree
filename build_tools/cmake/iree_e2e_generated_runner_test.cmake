@@ -30,6 +30,7 @@
 #   TEST_DEFINED: Whether to define a test target.
 #   TEST_DISABLED: The test target will be skipped and its status will be
 #       'Not Run'.
+#   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
 function(iree_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -43,7 +44,7 @@ function(iree_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
+    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED;TIMEOUT"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -119,6 +120,8 @@ function(iree_e2e_runner_test)
         ${_RULE_LABELS}
       DISABLED
         ${_RULE_TEST_DISABLED}
+      TIMEOUT
+        ${_RULE_TIMEOUT}
     )
   endif()
 endfunction()
@@ -145,6 +148,7 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
+#   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
 function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -157,7 +161,7 @@ function(iree_single_backend_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER;TIMEOUT"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -306,6 +310,7 @@ function(iree_single_backend_e2e_runner_test)
       LABELS ${_RULE_LABELS}
       TEST_DEFINED ${_TEST_DEFINED}
       TEST_DISABLED ${_TEST_DISABLED}
+      TIMEOUT ${_RULE_TIMEOUT}
     )
     # Note we are relying on the fact that the target created by
     # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -339,6 +344,7 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        TIMEOUT ${_RULE_TIMEOUT}
       )
       # Note we are relying on the fact that the target created by
       # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -365,6 +371,7 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        TIMEOUT ${_RULE_TIMEOUT}
       )
       # Note we are relying on the fact that the target created by
       # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
@@ -415,6 +422,7 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
+#   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
 function(iree_generated_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -423,7 +431,7 @@ function(iree_generated_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER;TIMEOUT"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -494,6 +502,8 @@ function(iree_generated_e2e_runner_test)
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_LABELS}
+        TIMEOUT
+          ${_RULE_TIMEOUT}
       )
     endforeach()
   endforeach()
