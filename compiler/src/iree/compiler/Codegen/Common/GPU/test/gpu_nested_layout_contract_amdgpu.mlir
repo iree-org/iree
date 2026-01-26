@@ -51,7 +51,7 @@ func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x8xf16>, vector<8x32xf16> into vector<32x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
@@ -123,7 +123,7 @@ func.func @contract_to_mfma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x1
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_b) : vector<16x16xf32>
@@ -206,7 +206,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vecto
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<64x8xf16>, vector<8x32xf16> into vector<64x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<64x32xf32>
@@ -297,7 +297,7 @@ func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vecto
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x16xf16>, vector<16x32xf16> into vector<32x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
@@ -380,7 +380,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b :
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<64x8xf16>, vector<8x96xf16> into vector<64x96xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<64x96xf32>
@@ -466,7 +466,7 @@ func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8x
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
   } %A, %B, %C : vector<32x8xf16>, vector<64x8xf16> into vector<32x64xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x64xf32>
@@ -547,7 +547,7 @@ func.func @contract_to_WMMAR3_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -629,7 +629,7 @@ func.func @contract_to_WMMAR4_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
   } %A, %B, %C : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -711,7 +711,7 @@ func.func @contract_to_gfx1250_WMMA_16x16x4_mm(%a : vector<16x4xf32>, %b : vecto
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x4_F32>
   } %A, %B, %C : vector<16x4xf32>, vector<4x16xf32> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -792,7 +792,7 @@ func.func @contract_to_gfx1250_WMMA_16x16x32_mm(%a : vector<16x32xf16>, %b : vec
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x32_F16>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x32_F16>
   } %A, %B, %C : vector<16x32xf16>, vector<32x16xf16> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -873,7 +873,7 @@ func.func @contract_to_gfx1250_WMMA_16x16x64_mm(%a : vector<16x64xf8E4M3FN>, %b 
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x64_F8E4M3FN>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x64_F8E4M3FN>
   } %A, %B, %C : vector<16x64xf8E4M3FN>, vector<64x16xf8E4M3FN> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -954,7 +954,7 @@ func.func @contract_to_gfx1250_WMMA_16x16x128_mm(%a : vector<16x128xf8E4M3FN>, %
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>
+    iree.gpu.mma = #iree_gpu.mma_layout<WMMA_F32_16x16x128_F8E4M3FN>
   } %A, %B, %C : vector<16x128xf8E4M3FN>, vector<128x16xf8E4M3FN> into vector<16x16xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<16x16xf32>
@@ -1033,7 +1033,7 @@ func.func @contract_to_vmfma_32x32x16_mm(%a : vector<32x16xf16>, %b : vector<16x
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mma = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>
+    iree.gpu.mma = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>
   } %A, %B, %C : vector<32x16xf16>, vector<16x32xf16> into vector<32x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
@@ -1113,7 +1113,7 @@ func.func @contract_with_3d_in_and_2d_out(%a: vector<32x2x64xf8E4M3FNUZ>, %b: ve
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d3)>],
     iterator_types = ["parallel", "reduction", "reduction", "parallel"],
     kind = #vector.kind<add>
-  } %A, %B, %C {iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>} : vector<32x2x64xf8E4M3FNUZ>, vector<32x2x64xf8E4M3FNUZ> into vector<32x32xf32>
+  } %A, %B, %C {iree.gpu.mma = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F8E4M3FNUZ>} : vector<32x2x64xf8E4M3FNUZ>, vector<32x2x64xf8E4M3FNUZ> into vector<32x32xf32>
 
   %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<32x32xf32>
   return %O : vector<32x32xf32>

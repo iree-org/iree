@@ -94,18 +94,6 @@ static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
         "enable the tile and fuse pipeline for supported convolutions"),
     llvm::cl::init(true));
 
-/// Flag to force using WMMA tensorcore operations.
-static llvm::cl::opt<bool>
-    clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
-                 llvm::cl::desc("force use of wmma operations for tensorcore"),
-                 llvm::cl::init(false));
-
-/// Flag used to toggle using mma.sync vs wmma when targeting tensorcore.
-static llvm::cl::opt<bool>
-    clGPUUseMMASync("iree-codegen-llvmgpu-use-mma-sync",
-                    llvm::cl::desc("force use mma sync instead of wmma ops"),
-                    llvm::cl::init(false));
-
 static llvm::cl::opt<int> clGPUMatmulCThreshold(
     "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
     llvm::cl::desc("matmul c matrix element count threshold to be considered "
@@ -304,6 +292,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -540,6 +532,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -791,6 +787,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -1348,12 +1348,6 @@ static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *computeOp) {
-  // We haven't properly plumbed through MMA op layouts and conversions for CUDA
-  // to target NVIDIA GPUs. So disable the vector distribution pass for it.
-  if (!isROCmBackend(target)) {
-    return failure();
-  }
-
   if (!clGPUEnableVectorDistribution) {
     LDBG() << "Vector Distribution not enabled, skipping...";
     return failure();

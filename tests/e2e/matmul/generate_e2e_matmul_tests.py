@@ -118,7 +118,7 @@ def generate(
     calls = []
 
     for compilation_info in get_test_compilation_infos(
-        compilation_info_id, lhs_rhs_type
+        compilation_info_id, lhs_rhs_type, acc_type
     ):
         for shape in get_test_shapes(shapes_id, accumulate):
             for dynamicities in get_dynamicities(shapes_id):

@@ -32,7 +32,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTACCGEMMTOGEMMPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static bool accGemmToGemmPrecondition(Operation *op) {
+static bool accGemmToGemmPrecondition(Operation *op, bool forceConversion) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
     return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
                IREE::GPU::DataTiledMMAInterfaceAttr>(innerTiledOp.getKind());
@@ -49,7 +49,8 @@ static bool accGemmToGemmPrecondition(Operation *op) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return false;
   }
-  if (isValidInPlaceAccumulatingOp(
+  if (!forceConversion &&
+      isValidInPlaceAccumulatingOp(
           cast<DestinationStyleOpInterface>(linalgOp.getOperation()))) {
     return false;
   }
@@ -129,11 +130,15 @@ namespace {
 
 struct ConvertAccGEMMToGEMMPass final
     : impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
+  using impl::ConvertAccGEMMToGEMMPassBase<
+      ConvertAccGEMMToGEMMPass>::ConvertAccGEMMToGEMMPassBase;
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     SmallVector<Operation *> candidates = llvm::filter_to_vector(
         llvm::make_pointer_range(funcOp.getFunctionBody().getOps()),
-        accGemmToGemmPrecondition);
+        [&](Operation *op) {
+          return accGemmToGemmPrecondition(op, forceConversion);
+        });
     IRRewriter rewriter(&getContext());
     for (Operation *candidate : candidates) {
       convertAccGemmToGemm(rewriter,
