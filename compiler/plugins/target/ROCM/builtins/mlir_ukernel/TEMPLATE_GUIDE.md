@@ -62,7 +62,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_dt_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
   -D ELEM_TYPE=f16 INTRINSIC=MFMA_F32_16x16x16_F16 \
-     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=4 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_large_f16.mlir
 ```
@@ -71,7 +71,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
   -D ELEM_TYPE=f16 INTRINSIC=MFMA_F32_16x16x16_F16 \
-     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=8 \
+     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=2 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_medium_f16_expanded.mlir
 ```
@@ -80,7 +80,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
   -D ELEM_TYPE=bf16 INTRINSIC=MFMA_F32_16x16x16_BF16 \
-     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=4 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_large_bf16.mlir
 ```
@@ -89,7 +89,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
   -D ELEM_TYPE=bf16 INTRINSIC=MFMA_F32_16x16x16_BF16 \
-     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=8 \
+     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=2 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_medium_bf16_expanded.mlir
 ```
@@ -98,7 +98,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
   -D ELEM_TYPE=f8E4M3FNUZ INTRINSIC=MFMA_F32_16x16x32_F8E4M3FNUZ \
-     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=16 \
+     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=2 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_medium_f8E4M3FNUZ_expanded.mlir
 ```
@@ -107,7 +107,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
   -D ELEM_TYPE=f8E4M3FNUZ INTRINSIC=MFMA_F32_16x16x32_F8E4M3FNUZ \
-     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=8 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_large_f8E4M3FNUZ_expanded.mlir
 ```
@@ -116,7 +116,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
   -D ELEM_TYPE=f8E4M3FN INTRINSIC=MFMA_F32_16x16x32_F8E4M3FN \
-     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=16 \
+     INTRINSICS_M=4 INTRINSICS_N=4 INTRINSICS_K=2 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_medium_f8E4M3FN_expanded.mlir
 ```
@@ -125,7 +125,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_matmul_large.mlir.in \
   -D ELEM_TYPE=f8E4M3FN INTRINSIC=MFMA_F32_16x16x32_F8E4M3FN \
-     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=8 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 \
      SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
   -o pingpong_large_f8E4M3FN_expanded.mlir
 ```
