@@ -5,6 +5,10 @@ message(FATAL_ERROR
   "-DLLVM_EXTERNAL_IREE_DIALECTS_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
+# Disable PCH for iree-dialects - uses different C++ standard flags (-std=gnu++17)
+# which are incompatible with LLVM's PCH built with -std=c++17.
+set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
+
 option(MLIR_ENABLE_BINDINGS_PYTHON "Enables MLIR Python Bindings" OFF)
 
 set(IREE_DIALECTS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
