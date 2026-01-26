@@ -6,30 +6,9 @@
 
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 
-IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CodegenOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
 
 namespace mlir::iree_compiler {
-
-void CodegenOptions::bindOptions(OptionsBinder &binder) {
-  static llvm::cl::OptionCategory category("IREE Codegen Options");
-
-  auto init_at_opt = binder.optimizationLevel(
-      "iree-codegen-opt-level", optLevel,
-      llvm::cl::desc("Optimization level for codegen."),
-      llvm::cl::cat(category));
-
-  // Emit performance warnings by default at O3 and higher, because it is
-  // usually important to know about slow codegen paths when optimizing for
-  // performance.
-  binder.opt<bool>(
-      "iree-codegen-emit-performance-warnings", emitPerformanceWarnings,
-      {init_at_opt(llvm::OptimizationLevel::O0, false),
-       init_at_opt(llvm::OptimizationLevel::O3, true)},
-      llvm::cl::desc("Emit warnings for slow codegen paths like type "
-                     "emulation or missing hardware support."),
-      llvm::cl::cat(category));
-}
 
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE CPU Codegen Options");

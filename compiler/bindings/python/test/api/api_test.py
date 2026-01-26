@@ -52,6 +52,19 @@ else:
             with self.assertRaises(ValueError):
                 session.set_flags("--does-not-exist=1")
 
+        def testCPUCodegenFlagsAreScopedToSession(self):
+            """Tests that CPU codegen options are session-scoped."""
+            session1 = Session()
+            session2 = Session()
+            session1.set_flags("--iree-llvmcpu-disable-distribution=true")
+            session2.set_flags("--iree-llvmcpu-disable-distribution=false")
+            self.assertIn(
+                "--iree-llvmcpu-disable-distribution=true", session1.get_flags()
+            )
+            self.assertIn(
+                "--iree-llvmcpu-disable-distribution=false", session2.get_flags()
+            )
+
         def testOptFlags(self):
             session = Session()
             flags = session.get_flags()
@@ -81,23 +94,6 @@ else:
             self.assertIn("--iree-opt-level=O2", flags)
             self.assertIn("--iree-global-optimization-opt-level=O0", flags)
             self.assertIn("--iree-opt-strip-assertions=false", flags)
-
-        def testCodegenOptLevelCascade(self):
-            # Set global opt level to O2, check cascade to codegen opt levels.
-            session = Session()
-            session.set_flags("--iree-opt-level=O2")
-            flags = session.get_flags()
-            self.assertIn("--iree-codegen-opt-level=O2", flags)
-            self.assertIn("--iree-llvmcpu-opt-level=O2", flags)
-
-        def testCodegenOptLevelOverride(self):
-            # Override just the CPU opt level, verify it doesn't affect others.
-            session = Session()
-            session.set_flags("--iree-opt-level=O2")
-            session.set_flags("--iree-llvmcpu-opt-level=O0")
-            flags = session.get_flags()
-            self.assertIn("--iree-codegen-opt-level=O2", flags)
-            self.assertIn("--iree-llvmcpu-opt-level=O0", flags)
 
     class DlInvocationTest(unittest.TestCase):
         def testCreate(self):

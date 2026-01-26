@@ -87,6 +87,13 @@ def LLVMCPULowerExecutableTargetPass :
     dialect. Currently this pass lowers to LLVM dialect, but could be
     generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
   }];
+  let options = [
+    Option<"cpuOptions", "cpu-options", "CPUCodegenOptions",
+      /*default=*/"CPUCodegenOptions::FromFlags::get()",
+      "Session-scoped CPU codegen options controlling optimization level, "
+      "distribution, stack allocation bounds checking, and FP reduction "
+      "reordering.">,
+  ];
 }
 
 def LLVMCPUMmt4dVectorLoweringPass

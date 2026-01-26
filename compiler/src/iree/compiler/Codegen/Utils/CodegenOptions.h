@@ -11,17 +11,6 @@
 
 namespace mlir::iree_compiler {
 
-struct CodegenOptions {
-  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
-
-  // Emit warnings for slow codegen paths (e.g., type emulation, missing
-  // intrinsics, suboptimal configurations).
-  bool emitPerformanceWarnings = false;
-
-  void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<CodegenOptions>;
-};
-
 struct CPUCodegenOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 

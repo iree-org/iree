@@ -679,14 +679,16 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+                                     const CPUCodegenOptions &cpuOpts,
                                      bool enableAArch64SME) {
-  const CPUCodegenOptions &cpuOpts = CPUCodegenOptions::FromFlags::get();
-
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createLLVMCPULowerExecutableTargetPass)
+        .addPass([&]() {
+          return createLLVMCPULowerExecutableTargetPass(
+              LLVMCPULowerExecutableTargetPassOptions{cpuOpts});
+        })
         .addPass(createVerifyWorkgroupDistributionPass);
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
@@ -783,7 +785,10 @@ void registerCodegenLLVMCPUPasses() {
           "Runs the progressive lowering pipeline from Linalg to LLVM",
           [](OpPassManager &variantPassManager,
              LinalgToLLVMPipelineOptions const &options) {
-            buildLLVMCPUCodegenPassPipeline(variantPassManager,
+            // Use global codegen options for pipeline registration.
+            const CPUCodegenOptions &cpuOpts =
+                CPUCodegenOptions::FromFlags::get();
+            buildLLVMCPUCodegenPassPipeline(variantPassManager, cpuOpts,
                                             options.enableArmSME);
           });
 

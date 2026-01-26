@@ -15,7 +15,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
-#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -526,12 +525,6 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
          "expected all vectors to be of equal size");
 
   size_t numDims = lbs.size();
-  // Set all the distribution tile sizes to zero if thread distribution is
-  // disabled.
-  if (CPUCodegenOptions::FromFlags::get().disableDistribution) {
-    return SmallVector<int64_t>(numDims, 0);
-  }
-
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
   for (auto i : llvm::seq<size_t>(0, numDims)) {

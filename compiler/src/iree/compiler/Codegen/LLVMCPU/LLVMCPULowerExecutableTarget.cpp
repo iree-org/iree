@@ -12,8 +12,8 @@
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -25,6 +25,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+
+#define DEBUG_TYPE "kernel-dispatch"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 
@@ -43,9 +45,7 @@ class LLVMCPULowerExecutableTargetPass
     : public impl::LLVMCPULowerExecutableTargetPassBase<
           LLVMCPULowerExecutableTargetPass> {
 public:
-  LLVMCPULowerExecutableTargetPass() = default;
-  LLVMCPULowerExecutableTargetPass(
-      const LLVMCPULowerExecutableTargetPass &pass) {}
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<IREE::HAL::HALDialect,
@@ -65,6 +65,33 @@ public:
   void runOnOperation() override;
 };
 } // namespace
+
+/// Returns a new lowering config with distribution tile sizes set to zeros.
+static IREE::CPU::LoweringConfigAttr
+getConfigWithZeroDistributionTiles(IREE::CPU::LoweringConfigAttr config) {
+  using TilingLevel = IREE::CPU::TilingLevel;
+  MLIRContext *ctx = config.getContext();
+  SmallVector<NamedAttribute> items;
+  for (int i : IREE::CPU::getTilingLevelsAsInts()) {
+    if (!config.hasTilingLevel(i)) {
+      continue;
+    }
+    auto level = static_cast<TilingLevel>(i);
+    if (level != TilingLevel::DistributionTiles) {
+
+      items.emplace_back(IREE::CPU::getTilingLevelName(level),
+                         config.getTilingLevelAttr(i));
+      continue;
+    }
+    // Reset distribution tiles to zeros.
+    SmallVector<int64_t> origSizes = config.getWorkgroupTileSizes();
+    SmallVector<int64_t> zeroSizes(origSizes.size(), 0);
+    auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+        ctx, zeroSizes, /*interchange=*/{}, /*scalableFlags=*/{});
+    items.emplace_back(IREE::CPU::getTilingLevelName(level), newLevel);
+  }
+  return IREE::CPU::LoweringConfigAttr::get(ctx, items);
+}
 
 static LoweringConfigAttrInterface
 getRootLoweringConfig(FunctionOpInterface funcOp) {
@@ -93,10 +120,23 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     return;
   }
 
-  LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
   LLVMCPUPipelineOptions pipelineOpts;
-  pipelineOpts.cpuOpts = CPUCodegenOptions::FromFlags::get();
+  pipelineOpts.cpuOpts = cpuOptions.getValue();
+
+  // If distribution is disabled, reset distribution tile sizes to zeros in the
+  // lowering config so the IR reflects the actual behavior.
+  if (pipelineOpts.cpuOpts.disableDistribution) {
+    LDBG() << "Distribution is disabled, resetting distribution tile sizes to "
+              "zeros in lowering configs.";
+    funcOp.walk([&](Operation *op) {
+      auto config = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
+      if (config && config.hasWorkgroupTilingLevel()) {
+        setLoweringConfig(op, getConfigWithZeroDistributionTiles(config));
+      }
+    });
+  }
+
   if (isX86(targetConfig) || isRISCV(targetConfig)) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
@@ -113,6 +153,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       isAArch64(targetConfig) && hasI8mmFeature(targetConfig);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
 
+  LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   OpPassManager passManager(func::FuncOp::getOperationName());
   switch (pipeline) {
   // No pipleline specified, nothing to do.

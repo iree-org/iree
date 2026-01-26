@@ -132,6 +132,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 /// to LLVM dialect via the structured ops path. The  `variantPassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+                                     const CPUCodegenOptions &codegenOptions,
                                      bool enableAArch64SME = false);
 
 //----------------------------------------------------------------------------//
