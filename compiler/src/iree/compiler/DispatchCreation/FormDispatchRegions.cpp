@@ -704,61 +704,65 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
   if (!options.aggressiveFusion) {
-    FailureOr<SmallVector<int64_t>> producerIterationSpace =
-        producerFusionOp.getStaticLoopRanges();
-    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
-        consumerFusionOp.getStaticLoopRanges();
-    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
       return false;
     }
-    if (producerIterationSpace.value().size() <
-        consumerIterationSpace.value().size()) {
+
+    SmallVector<int64_t> producerIterationSpace =
+        producerFusionOp.getStaticLoopRanges();
+    SmallVector<int64_t> consumerIterationSpace =
+        consumerFusionOp.getStaticLoopRanges();
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
       return false;
     }
   }
 
-  // When fusing a consumer with a producer that has reduction loops, ensure
-  // the iteration spaces match exactly to avoid fusing operations with very
-  // different parallelism patterns (e.g., a small reduction result with a
-  // large broadcast consumer). This prevents cases like batchnorm where the
-  // final elementwise op with broadcasting should be in a separate dispatch.
-  if (producerFusionOp.getNumLoops() !=
-      producerFusionOp.getNumParallelLoops()) {
-    FailureOr<SmallVector<int64_t>> producerIterationSpace =
+  // When fusing a broadcasting consumer with a producer that has reduction
+  // loops, ensure the iteration spaces match exactly to avoid losing
+  // parallelism. This prevents fusing cases where a small reduction result
+  // is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+  auto doesBroadcastConsumerBlockFusion = [&]() -> bool {
+    if (producerFusionOp.getNumLoops() ==
+        producerFusionOp.getNumParallelLoops()) {
+      return false;
+    }
+
+    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
+      return false;
+    }
+
+    SmallVector<int64_t> producerIterationSpace =
         producerFusionOp.getStaticLoopRanges();
-    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
+    SmallVector<int64_t> consumerIterationSpace =
         consumerFusionOp.getStaticLoopRanges();
 
-    // For dynamic dimensions, we can't compare statically, so conservatively
-    // disallow fusion when the producer has reductions and either has dynamic
-    // dimensions.
-    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+    // Only check when consumer might be broadcasting.
+    if (producerIterationSpace.size() > consumerIterationSpace.size()) {
       return false;
     }
 
-    // Compute the total iteration space size (product of all dimensions)
-    auto computeIterationSpaceSize =
-        [](const SmallVector<int64_t> &shape) -> int64_t {
-      int64_t size = 1;
-      for (int64_t dim : shape) {
-        if (ShapedType::isDynamic(dim)) {
-          return -1;
-        }
-        size *= dim;
-      }
-      return size;
+    auto computeIterationSpaceSize = [](ArrayRef<int64_t> shape) -> int64_t {
+      return ShapedType::isDynamicShape(shape)
+                 ? ShapedType::kDynamic
+                 : ShapedType::getNumElements(shape);
     };
+    int64_t producerSize = computeIterationSpaceSize(producerIterationSpace);
+    int64_t consumerSize = computeIterationSpaceSize(consumerIterationSpace);
 
-    int64_t producerSize =
-        computeIterationSpaceSize(producerIterationSpace.value());
-    int64_t consumerSize =
-        computeIterationSpaceSize(consumerIterationSpace.value());
-
-    // If the consumer has a significantly larger iteration space than the
-    // producer, don't fuse (broadcasting scenario).
-    if (producerSize > 0 && consumerSize > 0 && consumerSize > producerSize) {
+    // Only block fusion if we can statically determine the iteration spaces
+    // don't match. For dynamic shapes, allow fusion.
+    if (ShapedType::isDynamic(producerSize) ||
+        ShapedType::isDynamic(consumerSize)) {
       return false;
     }
+
+    return consumerSize != producerSize;
+  };
+
+  if (doesBroadcastConsumerBlockFusion()) {
+    return false;
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
