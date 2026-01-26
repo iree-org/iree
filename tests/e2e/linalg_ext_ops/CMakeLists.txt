@@ -16,7 +16,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
-    "attention_i1_mask_encoding.mlir"
+    "attention_i1_mask.mlir"
     "gather.mlir"
     "map_gather.mlir"
     "map_scatter.mlir"
@@ -32,22 +32,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  LABELS
-    "nowasm"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_i1
-  SRCS
-    "attention_i1_mask.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-    "--iree-experimental-packed-i1-storage"
   LABELS
     "nowasm"
 )

@@ -17,7 +17,7 @@ ALL_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
-        "attention_i1_mask_encoding.mlir",
+        "attention_i1_mask.mlir",
         "gather.mlir",
         "map_gather.mlir",
         "map_scatter.mlir",
@@ -29,9 +29,6 @@ ALL_SRCS = enforce_glob(
         "winograd_output.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "attention_i1_mask.mlir",
-    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -41,24 +38,6 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     tags = [
         # attention fails with a wasm target, just disable all tests there for now
-        #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
-        "nowasm",
-    ],
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_llvm-cpu_local-task_i1",
-    srcs = [
-        "attention_i1_mask.mlir",
-    ],
-    compiler_flags = [
-        "--iree-llvmcpu-target-cpu=generic",
-        "--iree-experimental-packed-i1-storage",
-    ],
-    driver = "local-task",
-    tags = [
-        # attention fails with a wasm target, just disable the tests there for now
         #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
         "nowasm",
     ],
@@ -83,7 +62,6 @@ VMVX_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "attention_i1_mask.mlir",
-        "attention_i1_mask_encoding.mlir",
     ],
 )
 
@@ -110,7 +88,6 @@ LLVM_GPU_SRCS = enforce_glob(
     exclude = [
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "attention_i1_mask_encoding.mlir",
         "map_gather.mlir",
         "map_scatter.mlir",
     ],
@@ -150,7 +127,6 @@ ROCM_HIP_SRCS = enforce_glob(
         "top-k.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "attention_i1_mask_encoding.mlir",
     ],
 )
 
@@ -178,7 +154,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
-            "attention_i1_mask_encoding.mlir",
             "map_gather.mlir",
             "map_scatter.mlir",
             "top-k.mlir",
@@ -208,7 +183,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
-            "attention_i1_mask_encoding.mlir",
         ],
     ),
     driver = "vulkan",
