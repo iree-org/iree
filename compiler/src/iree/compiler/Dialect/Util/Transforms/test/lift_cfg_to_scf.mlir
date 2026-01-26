@@ -888,9 +888,8 @@ util.func public @multi_entry_loop(%cond: i1) {
 // flow.func's getCallableRegion() returns nullptr, which should be handled
 // gracefully by the pass.
 
+// CHECK-LABEL: flow.func private @flow_func_empty_region
 module {
   flow.func private @flow_func_empty_region() {
   }
 }
-
-// CHECK-LABEL: flow.func private @flow_func_empty_region
