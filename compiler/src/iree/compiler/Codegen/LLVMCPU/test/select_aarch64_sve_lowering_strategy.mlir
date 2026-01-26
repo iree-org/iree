@@ -115,7 +115,7 @@ func.func @mmt4d_tensors(%arg0: tensor<32x128x8x1xf32>, %arg1 : tensor<?x128x?x1
   %mmt4d = linalg.mmt4d ins(%arg0, %arg1 : tensor<32x128x8x1xf32>, tensor<?x128x?x1xf32>) outs(%init : tensor<32x?x8x?xf32>) -> tensor<32x?x8x?xf32>
   return %mmt4d : tensor<32x?x8x?xf32>
 }
-// CHECK-DAG:  #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [4, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK-DAG:  #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 // CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
 // CHECK:      func.func @mmt4d_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -138,7 +138,7 @@ func.func @mmtd4_with_fill(%arg0 : tensor<32x128x8x1xf32>, %arg1 : tensor<?x128x
   return %mmt4d : tensor<32x?x8x?xf32>
 }
 // CHECK-DAG:  #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8, [8]]>
-// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [4, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [32, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 // CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
 // CHECK:      func.func @mmtd4_with_fill
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
