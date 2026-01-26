@@ -170,7 +170,7 @@ function(iree_native_test)
     endif()
   endif()
 
-  if (NOT DEFINED _RULE_TIMEOUT)
+  if (NOT DEFINED _RULE_TIMEOUT OR "${_RULE_TIMEOUT}" STREQUAL "")
     set(_RULE_TIMEOUT 60)
   endif()
 

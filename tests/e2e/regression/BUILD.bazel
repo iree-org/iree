@@ -139,6 +139,8 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_hip",
+    # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+    timeout = "moderate",
     srcs = [
         "dynamic_gather_attention.mlir",
         "linalg_ops_dynamic.mlir",

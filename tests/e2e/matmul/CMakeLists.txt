@@ -2903,6 +2903,9 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -2933,6 +2936,9 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -2960,6 +2966,9 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+  TIMEOUT
+    120
 )
 
 endif()
