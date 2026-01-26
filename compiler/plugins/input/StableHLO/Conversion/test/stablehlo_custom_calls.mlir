@@ -20,4 +20,3 @@ func.func public @noop_sharding_custom_call(%arg0: tensor<2xui32>) {
   // CHECK-NOT: sharding
   return
 }
-
