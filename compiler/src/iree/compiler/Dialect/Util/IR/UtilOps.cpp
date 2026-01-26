@@ -1884,6 +1884,30 @@ void IREE::Util::FuncOp::expandSignature(
   }
 }
 
+LogicalResult FuncOp::verify() {
+  // Get the tied_operands attribute if it exists
+  if (auto tiedOperandsAttr = getTiedOperandsAttr()) {
+    // Each index must be valid
+    unsigned numOperands = getFunctionType().getNumInputs();
+    for (auto [resultIdx, attr] : llvm::enumerate(tiedOperandsAttr)) {
+      int64_t operandIdx = cast<IntegerAttr>(attr).getInt();
+
+      // Allow -1 (untied)
+      if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        continue;
+      }
+
+      // Check if operand index is in valid range
+      if (operandIdx < 0 || operandIdx >= static_cast<int64_t>(numOperands)) {
+        return emitOpError() << "result #" << resultIdx
+                             << " tied to invalid operand index " << operandIdx;
+      }
+    }
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // util.call
 //===----------------------------------------------------------------------===//
