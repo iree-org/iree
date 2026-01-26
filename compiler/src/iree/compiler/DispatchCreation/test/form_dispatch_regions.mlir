@@ -2006,3 +2006,46 @@ util.func public @fuse_consumer_despite_nonfusable_sibling(%arg0: tensor<10x32x4
 //       CHECK:     flow.return %[[REDUCTION]], %[[SUB]]
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[DISPATCH]]#0
 //       CHECK:   util.return %[[EXPAND]], %[[DISPATCH]]#1
+
+// -----
+
+util.func public @reduction_broadcast_no_fusion(%arg0: tensor<128x512xf32>, %arg1: tensor<65536x512xf32>) -> tensor<65536x512xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<512xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<512xf32>) -> tensor<512xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<128x512xf32>) outs(%1 : tensor<512xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %4 = arith.addf %in, %out : f32
+      linalg.yield %4 : f32
+  } -> tensor<512xf32>
+  %3 = tensor.empty() : tensor<65536x512xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%2, %arg1 : tensor<512xf32>, tensor<65536x512xf32>) outs(%3 : tensor<65536x512xf32>) {
+    ^bb0(%in0: f32, %in1: f32, %out: f32):
+      %4 = arith.mulf %in0, %in1 : f32
+      linalg.yield %4 : f32
+  } -> tensor<65536x512xf32>
+  util.return %result : tensor<65536x512xf32>
+}
+
+// CHECK-LABEL: util.func public @reduction_broadcast_no_fusion
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<128x512xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<65536x512xf32>
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "reduction"]
+//       CHECK:     flow.return %[[REDUCTION]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[CONSUMER:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
+//  CHECK-SAME:         ins(%[[DISPATCH0]], %[[ARG1]] :
+//       CHECK:     flow.return %[[CONSUMER]]
+//       CHECK:   util.return %[[DISPATCH1]]

@@ -717,6 +717,50 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
+  // When fusing a consumer with a producer that has reduction loops, ensure
+  // the iteration spaces match exactly to avoid fusing operations with very
+  // different parallelism patterns (e.g., a small reduction result with a
+  // large broadcast consumer). This prevents cases like batchnorm where the
+  // final elementwise op with broadcasting should be in a separate dispatch.
+  if (producerFusionOp.getNumLoops() !=
+      producerFusionOp.getNumParallelLoops()) {
+    FailureOr<SmallVector<int64_t>> producerIterationSpace =
+        producerFusionOp.getStaticLoopRanges();
+    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
+        consumerFusionOp.getStaticLoopRanges();
+
+    // For dynamic dimensions, we can't compare statically, so conservatively
+    // disallow fusion when the producer has reductions and either has dynamic
+    // dimensions.
+    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+      return false;
+    }
+
+    // Compute the total iteration space size (product of all dimensions)
+    auto computeIterationSpaceSize =
+        [](const SmallVector<int64_t> &shape) -> int64_t {
+      int64_t size = 1;
+      for (int64_t dim : shape) {
+        if (ShapedType::isDynamic(dim)) {
+          return -1;
+        }
+        size *= dim;
+      }
+      return size;
+    };
+
+    int64_t producerSize =
+        computeIterationSpaceSize(producerIterationSpace.value());
+    int64_t consumerSize =
+        computeIterationSpaceSize(consumerIterationSpace.value());
+
+    // If the consumer has a significantly larger iteration space than the
+    // producer, don't fuse (broadcasting scenario).
+    if (producerSize > 0 && consumerSize > 0 && consumerSize > producerSize) {
+      return false;
+    }
+  }
+
   // Under aggressive fusion assume that the dispatches are vectorized. In which
   // case we dont need to account for the subsequent stack allocation condition.
   if (options.aggressiveFusion) {
