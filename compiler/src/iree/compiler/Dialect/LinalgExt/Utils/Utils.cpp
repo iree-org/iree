@@ -494,9 +494,8 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     return failure();
   }
 
-  // TODO: Support pooling operations. For pooling ops, the input/output channel
-  // size will be categorized as the additional batch dimension.
-  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
+  // TODO: Support pooling operations.
+  if (convDims.outputChannel.empty()) {
     LDBG() << "[unimplemented] expected no pooling operations.";
     return failure();
   }

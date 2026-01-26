@@ -493,6 +493,32 @@ util.func public @conv_1d_nhc_chf(%arg0: tensor<1x3x2xf32>, %arg1: tensor<2x2x2x
 
 // -----
 
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2 + d5, d3 + d6, d0, d4)>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d1)>
+#map5 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>
+util.func public @conv_2d_no_input_channel(%arg0: tensor<61x93x16x64xbf16>, %arg1: tensor<59x91x16x56xbf16>, %arg2: tensor<16x56x3x3x64xf32>) -> tensor<16x56x3x3x64xf32> {
+  %0 = linalg.generic {indexing_maps = [#map3, #map4, #map5], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<61x93x16x64xbf16>, tensor<59x91x16x56xbf16>) outs(%arg2 : tensor<16x56x3x3x64xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x56x3x3x64xf32>
+  util.return %0 : tensor<16x56x3x3x64xf32>
+}
+
+// CHECK:      util.func public @conv_2d_no_input_channel(
+// CHECK:        %[[IM2COL:.+]] = iree_linalg_ext.im2col
+// CHECK-SAME:   strides = [1, 1] dilations = [1, 1] kernel_size = [59, 91]
+// CHECK-SAME:   m_offset = [0, 0] * [3, 1] k_offset = [0] * [1]
+// CHECK-SAME:   batch_pos = [3, 2] m_pos = [0, 1] k_pos = []
+// CHECK-SAME:   input_k_perm = [0, 1] output_perm = [2, 3, 4, 1, 0]
+// CHECK-SAME:   ins({{.*}} : tensor<61x93x16x64xbf16>)
+// CHECK-SAME:   outs({{.*}} : tensor<3x3x5369x16x64xbf16>) -> tensor<3x3x5369x16x64xbf16>
+
+// -----
+
 util.func public @conv_2d_nhwgc_gfhwc(%arg0: tensor<2x10x10x7x4xf32>, %arg1: tensor<7x16x3x3x4xf32>, %arg2: tensor<2x8x8x7x16xf32>) -> tensor<2x8x8x7x16xf32> {
   %0 = linalg.conv_2d_nhwgc_gfhwc
     {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
