@@ -1430,6 +1430,31 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
 
 // -----
 
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value: tensor<?x?x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<?x?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %scale = arith.constant 0.125 : f32
+  %out = tensor.empty(%dim0, %dim1, %dim2) : tensor<?x?x?xf32>
+  %result = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+    affine_map<(d0, d1, d2, d3, d4) -> ()>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+    ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
+    outs(%out : tensor<?x?x?xf32>) {
+     ^bb0(%score: f32):
+       iree_linalg_ext.yield %score : f32
+    } -> tensor<?x?x?xf32>
+  return %result : tensor<?x?x?xf32>
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 0, 16, 0]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
+//      CHECK: func.func @attention_dynamic_3d(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   iree_linalg_ext.attention
+// CHECK-SAME:    lowering_config = #[[CONFIG]]
+
+// -----
+
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<640x4096x16x1xf16>) -> tensor<5x10240x16x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
