@@ -91,8 +91,7 @@ def LLVMCPULowerExecutableTargetPass :
     Option<"cpuOptions", "cpu-options", "CPUCodegenOptions",
       /*default=*/"CPUCodegenOptions::FromFlags::get()",
       "Session-scoped CPU codegen options controlling optimization level, "
-      "distribution, stack allocation bounds checking, and FP reduction "
-      "reordering.">,
+      "distribution, etc.">,
   ];
 }
 

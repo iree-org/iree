@@ -296,7 +296,6 @@ void GlobalInit::registerCommandLineOptions() {
   clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
   clParameterOptions = &ParameterOptions::FromFlags::get();
   clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
-
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
