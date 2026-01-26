@@ -76,15 +76,11 @@ struct VectorizeToLayoutOpPattern final
     int64_t rank = tensorTy.getShape().size();
     auto inBounds = rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
     auto identityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
-    auto empty = tensor::EmptyOp::create(
-        rewriter, loc,
-        tensor::getMixedSizes(rewriter, loc, tensorLayoutOp.getInput()),
-        tensorTy.getElementType());
     return vector::TransferWriteOp::create(
         rewriter, loc,
         /*result=*/resType,
         /*vector=*/vectorLayoutOp,
-        /*source=*/empty,
+        /*source=*/tensorLayoutOp.getInput(),
         /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
         /*permutation_map=*/identityMap,
         /*mask=*/mask,
