@@ -21,7 +21,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-    "--iree-experimental-packed-i1-storage"
   LABELS
     "nowasm"
 )
