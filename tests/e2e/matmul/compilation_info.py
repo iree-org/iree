@@ -313,9 +313,8 @@ def get_rocm_test_compilation_infos(
     else:
         raise NotImplementedError("unhandled intrinsic case")
 
-    subgroup_size = (
-        64 if intrinsic == "MFMA" else 32
-    )  # WMMAR3, WMMAR4, WMMA1250 all use 32.
+    # WMMAR3, WMMAR4, WMMA1250 all use 32.
+    subgroup_size = 64 if intrinsic == "MFMA" else 32
 
     infos = []
     for schedule in schedules:
