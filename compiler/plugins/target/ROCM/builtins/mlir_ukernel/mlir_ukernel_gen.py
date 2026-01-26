@@ -42,6 +42,33 @@ def fold1(val):
     return f"{val}x" if val != 1 else ""
 
 
+def extract_internal_k(intrinsic_name: str) -> int:
+    """
+    Extract the K dimension from an intrinsic name and divide by 4.
+
+    This aligns with:
+    https://github.com/iree-org/iree/blob/de381bdda5bbcfdd3e0897b2c30b9e781c4d3846/compiler/src/iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.cpp#L230-L239
+
+    Examples:
+        MFMA_F32_16x16x16_F16 -> 16 // 4 = 4
+        MFMA_F32_16x16x32_F8E4M3FNUZ -> 32 // 4 = 8
+        WMMA_F32_16x16x16_F16 -> 16 // 4 = 4
+    """
+    match = re.search(r"_(\d+)x(\d+)x(\d+)_", intrinsic_name)
+    if not match:
+        raise ValueError(
+            f"Could not extract K dimension from intrinsic: {intrinsic_name}"
+        )
+
+    m, n, k = int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+    # Assert that M and N are 16 as expected for supported intrinsics.
+    assert m == 16, f"Expected M=16 in intrinsic {intrinsic_name}, got M={m}"
+    assert n == 16, f"Expected N=16 in intrinsic {intrinsic_name}, got N={n}"
+
+    return k // 4
+
+
 def process_template(text: str, params: Dict[str, Any]) -> str:
     """Process ${...} substitutions in template text."""
     eval_context = params.copy()
@@ -62,7 +89,7 @@ def parse_define(define_str: str) -> tuple:
     """Parse a -D VAR=VALUE string into (var, value)."""
     if "=" in define_str:
         var, value = define_str.split("=", 1)
-        # Try to convert to int if possible
+        # Try to convert to int if possible.
         try:
             value = int(value)
         except ValueError:
@@ -102,27 +129,27 @@ Example:
 
     args = parser.parse_args()
 
-    # Default parameter values
+    # Default parameter values.
     DEFAULT_PARAMS = {
-        # Common defaults
+        # Common defaults.
         "ARCH": "gfx942",
         "ELEM_TYPE": "f16",
         "INTRINSIC": "MFMA_F32_16x16x16_F16",
-        # Benefit
+        # Benefit.
         "BENEFIT": 1,
-        # Constraint 0: size_min=0, size_max=INT32_MAX, size_div=1
+        # Constraint 0: size_min=0, size_max=INT32_MAX, size_div=1.
         "SIZE_MIN_0": 0,
         "SIZE_MAX_0": 2147483647,
         "SIZE_DIV_0": 1,
-        # Constraint 1: size_min=0, size_max=INT32_MAX, size_div=1
+        # Constraint 1: size_min=0, size_max=INT32_MAX, size_div=1.
         "SIZE_MIN_1": 0,
         "SIZE_MAX_1": 2147483647,
         "SIZE_DIV_1": 1,
-        # Constraint 2: size_min=0, size_max=INT32_MAX, size_div=1
+        # Constraint 2: size_min=0, size_max=INT32_MAX, size_div=1.
         "SIZE_MIN_2": 0,
         "SIZE_MAX_2": 2147483647,
         "SIZE_DIV_2": 1,
-        # MMA layout attributes
+        # MMA layout attributes.
         "INTRINSICS_M": 1,
         "INTRINSICS_N": 1,
         "INTRINSICS_K": 1,
@@ -130,25 +157,29 @@ Example:
         "SUBGROUPS_N": 1,
     }
 
-    # Start with defaults, then override with user params
+    # Start with defaults, then override with user params.
     params = DEFAULT_PARAMS.copy()
     for define in args.define:
         var, value = parse_define(define)
         params[var] = value
 
-    # Derive ELEM_BITS from ELEM_TYPE
+    # Derive ELEM_BITS from ELEM_TYPE.
     elem_type = params["ELEM_TYPE"]
     assert elem_type in ELEM_TYPE_BITS, f"Invalid element type: {elem_type}"
     params["ELEM_BITS"] = ELEM_TYPE_BITS[elem_type]
 
-    # Read template
+    # Derive INTERNAL_K from INTRINSIC.
+    intrinsic = params["INTRINSIC"]
+    params["INTERNAL_K"] = extract_internal_k(intrinsic)
+
+    # Read template.
     with open(args.template, "r") as f:
         template = f.read()
 
-    # Process template
+    # Process template.
     output = process_template(template, params)
 
-    # Write output
+    # Write output.
     with open(args.output, "w") as f:
         f.write(output)
     print(f"Generated: {args.output}")

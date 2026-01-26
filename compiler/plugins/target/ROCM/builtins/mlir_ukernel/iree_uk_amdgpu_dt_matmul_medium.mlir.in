@@ -1,15 +1,15 @@
 //  RUN: iree-opt %s
 // Template for medium data-tiled matmul kernels
 
-!m_acc_base_ty = tensor<1x1x${SUBGROUPS_N}x${INTRINSICS_M}x${INTRINSICS_N}x4x16x4xf32>
-!m_lhs_base_ty = tensor<1x?x${INTRINSICS_M}x4x16x${INTRINSICS_K}x${64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_lhs_expand_ty = tensor<1x?x2x${INTRINSICS_M}x4x4x4x${INTRINSICS_K}x${64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_rhs_base_ty = tensor<1x?x${INTRINSICS_M}x${INTRINSICS_N}x4x16x${INTRINSICS_K}x${64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_rhs_expand_ty = tensor<1x?x2x${INTRINSICS_M}x${INTRINSICS_N}x4x16x${INTRINSICS_K}x${64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_lhs_ty = tensor<?x2x${INTRINSICS_M}x64x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_rhs_ty = tensor<?x2x16x64x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-!m_lhs_shared_ty = memref<2x${INTRINSICS_M}x64x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}, #gpu.address_space<workgroup>>
-!m_rhs_shared_ty = memref<2x16x64x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}, #gpu.address_space<workgroup>>
+!m_acc_base_ty = tensor<1x1x${fold1(SUBGROUPS_M)}${fold1(SUBGROUPS_N)}${fold1(INTRINSICS_M)}${fold1(INTRINSICS_N)}4x16x4xf32>
+!m_lhs_base_ty = tensor<1x?x${fold1(SUBGROUPS_M)}${fold1(INTRINSICS_M)}4x16x${fold1(INTRINSICS_K)}${INTERNAL_K}x${ELEM_TYPE}>
+!m_rhs_base_ty = tensor<1x?x${fold1(SUBGROUPS_N)}${fold1(INTRINSICS_N)}4x16x${fold1(INTRINSICS_K)}${INTERNAL_K}x${ELEM_TYPE}>
+!m_lhs_expand_ty = tensor<1x?x2x${INTRINSICS_M}x4x4x4x${INTRINSICS_K}x${INTERNAL_K}x${ELEM_TYPE}>
+!m_rhs_expand_ty = tensor<1x?x2x${SUBGROUPS_N}x${INTRINSICS_N}x4x16x${INTRINSICS_K}x${INTERNAL_K}x${ELEM_TYPE}>
+!m_lhs_ty = tensor<?x2x${SUBGROUPS_M * INTRINSICS_M}x${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}x${128 // ELEM_BITS}x${ELEM_TYPE}>
+!m_rhs_ty = tensor<?x2x${SUBGROUPS_N * INTRINSICS_N}x${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}x${128 // ELEM_BITS}x${ELEM_TYPE}>
+!m_lhs_shared_ty = memref<2x${SUBGROUPS_M * INTRINSICS_M}x${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}x${128 // ELEM_BITS}x${ELEM_TYPE}, #gpu.address_space<workgroup>>
+!m_rhs_shared_ty = memref<2x${SUBGROUPS_N * INTRINSICS_N}x${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}x${128 // ELEM_BITS}x${ELEM_TYPE}, #gpu.address_space<workgroup>>
 
 #contraction_accesses = [
  affine_map<(i, j, k) -> (i, k)>,
@@ -63,15 +63,15 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
-  %c256 = arith.constant 256 : index
+  %c${SUBGROUPS_M * SUBGROUPS_N * 32} = arith.constant ${SUBGROUPS_M * SUBGROUPS_N * 32} : index
   %c4096 = arith.constant 4096 : index
   %cst = arith.constant 0.0 : ${ELEM_TYPE}
 
   %dim = tensor.dim %rhs_base, %c1 : !m_rhs_base_ty
   %nDim = arith.divui %dim, %c2 : index
 
-  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5, 6], [7], [8]] output_shape [1, %nDim, 2, ${INTRINSICS_M}, 4, 4, 4, 2, 8] : !m_lhs_base_ty into !m_lhs_expand_ty
-  %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6], [7], [8]] output_shape [1, %nDim, 2, ${INTRINSICS_M}, ${INTRINSICS_N}, 4, 16, 2, 8] : !m_rhs_base_ty into !m_rhs_expand_ty
+  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5, 6], [7], [8]] output_shape [1, %nDim, 2, ${INTRINSICS_M}, 4, 4, 4, 2, ${64 // ELEM_BITS}] : !m_lhs_base_ty into !m_lhs_expand_ty
+  %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6], [7], [8]] output_shape [1, %nDim, 2, ${INTRINSICS_M}, ${INTRINSICS_N}, 4, 16, 2, ${64 // ELEM_BITS}] : !m_rhs_base_ty into !m_rhs_expand_ty
 
   %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3], [4, 5, 6], [7, 8]] : !m_lhs_expand_ty into !m_lhs_ty
   %rhs = tensor.collapse_shape %rhs_expand [[0, 1], [2], [3, 4], [5, 6], [7, 8]] : !m_rhs_expand_ty into !m_rhs_ty
@@ -79,21 +79,21 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
   %lhs_shared = memref.alloc() : !m_lhs_shared_ty
   %rhs_shared = memref.alloc() : !m_rhs_shared_ty
 
-  scf.forall (%id) in (1024) {
-    %delin:3 = affine.delinearize_index %id into (2, ${INTRINSICS_M}, 64) : index, index, index
-    %lhs_thread_local = tensor.extract_slice %lhs [%c0, %delin#0, %delin#1, %delin#2, %c0] [1, 1, 1, 1, ${INTRINSICS_K * 64 // ELEM_BITS}] [1, 1, 1, 1, 1]  : !m_lhs_ty to tensor<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : tensor<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>, vector<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %delin#1, %delin#2, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>, !m_lhs_shared_ty
+  scf.forall (%id) in (${2 * SUBGROUPS_M * INTRINSICS_M * INTRINSICS_K * INTERNAL_K * ELEM_BITS}) {
+    %delin:3 = affine.delinearize_index %id into (2, ${SUBGROUPS_M * INTRINSICS_M}, ${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}) : index, index, index
+    %lhs_thread_local = tensor.extract_slice %lhs [%c0, %delin#0, %delin#1, %delin#2, %c0] [1, 1, 1, 1, ${128 // ELEM_BITS}] [1, 1, 1, 1, 1]  : !m_lhs_ty to tensor<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>
+    %lhs_vec_local = vector.transfer_read %lhs_thread_local [%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : tensor<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>, vector<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>
+    vector.transfer_write %lhs_vec_local, %lhs_shared[%delin#0, %delin#1, %delin#2, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>, !m_lhs_shared_ty
   } {mapping = [#gpu.thread<linear_dim_0>]}
-  scf.forall (%id) in (2048) {
-    %delin:3 = affine.delinearize_index %id into (2, 16, 64) : index, index, index
-    %rhs_thread_local = tensor.extract_slice %rhs [%c0, %delin#0, %delin#1, %delin#2, %c0] [1, 1, 1, 1, ${INTRINSICS_K * 64 // ELEM_BITS}] [1, 1, 1, 1, 1] : !m_rhs_ty to tensor<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : tensor<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>, vector<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %delin#1, %delin#2, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>, !m_rhs_shared_ty
+  scf.forall (%id) in (${2 * SUBGROUPS_N * INTRINSICS_N * INTRINSICS_K * INTERNAL_K * ELEM_BITS}) {
+    %delin:3 = affine.delinearize_index %id into (2, ${SUBGROUPS_N * INTRINSICS_N}, ${INTRINSICS_K * INTERNAL_K * ELEM_BITS // 2}) : index, index, index
+    %rhs_thread_local = tensor.extract_slice %rhs [%c0, %delin#0, %delin#1, %delin#2, %c0] [1, 1, 1, 1, ${128 // ELEM_BITS}] [1, 1, 1, 1, 1] : !m_rhs_ty to tensor<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>
+    %rhs_vec_local = vector.transfer_read %rhs_thread_local [%c0, %c0, %c0, %c0], %cst {in_bounds = [true, true, true, true]} : tensor<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>, vector<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>
+    vector.transfer_write %rhs_vec_local, %rhs_shared[%delin#0, %delin#1, %delin#2, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x1x${128 // ELEM_BITS}x${ELEM_TYPE}>, !m_rhs_shared_ty
   } {mapping = [#gpu.thread<linear_dim_0>]}
 
   %0 = tensor.empty() : !m_acc_base_ty
-  %1 = scf.forall (%id) in (512) shared_outs(%out = %0) -> !m_acc_base_ty {
+  %1 = scf.forall (%id) in (${SUBGROUPS_M * SUBGROUPS_N * 64}) shared_outs(%out = %0) -> !m_acc_base_ty {
     %ids:3 = affine.delinearize_index %id into (${SUBGROUPS_M}, ${SUBGROUPS_N}, 64) : index, index, index
     %threads:2 = affine.delinearize_index %ids#2 into (4, 16) : index, index
 
@@ -102,8 +102,8 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
 
     %2 = arith.constant dense<0.0> : vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
-    %cmp0 = arith.cmpi slt, %id, %c256 : index
-    %cmp1 = arith.cmpi sge, %id, %c256 : index
+    %cmp0 = arith.cmpi slt, %id, %c${SUBGROUPS_M * SUBGROUPS_N * 32} : index
+    %cmp1 = arith.cmpi sge, %id, %c${SUBGROUPS_M * SUBGROUPS_N * 32} : index
     scf.if %cmp0 {
       rocdl.s.barrier
     }
@@ -113,8 +113,8 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
       %lhs_vec = vector.transfer_read %lhs_shared[%c0, %ids#0, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_lhs_shared_ty, vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
       %lhs_vec_0 = vector.extract_strided_slice %lhs_vec {offsets = [0, 0, 0, 0], sizes = [1, ${INTRINSICS_M}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
       %lhs_vec_2 = vector.extract_strided_slice %lhs_vec {offsets = [1, 0, 0, 0], sizes = [1, ${INTRINSICS_M}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-      %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
-      %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
+      %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
+      %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
       rocdl.sched.barrier 0
 
@@ -130,8 +130,8 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
       %rhs_vec = vector.transfer_read %rhs_shared[%c0, %glb0_rhs, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_rhs_shared_ty, vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
       %rhs_vec_0 = vector.extract_strided_slice %rhs_vec {offsets = [0, 0, 0, 0], sizes = [1, ${INTRINSICS_N}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
       %rhs_vec_2 = vector.extract_strided_slice %rhs_vec {offsets = [1, 0, 0, 0], sizes = [1, ${INTRINSICS_N}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-      %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
-      %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
+      %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
+      %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
       rocdl.sched.barrier 0
 
@@ -154,7 +154,7 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
         kind = #iree_gpu.mma_layout<${INTRINSIC}>,
         semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-      } : vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
+      } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
       gpu.barrier
@@ -178,7 +178,7 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
         kind = #iree_gpu.mma_layout<${INTRINSIC}>,
         semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-      } : vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
+      } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
       gpu.barrier
@@ -194,28 +194,28 @@ util.func private @pingpong_dt_medium_${ELEM_TYPE}(%lhs_base: !m_lhs_base_ty, %r
     %lhs_vec = vector.transfer_read %lhs_shared[%c0, %ids#0, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_lhs_shared_ty, vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
     %lhs_vec_0 = vector.extract_strided_slice %lhs_vec {offsets = [0, 0, 0, 0], sizes = [1, ${INTRINSICS_M}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
     %lhs_vec_2 = vector.extract_strided_slice %lhs_vec {offsets = [1, 0, 0, 0], sizes = [1, ${INTRINSICS_M}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
-    %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
+    %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
+    %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
     %rhs_vec = vector.transfer_read %rhs_shared[%c0, %glb0_rhs, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_rhs_shared_ty, vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
     %rhs_vec_0 = vector.extract_strided_slice %rhs_vec {offsets = [0, 0, 0, 0], sizes = [1, ${INTRINSICS_N}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
     %rhs_vec_2 = vector.extract_strided_slice %rhs_vec {offsets = [1, 0, 0, 0], sizes = [1, ${INTRINSICS_N}, 1, ${INTRINSICS_K * 64 // ELEM_BITS}], strides = [1, 1, 1, 1]} : vector<2x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}>
-    %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
-    %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>
+    %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
+    %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K * 64 // ELEM_BITS}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
     %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0_t, %rhs_vec_0_t) outs(%3) {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<${INTRINSIC}>,
       semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-    } : vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
+    } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
     %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2_t, %rhs_vec_2_t) outs(%dot0) {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<${INTRINSIC}>,
       semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-    } : vector<${INTRINSICS_M}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x2x1x${64 // ELEM_BITS}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
+    } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
     %empty = tensor.empty() : tensor<1x1x1x${INTRINSICS_M}x${INTRINSICS_N}x1x1x4xf32>
     %cast = vector.shape_cast %dot2 : vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32> to vector<1x1x1x${INTRINSICS_M}x${INTRINSICS_N}x1x1x4xf32>
