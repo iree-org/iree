@@ -13,7 +13,7 @@ namespace mlir::iree_compiler {
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE CPU Codegen Options");
 
-  auto init_at_opt = binder.optimizationLevel(
+  auto initAtOpt = binder.optimizationLevel(
       "iree-llvmcpu-opt-level", optLevel,
       llvm::cl::desc("Optimization level for CPU codegen."),
       llvm::cl::cat(category));
@@ -31,8 +31,8 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
                    reassociateFpReductions,
-                   {init_at_opt(llvm::OptimizationLevel::O0, false),
-                    init_at_opt(llvm::OptimizationLevel::O1, true)},
+                   {initAtOpt(llvm::OptimizationLevel::O0, false),
+                    initAtOpt(llvm::OptimizationLevel::O1, true)},
                    llvm::cl::desc("Enables reassociation for FP reductions."),
                    llvm::cl::cat(category));
 }
