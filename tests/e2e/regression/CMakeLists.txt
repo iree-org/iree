@@ -174,6 +174,8 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-amd"
+  TIMEOUT
+    300
 )
 
 iree_check_single_backend_test_suite(

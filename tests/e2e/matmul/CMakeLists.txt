@@ -2903,6 +2903,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -2933,6 +2935,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -2960,6 +2964,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-gfx1250"
+  TIMEOUT
+    120
 )
 
 endif()
