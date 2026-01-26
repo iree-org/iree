@@ -38,6 +38,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
     LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
     LLVMGPUVectorDistributeWMMAR4 = "LLVMGPUVectorDistributeWMMAR4"
+    LLVMGPUVectorDistributeWMMA1250 = "LLVMGPUVectorDistributeWMMA1250"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
@@ -177,6 +178,8 @@ def get_rocm_test_compilation_infos(
         intrinsic = "WMMAR3"
     elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR4:
         intrinsic = "WMMAR4"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA1250:
+        intrinsic = "WMMA1250"
     else:
         raise ValueError("Unknown pipeline for rocm")
 
@@ -271,10 +274,46 @@ def get_rocm_test_compilation_infos(
             MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 4, 2, 1, 2),
             MMASchedule("WMMAR4_I32_16x16x16_I8", 4, 2, 4, 2, 2),
         ]
+    elif intrinsic == "WMMA1250":
+        # gfx1250 WMMA intrinsics: 16x16 tiles with various K sizes.
+        # F16: K=32, F8E4M3FN: K=64 or K=128, I8: K=64
+        schedules = [
+            MMASchedule("WMMA_F32_16x16x32_F16", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x32_F16", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F32_16x16x32_F16", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F32_16x16x32_F16", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F32_16x16x32_F16", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x32_F16", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F32_16x16x32_F16", 4, 2, 4, 2, 2),
+            # K=64 F8E4M3FN
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F32_16x16x64_F8E4M3FN", 4, 2, 4, 2, 2),
+            # K=128 F8E4M3FN
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F32_16x16x128_F8E4M3FN", 4, 2, 4, 2, 2),
+            # I8
+            MMASchedule("WMMA_I32_16x16x64_I8", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_I32_16x16x64_I8", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_I32_16x16x64_I8", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_I32_16x16x64_I8", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_I32_16x16x64_I8", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_I32_16x16x64_I8", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_I32_16x16x64_I8", 4, 2, 4, 2, 2),
+        ]
     else:
         raise NotImplementedError("unhandled intrinsic case")
 
-    subgroup_size = 64 if intrinsic == "MFMA" else 32
+    subgroup_size = 64 if intrinsic == "MFMA" else 32  # WMMAR3, WMMAR4, WMMA1250 all use 32.
 
     infos = []
     for schedule in schedules:
@@ -328,6 +367,24 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
+        elif schedule.intrinsic == "WMMA_F32_16x16x32_F16":
+            # gfx1250: M=16, N=16, K=32
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 32
+        elif schedule.intrinsic in (
+            "WMMA_F32_16x16x64_F8E4M3FN",
+            "WMMA_I32_16x16x64_I8",
+        ):
+            # gfx1250: M=16, N=16, K=64
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 64
+        elif schedule.intrinsic == "WMMA_F32_16x16x128_F8E4M3FN":
+            # gfx1250: M=16, N=16, K=128
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 128
         else:
             raise NotImplementedError("unhandled intrinsic case")
 
@@ -358,6 +415,7 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeMFMA,
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
         CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMA1250,
     ]:
         return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
