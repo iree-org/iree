@@ -787,10 +787,10 @@ static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
       }
 
       if (oldVal == 0) {
-        // Skip updating tile sizes of 0, we want to preserve these values.
-        if (!bounds.empty()) {
-          // If we have enough information about the upper bound of this tile
-          // size, use it.
+        // Skip updating tile sizes of 0, we want to preserve these values. If
+        // we do not have enough information about the upper bound of this tile
+        // size, don't use it.
+        if (!bounds.empty() && !ShapedType::isDynamic(bounds[loopNum])) {
           tileBits[i] *= bounds[loopNum];
         }
       } else {
