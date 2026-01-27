@@ -21,6 +21,8 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
+#define DEBUG_TYPE "iree-vector-ext-layout-attr"
+
 using namespace mlir;
 
 namespace mlir::iree_compiler::IREE::VectorExt {
@@ -92,6 +94,158 @@ VectorLayoutInterface NestedLayoutAttr::apply(AffineMap map) const {
       threadStrides[idx] = getThreadStrides()[pos];
     }
   }
+
+  return NestedLayoutAttr::get(getContext(), subgroupCount, batchCount,
+                               outerCount, threadCount, elementCount,
+                               subgroupStrides, threadStrides);
+}
+
+namespace {
+static SmallVector<int64_t> shuffle(unsigned rank, ArrayRef<int64_t> input,
+                                    bool simple) {
+  if (simple) {
+    SmallVector<int64_t> result(input);
+    std::reverse(result.begin(), result.end());
+    return result;
+  }
+  SmallVector<int64_t> result;
+  result.reserve(input.size());
+  for (unsigned r = 0; r < rank; ++r) {
+    for (unsigned i = r; i < input.size(); i += rank) {
+      result.push_back(input[i]);
+    }
+  }
+  std::reverse(result.begin(), result.end());
+  return result;
+}
+} // anonymous namespace
+
+VectorLayoutInterface
+NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
+  SmallVector<int64_t> subgroupCount;
+  SmallVector<int64_t> batchCount;
+  SmallVector<int64_t> outerCount;
+  SmallVector<int64_t> threadCount;
+  SmallVector<int64_t> elementCount;
+  SmallVector<int64_t> subgroupStrides;
+  SmallVector<int64_t> threadStrides;
+  // To reshape, we need to ensure that we always go up in the layout level.
+  // We can only go to a lower level if this is a new dimension, and we have
+  // to start from the lowest level (element).
+  //
+  // When merging a thread/subgroup level, we need to also ensure that the
+  // strides can be merged into a single stride.
+  SmallVector<int64_t> remainingLevels = {1, 1, 1, 1, 1};
+  SmallVector<int64_t> remainingStrides = {0, 0};
+  SmallVector<bool> unitDims = {true, true, true, true, true};
+  int64_t currDim = getRank();
+  int64_t currLevel = 5;
+  int64_t minLevel = 0;
+  for (int64_t dim : llvm::reverse(newShape)) {
+    // levels: element, thread, outer, batch, subgroup
+    // strides: thread, subgroup
+    SmallVector<int64_t> levels(5, 1);
+    SmallVector<int64_t> strides(2, 0);
+
+    int64_t dimRemaining = dim;
+    do {
+      if (dimRemaining == 1) {
+        // We have fully consumed this dimension.
+        break;
+      }
+
+      if (currLevel == 5) {
+        // Move to the next dimension.
+        if (currDim == 0) {
+          break;
+        }
+        --currDim;
+        currLevel = 0;
+        minLevel = 0;
+        remainingLevels = llvm::to_vector(
+            llvm::reverse(getPackedShapeForUndistributedDim(currDim)));
+        // printShape("New rem levels", remainingLevels);
+        remainingStrides = {getThreadStrides()[currDim],
+                            getSubgroupStrides()[currDim]};
+        // printShape("New rem strides", remainingStrides);
+        unitDims = llvm::map_to_vector(remainingLevels,
+                                       [](int64_t v) { return v == 1; });
+      }
+
+      // Handle cases where we have nothing left to consume at this level, i.e.
+      // remaining[currLevel] = 1.
+      if (unitDims[currLevel]) {
+        // Only increment the current level, since this is a unit dim, we don't
+        // need to update the minLevel.
+        ++currLevel;
+        continue;
+      }
+      if (remainingLevels[currLevel] == 1) {
+        // We have fully consumed this level, go up. We cannot go below the
+        // minLevel.
+        ++currLevel;
+        ++minLevel;
+        continue;
+      }
+
+      if (currLevel < minLevel) {
+        // Cannot go below the minimum level, bail out.
+        return VectorLayoutInterface();
+      }
+
+      // Distribute remaining[currLevel] into the current level.
+      int64_t consume = std::min(dimRemaining, remainingLevels[currLevel]);
+      // Check if the remaining strides can be consumed.
+      if (currLevel == 1) {
+        // thread level.
+        if (strides[0] != 0 &&
+            strides[0] * levels[currLevel] != remainingStrides[0]) {
+          // Cannot consume the stride, bail out.
+          return VectorLayoutInterface();
+        }
+        strides[0] = (strides[0] == 0 ? remainingStrides[0] : strides[0]);
+        remainingStrides[0] *= consume;
+      }
+      if (currLevel == 4) {
+        // subgroup level.
+        if (strides[1] != 0 &&
+            strides[1] * levels[currLevel] != remainingStrides[1]) {
+          // Cannot consume the stride, bail out.
+          return VectorLayoutInterface();
+        }
+        strides[1] = (strides[1] == 0 ? remainingStrides[1] : strides[1]);
+        remainingStrides[1] *= consume;
+      }
+
+      levels[currLevel] *= consume;
+      dimRemaining /= consume;
+      remainingLevels[currLevel] /= consume;
+    } while (true);
+
+    assert(dimRemaining == 1 && "cannot reshape, remaining dim not consumed");
+    elementCount.push_back(levels[0]);
+    threadCount.push_back(levels[1]);
+    outerCount.push_back(levels[2]);
+    batchCount.push_back(levels[3]);
+    subgroupCount.push_back(levels[4]);
+    threadStrides.push_back(strides[0]);
+    subgroupStrides.push_back(strides[1]);
+
+    // Check if we can reset the minimum level.
+    if (llvm::all_of(remainingLevels, [](int64_t v) { return v == 1; })) {
+      // We have fully consumed the current dimension, reset the minLevel.
+      minLevel = 0;
+      currLevel = 5;
+    }
+  }
+  // Reverse the counts and strides since we processed them in reverse order.
+  std::reverse(subgroupCount.begin(), subgroupCount.end());
+  std::reverse(batchCount.begin(), batchCount.end());
+  std::reverse(outerCount.begin(), outerCount.end());
+  std::reverse(threadCount.begin(), threadCount.end());
+  std::reverse(elementCount.begin(), elementCount.end());
+  std::reverse(threadStrides.begin(), threadStrides.end());
+  std::reverse(subgroupStrides.begin(), subgroupStrides.end());
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, batchCount,
                                outerCount, threadCount, elementCount,

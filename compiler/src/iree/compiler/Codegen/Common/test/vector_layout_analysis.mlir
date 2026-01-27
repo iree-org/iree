@@ -711,3 +711,100 @@ func.func @paged_transfer_gather(%indices: vector<16xindex>,
 
   return %l_out : vector<16x8xf16>
 }
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [4, 4],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides = [4, 1]
+>
+
+func.func @propagate_2D_reshape_expand(%arg0: memref<64x64xf16>) -> vector<16x4x16x4xf16> {
+  %c0 = arith.constant 0 : index
+  %cst0 = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0, %c0], %cst0 {in_bounds = [true, true]} : memref<64x64xf16>, vector<64x64xf16>
+  // expected-remark @above {{batch_tile = [4, 4], outer_tile = [1, 1], thread_tile = [16, 4], element_tile = [1, 4]}}
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<64x64xf16>
+  %reshape = vector.shape_cast %rootl : vector<64x64xf16> to vector<16x4x16x4xf16>
+  // expected-remark @above {{subgroup_tile = [1, 1, 1, 1], batch_tile = [4, 1, 4, 1], outer_tile = [1, 1, 1, 1], thread_tile = [4, 4, 4, 1], element_tile = [1, 1, 1, 4]}}
+  // expexted-remark @above {{subgroup_strides = [0, 0, 0, 0], thread_strides = [16, 4, 1, 0]}}
+  func.return %reshape : vector<16x4x16x4xf16>
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1, 1],
+  batch_tile = [4, 1, 4, 1],
+  outer_tile = [1, 1, 1, 1],
+  thread_tile = [4, 4, 4, 1],
+  element_tile = [1, 1, 1, 4],
+
+  subgroup_strides = [0, 0, 0, 0],
+  thread_strides = [16, 4, 1, 0]
+>
+
+func.func @propagate_2D_reshape_contract(%arg0: memref<16x4x16x4xf16>) -> vector<64x64xf16> {
+  %c0 = arith.constant 0 : index
+  %cst0 = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0, %c0, %c0, %c0], %cst0 {in_bounds = [true, true, true, true]} : memref<16x4x16x4xf16>, vector<16x4x16x4xf16>
+  // expected-remark @above {{batch_tile = [4, 1, 4, 1], outer_tile = [1, 1, 1, 1], thread_tile = [4, 4, 4, 1], element_tile = [1, 1, 1, 4]}}
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x4x16x4xf16>
+  %reshape = vector.shape_cast %rootl : vector<16x4x16x4xf16> to vector<64x64xf16>
+  // expected-remark @above {{subgroup_tile = [1, 1], batch_tile = [4, 4], outer_tile = [1, 1], thread_tile = [16, 4], element_tile = [1, 4], subgroup_strides = [0, 0], thread_strides = [4, 1]}}
+  func.return %reshape : vector<64x64xf16>
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2],
+  batch_tile = [4],
+  outer_tile = [1],
+  thread_tile = [4],
+  element_tile = [4],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+func.func @propagate_1D_reshape_expand(%arg0: memref<128xf16>) -> vector<4x32xf16> {
+  %c0 = arith.constant 0 : index
+  %cst0 = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0], %cst0 {in_bounds = [true]} : memref<128xf16>, vector<128xf16>
+  // expected-remark @above {{subgroup_tile = [2], batch_tile = [4], outer_tile = [1], thread_tile = [4], element_tile = [4]}}
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<128xf16>
+  %reshape = vector.shape_cast %rootl : vector<128xf16> to vector<4x32xf16>
+  // expected-remark @above {{subgroup_tile = [2, 1], batch_tile = [2, 2], outer_tile = [1, 1], thread_tile = [1, 4], element_tile = [1, 4], subgroup_strides = [1, 0], thread_strides = [0, 1]}}
+  func.return %reshape : vector<4x32xf16>
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @propagate_1D_reshape_contract(%arg0: memref<4x32xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst0 = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0, %c0], %cst0 {in_bounds = [true, true]} : memref<4x32xf16>, vector<4x32xf16>
+  // expected-remark @above {{subgroup_tile = [2, 1], batch_tile = [2, 2], outer_tile = [1, 1], thread_tile = [1, 4], element_tile = [1, 4]}}
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<4x32xf16>
+  %reshape = vector.shape_cast %rootl : vector<4x32xf16> to vector<128xf16>
+  // expected-remark @above {{subgroup_tile = [2], batch_tile = [4], outer_tile = [1], thread_tile = [4], element_tile = [4], subgroup_strides = [1], thread_strides = [1]}}
+  func.return %reshape : vector<128xf16>
+}
