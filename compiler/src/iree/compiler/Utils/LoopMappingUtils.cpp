@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/DispatchCreation/LoopMappingUtils.h"
+#include "iree/compiler/Utils/LoopMappingUtils.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
@@ -14,7 +14,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
-namespace mlir::iree_compiler::DispatchCreation {
+namespace mlir::iree_compiler {
 
 llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   if (auto setEncodingOp = dyn_cast<IREE::Encoding::SetEncodingOp>(op)) {
@@ -150,4 +150,4 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
   return resultMap ? resultMap : FailureOr<AffineMap>();
 }
 
-} // namespace mlir::iree_compiler::DispatchCreation
+} // namespace mlir::iree_compiler

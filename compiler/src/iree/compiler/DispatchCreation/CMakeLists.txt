@@ -15,7 +15,6 @@ iree_cc_library(
     DispatchCreation
   HDRS
     "FusionUtils.h"
-    "LoopMappingUtils.h"
     "Passes.h"
   SRCS
     "AnnotateDataTilingHints.cpp"
@@ -40,7 +39,6 @@ iree_cc_library(
     "HoistEncodingOps.cpp"
     "HoistUniformScalarCompute.cpp"
     "InsertTensorBarriers.cpp"
-    "LoopMappingUtils.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "PropagateEncodings.cpp"
