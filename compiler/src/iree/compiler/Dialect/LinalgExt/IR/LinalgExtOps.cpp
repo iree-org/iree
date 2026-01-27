@@ -587,6 +587,38 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.add<ConvertGatherToExtract>(ctx);
 }
 
+namespace {
+/// Convert an identity map_gather or map_scatter to a copy operation.
+/// We keep the copy to preserve DPS semantics.
+template <typename OpTy>
+struct ConvertIdentityMapGatherScatterToCopy : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.isIdentity()) {
+      return failure();
+    }
+    if (op.isVectorized()) {
+      return failure();
+    }
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+    Value source;
+    if constexpr (std::is_same_v<OpTy, MapGatherOp>) {
+      source = op.getSource();
+    } else {
+      source = op.getInput();
+    }
+    auto copyOp =
+        linalg::CopyOp::create(rewriter, op.getLoc(), source, op.getOutput());
+    rewriter.replaceOp(op, copyOp.getResults());
+    return success();
+  }
+};
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // MapGatherOp
 //===----------------------------------------------------------------------===//
@@ -712,28 +744,9 @@ bool MapGatherOp::isIdentity() {
   return true;
 }
 
-namespace {
-/// Replace an identity map_gather with its source.
-struct ReplaceIdentityMapGather : public OpRewritePattern<MapGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(MapGatherOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!op.isIdentity()) {
-      return failure();
-    }
-    if (!op.hasPureTensorSemantics()) {
-      return failure();
-    }
-    rewriter.replaceOp(op, op.getSource());
-    return success();
-  }
-};
-} // namespace
-
 void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *ctx) {
-  results.add<ReplaceIdentityMapGather>(ctx);
+  results.add<ConvertIdentityMapGatherScatterToCopy<MapGatherOp>>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -895,35 +908,10 @@ bool MapScatterOp::isIdentity() {
   }
   return true;
 }
-namespace {
-/// Convert an identity map_scatter to a copy operation. We keep the copy to
-/// preserve DPS semantics.
-struct ConvertIdentityMapScatterToCopy
-    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
-                                PatternRewriter &rewriter) const override {
-    if (!mapScatterOp.isIdentity()) {
-      return failure();
-    }
-    if (mapScatterOp.isVectorized()) {
-      return failure();
-    }
-    if (!mapScatterOp.hasPureTensorSemantics()) {
-      return failure();
-    }
-    auto copyOp = linalg::CopyOp::create(rewriter, mapScatterOp.getLoc(),
-                                         mapScatterOp.getInput(),
-                                         mapScatterOp.getOutput());
-    rewriter.replaceOp(mapScatterOp, copyOp.getResults());
-    return success();
-  }
-};
-} // namespace
 
 void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *ctx) {
-  results.add<ConvertIdentityMapScatterToCopy>(ctx);
+  results.add<ConvertIdentityMapGatherScatterToCopy<MapScatterOp>>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
