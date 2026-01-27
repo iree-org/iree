@@ -118,7 +118,6 @@ iree-compile \
     --iree-hal-local-target-device-backends=llvm-cpu \
     --iree-llvmcpu-target-cpu=host \
     --iree-opt-level=O2 \
-    --iree-llvmcpu-mlir-opt-level=O2 \
     --iree-opt-data-tiling \
     mobilenetv2.mlir -o mobilenet_cpu.vmfb
 ```
@@ -136,14 +135,6 @@ iree-compile \
     usually sufficient on most devices.
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
-
-???+ tip "Tip - MLIR Codegen Optimizations"
-
-    Use --iree-llvmcpu-mlir-opt-level=[O0,O1,O2,O3] to enable additional MLIR
-    codegen optimizations. E.g., Reassociation for FP reductions is enabled at
-    O2 and above. See
-    [CodegenOptions.cpp](https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/Utils/CodegenOptions.cpp)
-    for more details.
 
 ???+ tip "Tip - Data-Tiling"
 
