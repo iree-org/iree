@@ -120,6 +120,9 @@ fi
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
+readarray -t extra_label_exclude_args <<< "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
+label_exclude_args+=(${extra_label_exclude_args[@]})
+
 # Some tests are just failing on some platforms and this filtering lets us
 # exclude any type of test. Ideally each test would be tagged with the
 # platforms it doesn't support, but that would require editing through layers

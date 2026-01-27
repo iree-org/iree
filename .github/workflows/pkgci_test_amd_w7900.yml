@@ -59,6 +59,25 @@ jobs:
       - name: Run GPU tests
         env:
           CTEST_PARALLEL_LEVEL: 1
+          IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE: |
+            iree/hal/drivers/hip/cts/hip_stream_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_stream_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_stream_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_graph_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_graph_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_graph_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_command_buffer_fill_buffer_test
           IREE_CTEST_LABEL_REGEX: ^(?!hip_(?:stream|graph|multi_queue_stream|multi_queue_graph|multi_queue_stream_queue_1|multi_queue_graph_queue_1)_(?:buffer_mapping|command_buffer_dispatch_constants|command_buffer_fill_buffer)$)(?:requires-gpu|driver=vulkan$|driver=hip$)
           IREE_AMD_RDNA3_TESTS_DISABLE: 0
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
