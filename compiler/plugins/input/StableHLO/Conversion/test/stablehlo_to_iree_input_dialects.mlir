@@ -101,6 +101,16 @@ func.func public @empty_zero_extent(%arg0: tensor<ui8>, %arg1: tensor<0x4xui32>)
 
 // -----
 
+// CHECK-LABEL: func.func @add_zero_ext
+func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> tensor<5x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<5x0xi32>
+  func.return %0 : tensor<5x0xi32>
+}
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
+// CHECK:   return %[[EMPTY]]
+
+// -----
+
 // CHECK-LABEL: @convert_return
 func.func @convert_return() -> tensor<i32> {
   // CHECK: %[[CST:.+]] = arith.constant dense<1>

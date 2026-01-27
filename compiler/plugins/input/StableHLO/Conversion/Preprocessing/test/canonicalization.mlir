@@ -710,10 +710,12 @@ func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 
 // -----
 
 // CHECK-LABEL: @while_zero_extent
-// CHECK: %[[R0:.+]] = tensor.empty() : tensor<75x0xf32>
-// CHECK: %[[R1:.+]] = tensor.empty() : tensor<75x0xf32>
-// CHECK: %[[R2:.+]]:2 = stablehlo.while
-// CHECK: return %[[R2]]#0, %[[R0]]
+// CHECK: %[[EMPTY0:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: %[[WHILE:.+]]:2 = stablehlo.while
+// CHECK: %[[EMPTY1:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: stablehlo.return {{.*}} %[[EMPTY1]]
+// CHECK: %[[EMPTY2:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: return %[[WHILE]]#0, %[[EMPTY2]]
 
 
 func.func public @while_zero_extent(%arg0: tensor<i32>, %arg1: tensor<3xf32>, %arg2: tensor<75x0xf32>) -> (tensor<i32>, tensor<75x0xf32>) {
