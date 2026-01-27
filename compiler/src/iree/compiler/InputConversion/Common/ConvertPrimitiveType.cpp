@@ -257,7 +257,13 @@ struct ConvertTypesPass : public Base {
     SmallVector<std::pair<mlir::FunctionOpInterface, FunctionType>>
         exportedFuncOps;
     for (auto funcOp : moduleOp.template getOps<mlir::FunctionOpInterface>()) {
-      const auto funcType = cast<FunctionType>(funcOp.getFunctionType());
+      const auto funcType = dyn_cast<FunctionType>(funcOp.getFunctionType());
+      if (!funcType) {
+        funcOp.emitError()
+            << "cannot determine function type of function; do not use the "
+               "pass or manually convert the function prior to running it";
+        return this->signalPassFailure();
+      }
       if (funcOp.isExternal() && !typeConverter.isSignatureLegal(funcType)) {
         funcOp.emitError()
             << "external functions with types that are being demoted are not "
