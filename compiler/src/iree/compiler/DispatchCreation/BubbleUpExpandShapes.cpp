@@ -404,15 +404,6 @@ struct BubbleExpandThroughBitCast final
       return failure();
     }
 
-    // For rank > 1, the new expand output shape's last dim is derived from the
-    // bitcast source's last dim (scaled by bitwidth ratio). We don't support
-    // dynamic last dim yet since we'd need affine expressions to scale it.
-    // For rank 1, the bitwidth ratio is 1:1, so it doesn't matter.
-    if (bitcastSrcType.getRank() > 1 &&
-        ShapedType::isDynamic(bitcastSrcType.getShape().back())) {
-      return failure();
-    }
-
     // When src_bits < dst_bits (e.g., f4 -> i32), the bitcast shrinks the last
     // dim by the bitwidth ratio (4 / 32). Assume before sinking, the last dim
     // size at bitcast source is 16, then through bitcast, the last dim size at
@@ -434,24 +425,31 @@ struct BubbleExpandThroughBitCast final
       }
     }
 
+    // We don't support dynamic last dim yet since we'd need affine expressions
+    // to scale it.
+    RankedTensorType expandResultType = expandOp.getResultType();
+    int64_t lastDimSize = expandResultType.getShape().back();
+    if (ShapedType::isDynamic(lastDimSize)) {
+      return failure();
+    }
+
     // Compute the new expand output shape. Same as original but with the last
     // dim scaled according to the bitcast source and destination element type
     // bitwidths.
-    RankedTensorType expandResultType = expandOp.getResultType();
-    SmallVector<int64_t> newOutputShape(expandResultType.getShape());
-    newOutputShape.back() =
-        (newOutputShape.back() * bitcastDstType.getElementTypeBitWidth()) /
+    SmallVector<int64_t> newExpandedShape(expandResultType.getShape());
+    newExpandedShape.back() =
+        (lastDimSize * bitcastDstType.getElementTypeBitWidth()) /
         bitcastSrcType.getElementTypeBitWidth();
 
     SmallVector<OpFoldResult> oldMixedOutputShape =
         expandOp.getMixedOutputShape();
     SmallVector<OpFoldResult> newMixedOutputShape(oldMixedOutputShape);
-    newMixedOutputShape.back() = rewriter.getIndexAttr(newOutputShape.back());
+    newMixedOutputShape.back() = rewriter.getIndexAttr(newExpandedShape.back());
 
     // Create the new expand_shape with the original bitcast source, but with
     // the new output shape.
-    auto newExpandResultType =
-        RankedTensorType::get(newOutputShape, bitcastSrcType.getElementType());
+    auto newExpandResultType = RankedTensorType::get(
+        newExpandedShape, bitcastSrcType.getElementType());
     auto newExpandOp = tensor::ExpandShapeOp::create(
         rewriter, expandOp.getLoc(), newExpandResultType, bitcastOp.getSource(),
         expandOp.getReassociationIndices(), newMixedOutputShape);
@@ -460,11 +458,11 @@ struct BubbleExpandThroughBitCast final
     int64_t expandResultRank = expandResultType.getRank();
     SmallVector<Value> newDynSrcDims;
     for (int64_t i = 0; i < expandResultRank; ++i) {
-      if (ShapedType::isStatic(newOutputShape[i])) {
+      if (ShapedType::isStatic(newExpandedShape[i])) {
         continue;
       }
-      Value dimVal = getValueOrCreateConstantIndexOp(
-          rewriter, bitcastOp.getLoc(), newMixedOutputShape[i]);
+      Value dimVal = dyn_cast<Value>(newMixedOutputShape[i]);
+      assert(dimVal && "Expected dynamic dimension to be a Value.");
       newDynSrcDims.push_back(dimVal);
     }
 
@@ -473,8 +471,8 @@ struct BubbleExpandThroughBitCast final
       if (!expandResultType.isDynamicDim(i)) {
         continue;
       }
-      Value dimVal = getValueOrCreateConstantIndexOp(
-          rewriter, bitcastOp.getLoc(), oldMixedOutputShape[i]);
+      Value dimVal = dyn_cast<Value>(oldMixedOutputShape[i]);
+      assert(dimVal && "Expected dynamic dimension to be a Value.");
       newDynDstDims.push_back(dimVal);
     }
 
@@ -512,7 +510,23 @@ struct SinkCollapseThroughBitCast final
 
     // We don't support dynamic last dim yet since we'd need affine expressions
     // to scale it.
-    if (ShapedType::isDynamic(collapseSrcType.getShape().back())) {
+    int64_t lastDimSize = collapseSrcType.getShape().back();
+    if (ShapedType::isDynamic(lastDimSize)) {
+      return failure();
+    }
+
+    // Check that scaling the last dimension doesn't produce a fractional size.
+    // When sinking bitcast through collapse, we scale the last dimension by the
+    // bitwidth ratio. This is only valid if the result is an integer.
+    //
+    // Example (valid): tensor<4x?x512x32xf4> -> bitcast -> tensor<...xi8>
+    //   Last dim after scaling: 32 * 4 bits / 8 bits = 16 (integer).
+    //
+    // Example (invalid): tensor<4x5xf32> -> bitcast -> tensor<...xi64>
+    //   Last dim after scaling: 5 * 32 bits / 64 bits = 2.5 (fractional!).
+    int64_t srcBits = collapseDstType.getElementTypeBitWidth();
+    int64_t dstBits = bitcastDstType.getElementTypeBitWidth();
+    if ((lastDimSize * srcBits) % dstBits != 0) {
       return failure();
     }
 
@@ -533,9 +547,8 @@ struct SinkCollapseThroughBitCast final
     // The last dim of the new bitcast result should be scaled by the bitcast
     // source and destination element type bitwidths.
     SmallVector<int64_t> newBitcastResultShape(collapseSrcType.getShape());
-    newBitcastResultShape.back() = (newBitcastResultShape.back() *
-                                    collapseDstType.getElementTypeBitWidth()) /
-                                   bitcastDstType.getElementTypeBitWidth();
+    newBitcastResultShape.back() =
+        (newBitcastResultShape.back() * srcBits) / dstBits;
 
     // Create the new bitcast operating on the collapse_shape source.
     auto newBitcastResultType = RankedTensorType::get(
@@ -547,13 +560,13 @@ struct SinkCollapseThroughBitCast final
     SmallVector<Value> newBitcastDstDims;
     for (int64_t i = 0; i < collapseSrcType.getRank(); ++i) {
       if (collapseSrcType.isDynamicDim(i)) {
-        Value dimVal = tensor::DimOp::create(rewriter, collapseOp.getLoc(),
-                                             collapseOp.getSrc(), i);
+        Value dimVal = rewriter.createOrFold<tensor::DimOp>(
+            collapseOp.getLoc(), collapseOp.getSrc(), i);
         newBitcastSrcDims.push_back(dimVal);
       }
       if (ShapedType::isDynamic(newBitcastResultShape[i])) {
-        Value dimVal = tensor::DimOp::create(rewriter, collapseOp.getLoc(),
-                                             collapseOp.getSrc(), i);
+        Value dimVal = rewriter.createOrFold<tensor::DimOp>(
+            collapseOp.getLoc(), collapseOp.getSrc(), i);
         newBitcastDstDims.push_back(dimVal);
       }
     }

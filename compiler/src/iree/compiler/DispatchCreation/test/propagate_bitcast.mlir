@@ -62,6 +62,27 @@ func.func @sinkCollapseThroughBitCast(%arg0: tensor<4x?x512x32xf4E2M1FN>, %d0: i
 
 // -----
 
+// Negative test: Collapse with fractional dimension scaling should NOT sink.
+// When (lastDimSize * srcBits) % dstBits != 0, sinking would produce a
+// fractional dimension size, which is invalid.
+// CHECK-LABEL: @noSinkCollapseFractionalScaling
+// CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<4x5xf32>
+func.func @noSinkCollapseFractionalScaling(%arg0: tensor<4x5xf32>) -> tensor<10xi64> {
+  // Last dim scaling would be: 5 * 32 bits / 64 bits = 2.5 (fractional!)
+  // Pattern should NOT apply, leaving collapse before bitcast.
+  // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG0]]
+  // CHECK-SAME: tensor<4x5xf32> into tensor<20xf32>
+  // CHECK: %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[COLLAPSE]]
+  // CHECK-SAME: tensor<20xf32> -> tensor<10xi64>
+  // CHECK: return %[[BITCAST]]
+  %0 = tensor.collapse_shape %arg0 [[0, 1]]
+      : tensor<4x5xf32> into tensor<20xf32>
+  %1 = iree_tensor_ext.bitcast %0 : tensor<20xf32> -> tensor<10xi64>
+  return %1 : tensor<10xi64>
+}
+
+// -----
+
 // Test that consecutive bitcasts are folded after propagation through reshapes.
 // CHECK-LABEL: @bitcastExpandCollapseChain
 // CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<?x32xf4E2M1FN>
