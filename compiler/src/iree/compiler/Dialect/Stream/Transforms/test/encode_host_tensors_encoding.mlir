@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --iree-util-vscale-value=2 %s | FileCheck %s --check-prefix=CHECK-SCALABLE
+// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --iree-experimental-vscale-value=2 %s | FileCheck %s
 
 // CHECK-LABEL: @tensorSizeOfUnalignedPackedI1
 util.func public @tensorSizeOfUnalignedPackedI1() -> index {
@@ -260,12 +259,9 @@ util.func public @sizeof_scalable_layout() -> index {
     %size = stream.tensor.sizeof tensor<24x8xf32, #encoding> : index
     util.return %size : index
 }
-// CHECK-LABEL: @sizeof_scalable_layout
-// CHECK:        %[[C768:.+]] = arith.constant 768 : index
-// CHECK-NEXT:    util.return %[[C768]]
 
-// CHECK-SCALABLE-LABEL: @sizeof_scalable_layout
+// CHECK-LABEL: @sizeof_scalable_layout
 // Since we have vscale=2, the packed layout is effectively <2x8x16x1xf32>.
 // Therefore, the calculated size is 2*8*16*1*4(f32)=1024.
-// CHECK-SCALABLE:         %[[C1024:.+]] = arith.constant 1024 : index
-// CHECK-SCALABLE-NEXT:    util.return %[[C1024]]
+// CHECK:         %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK-NEXT:    util.return %[[C1024]]

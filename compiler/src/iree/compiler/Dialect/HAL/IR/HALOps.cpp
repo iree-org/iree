@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -1881,19 +1880,7 @@ calculateWorkgroupCountFromRegion(Location loc, Block *body, Value device,
   for (unsigned argNum : llvm::seq<unsigned>(0, numArgs)) {
     bvm.map(body->getArgument(/*device*/ 1 + argNum), workload[argNum]);
   }
-  // Currently, we cannot evaluate `vector.vscale` ops at host-side. Therefore,
-  // we map these values to the user-specified constants here at compile-time.
-  // TODO(#21317): Remove this mapping once we can properly query these values
-  // at host-side.
-  SmallVector<Operation *> vscaleOps;
   for (Operation &op : body->without_terminator()) {
-    mapVscaleOpToConstant(op, builder, bvm, vscaleOps);
-  }
-  for (Operation &op : body->without_terminator()) {
-    if (llvm::any_of(vscaleOps,
-                     [&](Operation *vscale) { return vscale == &op; })) {
-      continue;
-    }
     builder.clone(op, bvm);
   }
   auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());

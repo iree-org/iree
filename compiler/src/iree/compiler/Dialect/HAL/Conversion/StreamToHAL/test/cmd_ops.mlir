@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --iree-experimental-vscale-value=1 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true %s | FileCheck %s
 
 // Today all memory control operations are ignored and we're just left with
 // the normal sequential execution barriers.
@@ -520,53 +520,4 @@ util.func public @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1
     stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
   } => !stream.timepoint
   util.return %0 : !stream.timepoint
-}
-
-// -----
-
-// Tests that memoized dispatch workgroup counts are scalar-only (no vscale).
-// This mechanism is a workaround until #21590 and #21317 are resolved.
-
-#executable_target_embedded_elf_arm_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "cortex-a720", cpu_features = "+sve,+sve2,+neon,+reserve-x18", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, max_stack_allocation_size = 32768 : i64, native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer, Indirect>
-]>
-#device_target_local = #hal.device.target<"local", [#executable_target_embedded_elf_arm_64]> : !hal.device
-module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} {
-  util.global private @__device_0 = #device_target_local
-  hal.executable private @_encoding_1 {
-    hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64) {
-      hal.executable.export public @_encoding_1_encode_256x128xf32_to_256x128xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %c1 = arith.constant 1 : index
-        %c8 = arith.constant 8 : index
-        %vscale = vector.vscale
-        %c8_vscale = arith.muli %vscale, %c8 : index
-        hal.return %c8_vscale, %c1, %c1 : index, index, index
-      } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
-      builtin.module {
-        // Irrelevant
-      }
-    }
-  }
-
-  // CHECK-LABEL: @main
-  // CHECK: %[[DEVICE:.+]] = util.global.load immutable @__device_0
-  // CHECK: %[[MEMOIZE:.+]] = hal.device.memoize<%[[DEVICE]] : !hal.device>
-  // CHECK-NOT: vector.vscale
-  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-  // CHECK: %[[WG0:.+]] = arith.muli %[[C1]], %[[C8]] : index
-  // CHECK: hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer>
-  // CHECK-SAME: workgroups([%[[WG0]], %[[C1]], %[[C1]]])
-  // CHECK: hal.return %{{.+}} : !hal.command_buffer
-  util.func public @main(%arg_resource: !stream.resource<external>) -> !stream.timepoint {
-    %c0 = arith.constant 0 : index
-    %arg_size = arith.constant 200 : index
-    %2 = stream.cmd.execute on(#hal.device.affinity<@__device_0>) with(%arg_resource as %arg_capture: !stream.resource<external>{%arg_size}) {
-      stream.cmd.dispatch @_encoding_1::@embedded_elf_arm_64::@_encoding_1_encode_256x128xf32_to_256x128xf32 {
-        wo %arg_capture[%c0 for %arg_size] : !stream.resource<external>{%arg_size}
-      }
-    } => !stream.timepoint
-    util.return %2 : !stream.timepoint
-  }
 }

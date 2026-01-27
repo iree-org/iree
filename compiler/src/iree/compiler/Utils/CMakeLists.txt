@@ -59,7 +59,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
-    MLIRVectorDialect
     iree::base
     iree::base::internal::flatcc::building
     iree::base::internal::flatcc::debugging

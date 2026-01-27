@@ -7,9 +7,6 @@
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/Support/CommandLine.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Operation.h"
@@ -17,36 +14,6 @@
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir::iree_compiler {
-
-static llvm::cl::opt<int> clVscaleFromUser(
-    "iree-experimental-vscale-value",
-    llvm::cl::desc(
-        "The runtime value of vscale. This will _only_ be used for host-side "
-        "code, e.g. to calculate storage sizes and workgroup counts. This is "
-        "due to a current limitation of the host-side code not being able to "
-        "properly query this value at runtime, see #21317 and #21590. Codegen "
-        "will be vector-length agnostic and will be querying the value of "
-        "vscale at runtime, as intended. For scalable vector code that "
-        "propagates vscale ops into the host-side code, this value has to be "
-        "explicitly set by the user, e.g. for SVE data-tiling on the AArch64 "
-        "backend."),
-    llvm::cl::init(-1));
-
-unsigned getUserVscaleValue() {
-  assert(clVscaleFromUser >= 1 && "Currently, vscale needs to be specified by "
-                                  "the user for host-side code!");
-  return clVscaleFromUser;
-}
-
-void mapVscaleOpToConstant(Operation &op, OpBuilder &builder, IRMapping &bvm,
-                           SmallVector<Operation *> &vscaleOps) {
-  if (isa<vector::VectorScaleOp>(op)) {
-    vscaleOps.push_back(&op);
-    auto newCstVscaleOp = arith::ConstantIndexOp::create(builder, op.getLoc(),
-                                                         getUserVscaleValue());
-    bvm.map(op.getResult(0), newCstVscaleOp->getResult(0));
-  }
-}
 
 OperationEquivalenceCache::OperationEquivalenceCache(MLIRContext *context)
     : functionRefName(StringAttr::get(context, "function_ref")),
