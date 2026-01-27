@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1233,6 +1234,10 @@ namespace common {
 } // namespace common
 
 void registerCodegenLLVMGPUPasses() {
+  // Register codegen options so they're available from the command line.
+  // This ensures the options are registered for both iree-opt and iree-compile.
+  (void)GPUCodegenOptions::FromFlags::get();
+
   // Generated.
   common::registerPasses();
 
