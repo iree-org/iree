@@ -880,3 +880,13 @@ util.func public @multi_entry_loop(%cond: i1) {
 // CHECK: }
 // CHECK: util.call @process(%{{.*}}#1)
 // CHECK: util.return
+
+// -----
+
+// Tests flow.func with empty region (getCallableRegion() returns nullptr).
+// This is the specific case that caused the crash in https://github.com/iree-org/iree/issues/22971.
+// flow.func's getCallableRegion() returns nullptr, which should be handled
+// gracefully by the pass.
+
+// CHECK-LABEL: flow.func private @flow_func_empty_region
+flow.func private @flow_func_empty_region()
