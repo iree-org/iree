@@ -14,8 +14,8 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE CPU Codegen Options");
 
   auto initAtOpt = binder.optimizationLevel(
-      "iree-llvmcpu-opt-level", optLevel,
-      llvm::cl::desc("Optimization level for CPU codegen."),
+      "iree-llvmcpu-mlir-opt-level", optLevel,
+      llvm::cl::desc("Optimization level for MLIR codegen passes."),
       llvm::cl::cat(category));
 
   binder.opt<bool>("iree-llvmcpu-disable-distribution", disableDistribution,
