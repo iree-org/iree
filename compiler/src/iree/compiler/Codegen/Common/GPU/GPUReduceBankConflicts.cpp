@@ -48,12 +48,6 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
     return;
   }
 
-  // Return if we have CollapseShape op as an user as padding in that case is
-  // unsupported.
-  if (hasCollapseShapeUser(allocOp)) {
-    return;
-  }
-
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
@@ -68,12 +62,21 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = memref::AllocOp::create(rewriter, loc, allocType);
   SmallVector<int64_t> offsets(shape.size(), 0);
   SmallVector<int64_t> strides(shape.size(), 1);
-  Value subview =
-      memref::SubViewOp::create(rewriter, loc, paddedAlloc, offsets,
-                                allocOp.getType().getShape(), strides);
+  ArrayRef<int64_t> sizes = allocOp.getType().getShape();
+  // Before performing any transformation, verify that we can propagate the new
+  // type through the program. This could fail due to collapse_shape ops in the
+  // use chain of the alloc.
+  MemRefType resultType = memref::SubViewOp::inferRankReducedResultType(
+      sizes, allocType, offsets, sizes, strides);
+  if (failed(canReplaceMemrefUsesAndPropagateType(allocOp.getResult(),
+                                                  resultType))) {
+    return;
+  }
+  Value paddedAlloc = memref::AllocOp::create(rewriter, loc, allocType);
+  Value subview = memref::SubViewOp::create(rewriter, loc, paddedAlloc, offsets,
+                                            sizes, strides);
   replaceMemrefUsesAndPropagateType(rewriter, loc, allocOp, subview);
   rewriter.eraseOp(allocOp);
 }
