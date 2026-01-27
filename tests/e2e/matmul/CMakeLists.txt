@@ -1318,6 +1318,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=1024,1024,1024"
+    "--mnk_dynamicities=static,static,static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1347,6 +1348,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=2048,2048,2048"
+    "--mnk_dynamicities=static,static,static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1376,6 +1378,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=4096,4096,4096"
+    "--mnk_dynamicities=static,static,static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1405,6 +1408,7 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--shapes=custom_mnk"
     "--mnk=8192,8192,8192"
+    "--mnk_dynamicities=static,static,static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
