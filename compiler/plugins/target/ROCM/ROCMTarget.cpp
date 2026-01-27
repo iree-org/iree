@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -296,7 +297,9 @@ static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
 
 class ROCMTargetBackend final : public TargetBackend {
 public:
-  ROCMTargetBackend(const ROCMOptions &options) : options(options) {}
+  ROCMTargetBackend(const ROCMOptions &options,
+                    const GPUCodegenOptions &codegenOptions)
+      : options(options), codegenOptions(codegenOptions) {}
 
   std::string getLegacyDefaultDeviceID() const override { return "hip"; }
 
@@ -451,7 +454,8 @@ public:
     }
     modulePassManager.addPass(createMaterializeTuningSpecsPass());
     modulePassManager.addPass(createMaterializeUserConfigsPass());
-    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
+    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
+        LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -1065,6 +1069,7 @@ protected:
 
 private:
   const ROCMOptions &options;
+  const GPUCodegenOptions &codegenOptions;
 };
 
 class AMDGPUTargetDevice final : public TargetDevice {
@@ -1133,15 +1138,45 @@ struct ROCMSession final
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"rocm", ...
+    // Use session-scoped codegen options bound in createUninitializedSession.
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();
       LLVMInitializeAMDGPUTargetMC();
       LLVMInitializeAMDGPUTargetInfo();
       LLVMInitializeAMDGPUAsmParser();
       LLVMInitializeAMDGPUAsmPrinter();
-      return std::make_shared<ROCMTargetBackend>(options);
+      return std::make_shared<ROCMTargetBackend>(options, codegenOptions);
     });
   }
+
+  // Override Registration to also bind GPUCodegenOptions to the session.
+  struct Registration : PluginSession::Registration {
+    using PluginSession::Registration::Registration;
+    std::unique_ptr<AbstractPluginSession>
+    createUninitializedSession(OptionsBinder &localOptionsBinder) override {
+      auto instance = std::make_unique<ROCMSession>();
+      // Bootstrap target options from global CLI if available.
+      if (globalCLIOptions) {
+        instance->options = *(*globalCLIOptions);
+      }
+      instance->options.bindOptions(localOptionsBinder);
+
+      // Bootstrap codegen options from global CLI if available.
+      if (globalCLICodegenOptions) {
+        instance->codegenOptions = *(*globalCLICodegenOptions);
+      }
+      instance->codegenOptions.bindOptions(localOptionsBinder);
+
+      return instance;
+    }
+    void initializeCLI() override {
+      PluginSession::Registration::initializeCLI();
+      globalCLICodegenOptions = &GPUCodegenOptions::FromFlags::get();
+    }
+    std::optional<GPUCodegenOptions *> globalCLICodegenOptions;
+  };
+
+  GPUCodegenOptions codegenOptions;
 };
 
 // Iterate over ukernel bitcode embedded-data files, and insert them into the

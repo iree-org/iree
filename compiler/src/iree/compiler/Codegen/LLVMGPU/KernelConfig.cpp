@@ -113,11 +113,6 @@ static llvm::cl::opt<int> clGPUMatmulCThreshold(
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
 
-static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
-    "iree-llvmgpu-enable-prefetch",
-    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
@@ -220,10 +215,9 @@ static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
   return projectedBasis;
 }
 
-static LogicalResult
-setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                       mlir::FunctionOpInterface entryPoint,
-                                       linalg::LinalgOp op) {
+static LogicalResult setConvolutionVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::LinalgOp op, const GPUCodegenOptions &gpuOpts) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -406,7 +400,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
 
   // Prefetch shared memory if requested.
-  if (clLLVMGPUEnablePrefetch) {
+  if (gpuOpts.enablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetch_num_stages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
@@ -441,10 +435,9 @@ debugPrintContractionInfo(StringRef label, unsigned numLoops,
   DBGS() << label << ": " << llvm::interleaved_array(sizes) << "\n";
 }
 
-static LogicalResult
-setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  linalg::LinalgOp op) {
+static LogicalResult setMatmulVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::LinalgOp op, const GPUCodegenOptions &gpuOpts) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -675,7 +668,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
 
   // Prefetch shared memory if requested.
-  if (clLLVMGPUEnablePrefetch) {
+  if (gpuOpts.enablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetch_num_stages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
@@ -1344,10 +1337,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   return setAttentionReductionConfig(seeds, target, entryPoint, op);
 }
 
-static LogicalResult
-setVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                            mlir::FunctionOpInterface entryPoint,
-                            Operation *computeOp) {
+static LogicalResult setVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *computeOp, const GPUCodegenOptions &gpuOpts) {
   // We haven't properly plumbed through MMA op layouts and conversions for CUDA
   // to target NVIDIA GPUs. So disable the vector distribution pass for it.
   if (!isROCmBackend(target)) {
@@ -1366,13 +1358,14 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
         IREE::LinalgExt::isaHorizontallyFusedContraction(linalgOp)) {
       LDBG()
           << "VectorDistribution: trying to find a suitable contraction config";
-      return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
+      return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp,
+                                               gpuOpts);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
       LDBG()
           << "VectorDistribution: trying to find a suitable convolution config";
       return setConvolutionVectorDistributionConfig(target, entryPoint,
-                                                    linalgOp);
+                                                    linalgOp, gpuOpts);
     }
   }
 
@@ -2260,7 +2253,8 @@ static LogicalResult setConvolutionConfig(
 
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
-                                   Operation *computeOp) {
+                                   Operation *computeOp,
+                                   const GPUCodegenOptions &gpuOpts) {
   IREE::Codegen::UKernelDescriptorAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
@@ -2301,7 +2295,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
   }
-  if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
+  if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp,
+                                            gpuOpts))) {
     return success();
   }
 
@@ -2360,8 +2355,10 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       })
       .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
         LDBG() << "CustomOp Config";
-        return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
-                                                initGPULaunchConfig);
+        return setDefaultCustomOpLoweringConfig(
+            entryPointFn, customOp, [&](FunctionOpInterface funcOp) {
+              return initGPULaunchConfig(funcOp, gpuOpts);
+            });
       })
       .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
         LDBG() << "ScatterOp Config";
@@ -2408,7 +2405,8 @@ propagateLoweringConfig(Operation *rootOperation,
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
-LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
+                                  const GPUCodegenOptions &gpuOpts) {
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target) {
     return funcOp.emitError("missing GPU target in #hal.executable.target");
@@ -2535,7 +2533,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     return success();
   }
 
-  if (failed(setRootConfig(target, funcOp, rootOperation))) {
+  if (failed(setRootConfig(target, funcOp, rootOperation, gpuOpts))) {
     return funcOp.emitOpError("failed to set root config");
   }
 

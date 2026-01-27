@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 
 namespace mlir::iree_compiler {
 
@@ -35,6 +36,15 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
                     initAtOpt(llvm::OptimizationLevel::O2, true)},
                    llvm::cl::desc("Enables reassociation for FP reductions."),
                    llvm::cl::cat(category));
+}
+
+void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category("IREE GPU Codegen Options");
+
+  binder.opt<bool>(
+      "iree-llvmgpu-enable-prefetch", enablePrefetch,
+      llvm::cl::desc("Enable prefetch in the vector distribute pipeline."),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
