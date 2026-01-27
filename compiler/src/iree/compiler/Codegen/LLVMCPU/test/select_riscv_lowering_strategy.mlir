@@ -1,5 +1,9 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s
 // RUN: iree-opt --iree-llvmcpu-riscv-aggressive-distribution=true --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s -check-prefixes=CHECK-AGGRESSIVE
+// Test the same lowering strategy selection on generic convolution ops by first
+// generalizing the named ops. This ensures convolution pipeline selection works
+// on both named and generic convs.
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(linalg-generalize-named-ops),iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s --check-prefix=GENERIC
 
 #executable_target_embedded_elf_riscv_32_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_32", {cpu_features = "+m,+f", data_layout = "e-m:e-p:32:32-i64:64-n32-S128", native_vector_size = 16 : index, target_triple = "riscv32-none-elf"}>
 func.func @matmul_riscv(%lhs: tensor<384x512xf32>, %rhs: tensor<512x128xf32>) -> tensor<384x128xf32> attributes {
@@ -108,3 +112,9 @@ func.func @thin_depthwise_conv_static(%0: tensor<1x57x57x72xf32>, %1: tensor<3x3
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 28, 28, 8, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @thin_depthwise_conv_static(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:       lowering_config = #[[CONFIG]]
