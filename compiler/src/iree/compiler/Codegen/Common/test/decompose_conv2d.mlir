@@ -1,4 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
+// Test the same patterns on generic convolution ops by first generalizing the
+// named ops. This ensures decomposition works on both named and generic convs.
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(linalg-generalize-named-ops,iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s --check-prefix=GENERIC
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
 module {
@@ -24,3 +27,11 @@ module {
 // CHECK:       linalg.depthwise_conv_1d_nwc_wc
 // CHECK-SAME:    ins(%[[INPUT_SLICE]], %[[FILTER_SLICE]] : tensor<1x4x4xf32>, tensor<4x4xf32>)
 // CHECK-SAME:    outs({{.+}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>
+
+// For the generalized path: verify that the generic 2D conv is decomposed to 1D conv.
+// GENERIC-LABEL: func.func @restrict_num_workgroups
+// GENERIC-DAG:   %[[INPUT_SLICE:.+]] = tensor.extract_slice {{.+}} : tensor<1x1x4x4xf32> to tensor<1x4x4xf32>
+// GENERIC-DAG:   %[[FILTER_SLICE:.+]] = tensor.extract_slice {{.+}} : tensor<1x4x4xf32> to tensor<4x4xf32>
+// GENERIC:       linalg.depthwise_conv_1d_nwc_wc
+// GENERIC-SAME:    ins(%[[INPUT_SLICE]], %[[FILTER_SLICE]] : tensor<1x4x4xf32>, tensor<4x4xf32>)
+// GENERIC-SAME:    outs({{.+}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>
