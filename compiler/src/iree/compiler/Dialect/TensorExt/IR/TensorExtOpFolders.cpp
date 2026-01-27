@@ -127,6 +127,26 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
   }
 };
 
+/// Replaces chains of two bitcast operations by a single bitcast operation.
+/// bitcast(bitcast(x : A -> B) : B -> C) -> bitcast(x : A -> C).
+struct ChainedBitCast final : OpRewritePattern<BitCastOp> {
+  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(BitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const override {
+    auto producerBitcast = bitcastOp.getSource().getDefiningOp<BitCastOp>();
+    if (!producerBitcast) {
+      return failure();
+    }
+
+    auto resultType = cast<RankedTensorType>(bitcastOp.getType());
+    rewriter.replaceOpWithNewOp<BitCastOp>(
+        bitcastOp, resultType, producerBitcast.getSource(),
+        producerBitcast.getSourceDims(), bitcastOp.getResultDims());
+    return success();
+  }
+};
+
 }; // namespace
 
 OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
@@ -147,7 +167,7 @@ OpFoldResult BitCastOp::fold(FoldAdaptor operands) {
 void BitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<ReplaceBitCastIfTensorOperandEmpty,
-                 BitCastOfTensorCastStaticInfo>(context);
+                 BitCastOfTensorCastStaticInfo, ChainedBitCast>(context);
 }
 
 //===----------------------------------------------------------------------===//
