@@ -115,7 +115,6 @@ func.func @flex_attn_with_scoremod_and_maskmod(%arg0: !torch.vtensor<[4,8,1024,6
 }
 // CHECK-LABEL:   func.func @flex_attn_with_scoremod_and_maskmod(
 // CHECK-SAME:           %[[ARG0:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG1:.*]]: !torch.vtensor<[4,8,1024,64],f32>, %[[ARG2:.*]]: !torch.vtensor<[4,8,1024,64],f32>) -> !torch.vtensor<[4,8,1024,64],f32>
-// CHECK-DAG:         %[[CST:.*]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
 // CHECK-DAG:         %[[CST_0:.*]] = arith.constant 0xFF800000 : f32
 // CHECK-DAG:         %[[CST_1:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK-DAG:         %[[CST_2:.*]] = arith.constant 1.000000e+00 : f32
@@ -126,9 +125,10 @@ func.func @flex_attn_with_scoremod_and_maskmod(%arg0: !torch.vtensor<[4,8,1024,6
 // CHECK:             %[[MASK:.*]] = linalg.generic
 // CHECK-SAME:           outs(%[[MASK_EMPTY]] : tensor<4x8x1024x1024xf32>)
 // CHECK:               func.call @sdpa_mask0
+// CHECK:             %[[OUT_EMPTY:.*]] = tensor.empty() : tensor<4x8x1024x64xf32>
 // CHECK:             %[[ATTENTION:.*]] = iree_linalg_ext.attention
 // CHECK-SAME:           ins(%[[QUERY]], %[[KEY]], %[[VALUE]], %[[CST_2]], %[[MASK]] :
-// CHECK-SAME:           outs(%[[CST]] : tensor<4x8x1024x64xf32>)
+// CHECK-SAME:           outs(%[[OUT_EMPTY]] : tensor<4x8x1024x64xf32>)
 // CHECK:               func.call @sdpa_score0
 // CHECK:             %[[RESULT:.*]] = torch_c.from_builtin_tensor %[[ATTENTION]] : tensor<4x8x1024x64xf32> -> !torch.vtensor<[4,8,1024,64],f32>
 // CHECK:             return %[[RESULT]] : !torch.vtensor<[4,8,1024,64],f32>

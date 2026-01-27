@@ -232,53 +232,12 @@ void createScoreModificationRegion(
   IREE::LinalgExt::YieldOp::create(rewriter, loc, modifiedScore);
 }
 
-// Utility to compute dynamic sizes for attention tensors.
-// This helper is used in two places:
-//
-// For the mask tensor. Shape = (B, Hq, L, S). Any of these may be dynamic, so
-// we extract B/Hq/L from the query tensor and S from the key tensor. The
-// resulting dynamic sizes are passed to tensor.empty when materialising the
-// mask.
-//
-// For the output tensor. Shape = (B, Hq, L, Ev). Since Ev is statically known,
-// only B/Hq/L may be dynamic. The helper again generates the needed tensor.dim
-// ops from the query/value tensors so that tensor.splat/tensor.empty gets the
-// correct dynamic extents. Assuming the standard 4D layout:
-//   Query: (B, Hq, L, E)
-//   Key:   (B, Hkv, S, E)
-//   Value: (B, Hkv, S, Ev)
-// When constructing new tensors (mask/output), we need dynamic sizes for
-// dimensions that come from the input shapes.
-//
-// For dims (B, H, L), the runtime sizes always come from the query tensor.
-// For dim 3, the required runtime size depends on what we are building:
-// For the mask (shape = B×H×L×S), the 3rd axis is S, which lives at
-// index 2 of the Key tensor.
-// For the output (shape = B×H×L×Ev), Ev is statically known, so we never need a
-// dynamic dimension for i = 3.
-
-void computeDynamicSizes(PatternRewriter &rewriter, Location loc,
-                         const SmallVector<int64_t> &shape,
-                         SmallVector<Value> &dynSizes, Value first,
-                         Value second, const int kAttentionRank) {
-  for (int i = 0; i < kAttentionRank; ++i) {
-    if (shape[i] == torch::Torch::kUnknownSize) {
-      Value idx = arith::ConstantIndexOp::create(rewriter, loc, std::min(i, 2));
-      Value dim =
-          tensor::DimOp::create(rewriter, loc, i < 3 ? first : second, idx);
-      dynSizes.push_back(dim);
-    }
-  }
-}
-
 // Utility to create a modified mask tensor.
 Value createModifiedMask(PatternRewriter &rewriter, Location loc,
                          MLIRContext *ctx, FlatSymbolRefAttr maskModRef,
-                         int64_t batch, int64_t numHeads, int64_t seqLenQ,
-                         int64_t seqLenKV, FloatType floatType,
-                         Value builtinQuery, Value builtinKey, Value zero,
+                         SmallVector<int64_t> maskShape, FloatType floatType,
+                         Value builtinQuery, Value builtInValue, Value zero,
                          const int kAttentionRank) {
-  static const int kNumModificationIndices = 4;
   // Create mask tensor [B, H, M, N] with values 0.0 (attend) or -inf
   // (mask).
   RankedTensorType boolScalarTensorType =
@@ -293,14 +252,20 @@ Value createModifiedMask(PatternRewriter &rewriter, Location loc,
   torch::Torch::ValueTensorType torchI32ScalarType =
       rewriter.getType<torch::Torch::ValueTensorType>(ArrayRef<int64_t>{},
                                                       si32Type);
-  SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
-  SmallVector<Value> maskDynSizes;
 
-  computeDynamicSizes(rewriter, loc, maskShape, maskDynSizes, builtinQuery,
-                      builtinKey, kAttentionRank);
+  SmallVector<Value> dynSizes;
+  for (int i = 0; i < kAttentionRank-1; ++i) {
+    if (maskShape[i] == torch::Torch::kUnknownSize) {
+      dynSizes.push_back(tensor::DimOp::create(rewriter, loc, builtinQuery, i));
+    }
+  }
 
-  Value maskTensor = tensor::EmptyOp::create(rewriter, loc, maskShape,
-                                             floatType, maskDynSizes);
+  if(maskShape[kAttentionRank-1] == torch::Torch::kUnknownSize) {
+    dynSizes.push_back(tensor::DimOp::create(rewriter, loc, builtInValue, kAttentionRank-2));
+  }
+
+  Value maskTensor =
+      tensor::EmptyOp::create(rewriter, loc, maskShape, floatType, dynSizes);
   // Create linalg.generic to materialize mask.
   SmallVector<AffineMap> maskMaps;
   maskMaps.push_back(AffineMap::getMultiDimIdentityMap(kAttentionRank, ctx));
@@ -319,7 +284,7 @@ Value createModifiedMask(PatternRewriter &rewriter, Location loc,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Get indices and convert to torch tensors.
         SmallVector<Value> torchIndices;
-        for (unsigned i = 0; i < kNumModificationIndices; ++i) {
+        for (unsigned i = 0; i < kAttentionRank; ++i) {
           Value idx = linalg::IndexOp::create(b, loc, i);
           Value idxI32 =
               arith::IndexCastOp::create(b, loc, rewriter.getI32Type(), idx);
@@ -423,7 +388,7 @@ struct FlexAttentionOpConversion
 
     Value builtinQuery = convertToBuiltinTensor(rewriter, loc, query);
     Value builtinKey = convertToBuiltinTensor(rewriter, loc, key);
-    Value builtinValue = convertToBuiltinTensor(rewriter, loc, value);
+    Value builtInValue = convertToBuiltinTensor(rewriter, loc, value);
 
     // Declare common types for mask and score modification regions.
     Value zero = arith::ConstantFloatOp::create(
@@ -433,27 +398,33 @@ struct FlexAttentionOpConversion
     if (maskModSymbol) {
       FlatSymbolRefAttr maskModRef =
           FlatSymbolRefAttr::get(ctx, *maskModSymbol);
-      mask = createModifiedMask(rewriter, loc, ctx, maskModRef, batch, numHeads,
-                                seqLenQ, seqLenKV, floatType, builtinQuery,
-                                builtinKey, zero, kAttentionRank);
+      SmallVector<int64_t> maskShape = {batch, numHeads, seqLenQ, seqLenKV};
+      mask = createModifiedMask(rewriter, loc, ctx, maskModRef, maskShape,
+                                floatType, builtinQuery, builtInValue, zero,
+                                kAttentionRank);
     }
 
     // Create output tensor for attention.
     SmallVector<Value> outputDynSizes;
     SmallVector<int64_t> outputShape = {batch, numHeads, seqLenQ, valueDim};
-    computeDynamicSizes(rewriter, loc, outputShape, outputDynSizes,
-                        builtinQuery, builtinValue, kAttentionRank);
+    for (int i = 0; i < kAttentionRank-1; ++i) {
+      if (outputShape[i] == torch::Torch::kUnknownSize) {
+        outputDynSizes.push_back(
+            tensor::DimOp::create(rewriter, loc, builtinQuery, i));
+      }
+    }
+    if (outputShape[kAttentionRank-1] == torch::Torch::kUnknownSize) {
+      outputDynSizes.push_back(
+          tensor::DimOp::create(rewriter, loc, builtInValue, kAttentionRank-1));
+    }
 
-    // Initialize output tensor with identity value (0.0 for addition).
-    Value outputInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
-                                               floatType, rewriter, loc,
-                                               /*useOnlyFiniteValue=*/true);
-    Value outputTensor = tensor::SplatOp::create(rewriter, loc, outputInit,
-                                                 outputShape, outputDynSizes);
+    Value outputTensor =
+        tensor::EmptyOp::create(rewriter, loc, outputShape, floatType, outputDynSizes);
 
     // Build indexing maps for attention.
     // Standard maps: Q, K, V, scale, [mask], output.
-    AffineExpr b, h, m, n, k1, k2;
+    AffineExpr b,
+      h, m, n, k1, k2;
     bindDims(ctx, b, h, m, n, k1, k2);
 
     auto qMap = AffineMap::get(6, 0, {b, h, m, k1}, ctx);
@@ -471,9 +442,9 @@ struct FlexAttentionOpConversion
 
     // Create attention op.
     auto attentionOp = IREE::LinalgExt::AttentionOp::create(
-        rewriter, loc, outputTensor.getType(), builtinQuery, builtinKey,
-        builtinValue, scale, outputTensor,
-        rewriter.getAffineMapArrayAttr(indexingMaps), mask);
+        rewriter, loc, outputTensor.getType(), builtinQuery, builtinKey, builtInValue,
+        scale, outputTensor, rewriter.getAffineMapArrayAttr(indexingMaps),
+        mask);
 
     createScoreModificationRegion(rewriter, loc, attentionOp, scoreModSymbol,
                                   floatType, kAttentionRank);
