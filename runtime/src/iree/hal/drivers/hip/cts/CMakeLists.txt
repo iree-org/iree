@@ -38,14 +38,6 @@ iree_hal_cts_test_suite(
     # TODO: implement executable reflection.
     "executable"
     # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
-    # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
     "command_buffer_copy_buffer"
@@ -81,14 +73,6 @@ iree_hal_cts_test_suite(
     "event"
     # TODO: implement executable reflection.
     "executable"
-    # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -129,14 +113,6 @@ iree_hal_cts_test_suite(
     # TODO: implement executable reflection.
     "executable"
     # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
-    # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
     "command_buffer_copy_buffer"
@@ -176,14 +152,6 @@ iree_hal_cts_test_suite(
     "event"
     # TODO: implement executable reflection.
     "executable"
-    # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -226,14 +194,6 @@ iree_hal_cts_test_suite(
     # TODO: implement executable reflection.
     "executable"
     # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
-    # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
     "command_buffer_copy_buffer"
@@ -275,14 +235,6 @@ iree_hal_cts_test_suite(
     "event"
     # TODO: implement executable reflection.
     "executable"
-    # These tests fail with:
-    # Value of: (iree_hal_allocator_allocate_buffer( iree_hal_device_allocator(device_), params, buffer_size, &device_buffer))
-    # Expected: error code OK
-    # Actual: 0x5b21d0c53508, whose error code is RESOURCE_EXHAUSTED: iree/runtime/src/iree/hal/drivers/hip/hip_allocator.c:488: RESOURCE_EXHAUSTED; HIP driver error 'hipErrorOutOfMemory' (2): out of memory
-    # See https://github.com/iree-org/iree/issues/23242
-    "buffer_mapping"
-    "command_buffer_dispatch_constants"
-    "command_buffer_fill_buffer"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
