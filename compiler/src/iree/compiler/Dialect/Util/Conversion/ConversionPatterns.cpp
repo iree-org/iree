@@ -47,8 +47,11 @@ void populateUtilConversionPatterns(MLIRContext *context,
     return success();
   });
 
-  typeConverter.addConversion([&](IREE::Util::ListType type) {
+  typeConverter.addConversion([&](IREE::Util::ListType type) -> Type {
     auto elementType = typeConverter.convertType(type.getElementType());
+    if (!elementType) {
+      return nullptr;
+    }
     return IREE::Util::ListType::get(elementType);
   });
   patterns.insert<GenericConvertTypesPattern<IREE::Util::ListCreateOp>,
