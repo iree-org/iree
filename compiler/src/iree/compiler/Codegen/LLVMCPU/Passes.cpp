@@ -742,10 +742,6 @@ namespace {
 } // namespace
 
 void registerCodegenLLVMCPUPasses() {
-  // Register codegen options so they're available from the command line.
-  // This ensures the options are registered for both iree-opt and iree-compile.
-  (void)CPUCodegenOptions::FromFlags::get();
-
   // Generated.
   registerPasses();
 
