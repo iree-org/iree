@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-stream-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-stream-conversion --verify-diagnostics %s | FileCheck %s
 
 // CHECK: stream.executable private @executable
 flow.executable private @executable {
@@ -179,4 +179,15 @@ util.func public @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs:
   %0 = arith.select %cond, %lhs, %rhs : tensor<1024xf32>
   // CHECK: util.return %[[RET]], %[[RET_SIZE]]
   util.return %0 : tensor<1024xf32>
+}
+
+// -----
+
+// Tests that import of dynamically shaped tensors from an operation that is
+// not shape/size-aware fails.
+
+util.func public @failed_dynamic_import() -> tensor<8x?xf32> {
+  // expected-error @+1 {{failed to legalize operation 'some.op' that was explicitly marked illegal}}
+  %0 = "some.op"() : () -> tensor<8x?xf32>
+  util.return %0 : tensor<8x?xf32>
 }
