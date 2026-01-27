@@ -889,5 +889,4 @@ util.func public @multi_entry_loop(%cond: i1) {
 // gracefully by the pass.
 
 // CHECK-LABEL: flow.func private @flow_func_empty_region
-flow.func private @flow_func_empty_region() {
-}
+flow.func private @flow_func_empty_region()
