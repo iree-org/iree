@@ -196,20 +196,22 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   TargetChipAttr chip = target.getChip();
   DictionaryAttr peakPerfTlopsAttr = chip.getPerfTflops();
   llvm::DenseMap<ComputeBitwidths, float> peakPerfTflops;
-  for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
-    StringRef bitwidthStr = namedAttr.getName().strref();
-    auto floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
-    if (!floatAttr) {
-      continue;
-    }
+  if (peakPerfTlopsAttr) {
+    for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
+      StringRef bitwidthStr = namedAttr.getName().strref();
+      auto floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
+      if (!floatAttr) {
+        continue;
+      }
 
-    std::optional<ComputeBitwidths> bitwidth =
-        symbolizeComputeBitwidths(bitwidthStr);
-    if (!bitwidth) {
-      continue;
-    }
+      std::optional<ComputeBitwidths> bitwidth =
+          symbolizeComputeBitwidths(bitwidthStr);
+      if (!bitwidth) {
+        continue;
+      }
 
-    peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+      peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+    }
   }
 
   bool peakPerfTflopsFound = false;
