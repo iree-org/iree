@@ -21,7 +21,7 @@ namespace mlir::iree_compiler {
 // select which targets they want to support by only registering those they
 // need.
 inline void registerVMTargets() {
-  static bool init_once = []() {
+  static bool initOnce = []() {
     IREE::VM::registerToVMBytecodeTranslation();
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
@@ -30,7 +30,7 @@ inline void registerVMTargets() {
 
     return true;
   }();
-  (void)init_once;
+  (void)initOnce;
 }
 
 } // namespace mlir::iree_compiler

@@ -170,7 +170,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
   auto canAddOpToPartition = [&](Operation &op, OpInfo &opInfo,
                                  unsigned partitionOrdinal,
-                                 bool check_for_clones = true) {
+                                 bool checkForClones = true) {
     auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
     if (!streamableOp) {
       return false;
@@ -189,7 +189,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     }
 
     bool preferCloneToConsumers =
-        check_for_clones && streamableOp.preferCloneToConsumers();
+        checkForClones && streamableOp.preferCloneToConsumers();
     llvm::BitVector *opHazards = nullptr;
     llvm::BitVector opHazardsInCandidatePartition;
     if (preferCloneToConsumers) {
