@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -167,6 +168,19 @@ struct GPUReduceBankConflictsPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
+
+    // Skip bank conflict reduction if coalesced DMA ops are present.
+    // DMA operations have their own optimized memory access patterns that
+    // write directly to LDS with hardware-controlled coalescing. Padding
+    // shared memory would interfere with the expected DMA memory layout.
+    bool hasCoalescedDMA = false;
+    funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp) {
+      hasCoalescedDMA = true;
+      return WalkResult::interrupt();
+    });
+    if (hasCoalescedDMA) {
+      return;
+    }
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     unsigned sharedMemLimit =
