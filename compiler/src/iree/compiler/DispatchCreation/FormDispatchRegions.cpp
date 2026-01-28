@@ -601,6 +601,30 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+/// When fusing a broadcasting consumer with a producer that has reduction
+/// loops, ensure the iteration spaces match exactly to avoid losing
+/// parallelism. This prevents fusing cases where a small reduction result
+/// is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+/// Returns true if fusion is allowed for broadcasting consumers.
+static bool canFuseBroadcastingConsumer(
+    Operation *producer, const FusionTracker &tracker,
+    IREE::LinalgExt::LinalgFusionOpInterface consumerFusionOp) {
+  // Get the root op of the producer's fusion group.
+  Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
+  auto rootFusionOp =
+      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+  if (!rootFusionOp) {
+    return true;
+  }
+
+  // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+  if (isa<IREE::LinalgExt::CustomOp>(rootOp)) {
+    return true;
+  }
+
+  return consumerFusionOp.getNumLoops() <= rootFusionOp.getNumLoops();
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -704,17 +728,22 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
   if (!options.aggressiveFusion) {
-    FailureOr<SmallVector<int64_t>> producerIterationSpace =
+    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
+      return false;
+    }
+
+    SmallVector<int64_t> producerIterationSpace =
         producerFusionOp.getStaticLoopRanges();
-    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
+    SmallVector<int64_t> consumerIterationSpace =
         consumerFusionOp.getStaticLoopRanges();
-    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
       return false;
     }
-    if (producerIterationSpace.value().size() <
-        consumerIterationSpace.value().size()) {
-      return false;
-    }
+  }
+
+  if (!canFuseBroadcastingConsumer(producer, tracker, consumerFusionOp)) {
+    return false;
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
