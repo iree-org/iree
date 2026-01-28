@@ -1107,3 +1107,34 @@ util.func public @sink_transpose_through_expand_shape_and_pad(%arg0: tensor<16x2
 //  SINK-SAME:     ins(%[[EXPAND]]
 //       SINK:   %[[PAD:.+]] = tensor.pad %[[TRANSPOSE]]
 //       SINK:   util.return %[[PAD]]
+
+// -----
+
+util.func public @sink_transpose_through_dynamic_expand_shape(
+    %arg0: tensor<?x?xf32>, %sz0: index, %sz1: index, %sz2: index)
+    -> tensor<?x?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %dim1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%dim1, %dim0) : tensor<?x?xf32>
+  %transposed = linalg.transpose ins(%arg0 : tensor<?x?xf32>)
+      outs(%empty : tensor<?x?xf32>) permutation = [1, 0]
+  %expanded = tensor.expand_shape %transposed [[0, 1], [2]]
+      output_shape [%sz0, %sz1, %sz2] : tensor<?x?xf32> into tensor<?x?x?xf32>
+  util.return %expanded : tensor<?x?x?xf32>
+}
+
+// Test sinking transpose through expand_shape with fully dynamic expansion,
+// verifying proper output_shape handling in the pattern.
+// ENABLE-EDGE-PROP-LABEL: util.func public @sink_transpose_through_dynamic_expand_shape
+//  ENABLE-EDGE-PROP-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  ENABLE-EDGE-PROP-SAME:   %[[SZ0:[a-zA-Z0-9]+]]: index
+//  ENABLE-EDGE-PROP-SAME:   %[[SZ1:[a-zA-Z0-9]+]]: index
+//  ENABLE-EDGE-PROP-SAME:   %[[SZ2:[a-zA-Z0-9]+]]: index
+//       ENABLE-EDGE-PROP:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1, 2]]
+//  ENABLE-EDGE-PROP-SAME:       output_shape [%[[SZ2]], %[[SZ0]], %[[SZ1]]]
+//  ENABLE-EDGE-PROP-SAME:       tensor<?x?xf32> into tensor<?x?x?xf32>
+//       ENABLE-EDGE-PROP:   %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[EXPAND]] : tensor<?x?x?xf32>)
+//  ENABLE-EDGE-PROP-SAME:       permutation = [1, 2, 0]
+//       ENABLE-EDGE-PROP:   util.return %[[TRANSPOSE]] : tensor<?x?x?xf32>
