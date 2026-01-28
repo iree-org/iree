@@ -57,7 +57,6 @@ struct WgpDetails {
   std::optional<int32_t> simdsPerWgp;
   std::optional<int32_t> vgprSpaceBits;
   std::optional<ArrayRef<int64_t>> dmaSizes;
-  std::optional<int32_t> workgroupMemoryBankCount;
 };
 
 // Chip level feature/limit details
@@ -151,7 +150,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
       wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
-      dmaSizesAttr, wgp->workgroupMemoryBankCount, DictionaryAttr{});
+      dmaSizesAttr, DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip) {
@@ -253,8 +252,7 @@ const WgpDetails *getCDNA4WgpDetails() {
       /*maxLoadInstructionBits=*/128,
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/512 * 32,
-      /*dmaSizes=*/ArrayRef<int64_t>(cdna4DMASizes),
-      /*workgroupMemoryBankCount=*/64};
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna4DMASizes)};
   return &cdna4Wgp;
 }
 
@@ -299,8 +297,7 @@ const WgpDetails *getCDNA3WgpDetails() {
       /*maxLoadInstructionBits=*/128,
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/512 * 32,
-      /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes),
-      /*workgroupMemoryBankCount=*/32};
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes)};
   return &cdna3Wgp;
 }
 
@@ -332,9 +329,7 @@ const WgpDetails *getCDNA2WgpDetails() {
                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                       /*maxLoadInstructionBits=*/128,
                                       /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/32};
+                                      /*vgprSpaceBits=*/256 * 32};
   return &cdna2Wgp;
 }
 
@@ -359,9 +354,7 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                       /*maxLoadInstructionBits=*/128,
                                       /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/32};
+                                      /*vgprSpaceBits=*/256 * 32};
   return &cdna1Wgp;
 }
 
@@ -392,9 +385,7 @@ const WgpDetails *getRDNA4WgpDetails() {
                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                       /*maxLoadInstructionBits=*/128,
                                       /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/64};
+                                      /*vgprSpaceBits=*/256 * 32};
   return &rdna4Wgp;
 }
 
@@ -422,9 +413,7 @@ const WgpDetails *getRDNA3WgpDetails() {
                                       {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                       /*maxLoadInstructionBits=*/128,
                                       /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/64};
+                                      /*vgprSpaceBits=*/256 * 32};
   return &rdna3Wgp;
 }
 
@@ -508,9 +497,7 @@ const WgpDetails *getGfx1250WgpDetails() {
                                         {0x7fffffff, 0x7fffffff, 0x7fffffff},
                                         /*maxLoadInstructionBits=*/128,
                                         /*simdsPerWgp=*/4,
-                                        /*vgprSpaceBits=*/256 * 32,
-                                        /*dmaSizes=*/std::nullopt,
-                                        /*workgroupMemoryBankCount=*/64};
+                                        /*vgprSpaceBits=*/256 * 32};
   return &gfx1250Wgp;
 }
 
