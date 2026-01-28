@@ -59,6 +59,28 @@ jobs:
       - name: Run GPU tests
         env:
           CTEST_PARALLEL_LEVEL: 1
+          # TODO: https://github.com/iree-org/iree/issues/23242
+          # These tests are failing on the w7900 runner and are disabled
+          # until the issue is investigated further.
+          IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE: |-
+            iree/hal/drivers/hip/cts/hip_stream_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_stream_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_stream_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_graph_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_graph_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_graph_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_stream_queue_1_command_buffer_fill_buffer_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_buffer_mapping_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_command_buffer_dispatch_constants_test
+            iree/hal/drivers/hip/cts/hip_multi_queue_graph_queue_1_command_buffer_fill_buffer_test
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
           IREE_AMD_RDNA3_TESTS_DISABLE: 0
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
