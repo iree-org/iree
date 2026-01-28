@@ -59,7 +59,7 @@ jobs:
       - name: Run GPU tests
         env:
           CTEST_PARALLEL_LEVEL: 1
-          IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE: |
+          IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE: |-
             iree/hal/drivers/hip/cts/hip_stream_buffer_mapping_test
             iree/hal/drivers/hip/cts/hip_stream_command_buffer_dispatch_constants_test
             iree/hal/drivers/hip/cts/hip_stream_command_buffer_fill_buffer_test

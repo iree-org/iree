@@ -120,8 +120,11 @@ fi
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
-readarray -t extra_label_exclude_args <<< "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
-label_exclude_args+=(${extra_label_exclude_args[@]})
+if [[ -n "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}" ]]; then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && label_exclude_args+=("$line")
+  done <<< "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_LABELS_TO_EXCLUDE}"
+fi
 
 # Some tests are just failing on some platforms and this filtering lets us
 # exclude any type of test. Ideally each test would be tagged with the
