@@ -335,7 +335,11 @@ namespace {
 
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using Base::Base;
+  SwapExpandShapeWithSlicePattern(MLIRContext *context,
+                                  linalg::ControlFusionFn controlFn,
+                                  PatternBenefit benefit = 1)
+      : OpRewritePattern<tensor::ExtractSliceOp>(context, benefit),
+        controlFn(std::move(controlFn)) {}
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -349,14 +353,27 @@ struct SwapExpandShapeWithSlicePattern
                                          "unsupported: non-unit stride");
     }
 
+    // The control function receives the source operand of the extract_slice
+    // (which uses the expand_shape result).
+    OpOperand &srcOperand = sliceOp.getSourceMutable();
+    if (controlFn && !controlFn(&srcOperand)) {
+      return rewriter.notifyMatchFailure(sliceOp,
+                                         "rejected by control function");
+    }
+
     return swapExpandShapeWithSlice(rewriter, expandOp, sliceOp);
   }
+
+private:
+  linalg::ControlFusionFn controlFn;
 };
 
 } // namespace
 
-void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns) {
-  patterns.add<SwapExpandShapeWithSlicePattern>(patterns.getContext());
+void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns,
+                                          linalg::ControlFusionFn controlFn) {
+  patterns.add<SwapExpandShapeWithSlicePattern>(patterns.getContext(),
+                                                std::move(controlFn));
 }
 
 namespace {
