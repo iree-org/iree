@@ -617,13 +617,6 @@ static bool canFuseBroadcastingConsumer(
     return true;
   }
 
-  // Only block fusion if the root op is a reduction op (has reduction loops).
-  // Pure elementwise/parallel roots can always fuse with broadcasting
-  // consumers.
-  if (rootFusionOp.getNumLoops() == rootFusionOp.getNumParallelLoops()) {
-    return true;
-  }
-
   // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
   if (isa<IREE::LinalgExt::CustomOp>(rootOp)) {
     return true;
