@@ -607,29 +607,34 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 /// is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
 /// Returns true if fusion is allowed for broadcasting consumers.
 static bool canFuseBroadcastingConsumer(
-    Operation *producer,
-    IREE::LinalgExt::LinalgFusionOpInterface producerFusionOp,
+    Operation *producer, const FusionTracker &tracker,
     IREE::LinalgExt::LinalgFusionOpInterface consumerFusionOp) {
-  // Only block fusion if the producer is a reduction op (has reduction loops).
-  // Pure elementwise/parallel producers can always fuse with broadcasting
+  // Get the root op of the producer's fusion group.
+  Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
+  auto rootFusionOp =
+      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+  if (!rootFusionOp) {
+    return true;
+  }
+
+  // Only block fusion if the root op is a reduction op (has reduction loops).
+  // Pure elementwise/parallel roots can always fuse with broadcasting
   // consumers.
-  if (producerFusionOp.getNumLoops() ==
-      producerFusionOp.getNumParallelLoops()) {
+  if (rootFusionOp.getNumLoops() == rootFusionOp.getNumParallelLoops()) {
     return true;
   }
 
   // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
-  if (isa<IREE::LinalgExt::CustomOp>(producer)) {
+  if (isa<IREE::LinalgExt::CustomOp>(rootOp)) {
     return true;
   }
 
-  SmallVector<int64_t> producerIterationSpace =
-      producerFusionOp.getStaticLoopRanges();
+  SmallVector<int64_t> rootIterationSpace = rootFusionOp.getStaticLoopRanges();
   SmallVector<int64_t> consumerIterationSpace =
       consumerFusionOp.getStaticLoopRanges();
 
   // Only check when consumer might be broadcasting.
-  if (producerIterationSpace.size() > consumerIterationSpace.size()) {
+  if (rootIterationSpace.size() > consumerIterationSpace.size()) {
     return true;
   }
 
@@ -638,17 +643,16 @@ static bool canFuseBroadcastingConsumer(
                ? ShapedType::kDynamic
                : ShapedType::getNumElements(shape);
   };
-  int64_t producerSize = computeIterationSpaceSize(producerIterationSpace);
+  int64_t rootSize = computeIterationSpaceSize(rootIterationSpace);
   int64_t consumerSize = computeIterationSpaceSize(consumerIterationSpace);
 
   // Only block fusion if we can statically determine the iteration spaces
   // don't match. For dynamic shapes, allow fusion.
-  if (ShapedType::isDynamic(producerSize) ||
-      ShapedType::isDynamic(consumerSize)) {
+  if (ShapedType::isDynamic(rootSize) || ShapedType::isDynamic(consumerSize)) {
     return true;
   }
 
-  return consumerSize == producerSize;
+  return consumerSize == rootSize;
 }
 
 /// Returns true if this is a fusable use, while fusing a root with its
@@ -768,8 +772,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
-  if (!canFuseBroadcastingConsumer(producer, producerFusionOp,
-                                   consumerFusionOp)) {
+  if (!canFuseBroadcastingConsumer(producer, tracker, consumerFusionOp)) {
     return false;
   }
 
