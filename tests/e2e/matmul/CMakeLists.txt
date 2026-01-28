@@ -1431,7 +1431,6 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
@@ -1461,7 +1460,6 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
@@ -1491,7 +1489,6 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
@@ -1521,7 +1518,6 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-llvmgpu-use-direct-load"
   LABELS
     "noasan"
     "nomsan"
