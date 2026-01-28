@@ -161,7 +161,6 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
         }
         --currDim;
         currLevel = 0;
-        minLevel = 0;
         remainingLevels = llvm::to_vector(
             llvm::reverse(getPackedShapeForUndistributedDim(currDim)));
         // printShape("New rem levels", remainingLevels);
