@@ -72,9 +72,9 @@ getDistributeLBAndStep(OpBuilder &b, Location loc, OpFoldResult lb,
 static void changeArithCstToI64Attr(OpBuilder &b,
                                     MutableArrayRef<OpFoldResult> constants) {
   for (OpFoldResult &val : constants) {
-    if (auto dyn_cast = dyn_cast_if_present<Value>(val)) {
+    if (auto castVal = dyn_cast_if_present<Value>(val)) {
       APInt intVal;
-      if (matchPattern(dyn_cast, m_ConstantInt(&intVal))) {
+      if (matchPattern(castVal, m_ConstantInt(&intVal))) {
         val = b.getI64IntegerAttr(intVal.getSExtValue());
       }
     }

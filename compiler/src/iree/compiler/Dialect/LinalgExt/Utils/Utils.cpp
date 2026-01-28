@@ -922,8 +922,8 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // TODO: Add better affine map checks.
-  auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity()) {
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  if (!indexingMaps[0].isIdentity()) {
     return false;
   }
 

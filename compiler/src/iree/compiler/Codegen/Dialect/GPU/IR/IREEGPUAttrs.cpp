@@ -1303,18 +1303,18 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     Value acc = outputs[0];
     for (int i = 0; i < unrollKFactor; i++) {
       int64_t offset = vectorWidth * i;
-      Value sliced_lhs = vector::ExtractStridedSliceOp::create(
+      Value slicedLhs = vector::ExtractStridedSliceOp::create(
           builder, loc, inputs[0], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
-      Value sliced_rhs = vector::ExtractStridedSliceOp::create(
+      Value slicedRhs = vector::ExtractStridedSliceOp::create(
           builder, loc, inputs[1], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       if (getColMajor()) {
-        std::swap(sliced_lhs, sliced_rhs);
+        std::swap(slicedLhs, slicedRhs);
       }
       acc = amdgpu::MFMAOp::create(builder, loc, outputs[0].getType(), m, n,
-                                   nativeKSize, getBlockSize(), sliced_lhs,
-                                   sliced_rhs, acc)
+                                   nativeKSize, getBlockSize(), slicedLhs,
+                                   slicedRhs, acc)
                 .getResult();
     }
     results.push_back(acc);
