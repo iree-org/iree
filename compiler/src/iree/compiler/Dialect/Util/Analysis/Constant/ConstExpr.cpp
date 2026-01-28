@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
@@ -330,9 +331,10 @@ void ConstExprAnalysis::dump() const { print(llvm::dbgs()); }
 //===----------------------------------------------------------------------===//
 
 ConstExprHoistingPolicy::ConstExprHoistingPolicy(
-    const ConstExprAnalysis &analysis, int64_t threshold)
+    const ConstExprAnalysis &analysis, int64_t threshold,
+    const DataLayout &dataLayout)
     : analysis(analysis), constExprMaxSizeIncreaseThreshold(threshold),
-      decisions(analysis.allocedConstInfos.size()) {
+      dataLayout(dataLayout), decisions(analysis.allocedConstInfos.size()) {
   for (auto &it : analysis.allocedConstInfos) {
     decisions[it.get()] = {};
   }
@@ -421,8 +423,30 @@ void ConstExprHoistingPolicy::initialize() {
   }
 }
 
+static int64_t getRoundedStorageSize(int64_t elementCount, Type elementType,
+                                     const DataLayout &dataLayout) {
+  if (elementType.isIndex()) {
+    unsigned indexBits = *dataLayout.getTypeIndexBitwidth(elementType);
+    return elementCount * (indexBits / 8);
+  }
+  return IREE::Util::getRoundedPhysicalStorageSize(elementCount, elementType);
+}
+
+static bool
+wouldHoistIndexTypedExprs(const ConstExprAnalysis::ConstValueInfo *info) {
+  for (Value root : info->roots) {
+    auto rootElementType = getElementTypeOrSelf(root.getType());
+    if (rootElementType.isIndex()) {
+      return true;
+    }
+  }
+
+  return getElementTypeOrSelf(info->constValue.getType()).isIndex();
+}
+
 static bool doesHoistingIncreaseSizeSignificantly(
-    const ConstExprAnalysis::ConstValueInfo *info, int64_t threshold) {
+    const ConstExprAnalysis::ConstValueInfo *info, int64_t threshold,
+    const DataLayout &dataLayout) {
   int64_t inSize = 0;
   for (Value root : info->roots) {
     // TODO: Are there any other types we care about here?
@@ -435,11 +459,10 @@ static bool doesHoistingIncreaseSizeSignificantly(
           elementCount *= dim;
         }
       }
-      inSize +=
-          getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+      inSize += getRoundedStorageSize(elementCount, type.getElementType(),
+                                      dataLayout);
     }
   }
-
   int64_t outSize = 0;
   if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
     int64_t elementCount = 1;
@@ -452,7 +475,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       elementCount *= dim;
     }
     outSize =
-        getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+        getRoundedStorageSize(elementCount, type.getElementType(), dataLayout);
   }
 
   return outSize > inSize + threshold;
@@ -475,10 +498,24 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
     return decision->disableHoist();
   }
 
-  // Check 4: Does hoisting this value significantly increase the size of the
+  // Check 4: Do any parts of the expression involve index types?
+  //
+  // TODO: Currently we avoid hoisting index consteprs into globals altogether
+  // to side-step potential cases where the operation gets dispatched to a
+  // target with a different indexing bitwidth. We could consider materializing
+  // into integer types according to the data layout via
+  // HoistableTypeInterface::getPrefferredStorageType and still hoist. This is
+  // somewhat dubious, given that dependent transforms typically invoke this
+  // policy at the global optimization phase, i.e. early in the pipeline.
+  // Correct index_cast's would need to be inserted by the transforms.
+  if (wouldHoistIndexTypedExprs(info)) {
+    return decision->disableHoist();
+  }
+
+  // Check 5: Does hoisting this value significantly increase the size of the
   // module?
   if (doesHoistingIncreaseSizeSignificantly(
-          info, constExprMaxSizeIncreaseThreshold)) {
+          info, constExprMaxSizeIncreaseThreshold, dataLayout)) {
     return decision->disableHoist();
   }
 }

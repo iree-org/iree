@@ -16,6 +16,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::Util {
@@ -230,7 +231,8 @@ public:
 
   const ConstExprAnalysis &getAnalysis() const { return analysis; }
 
-  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis, int64_t threshold);
+  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis, int64_t threshold,
+                          const DataLayout &dataLayout);
   void initialize();
   Decision *getDecision(const ConstExprAnalysis::ConstValueInfo *info) {
     return &decisions[info];
@@ -256,6 +258,9 @@ private:
   const ConstExprAnalysis &analysis;
 
   int64_t constExprMaxSizeIncreaseThreshold;
+
+  // Data layout for querying index bitwidth.
+  const DataLayout &dataLayout;
 
   // Map of ConstValueInfo * to decision structs. All are allocated at
   // initialization and then the structure is not changed.

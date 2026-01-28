@@ -164,20 +164,14 @@ module @hoist_dialect_attrs {
 
 // -----
 
-// CHECK-LABEL: @hoist_index
-module @hoist_index {
-  // CHECK: util.global private @[[HOISTED:.*]] : i64
-  // CHECK: util.initializer
+// CHECK-LABEL: @do_not_hoist_index
+module @do_not_hoist_index {
+  // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
+  // CHECK: util.func public @main() -> index
   // CHECK:   %[[C0:.*]] = arith.constant 0 : index
   // CHECK:   %[[CEXPR:.*]] = "iree_unregistered.const_expr"(%[[C0]])
-  // CHECK:   %[[CAST:.*]] = arith.index_cast %[[CEXPR]] : index to i64
-  // CHECK:   util.global.store %[[CAST]], @[[HOISTED]] : i64
-  // CHECK:   util.return
-
-  // CHECK: util.func public @main() -> index
-  // CHECK:   %[[GLOBAL_LD:.*]] = util.global.load immutable @[[HOISTED]] : i64
-  // CHECK:   %[[ORIG_VAL:.*]] = arith.index_cast %[[GLOBAL_LD]] : i64 to index
-  // CHECK:   util.return %[[ORIG_VAL]]
+  // CHECK:   util.return %[[CEXPR]] : index
   util.func public @main() -> (index) {
     %0 = arith.constant 0 : index
     %1 = "iree_unregistered.const_expr"(%0) : (index) -> index
