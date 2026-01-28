@@ -293,7 +293,7 @@ def IREEVectorExt_ScatterOp : IREEVectorExt_PureOp<"scatter", [
                        Optional<VectorOfAnyRankOf<[I1]>>:$mask);
   let results = (outs Optional<AnyRankedTensor>:$result);
 
-  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
+  let summary = [{Scatters values from an SSA vector into memory}];
 
   let description = [{
   }];
