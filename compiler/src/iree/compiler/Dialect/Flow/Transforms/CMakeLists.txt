@@ -34,7 +34,6 @@ iree_cc_library(
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "ConvertRegionToWorkgroups.cpp"
-    "ConvertShardToFlow.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DumpDispatchGraph.cpp"
@@ -77,7 +76,6 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
-    MLIRShardDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
@@ -88,7 +86,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Flow::Conversion::ShardToFlow
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
