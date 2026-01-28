@@ -774,7 +774,7 @@ func.func @lower_coalesced_dma_linearized_2_rows_per_transfer(
 
 #executable_target_rocm_hsaco_fb_3d = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
@@ -841,7 +841,7 @@ func.func @lower_3d_partial_contiguous(
 
 #executable_target_rocm_hsaco_fb_3d_mixed = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
