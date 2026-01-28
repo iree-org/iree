@@ -132,14 +132,9 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   // of the `tensor.empty` op.
   if (auto swizzleHintOp =
           dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
-    bool onlySwizzle = llvm::all_of(empty->getUsers(), [](Operation *op) {
-      return isa<IREE::Codegen::SwizzleHintOp>(op);
-    });
-    if (!onlySwizzle) {
-      return swizzleHintOp->emitOpError(
-          "a tensor.empty op with a swizzle hint applied, should have only "
-          "swizzle hint ops as its users");
-    }
+    assert(empty->hasOneUse() &&
+           "a tensor.empty op with a swizzle hint applied, should have the "
+           "swizzle hint as its only user");
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
         rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
     return newSwizzle.getResult();
