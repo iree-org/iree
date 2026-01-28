@@ -611,9 +611,7 @@ struct ConvertIdentityMapGatherScatterToCopy : public OpRewritePattern<OpTy> {
     } else {
       source = op.getInput();
     }
-    auto copyOp =
-        linalg::CopyOp::create(rewriter, op.getLoc(), source, op.getOutput());
-    rewriter.replaceOp(op, copyOp.getResults());
+    rewriter.replaceOpWithNewOp<linalg::CopyOp>(op, source, op.getOutput());
     return success();
   }
 };
@@ -729,6 +727,10 @@ void MapGatherOp::inlineMapGatherBody(
 
 bool MapGatherOp::isIdentity() {
   if (getSourceType() != getOutputType()) {
+    return false;
+  }
+  // Bail out on dynamic shapes.
+  if (!getSourceType().hasStaticShape()) {
     return false;
   }
   // Check that the block arguments are directly yielded in the order that they
