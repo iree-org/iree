@@ -90,7 +90,7 @@ struct FftRfftOpConversion
         self);
 
     auto rewriteRes =
-        IREE::LinalgExt::rewriteFft(op, builtinCast, fftLength, rewriter);
+        IREE::LinalgExt::rewriteRfft(op, builtinCast, fftLength, rewriter);
     if (failed(rewriteRes)) {
       return failure();
     }

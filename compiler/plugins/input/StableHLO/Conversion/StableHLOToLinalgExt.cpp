@@ -314,26 +314,53 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Only handle 2^n fft length.
-    if (!llvm::all_equal(op.getFftLength())) {
-      return rewriter.notifyMatchFailure(op, "non-splat length");
+
+    // Only handle 1D ffts.
+    if (op.getFftLength().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "only 1D FFTs supported");
     }
     int64_t fftLength = op.getFftLength().front();
     if (!llvm::isPowerOf2_64(fftLength)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
     }
+    mlir::stablehlo::FftType fftType = op.getFftType();
+    FailureOr<std::pair<Value, Value>> rewriteRes;
+    if (fftType == mlir::stablehlo::FftType::RFFT) {
+      rewriteRes = IREE::LinalgExt::rewriteRfft(op, adaptor.getOperand(),
+                                                fftLength, rewriter);
+    } else if (fftType == mlir::stablehlo::FftType::FFT) {
+      rewriteRes = IREE::LinalgExt::rewriteFft(
+          op, adaptor.getOperand(), fftLength,
+          IREE::LinalgExt::FFTDirection::Forward,
+          IREE::LinalgExt::FFTNormalization::NoNormalize, rewriter);
+    } else if (fftType == mlir::stablehlo::FftType::IFFT) {
+      rewriteRes = IREE::LinalgExt::rewriteFft(
+          op, adaptor.getOperand(), fftLength,
+          IREE::LinalgExt::FFTDirection::Backward,
+          IREE::LinalgExt::FFTNormalization::Normalize, rewriter);
+    } else if (fftType == mlir::stablehlo::FftType::IRFFT) {
+      rewriteRes = IREE::LinalgExt::rewriteIrfft(op, adaptor.getOperand(),
+                                                 fftLength, rewriter);
+    } else {
+      // Not implemented.
+      return failure();
+    }
 
-    auto rewriteRes = IREE::LinalgExt::rewriteFft(op, adaptor.getOperand(),
-                                                  fftLength, rewriter);
     if (failed(rewriteRes)) {
       return failure();
     }
 
     auto [real, imag] = rewriteRes.value();
 
-    rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
-                                                            real, imag);
+    // For IRFFT, return only the real part (output is real-valued)
+    if (fftType == mlir::stablehlo::FftType::IRFFT) {
+      rewriter.replaceOp(op, real);
+    } else {
+      // For other FFT types, return complex output
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
+                                                              real, imag);
+    }
     return success();
   }
 };
