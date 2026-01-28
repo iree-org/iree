@@ -1519,14 +1519,15 @@ replaceNonTrivialUse(RewriterBase &rewriter, OpOperand &use,
     return std::nullopt;
   }
 
-  // If the result types are the same, no need to create a new op.
-  LDBG() << "\tReplacing in user by creating new user : " << *user;
-  if (llvm::equal(user->getResultTypes(), *resultTypes)) {
-    rewriter.modifyOpInPlace(user, [&]() { use.set(replacement); });
-    LDBG() << "\t\tUpdated operand in place : " << *user;
-    return llvm::to_vector_of<Value>(user->getResults());
+  // For memref.cast, we can fold the operation if the types now match, since
+  // the cast would become trivial.
+  if (llvm::equal(user->getResultTypes(), *resultTypes) &&
+      isa<memref::CastOp>(user)) {
+    LDBG() << "\t\tReplacing no-op memref.cast : " << *user;
+    return SmallVector<Value>({replacement});
   }
 
+  LDBG() << "\tReplacing in user by creating new user : " << *user;
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(user);
   SmallVector<Value> newOperands = llvm::to_vector(user->getOperands());
