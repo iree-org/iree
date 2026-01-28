@@ -295,8 +295,9 @@ FailureOr<std::pair<Value, Value>> rewriteRfft(Operation *op, Value operand,
   }
 
   // Require float type.
-  if (!operandType.getElementType().isFloat())
+  if (!operandType.getElementType().isFloat()) {
     return rewriter.notifyMatchFailure(op, "expected float types");
+  }
 
   ImplicitLocOpBuilder b(loc, rewriter);
 
