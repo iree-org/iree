@@ -132,13 +132,6 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   // allocation. Note that if there is a swizzle hint, it will be the only user
   // of the `tensor.empty` op.
   if (swizzleOp) {
-    bool onlySwizzle = llvm::all_of(
-        empty->getUsers(), llvm::IsaPred<IREE::Codegen::SwizzleHintOp>);
-    if (!onlySwizzle) {
-      return swizzleOp->emitOpError(
-          "a tensor.empty op with a swizzle hint applied, should have only "
-          "swizzle hint ops as its users");
-    }
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
         rewriter, loc, allocTensor.getResult(), swizzleOp.getSwizzle());
     return newSwizzle.getResult();
