@@ -352,21 +352,21 @@ struct Session {
   LogicalResult activatePluginsOnce() {
     if (!pluginsActivated) {
       pluginsActivated = true;
-      if (failed(pluginSession.initializePlugins())) {
+      if (failed(pluginSession->initializePlugins())) {
         pluginActivationStatus = failure();
       } else {
         DialectRegistry registry;
-        pluginSession.registerDialects(registry);
+        pluginSession->registerDialects(registry);
         context.appendDialectRegistry(registry);
-        pluginActivationStatus = pluginSession.activatePlugins(&context);
+        pluginActivationStatus = pluginSession->activatePlugins(&context);
 
         // Initialize target registry, bootstrapping with the static globals.
         targetRegistry.mergeFrom(IREE::HAL::TargetRegistry::getGlobal());
         IREE::HAL::TargetDeviceList pluginTargetDeviceList;
-        pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
+        pluginSession->populateHALTargetDevices(pluginTargetDeviceList);
         targetRegistry.mergeFrom(pluginTargetDeviceList);
         IREE::HAL::TargetBackendList pluginTargetBackendList;
-        pluginSession.populateHALTargetBackends(pluginTargetBackendList);
+        pluginSession->populateHALTargetBackends(pluginTargetBackendList);
         targetRegistry.mergeFrom(pluginTargetBackendList);
       }
     }
@@ -390,7 +390,12 @@ struct Session {
   // PluginManagerOptions must initialize first because the session depends on
   // it.
   PluginManagerOptions pluginManagerOptions;
-  PluginManagerSession pluginSession;
+
+  // Plugin session is constructed after applyOptimizationDefaults() so that
+  // opt-level-dependent defaults are applied before options are copied. The
+  // `std::optional` is required because PluginManagerSession does not have
+  // default constructor. Using `std::optional` allows deferring construction.
+  std::optional<PluginManagerSession> pluginSession;
 
   // We initialize the TargetRegistry lazily with the plugins.
   IREE::HAL::TargetRegistry targetRegistry;
@@ -419,15 +424,16 @@ struct Session {
 
 Session::Session(GlobalInit &globalInit)
     : globalInit(globalInit), ownedContext(globalInit.createContext()),
-      context(*ownedContext), binder(OptionsBinder::local()),
-      pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
+      context(*ownedContext), binder(OptionsBinder::local()) {
   context.allowUnregisteredDialects();
   context.appendDialectRegistry(globalInit.registry);
 
-  // Bootstrap session options from the cl environment, if enabled.
+  // Apply optimization defaults before creating plugin sessions, so that
+  // opt-level-dependent defaults are set correctly before options are copied to
+  // sessions.
   if (globalInit.usesCommandLine) {
-    auto binder = OptionsBinder::global();
-    binder.applyOptimizationDefaults();
+    auto globalBinder = OptionsBinder::global();
+    globalBinder.applyOptimizationDefaults();
     debugConfig = mlir::tracing::DebugConfig::createFromCLOptions();
     pipelineOptions = *globalInit.clGlobalPipelineOptions;
     pluginManagerOptions = *globalInit.clPluginManagerOptions;
@@ -446,6 +452,7 @@ Session::Session(GlobalInit &globalInit)
     cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
 #endif
   }
+  pluginSession.emplace(globalInit.pluginManager, binder, pluginManagerOptions);
 
   // Enable debug integration.
   debugHandlerInstall.emplace(context, debugConfig);
@@ -774,7 +781,7 @@ Invocation::Invocation(Session &session) : session(session) {
 
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.
-  pipelineHooks.pipelineExtensions = &session.pluginSession;
+  pipelineHooks.pipelineExtensions = &session.pluginSession.value();
 }
 
 Invocation::~Invocation() {
@@ -840,7 +847,7 @@ bool Invocation::initializeInvocation() {
   if (session.inputOptions.parseInputTypeMnemonic() ==
       InputDialectOptions::Type::plugin) {
     llvm::StringSet<> inputTypeMnemonics;
-    session.pluginSession.populateCustomInputConversionTypes(
+    session.pluginSession->populateCustomInputConversionTypes(
         inputTypeMnemonics);
     if (!inputTypeMnemonics.contains(session.inputOptions.inputTypeMnemonic)) {
       auto diag = emitError(UnknownLoc::get(&session.context))
