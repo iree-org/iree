@@ -548,7 +548,7 @@ util.func public @dont_propagate_non_projected_permutation(%arg0: tensor<?x4096x
 #map_bubble2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map_bubble3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map_bubble4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#encoding_bubble = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_bubble2, #map_bubble3, #map_bubble4]>
+#encoding_bubble = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_bubble2, #map_bubble3, #map_bubble4], iteration_sizes = [2, ?, ?, ?]>
 util.func public @bubble_through_dequant_with_encoding_dims(
     %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>,
     %m: index, %n: index, %k: index) -> tensor<2x11008x128xf32, #encoding_bubble> {
@@ -577,9 +577,9 @@ util.func public @bubble_through_dequant_with_encoding_dims(
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
-// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]]>
-// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]], iteration_sizes = [2, ?, ?, ?]>
+// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]], iteration_sizes = [2, ?, ?, ?]>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]], iteration_sizes = [2, ?, ?, ?]>
 // CHECK-LABEL: @bubble_through_dequant_with_encoding_dims
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xi8>,
 // CHECK-SAME:    %[[ARG1:.+]]: tensor<2x11008xf32>, %[[ARG2:.+]]: tensor<2x11008xf32>,
@@ -606,7 +606,7 @@ util.func public @bubble_through_dequant_with_encoding_dims(
 #map_remat2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map_remat3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map_remat4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#encoding_remat = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_remat2, #map_remat3, #map_remat4]>
+#encoding_remat = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_remat2, #map_remat3, #map_remat4], iteration_sizes = [2, ?, ?, ?]>
 util.func public @bubble_with_rematerialized_encoding_dims(
     %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>) -> tensor<2x11008x128xf32, #encoding_remat> {
   %6 = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding_remat>) {
@@ -667,7 +667,7 @@ util.func public @bubble_with_rematerialized_encoding_dims(
 #map_dom2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map_dom3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map_dom4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-#encoding_dom = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_dom2, #map_dom3, #map_dom4]>
+#encoding_dom = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_dom2, #map_dom3, #map_dom4], iteration_sizes = [2, ?, ?, ?]>
 util.func public @bubble_with_recursive_rematerialization(
     %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>,
     %dominating: tensor<?x?xf32>) -> tensor<2x11008x128xf32, #encoding_dom> {
@@ -749,7 +749,7 @@ module {
         %10 = arith.addf %9, %out : f32
         linalg.yield %10 : f32
       } -> tensor<2x4096x64xf32, #result_encoding_affine>
-      %unset = iree_encoding.unset_encoding %matmul : tensor<2x4096x64xf32, #result_encoding_affine> -> tensor<2x4096x64xf32>
+      %unset = iree_encoding.unset_encoding %matmul encoding_dims{%m} : tensor<2x4096x64xf32, #result_encoding_affine> -> tensor<2x4096x64xf32>
       flow.return %unset : tensor<2x4096x64xf32>
     }
     util.return %result : tensor<2x4096x64xf32>

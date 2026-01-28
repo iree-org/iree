@@ -216,3 +216,43 @@ func.func @negative_packed_storage_non_po2(%arg0: tensor<?x4xi3, #iree_encoding.
 func.func @negative_layout_packed_storage_superbyte(%arg0: tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>) -> tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>> {
   return %arg0 : tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, ?, ?]>
+func.func @illegal_set_encoding_missing_encoding_dims(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
+  // expected-error @+1 {{encoding expects 3 dynamic encoding dimension(s), but 0 provided}}
+  %0 = iree_encoding.set_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, ?, ?]>
+func.func @illegal_set_encoding_wrong_encoding_dims_count(%arg0 : tensor<?x?xf32>, %m: index) -> tensor<?x?xf32, #encoding> {
+  // expected-error @+1 {{encoding expects 3 dynamic encoding dimension(s), but 1 provided}}
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m}: tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, ?, ?]>
+func.func @illegal_unset_encoding_missing_encoding_dims(%arg0 : tensor<?x?xf32, #encoding>, %d0: index, %d1: index) -> tensor<?x?xf32> {
+  // expected-error @+1 {{encoding expects 3 dynamic encoding dimension(s), but 0 provided}}
+  %0 = iree_encoding.unset_encoding %arg0: tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, 1, ?]>
+func.func @illegal_unset_encoding_wrong_encoding_dims_count(%arg0 : tensor<?x?xf32, #encoding>, %d0: index, %d1: index, %m: index) -> tensor<?x?xf32> {
+  // expected-error @+1 {{encoding expects 2 dynamic encoding dimension(s), but 1 provided}}
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%m}: tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  return %0 : tensor<?x?xf32>
+}

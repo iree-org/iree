@@ -5,9 +5,9 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 1000, ?]>
 #executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "x86_64-xyz-xyz"}>
-func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f(%arg0: tensor<1x1000xbf16>)
+func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f(%arg0: tensor<1x1000xbf16>, %k: index)
     -> tensor<1x1000xbf16, #encoding> attributes { hal.executable.target = #executable_target } {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k} : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
   return %0 : tensor<1x1000xbf16, #encoding>
 }
 // This tests that
@@ -49,10 +49,10 @@ func.func @set_encoding_7x7x7_matmul_LHS(%14: tensor<7x7xf32>) -> tensor<7x7xf32
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 32, ?]>
-func.func @set_encoding_128x80x32_batch_matmul_LHS(%14: tensor<128x80x32xf32>) -> tensor<128x80x32xf32, #encoding> attributes {
+func.func @set_encoding_128x80x32_batch_matmul_LHS(%14: tensor<128x80x32xf32>, %k: index) -> tensor<128x80x32xf32, #encoding> attributes {
    hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
-  %17 = iree_encoding.set_encoding %14 : tensor<128x80x32xf32> -> tensor<128x80x32xf32, #encoding>
+  %17 = iree_encoding.set_encoding %14 encoding_dims{%k} : tensor<128x80x32xf32> -> tensor<128x80x32xf32, #encoding>
   return %17 : tensor<128x80x32xf32, #encoding>
 }
 // CHECK-LABEL:    func @set_encoding_128x80x32_batch_matmul_LHS(
@@ -67,10 +67,10 @@ func.func @set_encoding_128x80x32_batch_matmul_LHS(%14: tensor<128x80x32xf32>) -
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 32, 320, ?]>
-func.func @set_encoding_128x32x320_batch_matmul_RHS(%16: tensor<128x32x320xf32>) -> tensor<128x32x320xf32, #encoding> attributes {
+func.func @set_encoding_128x32x320_batch_matmul_RHS(%16: tensor<128x32x320xf32>, %k: index) -> tensor<128x32x320xf32, #encoding> attributes {
    hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
-  %19 = iree_encoding.set_encoding %16 : tensor<128x32x320xf32> -> tensor<128x32x320xf32, #encoding>
+  %19 = iree_encoding.set_encoding %16 encoding_dims{%k} : tensor<128x32x320xf32> -> tensor<128x32x320xf32, #encoding>
   return %19 : tensor<128x32x320xf32, #encoding>
 }
 // CHECK-LABEL:    func @set_encoding_128x32x320_batch_matmul_RHS(
@@ -85,10 +85,10 @@ func.func @set_encoding_128x32x320_batch_matmul_RHS(%16: tensor<128x32x320xf32>)
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 320, ?]>
-func.func @unset_encoding_128x80x320_batch_matmul_RESULT(%arg0: tensor<128x80x320xf32, #encoding>) -> tensor<128x80x320xf32> attributes {
+func.func @unset_encoding_128x80x320_batch_matmul_RESULT(%arg0: tensor<128x80x320xf32, #encoding>, %k: index) -> tensor<128x80x320xf32> attributes {
    hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
-  %0 = iree_encoding.unset_encoding %arg0 : tensor<128x80x320xf32, #encoding> -> tensor<128x80x320xf32>
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<128x80x320xf32, #encoding> -> tensor<128x80x320xf32>
   return %0 : tensor<128x80x320xf32>
 }
 // CHECK-LABEL: func @unset_encoding_128x80x320_batch_matmul_RESULT(
@@ -106,7 +106,7 @@ func.func @unset_encoding_128x80x320_batch_matmul_RESULT(%arg0: tensor<128x80x32
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
+func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
    hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %c0 = arith.constant 0 : index
@@ -114,14 +114,14 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
   %cst = arith.constant 0.0 : f32
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
-  %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
-  %1 = iree_encoding.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_rhs>
   %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #encoding_result>
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
   %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #encoding_lhs>, tensor<?x?xf32, #encoding_rhs>)
       outs(%3 : tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result>
-  %5 = iree_encoding.unset_encoding %4 : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%d0, %d1}
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%d0, %d1}
   return %5 : tensor<?x?xf32>
 }
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1552,13 +1552,13 @@ func.func @scaled_matmul_f4E2M1FN_f8E8M0FNU_f32(
 #map2_bitcast = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_rhs_bitcast = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i16, ui4, i32], original_element_type = ui4, user_indexing_maps = [#map_bitcast, #map1_bitcast, #map2_bitcast], iteration_sizes = [?, ?, ?]>
 func.func @set_encoding_rhs_bitcast_ui4_to_i8(
-    %rhs: tensor<?x?xi8>
+    %rhs: tensor<?x?xi8>, %m: index, %n: index, %k: index
 ) -> tensor<?x?xi8, #encoding_rhs_bitcast> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   // The input has i8 storage type but encoding records ui4 as original type.
   // Shape: tensor<?x?xi8> where the K dimension is halved compared to ui4.
-  %encoded = iree_encoding.set_encoding %rhs : tensor<?x?xi8> -> tensor<?x?xi8, #encoding_rhs_bitcast>
+  %encoded = iree_encoding.set_encoding %rhs encoding_dims{%m, %n, %k} : tensor<?x?xi8> -> tensor<?x?xi8, #encoding_rhs_bitcast>
   return %encoded : tensor<?x?xi8, #encoding_rhs_bitcast>
 }
 // For i16ui4i32 with avx512vnni, the normal RHS tile would be 32x8 (N=32, K=8).

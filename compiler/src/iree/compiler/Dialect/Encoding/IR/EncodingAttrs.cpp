@@ -395,6 +395,16 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
 
 bool EncodingAttr::isSerialized() const { return false; }
 
+std::optional<int64_t> EncodingAttr::getNumDynamicEncodingDims() const {
+  ArrayAttr iterationSizes = getIterationSizes();
+  if (!iterationSizes) {
+    return 0;
+  }
+  return llvm::count_if(iterationSizes, [](Attribute attr) {
+    return ShapedType::isDynamic(cast<IntegerAttr>(attr).getInt());
+  });
+}
+
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
   return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));

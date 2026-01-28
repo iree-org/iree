@@ -164,10 +164,10 @@ func.func @set_encoding_ops_with_indexing_maps(%arg0: tensor<?x?xf32>) -> tensor
 #encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [1, 1, 1]>
 #encoding1 = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, ?, ?]>
 #encoding2 = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map, #map], iteration_sizes = [?, 1, ?]>
-func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>) {
+func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>, %m: index, %n: index, %k: index) {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
-  %1 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding1>
-  %2 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding2>
+  %1 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding1>
+  %2 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding2>
   return
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -175,10 +175,13 @@ func.func @set_encoding_ops_with_iteration_sizes(%arg0: tensor<?x?xf32>) {
 //  CHECK-DAG: #[[ENCODING1:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]], iteration_sizes = [?, ?, ?]>
 //  CHECK-DAG: #[[ENCODING2:.+]] = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP]], #[[MAP]]], iteration_sizes = [?, 1, ?]>
 //      CHECK:  func.func @set_encoding_ops_with_iteration_sizes(
-// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]:
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+// CHECK-SAME:      %[[M:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[N:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[K:[a-zA-Z0-9]+]]: index
 //      CHECK:    iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
-//      CHECK:    iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING1]]>
-//      CHECK:    iree_encoding.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING2]]>
+//      CHECK:    iree_encoding.set_encoding %[[ARG0]] encoding_dims{%[[M]], %[[N]], %[[K]]} : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING1]]>
+//      CHECK:    iree_encoding.set_encoding %[[ARG0]] encoding_dims{%[[M]], %[[K]]} : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING2]]>
 
 // -----
 
