@@ -264,8 +264,7 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
           {/*bestSubgroupCountPerWorkgroup=*/8,
            /*bestMNTileCountPerSubgroup=*/32,
            /*bestKTileCountPerSubgroup=*/4,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -278,8 +277,7 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
           {/*bestSubgroupCountPerWorkgroup=*/8,
            /*bestMNTileCountPerSubgroup=*/32,
            /*bestKTileCountPerSubgroup=*/2,
-           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
-               inBitWidth});
+           /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
@@ -2160,7 +2158,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{"
+            << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", prefetchNumStages = " << options.prefetchNumStages
             << ", useIgemmConvolution = " << options.useIgemmConvolution
