@@ -1540,8 +1540,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, OpOperand &use,
 
 LogicalResult canReplaceMemrefUsesAndPropagateType(Value origValue,
                                                    Type replacementType) {
-  SmallVector<std::pair<Value, Type>> worklist;
-  worklist.push_back({origValue, replacementType});
+  SmallVector<std::pair<Value, Type>> worklist = {{origValue, replacementType}};
   while (!worklist.empty()) {
     auto [original, newType] = worklist.pop_back_val();
     if (original.getType() == newType) {
