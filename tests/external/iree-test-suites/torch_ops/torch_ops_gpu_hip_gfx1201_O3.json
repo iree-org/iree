@@ -18,12 +18,12 @@
   "expected_compile_failures": [],
   "expected_run_failures": [],
   "golden_times_ms": {
-    "AB/128x128xf32_bench": "0.07",
-    "AB/256x256xf32_bench" : "0.10",
-    "AB/512x512xf32_bench" : "0.16",
-    "AB/1024x1024xf32_bench": "0.59",
-    "AB/2048x2048xf32_bench" : "3.61",
-    "AB/4096x4096xf32_bench": "27.46",
-    "AB/8192x8192xf32_bench": "232.44"
+    "AB/128x128xf32_bench": 0.07,
+    "AB/256x256xf32_bench" : 0.10,
+    "AB/512x512xf32_bench" : 0.16,
+    "AB/1024x1024xf32_bench": 0.59,
+    "AB/2048x2048xf32_bench" : 3.61,
+    "AB/4096x4096xf32_bench": 27.46,
+    "AB/8192x8192xf32_bench": 232.44
   }
 }
