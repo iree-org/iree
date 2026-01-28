@@ -647,6 +647,14 @@ static bool hasNestedSharedWrite(Operation *op) {
     }
     return WalkResult::advance();
   });
+  if (found)
+    return true;
+
+  // Also check for gather_to_lds which writes to shared memory (LDS).
+  op->walk([&](amdgpu::GatherToLDSOp) {
+    found = true;
+    return WalkResult::interrupt();
+  });
   return found;
 }
 
@@ -733,16 +741,30 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
     // Start with needBarrierBeforeWrite=true because the epilogue of the
     // previous outer iteration may have read from shared memory.
     state.needBarrierBeforeWrite = true;
+    state.needBarrierBeforeRead = true;
     state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
                                   newForOp->getIterator(), state);
   } else {
-    // Non-nested loop: skip prologue barriers for performance.
-    // The prologue contains global->shared memory copies that don't require
-    // barriers between them since there are no shared memory reads in prologue.
-    // We only need to set up the state for the loop body: since the prologue
-    // writes to shared memory, subsequent shared reads in the loop body will
-    // need a barrier.
+    // Non-nested loop: The prologue writes to shared memory, and the first
+    // iteration reads from it. We need a barrier right before the loop to
+    // ensure prologue writes are visible.
+    //
+    // For gather_to_lds (async copy mode), the prologue writes to buffer 0,
+    // and the first loop iteration reads from buffer 0 (via iter_args) while
+    // writing to buffer 1. The barrier inside the loop only syncs the current
+    // iteration's writes before reads, but doesn't sync the prologue's writes.
+    //
+    // Insert barrier just before the loop.
+    rewriter.setInsertionPoint(newForOp);
+    gpu::BarrierOp::create(rewriter, loc);
+
+    // The loop body will need barriers between writes and reads.
+    // - needBarrierBeforeRead = true: The previous iteration's writes must
+    //   complete before we read from that buffer.
+    // - needBarrierBeforeWrite = true: We need a sched_barrier before writes
+    //   to prevent the compiler from moving gather_to_lds before the barrier.
     state.needBarrierBeforeRead = true;
+    state.needBarrierBeforeWrite = true;
   }
 
   // Loop body (exclude terminator).
@@ -751,6 +773,14 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
                                 std::prev(body->end()), state);
 
   // Epilogue (operations after the loop).
+  // The last loop iteration writes to shared memory (gather_to_lds), and the
+  // epilogue reads from that buffer. We need a barrier before the epilogue's
+  // first shared memory read to ensure the last iteration's writes are visible.
+  // Force needBarrierBeforeRead since the loop's last write needs to be synced.
+  // Note: needBarrierBeforeWrite state doesn't matter for epilogue since the
+  // epilogue only reads from shared memory (no shared memory writes).
+  state.needBarrierBeforeRead = true;
+
   Block::iterator epilogueStart = std::next(newForOp->getIterator());
   insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
                         state);
@@ -784,20 +814,161 @@ static bool hasGatherToLDS(scf::ForOp forOp) {
   return found;
 }
 
+/// Trace through view-like ops to find the root allocation.
+static memref::AllocOp traceToAllocation(Value base) {
+  while (base) {
+    if (auto alloc = base.getDefiningOp<memref::AllocOp>())
+      return alloc;
+    if (auto subview = base.getDefiningOp<memref::SubViewOp>()) {
+      base = subview.getSource();
+    } else if (auto expand = base.getDefiningOp<memref::ExpandShapeOp>()) {
+      base = expand.getSrc();
+    } else if (auto collapse = base.getDefiningOp<memref::CollapseShapeOp>()) {
+      base = collapse.getSrc();
+    } else if (auto cast = base.getDefiningOp<memref::CastOp>()) {
+      base = cast.getSource();
+    } else {
+      break;
+    }
+  }
+  return nullptr;
+}
+
+/// Check if a view-like op is defined outside the loop but used inside it.
+static bool isViewOpToClone(Operation *op, scf::ForOp forOp) {
+  // Must be outside the loop
+  if (forOp->isAncestor(op))
+    return false;
+
+  // Must be a view-like op
+  if (!isa<memref::SubViewOp, memref::ExpandShapeOp, memref::CollapseShapeOp,
+           memref::CastOp>(op))
+    return false;
+
+  // Must have at least one use inside the loop
+  for (Operation *user : op->getUsers()) {
+    if (forOp->isAncestor(user))
+      return true;
+  }
+  return false;
+}
+
+/// Collect all view-like ops that need to be cloned inside the loop.
+/// Returns ops in topological order (dependencies first).
+static SmallVector<Operation *>
+collectViewOpsToClone(memref::AllocOp alloc, scf::ForOp forOp) {
+  SmallVector<Operation *> result;
+  SetVector<Operation *> visited;
+  SmallVector<Operation *> worklist;
+
+  // Start with direct users of the allocation
+  for (Operation *user : alloc->getUsers()) {
+    if (isViewOpToClone(user, forOp))
+      worklist.push_back(user);
+  }
+
+  // BFS to find all transitively dependent view ops
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (!visited.insert(op))
+      continue;
+
+    result.push_back(op);
+
+    // Check users of this op
+    for (Operation *user : op->getUsers()) {
+      if (isViewOpToClone(user, forOp) && !visited.contains(user))
+        worklist.push_back(user);
+    }
+  }
+
+  // Sort in topological order - ops must come after their dependencies
+  llvm::stable_sort(result, [](Operation *a, Operation *b) {
+    return a->isBeforeInBlock(b);
+  });
+
+  return result;
+}
+
+/// Clone view-like operations inside the loop body.
+/// This is necessary for multi-buffering to work when view ops are defined
+/// outside the target loop but used inside it.
+static LogicalResult cloneViewOpsInsideLoop(memref::AllocOp alloc,
+                                            scf::ForOp forOp) {
+  SmallVector<Operation *> viewOps = collectViewOpsToClone(alloc, forOp);
+  if (viewOps.empty())
+    return success();
+
+  LDBG() << "Cloning " << viewOps.size()
+         << " view ops inside loop for allocation: " << *alloc;
+
+  // Create clones at the beginning of the loop body
+  Block *loopBody = forOp.getBody();
+  OpBuilder builder(forOp.getContext());
+  builder.setInsertionPointToStart(loopBody);
+
+  // Map from original values to cloned values
+  IRMapping mapping;
+
+  // Track ops to potentially erase
+  SmallVector<Operation *> opsToErase;
+
+  for (Operation *op : viewOps) {
+    // Clone the op
+    Operation *clone = builder.clone(*op, mapping);
+
+    LDBG() << "  Cloned: " << *op << " -> " << *clone;
+
+    // Replace uses of the original op inside the loop with the clone
+    Value origResult = op->getResult(0);
+    Value cloneResult = clone->getResult(0);
+
+    // Only replace uses inside this loop
+    origResult.replaceUsesWithIf(cloneResult, [&](OpOperand &use) {
+      return forOp->isAncestor(use.getOwner());
+    });
+
+    // Add to mapping so dependent ops will use the cloned version
+    mapping.map(origResult, cloneResult);
+
+    // Mark for erasure if all uses have been replaced
+    opsToErase.push_back(op);
+  }
+
+  // Erase original ops that now have no uses (in reverse order to handle deps)
+  for (auto it = opsToErase.rbegin(); it != opsToErase.rend(); ++it) {
+    Operation *op = *it;
+    if (op->use_empty()) {
+      LDBG() << "  Erasing dead op: " << *op;
+      op->erase();
+    }
+  }
+
+  return success();
+}
+
 /// Multi-buffer LDS allocations used by gather_to_lds operations.
 /// Only used in async copy mode.
 static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
                                                unsigned numBuffers) {
   SetVector<memref::AllocOp> sharedAllocs;
 
+  // Find all LDS allocations used by gather_to_lds
   forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
-    Value base = gatherOp.getDst();
-    while (auto subview = base.getDefiningOp<memref::SubViewOp>())
-      base = subview.getSource();
-
-    if (auto alloc = base.getDefiningOp<memref::AllocOp>()) {
+    if (auto alloc = traceToAllocation(gatherOp.getDst())) {
       if (hasSharedMemoryAddressSpace(alloc.getType()))
         sharedAllocs.insert(alloc);
+    }
+  });
+
+  // Also find allocations used by transfer_read from shared memory
+  // (these are the read-side views of the same LDS buffers)
+  forOp->walk([&](vector::TransferReadOp readOp) {
+    if (hasSharedMemory(readOp.getBase())) {
+      if (auto alloc = traceToAllocation(readOp.getBase())) {
+        if (hasSharedMemoryAddressSpace(alloc.getType()))
+          sharedAllocs.insert(alloc);
+      }
     }
   });
 
@@ -806,14 +977,24 @@ static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
     return failure();
   }
 
+  // First, clone view ops inside the loop for each allocation
   for (memref::AllocOp alloc : sharedAllocs) {
+    if (failed(cloneViewOpsInsideLoop(alloc, forOp))) {
+      LDBG() << "Failed to clone view ops for: " << *alloc;
+      return failure();
+    }
+  }
+
+  // Now apply multi-buffering
+  for (memref::AllocOp alloc : sharedAllocs) {
+    Location loc = alloc.getLoc();
     if (failed(memref::multiBuffer(alloc, numBuffers,
                                    /*skipOverrideAnalysis=*/true))) {
-      alloc.emitError("failed to multi-buffer LDS for async copy pipelining");
+      LDBG() << "Failed to multi-buffer LDS allocation at " << loc;
       return failure();
     }
     LDBG() << "Multi-buffered LDS allocation with " << numBuffers
-           << " buffers: " << *alloc;
+           << " buffers at " << loc;
   }
   return success();
 }
@@ -890,11 +1071,10 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   scf::ForOp newForOp = *newForOpOrFail;
 
-  // Insert barriers only for stream copy mode.
-  // Async copy relies on vmcnt for synchronization.
-  if (mode == PipelineMode::StreamCopy) {
-    insertPipelineBarriers(rewriter, newForOp);
-  }
+  // Insert barriers for both modes.
+  // For async copy, barriers are needed to synchronize gather_to_lds writes
+  // with subsequent reads from shared memory.
+  insertPipelineBarriers(rewriter, newForOp);
 
   return newForOp;
 }
