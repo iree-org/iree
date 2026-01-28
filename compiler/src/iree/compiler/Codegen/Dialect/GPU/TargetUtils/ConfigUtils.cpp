@@ -948,19 +948,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
-  // Use global load DMA attribute (subgroup sizes will be derived from
-  // translation_info) only on gfx950+.
-  SmallVector<Attribute> promotionArray;
-  if (targetSupportsGlobalLoadDMA(target)) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    promotionArray = {useGlobalDma, useGlobalDma};
-  }
+  // Build promotion list - global load DMA eligibility is determined
+  // dynamically in the GPUConvertToCoalescedDMA pass based on whether
+  // the source comes directly from global memory.
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
-    // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-    // compilation doesn't support it. Once this is fixed, we should use global
-    // load DMA here when possible.
-    promotionArray = {};
     promotionList.append({2, 3});
   }
   bool cWasPromoted = (!mustBeAligned || couldNeedPadding) && cPromoteIfPadding;
@@ -969,14 +961,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // and scaled GEMM respectively.
     promotionList.push_back(promotionList.size());
   }
-  // Do not use direct load DMA when padding is needed, as the source will
-  // go through tensor.pad and won't be directly from global memory. Also don't
-  // use DMA types when C is promoted since C is output, not loaded from global.
-  ArrayRef<Attribute> promotionTypes =
-      (couldNeedPadding || cWasPromoted) ? ArrayRef<Attribute>{}
-                                         : ArrayRef<Attribute>(promotionArray);
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
-                                  promotionTypes);
+                                  /*promotionTypes=*/{});
   if (!mustBeAligned || couldNeedPadding) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
