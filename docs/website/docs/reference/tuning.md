@@ -42,17 +42,17 @@ graph LR;
 ### :octicons-book-16: Overview
 
 While tuning can be done manually, the
-[SHARK Tuner](https://github.com/nod-ai/shark-ai/tree/main/sharktuner) tool
-can automatically search through possible knob values for individual
+[AMDSHARK Tuner](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner)
+tool can automatically search through possible knob values for individual
 dispatches to improve overall program performance. Dispatches are blocks of
 code that are created as part of IREE's compilation flow by splitting the
 input program into blocks that can be executed concurrently and atomically.
 For further information on dispatches see the sections below.
 
 !!! info
-    For more information about SHARK Tuner, see its source in the
-    [shark-ai GitHub repository](https://github.com/nod-ai/shark-ai/tree/main/sharktuner)
-    and the [Model Tuner example](https://github.com/nod-ai/shark-ai/tree/main/sharktuner/model_tuner).
+    For more information about AMDSHARK Tuner, see its source in the
+    [amd-shark-ai GitHub repository](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner)
+    and the [Model Tuner example](https://github.com/nod-ai/amd-shark-ai/tree/main/amdsharktuner/model_tuner).
 
 In our experience, using the SHARK Tuner can provide **meaningful speedup** of
 model execution.

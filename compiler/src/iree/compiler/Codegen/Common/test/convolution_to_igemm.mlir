@@ -71,7 +71,41 @@ module {
 
 // -----
 
-func.func @conv_with_lowering_config() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>} {
+func.func @fold_with_buffer_load_store(
+    %arg0: memref<1x16x16x4xf32>,
+    %arg1: memref<3x3x4x16xf32>,
+    %arg2: memref<1x14x14x16xf32>) {
+  %0 = iree_codegen.load_from_buffer %arg0 : memref<1x16x16x4xf32> -> tensor<1x16x16x4xf32>
+  %1 = iree_codegen.load_from_buffer %arg1 : memref<3x3x4x16xf32> -> tensor<3x3x4x16xf32>
+  %2 = iree_codegen.load_from_buffer %arg2 : memref<1x14x14x16xf32> -> tensor<1x14x14x16xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%2 : tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
+  %3 = linalg.conv_2d_nhwc_hwcf
+    {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+     ins(%0, %1: tensor<1x16x16x4xf32>, tensor<3x3x4x16xf32>)
+    outs(%fill: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
+  iree_codegen.store_to_buffer %3, %arg2 : tensor<1x14x14x16xf32> into memref<1x14x14x16xf32>
+  return
+}
+
+// CHECK:      func.func @fold_with_buffer_load_store
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: memref<1x16x16x4xf32>
+// CHECK-SAME:   %[[FILTER:[a-zA-Z0-9]+]]: memref<3x3x4x16xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]: memref<1x14x14x16xf32>
+// CHECK-DAG:  %[[LHS:.+]] = iree_codegen.load_from_buffer %[[INPUT]] : memref<1x16x16x4xf32> -> tensor<1x16x16x4xf32>
+// CHECK-DAG:  %[[RHS:.+]] = iree_codegen.load_from_buffer {{.*}} : memref<36x16xf32> -> tensor<36x16xf32>
+// CHECK-DAG:  %[[RES:.+]] = iree_codegen.load_from_buffer %[[OUTPUT]] : memref<1x14x14x16xf32> -> tensor<1x14x14x16xf32>
+// CHECK-DAG:  %[[IM2COL:.+]] = iree_linalg_ext.im2col {{.*}} ins(%[[LHS]] : tensor<1x16x16x4xf32>){{.*}}-> tensor<1x14x14x36xf32>
+// CHECK-DAG:  %[[FILL:.+]] = linalg.fill {{.*}}outs(%[[RES]] : tensor<1x14x14x16xf32>)
+// CHECK:      %[[MATMUL:.+]] = linalg.generic
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME:   ins(%[[IM2COL]], %[[RHS]] : tensor<1x14x14x36xf32>, tensor<36x16xf32>)
+// CHECK-SAME:   outs(%[[FILL]] : tensor<1x14x14x16xf32>) {
+// CHECK:      iree_codegen.store_to_buffer %[[MATMUL]], %[[OUTPUT]]
+
+// -----
+
+func.func @conv_with_lowering_config() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false>}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x34x34x128xf32>>

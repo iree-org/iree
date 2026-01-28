@@ -110,7 +110,7 @@ or from pip:
 | -- | -- |
 Generated op tests | [iree-test-suites `onnx_ops`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_ops)
 Public model tests | [iree-test-suites `onnx_models`](https://github.com/iree-org/iree-test-suites/tree/main/onnx_models)
-Curated op and model tests | SHARK-TestSuite [`e2eshark/onnx`](https://github.com/nod-ai/SHARK-TestSuite/tree/main/e2eshark/onnx) and [`alt_e2eshark/onnx_tests`](https://github.com/nod-ai/SHARK-TestSuite/tree/main/alt_e2eshark/onnx_tests)
+Curated op and model tests | AMD-SHARK-TestSuite [`e2eshark/onnx`](https://github.com/nod-ai/AMD-SHARK-TestSuite/tree/main/e2eamdshark/onnx) and [`alt_e2eshark/onnx_tests`](https://github.com/nod-ai/AMD-SHARK-TestSuite/tree/main/alt_e2eamdshark/onnx_tests)
 Importer tests | [torch-mlir `test/python/onnx_importer`](https://github.com/llvm/torch-mlir/tree/main/test/python/onnx_importer)
 
 ## :octicons-question-16: Troubleshooting
@@ -118,7 +118,7 @@ Importer tests | [torch-mlir `test/python/onnx_importer`](https://github.com/llv
 Support for a broad set of [ONNX operators](https://onnx.ai/onnx/operators/)
 and [data types](https://onnx.ai/onnx/intro/concepts.html#supported-types)
 is an active investment area. See the
-[ONNX Op Support tracking issue](https://github.com/nod-ai/SHARK-ModelDev/issues/215)
+[ONNX Op Support tracking issue](https://github.com/nod-ai/AMD-SHARK-ModelDev/issues/215)
 for the latest status.
 
 ### Failed to legalize operation that was explicitly marked illegal
@@ -138,7 +138,7 @@ There are several possible scenarios:
 1. The operator is not implemented, or the implementation is missing a case.
    Search for a matching issue in one of these places:
      * <https://github.com/llvm/torch-mlir/issues>
-     * <https://github.com/nod-ai/SHARK-ModelDev/issues>
+     * <https://github.com/nod-ai/AMD-SHARK-ModelDev/issues>
 2. The operator is implemented but only for a more recent ONNX version. You can
    try upgrading your .onnx file using the
    [ONNX Version Converter](https://github.com/onnx/onnx/blob/main/docs/VersionConverter.md):

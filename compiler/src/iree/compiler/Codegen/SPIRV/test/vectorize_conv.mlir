@@ -15,7 +15,7 @@ func.func @ncw_conv_1d(%input: tensor<2x4x4xf32>, %filter: tensor<4x4x1xf32>, %i
 //  CHECK-COUNT-8:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
 // CHECK-COUNT-16:   vector.transfer_read %[[FILTER]]{{.+}} : tensor<4x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:   vector.transfer_read %[[INIT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
-// CHECK-COUNT-16:   vector.extract %{{.+}}[0] : f32 from vector<1xf32>
+// CHECK-COUNT-4:   vector.extract %{{.+}}[0] : f32 from vector<1xf32>
 //      CHECK-NOT:   vector.insert
 // CHECK-COUNT-32:   vector.fma {{.+}} : vector<4xf32>
 //      CHECK-NOT:   vector.insert

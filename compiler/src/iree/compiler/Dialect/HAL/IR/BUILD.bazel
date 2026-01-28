@@ -21,6 +21,7 @@ exports_files([
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "HALAttrs.td",
             "HALBase.td",
@@ -55,6 +56,7 @@ iree_compiler_cc_library(
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
+        "HALTraits.h",
         "HALTypes.h",
     ],
     textual_hdrs = [

@@ -54,8 +54,9 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
   auto translationInfo = getTranslationInfo(funcOp);
-  if (!translationInfo)
+  if (!translationInfo) {
     return;
+  }
 
   std::optional<OpPassManager> maybePipeline =
       getFunctionOpInterfacePassManager(funcOp);

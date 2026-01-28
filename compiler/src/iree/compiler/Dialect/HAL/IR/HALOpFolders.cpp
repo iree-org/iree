@@ -34,8 +34,9 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
       : OpRewritePattern<Op>(context, /*benefit=*/1000) {}
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.use_empty())
+    if (!op.use_empty()) {
       return failure();
+    }
     rewriter.eraseOp(op);
     return success();
   }
@@ -230,8 +231,9 @@ struct FoldBufferViewCreateSubspan
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
@@ -318,8 +320,9 @@ struct FoldCommandBufferFillBufferSubspans
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getTargetBufferMutable().assign(newTargetBuffer);
       op.getTargetOffsetMutable().assign(newTargetOffset);
@@ -358,8 +361,9 @@ struct FoldCommandBufferUpdateBufferSubspans
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getTargetBufferMutable().assign(newTargetBuffer);
       op.getTargetOffsetMutable().assign(newTargetOffset);
@@ -408,8 +412,9 @@ struct FoldCommandBufferCopyBufferSubspans
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
@@ -444,8 +449,9 @@ struct FoldCommandBufferDispatchBufferSubspan : public OpRewritePattern<OpT> {
     auto bindingOffsets = llvm::to_vector(op.getBindingOffsets());
     for (size_t i = 0; i < bindingBuffers.size(); ++i) {
       auto *definingOp = bindingBuffers[i].getDefiningOp();
-      if (!definingOp)
+      if (!definingOp) {
         continue;
+      }
       if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
         needsUpdate = true;
         bindingBuffers[i] = subspanOp.getSourceBuffer();
@@ -454,8 +460,9 @@ struct FoldCommandBufferDispatchBufferSubspan : public OpRewritePattern<OpT> {
       }
     }
     rewriter.restoreInsertionPoint(ip);
-    if (!needsUpdate)
+    if (!needsUpdate) {
       return failure();
+    }
     rewriter.modifyOpInPlace(op, [&]() {
       auto mutableBindingBuffers = op.getBindingBuffersMutable();
       mutableBindingBuffers.clear();
@@ -489,8 +496,9 @@ struct FoldCommandBufferDispatchIndirectBufferSubspan
                                 PatternRewriter &rewriter) const override {
     Value workgroupsBuffer = op.getWorkgroupsBuffer();
     auto *definingOp = workgroupsBuffer.getDefiningOp();
-    if (!definingOp)
+    if (!definingOp) {
       return failure();
+    }
     Value workgroupsOffset = op.getWorkgroupsOffset();
     if (auto subspanOp = dyn_cast<IREE::HAL::BufferSubspanOp>(definingOp)) {
       workgroupsBuffer = subspanOp.getSourceBuffer();
@@ -526,18 +534,21 @@ void CommandBufferDispatchIndirectOp::getCanonicalizationPatterns(
 // same basic block. We need an abstract interpreter to do much more as we'd
 // need to track conditionals/branching logic.
 static bool isOpAlwaysExecutedWith(Operation *before, Operation *after) {
-  if (before == after)
+  if (before == after) {
     return true;
-  if (before->getBlock() != after->getBlock())
+  }
+  if (before->getBlock() != after->getBlock()) {
     return false;
+  }
   return before->isBeforeInBlock(after);
 }
 
 // Returns true if |op| was hoisted before |insertBefore| without breaking
 // SSA invariants. Returns false if no IR modifications were made.
 static bool tryHoistOpBeforeUser(Operation *op, Operation *insertBefore) {
-  if (op == insertBefore)
+  if (op == insertBefore) {
     return false;
+  }
 
   // Currently conservative - should be doing a domination check.
   if (op->getBlock() != insertBefore->getBlock()) {
@@ -811,11 +822,13 @@ static void rewriteToOneReturn(int numResults, Region &region,
   // Get all of the return ops - if there's only one then the requirement is
   // already satisfied and we can exit early.
   auto returnOps = llvm::to_vector(region.getOps<IREE::HAL::ReturnOp>());
-  if (returnOps.size() <= 1)
+  if (returnOps.size() <= 1) {
     return; // no-op
+  }
   SmallVector<Location> returnLocs;
-  for (auto returnOp : returnOps)
+  for (auto returnOp : returnOps) {
     returnLocs.push_back(returnOp.getLoc());
+  }
 
   // Create the new exit block with arguments matching 1:1 with results.
   auto anyReturnOp = returnOps.front();
@@ -860,8 +873,9 @@ struct MergeExecutableConstantBlocks
     SmallVector<Location> resultLocs;
     for (auto blockOp : blockOps) {
       blockLocs.push_back(blockOp.getLoc());
-      if (blockOp.getNumArguments() > 0)
+      if (blockOp.getNumArguments() > 0) {
         anyRequireDevice = true;
+      }
       llvm::append_range(resultTypes, blockOp.getResultTypes());
       llvm::append_range(resultKeys, blockOp.getKeys().getValue());
       llvm::append_range(
@@ -967,8 +981,9 @@ static void filterReturnOperands(ExecutableConstantBlockOp blockOp,
        llvm::make_early_inc_range(blockOp.getOps<IREE::HAL::ReturnOp>())) {
     SmallVector<Value> operands;
     for (auto [i, operand] : llvm::enumerate(returnOp.getOperands())) {
-      if (preservedIndices.test(i))
+      if (preservedIndices.test(i)) {
         operands.push_back(operand);
+      }
     }
     returnOp.getOperandsMutable().assign(operands);
   }
@@ -980,11 +995,13 @@ struct DropUnusedExecutableConstantBlockDeviceArg
   using Base::Base;
   LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
                                 PatternRewriter &rewriter) const override {
-    if (blockOp.getNumArguments() == 0)
+    if (blockOp.getNumArguments() == 0) {
       return failure();
+    }
     auto deviceArg = blockOp.getArgument(0);
-    if (!deviceArg.use_empty())
+    if (!deviceArg.use_empty()) {
       return failure();
+    }
     rewriter.modifyOpInPlace(blockOp, [&]() {
       // Type conversion here shouldn't fail.
       (void)blockOp.eraseArgument(0);
@@ -1057,8 +1074,9 @@ void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult FenceJoinOp::fold(FoldAdaptor operands) {
-  if (getFences().size() == 1)
+  if (getFences().size() == 1) {
     return getFences().front();
+  }
   return {};
 }
 
@@ -1069,8 +1087,9 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getNumOperands() != 0)
+    if (op.getNumOperands() != 0) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op,
                                                     op.getResult().getType());
     return success();
@@ -1091,8 +1110,9 @@ deduplicateFenceOperands(ValueRange operands) {
     newOperands.insert(operand);
   }
 
-  if (newOperands.size() == operands.size())
+  if (newOperands.size() == operands.size()) {
     return std::nullopt;
+  }
   return newOperands.takeVector();
 }
 
@@ -1102,8 +1122,9 @@ struct DeduplicateFenceJoinFences : public OpRewritePattern<FenceJoinOp> {
   LogicalResult matchAndRewrite(FenceJoinOp op,
                                 PatternRewriter &rewriter) const override {
     auto newOperands = deduplicateFenceOperands(op.getFences());
-    if (!newOperands)
+    if (!newOperands) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<FenceJoinOp>(
         op, op.getResult().getType(), op.getFlagsAttr(), newOperands.value());
     return success();
@@ -1143,8 +1164,9 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
     auto fence = signalOp.getFence();
     auto createOp =
         dyn_cast_if_present<IREE::HAL::FenceCreateOp>(fence.getDefiningOp());
-    if (!createOp)
+    if (!createOp) {
       return failure();
+    }
 
     // TODO(benvanik): broader analysis - likely in a dedicated fence elision
     // pass so we can do IPO. For now block-only.
@@ -1194,8 +1216,9 @@ struct ElideEmptyFenceAwait : public OpRewritePattern<FenceAwaitOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getFences().empty())
+    if (!op.getFences().empty()) {
       return failure();
+    }
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(op, /*ok=*/0, 32);
     return success();
   }
@@ -1207,8 +1230,9 @@ struct DeduplicateFenceAwaitFences : public OpRewritePattern<FenceAwaitOp> {
   LogicalResult matchAndRewrite(FenceAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     auto newOperands = deduplicateFenceOperands(op.getFences());
-    if (newOperands == std::nullopt)
+    if (newOperands == std::nullopt) {
       return failure();
+    }
     // TODO(benvanik): resolve flag sets.
     rewriter.replaceOpWithNewOp<FenceAwaitOp>(
         op, op.getStatus().getType(), op.getTimeoutMillis(), op.getFlagsAttr(),

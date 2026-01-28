@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/vm/bytecode/archive.h"
+#include "iree/vm/bytecode/disassembler.h"
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/verifier.h"
 
@@ -27,41 +28,44 @@ static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
 }
 
 // Resolves a type through either builtin rules or the ref registered types.
-static bool iree_vm_bytecode_module_resolve_type(
+// If |flags| includes IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES then
+// unresolved ref types will be registered as placeholder types.
+static iree_status_t iree_vm_bytecode_module_resolve_type(
     iree_vm_instance_t* instance, iree_vm_TypeDef_table_t type_def,
-    iree_vm_type_def_t* out_type) {
+    iree_vm_bytecode_module_flags_t flags, iree_vm_type_def_t* out_type) {
   memset(out_type, 0, sizeof(*out_type));
   flatbuffers_string_t full_name = iree_vm_TypeDef_full_name(type_def);
   if (!flatbuffers_string_len(full_name)) {
-    return false;
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "type definition has no name");
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i8")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I8);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i16")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I16);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i32")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("i64")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I64);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f32")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(full_name,
                                        iree_make_cstring_view("f64")) == 0) {
     *out_type = iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F64);
-    return true;
+    return iree_ok_status();
   } else if (iree_vm_flatbuffer_strcmp(
                  full_name, iree_make_cstring_view("!vm.opaque")) == 0) {
     *out_type = iree_vm_make_undefined_type_def();
-    return true;
+    return iree_ok_status();
   } else if (full_name[0] == '!') {
     // Note that we drop the ! prefix:
     iree_string_view_t type_name = {full_name + 1,
@@ -73,13 +77,29 @@ static bool iree_vm_bytecode_module_resolve_type(
       // all we have registered.
       type_name = iree_make_cstring_view("vm.list");
     }
-    iree_vm_ref_type_t type = iree_vm_instance_lookup_type(instance, type_name);
+
+    iree_vm_ref_type_t type = 0;
+    if (iree_any_bit_set(
+            flags, IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES)) {
+      // Try lookup including placeholders, register placeholder if not found.
+      type = iree_vm_instance_lookup_type_placeholder(instance, type_name);
+      if (!type) {
+        IREE_RETURN_IF_ERROR(
+            iree_vm_instance_register_type_placeholder(instance, type_name));
+        type = iree_vm_instance_lookup_type_placeholder(instance, type_name);
+      }
+    } else {
+      // Normal path - real types only.
+      type = iree_vm_instance_lookup_type(instance, type_name);
+    }
+
     if (type) {
       *out_type = iree_vm_make_ref_type_def(type);
-      return true;
+      return iree_ok_status();
     }
   }
-  return false;
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "no type registered with name '%s'", full_name);
 }
 
 // Resolves all types through either builtin rules or the ref registered types.
@@ -87,18 +107,14 @@ static bool iree_vm_bytecode_module_resolve_type(
 // registered.
 static iree_status_t iree_vm_bytecode_module_resolve_types(
     iree_vm_instance_t* instance, iree_vm_TypeDef_vec_t type_defs,
-    iree_vm_type_def_t* type_table) {
+    iree_vm_bytecode_module_flags_t flags, iree_vm_type_def_t* type_table) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
     iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
-    if (!iree_vm_bytecode_module_resolve_type(instance, type_def,
-                                              &type_table[i])) {
-      status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                                "no type registered with name '%s'",
-                                iree_vm_TypeDef_full_name(type_def));
-      break;
-    }
+    status = iree_vm_bytecode_module_resolve_type(instance, type_def, flags,
+                                                  &type_table[i]);
+    if (!iree_status_is_ok(status)) break;
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -608,9 +624,9 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
 // Lays out the nested tables within a |state| structure.
 // Returns the total size of the structure and all tables with padding applied.
 // |state| may be null if only the structure size is required for allocation.
-static iree_host_size_t iree_vm_bytecode_module_layout_state(
+static iree_status_t iree_vm_bytecode_module_layout_state(
     iree_vm_BytecodeModuleDef_table_t module_def,
-    iree_vm_bytecode_module_state_t* state) {
+    iree_vm_bytecode_module_state_t* state, iree_host_size_t* out_total_size) {
   iree_vm_ModuleStateDef_table_t module_state_def =
       iree_vm_BytecodeModuleDef_module_state(module_def);
   iree_host_size_t rwdata_storage_capacity = 0;
@@ -624,30 +640,35 @@ static iree_host_size_t iree_vm_bytecode_module_layout_state(
   iree_host_size_t import_function_count = iree_vm_ImportFunctionDef_vec_len(
       iree_vm_BytecodeModuleDef_imported_functions(module_def));
 
-  uint8_t* base_ptr = (uint8_t*)state;
-  iree_host_size_t offset =
-      iree_host_align(sizeof(iree_vm_bytecode_module_state_t), 16);
+  // Calculate layout with overflow checking. All counts come from flatbuffer
+  // data (untrusted input).
+  iree_host_size_t total_size = 0;
+  iree_host_size_t rwdata_offset = 0;
+  iree_host_size_t global_refs_offset = 0;
+  iree_host_size_t imports_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_vm_bytecode_module_state_t), &total_size,
+      IREE_STRUCT_FIELD_ALIGNED(rwdata_storage_capacity, uint8_t, 16,
+                                &rwdata_offset),
+      IREE_STRUCT_FIELD_ALIGNED(global_ref_count, iree_vm_ref_t, 16,
+                                &global_refs_offset),
+      IREE_STRUCT_FIELD_ALIGNED(import_function_count,
+                                iree_vm_bytecode_import_t, 16,
+                                &imports_offset)));
 
   if (state) {
+    uint8_t* base_ptr = (uint8_t*)state;
     state->rwdata_storage =
-        iree_make_byte_span(base_ptr + offset, rwdata_storage_capacity);
-  }
-  offset += iree_host_align(rwdata_storage_capacity, 16);
-
-  if (state) {
+        iree_make_byte_span(base_ptr + rwdata_offset, rwdata_storage_capacity);
     state->global_ref_count = global_ref_count;
-    state->global_ref_table = (iree_vm_ref_t*)(base_ptr + offset);
-  }
-  offset += iree_host_align(global_ref_count * sizeof(iree_vm_ref_t), 16);
-
-  if (state) {
+    state->global_ref_table = (iree_vm_ref_t*)(base_ptr + global_refs_offset);
     state->import_count = import_function_count;
-    state->import_table = (iree_vm_bytecode_import_t*)(base_ptr + offset);
+    state->import_table =
+        (iree_vm_bytecode_import_t*)(base_ptr + imports_offset);
   }
-  offset +=
-      iree_host_align(import_function_count * sizeof(*state->import_table), 16);
 
-  return offset;
+  *out_total_size = total_size;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_vm_bytecode_module_alloc_state(
@@ -661,8 +682,10 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   iree_vm_BytecodeModuleDef_table_t module_def = module->def;
 
   // Compute the total size required (with padding) for the state structure.
-  iree_host_size_t total_state_struct_size =
-      iree_vm_bytecode_module_layout_state(module_def, NULL);
+  iree_host_size_t total_state_struct_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_bytecode_module_layout_state(module_def, NULL,
+                                               &total_state_struct_size));
 
   // Allocate the storage for the structure and all its nested tables.
   iree_vm_bytecode_module_state_t* state = NULL;
@@ -672,7 +695,10 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   state->allocator = allocator;
 
   // Perform layout to get the pointers into the storage for each nested table.
-  iree_vm_bytecode_module_layout_state(module_def, state);
+  // This cannot fail since we already computed the layout above.
+  iree_host_size_t unused_size = 0;
+  iree_status_ignore(
+      iree_vm_bytecode_module_layout_state(module_def, state, &unused_size));
 
   *out_module_state = (iree_vm_module_state_t*)state;
   IREE_TRACE_ZONE_END(z0);
@@ -714,8 +740,10 @@ static iree_status_t IREE_API_PTR iree_vm_bytecode_module_fork_state(
 
   // Compute the total size required (with padding) for the state structure.
   // This should exactly match the original parent_state size.
-  iree_host_size_t total_state_struct_size =
-      iree_vm_bytecode_module_layout_state(module_def, NULL);
+  iree_host_size_t total_state_struct_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_bytecode_module_layout_state(module_def, NULL,
+                                               &total_state_struct_size));
 
   // Allocate the storage for the structure and all its nested tables.
   iree_vm_bytecode_module_state_t* child_state = NULL;
@@ -726,7 +754,10 @@ static iree_status_t IREE_API_PTR iree_vm_bytecode_module_fork_state(
 
   // Perform layout to get the pointers into the storage for each nested table.
   // They are initially unpopulated until we copy over the values.
-  iree_vm_bytecode_module_layout_state(module_def, child_state);
+  // This cannot fail since we already computed the layout above.
+  iree_host_size_t unused_size = 0;
+  iree_status_ignore(iree_vm_bytecode_module_layout_state(
+      module_def, child_state, &unused_size));
 
   // Copy rwdata directly. Any values that the module doesn't want to persist
   // across the fork will be reinitialized during the fork signal handler.
@@ -859,9 +890,9 @@ static iree_status_t iree_vm_bytecode_module_resume_call(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_vm_instance_t* instance, iree_const_byte_span_t archive_contents,
-    iree_allocator_t archive_allocator, iree_allocator_t allocator,
-    iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_vm_bytecode_module_flags_t flags,
+    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
+    iree_allocator_t allocator, iree_vm_module_t** out_module) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
@@ -894,20 +925,25 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   }
 
   iree_vm_TypeDef_vec_t type_defs = iree_vm_BytecodeModuleDef_types(module_def);
-  size_t type_table_size = iree_host_align(
-      iree_vm_TypeDef_vec_len(type_defs) * sizeof(iree_vm_type_def_t), 16);
-
+  iree_host_size_t type_count = iree_vm_TypeDef_vec_len(type_defs);
   iree_host_size_t rodata_ref_count = iree_vm_RodataSegmentDef_vec_len(
       iree_vm_BytecodeModuleDef_rodata_segments(module_def));
-  size_t rodata_ref_table_size =
-      iree_host_align(rodata_ref_count * sizeof(iree_vm_buffer_t), 16);
+
+  // Calculate allocation size with overflow checking. All counts come from
+  // flatbuffer data (untrusted input). type_table is a FAM accessed via
+  // module->type_table; rodata_ref_table alignment pads type_table to 16.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t rodata_ref_table_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              sizeof(iree_vm_bytecode_module_t), &total_size,
+              IREE_STRUCT_FIELD_FAM(type_count, iree_vm_type_def_t),
+              IREE_STRUCT_FIELD_ALIGNED(rodata_ref_count, iree_vm_buffer_t, 16,
+                                        &rodata_ref_table_offset)));
 
   iree_vm_bytecode_module_t* module = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(
-          allocator, sizeof(*module) + type_table_size + rodata_ref_table_size,
-          (void**)&module));
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&module));
   module->allocator = allocator;
 
   iree_vm_FunctionDescriptor_vec_t function_descriptors =
@@ -925,9 +961,9 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->archive_allocator = archive_allocator;
   module->def = module_def;
 
-  module->type_count = iree_vm_TypeDef_vec_len(type_defs);
+  module->type_count = type_count;
   iree_status_t resolve_status = iree_vm_bytecode_module_resolve_types(
-      instance, type_defs, module->type_table);
+      instance, type_defs, flags, module->type_table);
   if (!iree_status_is_ok(resolve_status)) {
     iree_allocator_free(allocator, module);
     IREE_TRACE_ZONE_END(z0);
@@ -960,7 +996,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   // Setup rodata segments to point directly at the FlatBuffer memory.
   module->rodata_ref_count = rodata_ref_count;
   module->rodata_ref_table =
-      (iree_vm_buffer_t*)((uint8_t*)module + sizeof(*module) + type_table_size);
+      (iree_vm_buffer_t*)((uint8_t*)module + rodata_ref_table_offset);
   iree_vm_RodataSegmentDef_vec_t rodata_segments =
       iree_vm_BytecodeModuleDef_rodata_segments(module_def);
   for (int i = 0; i < module->rodata_ref_count; ++i) {
@@ -1005,4 +1041,19 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
   IREE_TRACE_ZONE_END(z0);
   return verify_status;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
+    iree_vm_module_t* module, uint16_t function_ordinal,
+    iree_string_builder_t* string_builder) {
+  IREE_ASSERT_ARGUMENT(module);
+  IREE_ASSERT_ARGUMENT(string_builder);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_vm_bytecode_module_t* bytecode_module =
+      (iree_vm_bytecode_module_t*)module;
+  iree_status_t status = iree_vm_bytecode_disassemble_function(
+      bytecode_module, /*module_state=*/NULL, function_ordinal,
+      IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT, string_builder);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }

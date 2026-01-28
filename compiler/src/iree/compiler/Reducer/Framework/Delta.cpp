@@ -102,8 +102,9 @@ void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
     for (Chunk chunk : maybeInteresting) {
       FailureOr<WorkItem> result =
           checkChunk(chunk, deltaFunc, maybeInteresting, uninterestingChunks);
-      if (failed(result))
+      if (failed(result)) {
         continue;
+      }
 
       // Removing this chunk is still interesting. Mark this chunk as
       // uninteresting.

@@ -7,11 +7,14 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Utils/EncodingUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -699,8 +702,9 @@ Attribute MMAAttr::getDistributionMappingKind() const {
 
 OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
                                                  Operation *) const {
-  if (!getDistributionMappingKind())
+  if (!getDistributionMappingKind()) {
     return OpFoldResult();
+  }
   return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
 }
 
@@ -780,6 +784,59 @@ MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
   return failure();
 }
 
+/// Creates index_hint ops wrapping delinearized lane ID values.
+/// The `delinearizedLaneId` values come from delinearizing the lane ID using
+/// `basis`, with the innermost/fastest-varying dimension last.
+///
+/// Non-final indices get lane_constant hints (uniform across lane groups).
+/// The final index gets lane_increment hint (increments within lane group).
+/// The group size is derived from the innermost basis element.
+/// Indices with a unit basis are ignored, and given a lane_constant hint.
+static SmallVector<Value>
+createTransposeLoadIndexHint(OpBuilder &builder, Location loc,
+                             ValueRange delinearizedLaneId,
+                             ArrayRef<int64_t> basis) {
+  // Need at least 2 dimensions for transpose load pattern.
+  if (delinearizedLaneId.size() < 2) {
+    return SmallVector<Value>(delinearizedLaneId.begin(),
+                              delinearizedLaneId.end());
+  }
+
+  // Find the index of the innermost non-unit (> 1) basis element.
+  // This determines which result gets the lane-increment hint.
+  // Size-1 dimensions produce constant 0 outputs regardless of lane ID,
+  // so they don't contribute to the meaningful group structure.
+  int64_t groupSize = 1;
+  size_t incrementResultIdx = delinearizedLaneId.size() - 1;
+  // The delinearized indices could have N or N + 1 results, and the basis
+  // elements are aligned with the last N results, so iterate backwards
+  // together.
+  for (size_t i = 1; i <= basis.size(); ++i) {
+    groupSize = basis[basis.size() - i];
+    incrementResultIdx = delinearizedLaneId.size() - i;
+    if (groupSize > 1) {
+      break;
+    }
+  }
+
+  auto laneConstantAttr =
+      IREE::GPU::LaneConstantAttr::get(builder.getContext(), groupSize);
+  auto laneIncrementAttr = IREE::GPU::LaneIncrementAttr::get(
+      builder.getContext(), groupSize, /*step=*/1, /*aligned=*/true);
+
+  SmallVector<Value> results;
+  for (auto [i, value] : llvm::enumerate(delinearizedLaneId)) {
+    // The result corresponding to innermost non-unit basis gets lane-increment;
+    // all other results get lane-constant hints.
+    Attribute hint = (i == incrementResultIdx) ? Attribute(laneIncrementAttr)
+                                               : Attribute(laneConstantAttr);
+    auto hintOp = IREE::Codegen::IndexHintOp::create(builder, loc, value, hint);
+    results.push_back(hintOp.getResult());
+  }
+
+  return results;
+}
+
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
@@ -817,6 +874,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   auto splitLaneId = affine::AffineDelinearizeIndexOp::create(
       builder, loc, laneId, vtidBasis, /*hasOuterBound=*/false);
 
+  // Wrap delinearize results with index_hint ops for transpose load.
+  // The delinearize results are already in the correct order
+  // (innermost/fastest-varying dimension is last).
+  SmallVector<Value> hintedSplitLaneId = createTransposeLoadIndexHint(
+      builder, loc, splitLaneId.getResults(), vtidBasis);
+
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
@@ -828,7 +891,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // worsen the generated code quality.
   for (auto [splitResultIdx, element] :
        llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
-    Value vtid = splitLaneId.getResult(splitResultIdx);
+    Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
     if (element != 1) {
       vtid = affine::AffineLinearizeIndexOp::create(
@@ -1831,8 +1894,9 @@ DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
 
 std::optional<int> TargetAttr::getCUDAComputeCapability() const {
   StringRef arch = getArch();
-  if (!arch.starts_with("sm_"))
+  if (!arch.starts_with("sm_")) {
     return false;
+  }
   APInt version;
   if (arch.substr(3).getAsInteger(10, version)) {
     return false;
@@ -1843,14 +1907,16 @@ std::optional<int> TargetAttr::getCUDAComputeCapability() const {
 bool TargetAttr::supportsTF32InputMMAOps() const {
   // TODO: scan the list of MMA ops to decude after plumbing through support
   // for NVIDIA TensorCore MMA ops.
-  if (auto cc = getCUDAComputeCapability())
+  if (auto cc = getCUDAComputeCapability()) {
     return cc >= 80;
+  }
   return false;
 }
 
 bool TargetAttr::supportsSyncMMAOps() const {
-  if (auto cc = getCUDAComputeCapability())
+  if (auto cc = getCUDAComputeCapability()) {
     return cc >= 80;
+  }
   return false;
 }
 
@@ -1983,8 +2049,9 @@ getLoopBounds(ArrayRef<Range> loopRanges,
   for (auto [loopRange, givenTileSize] :
        llvm::zip_equal(loopRanges, givenTileSizes)) {
     // No loop if the tile size is 0.
-    if (isZeroInteger(givenTileSize))
+    if (isZeroInteger(givenTileSize)) {
       continue;
+    }
     lbs.push_back(loopRange.offset);
     ubs.push_back(loopRange.size);
     steps.push_back(givenTileSize);
@@ -2276,6 +2343,15 @@ Value PromoteWithCacheSwizzleAttr::promoteOperand(
 }
 
 //===----------------------------------------------------------------------===//
+// SwizzleOperandAttr
+//===----------------------------------------------------------------------===//
+
+Value SwizzleOperandAttr::promoteOperand(mlir::OpBuilder &builder,
+                                         mlir::OpOperand &operand) const {
+  return swizzlePromotionImpl(builder, operand, getCopyConfig(), getSwizzle());
+}
+
+//===----------------------------------------------------------------------===//
 // LaneIdAttr
 //===----------------------------------------------------------------------===//
 
@@ -2290,7 +2366,7 @@ int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
 //===----------------------------------------------------------------------===//
 
 GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
-    MLIRContext *context, bool prefetchSharedMemory,
+    MLIRContext *context, unsigned prefetchNumStages,
     bool noReduceSharedMemoryBankConflicts, bool useIgemmConvolution,
     std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy) {
   auto strategyAttr = ReorderWorkgroupsStrategyAttr();
@@ -2299,9 +2375,155 @@ GPUPipelineOptionsAttr GPUPipelineOptionsAttr::get(
         ReorderWorkgroupsStrategyAttr::get(context, *reorderWorkgroupsStrategy);
   }
   Builder b(context);
-  return Base::get(context, b.getBoolAttr(prefetchSharedMemory),
+  std::optional<int64_t> prefetchOpt;
+  if (prefetchNumStages > 0) {
+    prefetchOpt = prefetchNumStages;
+  }
+  return Base::get(context, prefetchOpt,
                    b.getBoolAttr(noReduceSharedMemoryBankConflicts),
                    b.getBoolAttr(useIgemmConvolution), strategyAttr);
+}
+
+//===----------------------------------------------------------------------===//
+// DimensionExpansionAttr
+//===----------------------------------------------------------------------===//
+
+DimensionExpansionAttr
+DimensionExpansionAttr::get(MLIRContext *context,
+                            ArrayRef<ReassociationIndices> reassociations,
+                            ArrayRef<int64_t> outputShape) {
+  Builder b(context);
+  SmallVector<Attribute> reassociationAttrs;
+  for (const ReassociationIndices &indices : reassociations) {
+    SmallVector<Attribute> indexAttrs;
+    for (int64_t idx : indices) {
+      indexAttrs.push_back(b.getI64IntegerAttr(idx));
+    }
+    reassociationAttrs.push_back(b.getArrayAttr(indexAttrs));
+  }
+  ArrayAttr reassociationAttr = b.getArrayAttr(reassociationAttrs);
+  DenseI64ArrayAttr outputShapeAttr = b.getDenseI64ArrayAttr(outputShape);
+  return get(context, reassociationAttr, outputShapeAttr);
+}
+
+LogicalResult
+DimensionExpansionAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                               ArrayAttr reassociations,
+                               DenseI64ArrayAttr outputShape) {
+  if (reassociations.empty()) {
+    return emitError() << "reassociations cannot be empty";
+  }
+
+  int64_t nextExpected = 0;
+
+  for (auto [groupIdx, attr] : llvm::enumerate(reassociations)) {
+    auto indexArray = dyn_cast<ArrayAttr>(attr);
+    if (!indexArray) {
+      return emitError() << "reassociation at index " << groupIdx
+                         << " must be an array";
+    }
+
+    if (indexArray.empty()) {
+      return emitError() << "reassociation group " << groupIdx
+                         << " cannot be empty";
+    }
+
+    int numDynamicDims = 0;
+    for (auto [innerIdx, idxAttr] : llvm::enumerate(indexArray)) {
+      auto intAttr = dyn_cast<IntegerAttr>(idxAttr);
+      if (!intAttr) {
+        return emitError() << "reassociation index at [" << groupIdx << "]["
+                           << innerIdx << "] must be an integer";
+      }
+
+      int64_t idx = intAttr.getInt();
+      if (idx != nextExpected) {
+        return emitError() << "reassociation indices must form contiguous "
+                           << "sequence; expected dimension " << nextExpected
+                           << " at [" << groupIdx << "][" << innerIdx
+                           << "], got " << idx;
+      }
+
+      if (outputShape[idx] == ShapedType::kDynamic) {
+        numDynamicDims++;
+      }
+
+      nextExpected++;
+    }
+
+    if (numDynamicDims > 1) {
+      return emitError()
+             << "reassociation group " << groupIdx
+             << " has multiple dynamic dimensions; at most 1 allowed";
+    }
+  }
+
+  ArrayRef<int64_t> outputShapeArray = outputShape.asArrayRef();
+  if (nextExpected != static_cast<int64_t>(outputShapeArray.size())) {
+    return emitError() << "reassociations cover " << nextExpected
+                       << " dimensions, but output_shape has rank "
+                       << outputShapeArray.size();
+  }
+
+  return success();
+}
+
+// Index Hint Attributes
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to make the step and aligned fields optional.
+// When step is 1 and aligned is false, these fields will be omitted.
+// Format: <group_size[, step = N][, aligned]>
+Attribute IREE::GPU::LaneIncrementAttr::parse(AsmParser &parser, Type) {
+  int64_t groupSize = 0;
+  if (failed(parser.parseLess()) || failed(parser.parseInteger(groupSize))) {
+    return {};
+  }
+  int64_t step = 1;
+  bool aligned = false;
+  bool parsedStep = false;
+  bool parsedAligned = false;
+  // Parse optional ", step = N" and/or ", aligned"
+  while (succeeded(parser.parseOptionalComma())) {
+    if (succeeded(parser.parseOptionalKeyword("step"))) {
+      if (parsedStep) {
+        parser.emitError(parser.getCurrentLocation(),
+                         "'step' specified more than once");
+        return {};
+      }
+      if (failed(parser.parseEqual()) || failed(parser.parseInteger(step))) {
+        return {};
+      }
+      parsedStep = true;
+    } else if (succeeded(parser.parseOptionalKeyword("aligned"))) {
+      if (parsedAligned) {
+        parser.emitError(parser.getCurrentLocation(),
+                         "'aligned' specified more than once");
+        return {};
+      }
+      aligned = true;
+      parsedAligned = true;
+    } else {
+      parser.emitError(parser.getCurrentLocation(),
+                       "expected 'step' or 'aligned'");
+      return {};
+    }
+  }
+  if (failed(parser.parseGreater())) {
+    return {};
+  }
+  return LaneIncrementAttr::get(parser.getContext(), groupSize, step, aligned);
+}
+
+void IREE::GPU::LaneIncrementAttr::print(AsmPrinter &printer) const {
+  printer << "<" << getGroupSize();
+  if (getStep() != 1) {
+    printer << ", step = " << getStep();
+  }
+  if (getAligned()) {
+    printer << ", aligned";
+  }
+  printer << ">";
 }
 
 //===----------------------------------------------------------------------===//

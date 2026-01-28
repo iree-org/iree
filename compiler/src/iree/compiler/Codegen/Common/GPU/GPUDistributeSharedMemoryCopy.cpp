@@ -70,8 +70,9 @@ static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
 
         unsigned rank = dstMemRefType.getRank();
         // Return empty tile size for zero dim tensor.
-        if (rank == 0)
+        if (rank == 0) {
           return tileSizesVal;
+        }
         int copyTileSize =
             copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();
         for (unsigned i = 0; i < rank - 1; i++) {
@@ -145,8 +146,9 @@ getTileToDistributableSize(linalg::GenericOp copyOp,
     unroll.push_back(numThreads * numElementPerThread);
     assert(threadsAvailable % numThreads == 0);
     threadsAvailable = threadsAvailable / numThreads;
-    if (threadsAvailable == 1)
+    if (threadsAvailable == 1) {
       break;
+    }
   }
   assert(threadsAvailable == 1);
   unroll.resize(shape.size(), 1);
@@ -162,8 +164,9 @@ static LogicalResult tileToUnroll(mlir::FunctionOpInterface funcOp,
       [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
         SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
-        if (!copyOp)
+        if (!copyOp) {
           return tileSizesVal;
+        }
         std::optional<SmallVector<int64_t>> staticSize =
             getTileToDistributableSize(copyOp, flatWorkgroupSize);
         for (int64_t dim : *staticSize) {
@@ -235,8 +238,9 @@ static LogicalResult tileAndDistribute(mlir::FunctionOpInterface funcOp,
       [](OpBuilder &builder, Operation *operation) {
         SmallVector<Value> tileSizesVal;
         auto copyOp = dyn_cast<linalg::GenericOp>(operation);
-        if (!copyOp)
+        if (!copyOp) {
           return tileSizesVal;
+        }
         SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);
         for (int64_t dim : staticSize) {
           tileSizesVal.push_back(arith::ConstantIndexOp::create(
@@ -308,8 +312,9 @@ static Value createFlatId(mlir::FunctionOpInterface funcOp,
 static void hoistAlloc(mlir::FunctionOpInterface funcOp) {
   SmallVector<memref::AllocOp> allocs;
   funcOp.walk([&](memref::AllocOp alloc) {
-    if (alloc.getOperands().empty())
+    if (alloc.getOperands().empty()) {
       allocs.push_back(alloc);
+    }
   });
   for (memref::AllocOp alloc : allocs) {
     alloc->moveBefore(&(*funcOp.getBlocks().begin()),
@@ -325,15 +330,17 @@ static void removeRedundantBarriers(mlir::FunctionOpInterface funcOp) {
       Operation *prevOp = copyOp->getPrevNode();
       SmallVector<Operation *> redundantBarriers;
       while (prevOp) {
-        if (isa<gpu::BarrierOp>(prevOp))
+        if (isa<gpu::BarrierOp>(prevOp)) {
           redundantBarriers.push_back(prevOp);
-        else
+        } else {
           break;
+        }
         prevOp = prevOp->getPrevNode();
       }
       if (prevOp && hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
-        for (Operation *op : redundantBarriers)
+        for (Operation *op : redundantBarriers) {
           op->erase();
+        }
       }
     }
   });
@@ -345,8 +352,9 @@ static int64_t numIteration(scf::ForOp forOp) {
   auto ubCstOp = forOp.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
   auto stepCstOp = forOp.getStep().getDefiningOp<arith::ConstantIndexOp>();
   if (!lbCstOp || !ubCstOp || !stepCstOp || lbCstOp.value() < 0 ||
-      ubCstOp.value() < 0 || stepCstOp.value() < 0)
+      ubCstOp.value() < 0 || stepCstOp.value() < 0) {
     return 0;
+  }
   int64_t tripCount =
       llvm::divideCeil(ubCstOp.value() - lbCstOp.value(), stepCstOp.value());
   return tripCount;
@@ -358,8 +366,9 @@ unrollSharedMemoryLoops(mlir::FunctionOpInterface funcOp,
                         const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
   SmallVector<scf::ForOp> forOpsToUnroll;
   funcOp.walk([&](scf::ForOp forOp) {
-    if (!loopsToIgnore.count(forOp))
+    if (!loopsToIgnore.contains(forOp)) {
       forOpsToUnroll.push_back(forOp);
+    }
   });
   for (scf::ForOp forOp : llvm::reverse(forOpsToUnroll)) {
     (void)loopUnrollByFactor(forOp, numIteration(forOp));
@@ -378,11 +387,13 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   SmallVector<linalg::GenericOp> copiesToWorkgroupMem;
   funcOp.walk([&](linalg::GenericOp copyOp) {
-    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker()))
+    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
       copiesToWorkgroupMem.push_back(copyOp);
+    }
   });
-  if (copiesToWorkgroupMem.empty())
+  if (copiesToWorkgroupMem.empty()) {
     return success();
+  }
 
   // Step 0. First clean up the IR.
   hoistAlloc(funcOp);

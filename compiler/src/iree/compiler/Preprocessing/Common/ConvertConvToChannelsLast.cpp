@@ -216,7 +216,10 @@ createTransposeAsTensorPack(
   SmallVector<AffineExpr> mapResults(inputMap.getResults());
   AffineMap transposedMap;
 
-  Value packedOperand = packedInput;
+  Value packedOperand;
+  if (!packedInput.getResults().empty()) {
+    packedOperand = packedInput.getResult();
+  }
   // Collapse the unit dims created by linalg.pack if the pack is just a
   // transpose.
   if (tilingFactor <= 0) {
@@ -522,10 +525,12 @@ public:
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
-    if (!packOp.getOuterDimsPerm().empty())
+    if (!packOp.getOuterDimsPerm().empty()) {
       return failure();
-    if (packOp.getPaddingValue())
+    }
+    if (packOp.getPaddingValue()) {
       return failure();
+    }
 
     RankedTensorType destType =
         cast<RankedTensorType>(packOp.getDest().getType());
@@ -572,8 +577,9 @@ public:
     int64_t nTiled = 0;
     for (int64_t srcIdx = 0; srcIdx < srcRank; srcIdx++) {
       reassocationIndices.push_back({srcIdx + nTiled});
-      while (innerDims.contains(srcIdx + nTiled))
+      while (innerDims.contains(srcIdx + nTiled)) {
         reassocationIndices.back().push_back(srcIdx + ++nTiled);
+      }
     }
 
     rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
@@ -603,8 +609,9 @@ public:
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
-    if (!unpackOp.getOuterDimsPerm().empty())
+    if (!unpackOp.getOuterDimsPerm().empty()) {
       return failure();
+    }
 
     RankedTensorType srcType =
         cast<RankedTensorType>(unpackOp.getSource().getType());

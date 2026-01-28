@@ -15,6 +15,7 @@ include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Dialect/Linalg/IR/LinalgBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/Properties.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
@@ -112,6 +113,22 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
 }
 
 //===----------------------------------------------------------------------===//
+// FusionBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_FusionBarrierOp :
+    Op<IREECodegen_Dialect, "fusion_barrier", [
+      SameOperandsAndResultType, Pure]> {
+  let summary = [{Prevents fusion through a tensor value}];
+
+  let arguments = (ins AnyRankedTensor:$source);
+  let results = (outs AnyRankedTensor:$result);
+  let assemblyFormat = [{
+    attr-dict $source `:` type($result)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // SwizzleHintOp
 //===----------------------------------------------------------------------===//
 
@@ -156,9 +173,9 @@ def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
     is otherwise perfectly legal.
   }];
 
-  let arguments = (ins RankedTensorOrMemRefOf<[AnyType], [1]>:$operand,
+  let arguments = (ins AnyRankedTensorOrMemRef:$operand,
                        IREECodegen_AnySwizzleAttr:$swizzle);
-  let results = (outs RankedTensorOrMemRefOf<[AnyType], [1]>:$result);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
     $operand `[` $swizzle attr-dict `]` `:` type($result)
@@ -492,6 +509,110 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// HintWorkgroupCountOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_WorkgroupCountHintOp :
+    Op<IREECodegen_Dialect, "workgroup_count_hint", []> {
+  let summary = [{Hints at the workgroup count to set}];
+
+  let description = [{
+    Captures a set of values to use as the workgroup count. The backward slice
+    starting from this op's operands is cloned into the workgroup count region
+    of all transitive callers.
+
+    The sizes are specified in logical order (innermost to outermost), matching
+    the workgroup count region's (x, y, z) convention. If fewer than 3 sizes
+    are provided, the remaining dimensions default to 1.
+
+    If multiple hints inform the same entry point, the **elementwise maximum**
+    across all hints is used as the count along each dimension. For example:
+
+    ```mlir
+    hal.executable.export @entry_point
+    module {
+      func.func @entry_point() {
+        iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+        iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+      }
+    }
+    ```
+
+    resolves to:
+
+    ```mlir
+    hal.executable.export @entry_point {
+      %wx = arith.maxsi %a, %x
+      %wy = arith.maxsi %b, %y
+      %wz = arith.maxsi %c, %z
+      hal.return %wx, %wy, %wz
+    }
+    ```
+
+    #### Common Usage: Linearized Workgroup Counts
+
+    The most common use case for this operation involves computing a linearized
+    (1-D) workgroup count and specifying it as a single size.
+
+    ```mlir
+    %num_workgroups = arith.ceildivui %total_iterations, %tile_size : index
+    iree_codegen.workgroup_count_hint sizes(%num_workgroups)
+    ```
+
+    This results in `(%num_workgroups, 1, 1)` as the final workgroup count.
+  }];
+
+  let arguments = (ins
+    Variadic<Index>:$sizes,
+    DenseI64ArrayAttr:$static_sizes
+  );
+  let results = (outs);
+  let hasCustomAssemblyFormat = 1;
+
+  let builders = [
+    OpBuilder<(ins "ArrayRef<OpFoldResult>":$sizes)>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns a vector with all the static and dynamic sizes.
+    SmallVector<OpFoldResult> getMixedSizes() {
+      OpBuilder builder(getContext());
+      return ::mlir::getMixedValues(getStaticSizes(), getSizes(), builder);
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// IndexHintOp
+//===----------------------------------------------------------------------===//
+
+def IREECodegen_IndexHintOp : Op<IREECodegen_Dialect, "index_hint", [Pure]> {
+  let summary = "Compiler hint providing semantic information about an index";
+  let description = [{
+    Pure pass-through operation that annotates an index value with semantic
+    information about how it varies across parallel workers (e.g., GPU lanes).
+
+    The hint attribute describes the index behavior. Common hints include:
+    - `#iree_gpu.lane_constant<N>`: Index is uniform within groups of N lanes
+    - `#iree_gpu.lane_increment<N>`: Index increments by 1 within groups of N lanes
+
+    This operation is always safe to remove (replace with input). It exists
+    purely to guide optimization passes.
+
+    Example:
+    ```mlir
+    %row = iree_codegen.index_hint %idx(#iree_gpu.lane_constant<16>) : index
+    %col = iree_codegen.index_hint %idx(#iree_gpu.lane_increment<16>) : index
+    ```
+  }];
+
+  let arguments = (ins Index:$input, AnyAttr:$hint);
+  let results = (outs Index:$result);
+
+  let assemblyFormat = "$input `(` $hint `)` attr-dict `:` type($input)";
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGENOPS

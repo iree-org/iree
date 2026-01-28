@@ -6,7 +6,8 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -50,8 +51,19 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":core_headers",
+        "//build_tools/third_party/libbacktrace",
         "//runtime/src/iree/base/internal:time",
         "//runtime/src/iree/base/tracing:provider",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "allocator_test",
+    srcs = ["allocator_test.cc"],
+    deps = [
+        ":base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -111,6 +123,14 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_fuzz(
+    name = "string_view_fuzz",
+    srcs = ["string_view_fuzz.cc"],
+    deps = [
+        ":base",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "string_view_test",
     srcs = ["string_view_test.cc"],
@@ -164,5 +184,15 @@ iree_runtime_cc_test(
         ":loop_test_hdrs",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "allocator_benchmark",
+    srcs = ["allocator_benchmark.cc"],
+    deps = [
+        ":base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
     ],
 )

@@ -1,0 +1,10 @@
+{
+  "model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+  "description": "Question-answering embeddings (4M+ downloads)",
+  "tests": [
+    {"name": "question", "input": "What is machine learning?"},
+    {"name": "answer", "input": "Machine learning is a subset of artificial intelligence."},
+    {"name": "technical", "input": "How does gradient descent work?"},
+    {"name": "no_special", "input": "query text", "add_special_tokens": false}
+  ]
+}

@@ -400,18 +400,20 @@ static StringAttr inferResultName(MLIRContext *context, int index,
 }
 
 static DictionaryAttr getIOAttr(ArrayAttr allAttrs, unsigned i) {
-  if (!allAttrs)
+  if (!allAttrs) {
     return nullptr;
+  }
   return cast_or_null<DictionaryAttr>(allAttrs.getValue()[i]);
 }
 
 static void formatIOAttr(DictionaryAttr attrs, llvm::raw_ostream &os) {
-  if (!attrs || attrs.empty())
+  if (!attrs || attrs.empty()) {
     return;
+  }
   auto shouldIncludeAttr = [](const NamedAttribute &attr) {
     return attr.getName().getValue() != "iree.abi.name";
   };
-  if (!llvm::any_of(attrs, shouldIncludeAttr)) {
+  if (llvm::none_of(attrs, shouldIncludeAttr)) {
     return;
   }
   os << " {";

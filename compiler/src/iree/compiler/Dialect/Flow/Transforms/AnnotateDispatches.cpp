@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
@@ -79,8 +80,9 @@ static TensorType getMainTensorForLinalgExtOp(Operation *op) {
   auto resultTypes = llvm::to_vector(op->getResultTypes());
   for (Type t : llvm::concat<Type>(operandTypes, resultTypes)) {
     auto tensorType = dyn_cast<TensorType>(t);
-    if (!tensorType)
+    if (!tensorType) {
       continue;
+    }
     if (!main) {
       main = tensorType;
     } else if (costOfDomain(tensorType.getShape()) >
@@ -111,12 +113,6 @@ static int64_t estimateLinalgExtOpCost(Operation *op) {
   LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
                           << "\n");
   return cost;
-}
-
-// Estimates the evaluation cost of a Linalg::Softmax op using a heuristic cost
-// model similar to LinalgExt ops.
-static int64_t estimateLinalgSoftmaxOpCost(Operation *op) {
-  return estimateLinalgExtOpCost(op);
 }
 
 // Returns a string like "512xDx128" representing loop ranges.
@@ -181,19 +177,22 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
 static std::string getOpNameWithoutDialectName(Operation *op) {
   auto opName =
       op->getName().getStringRef().drop_until([](char c) { return c == '.'; });
-  if (opName.starts_with("."))
+  if (opName.starts_with(".")) {
     opName = opName.drop_front();
+  }
   return opName.str();
 }
 
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (!linalg::isaContractionOpInterface(linalgOp))
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
     return false;
+  }
 
   FailureOr<linalg::ContractionDimensions> dims =
       linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
+  if (failed(dims)) {
     return false;
+  }
 
   // One of the input should have all the parallel dimensions with size one.
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -206,8 +205,9 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
       unsigned pos = cast<AffineDimExpr>(result).getPosition();
       // For a parallel dim, the bounds can be non-one if it's batch dim.
       if (iterators[pos] == utils::IteratorType::parallel && bounds[pos] != 1 &&
-          !llvm::is_contained(dims->batch, pos))
+          !llvm::is_contained(dims->batch, pos)) {
         return false;
+      }
     }
     return true;
   };
@@ -221,6 +221,10 @@ static bool isMatmulLike(linalg::LinalgOp linalgOp) {
   // and 2 parallel dimensions.
   return linalg::isaContractionOpInterface(linalgOp) &&
          linalgOp.getNumParallelLoops() >= 2;
+}
+
+static bool isScaledMatmulLike(linalg::LinalgOp linalgOp) {
+  return IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp);
 }
 
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
@@ -291,6 +295,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
     } else if (isPermutationOuts && isProjectedPermIns &&
                numPermutationIn == 0) {
       prefix = "elementwise_broadcast";
+    } else if (isScaledMatmulLike(op)) {
+      prefix = "scaled_matmul_like";
     } else if (isMatvecLike(op)) {
       prefix = "matvec_like";
     } else if (isMatmulLike(op)) {
@@ -309,8 +315,9 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   if (prefix.empty()) {
     // By default, use the op name as prefix.
     auto opName = op->getName().getStringRef();
-    if (!opName.consume_front("linalg."))
+    if (!opName.consume_front("linalg.")) {
       return "";
+    }
     prefix = opName.str();
   }
 
@@ -324,8 +331,9 @@ static std::string summarizeLinalgExtOp(Operation *op) {
   auto opName = op->getName().getStringRef();
   // Currently, this utility is also invoked by Linalg::SoftmaxOp.
   if (!(opName.consume_front("iree_linalg_ext.") ||
-        opName.consume_front("linalg.")))
+        opName.consume_front("linalg."))) {
     return "";
+  }
   std::string suffix = "";
   if (TensorType mainTensor = getMainTensorForLinalgExtOp(op)) {
     llvm::raw_string_ostream sstream(suffix);
@@ -366,6 +374,18 @@ static std::string summarizeDispatchRegion(Region &region) {
   Operation *bestOp = NULL;
   const int64_t kMinEstimatedCost = -1;
   int64_t bestEstimatedCost = kMinEstimatedCost;
+
+  auto updateIfBetter = [&bestEstimatedCost, &bestOp](int64_t candidateCost,
+                                                      Operation *candidate) {
+    if (candidateCost < bestEstimatedCost) {
+      return;
+    }
+    bestEstimatedCost = candidateCost;
+    bestOp = candidate;
+    LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
+                            << "', cost: " << bestEstimatedCost << "\n");
+  };
+
   // Collect TilingInterface ops for better heuristic names.
   SmallVector<Operation *> tileableOps;
   region.walk([&](Operation *op) {
@@ -373,44 +393,22 @@ static std::string summarizeDispatchRegion(Region &region) {
       tileableOps.push_back(op);
     }
     TypeSwitch<Operation *>(op)
-        .Case<linalg::SoftmaxOp>([&](auto op) {
-          int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
-            return;
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
-        })
+        .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+            [&](auto op) { updateIfBetter(kMaxCost, op); })
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
-            return;
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
         .Case<IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
               linalg::PackOp, linalg::UnPackOp>([&](auto op) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
           int64_t estimatedCost = kMinEstimatedCost + 1;
-          if (estimatedCost < bestEstimatedCost)
-            return;
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
-        .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
+        .Case<IREE::LinalgExt::LinalgExtOp, linalg::SoftmaxOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
-          if (estimatedCost < bestEstimatedCost)
-            return;
-          bestEstimatedCost = estimatedCost;
-          bestOp = op;
-          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
-                                  << "', cost: " << bestEstimatedCost << "\n");
+          updateIfBetter(estimatedCost, op);
         })
         .Default([&](Operation *op) {
           // No cost estimation implemented, skip.
@@ -437,8 +435,12 @@ static std::string summarizeDispatchRegion(Region &region) {
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
-      .Case<linalg::SoftmaxOp>(
-          [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
+      .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          [&](auto op) {
+            auto opName = getOpNameWithoutDialectName(op);
+            bestSummary =
+                opName + "_" + loopRangesToString(op.getStaticLoopRanges());
+          })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
       .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
@@ -464,7 +466,7 @@ static std::string summarizeDispatchRegion(Region &region) {
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary = opName + "_" + index + "_" + loopRangesToString(shape);
       })
-      .Case<IREE::LinalgExt::LinalgExtOp>(
+      .Case<IREE::LinalgExt::LinalgExtOp, linalg::SoftmaxOp>(
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Default([&](Operation *op) {
         // No summarization implemented, default to the op's name.
@@ -500,8 +502,9 @@ struct AnnotateDispatchesPass
     for (auto executableOp :
          getOperation().getBody()->getOps<IREE::Flow::ExecutableOp>()) {
       auto innerModuleOp = executableOp.getInnerModule();
-      if (!innerModuleOp)
+      if (!innerModuleOp) {
         continue;
+      }
       for (auto exportOp :
            executableOp.getBlock().getOps<ExecutableExportOp>()) {
         auto oldSymbolRefAttr = SymbolRefAttr::get(
@@ -510,11 +513,13 @@ struct AnnotateDispatchesPass
 
         auto funcOp = innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
             exportOp.getFunctionRef());
-        if (!funcOp)
+        if (!funcOp) {
           continue; // extern module, maybe
+        }
         std::string summary = summarizeDispatchRegion(funcOp.getFunctionBody());
-        if (summary.empty())
+        if (summary.empty()) {
           continue; // unable to tell
+        }
 
         std::string newName = funcOp.getName().str() + "_" + summary;
 

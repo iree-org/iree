@@ -223,11 +223,11 @@ func.func @testing_without_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<
 
 // -----
 
-#encoding = #iree_encoding.testing<[#iree_encoding.specialization_resolver<123>]>
+#encoding = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 func.func @testing_with_layouts(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf32, #encoding> {
   return %arg0 : tensor<?x?xf32, #encoding>
 }
-//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<[#iree_encoding.specialization_resolver<123>]>
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<layouts = [#iree_encoding.specialized<123>]>
 //      CHECK: func.func @testing_with_layouts(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xf32, #[[ENCODING]]>
 // CHECK         return %[[ARG0]]
@@ -259,3 +259,36 @@ func.func @identity_encoding(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xf3
   return %arg0 : tensor<?x?xf32, #encoding>
 }
 //      CHECK: func.func @identity_encoding(%[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.identity>
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+func.func @set_encoding_with_encoding_dims(%arg0: tensor<?x?xf32>, %m: index, %n: index, %k: index) -> tensor<?x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>
+  return %0 : tensor<?x?xf32, #encoding>
+}
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<>
+//      CHECK: func.func @set_encoding_with_encoding_dims
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+// CHECK-SAME:     %[[M:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[N:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]: index
+//      CHECK:   iree_encoding.set_encoding %[[ARG0]] encoding_dims{%[[M]], %[[N]], %[[K]]} : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+func.func @unset_encoding_with_encoding_dims(
+    %arg0: tensor<?x?xf32, #encoding>, %d0: index, %d1: index, %m: index, %n: index, %k: index) -> tensor<?x?xf32> {
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+  return %0 : tensor<?x?xf32>
+}
+//      CHECK: #[[ENCODING:.+]] = #iree_encoding.testing<>
+//      CHECK: func.func @unset_encoding_with_encoding_dims
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #[[ENCODING]]>
+// CHECK-SAME:     %[[D0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[D1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[M:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[N:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[K:[a-zA-Z0-9]+]]: index
+//      CHECK:   iree_encoding.unset_encoding %[[ARG0]] encoding_dims{%[[M]], %[[N]], %[[K]]} : tensor<?x?xf32, #[[ENCODING]]> -> tensor<?x?xf32>{%[[D0]], %[[D1]]}

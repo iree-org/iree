@@ -15,8 +15,9 @@ namespace mlir::iree_compiler::DFX {
 
 ChangeStatus AbstractElement::update(Solver &solver) {
   ChangeStatus changeStatus = ChangeStatus::UNCHANGED;
-  if (getState().isAtFixpoint())
+  if (getState().isAtFixpoint()) {
     return changeStatus;
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "[Solver] updating: ";

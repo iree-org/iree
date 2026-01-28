@@ -10,10 +10,55 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 
 #define DEBUG_TYPE "iree-stream-partitioning"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+// Collects all values consumed by an operation, including those used in nested
+// regions (e.g. scf.for bodies). This is a conservative analysis that walks all
+// regions to find consumed values.
+void collectConsumedValues(Operation *rootOp,
+                           SetVector<Value> &consumedValues) {
+  SmallVector<Operation *> worklist;
+  DenseSet<Operation *> visitedOps;
+  worklist.push_back(rootOp);
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+
+    // Skip if already visited.
+    if (!visitedOps.insert(op).second) {
+      continue;
+    }
+
+    // Collect direct operands.
+    for (auto operand : op->getOperands()) {
+      consumedValues.insert(operand);
+    }
+
+    // Conservatively walk all regions to find consumed values.
+    // We can't use RegionBranchOpInterface::getEntrySuccessorRegions because
+    // it requires compile-time constant operands to determine reachability,
+    // but we need to handle runtime values. For hazard detection we need to be
+    // conservative and assume all regions may execute.
+    for (auto &region : op->getRegions()) {
+      for (auto &block : region) {
+        for (auto &nestedOp : block) {
+          worklist.push_back(&nestedOp);
+        }
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Partition data structures
+//===----------------------------------------------------------------------===//
 
 #ifndef NDEBUG
 
@@ -54,14 +99,25 @@ void PartitionSet::dump(AsmState &asmState) {}
 #endif // !NDEBUG
 
 LogicalResult Partition::verify(Location loc) {
-  // Ensure all ops are compatible with the partition affinity.
   for (auto *op : ops) {
+    // Ensure all ops are compatible with the partition affinity.
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
       if (!IREE::Stream::AffinityAttr::areCompatible(
               affinity, affinityOp.getAffinityAttr())) {
         return op->emitError("op affinity ")
                << affinityOp.getAffinityAttr()
                << " is not compatible with the partition affinity " << affinity;
+      }
+    }
+
+    // Verify that no ops in the partitions produce result timepoints.
+    // When forming the partition we could gather the result timepoints and
+    // replace them all with the new timepoint of the execution region.
+    if (auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
+      if (Value resultTimepoint = timelineOp.getResultTimepoint()) {
+        return op->emitError()
+               << "cannot partition timeline op with result timepoint; "
+               << "result timepoints from partitioned ops not yet supported";
       }
     }
   }
@@ -93,14 +149,50 @@ LogicalResult Partition::verify(Location loc) {
     }
   }
 
+  // Check for circular dependencies: input ops using partition outputs.
+  // This can happen if an operation with nested regions (like scf.for) is
+  // incorrectly placed as a partition input when its nested regions actually
+  // consume partition outputs.
+  for (auto in : ins) {
+    // Only check ops, not bare values.
+    auto definingOp = in.getDefiningOp();
+    if (!definingOp) {
+      continue;
+    }
+
+    // Collect all values used by this input op (including nested regions).
+    SetVector<Value> inputConsumedValues;
+    collectConsumedValues(definingOp, inputConsumedValues);
+
+    // Check if any consumed value comes from partition outputs.
+    //
+    // NOTE: We only check outputs, not all defValues. When operations are
+    // duplicated across partitions (e.g., clones with preferCloneToConsumers),
+    // the same operation may define values in multiple partitions. An input
+    // operation might consume a value that is defined in THIS partition's
+    // defValues, but if that value is not exported (not in outputs), the input
+    // operation must be using a copy from another partition that also defines
+    // it. Checking defValues would create false positives for such cases.
+    for (auto consumedValue : inputConsumedValues) {
+      if (outs.contains(consumedValue)) {
+        return mlir::emitError(loc)
+               << "circular dependency: input operation uses partition output "
+               << consumedValue
+               << " - this indicates the operation should be inside the "
+                  "partition";
+      }
+    }
+  }
+
   return success();
 }
 
 LogicalResult PartitionSet::verify(Location loc) {
   // Verify each partition is consistent.
   for (auto &partition : partitions) {
-    if (failed(partition.verify(loc)))
+    if (failed(partition.verify(loc))) {
       return failure();
+    }
   }
 
   // Ensure a correct topological order of partitions. This only checks the
@@ -125,8 +217,9 @@ LogicalResult PartitionSet::verify(Location loc) {
 }
 
 void PartitionSet::topologicalSort() {
-  if (partitions.empty())
+  if (partitions.empty()) {
     return;
+  }
 
   SetVector<Partition *> unsortedSet;
   DenseMap<Value, SmallVector<Partition *>> consumers;
@@ -155,8 +248,9 @@ void PartitionSet::topologicalSort() {
       }
     }
   };
-  for (auto *partition : unsortedSet)
+  for (auto *partition : unsortedSet) {
     postorderWalk(partition);
+  }
 
   SmallVector<Partition> sortedSet;
   sortedSet.reserve(partitions.size());

@@ -47,8 +47,9 @@ public:
   SmallVector<SmallVector<Value>> getValueAliasSets() const {
     SmallVector<SmallVector<Value>> result;
     for (auto it = valueAliasing.begin(); it != valueAliasing.end(); ++it) {
-      if (!(*it)->isLeader())
+      if (!(*it)->isLeader()) {
         continue; // Ignore non-leader sets.
+      }
       auto &aliasSet = result.emplace_back();
       for (auto mi = valueAliasing.member_begin(**it);
            mi != valueAliasing.member_end(); ++mi) {
@@ -110,8 +111,9 @@ static void computeRegionValueAliases(Operation *regionOp,
     // Tied results reuse their operand buffer.
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto result : op.getResults()) {
-      if (!isa<IREE::Stream::ResourceType>(result.getType()))
+      if (!isa<IREE::Stream::ResourceType>(result.getType())) {
         continue;
+      }
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
         if (tiedOperand) {
@@ -181,8 +183,9 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
   SmallPtrSet<Value, 16> liveOuts;
   auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->back());
   for (auto returnValue : yieldOp.getResourceOperands()) {
-    if (!isa<IREE::Stream::ResourceType>(returnValue.getType()))
+    if (!isa<IREE::Stream::ResourceType>(returnValue.getType())) {
       continue;
+    }
     liveOuts.insert(returnValue);
   }
 
@@ -191,8 +194,9 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
   LivenessIntervalMap valueIntervals;
   int ordinal = 0;
   for (Value value : streamBlock->getArguments()) {
-    if (!isa<IREE::Stream::ResourceType>(value.getType()))
+    if (!isa<IREE::Stream::ResourceType>(value.getType())) {
       continue;
+    }
     LivenessInterval interval;
     interval.start = LIVE_IN;
     if (liveOuts.contains(value)) {
@@ -218,16 +222,19 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
       // the duration of the region.
       concurrentOp.walk([&](Operation *op) {
         for (auto value : op->getResults()) {
-          if (!isa<IREE::Stream::ResourceType>(value.getType()))
+          if (!isa<IREE::Stream::ResourceType>(value.getType())) {
             continue;
+          }
           if (auto tiedOp = dyn_cast<Util::TiedOpInterface>(op)) {
             // Skip tied results as their liveness is determined by the tied
             // operand.
-            if (tiedOp.getTiedResultOperand(value))
+            if (tiedOp.getTiedResultOperand(value)) {
               continue;
+            }
           }
-          if (!value.use_empty())
+          if (!value.use_empty()) {
             continue;
+          }
           LivenessInterval interval;
           interval.start = start;
           interval.end = start;
@@ -238,8 +245,9 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
       });
     }
     for (auto value : op.getResults()) {
-      if (!isa<IREE::Stream::ResourceType>(value.getType()))
+      if (!isa<IREE::Stream::ResourceType>(value.getType())) {
         continue;
+      }
       LivenessInterval interval;
       interval.start = start;
       if (liveOuts.contains(value)) {
@@ -267,8 +275,9 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
     // We'd need to update this analysis to handle the nesting in order to
     // compute the ranges here but that's not (currently) required as all
     // allocated values roll up to the parent scope by way of the yields.
-    if (llvm::all_of(aliasSet, isNested))
+    if (llvm::all_of(aliasSet, isNested)) {
       continue;
+    }
 
     assert((llvm::all_of(aliasSet, isNested) ||
             llvm::none_of(aliasSet, isNested)) &&
@@ -371,8 +380,9 @@ struct AllocationScope {
   // Returns a memoized ConstantIndexOp of |value|.
   Value lookupOrCreateIndex(int64_t value) {
     auto it = indexConstantMap.find(value);
-    if (it != indexConstantMap.end())
+    if (it != indexConstantMap.end()) {
       return it->second;
+    }
     auto constantValue = OpBuilder(rootOp).createOrFold<arith::ConstantIndexOp>(
         rootOp->getLoc(), value);
     indexConstantMap.insert(std::make_pair(value, constantValue));
@@ -382,10 +392,12 @@ struct AllocationScope {
   // Performs a memoized add (as many adds of offsets or lengths are redundant).
   Value add(Location loc, Value lhs, Value rhs) {
     // TODO(benvanik): memoize - if worth it. Needs profiling.
-    if (matchPattern(lhs, m_Zero()))
+    if (matchPattern(lhs, m_Zero())) {
       return rhs;
-    if (matchPattern(rhs, m_Zero()))
+    }
+    if (matchPattern(rhs, m_Zero())) {
       return lhs;
+    }
     auto result = OpBuilder(rootOp).createOrFold<arith::AddIOp>(loc, lhs, rhs);
     return result;
   }
@@ -394,8 +406,9 @@ struct AllocationScope {
   // All aliases of |resource| will also be mapped.
   void mapResourceRange(Value resource, ResourceRange resourceRange,
                         AsmState *asmState) {
-    if (resourceRangeMap.count(resource))
+    if (resourceRangeMap.contains(resource)) {
       return;
+    }
 
     if (!resourceRange.offset && !resourceRange.length) {
       resourceRange.offset = lookupOrCreateIndex(0);
@@ -459,7 +472,7 @@ struct AllocationScope {
 
   // Returns true if the given |resource| has a storage range mapped to it.
   bool hasResourceRange(Value resource) const {
-    return resourceRangeMap.count(resource) != 0;
+    return resourceRangeMap.contains(resource) != 0;
   }
 
   // Calls |callback| for |resource| and each value aliasing it.
@@ -957,8 +970,9 @@ applyAsyncAllocations(IREE::Stream::AffinityAttr executionAffinityAttr,
   auto ops = llvm::map_to_vector(llvm::reverse(block),
                                  [&](Operation &op) { return &op; });
   for (auto *op : ops) {
-    if (op->hasTrait<OpTrait::IsTerminator>())
+    if (op->hasTrait<OpTrait::IsTerminator>()) {
       continue;
+    }
     if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                    .Case([&](IREE::Stream::ResourceSubviewOp op) {
                      return applyResourceSubviewOp(op, scope, OpBuilder(op));
@@ -1053,8 +1067,9 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
     auto value = valueInterval.value;
     assert(value && "must have value for interval");
     auto valueType = dyn_cast<IREE::Stream::ResourceType>(value.getType());
-    if (!valueType)
+    if (!valueType) {
       continue;
+    }
 
     // Only handle transient buffers (created/used/dropped within the stream).
     if (valueInterval.start == LIVE_IN || valueInterval.end == LIVE_OUT) {
@@ -1160,7 +1175,7 @@ static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
       auto terminatorOp =
           cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
       value = terminatorOp.getSuccessorOperands(
-          RegionSuccessor(definingOp, definingOp->getResults()))[resultIndex];
+          RegionSuccessor::parent())[resultIndex];
     } else if (auto tiedOp =
                    dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
       // If the producer is tied then try to get the operand.
@@ -1268,8 +1283,9 @@ struct ConstantAllocation {
 // Returns true if |value| has one use and it is a stream.yield op.
 static bool isOnlyUseYield(Value value) {
   for (auto *user : value.getUsers()) {
-    if (!isa<IREE::Stream::YieldOp>(user))
+    if (!isa<IREE::Stream::YieldOp>(user)) {
       return false;
+    }
   }
   return true;
 }
@@ -1524,7 +1540,7 @@ static Value findTiedYieldResult(Value seedValue) {
       cast<RegionBranchOpInterface>(seedValue.getParentRegion()->getParentOp());
   SmallVector<RegionSuccessor> regions;
   regionOp.getSuccessorRegions(regionOp->getRegion(0), regions);
-  auto results = regions.front().getSuccessorInputs();
+  auto results = regionOp.getSuccessorInputs(regions.front());
   SmallVector<Value> worklist;
   worklist.push_back(seedValue);
   while (!worklist.empty()) {
@@ -1552,8 +1568,9 @@ gatherSubranges(Value derivedValue) {
   while (auto definingOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
              baseValue.getDefiningOp())) {
     auto tiedValue = definingOp.getTiedResultOperand(baseValue);
-    if (!tiedValue)
+    if (!tiedValue) {
       break;
+    }
     if (auto subrangeOp = dyn_cast<IREE::Util::SubrangeOpInterface>(
             definingOp.getOperation())) {
       if (subrangeOp.getSubrangeResource() == tiedValue) {
@@ -1580,8 +1597,9 @@ static ResourceRange deriveResourceRangeFromResult(Value resultValue,
                                                    Value resultSize,
                                                    OpBuilder &builder) {
   auto subranges = gatherSubranges(resultValue);
-  if (subranges.empty())
+  if (subranges.empty()) {
     return ResourceRange(resultValue, resultSize);
+  }
 
   // TODO(benvanik): switch to affine.apply when fully supported.
   Value offset;
@@ -1716,8 +1734,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     // Replace results of escaping uploads with the upload values.
     for (auto &reservation : constantAllocation.reservations) {
       auto result = findTiedYieldResult(reservation.constantOp.getResult());
-      if (!result)
+      if (!result) {
         continue;
+      }
       result.replaceAllUsesWith(reservation.resource);
       handledResults.insert(result);
       LLVM_DEBUG({
@@ -1954,8 +1973,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
   executeOp.getResultTimepoint().replaceAllUsesWith(
       newExecuteOp.getResultTimepoint());
   for (auto replacement : resultReplacements) {
-    if (!replacement.second)
+    if (!replacement.second) {
       continue; // handled already
+    }
     LLVM_DEBUG({
       AsmState asmState(newExecuteOp->getParentOp());
       llvm::dbgs() << "  == replacing region result ";
@@ -2047,14 +2067,16 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
-    auto joinOp = IREE::Stream::TimepointJoinOp::create(
-        builder, fusedLoc, newExecuteOp.getResultTimepoint().getType(),
-        joinTimepoints);
-    executeTimepointUsers.insert(joinOp);
-    newExecuteOp.getResultTimepoint().replaceUsesWithIf(
-        joinOp.getResultTimepoint(), [&](OpOperand &operand) {
-          return !executeTimepointUsers.contains(operand.getOwner());
-        });
+    Value joinedTimepoint =
+        IREE::Stream::TimepointJoinOp::join(fusedLoc, joinTimepoints, builder);
+    // Only replace uses if a join was actually created (size > 1).
+    if (joinedTimepoint != newExecuteOp.getResultTimepoint()) {
+      executeTimepointUsers.insert(joinedTimepoint.getDefiningOp());
+      newExecuteOp.getResultTimepoint().replaceUsesWithIf(
+          joinedTimepoint, [&](OpOperand &operand) {
+            return !executeTimepointUsers.contains(operand.getOwner());
+          });
+    }
   }
 
   return success();
@@ -2076,6 +2098,85 @@ static LogicalResult convertAsyncStoreOp(IREE::Stream::AsyncStoreOp asyncOp) {
       builder, asyncOp.getLoc(), asyncOp.getTarget(), asyncOp.getTargetSize(),
       asyncOp.getTargetOffset(), asyncOp.getValue());
   asyncOp.replaceAllUsesWith(newOp.getTarget());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterLoadOp(IREE::Stream::AsyncParameterLoadOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  SmallVector<Type> resultTypes = {asyncOp.getResult().getType()};
+  SmallVector<Value> resultSizes = {asyncOp.getResultSize()};
+  SmallVector<StringRef> sourceKeys = {asyncOp.getSourceKey()};
+  SmallVector<Value> sourceOffsets = {asyncOp.getSourceOffset()};
+  auto cmdOp = IREE::Stream::CmdParameterLoadOp::create(
+      builder, asyncOp.getLoc(), resultTypes,
+      builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), builder.getStrArrayAttr(sourceKeys),
+      sourceOffsets, resultSizes, asyncOp.getAwaitTimepoint(),
+      asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(cmdOp.getResults()[0]);
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterReadOp(IREE::Stream::AsyncParameterReadOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterReadOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeyAttr(),
+      asyncOp.getSourceOffset(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+      asyncOp.getTargetOffset(), asyncOp.getTargetLength(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getTarget());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterWriteOp(IREE::Stream::AsyncParameterWriteOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterWriteOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffset(),
+      asyncOp.getSourceLength(), asyncOp.getTargetScopeAttr(),
+      asyncOp.getTargetKeyAttr(), asyncOp.getTargetOffset(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterGatherOp(IREE::Stream::AsyncParameterGatherOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterGatherOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeysAttr(),
+      asyncOp.getSourceOffsets(), asyncOp.getTarget(), asyncOp.getTargetSize(),
+      asyncOp.getTargetOffsets(), asyncOp.getTargetLengths(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getTarget());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
+  asyncOp.erase();
+  return success();
+}
+
+static LogicalResult
+convertAsyncParameterScatterOp(IREE::Stream::AsyncParameterScatterOp asyncOp) {
+  OpBuilder builder(asyncOp);
+  auto cmdOp = IREE::Stream::CmdParameterScatterOp::create(
+      builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffsets(),
+      asyncOp.getSourceLengths(), asyncOp.getTargetScopeAttr(),
+      asyncOp.getTargetKeysAttr(), asyncOp.getTargetOffsets(),
+      asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
+  asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
+  asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
   asyncOp.erase();
   return success();
 }
@@ -2121,6 +2222,21 @@ struct ScheduleAllocationPass
                        })
                        .Case([&](IREE::Stream::AsyncStoreOp op) {
                          return convertAsyncStoreOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterLoadOp op) {
+                         return convertAsyncParameterLoadOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+                         return convertAsyncParameterReadOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+                         return convertAsyncParameterWriteOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+                         return convertAsyncParameterGatherOp(op);
+                       })
+                       .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+                         return convertAsyncParameterScatterOp(op);
                        })
                        .Default(success()))) {
           return signalPassFailure();

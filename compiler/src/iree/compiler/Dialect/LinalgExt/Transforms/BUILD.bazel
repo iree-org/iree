@@ -33,6 +33,7 @@ iree_compiler_cc_library(
         "ConvertConv2DToWinograd.cpp",
         "ConvertConvToIm2ColOp.cpp",
         "ConvertToLoops.cpp",
+        "DecomposeAggregatedOps.cpp",
         "DecomposeAttention.cpp",
         "DecomposeIm2col.cpp",
         "DecomposeMapScatter.cpp",
@@ -91,6 +92,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
         "@llvm-project//mlir:VectorDialect",
     ],
 )

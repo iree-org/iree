@@ -22,6 +22,12 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clUnifyEncodingForGlobals(
+    "iree-stream-experimental-unify-encoding-for-globals",
+    llvm::cl::desc("Unifies multiple encodings of the same immutable global to "
+                   "reduce memory. It is an experimental flag for data-tiling"),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -139,6 +145,12 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
         IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
   }
 
+  // Unify encodings for globals, which ensures that we don't increase memory
+  // footprint significantly, unless the program explicitly requires it.
+  if (clUnifyEncodingForGlobals) {
+    passManager.addPass(IREE::Stream::createUnifyEncodingForGlobalsPass());
+  }
+
   //----------------------------------------------------------------------------
   // Stream affinity/assignment
   //----------------------------------------------------------------------------
@@ -172,30 +184,66 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Specialize the encodings before the lowering of stream tensor ops.
   passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
 
+  // Lower stream.tensor.* ops to stream.async.* ops based on
+  // affinity/configuration assigned during placement.
   FunctionLikeNest(passManager)
-      // Run canonicalization after specializing to clean up any
-      // duplicate/redundant IR and fold any duplicate encoding chains before we
-      // perform the encoding materialization.
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
-
-      // Lower stream.tensor.* ops to stream.async.* ops based on
-      // affinity/configuration assigned during placement.
       .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
   passManager.addPass(IREE::Stream::createMaterializeEncodingsPass());
 
+  // Layout packed slices (if any exist yet) to emit the arithmetic required for
+  // all resource offsets. We introduce more packing ops later on but do want
+  // to support using the layout utilities earlier if the encodings need them.
+  // Having the arithmetic baked out allows for better propagation (resource
+  // offsets and sizes can be detected as constant if statically packed, etc).
+  FunctionLikeNest(passManager).addPass(IREE::Stream::createLayoutSlicesPass);
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Everything must now be in stream.async.* form but we don't yet have
-  // lifetime assigned.
+  // lifetime assigned. We don't expect there to be any aliasing or other
+  // trickery yet as we haven't materialized copy-on-write handling and copy
+  // elision.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
-  // Elide transfers we can provably detect are not required due to the target
-  // topology. We do this prior to copy-on-write so that we are only providing
-  // real transfers to the analysis.
-  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
+  // If we want to split out a parameter encoder now is the best time: we have
+  // all of the encodings specialized but haven't yet started allocating memory
+  // (which will be entirely different in the split module) and if any are
+  // multi-targeting we haven't yet materialized their concrete forms.
+  //
+  // Once this pass runs the original parameters will (mostly) be removed and
+  // in place of globally initialized constants will be loads from the new
+  // encoded parameters. Any packing/layout is done now so that the parameter
+  // index has a common layout between both modules.
+  if (transformOptions.parameterEncoderOutputFile.hasValue() &&
+      !transformOptions.parameterEncoderOutputFile.empty()) {
+    IREE::Stream::SplitParameterEncoderPassOptions encoderPassOptions;
+    encoderPassOptions.mode = transformOptions.parameterEncoderMode;
+    encoderPassOptions.outputScope =
+        transformOptions.parameterEncoderOutputScope;
+    encoderPassOptions.outputFile = transformOptions.parameterEncoderOutputFile;
+    passManager.addPass(
+        IREE::Stream::createSplitParameterEncoderPass(encoderPassOptions));
+
+    // This is somewhat dangerous in that if there is any aliasing in the
+    // program this _may_ break it. But we don't allow aliasing at this point of
+    // the pipeline so that's a risk I'm willing to take. The splitting pass
+    // introduces resource subview ops that we need to propagate to consumers.
+    //
+    // TODO(benvanik): improve stream.async.slice handling in
+    // ElideAsyncCopiesPass. Today it is local only and it results in parameters
+    // sliced in initializers being treated as copies. If we fixed that we could
+    // use stream.async.slice as is appropriate at this phase of lowering and
+    // remove this pass.
+    passManager.addPass(IREE::Util::createPropagateSubrangesPass());
+
+    // DCE any executables no longer required just to make the IR cleaner.
+    // Often times we'll have quite a few hoisted initialization and encoding
+    // dispatches that are not used elsewhere in the program (though some may
+    // be due to deduplication!).
+    passManager.addPass(mlir::createSymbolDCEPass());
+  }
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides
@@ -339,11 +387,6 @@ void buildStreamOptimizationPassPipeline(
   // cause duplication. Run CSE to collapse.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
-  // If any scf ops crept in we get rid of them here. We should be able to
-  // support them all the way through the stream dialect but some passes are not
-  // currently set up to handle them (such as elide timepoints).
-  FunctionLikeNest(passManager).addPass(mlir::createSCFToControlFlowPass);
-
   //----------------------------------------------------------------------------
   // Whole-program scheduling optimization
   //----------------------------------------------------------------------------
@@ -366,6 +409,11 @@ void buildStreamOptimizationPassPipeline(
     // lifetimes.
     FunctionLikeNest(passManager)
         .addPass(IREE::Stream::createReuseAllocationsPass);
+
+    // If any scf ops crept in we get rid of them here. We should be able to
+    // support them all the way through the stream dialect but some passes are
+    // not currently set up to handle them (such as elide timepoints).
+    FunctionLikeNest(passManager).addPass(mlir::createSCFToControlFlowPass);
 
     // Elide timepoints in dependency chains where one is known to have been
     // reached by the time another is (A -> B -> A|C).

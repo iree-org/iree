@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -37,6 +37,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/CPU/IR:IREECPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/PCF/IR",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces",
         "//compiler/src/iree/compiler/ConstEval",
@@ -49,6 +50,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/TransformOps",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
@@ -205,4 +208,29 @@ iree_compiler_cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+iree_compiler_cc_library(
+    name = "MlirTransformHarness",
+    hdrs = ["MlirTransformHarness.h"],
+    deps = [
+        ":init_passes_and_dialects",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Rewrite",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+iree_compiler_cc_test(
+    name = "MlirTransformHarnessDemo",
+    srcs = ["MlirTransformHarnessDemo.cpp"],
+    data = ["MlirTransformHarnessDemo.mlir"],
+    deps = [
+        ":MlirTransformHarness",
+    ],
 )

@@ -251,16 +251,18 @@ static Value recomposeFromI32sAndConvert(
   // Preserve the arg attrs on either the final op or the function argument
   // if none was required.
   if (auto definingOp = value.getDefiningOp()) {
-    if (oldArgAttr)
+    if (oldArgAttr) {
       definingOp->setAttrs(oldArgAttr);
+    }
     newArgAttrs.push_back(nullptr);
   } else {
     newArgAttrs.push_back(oldArgAttr);
   }
   // Note that if we had decomposed the arg we'll expect that there are two attr
   // dicts for the two new args.
-  if (wasDecomposed)
+  if (wasDecomposed) {
     newArgAttrs.push_back(nullptr);
+  }
 
   return value;
 }
@@ -298,7 +300,7 @@ static void updateExportFuncOp(mlir::FunctionOpInterface funcOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// --iree-hal-pack-dispatch-operands
+// --iree-stream-pack-dispatch-operands
 //===----------------------------------------------------------------------===//
 
 struct PackDispatchOperandsPass
@@ -311,8 +313,9 @@ struct PackDispatchOperandsPass
     for (auto executableOp :
          getOperation().getOps<IREE::Stream::ExecutableOp>()) {
       auto innerModuleOp = executableOp.getInnerModule();
-      if (!innerModuleOp)
+      if (!innerModuleOp) {
         continue;
+      }
       for (auto funcOp : innerModuleOp.getOps<mlir::FunctionOpInterface>()) {
         if (funcOp.isPublic()) {
           updateExportFuncOp(funcOp);

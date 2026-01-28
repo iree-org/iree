@@ -91,6 +91,13 @@ static inline bool iree_host_size_is_power_of_two(iree_host_size_t value) {
   return (value != 0) && ((value & (value - 1)) == 0);
 }
 
+// Returns true if |alignment| is valid for aligned allocation functions.
+// Valid alignments are either 0 (use default) or a power of two.
+static inline bool iree_host_size_is_valid_alignment(
+    iree_host_size_t alignment) {
+  return alignment == 0 || iree_host_size_is_power_of_two(alignment);
+}
+
 // Returns true if |value| matches the given minimum |alignment|.
 static inline bool iree_host_size_has_alignment(iree_host_size_t value,
                                                 iree_host_size_t alignment) {
@@ -107,6 +114,13 @@ static inline iree_device_size_t iree_device_align(
 // Returns true if |value| is a power-of-two.
 static inline bool iree_device_size_is_power_of_two(iree_device_size_t value) {
   return (value != 0) && ((value & (value - 1)) == 0);
+}
+
+// Returns true if |alignment| is valid for aligned allocation functions.
+// Valid alignments are either 0 (use default) or a power of two.
+static inline bool iree_device_size_is_valid_alignment(
+    iree_device_size_t alignment) {
+  return alignment == 0 || iree_device_size_is_power_of_two(alignment);
 }
 
 // Returns true if |value| matches the given minimum |alignment|.
@@ -461,13 +475,23 @@ static inline void iree_unaligned_store_le_f64(double* ptr, double value) {
        int64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
       uint64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
          float*: iree_unaligned_load_le_f32((const float*)(ptr)),              \
-        double*: iree_unaligned_load_le_f64((const double*)(ptr))              \
+        double*: iree_unaligned_load_le_f64((const double*)(ptr)),             \
+  const int8_t*: iree_unaligned_load_le_u8((const uint8_t*)(ptr)),             \
+ const uint8_t*: iree_unaligned_load_le_u8((const uint8_t*)(ptr)),             \
+ const int16_t*: iree_unaligned_load_le_u16((const uint16_t*)(ptr)),           \
+const uint16_t*: iree_unaligned_load_le_u16((const uint16_t*)(ptr)),           \
+ const int32_t*: iree_unaligned_load_le_u32((const uint32_t*)(ptr)),           \
+const uint32_t*: iree_unaligned_load_le_u32((const uint32_t*)(ptr)),           \
+ const int64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
+const uint64_t*: iree_unaligned_load_le_u64((const uint64_t*)(ptr)),           \
+   const float*: iree_unaligned_load_le_f32((const float*)(ptr)),              \
+  const double*: iree_unaligned_load_le_f64((const double*)(ptr))              \
   )
 
 // Dereferences |ptr| and writes the given |value|.
 // Automatically handles unaligned accesses on architectures that may not
 // support them natively (or efficiently). Memory is treated as little-endian.
-#define iree_unaligned_store(ptr, value)                                       \
+#define iree_unaligned_store_le(ptr, value)                                    \
   _Generic((ptr),                                                              \
         int8_t*: iree_unaligned_store_le_u8((uint8_t*)(ptr), value),           \
        uint8_t*: iree_unaligned_store_le_u8((uint8_t*)(ptr), value),           \

@@ -85,11 +85,10 @@ TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
 
 TEST_F(DynamicLibraryTest, LoadLibraryFailure) {
   iree_dynamic_library_t* library = NULL;
-  iree_status_t status = iree_dynamic_library_load_from_file(
-      kUnknownName, IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_system(),
-      &library);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND,
+                        iree_dynamic_library_load_from_file(
+                            kUnknownName, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+                            iree_allocator_system(), &library));
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
@@ -127,10 +126,9 @@ TEST_F(DynamicLibraryTest, GetSymbolFailure) {
       iree_allocator_system(), &library));
 
   int (*fn_ptr)(int);
-  iree_status_t status =
-      iree_dynamic_library_lookup_symbol(library, "unknown", (void**)&fn_ptr);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
-  iree_status_free(status);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_NOT_FOUND,
+      iree_dynamic_library_lookup_symbol(library, "unknown", (void**)&fn_ptr));
   EXPECT_EQ(nullptr, fn_ptr);
 
   iree_dynamic_library_release(library);

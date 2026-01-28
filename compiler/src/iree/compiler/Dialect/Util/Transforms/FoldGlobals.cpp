@@ -307,6 +307,7 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
             context,
             {
                 global.op.getGlobalInitialValue(),
+                TypeAttr::get(global.op.getGlobalType()),
                 DictionaryAttr::get(
                     context, llvm::to_vector(global.op->getDialectAttrs())),
             }),
@@ -379,13 +380,16 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
     }
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
+    GreedyRewriteConfig config;
+    config.setRegionSimplificationLevel(GreedySimplifyRegionLevel::Normal);
+
     mlir::ModuleOp moduleOp = getOperation();
     GlobalTable globalTable(moduleOp);
     beforeFoldingGlobals = globalTable.size();
     bool didChangeAny = false;
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
-      if (failed(applyPatternsGreedily(moduleOp, frozenPatterns))) {
+      if (failed(applyPatternsGreedily(moduleOp, frozenPatterns, config))) {
         signalPassFailure();
         return;
       }

@@ -26,7 +26,7 @@ module attributes {hal.device.targets = [
 
   stream.executable private @executable {
     stream.executable.export public @dispatch workgroups() -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root()
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       stream.return %x, %y, %z : index, index, index
     }
     builtin.module {

@@ -63,9 +63,44 @@ MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold);
 
 // The structs defined here because they are used by encoding_interfaces.td.
+
+/// Bundles an encoding attribute with its associated dynamic information.
+/// This is returned by interface methods that query encoding properties
+/// from operations. Dynamic values can include runtime information needed
+/// by the encoding (e.g., Batch, M, N, K dimensions for matmul encodings).
+struct EncodingProperties {
+  /// The encoding attribute for the operand/result.
+  Attribute encoding;
+  /// Optional dynamic values needed by the encoding. This field may be empty
+  /// for operations that don't require dynamic dimension tracking.
+  ///
+  /// For operations implementing IndexingMapOpInterface (e.g., linalg ops),
+  /// these correspond to the dynamic entries in iteration_sizes, ordered by
+  /// loop dimension index. For example:
+  /// - matmul with iteration_sizes=[?, ?, ?] -> [M, N, K]
+  /// - batch_matmul with iteration_sizes=[?, ?, ?, ?] -> [Batch, M, N, K]
+  /// - matmul with iteration_sizes=[?, 128, ?] -> [M, K] (N is static)
+  ///
+  /// For operations that do not implement IndexingMapOpInterface, the meaning
+  /// and ordering of these values is defined by downstream users.
+  SmallVector<Value> dynamicValues;
+};
+
+/// Bundles encoding properties for all operands and DPS init operands of an
+/// operation. This is returned by SerializableAttr::getEncodingProperties()
+/// when deriving encodings from an operation (e.g., linalg.matmul).
+struct OpEncodingProperties {
+  SmallVector<EncodingProperties> operands;
+  SmallVector<EncodingProperties> inits;
+};
+
 struct PropagationEncoding {
   SmallVector<Attribute> operandEncodings;
   SmallVector<Attribute> resultEncodings;
+  /// Optional dynamic encoding dimension values that should be carried through
+  /// during propagation. See EncodingProperties::dynamicValues for details on
+  /// the ordering and semantics of these values.
+  SmallVector<Value> encodingDims;
 };
 
 struct PropagationResult {
@@ -80,6 +115,15 @@ struct PropagationResult {
   // The new results created after propagating an encoding through an operation.
   // It is returned to the caller for further transformation or replacement.
   SmallVector<Value> replacements;
+};
+
+/// Information returned by convertForBitcast interface method.
+/// Contains the new shape and encoding after bitcasting to a new element type.
+struct BitcastEncodingInfo {
+  /// The new shape after bitcasting.
+  SmallVector<int64_t> newShape;
+  /// The new encoding attribute after bitcasting.
+  Attribute encoding;
 };
 
 } // namespace mlir::iree_compiler::IREE::Encoding

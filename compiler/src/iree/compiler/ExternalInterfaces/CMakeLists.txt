@@ -31,16 +31,21 @@ iree_cc_library(
     "UtilExternalModels.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
+    MLIRControlFlowInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
+    MLIRMemRefDialect
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR

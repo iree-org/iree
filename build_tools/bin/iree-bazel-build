@@ -1,0 +1,167 @@
+#!/bin/bash
+# Build IREE targets with Bazel.
+#
+# Usage: iree-bazel-build [options] [target] [bazel-args...]
+#
+# Examples:
+#   iree-bazel-build                      # Build all tools
+#   iree-bazel-build //compiler/...       # Build compiler
+#   iree-bazel-build --config=debug       # Debug build
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-build"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-build - Build IREE with Bazel
+
+USAGE
+    iree-bazel-build [options] [target] [bazel-args...]
+
+OPTIONS
+    -n, --dry_run    Show the bazel command without executing
+    -v, --verbose    Show the bazel command before executing
+    -k, --keep_going Continue building after errors
+    -w, --watch      Watch mode: rebuild on file changes
+    -h, --help       Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+
+ARGUMENTS
+    target       Bazel target (required)
+    bazel-args   Additional arguments passed to bazel build
+
+EXAMPLES
+    # Build the compiler tool
+    iree-bazel-build //tools:iree-compile
+
+    # Build multiple tools at once
+    iree-bazel-build //tools:iree-compile //tools:iree-opt
+
+    # Build the runtime module executor
+    iree-bazel-build //tools:iree-run-module
+
+    # Build all compiler components
+    iree-bazel-build //compiler/...
+
+    # Debug build
+    iree-bazel-build //tools:iree-compile --config=debug
+
+    # Continue building after errors
+    iree-bazel-build -k //compiler/...
+
+    # Watch and rebuild on changes
+    iree-bazel-build -w //tools:iree-opt
+
+    # Show command without executing (verbose dry-run)
+    iree-bazel-build -nv //tools:iree-compile
+
+COMMON TARGETS
+    //tools/...              All tools
+    //compiler/...           Compiler components
+    //runtime/...            Runtime components
+    //tools:iree-compile     Main compiler tool
+    //tools:iree-run-module  Module runner
+
+CONFIGURATIONS
+    --config=localdev        Local dev optimizations (disk cache, skymeld)
+    --config=debug           No optimizations, assertions enabled
+    --config=asserts         Optimized with assertions
+    --config=asan            Address Sanitizer
+    --config=msan            Memory Sanitizer
+    --config=tsan            Thread Sanitizer
+
+SEE ALSO
+    iree-bazel-configure, iree-bazel-test
+EOF
+}
+
+# Parse arguments.
+KEEP_GOING=0
+WATCH_MODE=0
+TARGET=""
+BAZEL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            IREE_BAZEL_DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -k|--keep_going|--keep-going)
+            KEEP_GOING=1
+            shift
+            ;;
+        -w|--watch)
+            WATCH_MODE=1
+            shift
+            ;;
+        -*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        *)
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
+            else
+                BAZEL_ARGS+=("${1}")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Set up worktree (after arg parsing so --help works anywhere).
+iree_setup_worktree
+
+# Target is required.
+if [[ -z "${TARGET}" ]]; then
+    iree_error "Target is required for bazel build"
+    echo ""
+    echo "Examples:"
+    echo "  iree-bazel-build //tools:iree-compile"
+    echo "  iree-bazel-build //tools:iree-compile //tools:iree-opt"
+    echo "  iree-bazel-build //tools:iree-run-module"
+    echo "  iree-bazel-build //compiler/..."
+    exit 1
+fi
+
+# Build the command with default configs before user args.
+iree_bazel_build_default_configs
+BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+CMD=("${BAZEL_BIN}" build "${IREE_BAZEL_DEFAULT_CONFIGS[@]}")
+if [[ "${KEEP_GOING}" == "1" ]]; then
+    CMD+=(--keep_going)
+fi
+CMD+=("${TARGET}" "${BAZEL_ARGS[@]}")
+
+# Execute or show.
+if iree_is_verbose || iree_is_dry_run; then
+    iree_info "Command: ${CMD[*]}"
+fi
+
+if iree_is_dry_run; then
+    exit 0
+fi
+
+iree_info "Building ${TARGET}"
+exec "${CMD[@]}"

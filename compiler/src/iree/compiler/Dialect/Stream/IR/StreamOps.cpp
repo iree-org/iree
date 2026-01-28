@@ -167,10 +167,12 @@ static LogicalResult verifyAllResourcesCaptured(Region &region) {
       availableResources.insert(result);
     }
     for (auto operand : op.getOperands()) {
-      if (!operand)
+      if (!operand) {
         continue;
-      if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+      }
+      if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
         continue;
+      }
       if (!availableResources.contains(operand)) {
         return op.emitOpError() << "used resource not listed in explicit "
                                    "captures (or produced internally)";
@@ -215,8 +217,9 @@ static void eraseStreamRegionResults(Region &region,
                                      ArrayRef<unsigned> excludedResultIndices) {
   for (auto &block : region.getBlocks()) {
     auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
-    if (!yieldOp)
+    if (!yieldOp) {
       continue;
+    }
     // HACK: there's no good way of updating the operand and size together today
     // - we should add a helper to the ClosureYieldOpInterface that checks for
     // size/shape aware traits and does this automatically.
@@ -230,6 +233,85 @@ static void eraseStreamRegionResults(Region &region,
   }
 }
 
+// Checks if a timepoint transitively covers another timepoint through the
+// await dependency chain. This performs a local dominance-based check without
+// requiring global analysis.
+static bool timepointCoversTimepoint(Value coveringTimepoint,
+                                     Value coveredTimepoint) {
+  if (coveringTimepoint == coveredTimepoint) {
+    return true;
+  }
+
+  // Check if coveringTimepoint is defined by an op that awaits
+  // coveredTimepoint.
+  auto coveringOp = dyn_cast_or_null<IREE::Stream::TimelineOpInterface>(
+      coveringTimepoint.getDefiningOp());
+  if (!coveringOp) {
+    return false;
+  }
+
+  // Get await timepoints and check if any match or transitively cover.
+  SmallVector<Value> awaitTimepoints = coveringOp.getAwaitTimepoints();
+  for (Value awaitTp : awaitTimepoints) {
+    if (timepointCoversTimepoint(awaitTp, coveredTimepoint)) {
+      return true;
+    }
+  }
+
+  // Check stream.timepoint.join operations.
+  if (auto joinOp = dyn_cast<IREE::Stream::TimepointJoinOp>(
+          coveringTimepoint.getDefiningOp())) {
+    for (Value joinedTp : joinOp.getAwaitTimepoints()) {
+      if (timepointCoversTimepoint(joinedTp, coveredTimepoint)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Verifies that a timeline op's await clause covers all the resources it uses.
+// For each resource operand, if it was produced by a timeline op with a
+// timepoint, that timepoint should be in the await list or transitively
+// covered.
+static LogicalResult
+verifyTimelineResourceDominance(IREE::Stream::TimelineOpInterface timelineOp,
+                                ValueRange resourceOperands) {
+  SmallVector<Value> awaitTimepoints = timelineOp.getAwaitTimepoints();
+  for (Value resource : resourceOperands) {
+    // Skip resources not defined by timeline ops.
+    auto producerTimeline =
+        dyn_cast_if_present<IREE::Stream::TimelineOpInterface>(
+            resource.getDefiningOp());
+    if (!producerTimeline) {
+      continue;
+    }
+    Value producerTimepoint = producerTimeline.getResultTimepoint();
+    if (!producerTimepoint) {
+      continue;
+    }
+
+    // Check if any of the await timepoints cover the producer's timepoint.
+    bool isCovered = false;
+    for (Value awaitTp : awaitTimepoints) {
+      if (timepointCoversTimepoint(awaitTp, producerTimepoint)) {
+        isCovered = true;
+        break;
+      }
+    }
+
+    if (!isCovered) {
+      return timelineOp->emitOpError()
+             << "uses resource produced by timeline op but does not await its "
+                "completion timepoint (resource produced at "
+             << resource.getLoc() << ", timepoint not covered by await clause)";
+    }
+  }
+
+  return success();
+}
+
 // Computes the value access bits starting from |rootValue|.
 // Traverses the IR graph along tied ops but does not handle branches.
 static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
@@ -237,8 +319,9 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   DenseSet<Value> processedValues;
   SmallVector<Value> worklist;
   auto enqueueValue = [&](Value value) {
-    if (processedValues.contains(value))
+    if (processedValues.contains(value)) {
       return;
+    }
     processedValues.insert(value);
     worklist.push_back(value);
   };
@@ -278,8 +361,9 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
       if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user)) {
         auto tiedIndices = tiedOp.getTiedResultOperandIndices();
         for (int64_t tiedIndex : tiedIndices) {
-          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex)
+          if (tiedIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
             continue;
+          }
           auto operand = user->getOperand(tiedIndex);
           if (operand == value) {
             // Tied operand.
@@ -308,16 +392,19 @@ static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
   if (succeeded(parser.parseOptionalLBrace())) {
     do {
       SymbolRefAttr entryPointAttr;
-      if (failed(parser.parseAttribute(entryPointAttr)))
+      if (failed(parser.parseAttribute(entryPointAttr))) {
         return failure();
+      }
       entryPointAttrs.push_back(entryPointAttr);
     } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRBrace()))
+    if (failed(parser.parseRBrace())) {
       return failure();
+    }
   } else {
     SymbolRefAttr entryPointAttr;
-    if (failed(parser.parseAttribute(entryPointAttr)))
+    if (failed(parser.parseAttribute(entryPointAttr))) {
       return failure();
+    }
     entryPointAttrs.push_back(entryPointAttr);
   }
   entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
@@ -355,21 +442,24 @@ static ParseResult parseEncodedResourceOperands(
     TypeAttr resourceEncoding;
     if (failed(parser.parseOperand(resources.back())) ||
         failed(parser.parseColon()) ||
-        failed(parser.parseAttribute(resourceEncoding)))
+        failed(parser.parseAttribute(resourceEncoding))) {
       return failure();
+    }
     resourceEncodingAttrs.push_back(resourceEncoding);
     if (int64_t dynamicDimCount =
             cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims()) {
       if (failed(parser.parseOperandList(resourceEncodingDims, dynamicDimCount,
-                                         AsmParser::Delimiter::Braces)))
+                                         AsmParser::Delimiter::Braces))) {
         return failure();
+      }
     }
     resourceTypes.emplace_back();
     resourceSizes.emplace_back();
     if (failed(parser.parseKeyword("in")) ||
         failed(parseSizeAwareType(parser, resourceTypes.back(),
-                                  resourceSizes.back())))
+                                  resourceSizes.back()))) {
       return failure();
+    }
   } while (succeeded(parser.parseOptionalComma()));
   resourceEncodings = parser.getBuilder().getArrayAttr(resourceEncodingAttrs);
   return success();
@@ -859,12 +949,118 @@ static void printParameterLoadOperations(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<ParameterGatherOperations>(
+// custom<AsyncParameterGatherOperations>(
+//     $source_scope, $source_keys, $source_offsets,
+//     $target, type($target), $target_size, $target_offsets, $target_ends,
+//     $target_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseAsyncParameterGatherOperations(
+    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    OpAsmParser::UnresolvedOperand &target, Type &targetType,
+    OpAsmParser::UnresolvedOperand &targetSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetLengths) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> sourceKeyAttrs;
+  do {
+    StringAttr rowSourceScopeAttr;
+    StringAttr sourceKeyAttr;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    OpAsmParser::UnresolvedOperand targetEnd;
+    OpAsmParser::UnresolvedOperand targetLength;
+    OpAsmParser::UnresolvedOperand rowTarget;
+    Type rowTargetType;
+    OpAsmParser::UnresolvedOperand rowTargetSize;
+    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
+                                       sourceKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseRSquare()) || failed(parser.parseArrow()) ||
+        failed(parser.parseOperand(rowTarget)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseKeyword("to")) ||
+        failed(parser.parseOperand(targetEnd)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(targetLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowTargetType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowTargetSize)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    if (!targetType) {
+      sourceScopeAttr = rowSourceScopeAttr;
+      target = rowTarget;
+      targetType = rowTargetType;
+      targetSize = rowTargetSize;
+    } else if (rowSourceScopeAttr != sourceScopeAttr ||
+               rowTarget.name != target.name || rowTargetType != targetType ||
+               rowTargetSize.name != targetSize.name) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same scope and target resource");
+    }
+    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceOffsets.push_back(sourceOffset);
+    targetOffsets.push_back(targetOffset);
+    targetEnds.push_back(targetEnd);
+    targetLengths.push_back(targetLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
+  return success();
+}
+
+static void printAsyncParameterGatherOperations(
+    OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
+    ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value target,
+    Type targetType, Value targetSize, ValueRange targetOffsets,
+    ValueRange targetEnds, ValueRange targetLengths) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
+                      targetOffsets, targetEnds, targetLengths),
+      [&](std::tuple<StringAttr, Value, Value, Value, Value> it) {
+        auto [sourceKeyAttr, sourceOffset, targetOffset, targetEnd,
+              targetLength] = it;
+        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << "] -> ";
+        p.printOperand(target);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << " to ";
+        p.printOperand(targetEnd);
+        p << " for ";
+        p.printOperand(targetLength);
+        p << "] : ";
+        p.printType(targetType);
+        p << "{";
+        p.printOperand(targetSize);
+        p << "}";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<CmdParameterGatherOperations>(
 //     $source_scope, $source_keys, $source_offsets,
 //     $target, type($target), $target_size, $target_offsets, $target_lengths)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseParameterGatherOperations(
+static ParseResult parseCmdParameterGatherOperations(
     OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
     OpAsmParser::UnresolvedOperand &target, Type &targetType,
@@ -920,7 +1116,7 @@ static ParseResult parseParameterGatherOperations(
   return success();
 }
 
-static void printParameterGatherOperations(
+static void printCmdParameterGatherOperations(
     OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
     ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value target,
     Type targetType, Value targetSize, ValueRange targetOffsets,
@@ -956,12 +1152,117 @@ static void printParameterGatherOperations(
 }
 
 //===----------------------------------------------------------------------===//
-// custom<ParameterScatterOperations>(
+// custom<AsyncParameterScatterOperations>(
+//     $source, type($source), $source_size, $source_offsets, $source_ends,
+//     $source_lengths, $target_scope, $target_keys, $target_offsets)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseAsyncParameterScatterOperations(
+    OpAsmParser &parser, OpAsmParser::UnresolvedOperand &source,
+    Type &sourceType, OpAsmParser::UnresolvedOperand &sourceSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceLengths,
+    StringAttr &targetScopeAttr, ArrayAttr &targetKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> targetKeyAttrs;
+  do {
+    OpAsmParser::UnresolvedOperand rowSource;
+    Type rowSourceType;
+    OpAsmParser::UnresolvedOperand rowSourceSize;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand sourceEnd;
+    OpAsmParser::UnresolvedOperand sourceLength;
+    StringAttr rowTargetScopeAttr;
+    StringAttr targetKeyAttr;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    if (failed(parser.parseOperand(rowSource)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseKeyword("to")) ||
+        failed(parser.parseOperand(sourceEnd)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(sourceLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowSourceType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowSourceSize)) ||
+        failed(parser.parseRBrace()) || failed(parser.parseArrow()) ||
+        failed(parseParameterReference(parser, rowTargetScopeAttr,
+                                       targetKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    if (!sourceType) {
+      source = rowSource;
+      sourceType = rowSourceType;
+      sourceSize = rowSourceSize;
+      targetScopeAttr = rowTargetScopeAttr;
+    } else if (rowSource.name != source.name || rowSourceType != sourceType ||
+               rowSourceSize.name != sourceSize.name ||
+               rowTargetScopeAttr != targetScopeAttr) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same source resource and scope");
+    }
+    sourceOffsets.push_back(sourceOffset);
+    sourceEnds.push_back(sourceEnd);
+    sourceLengths.push_back(sourceLength);
+    targetKeyAttrs.push_back(targetKeyAttr);
+    targetOffsets.push_back(targetOffset);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetKeysAttr = builder.getArrayAttr(targetKeyAttrs);
+  return success();
+}
+
+static void printAsyncParameterScatterOperations(
+    OpAsmPrinter &p, Operation *op, Value source, Type sourceType,
+    Value sourceSize, ValueRange sourceOffsets, ValueRange sourceEnds,
+    ValueRange sourceLengths, StringAttr targetScopeAttr,
+    ArrayAttr targetKeysAttr, ValueRange targetOffsets) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceOffsets, sourceEnds, sourceLengths,
+                      targetKeysAttr.getAsRange<StringAttr>(), targetOffsets),
+      [&](std::tuple<Value, Value, Value, StringAttr, Value> it) {
+        auto [sourceOffset, sourceEnd, sourceLength, targetKeyAttr,
+              targetOffset] = it;
+        p.printOperand(source);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << " to ";
+        p.printOperand(sourceEnd);
+        p << " for ";
+        p.printOperand(sourceLength);
+        p << "] : ";
+        p.printType(sourceType);
+        p << "{";
+        p.printOperand(sourceSize);
+        p << "} -> ";
+        printParameterReference(p, op, targetScopeAttr, targetKeyAttr);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << "]";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<CmdParameterScatterOperations>(
 //     $source, type($source), $source_size, $source_offsets, $source_lengths,
 //     $target_scope, $target_keys, $target_offsets)
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseParameterScatterOperations(
+static ParseResult parseCmdParameterScatterOperations(
     OpAsmParser &parser, OpAsmParser::UnresolvedOperand &source,
     Type &sourceType, OpAsmParser::UnresolvedOperand &sourceSize,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
@@ -1017,7 +1318,7 @@ static ParseResult parseParameterScatterOperations(
   return success();
 }
 
-static void printParameterScatterOperations(
+static void printCmdParameterScatterOperations(
     OpAsmPrinter &p, Operation *op, Value source, Type sourceType,
     Value sourceSize, ValueRange sourceOffsets, ValueRange sourceLengths,
     StringAttr targetScopeAttr, ArrayAttr targetKeysAttr,
@@ -1139,12 +1440,14 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
   p << ")";
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << "(";
+    }
     printShapedResultList(p, op, operands, operandTypes, operandSizes,
                           resultTypes, resultSizes, tiedOperands);
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << ")";
+    }
   }
   p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
@@ -1237,8 +1540,9 @@ static ParseResult parsePackSliceRanges(
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
   do {
-    if (failed(parser.parseOptionalLSquare()))
+    if (failed(parser.parseOptionalLSquare())) {
       break;
+    }
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
     OpAsmParser::UnresolvedOperand dynamicSliceSize;
@@ -1262,8 +1566,9 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
                                  ArrayAttr lifetimeIntervals,
                                  ValueRange dynamicSliceSizes,
                                  TypeRange packedOffsetTypes) {
-  if (packedOffsetTypes.empty())
+  if (packedOffsetTypes.empty()) {
     return;
+  }
   for (unsigned i = 0; i < packedOffsetTypes.size(); ++i) {
     auto lifetimeStart = lifetimeIntervals[i * 2];
     auto lifetimeEnd = lifetimeIntervals[i * 2 + 1];
@@ -1275,8 +1580,9 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
     p.printAttributeWithoutType(lifetimeEnd);
     p << "] = ";
     p.printOperand(sliceSize);
-    if (i < packedOffsetTypes.size() - 1)
+    if (i < packedOffsetTypes.size() - 1) {
       p << ",";
+    }
   }
   p.printNewline();
 }
@@ -1314,16 +1620,18 @@ static ParseResult parseConstantValueList(
 static void printConstantValueList(OpAsmPrinter &p, Operation *op,
                                    TypeRange resultTypes,
                                    ValueRange resultSizes, ArrayAttr values) {
-  if (resultTypes.empty())
+  if (resultTypes.empty()) {
     return;
+  }
   for (unsigned i = 0; i < resultTypes.size(); ++i) {
     p.printNewline();
     p << "  ";
     printSizeAwareType(p, op, resultTypes[i], resultSizes[i]);
     p << " = ";
     p.printAttribute(values[i]);
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ",";
+    }
   }
 }
 
@@ -1377,13 +1685,15 @@ static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
 
 static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
                                       Region &body) {
-  if (body.empty())
+  if (body.empty()) {
     return;
+  }
   p << "workgroups(";
   auto args = body.getArguments();
   for (unsigned i = 0; i < args.size(); ++i) {
-    if (i > 0)
+    if (i > 0) {
       p << ", ";
+    }
     p.printRegionArgument(args[i]);
   }
   p << ")";
@@ -1405,8 +1715,9 @@ ResourceAllocOp::createSuballocations(
     bool uninitialized, AffinityAttr affinityAttr, OpBuilder &builder) {
   assert(locs.size() == storageSizes.size() &&
          "expect locs and storageSizes to match");
-  if (locs.empty())
+  if (locs.empty()) {
     return {};
+  }
   if (locs.size() == 1) {
     auto allocOp = IREE::Stream::ResourceAllocOp::create(
         builder, locs.front(), resourceType, storageSizes.front(),
@@ -1422,17 +1733,10 @@ ResourceAllocOp::createSuballocations(
   // small enough workloads and our target devices are relatively lax on
   // things so long as we stay under UINT32_MAX boundaries.
 
-  // All slices are 0-0 (overlapping).
-  size_t sliceCount = locs.size();
-  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
-
   // Compute total size and the offsets of all suballocated resources via the
   // pack op.
-  auto indexType = builder.getIndexType();
-  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
-      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
-      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+      builder, fusedLoc, /*offset=*/nullptr, storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
   auto allocOp = IREE::Stream::ResourceAllocOp::create(
@@ -1467,8 +1771,9 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
                                        OpBuilder &builder) {
   assert(locs.size() == storageSizes.size() &&
          "expect locs and storageSizes to match");
-  if (locs.empty())
+  if (locs.empty()) {
     return {};
+  }
   if (locs.size() == 1) {
     auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
         builder, locs.front(), resourceType, timepointType,
@@ -1592,6 +1897,18 @@ void ResourcePackOp::getAsmResultNames(
   // setNameFn(packedOffset.value(),
   //           "offset" + std::to_string(packedOffset.index()));
   // }
+}
+
+void ResourcePackOp::build(OpBuilder &builder, OperationState &state,
+                           Value offset, ValueRange valueSizes,
+                           IREE::Stream::AffinityAttr affinity) {
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = valueSizes.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> indexTypes(sliceCount, indexType);
+  build(builder, state, indexType, indexTypes, offset,
+        builder.getIndexArrayAttr(lifetimeIntervals), valueSizes, affinity);
 }
 
 LogicalResult ResourcePackOp::verify() {
@@ -2247,6 +2564,20 @@ void AsyncConstantOp::getAsyncAccessRanges(
 // stream.async.splat
 //===----------------------------------------------------------------------===//
 
+void AsyncSplatOp::build(OpBuilder &builder, OperationState &state,
+                         Type resultType, Value value, Value resultSize,
+                         Attribute affinity, Value awaitTimepoint) {
+  state.addTypes(resultType);
+  if (awaitTimepoint) {
+    state.addOperands(awaitTimepoint);
+  }
+  state.addOperands(value);
+  state.addOperands(resultSize);
+  if (affinity) {
+    state.addAttribute("affinity", affinity);
+  }
+}
+
 LogicalResult AsyncSplatOp::verify() {
   AsyncSplatOp op = *this;
   if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
@@ -2441,8 +2772,9 @@ static ParseResult parseCollectiveParam(
     OpAsmParser &parser, Attribute opAttr,
     std::optional<OpAsmParser::UnresolvedOperand> &optionalParamValue) {
   const char *keyword = getCollectiveParamKeyword(opAttr);
-  if (!keyword)
+  if (!keyword) {
     return success(); // optional
+  }
   OpAsmParser::UnresolvedOperand paramValue;
   if (failed(parser.parseKeyword(keyword)) || failed(parser.parseLParen()) ||
       failed(parser.parseOperand(paramValue)) || failed(parser.parseRParen())) {
@@ -2607,6 +2939,11 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getResultAffinityAttr() {
   return getTargetAffinityAttr();
 }
 
+void AsyncTransferOp::removeAffinityAttrs() {
+  removeSourceAffinityAttr();
+  removeTargetAffinityAttr();
+}
+
 void AsyncTransferOp::getAsyncAccessRanges(
     SmallVectorImpl<AsyncAccessRange> &ranges) {
   ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},
@@ -2683,16 +3020,19 @@ static ParseResult parseDispatchOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen()))
+  if (succeeded(parser.parseOptionalRParen())) {
     return success();
+  }
   do {
     // All entries at least have an %operand.
     resourceOperands.emplace_back();
-    if (failed(parser.parseOperand(resourceOperands.back())))
+    if (failed(parser.parseOperand(resourceOperands.back()))) {
       return failure();
+    }
     // Resources have a range.
     if (succeeded(parser.parseOptionalLSquare())) {
       resourceOffsets.emplace_back();
@@ -2708,8 +3048,9 @@ static ParseResult parseDispatchOperands(
       }
     }
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
   return success();
 }
 
@@ -2778,8 +3119,9 @@ void AsyncDispatchOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -2849,8 +3191,8 @@ void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
   }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
-    assert(type.getNumInputs() == argAttrs.size());
-    assert(type.getNumResults() == resAttrs.size());
+    assert(argAttrs.empty() || (type.getNumInputs() == argAttrs.size()));
+    assert(resAttrs.empty() || (type.getNumResults() == resAttrs.size()));
     call_interface_impl::addArgAndResultAttrs(
         builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
         builder.getStringAttr("res_attrs"));
@@ -2859,12 +3201,14 @@ void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
 
 bool AsyncFuncOp::isResultTied(int resultIndex) {
   auto tiedOperandsAttr = getTiedOperandsAttr();
-  if (!tiedOperandsAttr)
+  if (!tiedOperandsAttr) {
     return false;
+  }
   auto indexAttr = dyn_cast_if_present<IntegerAttr>(
       tiedOperandsAttr.getValue()[resultIndex]);
-  if (!indexAttr)
+  if (!indexAttr) {
     return false;
+  }
   return indexAttr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
 }
 
@@ -2934,8 +3278,9 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   }
   // auto typesCompatible = [](Type actual, Type expected) {
   auto typesCompatible = [](Type callee, Type call) {
-    if (callee == call)
+    if (callee == call) {
       return true;
+    }
     auto calleeResource = dyn_cast<IREE::Stream::ResourceType>(callee);
     auto callResource = dyn_cast<IREE::Stream::ResourceType>(call);
     if (calleeResource && callResource) {
@@ -2981,8 +3326,9 @@ void AsyncCallOp::getAsyncAccessRanges(
   unsigned rangeIndex = 0;
   unsigned tiedOperandBase = getTiedOperandsIndexAndLength().first;
   for (auto [operandIndex, operand] : llvm::enumerate(getResourceOperands())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = getOperandTiedResults(tiedOperandBase + operandIndex);
     if (!tiedResults.empty()) {
@@ -3024,8 +3370,9 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operands);
   state.addOperands(operandSizes);
   state.addOperands(resultSizes);
-  if (awaitTimepoint)
+  if (awaitTimepoint) {
     state.addOperands(awaitTimepoint);
+  }
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
@@ -3066,15 +3413,20 @@ AsyncExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange AsyncExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange(getResults())
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void AsyncExecuteOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getOperation(), getResults()));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -3088,8 +3440,9 @@ getExecutionAsyncAccessRanges(Op op,
   for (auto [i, operand, operandSize] : llvm::zip_equal(
            llvm::seq<unsigned>(0, op.getResourceOperands().size()),
            op.getResourceOperands(), op.getResourceOperandSizes())) {
-    if (!isa<IREE::Stream::ResourceType>(operand.getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
       continue;
+    }
     ResourceAccessBitfield access = ResourceAccessBitfield::Read;
     auto tiedResults = op.getOperandTiedResults(tiedOperandBase + i);
     if (!tiedResults.empty()) {
@@ -3167,8 +3520,9 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
 
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -3221,15 +3575,20 @@ AsyncConcurrentOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange AsyncConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange(getResults())
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void AsyncConcurrentOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor(getOperation(), getResults()));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -3286,10 +3645,237 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   eraseStreamRegionResults(newBody, excludedResultIndices);
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterLoadOp::verify() {
+  AsyncParameterLoadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+void AsyncParameterLoadOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getResultSize(), getResultSize()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterReadOp::verify() {
+  AsyncParameterReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterReadOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::std::optional<unsigned>
+AsyncParameterReadOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return {0}; // result tied to target
+  }
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterReadOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to target,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterReadOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(),
+                    getTargetOffset(), getTargetEnd(), getTargetLength()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterWriteOp::verify() {
+  AsyncParameterWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterWriteOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncParameterWriteOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return {0}; // result tied to source
+  }
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterWriteOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to source,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterWriteOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(),
+                    getSourceOffset(), getSourceEnd(), getSourceLength()});
+  ranges.push_back({ResourceAccessBitfield::Read, getResult(),
+                    getSourceOffset(), getSourceEnd(), getSourceLength()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.gather
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterGatherOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  // The result type matches the target operand type.
+  AsyncParameterGatherOpAdaptor adaptor(operands, attributes, properties,
+                                        regions);
+  inferredReturnTypes.push_back(adaptor.getTarget().getType());
+  inferredReturnTypes.push_back(IREE::Stream::TimepointType::get(context));
+  return success();
+}
+
+LogicalResult AsyncParameterGatherOp::verify() {
+  AsyncParameterGatherOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount ||
+      op.getTargetEnds().size() != expectedCount ||
+      op.getTargetLengths().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source keys, source offsets, target offsets, "
+              "target ends, and lengths are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterGatherOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
+}
+
+::std::optional<unsigned>
+AsyncParameterGatherOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return {
+        getSourceOffsets()
+            .size()}; // result tied to target (after variadic source_offsets)
+  }
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterGatherOp::getTiedResultOperandIndices() {
+  return {
+      static_cast<int64_t>(getSourceOffsets().size()),
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to target,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterGatherOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  // Gather writes to the entire target resource across all gather operations.
+  // We conservatively mark the entire target as written. We could return
+  // the exact ranges (adding more) but I don't currently know the performance
+  // implications of that (this may be part of an n^2 algorithm).
+  ranges.push_back({ResourceAccessBitfield::Write, getTarget(), Value{},
+                    getTargetSize(), getTargetSize()});
+  ranges.push_back({ResourceAccessBitfield::Write, getResult(), Value{},
+                    getTargetSize(), getTargetSize()});
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+LogicalResult AsyncParameterScatterOp::inferReturnTypes(
+    MLIRContext *context, std::optional<Location> location, ValueRange operands,
+    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  // The result type matches the source operand type.
+  AsyncParameterScatterOpAdaptor adaptor(operands, attributes, properties,
+                                         regions);
+  inferredReturnTypes.push_back(adaptor.getSource().getType());
+  inferredReturnTypes.push_back(IREE::Stream::TimepointType::get(context));
+  return success();
+}
+
+LogicalResult AsyncParameterScatterOp::verify() {
+  AsyncParameterScatterOp op = *this;
+  size_t expectedCount = op.getTargetKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getSourceEnds().size() != expectedCount ||
+      op.getSourceLengths().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source offsets, source ends, lengths, "
+              "target keys, and target offsets are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value AsyncParameterScatterOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncParameterScatterOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  if (resultIndex == 0) {
+    return {0}; // result tied to source
+  }
+  return std::nullopt; // result_timepoint not tied
+}
+
+SmallVector<int64_t> AsyncParameterScatterOp::getTiedResultOperandIndices() {
+  return {
+      0,
+      IREE::Util::TiedOpInterface::kUntiedIndex}; // result tied to source,
+                                                  // result_timepoint not tied
+}
+
+void AsyncParameterScatterOp::getAsyncAccessRanges(
+    SmallVectorImpl<AsyncAccessRange> &ranges) {
+  // Scatter reads from the entire source resource across all scatter
+  // operations. We conservatively mark the entire source as read. We could
+  // return the exact ranges (adding more) but I don't currently know the
+  // performance implications of that (this may be part of an n^2 algorithm).
+  ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},
+                    getSourceSize(), getSourceSize()});
+  ranges.push_back({ResourceAccessBitfield::Read, getResult(), Value{},
+                    getSourceSize(), getSourceSize()});
 }
 
 //===----------------------------------------------------------------------===//
@@ -3575,8 +4161,9 @@ printDispatchResources(OpAsmPrinter &p, Operation *op, ValueRange resources,
     p.printOperand(resourceLength);
     p << "] : ";
     printSizeAwareType(p, op, resourceType, resourceSize);
-    if (i < resources.size() - 1)
+    if (i < resources.size() - 1) {
       p << ",";
+    }
   }
 }
 
@@ -3662,8 +4249,9 @@ static ParseResult parseDispatchFunctionArgumentList(
   SmallVector<Attribute> argAttrsVec;
   do {
     OpAsmParser::UnresolvedOperand arg;
-    if (failed(parser.parseOperand(arg)))
+    if (failed(parser.parseOperand(arg))) {
       return failure();
+    }
     bool hasOffsetLength = false;
     OpAsmParser::UnresolvedOperand offsetArg;
     OpAsmParser::UnresolvedOperand lengthArg;
@@ -3738,8 +4326,9 @@ static void printDispatchFunctionResultList(OpAsmPrinter &p, Operation *op,
         p.printOptionalAttrDict(attrs.getValue());
       }
     }
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ", ";
+    }
   }
 }
 
@@ -3750,8 +4339,9 @@ ParseResult parseDispatchFunctionSignature(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> args;
   SmallVector<Type> argTypes;
   SmallVector<Type> resultTypes;
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseDispatchFunctionArgumentList(parser, args, argTypes,
                                                  argAttrs)) ||
@@ -3784,8 +4374,9 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto functionType = cast<FunctionType>(functionTypeAttr.getValue());
   p << "(";
   for (size_t argIndex = 0; argIndex < functionType.getNumInputs();) {
-    if (argIndex)
+    if (argIndex) {
       p << ", ";
+    }
     int baseArgIndex = argIndex;
     auto type = functionType.getInput(baseArgIndex);
     p << "%arg";
@@ -3811,11 +4402,13 @@ void printDispatchFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto resultTypes = functionType.getResults();
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << "(";
+    }
     printDispatchFunctionResultList(p, op, resultTypes, resultAttrs);
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1) {
       p << ")";
+    }
   }
 }
 
@@ -3877,11 +4470,13 @@ static ParseResult parseCmdCallOperands(
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths,
     ArrayAttr &resourceAccesses) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   // Handle the case of no operands specially.
-  if (succeeded(parser.parseOptionalRParen()))
+  if (succeeded(parser.parseOptionalRParen())) {
     return success();
+  }
   SmallVector<Attribute> accessAttrs;
   do {
     StringRef accessStr;
@@ -3920,8 +4515,9 @@ static ParseResult parseCmdCallOperands(
     }
   } while (succeeded(parser.parseOptionalComma()));
   resourceAccesses = parser.getBuilder().getArrayAttr(accessAttrs);
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
   return success();
 }
 
@@ -3966,8 +4562,9 @@ static void printCmdCallOperands(OpAsmPrinter &p, Operation *op,
       // Primitive/custom type.
       p.printOperand(operand);
     }
-    if (i < resourceOperands.size() - 1)
+    if (i < resourceOperands.size() - 1) {
       p << ", ";
+    }
   }
   p << ")";
 }
@@ -3983,8 +4580,9 @@ void CmdExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addTypes(IREE::Stream::TimepointType::get(builder.getContext()));
   state.addOperands(operands);
   state.addOperands(operandSizes);
-  if (awaitTimepoint)
+  if (awaitTimepoint) {
     state.addOperands(awaitTimepoint);
+  }
   state.addAttributes(attributes);
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
@@ -4018,8 +4616,9 @@ LogicalResult CmdExecuteOp::verify() {
     return failure();
   }
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
 }
@@ -4030,16 +4629,20 @@ CmdExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   return getResourceOperands();
 }
 
+ValueRange CmdExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? ValueRange()
+                              : ValueRange(getBodyRegion().getArguments());
+}
+
 void CmdExecuteOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4082,8 +4685,9 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
   newBody.takeBody(getClosureBodyRegion());
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
-  for (auto i : excludedOperandIndices)
+  for (auto i : excludedOperandIndices) {
     eraseIndices.set(i);
+  }
   block.eraseArguments(eraseIndices);
   return newOp;
 }
@@ -4095,10 +4699,15 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
 LogicalResult CmdSerialOp::verify() {
   CmdSerialOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
+}
+
+ValueRange CmdSerialOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? getOperation()->getResults() : ValueRange();
 }
 
 void CmdSerialOp::getSuccessorRegions(
@@ -4107,10 +4716,9 @@ void CmdSerialOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), {}));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4121,10 +4729,15 @@ void CmdSerialOp::getSuccessorRegions(
 LogicalResult CmdConcurrentOp::verify() {
   CmdConcurrentOp op = *this;
   for (auto &nestedOp : op.getBody().front()) {
-    if (failed(verifyCmdOp(&nestedOp)))
+    if (failed(verifyCmdOp(&nestedOp))) {
       return failure();
+    }
   }
   return success();
+}
+
+ValueRange CmdConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
+  return successor.isParent() ? getOperation()->getResults() : ValueRange();
 }
 
 void CmdConcurrentOp::getSuccessorRegions(
@@ -4133,10 +4746,9 @@ void CmdConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(
-        RegionSuccessor(getOperation(), Operation::result_range(nullptr, 0)));
+    regions.push_back(RegionSuccessor::parent());
   } else {
-    regions.push_back(RegionSuccessor(&getBody(), {}));
+    regions.push_back(RegionSuccessor(&getBody()));
   }
 }
 
@@ -4234,8 +4846,9 @@ LogicalResult TimepointJoinOp::verify() {
 Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
                             OpBuilder &builder) {
   assert(!timepoints.empty() && "must have at least one timepoint");
-  if (timepoints.size() == 1)
+  if (timepoints.size() == 1) {
     return timepoints.front();
+  }
   return IREE::Stream::TimepointJoinOp::create(
       builder, loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
 }
@@ -4245,6 +4858,19 @@ Value TimepointJoinOp::join(ValueRange timepoints, OpBuilder &builder) {
   return join(builder.getFusedLoc(llvm::to_vector(llvm::map_range(
                   timepoints, [](Value value) { return value.getLoc(); }))),
               timepoints, builder);
+}
+
+void TimepointJoinOp::setAwaitTimepoint(Value timepoint) {
+  if (timepoint) {
+    getAwaitTimepointsMutable().assign(timepoint);
+  } else {
+    getAwaitTimepointsMutable().clear();
+  }
+}
+
+void TimepointJoinOp::setAwaitTimepoints(ValueRange timepoints,
+                                         OpBuilder &builder) {
+  getAwaitTimepointsMutable().assign(timepoints);
 }
 
 //===----------------------------------------------------------------------===//
@@ -4319,6 +4945,24 @@ TimepointAwaitOp::getTiedResultOperandIndex(unsigned resultIndex) {
 SmallVector<int64_t> TimepointAwaitOp::getTiedResultOperandIndices() {
   return llvm::to_vector(llvm::seq<int64_t>(0, getResourceOperands().size()));
 }
+
+SmallVector<Value> TimepointAwaitOp::getAwaitTimepoints() {
+  if (getAwaitTimepoint()) {
+    return {getAwaitTimepoint()};
+  } else {
+    return {};
+  }
+}
+
+void TimepointAwaitOp::setAwaitTimepoint(Value timepoint) {
+  if (timepoint) {
+    getAwaitTimepointMutable().set(timepoint);
+  } else {
+    getAwaitTimepointMutable().drop();
+  }
+}
+
+Value TimepointAwaitOp::getResultTimepoint() { return {}; }
 
 //===----------------------------------------------------------------------===//
 // stream.channel.create
@@ -4402,11 +5046,13 @@ LogicalResult ExecutableExportOp::verify() {
 mlir::FunctionOpInterface ExecutableExportOp::lookupFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
-  if (!executableOp)
+  if (!executableOp) {
     return {};
+  }
   auto innerModuleOp = executableOp.getInnerModule();
-  if (!innerModuleOp)
+  if (!innerModuleOp) {
     return {};
+  }
   return innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
       getFunctionRef());
 }
@@ -4490,6 +5136,31 @@ YieldOp::getMutableSuccessorOperands(RegionSuccessor successor) {
 
 MutableOperandRange YieldOp::getClosureResultsMutable() {
   return getResourceOperandsMutable();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.test.timeline_aware
+//===----------------------------------------------------------------------===//
+
+SmallVector<Value>
+TestTimelineAwareOp::buildAwaitTimepoints(OpBuilder &builder) {
+  // Build timepoint.import ops for each wait fence.
+  SmallVector<Value> timepoints;
+  for (auto fence : getWaitFenceLikes()) {
+    auto importOp = IREE::Stream::TimepointImportOp::create(
+        builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+        ValueRange{fence}, /*affinity=*/nullptr);
+    timepoints.push_back(importOp.getResultTimepoint());
+  }
+  return timepoints;
+}
+
+Value TestTimelineAwareOp::buildResultTimepoint(OpBuilder &builder) {
+  // Build timepoint.import for signal fence.
+  auto importOp = IREE::Stream::TimepointImportOp::create(
+      builder, getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      ValueRange{getSignalFenceLike()}, /*affinity=*/nullptr);
+  return importOp.getResultTimepoint();
 }
 
 } // namespace mlir::iree_compiler::IREE::Stream

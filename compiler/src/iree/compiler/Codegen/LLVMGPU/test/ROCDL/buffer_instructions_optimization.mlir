@@ -235,3 +235,48 @@ func.func @simplify_trivial(%1 : memref<1x8xbf16, #amdgpu.address_space<fat_raw_
 //   CHECK-NOT: vector.create_mask
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //       CHECK: return %[[READ]] : vector<1x8xbf16>
+
+// -----
+
+func.func @simplify_divisible_innermost(%1 : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg0 : index) -> vector<1x8xbf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %cst = arith.constant 1.000000e+00 : bf16
+  %divisible = util.assume.int %arg0<udiv = 8> : index
+  %mask = vector.create_mask %c1, %divisible : vector<1x8xi1>
+  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
+  return %read : vector<1x8xbf16>
+}
+
+// CHECK-LABEL: @simplify_divisible_innermost
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index)
+//   CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<1x8xbf16>
+//   CHECK-DAG: %[[CSTBF16:.+]] = arith.constant 1.000000e+00 : bf16
+//       CHECK: %[[DIV:.+]] = util.assume.int %[[ARG1]]<udiv = 8> : index
+//       CHECK: %[[CMP:.+]] = arith.cmpi eq, %[[DIV]], %[[C8]] : index
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[CSTBF16]]
+//  CHECK-SAME: {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
+//       CHECK: %[[SEL:.+]] = arith.select %[[CMP]], %[[READ]], %[[CST]] : vector<1x8xbf16>
+//       CHECK: return %[[SEL]] : vector<1x8xbf16>
+
+// -----
+
+func.func @no_simplify_not_divisible(%1 : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %arg0 : index) -> vector<1x8xbf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %cst = arith.constant 1.000000e+00 : bf16
+  %divisible = util.assume.int %arg0<udiv = 7> : index
+  %mask = vector.create_mask %c1, %divisible : vector<1x8xi1>
+  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<1x8xbf16>
+  return %read : vector<1x8xbf16>
+}
+
+// CHECK-LABEL: @no_simplify_not_divisible
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<1x?xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: index)
+//   CHECK-DAG: %[[MASK:.+]] = vector.create_mask
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
+//  CHECK-SAME: %[[MASK]]
+//       CHECK: return %[[READ]] : vector<1x8xbf16>

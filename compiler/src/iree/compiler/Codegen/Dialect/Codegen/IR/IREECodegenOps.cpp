@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -41,8 +42,9 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
     ExtractStridedMetadataOp::Adaptor adaptor,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   auto sourceType = dyn_cast<MemRefType>(adaptor.getSource().getType());
-  if (!sourceType)
+  if (!sourceType) {
     return failure();
+  }
 
   unsigned sourceRank = sourceType.getRank();
   IndexType indexType = IndexType::get(context);
@@ -54,8 +56,9 @@ LogicalResult ExtractStridedMetadataOp::inferReturnTypes(
   // Offset.
   inferredReturnTypes.push_back(indexType);
   // Sizes and strides.
-  for (unsigned i = 0; i < sourceRank * 2; ++i)
+  for (unsigned i = 0; i < sourceRank * 2; ++i) {
     inferredReturnTypes.push_back(indexType);
+  }
   return success();
 }
 
@@ -281,8 +284,9 @@ LogicalResult InnerTiledOp::verify() {
   SmallVector<AffineMap, 4> indexingMaps = getIndexingMapsArray();
 
   // Verify that an indexing map was specified for each operand.
-  if (indexingMaps.size() != expectedNumIns + expectedNumOuts)
+  if (indexingMaps.size() != expectedNumIns + expectedNumOuts) {
     return emitOpError("expected an indexing map for each operand");
+  }
 
   // Verify that each index map has 'numIterators' inputs, no symbols, and
   // that the number of map outputs equals the rank of its associated
@@ -291,9 +295,10 @@ LogicalResult InnerTiledOp::verify() {
   for (const auto &it : llvm::enumerate(indexingMaps)) {
     auto index = it.index();
     auto map = it.value();
-    if (map.getNumSymbols() != 0)
+    if (map.getNumSymbols() != 0) {
       return emitOpError("expected indexing map ")
              << index << " to have no symbols";
+    }
     auto shapedType = opTypes[index];
     unsigned rank = shapedType.getRank();
     // Verify that the map has the right number of inputs, outputs, and indices.
@@ -369,9 +374,11 @@ LogicalResult InnerTiledOp::verify() {
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
-  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i)
-    if (targetExpr == map.getResult(i))
+  for (int64_t i = 0, e = map.getNumResults(); i < e; ++i) {
+    if (targetExpr == map.getResult(i)) {
       return i;
+    }
+  }
   return -1;
 }
 
@@ -393,4 +400,55 @@ std::optional<SmallVector<int64_t, 4>> InnerTiledOp::getShapeForUnroll() {
   SmallVector<int64_t, 4> shape;
   getIterationBounds(shape);
   return shape;
+}
+
+//===----------------------------------------------------------------------===//
+// WorkgroupCountHintOp
+//===----------------------------------------------------------------------===//
+
+ParseResult WorkgroupCountHintOp::parse(OpAsmParser &parser,
+                                        OperationState &result) {
+  SmallVector<OpAsmParser::UnresolvedOperand, 3> dynamicSizes;
+  DenseI64ArrayAttr staticSizesAttr;
+
+  if (parseDynamicIndexList(parser, dynamicSizes, staticSizesAttr,
+                            /*valueTypes=*/{},
+                            /*delimiter=*/AsmParser::Delimiter::Paren)) {
+    return failure();
+  }
+
+  // All sizes are of index type. `parseDynamicIndexList` does not set the sizes
+  // correctly when used as a custom directive so manually infer it from the
+  // number of parsed sizes.
+  IndexType indexType = parser.getBuilder().getIndexType();
+  SmallVector<Type> dynamicSizeTypes(dynamicSizes.size(), indexType);
+
+  if (parser.resolveOperands(dynamicSizes, dynamicSizeTypes,
+                             parser.getCurrentLocation(), result.operands)) {
+    return failure();
+  }
+
+  result.addAttribute("static_sizes", staticSizesAttr);
+  if (parser.parseOptionalAttrDict(result.attributes)) {
+    return failure();
+  }
+
+  return success();
+}
+
+void WorkgroupCountHintOp::print(OpAsmPrinter &printer) {
+  printDynamicIndexList(printer, getOperation(), getSizes(), getStaticSizes(),
+                        /*valueTypes=*/{},
+                        /*delimiter=*/AsmParser::Delimiter::Paren);
+  printer.printOptionalAttrDict((*this)->getAttrs(),
+                                /*elidedAttrs=*/{"static_sizes"});
+}
+
+void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
+                                 ArrayRef<OpFoldResult> sizes) {
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  build(builder, state, dynamicSizes,
+        builder.getDenseI64ArrayAttr(staticSizes));
 }

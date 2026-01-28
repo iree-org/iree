@@ -116,9 +116,9 @@ static iree_status_t iree_tooling_create_run_context(
   if (!iree_const_byte_span_is_empty(module_contents)) {
     iree_vm_module_t* module = NULL;
     status = iree_status_annotate_f(
-        iree_vm_bytecode_module_create(instance, module_contents,
-                                       iree_allocator_null(), host_allocator,
-                                       &module),
+        iree_vm_bytecode_module_create(
+            instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_contents,
+            iree_allocator_null(), host_allocator, &module),
         "loading custom bytecode module from memory");
     if (iree_status_is_ok(status)) {
       status = iree_tooling_module_list_push_back(&module_list, module);

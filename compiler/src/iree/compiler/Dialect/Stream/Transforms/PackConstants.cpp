@@ -145,8 +145,9 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   SmallVector<Attribute> values;
   int64_t offset = 0;
   for (auto &constantSpan : storageBuffer.spans) {
-    if (constantSpan.length == 0)
+    if (constantSpan.length == 0) {
       continue;
+    }
 
     int64_t start = constantSpan.offset;
     int64_t end = start + constantSpan.length;
@@ -465,8 +466,9 @@ static Value generateSerializedUpload(
   // will need and where each value will be placed.
   auto storageResources =
       computePackingMap(slices, resourceConfig, builder.getContext());
-  if (storageResources.empty())
+  if (storageResources.empty()) {
     return nullptr;
+  }
 
   // TODO(benvanik): should be able to have a single buffer constant and
   // subrange it so that we don't need so many files.
@@ -551,8 +553,9 @@ static Value generateParameterUpload(
     storageResources =
         computePackingMap(slices, resourceConfig, builder.getContext());
   }
-  if (storageResources.empty())
+  if (storageResources.empty()) {
     return nullptr;
+  }
 
   // Sort resources by type so we can batch them.
   // Loads are only possible if we are using the parameter as a constant and

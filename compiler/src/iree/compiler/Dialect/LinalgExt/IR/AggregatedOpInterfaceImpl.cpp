@@ -10,6 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -208,7 +209,7 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
 }
 
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
-                       AffineMap maskMap, Value qk, Value mask) {
+                       AffineMap maskMap, Value qk, Value mask, bool useExp2) {
 
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
@@ -244,9 +245,11 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
           // Scaling to compensate for base-2 softmax
-          Value log2e = arith::ConstantOp::create(
-              b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
-          maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          if (useExp2) {
+            Value log2e = arith::ConstantOp::create(
+                b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+            maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
+          }
         }
         // Finally, set the returned value to the qk element plus the mask
         // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
@@ -259,10 +262,10 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   return genericOp.getResult(0);
 }
 
-// Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
+// Compute output = exp2/exp(output - input) depending on useExp2 flag.
+static Value computeSubAndExp(OpBuilder &builder, Location loc,
+                              AffineMap inputMap, AffineMap outputMap,
+                              Value input, Value output, bool useExp2) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -278,7 +281,8 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = math::Exp2Op::create(b, loc, diff);
+        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
+                               : math::ExpOp::create(b, loc, diff).getResult();
         linalg::YieldOp::create(b, loc, weight);
       });
   return genericOp.getResult(0);
@@ -315,15 +319,18 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
                               std::optional<AffineMap> maskMap,
                               SmallVector<OpFoldResult> iterationDomain,
                               Type sElementType, Region &elementwiseRegion,
-                              DictionaryAttr qkAttrs, bool lowPrecision) {
+                              DictionaryAttr qkAttrs, bool lowPrecision,
+                              bool useExp2) {
   MLIRContext *ctx = b.getContext();
-  // Since we use exp2 for attention instead of the original exp, we have to
+  // If using exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
-  Value log2e = arith::ConstantOp::create(
-      b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = arith::MulFOp::create(b, loc, scale, log2e);
+  if (useExp2) {
+    Value log2e = arith::ConstantOp::create(
+        b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = arith::MulFOp::create(b, loc, scale, log2e);
+  }
 
   auto qETy = getElementTypeOrSelf(query.getType());
 
@@ -391,7 +398,7 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
 
   // S += mask
   if (mask != nullptr) {
-    s = applyMask(b, loc, sMap, *maskMap, s, mask.value());
+    s = applyMask(b, loc, sMap, *maskMap, s, mask.value(), useExp2);
   }
 
   return s;
@@ -435,9 +442,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(loc, b, query, key, getScale(), mask, qMap,
-                                    kMap, sMap, getMaskMap(), sizes, f32Type,
-                                    getRegion(), qkAttrs, lowPrecision);
+  Value s = computeQKAndElementwise(
+      loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
+      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true);
 
   // ---- Softmax ----
 
@@ -479,7 +486,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
 
   // P = exp2(S - max)
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, max, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, max, s, /*useExp2=*/true);
 
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
@@ -529,9 +536,13 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   DictionaryAttr config = getDecompositionConfigAttr();
 
   DictionaryAttr qkAttrs, pvAttrs;
+  bool useExp2 = true;
   if (config) {
     qkAttrs = config.getAs<DictionaryAttr>(getQKAttrStr());
     pvAttrs = config.getAs<DictionaryAttr>(getPVAttrStr());
+    if (auto useExp2Attr = config.getAs<BoolAttr>(getUseExp2AttrStr())) {
+      useExp2 = useExp2Attr.getValue();
+    }
   }
 
   FailureOr<AttentionOpDetail> maybeOpInfo = AttentionOpDetail::get(
@@ -552,7 +563,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // ---- QK Matmul + elementwise math ----
   Value s = computeQKAndElementwise(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision);
+      sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -562,20 +573,21 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap maxMap = getMaxMap();
   Value newMax = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
 
-  // norm = exp2(oldMax - newMax)
+  // norm = exp2(oldMax - newMax) or exp(oldMax - newMax) depending on useExp2
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm =
+      computeSubAndExp(b, loc, maxMap, normMap, newMax, oldMax, useExp2);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(b, loc, sumMap,
                                                          normMap, oldSum, norm);
 
-  // P = exp2(S - newMax)
+  // P = exp2(S - newMax) or exp(S - newMax) depending on useExp2
   // PMap = SMap
   AffineMap pMap = sMap;
-  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp(b, loc, maxMap, sMap, newMax, s, useExp2);
 
   // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
@@ -815,8 +827,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
   SetVector<int64_t> batchPosSet(getBatchPos().begin(), getBatchPos().end());
   for (auto [idx, size] : enumerate(inputSizes)) {
-    if (batchPosSet.contains(idx))
+    if (batchPosSet.contains(idx)) {
       continue;
+    }
     if (mPosSet.contains(idx)) {
       kBasis.push_back(kernelSize[mKernelIdx[idx]]);
       continue;
@@ -849,8 +862,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   int delinKIdx = 0;
   SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
   for (int i = 0; i < getInputRank(); ++i) {
-    if (batchPosSet.contains(i))
+    if (batchPosSet.contains(i)) {
       continue;
+    }
     if (mPosSet.contains(i)) {
       windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
       continue;
@@ -902,8 +916,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   sliceSizes.back() = innerInputTileSize;
 
   // Set the batch and K offsets for the input tensor.
-  const int64_t kPos = getKPos().front();
-  sliceOffsets[kPos] = inputKOffset.front();
+  if (!getKPos().empty()) {
+    const int64_t kPos = getKPos().front();
+    sliceOffsets[kPos] = inputKOffset.front();
+  }
   SmallVector<int64_t> inverseOutputPerm =
       invertPermutationVector(getOutputPerm());
   for (auto [ivIdx, bPos] : llvm::enumerate(getBatchPos())) {
@@ -1041,6 +1057,211 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
   rewriter.mergeBlocks(newBlock, oldBlock);
 
   return customOpReplacements;
+}
+
+//===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+/// The return value of captureUsedOperationsAndBlockArguments
+struct UsedOperationsAndBlockArguments {
+  SetVector<int64_t> usedInputIndices;
+  SetVector<Operation *> usedOperations;
+};
+
+/// For a given `resultNumber` in a linalg::GenericOp, this op scans the
+/// GenericOp's body for the block arguments and operations that are involved
+/// in its computation.
+///
+/// Block arguments used are returned as indices over the dpsInputs and
+/// dpsInputs, to be used as:
+/// ```
+/// for (auto idx : usedInputIndices)
+///   if (idx < getNumDpsInputs())
+///     getDpsInputOperand(idx)
+///   else
+///     getDpsInitOperand(idx)
+/// ```
+/// As resultNumber is specified, if a dpsInit is used that is not resultNumber
+/// failure is returned.
+///
+/// Operations are returned as generic operations.
+static FailureOr<UsedOperationsAndBlockArguments>
+captureUsedOperationsAndBlockArguments(linalg::GenericOp genericOp,
+                                       int64_t resultNumber) {
+  BackwardSliceOptions options;
+  options.inclusive = true;
+  options.filter = [&genericOp](Operation *op) -> bool {
+    return op->getBlock() == genericOp.getBody();
+  };
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
+  Value result = yieldOp.getOperand(resultNumber);
+  SetVector<Operation *> usedOperations;
+  if (failed(getBackwardSlice(result, &usedOperations, options))) {
+    return failure();
+  }
+
+  SetVector<int64_t> usedInputIndices;
+  // Get all block arguments used by the operations. If any of the arguments
+  // used is a dpsInit argument other than resultNumber, return failure.
+  for (Operation *op : usedOperations) {
+    for (Value operand : op->getOperands()) {
+      auto blockArg = dyn_cast<BlockArgument>(operand);
+      if (!blockArg) {
+        continue;
+      }
+      if (blockArg.getOwner() != genericOp.getBlock()) {
+        continue;
+      }
+      int64_t argNumber = blockArg.getArgNumber();
+      if (argNumber < genericOp.getNumDpsInputs()) {
+        usedInputIndices.insert(argNumber);
+        continue;
+      }
+      if (argNumber - genericOp.getNumDpsInputs() != resultNumber) {
+        return failure();
+      }
+    }
+  }
+
+  return UsedOperationsAndBlockArguments{usedInputIndices, usedOperations};
+}
+
+/// Returns a vector of GenericOps with only one output.
+/// Each generic op in the vector corresponds to an output in the input
+/// generic op. However, these resultant ops will only contain the:
+///   1. Block Arguments that are involved in the result's computation and
+///   2. The Operations involved in the result's computation
+static FailureOr<SmallVector<linalg::GenericOp>>
+decomposeMultipleResults(linalg::GenericOp genericOp, RewriterBase &rewriter) {
+  if (genericOp.getNumResults() < 2) {
+    return SmallVector<linalg::GenericOp>{genericOp};
+  }
+
+  IRRewriter::InsertionGuard g(rewriter);
+  SmallVector<linalg::GenericOp> results;
+  // Create num_results linalg.generics, each producing a single result (and
+  // relying on canonicalizations to simplify).
+  for (auto resultNumber : llvm::seq<int64_t>(genericOp.getNumResults())) {
+    rewriter.setInsertionPoint(genericOp);
+    auto yieldOp = cast<linalg::YieldOp>(genericOp.getBlock()->getTerminator());
+    Value result = yieldOp.getOperand(resultNumber);
+    // Get all operations required to produce this result.
+    auto usedOperationsAndBlockArguments =
+        captureUsedOperationsAndBlockArguments(genericOp, resultNumber);
+    if (failed(usedOperationsAndBlockArguments)) {
+      return failure();
+    }
+    // Create a new linalg.generic operation for this result.
+    SmallVector<Value> inputs = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getDpsInputOperand(x)->get(); });
+    SmallVector<Value> inits = {
+        genericOp.getDpsInitOperand(resultNumber)->get()};
+
+    SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
+        usedOperationsAndBlockArguments->usedInputIndices,
+        [&](int64_t x) { return genericOp.getIndexingMapsArray()[x]; });
+    indexingMaps.push_back(genericOp.getIndexingMapMatchingResult(
+        genericOp->getOpResult(resultNumber)));
+    llvm::SmallBitVector unusedDims = getUnusedDimsBitVector(indexingMaps);
+    indexingMaps = compressUnusedDims(indexingMaps);
+    SmallVector<utils::IteratorType> iteratorTypes;
+    for (auto i : llvm::seq<int64_t>(genericOp.getNumLoops())) {
+      if (!unusedDims.test(i)) {
+        iteratorTypes.push_back(genericOp.getIteratorTypesArray()[i]);
+      }
+    }
+    auto newOp = linalg::GenericOp::create(
+        rewriter, genericOp.getLoc(), TypeRange(inits), inputs, inits,
+        indexingMaps, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
+          Block *oldBody = genericOp.getBody();
+          usedOperationsAndBlockArguments->usedInputIndices.insert(
+              resultNumber + genericOp.getNumDpsInputs());
+          IRMapping regionMapping;
+          for (auto [oldBlockArgNum, newBlockArg] : llvm::zip_equal(
+                   usedOperationsAndBlockArguments->usedInputIndices,
+                   blockArgs)) {
+            regionMapping.map(oldBody->getArgument(oldBlockArgNum),
+                              newBlockArg);
+          }
+          for (Operation *usedOperation :
+               usedOperationsAndBlockArguments->usedOperations) {
+            b.clone(*usedOperation, regionMapping);
+          }
+          linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
+        });
+    rewriter.replaceAllUsesWith(genericOp.getResult(resultNumber),
+                                newOp.getResult(0));
+
+    results.push_back(newOp);
+  }
+
+  return results;
+}
+
+FailureOr<SmallVector<Value>> ExpReductionOp::decomposeOperation(OpBuilder &b) {
+  Location loc = getLoc();
+  IRRewriter rewriter(b);
+
+  // Let the first dpsInputOperand be s
+  // Split the op into:
+  // curr_max = max(s, old_max)
+  // ex = e^{x - curr_max}
+  // norm = e^{curr_max - old_max}
+  // for each outs in exp_reduction:
+  //     norm_outs = outs * norm
+  // linalg.generic ins(ex, ...) outs(norm_outs)
+
+  const int reducingOpIndex = getReducingOpIndex();
+  OpOperand *sValue = getDpsInputOperand(reducingOpIndex);
+  OpOperand *prevMax = getDpsInitOperand(reducingOpIndex);
+  AffineMap normValMap = getMatchingIndexingMap(sValue);
+  AffineMap prevMaxMap = getMatchingIndexingMap(prevMax);
+
+  // curr_max = max(sValue, prev_max)
+  Value currMax = reduce<arith::MaximumFOp>(
+      rewriter, loc, normValMap, prevMaxMap, sValue->get(), prevMax->get());
+  // ex = e^{sValue - curr_max}
+  Value ex = computeSubAndExp(rewriter, loc, prevMaxMap, normValMap, currMax,
+                              sValue->get(), /*useExp2=*/true);
+  // norm = e^(prev_max - curr_max)
+  Value norm = computeSubAndExp(rewriter, loc, prevMaxMap, prevMaxMap, currMax,
+                                prevMax->get(), /*useExp2=*/true);
+
+  SmallVector<Value> inputs = getDpsInputs();
+  SmallVector<Value> normOuts(getNumDpsInits());
+  inputs[reducingOpIndex] = ex;
+  normOuts[reducingOpIndex] = currMax;
+  for (int64_t index : getExpReducedOperands()) {
+    OpOperand *oldOut = getDpsInitOperand(index);
+    AffineMap oldOutMap = getMatchingIndexingMap(oldOut);
+    Value normOut = elementwiseValueInPlace<arith::MulFOp>(
+        rewriter, loc, oldOutMap, prevMaxMap, oldOut->get(), norm);
+    normOuts[index] = normOut;
+  }
+
+  auto expRedGeneric = linalg::GenericOp::create(
+      rewriter, loc, TypeRange(normOuts), inputs, normOuts,
+      getIndexingMapsArray(), getLoopIteratorTypes());
+
+  IRMapping mapper;
+  getBodyRegion().cloneInto(&expRedGeneric.getBodyRegion(), mapper);
+  IRRewriter::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(expRedGeneric.getBody()->getTerminator());
+  auto yieldOp =
+      cast<IREE::LinalgExt::YieldOp>(expRedGeneric.getBody()->getTerminator());
+  rewriter.replaceOpWithNewOp<linalg::YieldOp>(yieldOp, yieldOp.getOperands());
+  FailureOr<SmallVector<linalg::GenericOp>> decomposedResults =
+      decomposeMultipleResults(expRedGeneric, rewriter);
+  if (failed(decomposedResults)) {
+    return failure();
+  }
+
+  return llvm::map_to_vector(
+      decomposedResults.value(),
+      [](linalg::GenericOp op) -> Value { return op->getResult(0); });
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

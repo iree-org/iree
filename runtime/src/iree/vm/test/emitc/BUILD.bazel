@@ -8,13 +8,14 @@ load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_c_module.bzl", "iree_c_module")
 
 package(
+    default_visibility = ["//runtime/src/iree/vm:__subpackages__"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
 iree_runtime_cc_test(
-    name = "module_test",
-    srcs = ["module_test.cc"],
+    name = "emitc_module_test",
+    srcs = ["emitc_module_test.cc"],
     deps = [
         ":arithmetic_ops",
         ":arithmetic_ops_f32",
@@ -46,6 +47,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/vm:ops",
         "//runtime/src/iree/vm:ops_emitc",
         "//runtime/src/iree/vm:shims_emitc",
+        "//runtime/src/iree/vm/testing:test_runner",
     ],
 )
 

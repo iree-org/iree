@@ -208,7 +208,7 @@ func.func @elementwise() {
 }
 //      CHECK: func.func @elementwise()
 //  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
-//  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_buffer %[[CST_TENSOR]]
+//  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_buffer %[[CST_TENSOR]] read_only
 //  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(0) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan layout({{.+}})  binding(1) {{.+}} : memref<1x10xf32, strided<[10, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //      CHECK:   scf.for
@@ -285,7 +285,7 @@ func.func @early_bufferized_copy_cst_ops() {
 }
 // CHECK: func.func @early_bufferized_copy_cst_ops
 // CHECK:   %[[CST:.+]] = arith.constant dense<0> : tensor<2x3xi32>
-// CHECK:   %{{.+}} = bufferization.to_buffer %[[CST]]
+// CHECK:   %{{.+}} = bufferization.to_buffer %[[CST]] read_only
 
 // -----
 
@@ -1089,7 +1089,7 @@ func.func @rhs_non_splat_constant() {
 }
 // CHECK-LABEL: func.func @rhs_non_splat_constant
 //   CHECK-DAG:   %[[CONSTANT:.+]] = arith.constant {{.+}} : tensor<3x5xf32>
-//   CHECK-DAG:   %[[RHS:.+]] = bufferization.to_buffer %[[CONSTANT]]
+//   CHECK-DAG:   %[[RHS:.+]] = bufferization.to_buffer %[[CONSTANT]] read_only
 //   CHECK-DAG:   %[[LHS_INPUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<1x5x3x1xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<5x5xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   %[[LHS:.+]] = memref.collapse_shape %[[LHS_INPUT]]
@@ -3207,3 +3207,16 @@ func.func @retry_constant_bufferize() {
 // CHECK:         %[[CST:.+]] = arith.constant dense<0> : tensor<6xi32>
 // CHECK:         %[[MEMREF:.+]] = bufferization.to_buffer %[[CST]] read_only
 // CHECK:         memref.copy %[[MEMREF]]
+
+// -----
+
+func.func @drop_fusion_barrier() -> memref<6xf32> {
+  %alloc = bufferization.alloc_tensor() : tensor<6xf32>
+  %0 = iree_codegen.fusion_barrier %alloc : tensor<6xf32>
+  %memref = bufferization.to_buffer %0 : tensor<6xf32> to memref<6xf32>
+  return %memref : memref<6xf32>
+}
+
+// CHECK-LABEL: func.func @drop_fusion_barrier
+// CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
+// CHECK:         return %[[ALLOC]]

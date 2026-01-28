@@ -47,19 +47,18 @@ IREE_API_EXPORT iree_status_t iree_io_scope_map_lookup(
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "miss");
 
   if (scope_map->count == scope_map->capacity) {
-    iree_host_size_t new_capacity = iree_max(8, scope_map->capacity * 2);
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_realloc(
+        z0, iree_allocator_grow_array(
                 scope_map->host_allocator,
-                new_capacity * sizeof(iree_io_scope_map_entry_t*),
-                (void**)&scope_map->entries));
-    scope_map->capacity = new_capacity;
+                /*min_capacity=*/8, sizeof(scope_map->entries[0]),
+                &scope_map->capacity, (void**)&scope_map->entries));
   }
 
   iree_io_scope_map_entry_t* entry = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(scope_map->host_allocator,
-                                sizeof(*entry) + scope.size, (void**)&entry));
+      z0, iree_allocator_malloc_with_trailing(scope_map->host_allocator,
+                                              sizeof(*entry), scope.size,
+                                              (void**)&entry));
   entry->scope =
       iree_make_string_view((const char*)entry + sizeof(*entry), scope.size);
   memcpy((char*)entry->scope.data, scope.data, scope.size);

@@ -143,8 +143,9 @@ deduplicateOperands(mlir::FunctionOpInterface funcOp,
     llvm::interleaveComma(deadOperandsMap.set_bits(), llvm::dbgs());
     llvm::dbgs() << "\n";
     for (auto replacement : llvm::enumerate(argReplacementMap)) {
-      if (replacement.index() == replacement.value())
+      if (replacement.index() == replacement.value()) {
         continue;
+      }
       llvm::dbgs() << "  %arg" << replacement.index() << " -> %arg"
                    << replacement.value() << "\n";
     }
@@ -155,8 +156,9 @@ deduplicateOperands(mlir::FunctionOpInterface funcOp,
   for (auto replacement : llvm::enumerate(argReplacementMap)) {
     unsigned deadIdx = replacement.index();
     unsigned liveIdx = replacement.value();
-    if (deadIdx == liveIdx)
+    if (deadIdx == liveIdx) {
       continue;
+    }
     deadArgMap.set(deadIdx);
     entryBlock.getArgument(deadIdx).replaceAllUsesWith(
         entryBlock.getArgument(liveIdx));
@@ -164,8 +166,9 @@ deduplicateOperands(mlir::FunctionOpInterface funcOp,
 
   // Update each dispatch site to remove duplicates.
   SmallVector<unsigned> deadOperands;
-  for (auto idx : deadOperandsMap.set_bits())
+  for (auto idx : deadOperandsMap.set_bits()) {
     deadOperands.push_back(idx);
+  }
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
       dispatchOp.getUniformOperandsMutable().erase(idx);
@@ -202,8 +205,9 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
   llvm::BitVector uniformOperandMap(operandCount, /*t=*/true);
   for (auto dispatchOp : dispatchOps) {
     for (unsigned idx = 0; idx < operandCount; ++idx) {
-      if (!uniformOperandMap.test(idx))
+      if (!uniformOperandMap.test(idx)) {
         continue;
+      }
       auto value = dispatchOp.getUniformOperands()[idx];
       APInt intValue;
       if (!matchPattern(value, m_ConstantInt(&intValue))) {
@@ -232,8 +236,9 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
   LLVM_DEBUG({
     llvm::dbgs() << "inlineUniformConstants for " << funcOp.getName() << "\n";
     for (unsigned i = 0; i < operandValues.size(); ++i) {
-      if (!operandValues[i].has_value())
+      if (!operandValues[i].has_value()) {
         continue;
+      }
       llvm::dbgs() << "  operand " << i << " = " << operandValues[i].value()
                    << "\n";
     }
@@ -258,8 +263,9 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
 
   // Update each dispatch site to remove duplicates.
   SmallVector<unsigned> deadOperands;
-  for (auto idx : uniformOperandMap.set_bits())
+  for (auto idx : uniformOperandMap.set_bits()) {
     deadOperands.push_back(idx);
+  }
   for (auto dispatchOp : dispatchOps) {
     for (auto idx : llvm::reverse(deadOperands)) {
       dispatchOp.getUniformOperandsMutable().erase(idx);
@@ -410,8 +416,9 @@ struct FoldUniformOperandsPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         auto &dispatchOps = entryDispatchMap[exportOp];
-        if (dispatchOps.empty())
+        if (dispatchOps.empty()) {
           continue; // no-op if no dispatches
+        }
 
         auto funcOp = exportOp.lookupFunctionRef();
 

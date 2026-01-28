@@ -244,8 +244,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     int64_t lhsKBatch = lhsLayout.getBatchTile()[lhsK];
     int64_t rhsKBatch = rhsLayout.getBatchTile()[rhsK];
 
-    if (lhsKBatch != rhsKBatch)
+    if (lhsKBatch != rhsKBatch) {
       return std::nullopt;
+    }
     return lhsKBatch;
   }
 

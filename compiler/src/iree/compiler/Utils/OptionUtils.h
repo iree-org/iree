@@ -36,8 +36,9 @@ struct opt_initializer {
       : parentName(parentName), init(val), optLevel(opt) {}
   void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
     assert(inLevel.getSizeLevel() == 0 && "size level not implemented");
-    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel())
+    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel()) {
       val = init;
+    }
   }
 
   /// Append to the description string of the flag.
@@ -69,6 +70,18 @@ struct opt_scope {
   }
 };
 
+// Modifier to mark an option as deprecated with a warning message.
+// When the option is parsed, a deprecation warning will be printed to stderr.
+// The apply method is a no-op since OptionsBinder handles the deprecation
+// warning through the callback mechanism, but it's required because LLVM's
+// applicator will try to call it when the modifier is forwarded.
+struct Deprecated {
+  llvm::StringRef message;
+  explicit Deprecated(llvm::StringRef msg) : message(msg) {}
+  template <class Opt>
+  void apply(Opt &) const {}
+};
+
 // Base class that can bind named options to fields of structs.
 //
 // Typically use by adding the following to your struct:
@@ -98,7 +111,8 @@ public:
 
   template <typename T, typename V, typename... Mods>
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
-    auto [changedCallback, clCallback] = makeChangedCallback<V>();
+    const Deprecated *dep = filterDeprecated(Ms...);
+    auto [changedCallback, clCallback] = makeChangedCallback<V>(name, dep);
     OptionInfo &info = getOptionsStorage()[name];
     if (!scope) {
       // Bind global options.
@@ -188,8 +202,9 @@ public:
 
   void restoreOptimizationDefaults() {
     for (auto &[_, info] : getOptionsStorage()) {
-      if (info.optOverrides)
+      if (info.optOverrides) {
         info.optOverrides->restoreBackup();
+      }
     }
   }
 
@@ -402,14 +417,25 @@ private:
 
   // Returns a pair of callbacks, the first returns if the option has been
   // parsed and the second is passed to llvm::cl to track if the option has been
-  // parsed.
+  // parsed. If a deprecation message is provided, it will be printed to stderr
+  // when the option is parsed.
   template <typename V>
   static std::pair<OptionInfo::ChangedCallback, llvm::cl::cb<void, V>>
-  makeChangedCallback() {
+  makeChangedCallback(llvm::StringRef name = "",
+                      const Deprecated *dep = nullptr) {
     std::shared_ptr<bool> changed = std::make_shared<bool>(false);
+    // Capture name and message by value for lambda lifetime.
+    std::string optName = name.str();
+    std::string depMsg = dep ? dep->message.str() : "";
     return std::pair{
         [changed]() -> bool { return *changed; },
-        llvm::cl::cb<void, V>([changed](const V &) { *changed = true; })};
+        llvm::cl::cb<void, V>([changed, optName, depMsg](const V &) {
+          *changed = true;
+          if (!depMsg.empty()) {
+            llvm::errs() << "warning: --" << optName << " is deprecated; "
+                         << depMsg << "\n";
+          }
+        })};
   }
 
   // Scalar default specialization.
@@ -439,14 +465,15 @@ private:
     return [optionName, values](llvm::raw_ostream &os) {
       os << "--" << optionName << "=";
       for (auto it : llvm::enumerate(*values)) {
-        if (it.index() > 0)
+        if (it.index() > 0) {
           os << ",";
+        }
         os << it.value();
       }
     };
   }
 
-  // Finds the description in args
+  // Finds the description in args.
   template <typename... Args>
   static llvm::cl::desc &filterDescription(Args &...args) {
     llvm::cl::desc *result = nullptr;
@@ -454,13 +481,28 @@ private:
         [&] {
           if constexpr (std::is_same_v<std::decay_t<Args>, llvm::cl::desc>) {
             assert(!result && "Multiple llvm::cl::desc in args");
-            if (!result)
+            if (!result) {
               result = &args;
+            }
           }
         }(),
         ...);
     assert(result && "Expected llvm::cl::desc in args");
     return *result;
+  }
+
+  // Extracts deprecated modifier from args (returns nullptr if not found).
+  template <typename... Args>
+  static const Deprecated *filterDeprecated(const Args &...args) {
+    const Deprecated *result = nullptr;
+    (
+        [&] {
+          if constexpr (std::is_same_v<std::decay_t<Args>, Deprecated>) {
+            result = &args;
+          }
+        }(),
+        ...);
+    return result;
   }
 
   std::unique_ptr<llvm::cl::SubCommand> scope;

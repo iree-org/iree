@@ -75,16 +75,18 @@ mapHALDescriptorTypeForOpenCL(Attribute attr) {
 
 bool allowsShaderCapability(ArrayRef<StringRef> features) {
   for (StringRef feature : features) {
-    if (feature.consume_front("cap:") && feature == "Shader")
+    if (feature.consume_front("cap:") && feature == "Shader") {
       return true;
+    }
   }
   return false;
 }
 
 bool allowsKernelCapability(ArrayRef<StringRef> features) {
   for (StringRef feature : features) {
-    if (feature.consume_front("cap:") && feature == "Kernel")
+    if (feature.consume_front("cap:") && feature == "Kernel") {
       return true;
+    }
   }
   return false;
 }

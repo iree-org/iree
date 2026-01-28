@@ -23,15 +23,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_ANNOTATEDATATILINGHINTSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
-/// Command line options used purely for development purposes. Not to be relied
-/// on in any way.
-/// TODO(Max191): Remove this once materialization for scaled matmul encodings
-/// is implemented.
-static llvm::cl::opt<bool> clTestSetScaledMatmulEncodings(
-    "iree-dispatch-creation-test-set-scaled-matmul-encodings",
-    llvm::cl::desc("Set encodings on scaled matmul ops"), llvm::cl::init(false),
-    llvm::cl::Hidden);
-
 namespace {
 struct AnnotateDataTilingHintsPass final
     : impl::AnnotateDataTilingHintsPassBase<AnnotateDataTilingHintsPass> {
@@ -159,9 +150,6 @@ static bool isSupportedContractionOp(linalg::LinalgOp linalgOp) {
 /// TODO(Max191): Loosen restrictions on scaled contraction ops once data tiling
 /// can support more cases.
 static bool isSupportedScaledContractionOp(linalg::LinalgOp linalgOp) {
-  if (!clTestSetScaledMatmulEncodings) {
-    return false;
-  }
   if (!dataTilablePreCondition(linalgOp)) {
     return false;
   }

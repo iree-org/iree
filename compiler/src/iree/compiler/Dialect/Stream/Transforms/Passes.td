@@ -44,6 +44,56 @@ def ConvertToStreamPass :
   ];
 }
 
+def SplitParameterEncoderPass :
+    Pass<"iree-stream-split-parameter-encoder", "mlir::ModuleOp"> {
+  let summary = "Splits out a parameter encoder module for compatible hoisted expressions.";
+  let description = [{
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::HAL::HALDialect",
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+  let options = [
+    Option<
+      "mode", "mode",
+      "IREE::Stream::ParameterEncoderMode",
+      /*default=*/"IREE::Stream::ParameterEncoderMode::Consolidate",
+      "Controls how the encoder manages parameters.",
+      [{::llvm::cl::values(
+        clEnumValN(IREE::Stream::ParameterEncoderMode::Consolidate, "consolidate", "Merge all encoded parameters and original parameters into a single consolidated scope."),
+        clEnumValN(IREE::Stream::ParameterEncoderMode::Overlay, "overlay", "Only produce encoded parameters and leave original parameters untouched.")
+      )}]
+    >,
+    Option<
+      "outputScope", "output-scope",
+      "std::string", /*default=*/"\"encoded\"",
+      "Parameter scope for the output parameters. Omit for global."
+    >,
+    Option<
+      "outputFile", "output-file",
+      "std::string", /*default=*/"std::string()",
+      ".mlir/.mlirbc file path to write the split parameter encoder module to."
+    >,
+    Option<
+      "hoistParameterExpressions", "hoist-parameter-expressions",
+      "bool", /*default=*/"true",
+      "Enable hoisting parameter transformation expressions."
+    >,
+    Option<
+      "hoistConstantExpressions", "hoist-constant-expressions",
+      "bool", /*default=*/"true",
+      "Enable hoisting pure constant expressions with transformations."
+    >,
+    Option<
+      "maxEncodingGrowthFactor", "max-encoding-growth-factor",
+      "float", /*default=*/"1.2f",
+      "Maximum ratio of output size to input parameter size."
+    >,
+  ];
+}
+
 def EncodeHostTensorsPass :
     Pass<"iree-stream-encode-host-tensors", ""> {
   let summary = "Encodes tensors into storage formats based on affinity and target support.";
@@ -205,22 +255,12 @@ def ElideAsyncCopiesPass :
   let statistics = [
     Statistic<"numClonesElided", "num-clones-elided",
               "Number of async clone operations elided">,
+    Statistic<"numTransfersElided", "num-transfers-elided",
+              "Number of async transfer operations elided">,
     Statistic<"numSlicesElided", "num-slices-elided",
               "Number of async slice operations elided">,
     Statistic<"numIterations", "num-iterations",
               "Number of fixed-point iterations required for convergence">
-  ];
-}
-
-def ElideAsyncTransfersPass :
-    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfer ops when they the topology allows";
-  let description = [{
-    Elides all transfer ops that are between device links that do not
-    require tansfers and do not change the lifetime of the resource.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
   ];
 }
 
@@ -572,6 +612,42 @@ def SpecializeDispatchesPass :
   ];
 }
 
+def UnifyEncodingForGlobalsPass :
+    Pass<"iree-stream-unify-encoding-for-globals", "mlir::ModuleOp"> {
+  let summary = "Unifies multiple encodings of the same immutable global to reduce memory.";
+  let description = [{
+    When a single source global (e.g., a model weight) is encoded multiple
+    times with different encodings for different uses, this pass selects a
+    unified encoding and updates all references to reduce memory footprint.
+
+    The pass analyzes initializers to identify:
+    1. Source globals (e.g., stream.tensor.constant with parameters)
+    2. Encoded globals derived from the same source
+    3. Dispatch sites using these encoded globals
+
+    When multiple encoded globals share the same source, the pass queries
+    layout resolvers to determine a unified encoding. If a common encoding
+    is found, the pass updates:
+    1. The encoding operations in initializers
+    2. The corresponding stream.tensor.sizeof operations
+    3. The dispatch operand encodings
+    4. The executable binding types
+
+    Constraints:
+    - Only handles immutable globals with !stream.resource<constant> type
+    - Bails out if an encoded global can have multiple sources due to CFG
+    - Requires exactly one AffinityAnalysisDialectInterface implementation
+    - Skips hand-authored executables to avoid incorrect modifications
+
+    This pass should run after CombineInitializersPass and before
+    SpecializeEncodingsPass in the Stream pipeline.
+  }];
+  let dependentDialects = [
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 def SpecializeEncodingsPass :
     Pass<"iree-stream-specialize-encodings", "mlir::ModuleOp"> {
   let summary = "Specializes serializable encodings based on layout analysis.";
@@ -681,7 +757,7 @@ def DumpStatisticsPass :
     Option<
       "outputFormat", "output-format",
       "IREE::Stream::DumpOutputFormat",
-      "IREE::Stream::DumpOutputFormat::Pretty",
+      /*default=*/"IREE::Stream::DumpOutputFormat::Pretty",
       "Specifies the output format to produce.",
       [{::llvm::cl::values(
         clEnumValN(IREE::Stream::DumpOutputFormat::Pretty, "pretty", "Human-readable pretty printed output."),
@@ -691,8 +767,7 @@ def DumpStatisticsPass :
     >,
     Option<
       "outputFile", "output-file",
-      "std::string",
-      /*default=*/"std::string()",
+      "std::string", /*default=*/"std::string()",
       "File path to write to; or `` for stderr or `-` for stdout."
     >,
   ];

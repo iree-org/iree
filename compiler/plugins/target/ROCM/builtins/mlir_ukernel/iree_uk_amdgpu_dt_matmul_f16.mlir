@@ -17,6 +17,7 @@
 util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty attributes {
   ukernel_info = #rocm.ukernel_info<
     match = {
+      archs = ["gfx942"],
       types = [f16, f16, f32],
       iteration_sizes_constraints = [
         #rocm.ukernel_interation_size_constraint<

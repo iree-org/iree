@@ -86,12 +86,6 @@ external_cc_library(
   PUBLIC
 )
 
-if(IREE_HOST_BIN_DIR)
-  # Just import if IREE_HOST_BIN_DIR is set (e.g. when cross-compiling).
-  iree_import_binary(NAME iree-flatcc-cli)
-  return()
-endif()
-
 # Define our own binary target for the CLI.
 # flatcc's `flatcc_cli` target renames itself to `flatcc` or `flatcc_d`
 # depending on the build configuration, so we prefer to just set our own name.

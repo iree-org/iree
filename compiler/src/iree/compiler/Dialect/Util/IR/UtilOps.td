@@ -741,6 +741,7 @@ def Util_FuncOp : Util_Op<"func", [
   }];
 
   let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def Util_CallOp : Util_Op<"call", [
@@ -1416,6 +1417,20 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
 
   let assemblyFormat = [{
     ($name^)? attr-dict `:` type($result) `=` $value
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Attribute":$value)>,
+    OpBuilder<(ins "StringRef":$value)>,
+    OpBuilder<(ins "ArrayRef<uint8_t>":$value)>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a new buffer op with the given contents unless they are
+    // nullptr/empty in which case returns util.null.
+    static Value createOrNull(OpBuilder &builder, Location loc, Attribute value);
+    static Value createOrNull(OpBuilder &builder, Location loc, StringRef value);
+    static Value createOrNull(OpBuilder &builder, Location loc, ArrayRef<uint8_t> value);
   }];
 
   let hasVerifier = 1;

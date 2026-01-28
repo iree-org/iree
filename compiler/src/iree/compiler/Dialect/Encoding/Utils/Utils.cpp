@@ -6,11 +6,18 @@
 
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 
+#include <variant>
+
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/Dominance.h"
+
+#define DEBUG_TYPE "iree-encoding-utils"
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
@@ -138,6 +145,208 @@ bool isNarrowNResult(EncodingAttr encoding) {
   }
 
   return IREE::Encoding::getPo2MatmulNarrowDim(encoding).isN();
+}
+
+namespace {
+
+/// Action types for rematerialization plan.
+/// Value already dominates, use as-is.
+struct UseExistingAction {
+  Value originalValue;
+};
+
+/// Create new tensor.dim from newSource.
+struct CreateDimOpAction {
+  Value originalValue;
+  LocationAttr dimLoc;
+  Value dimIndex;
+};
+
+/// Clone operation with rematerialized operands.
+struct CloneOpAction {
+  OpResult originalValue;
+};
+
+using RematerializationAction =
+    std::variant<UseExistingAction, CreateDimOpAction, CloneOpAction>;
+
+/// Helper for std::visit with multiple lambdas (explicit overload set).
+template <class... Ts>
+struct OverloadedVisit : Ts... {
+  using Ts::operator()...;
+};
+// Deduction guide for aggregate initialization (required in C++17).
+template <class... Ts>
+OverloadedVisit(Ts...) -> OverloadedVisit<Ts...>;
+
+/// Helper class for analyzing and executing rematerialization of encoding dims.
+/// Split into two phases to avoid creating operations on failure:
+/// 1. analyze() - builds a plan without creating any operations.
+/// 2. apply() - executes the plan and creates operations.
+class RematerializationHelper {
+public:
+  RematerializationHelper(Operation *insertionPoint, Value propagationSource,
+                          Value newSource)
+      : insertionPoint(insertionPoint), propagationSource(propagationSource),
+        newSource(newSource), domInfo(insertionPoint->getParentOp()) {}
+
+  /// Phase 1: Analyze what needs to be rematerialized.
+  /// Returns failure if rematerialization is not possible.
+  FailureOr<SmallVector<RematerializationAction>> analyze(ValueRange values) {
+    SmallVector<RematerializationAction> plan;
+    for (Value value : values) {
+      if (!analyzeValue(value, plan)) {
+        return failure();
+      }
+    }
+    return plan;
+  }
+
+  /// Phase 2: Apply the plan and create operations.
+  /// Returns rematerialized values only for the requested values.
+  SmallVector<Value> apply(RewriterBase &builder,
+                           ArrayRef<RematerializationAction> plan,
+                           ValueRange requestedValues) {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(insertionPoint);
+
+    // Apply all actions to populate the applied map.
+    for (const RematerializationAction &action : plan) {
+      applyAction(builder, action);
+    }
+
+    // Return only the requested values.
+    return llvm::map_to_vector(
+        requestedValues, [&](Value value) { return applied.lookup(value); });
+  }
+
+private:
+  /// Analyze a single value, adding actions to the plan.
+  /// Returns false if rematerialization is not possible.
+  bool analyzeValue(Value value, SmallVector<RematerializationAction> &plan) {
+    // Check if already analyzed.
+    if (analyzed.contains(value)) {
+      return true;
+    }
+
+    // If the value already dominates, use it directly.
+    if (domInfo.properlyDominates(value, insertionPoint)) {
+      analyzed.insert(value);
+      plan.push_back(UseExistingAction{value});
+      return true;
+    }
+
+    Operation *definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      LDBG() << "Cannot rematerialize: block argument does not dominate";
+      return false;
+    }
+
+    // Special case: tensor.dim on the propagation source.
+    if (auto dimOp = dyn_cast<tensor::DimOp>(definingOp)) {
+      if (dimOp.getSource() == propagationSource) {
+        analyzed.insert(value);
+        plan.push_back(
+            CreateDimOpAction{value, dimOp.getLoc(), dimOp.getIndex()});
+        return true;
+      }
+    }
+
+    // General case: pure operations can be cloned.
+    if (!isPure(definingOp)) {
+      LDBG() << "Cannot rematerialize: operation is not pure";
+      return false;
+    }
+
+    // Recursively analyze operands first (they must be rematerialized before
+    // this op).
+    for (Value operand : definingOp->getOperands()) {
+      if (!analyzeValue(operand, plan)) {
+        LDBG() << "Cannot rematerialize operand: " << operand;
+        return false;
+      }
+    }
+
+    analyzed.insert(value);
+    plan.push_back(CloneOpAction{cast<OpResult>(value)});
+    return true;
+  }
+
+  /// Get the original value from any action type.
+  static Value getOriginalValue(const RematerializationAction &action) {
+    return std::visit([](const auto &a) -> Value { return a.originalValue; },
+                      action);
+  }
+
+  /// Apply a single action and return the resulting value.
+  Value applyAction(RewriterBase &builder,
+                    const RematerializationAction &action) {
+    Value originalValue = getOriginalValue(action);
+
+    // Check if already applied.
+    if (applied.contains(originalValue)) {
+      return applied[originalValue];
+    }
+
+    Value result = std::visit(
+        OverloadedVisit{
+            [&](const UseExistingAction &a) -> Value {
+              return a.originalValue;
+            },
+            [&](const CreateDimOpAction &a) -> Value {
+              return tensor::DimOp::create(builder, a.dimLoc, newSource,
+                                           a.dimIndex);
+            },
+            [&](const CloneOpAction &a) -> Value {
+              Operation *originalOp = a.originalValue.getOwner();
+              Operation *cloned = builder.clone(*originalOp);
+              // Update operands to use rematerialized values.
+              for (auto [idx, operand] :
+                   llvm::enumerate(originalOp->getOperands())) {
+                if (applied.contains(operand)) {
+                  cloned->setOperand(idx, applied[operand]);
+                }
+              }
+              return cloned->getResult(a.originalValue.getResultNumber());
+            },
+        },
+        action);
+
+    applied[originalValue] = result;
+    return result;
+  }
+
+  Operation *insertionPoint;
+  Value propagationSource;
+  Value newSource;
+  DominanceInfo domInfo;
+  // Tracks values that have already been analyzed.
+  DenseSet<Value> analyzed;
+  // Maps original value to rematerialized value (for apply phase).
+  DenseMap<Value, Value> applied;
+};
+} // namespace
+
+FailureOr<SmallVector<Value>>
+rematerializeEncodingDims(RewriterBase &builder, Operation *insertionPoint,
+                          ValueRange encodingDims, Value propagationSource,
+                          Value newSource) {
+  if (encodingDims.empty()) {
+    return SmallVector<Value>{};
+  }
+
+  RematerializationHelper helper(insertionPoint, propagationSource, newSource);
+
+  // Phase 1: Analyze without creating operations.
+  FailureOr<SmallVector<RematerializationAction>> plan =
+      helper.analyze(encodingDims);
+  if (failed(plan)) {
+    LDBG() << "Cannot rematerialize encoding dims: analysis failed";
+    return failure();
+  }
+
+  // Phase 2: Apply the plan and create operations.
+  return helper.apply(builder, *plan, encodingDims);
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

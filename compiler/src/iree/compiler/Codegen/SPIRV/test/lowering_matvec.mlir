@@ -59,13 +59,13 @@ func.func @i4_dequant_matvec_f32() {
 //         CHECK:     %[[BROADCAST1:.+]] = vector.broadcast %[[EXTRACT1]] : f32 to vector<4xf32>
 //         CHECK:     %[[MUL0:.+]] = arith.mulf %[[SUB]], %[[BROADCAST1]] : vector<4xf32>
 //         CHECK:     %[[MUL1:.+]] = arith.mulf %[[READ3]], %[[MUL0]] : vector<4xf32>
-//         CHECK:     %[[EXTRACT2:.+]] = vector.extract %arg1[0] : vector<4xf32> from vector<1x4xf32>
-//         CHECK:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[EXTRACT2]] : vector<4xf32>
-//         CHECK:     %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xf32> to vector<1x4xf32>
-//         CHECK:     scf.yield %[[BCAST]] : vector<1x4xf32>
+//         CHECK:     %[[SHAPE_CAST:.+]] = vector.shape_cast %arg1 : vector<1x4xf32> to vector<4xf32>
+//         CHECK:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[SHAPE_CAST]] : vector<4xf32>
+//         CHECK:     %[[SHAPE_CAST2:.+]] = vector.shape_cast %[[ADD]] : vector<4xf32> to vector<1x4xf32>
+//         CHECK:     scf.yield %[[SHAPE_CAST2]] : vector<1x4xf32>
 
-//         CHECK:   %[[EXTRACT3:.+]] = vector.extract %[[FOR]][0] : vector<4xf32> from vector<1x4xf32>
-//         CHECK:   %[[REDUCE:.+]] = vector.reduction <add>, %[[EXTRACT3]] : vector<4xf32> into f32
+//         CHECK:   %[[SHAPE_CAST3:.+]] = vector.shape_cast %[[FOR]] : vector<1x4xf32> to vector<4xf32>
+//         CHECK:   %[[REDUCE:.+]] = vector.reduction <add>, %[[SHAPE_CAST3]] : vector<4xf32> into f32
 //         CHECK:   gpu.subgroup_reduce add %[[REDUCE]] : (f32) -> f32
 //         CHECK:   scf.if
 //         CHECK:     vector.transfer_write

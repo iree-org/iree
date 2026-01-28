@@ -199,6 +199,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::io::file_handle
     iree::schemas::bytecode_module_def_c_fbs
+    iree::vm
     iree::vm::bytecode::module
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
@@ -216,6 +217,30 @@ iree_cc_binary(
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
+    iree-encode-parameters
+  SRCS
+    "iree-encode-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::hal
+    iree::io::file_handle
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::parameter_index_provider
+    iree::io::scope_map
+    iree::io::stream
+    iree::modules::hal
+    iree::tooling::context_util
+    iree::tooling::function_util
+    iree::tooling::parameter_util
+    iree::vm
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
@@ -252,6 +277,23 @@ iree_cc_binary(
     iree::tooling::context_util
     iree::tooling::run_module
     iree::vm
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
+    iree-tokenize
+  SRCS
+    "iree-tokenize-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::base::internal::json
+    iree::base::internal::unicode
+    iree::io::file_handle
+    iree::tokenizer::tokenizer
+    iree::tokenizer::huggingface::tokenizer_json
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )

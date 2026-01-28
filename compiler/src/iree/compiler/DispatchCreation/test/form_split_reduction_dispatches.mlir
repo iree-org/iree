@@ -218,8 +218,50 @@ util.func public @split_reduction_arg_compare(%arg0: tensor<4x1x128256xf16>) -> 
 //       CHECK:      } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
 //       CHECK:      flow.return %[[FORALL]]#0, %[[FORALL]]#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>
 //       CHECK:    }
-//       CHECK:    %[[REDUCE:.+]]:2 = linalg.reduce
-//  CHECK-SAME:        ins(%[[DISPATCH]]#0, %[[DISPATCH]]#1 :
-//  CHECK-SAME:        outs(%[[FILL_F16]], %[[FILL_I32]] :
-//  CHECK-SAME:        dimensions = [2]
+//       CHECK:    %[[REDUCE:.+]]:2 = iree_linalg_ext.arg_compare dimension(2)
+//  CHECK-SAME:        ins(%[[DISPATCH]]#0, %[[DISPATCH]]#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>)
+//  CHECK-SAME:        outs(%[[FILL_F16]], %[[FILL_I32]] : tensor<4x1xf16>, tensor<4x1xi32>)
 //       CHECK:    util.return %[[REDUCE]]#0, %[[REDUCE]]#1
+
+// -----
+
+util.func public @split_reduction_bitext_producer(%arg0: tensor<?x?xf32>) -> tensor<?xf64> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %dim1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+
+  %empty0 = tensor.empty(%dim0, %dim1) : tensor<?x?xf64>
+  %extf = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%arg0 : tensor<?x?xf32>) outs(%empty0 : tensor<?x?xf64>) {
+  ^bb0(%in: f32, %out: f64):
+    %e = arith.extf %in : f32 to f64
+    linalg.yield %e : f64
+  } -> tensor<?x?xf64>
+
+  %cst = arith.constant 0.000000e+00 : f64
+  %empty1 = tensor.empty(%dim0) : tensor<?xf64>
+  %init = linalg.fill ins(%cst : f64) outs(%empty1 : tensor<?xf64>) -> tensor<?xf64>
+  %reduce = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"],
+      iree_linalg_ext.split_reduction = [128]}
+      ins(%extf : tensor<?x?xf64>) outs(%init : tensor<?xf64>) {
+  ^bb0(%in: f64, %out: f64):
+    %add = arith.addf %in, %out : f64
+    linalg.yield %add : f64
+  } -> tensor<?xf64>
+  util.return %reduce : tensor<?xf64>
+}
+// Bit extends should be fused into the 'forall' loop.
+// CHECK-LABEL:  @split_reduction_bitext_producer
+// CHECK: scf.forall {{.+}} {
+// CHECK:   linalg.generic {
+// CHECK:     arith.extf
+// CHECK:   }
+// CHECK:   linalg.generic {
+// CHECK:     arith.addf
+// CHECK:   }
+// CHECK: }

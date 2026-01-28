@@ -18,13 +18,44 @@ iree_cc_library(
   SRCS
     "Folders.cpp"
   DEPS
+    ::Passes
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformUtils
     iree::compiler::Dialect::TensorExt::IR
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    Passes
+  HDRS
+    "Passes.h"
+    "Passes.h.inc"
+  SRCS
+    "Passes.cpp"
+    "TestSparseInterfaceMethods.cpp"
+  DEPS
+    ::PassesIncGen
+    MLIRFunctionInterfaces
+    MLIRIR
+    MLIRPass
+    MLIRSCFDialect
+    MLIRTransforms
+    iree::compiler::Dialect::TensorExt::IR
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

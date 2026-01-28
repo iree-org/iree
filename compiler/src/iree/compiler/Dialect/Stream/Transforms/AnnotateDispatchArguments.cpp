@@ -216,8 +216,9 @@ ChangeStatus GlobalPVS::updateOperation(IREE::Util::GlobalOp globalOp,
   auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
   for (auto use : globalInfo->uses) {
     auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(use);
-    if (!storeOp)
+    if (!storeOp) {
       continue;
+    }
     auto value = solver.getElementFor<ValuePVS>(
         *this, Position::forValue(storeOp.getStoredGlobalValue()),
         DFX::Resolution::REQUIRED);
@@ -275,8 +276,9 @@ private:
   }
 
   static llvm::MaybeAlign computeAlignment(const ValuePVS::SetTy &set) {
-    if (set.empty())
+    if (set.empty()) {
       return llvm::MaybeAlign();
+    }
     llvm::MaybeAlign alignment;
     for (auto value : set) {
       APInt valueDivisor = (value & (~(value - 1)));
@@ -330,12 +332,8 @@ const char ValueAlignment::ID = 0;
 class ArgumentAnalysis {
 public:
   explicit ArgumentAnalysis(Operation *rootOp)
-      : explorer(rootOp, TraversalAction::SHALLOW),
+      : explorer(rootOp, TraversalAction::RECURSE),
         solver(explorer, allocator) {
-    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-        TraversalAction::RECURSE);
-    explorer.setDialectAction<IREE::Stream::StreamDialect>(
-        TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
     explorer.initialize();
@@ -377,8 +375,9 @@ public:
   ArrayRef<IREE::Stream::CmdDispatchOp>
   getDispatchSites(IREE::Stream::ExecutableExportOp exportOp) {
     auto it = entryDispatchMap.find(exportOp);
-    if (it == entryDispatchMap.end())
+    if (it == entryDispatchMap.end()) {
       return {};
+    }
     return it->second;
   }
 
@@ -387,8 +386,9 @@ public:
   llvm::MaybeAlign getAlignmentFor(Value value) {
     auto element =
         solver.lookupElementFor<ValueAlignment>(Position::forValue(value));
-    if (!element)
+    if (!element) {
       return llvm::MaybeAlign();
+    }
     return element->getAssumedAlignment();
   }
 
@@ -426,8 +426,9 @@ public:
     for (auto dispatchOp : getDispatchSites(exportOp)) {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.getUniformOperands()[operandIdx]));
-      if (!element || !element->isValidState())
+      if (!element || !element->isValidState()) {
         return llvm::MaybeAlign();
+      }
       alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
@@ -445,8 +446,9 @@ public:
     for (auto dispatchOp : getDispatchSites(exportOp)) {
       auto element = solver.lookupElementFor<ValueAlignment>(
           Position::forValue(dispatchOp.getResourceOffsets()[resourceIdx]));
-      if (!element || !element->isValidState())
+      if (!element || !element->isValidState()) {
         return llvm::MaybeAlign();
+      }
       alignment = commonAlignment(alignment, element->getAssumedAlignment());
     }
     if (alignment.valueOrOne().value() == kMaximumAlignment) {
@@ -481,8 +483,9 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
   // Operands/resources on the func are in an arbitrary order; get maps that
   // lets us go from dispatch site operand/resource to function argument.
   auto funcOp = exportOp.lookupFunctionRef();
-  if (!funcOp)
+  if (!funcOp) {
     return;
+  }
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   auto resourceToArgMap =
@@ -506,8 +509,9 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
       llvm::sort(potentialValues, [](Attribute lhs, Attribute rhs) {
         auto lhsInt = dyn_cast<IntegerAttr>(lhs);
         auto rhsInt = dyn_cast<IntegerAttr>(rhs);
-        if (!lhsInt || !rhsInt)
+        if (!lhsInt || !rhsInt) {
           return false;
+        }
         return lhsInt.getValue().ult(rhsInt.getValue());
       });
       auto potentialValuesAttr = ArrayAttr::get(context, potentialValues);

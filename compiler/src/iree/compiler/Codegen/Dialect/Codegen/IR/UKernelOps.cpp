@@ -329,8 +329,9 @@ struct UKernelOpsBufferizationInterface
     SmallVector<Value> nonTensorResultValues;
     for (OpResult result : op->getResults()) {
       Type resultType = result.getType();
-      if (isa<RankedTensorType>(resultType))
+      if (isa<RankedTensorType>(resultType)) {
         continue;
+      }
       nonTensorResultTypes.push_back(resultType);
       nonTensorResultValues.push_back(result);
     }

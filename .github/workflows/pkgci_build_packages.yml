@@ -23,11 +23,11 @@ jobs:
         run: |
           docker pull "$MANYLINUX_DOCKER_IMAGE" &
       - name: Checking out repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: true
       - name: Setup Python
-        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.3.3
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v5.3.3
         with:
           python-version: 3.12
           cache: "pip"
@@ -74,7 +74,7 @@ jobs:
           cat runtime/version_local.json
 
       - name: Enable cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
         with:
           path: ${{ env.CACHE_DIR }}
           key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
@@ -97,7 +97,7 @@ jobs:
           # permissions. Take them back.
           sudo chown -R "$(whoami)" "${cache_dir}"
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: linux_x86_64_release_packages
           path: |
@@ -122,7 +122,7 @@ jobs:
 #       run: |
 #         docker pull "$MANYLINUX_DOCKER_IMAGE" &
 #     - name: "Checking out repository"
-#       uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+#       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 #       with:
 #         submodules: true
 #     - name: Write version info
@@ -138,7 +138,7 @@ jobs:
 #         realpath version_info.json
 #         cat version_info.json
 #     - name: Enable cache
-#       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+#       uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
 #       with:
 #         path: ${{ env.CACHE_DIR }}
 #         key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
@@ -161,7 +161,7 @@ jobs:
 #         # permissions. Take them back.
 #         sudo chown -R "$(whoami)" "${cache_dir}"
 #     - name: Upload wheel artifacts
-#       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+#       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
 #       with:
 #         name: linux_x86_64_release_asserts_packages
 #         path: |

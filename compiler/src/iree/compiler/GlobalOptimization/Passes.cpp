@@ -159,6 +159,7 @@ void buildGlobalOptimizationPassPipeline(
                          DispatchCreation::createInsertTensorBarriersPass);
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
+      .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);
@@ -178,6 +179,10 @@ void buildGlobalOptimizationPassPipeline(
                            PropagateLinalgTransposePassOptions options;
                            options.enableAggressivePropagation =
                                transformOptions.aggressiveTransposePropagation;
+                           options.enableConvolutionPropagation =
+                               transformOptions.propagateTransposesThroughConv;
+                           options.enableSinkTransposeThroughPad =
+                               transformOptions.sinkTransposeThroughPad;
                            options.enableAttentionVTranspose =
                                clEnableAttentionVTranspose;
                            options.enableEdgeReshapePropagation =
@@ -269,10 +274,10 @@ void buildGlobalOptimizationPassPipeline(
         exportParametersOptions));
   }
 
-  if (!transformOptions.parameterSplatExportFile.empty()) {
+  if (!transformOptions.parameterSplatPath.empty()) {
     IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
         generateSplatOptions;
-    generateSplatOptions.filePath = transformOptions.parameterSplatExportFile;
+    generateSplatOptions.filePath = transformOptions.parameterSplatPath;
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));

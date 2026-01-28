@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: CI - Linux x64 clang UBSan
+name: CI - Linux x64 clang UBSan and Reverse Iteration
 
 on:
   workflow_call:
@@ -19,7 +19,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: true
       - name: Install Python requirements
@@ -29,6 +29,9 @@ jobs:
           # Use a modern clang explicitly.
           CC: clang-19
           CXX: clang++-19
+          # Enable reverse iteration of unordered LLVM containers. This helps
+          # catch non-determinism bugs.
+          IREE_REVERSE_ITERATION: "ON"
           SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
           SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
           SCCACHE_CACHE_ZSTD_LEVEL: 10

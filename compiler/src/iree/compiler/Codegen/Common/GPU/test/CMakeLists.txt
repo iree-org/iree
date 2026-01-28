@@ -14,7 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_lower_coalesced_dma_to_gather_lds.mlir"
     "decompose_horizontally_fused_gemms.mlir"
+    "flatten_swizzle_hint_allocs.mlir"
     "gpu_alloc_private_memory_for_dps_ops.mlir"
     "gpu_apply_derived_thread_config.mlir"
     "gpu_apply_padding_online_attention.mlir"
@@ -31,11 +33,13 @@ iree_lit_test_suite(
     "gpu_distribute_forall.mlir"
     "gpu_distribute_scf_for.mlir"
     "gpu_distribute_shared_memory.mlir"
+    "gpu_expand_dimensions.mlir"
+    "gpu_fold_swizzle_hint_ops.mlir"
     "gpu_fuse_and_hoist_forall.mlir"
     "gpu_generalize_named_ops.mlir"
     "gpu_greedily_distribute_to_threads.mlir"
     "gpu_infer_memory_space.mlir"
-    "gpu_lower_to_global_loads.mlir"
+    "gpu_lower_coalesced_dma_to_global_loads.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
     "gpu_nested_layout_vector_distribution_mask.mlir"

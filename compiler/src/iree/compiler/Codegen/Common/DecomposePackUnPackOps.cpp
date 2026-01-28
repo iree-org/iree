@@ -169,8 +169,9 @@ static LogicalResult commonRunOnOperation(
             scf::tileConsumerAndFuseProducersUsingSCF(
                 rewriter, cast<TilingInterface>(op.getOperation()),
                 packOptions);
-        if (failed(tileAndFuseResult))
+        if (failed(tileAndFuseResult)) {
           return WalkResult::interrupt();
+        }
         rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
         return WalkResult::advance();
       });
@@ -203,8 +204,9 @@ static LogicalResult commonRunOnOperation(
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
             rewriter, cast<TilingInterface>(op.getOperation()),
             unpackTilingOptions);
-        if (failed(tilingResult))
+        if (failed(tilingResult)) {
           return WalkResult::interrupt();
+        }
         rewriter.replaceOp(op, tilingResult->replacements);
         return WalkResult::advance();
       });
@@ -342,9 +344,8 @@ static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
   // If all consumers are dispatch tensor stores, then the `op` is decomposable
   // if it is an UnPackOp.
   if (isa<linalg::UnPackOp>(op) &&
-      llvm::all_of(op->getUsers(), [&](Operation *user) {
-        return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
-      })) {
+      llvm::all_of(op->getUsers(),
+                   llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>)) {
     return success();
   }
   return failure();

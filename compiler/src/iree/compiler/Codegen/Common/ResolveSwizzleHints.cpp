@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -157,6 +158,22 @@ static void swizzleGatherToLDS(RewriterBase &rewriter,
   });
 }
 
+static LogicalResult
+verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
+  auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
+  // Swizzle hints require flat (rank 1) memrefs.
+  // For rank 1, allow dynamic memrefs or static contiguous row-major memrefs.
+  if ((memrefType.getRank() != 1 || !memrefType.getLayout().isIdentity()) ||
+      (memrefType.hasStaticShape() &&
+       !memref::isStaticShapeAndContiguousRowMajor(memrefType))) {
+    hintOp.emitError()
+        << "swizzle hint operand must be a contiguous flat memref, got "
+        << hintOp.getOperand().getType();
+    return failure();
+  }
+  return success();
+}
+
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -189,7 +206,7 @@ static void resolveHintOp(RewriterBase &rewriter,
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
       // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
-      // subgroup contiguously in order of lane ID
+      // subgroup contiguously in order of lane ID.
       if (gatherToLDSOp.getDst() == hintOp) {
         continue;
       }
@@ -242,6 +259,9 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   // silently pass through for that hint.
   IRRewriter rewriter(funcOp->getContext());
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
+    if (failed(verifyFlatContiguousSwizzleHintOp(hintOp))) {
+      return signalPassFailure();
+    }
     resolveHintOp(rewriter, hintOp);
   }
 

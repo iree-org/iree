@@ -1244,7 +1244,7 @@ func.func @multi_fusable_users(%arg0: tensor<?x65536x32xf16>, %arg1: index, %arg
 // -----
 func.func @matmul_transposed_reordering_static_on(%arg0 : tensor<8192x4096xf16>,%arg1 : tensor<128256x4096xf16>) -> tensor<8192x128256xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
@@ -1273,7 +1273,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_static_no_reordering(%arg0 : tensor<8192x4096xf16>,%arg1 : tensor<128256x4096xf16>) -> tensor<8192x128256xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<8192x128256xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
@@ -1301,7 +1301,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_static_off(%arg0 : tensor<128256x4096xf16>,%arg1 : tensor<8192x4096xf16>) -> tensor<128256x8192xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %7 = tensor.empty() : tensor<128256x8192xf32>
   %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128256x8192xf32>) -> tensor<128256x8192xf32>
@@ -1330,7 +1330,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 
 func.func @matmul_transposed_reordering_dynamic(%arg0 : tensor<?x256x4096xf16>,%arg1 : tensor<8192x4096xf16>) -> tensor<?x256x8192xf32>
 attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64,
-{gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+{gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %dim0 = tensor.dim %arg0, %c0 : tensor<?x256x4096xf16>
@@ -1364,3 +1364,68 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[OFFSET0]], 0, %[[OFFSET1]]]
 //   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+func.func @arg_compare_fold_broadcast(
+    %input : tensor<4x1x128256xf16>,
+    %init_f16 : tensor<4x1xf16>,
+    %init_i32 : tensor<4x1xi32>,
+    %out_init_f16 : tensor<4x1x96xf16>,
+    %out_init_i32 : tensor<4x1x96xi32>)
+    -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
+  %c0 = arith.constant 0 : index
+  %c-1 = arith.constant -1 : index
+  %c1336 = arith.constant 1336 : index
+  %result:2 = scf.forall (%iv) = (0) to (128256) step (1336)
+      shared_outs(%out_f16 = %out_init_f16, %out_i32 = %out_init_i32)
+      -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
+    %cmp = arith.cmpi slt, %iv, %c0 : index
+    %neg_iv = arith.subi %c-1, %iv : index
+    %abs_iv = arith.select %cmp, %neg_iv, %iv : index
+    %idx = arith.divsi %abs_iv, %c1336 : index
+    %neg_idx = arith.subi %c-1, %idx : index
+    %final_idx = arith.select %cmp, %neg_idx, %idx : index
+    %in_slice = tensor.extract_slice %input[0, 0, %iv] [4, 1, 1336] [1, 1, 1]
+        : tensor<4x1x128256xf16> to tensor<4x1x1336xf16>
+    %slice_f16 = tensor.extract_slice %out_f16[0, 0, %final_idx] [4, 1, 1] [1, 1, 1]
+        : tensor<4x1x96xf16> to tensor<4x1x1xf16>
+    %bcast_f16 = linalg.broadcast ins(%init_f16 : tensor<4x1xf16>)
+        outs(%slice_f16 : tensor<4x1x1xf16>) dimensions = [2]
+    %extract_f16 = tensor.extract_slice %bcast_f16[0, 0, 0] [4, 1, 1] [1, 1, 1]
+        : tensor<4x1x1xf16> to tensor<4x1xf16>
+    %slice_i32 = tensor.extract_slice %out_i32[0, 0, %final_idx] [4, 1, 1] [1, 1, 1]
+        : tensor<4x1x96xi32> to tensor<4x1x1xi32>
+    %bcast_i32 = linalg.broadcast ins(%init_i32 : tensor<4x1xi32>)
+        outs(%slice_i32 : tensor<4x1x1xi32>) dimensions = [2]
+    %extract_i32 = tensor.extract_slice %bcast_i32[0, 0, 0] [4, 1, 1] [1, 1, 1]
+        : tensor<4x1x1xi32> to tensor<4x1xi32>
+    %index_base = arith.muli %final_idx, %c1336 : index
+    %compare:2 = iree_linalg_ext.arg_compare
+        {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 128]]>}
+        dimension(2) ins(%in_slice : tensor<4x1x1336xf16>)
+        outs(%extract_f16, %extract_i32 : tensor<4x1xf16>, tensor<4x1xi32>)
+        index_base(%index_base : index) {
+      ^bb0(%lhs: f16, %rhs: f16):
+        %cmp_result = arith.cmpf ogt, %lhs, %rhs : f16
+        iree_linalg_ext.yield %cmp_result : i1
+    } -> tensor<4x1xf16>, tensor<4x1xi32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %compare#0 into %out_f16[0, 0, %final_idx] [4, 1, 1] [1, 1, 1]
+          : tensor<4x1xf16> into tensor<4x1x96xf16>
+      tensor.parallel_insert_slice %compare#1 into %out_i32[0, 0, %final_idx] [4, 1, 1] [1, 1, 1]
+          : tensor<4x1xi32> into tensor<4x1x96xi32>
+    }
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
+  return %result#0, %result#1 : tensor<4x1x96xf16>, tensor<4x1x96xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_fold_broadcast
+//  CHECK-SAME:     %[[INPUT:.+]]: tensor<4x1x128256xf16>
+//  CHECK-SAME:     %[[INIT_F16:.+]]: tensor<4x1xf16>
+//  CHECK-SAME:     %[[INIT_I32:.+]]: tensor<4x1xi32>
+//  CHECK-SAME:     %[[OUT_F16:.+]]: tensor<4x1x96xf16>
+//  CHECK-SAME:     %[[OUT_I32:.+]]: tensor<4x1x96xi32>
+//       CHECK:   scf.forall
+//   CHECK-NOT:     linalg.broadcast
+//       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
+//       CHECK:       iree_linalg_ext.arg_compare

@@ -11,6 +11,7 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::GlobalOptimizationOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::ParameterOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GlobalPipelineOptions);
@@ -161,6 +162,84 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 }
 
+void ParameterOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category("IREE Parameter Options");
+
+  // Parameter import/export options.
+  binder.list<std::string>(
+      "iree-parameter-import", importPaths,
+      llvm::cl::desc("File paths to archives to import parameters from with an "
+                     "optional `scope=` prefix."),
+      llvm::cl::cat(category));
+  binder.list<std::string>(
+      "iree-parameter-import-keys", importKeys,
+      llvm::cl::desc("List of parameter keys to import. Any matching keys from "
+                     "any scope will be imported."),
+      llvm::cl::cat(category));
+  binder.opt<int64_t>(
+      "iree-parameter-import-maximum-size", importMaximumSize,
+      llvm::cl::desc("Maximum size of parameters to import or 0 to disable "
+                     "automatic import."),
+      llvm::cl::cat(category));
+
+  binder.opt<std::string>(
+      "iree-parameter-export", exportPath,
+      llvm::cl::desc("File path to an archive to export parameters to with an "
+                     "optional `scope=` prefix."),
+      llvm::cl::cat(category));
+  binder.opt<int64_t>(
+      "iree-parameter-export-minimum-size", exportMinimumSize,
+      llvm::cl::desc("Minimum size of constants to export to the parameter "
+                     "archive."),
+      llvm::cl::cat(category));
+
+  binder.opt<std::string>(
+      "iree-parameter-splat", splatPath,
+      llvm::cl::desc("File path to create a parameter archive of splat values "
+                     "from all parameter backed globals."),
+      llvm::cl::cat(category));
+
+  // Parameter encoder options.
+  binder.opt<ParameterEncoderMode>(
+      "iree-parameter-encoder-mode", encoderMode,
+      llvm::cl::desc("Controls how the encoder manages parameters."),
+      llvm::cl::values(
+          clEnumValN(ParameterEncoderMode::Consolidate, "consolidate",
+                     "Merge all encoded and original parameters into a single "
+                     "consolidated scope."),
+          clEnumValN(ParameterEncoderMode::Overlay, "overlay",
+                     "Only produce encoded parameters and leave original "
+                     "parameters untouched.")),
+      llvm::cl::cat(category));
+
+  binder.opt<std::string>(
+      "iree-parameter-encoder-output-file", encoderOutputFile,
+      llvm::cl::desc(".mlir/.mlirbc file path to write the split parameter "
+                     "encoder module to (empty = disabled)."),
+      llvm::cl::cat(category));
+
+  binder.opt<std::string>(
+      "iree-parameter-encoder-output-scope", encoderOutputScope,
+      llvm::cl::desc("Parameter scope for the encoder output parameters."),
+      llvm::cl::cat(category));
+
+  // Deprecated flags aliasing the new ones above.
+  binder.opt<std::string>(
+      "iree-opt-export-parameters", exportPath,
+      Deprecated("use --iree-parameter-export=<path> instead"),
+      llvm::cl::Hidden,
+      llvm::cl::desc("File path to an archive to export parameters to with an "
+                     "optional `scope=` prefix."),
+      llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-splat-parameters", splatPath,
+      Deprecated("use --iree-parameter-splat=<path> instead"), llvm::cl::Hidden,
+      llvm::cl::desc(
+          "File path to create a parameter archive of splat values out of all "
+          "parameter backed globals."),
+      llvm::cl::cat(category));
+}
+
 void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling global optimizations.");
@@ -176,6 +255,17 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Propagates transposes to named ops even when the resulting op will "
           "be a linalg.generic"),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-global-opt-propagate-transposes-through-conv",
+      propagateTransposesThroughConv,
+      llvm::cl::desc(
+          "Enables propagation of transpose ops through convolutions."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-global-opt-enable-sink-transpose-through-pad",
+      sinkTransposeThroughPad,
+      llvm::cl::desc("Enables sinking transpose through pad operations."),
       llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-outer-dim-concat", outerDimConcat,
                    {init_at_opt(llvm::OptimizationLevel::O0, false),
@@ -204,39 +294,6 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
-
-  binder.list<std::string>(
-      "iree-opt-import-parameters", parameterImportPaths,
-      llvm::cl::desc("File paths to archives to import parameters from with an "
-                     "optional `scope=` prefix."),
-      llvm::cl::cat(category));
-  binder.list<std::string>("iree-opt-import-parameter-keys",
-                           parameterImportKeys,
-                           llvm::cl::desc("List of parameter keys to import."),
-                           llvm::cl::cat(category));
-  binder.opt<int64_t>("iree-opt-import-parameter-maximum-size",
-                      parameterImportMaximumSize,
-                      llvm::cl::desc("Maximum size of parameters to import."),
-                      llvm::cl::cat(category));
-
-  binder.opt<std::string>(
-      "iree-opt-export-parameters", parameterExportPath,
-      llvm::cl::desc("File path to an archive to export parameters to with an "
-                     "optional `scope=` prefix."),
-      llvm::cl::cat(category));
-  binder.opt<int64_t>(
-      "iree-opt-export-parameter-minimum-size", parameterExportMinimumSize,
-      llvm::cl::desc(
-          "Minimum size of constants to export to the archive created in "
-          "`iree-opt-export-parameter-archive-export-file`."),
-      llvm::cl::cat(category));
-
-  binder.opt<std::string>(
-      "iree-opt-splat-parameters", parameterSplatExportFile,
-      llvm::cl::desc(
-          "File path to create a parameter archive of splat values out of all "
-          "parameter backed globals."),
-      llvm::cl::cat(category));
 
   binder.opt<bool>(
       "iree-opt-generalize-matmul", generalizeMatmul,
@@ -345,6 +402,15 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Enable aggressive reshape movement (bubbling expand/collapse "
           "shapes across reduction ops)."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-flow-enable-pad-handling", enablePadHandling,
+      llvm::cl::desc("Enable native handling of tensor.pad operations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
+      enableFusePaddingIntoLinalgConsumerOps,
+      llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
       llvm::cl::cat(category));
 }
 

@@ -49,8 +49,9 @@ public:
 static bool canBeHoisted(LoopLikeOpInterface loopLike,
                          SubsetInsertionOpInterface insertion) {
   // Do not move terminators.
-  if (insertion->hasTrait<OpTrait::IsTerminator>())
+  if (insertion->hasTrait<OpTrait::IsTerminator>()) {
     return false;
+  }
 
   // Walk the nested operations and check that all used values are either
   // defined outside of the loop or in a nested region, but not at the level of
@@ -58,8 +59,10 @@ static bool canBeHoisted(LoopLikeOpInterface loopLike,
   auto walkFn = [&](Operation *child) {
     for (OpOperand &operand : child->getOpOperands()) {
       // Ignore values defined in a nested region.
-      if (insertion->isAncestor(operand.get().getParentRegion()->getParentOp()))
+      if (insertion->isAncestor(
+              operand.get().getParentRegion()->getParentOp())) {
         continue;
+      }
       if (!loopLike.isDefinedOutsideOfLoop(operand.get()) &&
           &operand != &insertion.getSourceOperand()) {
         return WalkResult::interrupt();
@@ -222,23 +225,6 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
   }
 }
 
-void moveLoopInvariantCodeFromGenericOps(Operation *op) {
-  // linalg.generic operations are also loop-like, but they don't have
-  // LoopLikeOpInterface implemented for them.
-  op->walk([&](linalg::GenericOp genericOp) {
-    moveLoopInvariantCode(
-        &genericOp.getBodyRegion(),
-        [&](Value value, Region *) {
-          return !genericOp->isAncestor(value.getParentRegion()->getParentOp());
-        },
-        [&](Operation *op, Region *) {
-          return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
-                 isSpeculatable(op);
-        },
-        [&](Operation *op, Region *) { op->moveBefore(genericOp); });
-  });
-}
-
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
@@ -310,8 +296,9 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
                       [](Value v) { return !isZeroInteger(v); }) ||
          llvm::any_of(writeOp.getIndices(),
                       [](Value v) { return !isZeroInteger(v); })) &&
-        (op.getIndices() != writeOp.getIndices()))
+        (op.getIndices() != writeOp.getIndices())) {
       return failure();
+    }
 
     // Work only with minor identity mappings.
     if (!op.getPermutationMap().isMinorIdentity() ||
@@ -378,11 +365,8 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     extractSliceOp->moveAfter(latestInsertionPoint);
   });
 
-  funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
-  LDBG() << "after hoisting loop invariant code\n" << funcOp;
-
-  moveLoopInvariantCodeFromGenericOps(funcOp);
-  LDBG() << "after hoisting loop invariant code out of generic ops\n" << funcOp;
+  moveLoopInvariantCodeFromGuaranteedLoops(funcOp);
+  LDBG() << "after hoisting loop invariant code\n" << funcOp << "\n";
 
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.

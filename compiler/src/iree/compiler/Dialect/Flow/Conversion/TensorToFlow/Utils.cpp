@@ -104,12 +104,14 @@ bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     int64_t staticSize = getVal(size, ShapedType::kDynamic);
     int64_t staticStride = getVal(stride, ShapedType::kDynamic);
 
-    if (staticStride != 1)
+    if (staticStride != 1) {
       return false;
+    }
 
     if (fullSlices == false) {
-      if (staticSize != 1)
+      if (staticSize != 1) {
         return false;
+      }
     } else {
       // TODO: Use ValueBoundsAnalysis to check whether two dynamic values
       // are equal.

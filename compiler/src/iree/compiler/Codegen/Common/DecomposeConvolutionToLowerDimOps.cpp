@@ -72,19 +72,22 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
 
   // ATM only folding of the H dim is supported.
   // TODO: Add support for cases where the W dim is folded.
-  if (!foldHDim(convOp))
+  if (!foldHDim(convOp)) {
     return failure();
+  }
 
   // 2. Get the current lowering config attached to the Conv Op.
   FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfigAttr =
       getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
-  if (failed(loweringConfigAttr))
+  if (failed(loweringConfigAttr)) {
     return failure();
+  }
 
   // TODO: Either remove "interchange" from lowering_config or add support in
   // this pass.
-  if (!loweringConfigAttr->isInterchangeEmpty())
+  if (!loweringConfigAttr->isInterchangeEmpty()) {
     return failure();
+  }
 
   // 3. Calculate new tiling levels.
   // Note that this will basically erase the _H_ dims from the orignal lowering
@@ -159,8 +162,9 @@ class DecomposeConvolutionToLowerDimOpsPass final
     if (numConvOps == 1 && succeeded(newLoweringConfig)) {
       auto computeOps = getComputeOps(funcOp);
       for (auto computeOp : computeOps) {
-        if (isa<linalg::DepthwiseConv1DNwcWcOp>(computeOp))
+        if (isa<linalg::DepthwiseConv1DNwcWcOp>(computeOp)) {
           setLoweringConfig(computeOp, newLoweringConfig.value());
+        }
       }
     }
   }

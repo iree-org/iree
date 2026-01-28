@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -35,17 +36,6 @@ using TensorDivisibilityInfo =
     llvm::SmallDenseMap<unsigned, IREE::Util::ConstantIntDivisibility>;
 
 namespace {
-
-struct RemoveOptimizationBarrier final
-    : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOp(barrierOp, barrierOp.getOperands());
-    return success();
-  }
-};
 
 /// This pass is used to materialize information about dynamic dimensions of
 /// `tensor` operands of an operation in the IR. If a dynamic dimension is
@@ -85,12 +75,14 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
   }
 
   for (auto [index, dim] : llvm::enumerate(tensorType.getShape())) {
-    if (!tensorType.isDynamicDim(index))
+    if (!tensorType.isDynamicDim(index)) {
       continue;
+    }
     std::optional<IREE::Util::ConstantIntDivisibility> dimDivisibility =
         dynamicDimAnalysis.getDivisibilityInfo(v, index);
-    if (!dimDivisibility)
+    if (!dimDivisibility) {
       continue;
+    }
     divisibilityInfo[index] = std::move(dimDivisibility.value());
   }
 
@@ -110,10 +102,6 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-struct ReshapeOps {
-  tensor::ExpandShapeOp expandShapeOp;
-  tensor::CollapseShapeOp collapseShapeOp;
-};
 static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
@@ -205,14 +193,17 @@ static LogicalResult blockDynamicDimensions(
     Operation *operation, llvm::SmallDenseSet<int64_t> limitToOperandNumbers,
     llvm::SmallDenseSet<int64_t> limitToResultNumbers) {
   for (OpOperand &operand : operation->getOpOperands()) {
-    if (!limitToOperandNumbers.contains(operand.getOperandNumber()))
+    if (!limitToOperandNumbers.contains(operand.getOperandNumber())) {
       continue;
-    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
+    }
+    if (operand.get().getDefiningOp<tensor::CollapseShapeOp>()) {
       continue;
+    }
     TensorDivisibilityInfo operandDivisibilityInfo =
         getTensorDivisibilityInfo(dynamicDimAnalysis, operand.get());
-    if (operandDivisibilityInfo.empty())
+    if (operandDivisibilityInfo.empty()) {
       continue;
+    }
     std::optional<ReshapeOps> reshapes = blockDynamicDimensionsOfValue(
         rewriter, operandDivisibilityInfo, operand.get());
     if (reshapes) {
@@ -224,12 +215,14 @@ static LogicalResult blockDynamicDimensions(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(operation);
   for (OpResult result : operation->getResults()) {
-    if (!limitToResultNumbers.contains(result.getResultNumber()))
+    if (!limitToResultNumbers.contains(result.getResultNumber())) {
       continue;
+    }
     TensorDivisibilityInfo resultDivisibilityInfo =
         getTensorDivisibilityInfo(dynamicDimAnalysis, result);
-    if (resultDivisibilityInfo.empty())
+    if (resultDivisibilityInfo.empty()) {
       continue;
+    }
     std::optional<ReshapeOps> reshapes =
         blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
     if (reshapes) {
@@ -333,6 +326,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                       controlFusionFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
                                                                controlFusionFn);
+    IREE::Codegen::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                             controlFusionFn);
     // Add patterns to fold `tensor.empty` operations with its consumers.
     tensor::populateFoldTensorEmptyPatterns(patterns);
     // Add some additional patterns that can simplify the IR.
@@ -382,6 +377,8 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                       controlFn);
     IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
         bubbleExpandShapePatterns, controlFn);
+    IREE::Codegen::populateFoldReshapeOpsByExpansionPatterns(
+        bubbleExpandShapePatterns, controlFn);
     // Add patterns to fold the "bubbled-up" `tensor.expand_shape` operation and
     // "pushed-down" `tensor.collapse_shape` operation with their interface
     // bindings or `tensor.empty` operations.
@@ -413,7 +410,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   // Delete the optimization barrier and run some further cleanup.
   {
     RewritePatternSet removeBarrierOpsPatterns(context);
-    removeBarrierOpsPatterns.insert<RemoveOptimizationBarrier>(context);
+    populateRemoveOptimizationBarrierPatterns(removeBarrierOpsPatterns);
     tensor::ExpandShapeOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(

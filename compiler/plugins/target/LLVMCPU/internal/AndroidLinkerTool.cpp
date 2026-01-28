@@ -104,8 +104,9 @@ public:
 
   std::string getSystemToolPath() const override {
     auto toolPath = LinkerTool::getSystemToolPath();
-    if (!toolPath.empty())
+    if (!toolPath.empty()) {
       return toolPath;
+    }
 
     // ANDROID_NDK must be set for us to infer the tool path.
     char *androidNDKPath = std::getenv("ANDROID_NDK");
@@ -216,8 +217,9 @@ public:
     flagsToPrefixForLinker.clear();
 
     auto commandLine = llvm::join(flags, " ");
-    if (failed(runLinkCommand(commandLine)))
+    if (failed(runLinkCommand(commandLine))) {
       return std::nullopt;
+    }
     return artifacts;
   }
 };

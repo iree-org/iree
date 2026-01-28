@@ -103,29 +103,11 @@ static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
 // Transpose specialization
 //===----------------------------------------------------------------------===//
 
-// Indicates whether the given linalg op represents a transpose. In particular,
-// it requires a single input where the indexing maps are full permutations and
-// non-equal.
-static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
-    return false;
-
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
-    return false;
-  auto mapRange = linalgOp.getIndexingMapsArray();
-  if (mapRange.size() != 2 || !mapRange.front().isPermutation() ||
-      !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
-    return false;
-  }
-  return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
-}
-
 // Specializes linalg.generic op to linalg.transpose if it is transposing a
 // single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (!mlir::iree_compiler::GlobalOptimization::isaTransposeOpInterface(
-          genericOp)) {
+  if (!IREE::LinalgExt::isaTransposeOpInterface(genericOp)) {
     return;
   }
 
@@ -303,8 +285,9 @@ public:
     rewriter.replaceOp(transposeOp, newGenericOp->getResult(resultIndex));
     for (auto [oldRes, newRes] :
          llvm::zip_equal(genericOp.getResults(), newGenericOp->getResults())) {
-      if (oldRes.getResultNumber() == resultIndex)
+      if (oldRes.getResultNumber() == resultIndex) {
         continue;
+      }
       rewriter.replaceAllUsesWith(oldRes, newRes);
     }
     return success();
@@ -494,10 +477,10 @@ public:
     llvm::SmallDenseMap<int64_t, int64_t> rankReducedMap;
     // Since `dim` is in the pre-transposed domain, and is incrementing each
     // iteration, `idx` must also be in the pre-transposed domain.
-    for (int64_t idx = 0, e = perm.size(); idx < e; ++idx) {
+    for (int64_t idx = 0, e = invPerm.size(); idx < e; ++idx) {
       // Get index in the transposed domain, since `rankReducingMask` is in
       // the transposed domain.
-      if (!rankReducingMask.contains(perm[idx])) {
+      if (!rankReducingMask.contains(invPerm[idx])) {
         // Domain of `rankReducedMap` is in pre-transposed domain.
         rankReducedMap[idx] = dim++;
       }
@@ -506,7 +489,7 @@ public:
     // Compute the new permutation by dropping all rank-reduced dimensions.
     SmallVector<int64_t> rankReducedPerm;
     for (int64_t i : perm) {
-      if (!rankReducingMask.contains(i)) {
+      if (rankReducedMap.contains(i)) {
         rankReducedPerm.push_back(rankReducedMap[i]);
       }
     }
@@ -605,6 +588,52 @@ public:
 
 private:
   bool enableEdgeReshapePropagation = true;
+};
+
+// Sinks a transpose through a tensor.pad.
+class SinkTransposeThroughPad : public OpRewritePattern<tensor::PadOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(padOp)) {
+      return failure();
+    }
+    Value source = padOp.getSource();
+    auto transposeOp = source.getDefiningOp<linalg::TransposeOp>();
+    if (!transposeOp) {
+      return failure();
+    }
+
+    Block &block = padOp.getRegion().front();
+    if (llvm::any_of(block.getArguments(), [](BlockArgument blockArg) {
+          return blockArg.getNumUses();
+        })) {
+      return failure();
+    }
+
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
+    SmallVector<OpFoldResult> lowSizes = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> highSizes = padOp.getMixedHighPad();
+    applyPermutationToVector(lowSizes, invPerm);
+    applyPermutationToVector(highSizes, invPerm);
+
+    RankedTensorType oldPaddedType = cast<RankedTensorType>(padOp.getType());
+    RankedTensorType newPaddedType = oldPaddedType.clone(
+        applyPermutation(oldPaddedType.getShape(), invPerm));
+
+    auto newPadOp = tensor::PadOp::create(
+        rewriter, padOp.getLoc(), newPaddedType, transposeOp.getInput(),
+        lowSizes, highSizes, padOp.getNofold());
+    rewriter.cloneRegionBefore(padOp.getRegion(), newPadOp.getRegion(),
+                               newPadOp.getRegion().begin());
+
+    Value newTransposeOp =
+        createTranspose(rewriter, newPadOp, transposeOp.getPermutation());
+    rewriter.replaceOp(padOp, newTransposeOp);
+    return success();
+  }
 };
 
 // Fuses a transpose with the input of a linalg.generic op or contraction op.
@@ -1007,6 +1036,83 @@ private:
   SmallVector<int64_t> permutation;
 };
 
+// Fuses a transpose into a reduction linalg.generic by absorbing it into the
+// indexing map.
+class FuseTransposeThroughGenericReduction
+    : public OpRewritePattern<linalg::GenericOp> {
+public:
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+      return failure();
+    }
+
+    // Only try to fuse when the generic has at least one reduction dimension.
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops()) {
+      return rewriter.notifyMatchFailure(genericOp, "not a reduction");
+    }
+
+    // All maps must be projected permutations.
+    if (!llvm::all_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
+          return map.isProjectedPermutation();
+        })) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "not a projected permutation");
+    }
+
+    // Look for a transpose on any input.
+    for (int64_t inputIdx = 0, endIdx = genericOp.getNumDpsInputs();
+         inputIdx < endIdx; ++inputIdx) {
+      auto transpose = genericOp.getDpsInputs()[inputIdx]
+                           .getDefiningOp<linalg::TransposeOp>();
+      if (!transpose) {
+        continue;
+      }
+
+      // Update the indexing map according to the transpose.
+      AffineMap inputMap = genericOp.getMatchingIndexingMap(
+          genericOp.getDpsInputOperand(inputIdx));
+
+      // Fuse by updating the indexing map to absorb the transpose.
+      auto invPerm = invertPermutationVector(transpose.getPermutation());
+      SmallVector<AffineExpr> newExprs =
+          applyPermutation(inputMap.getResults(), invPerm);
+
+      // Only fuse if dimension indices are in increasing order to maintain
+      // efficient memory access patterns. This should offset the fact that the
+      // transpose may have multiple uses.
+      int64_t prevDim = -1;
+      for (AffineExpr expr : newExprs) {
+        const int64_t dim = cast<AffineDimExpr>(expr).getPosition();
+        if (dim < prevDim) {
+          return rewriter.notifyMatchFailure(genericOp,
+                                             "newExprs are not contiguous");
+        }
+        prevDim = dim;
+      }
+
+      auto transposedMap =
+          AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
+                         newExprs, rewriter.getContext());
+
+      SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
+      newIndexingMaps[inputIdx] = transposedMap;
+
+      rewriter.startOpModification(genericOp);
+      genericOp.setIndexingMapsAttr(
+          rewriter.getAffineMapArrayAttr(newIndexingMaps));
+      genericOp.setOperand(inputIdx, transpose.getInput());
+      rewriter.finalizeOpModification(genericOp);
+      return success();
+    }
+
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "no matching transpose found");
+  }
+};
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -1029,8 +1135,8 @@ struct PropagateLinalgTransposePass
 };
 } // namespace
 
-static void populateNamedOpSinkingPatterns(MLIRContext *context,
-                                           RewritePatternSet &sinkingPatterns) {
+static void populateMatmulSinkingPatterns(MLIRContext *context,
+                                          RewritePatternSet &sinkingPatterns) {
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
                                            /*inputIdx=*/1>>(
       context, SmallVector<int64_t>{1, 0});
@@ -1043,6 +1149,7 @@ static void populateNamedOpSinkingPatterns(MLIRContext *context,
   sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                                            /*inputIdx=*/0>>(
       context, SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<FuseTransposeThroughGenericReduction>(context);
 }
 
 static void
@@ -1091,7 +1198,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
@@ -1232,10 +1339,13 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(
         context, enableEdgeReshapePropagation);
+    if (enableSinkTransposeThroughPad) {
+      sinkingPatterns.insert<SinkTransposeThroughPad>(context);
+    }
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(
         context, enableAggressivePropagation, enableConvolutionPropagation);
     sinkingPatterns.insert<ComposeTransposes>(context);
-    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    populateMatmulSinkingPatterns(context, sinkingPatterns);
     populateCommonCanonicalizationPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);

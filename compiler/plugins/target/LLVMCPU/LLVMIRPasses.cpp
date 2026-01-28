@@ -89,8 +89,9 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
     modulePassManager.run(*module, moduleAnalysisManager);
   }
 
-  if (llvm::verifyModule(*module))
+  if (llvm::verifyModule(*module)) {
     return failure();
+  }
 
   return success();
 }

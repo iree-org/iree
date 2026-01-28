@@ -33,8 +33,9 @@ static std::optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
   // I don't know if there's a better way to do this - the interface doesn't
   // help.
   auto operandRange = branchOp.getSuccessorOperands(successorIdx);
-  if (operandRange.empty())
+  if (operandRange.empty()) {
     return std::nullopt;
+  }
   unsigned beginIdx =
       operandRange.getForwardedOperands().getBeginOperandIndex();
   if (operandIdx >= beginIdx && operandIdx < beginIdx + operandRange.size()) {
@@ -187,8 +188,9 @@ void Explorer::initializeInverseCallGraph() {
 const Explorer::GlobalInfo *
 Explorer::getGlobalInfo(IREE::Util::GlobalOpInterface globalOp) {
   auto it = globalInfos.find(globalOp);
-  if (it == globalInfos.end())
+  if (it == globalInfos.end()) {
     return nullptr;
+  }
   return it->second.get();
 }
 
@@ -198,11 +200,13 @@ const Explorer::GlobalInfo *Explorer::queryGlobalInfoFrom(StringRef globalName,
   auto &symbolTable = symbolTables.getSymbolTable(symbolTableOp);
   auto op = symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
       from, StringAttr::get(from->getContext(), globalName));
-  if (!op)
+  if (!op) {
     return nullptr;
+  }
   auto it = globalInfos.find(op);
-  if (it == globalInfos.end())
+  if (it == globalInfos.end()) {
     return nullptr;
+  }
   return it->second.get();
 }
 
@@ -259,8 +263,9 @@ void Explorer::forEachFunctionLikeOp(
 }
 
 bool Explorer::mayValuesAlias(Value a, Value b) {
-  if (a == b)
+  if (a == b) {
     return true;
+  }
   bool mayAlias = false;
   auto traversalResult = walkTransitiveUses(a, [&](OpOperand &value) {
     mayAlias = value.get() == b;
@@ -287,8 +292,9 @@ TraversalResult Explorer::walk(OperationWalkFn fn) {
     LLVM_DEBUG(llvm::dbgs()
                << "? entering scc slice with " << scc.size() << " callables\n");
     for (auto *node : scc) {
-      if (node->isExternal())
+      if (node->isExternal()) {
         continue;
+      }
 
       // Ensure we want to step into this region.
       // Note that SCC returns every function like in the whole program,
@@ -296,8 +302,9 @@ TraversalResult Explorer::walk(OperationWalkFn fn) {
       auto &callableRegion = *node->getCallableRegion();
       auto *callableOp = callableRegion.getParentOp();
       auto action = getTraversalAction(callableOp);
-      if (action == TraversalAction::IGNORE)
+      if (action == TraversalAction::IGNORE) {
         continue;
+      }
       bool validInPlace = true;
       for (auto *parentOp = callableOp->getParentOp(); parentOp != rootOp;
            parentOp = parentOp->getParentOp()) {
@@ -315,10 +322,12 @@ TraversalResult Explorer::walk(OperationWalkFn fn) {
       LLVM_DEBUG(llvm::dbgs() << "   + entering callable region @"
                               << getRegionName(callableRegion) << "\n");
       auto emitResult = recursiveWalk(callableOp, fn);
-      if (emitResult.wasInterrupted())
+      if (emitResult.wasInterrupted()) {
         break;
-      if (emitResult.wasSkipped())
+      }
+      if (emitResult.wasSkipped()) {
         continue;
+      }
     }
   }
 
@@ -338,10 +347,12 @@ WalkResult Explorer::recursiveWalk(Operation *parentOp,
   LLVM_DEBUG(llvm::dbgs() << "  == emitting op " << getOpName(parentOp)
                           << "\n");
   auto emitResult = fn(parentOp);
-  if (emitResult.wasInterrupted())
+  if (emitResult.wasInterrupted()) {
     return WalkResult::interrupt();
-  if (emitResult.wasSkipped())
+  }
+  if (emitResult.wasSkipped()) {
     return WalkResult::advance();
+  }
 
   if (parentOp->getNumRegions() == 0 ||
       parentAction != TraversalAction::RECURSE) {
@@ -355,8 +366,9 @@ WalkResult Explorer::recursiveWalk(Operation *parentOp,
     for (auto &block : region.getBlocks()) {
       for (auto &op : block) {
         auto opResult = recursiveWalk(&op, fn);
-        if (opResult.wasInterrupted())
+        if (opResult.wasInterrupted()) {
           return WalkResult::interrupt();
+        }
       }
     }
   }
@@ -374,8 +386,9 @@ TraversalResult Explorer::walkAllValues(ValueWalkFn fn,
     LLVM_DEBUG(llvm::dbgs()
                << "? entering scc slice with " << scc.size() << " callables\n");
     for (auto *node : scc) {
-      if (node->isExternal())
+      if (node->isExternal()) {
         continue;
+      }
 
       // Ensure we want to step into this region.
       // Note that SCC returns every function like in the whole program,
@@ -383,8 +396,9 @@ TraversalResult Explorer::walkAllValues(ValueWalkFn fn,
       auto &callableRegion = *node->getCallableRegion();
       auto *callableOp = callableRegion.getParentOp();
       auto action = getTraversalAction(callableOp);
-      if (action == TraversalAction::IGNORE)
+      if (action == TraversalAction::IGNORE) {
         continue;
+      }
       bool validInPlace = true;
       for (auto *parentOp = callableOp->getParentOp(); parentOp != rootOp;
            parentOp = parentOp->getParentOp()) {
@@ -403,10 +417,12 @@ TraversalResult Explorer::walkAllValues(ValueWalkFn fn,
                               << getRegionName(callableRegion) << "\n");
       auto emitResult =
           recursiveWalkValues(callableOp, visitedValues, fn, typeID);
-      if (emitResult.wasInterrupted())
+      if (emitResult.wasInterrupted()) {
         break;
-      if (emitResult.wasSkipped())
+      }
+      if (emitResult.wasSkipped()) {
         continue;
+      }
     }
   }
 
@@ -442,16 +458,18 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
     LLVM_DEBUG(llvm::dbgs()
                << "   + processing op results " << getOpName(parentOp) << "\n");
     for (auto result : parentOp->getResults()) {
-      if (typeID.has_value() && result.getType().getTypeID() != *typeID)
+      if (typeID.has_value() && result.getType().getTypeID() != *typeID) {
         continue;
+      }
       if (visitedValues.insert(result).second) {
         LLVM_DEBUG({
           llvm::dbgs() << "  == emitting value ";
           result.printAsOperand(llvm::dbgs(), asmState);
           llvm::dbgs() << "\n";
         });
-        if (fn(result).wasInterrupted())
+        if (fn(result).wasInterrupted()) {
           return WalkResult::interrupt();
+        }
       }
     }
   }
@@ -473,23 +491,26 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
           llvm::dbgs() << " arguments\n";
         });
         for (auto arg : block.getArguments()) {
-          if (typeID.has_value() && arg.getType().getTypeID() != *typeID)
+          if (typeID.has_value() && arg.getType().getTypeID() != *typeID) {
             continue;
+          }
           if (visitedValues.insert(arg).second) {
             LLVM_DEBUG({
               llvm::dbgs() << "  == emitting block arg ";
               arg.printAsOperand(llvm::dbgs(), asmState);
               llvm::dbgs() << "\n";
             });
-            if (fn(arg).wasInterrupted())
+            if (fn(arg).wasInterrupted()) {
               return WalkResult::interrupt();
+            }
           }
         }
       }
       for (auto &op : block) {
         auto opResult = recursiveWalkValues(&op, visitedValues, fn, typeID);
-        if (opResult.wasInterrupted())
+        if (opResult.wasInterrupted()) {
           return WalkResult::interrupt();
+        }
       }
     }
   }
@@ -502,8 +523,9 @@ Explorer::walkIncomingCalls(CallableOpInterface callableOp,
   auto it = callGraphInv.find(callableOp.getCallableRegion());
   if (it != callGraphInv.end()) {
     for (auto &callOp : it->second) {
-      if (fn(callOp).wasInterrupted())
+      if (fn(callOp).wasInterrupted()) {
         break;
+      }
     }
   }
   bool isPublic = false;
@@ -560,8 +582,9 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
       return WalkResult::advance();
     };
     for (auto &region : regionOp->getRegions()) {
-      if (enumerateTerminatorOps(region).wasInterrupted())
+      if (enumerateTerminatorOps(region).wasInterrupted()) {
         break;
+      }
     }
   } else if (auto parentFuncOp =
                  dyn_cast<mlir::FunctionOpInterface>(parentOp)) {
@@ -582,8 +605,9 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
               terminatorOp->print(llvm::dbgs(), asmState);
               llvm::dbgs() << "\n";
             });
-            if (fn(terminatorOp).wasInterrupted())
+            if (fn(terminatorOp).wasInterrupted()) {
               break;
+            }
           }
         }
       }
@@ -599,8 +623,7 @@ TraversalResult Explorer::walkReturnOperands(Operation *parentOp,
   return walkReturnOps(parentOp, [&](Operation *returnOp) {
     if (auto terminatorOp =
             dyn_cast<RegionBranchTerminatorOpInterface>(returnOp)) {
-      return fn(terminatorOp.getSuccessorOperands(
-          RegionSuccessor(parentOp, parentOp->getResults())));
+      return fn(terminatorOp.getSuccessorOperands(RegionSuccessor::parent()));
     } else {
       return fn(returnOp->getOperands());
     }
@@ -711,8 +734,9 @@ TraversalResult Explorer::walkOutgoingBranchOperandArguments(
        ++successorIdx) {
     auto successorOperandIdx =
         mapSuccessorOperand(branchOp, successorIdx, operandIdx);
-    if (!successorOperandIdx.has_value())
+    if (!successorOperandIdx.has_value()) {
       continue;
+    }
     auto *targetBlock = branchOp->getSuccessor(successorIdx);
     auto blockArg = targetBlock->getArgument(*successorOperandIdx);
     if (fn(targetBlock, blockArg).wasInterrupted()) {
@@ -833,8 +857,9 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
                             << loadOp.getGlobalName() << ":\n");
     for (auto *user : globalInfo->uses) {
       auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(user);
-      if (!storeOp)
+      if (!storeOp) {
         continue;
+      }
       LLVM_DEBUG({
         llvm::dbgs() << "   + queuing stored value from ";
         storeOp.print(llvm::dbgs(), asmState);
@@ -886,8 +911,9 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
   do {
     // Pop the next work item; avoiding processing values more than once.
     auto work = worklist.pop_back_val();
-    if (!processedValues.insert(work.getAsOpaquePointer()).second)
+    if (!processedValues.insert(work.getAsOpaquePointer()).second) {
       continue;
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "   ? working on ";
@@ -981,7 +1007,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
     SmallVector<RegionSuccessor, 2> entrySuccessors;
     regionOp.getSuccessorRegions(RegionBranchPoint::parent(), entrySuccessors);
     for (auto &entrySuccessor : entrySuccessors) {
-      auto successorInputs = entrySuccessor.getSuccessorInputs();
+      auto successorInputs = regionOp.getSuccessorInputs(entrySuccessor);
       if (operandIdx >= successorInputs.size()) {
         // Implicit capture; argument has the same SSA value on the inside of
         // the region. Uses show up as normal so we ignore here.
@@ -1003,9 +1029,8 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
   // Move within/out-of a region.
   auto traverseRegionBranchOp = [&](RegionBranchTerminatorOpInterface branchOp,
                                     unsigned operandIdx) {
-    Operation *parentOp = branchOp.getOperation()->getParentOp();
-    auto successorOperands = branchOp.getSuccessorOperands(
-        RegionSuccessor(parentOp, parentOp->getResults()));
+    auto successorOperands =
+        branchOp.getSuccessorOperands(RegionSuccessor::parent());
     unsigned beginIdx = successorOperands.getBeginOperandIndex();
     if (operandIdx < beginIdx ||
         operandIdx >= beginIdx + successorOperands.size()) {
@@ -1115,8 +1140,9 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
                             << storeOp.getGlobalName() << ":\n");
     for (auto *user : globalInfo->uses) {
       auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(user);
-      if (!loadOp)
+      if (!loadOp) {
         continue;
+      }
       LLVM_DEBUG({
         llvm::dbgs() << "   + queuing loaded value from ";
         loadOp.print(llvm::dbgs(), asmState);
@@ -1143,8 +1169,9 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
     // times!).
     for (auto &use : work.getUses()) {
       auto *ownerOp = use.getOwner();
-      if (!processedValues.insert(&use).second)
+      if (!processedValues.insert(&use).second) {
         continue;
+      }
 
       auto action = getTraversalAction(ownerOp);
       if (action == TraversalAction::IGNORE) {

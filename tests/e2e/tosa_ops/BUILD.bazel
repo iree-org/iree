@@ -13,6 +13,7 @@ package(
 )
 
 ALL_SRCS = enforce_glob(
+    # keep sorted
     [
         "abs.mlir",
         "add.mlir",
@@ -99,6 +100,7 @@ iree_check_single_backend_test_suite(
 )
 
 ROCM_AND_CUDA_SRCS = enforce_glob(
+    # keep sorted
     [
         "abs.mlir",
         "add.mlir",

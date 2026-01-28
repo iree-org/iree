@@ -20,55 +20,62 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
-BUILD_TYPE="${IREE_BUILD_TYPE:-RelWithDebInfo}"
-RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
-RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
+INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
+CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
+CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$(realpath build_tools/cmake/linux_riscv64.cmake)}"
+RISCV_TOOLCHAIN_PREFIX="${RISCV_TOOLCHAIN_PREFIX:-}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
+IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
+# Enable building the `iree-test-deps` target.
+IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
-RISCV_PLATFORM_ARCH="${RISCV_PLATFORM}-${RISCV_ARCH}"
-echo "Build riscv target with the config of ${RISCV_PLATFORM_ARCH}"
-TOOLCHAIN_FILE="$(realpath build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
-  "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+
+  "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+  "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-  "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
-  "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
-  "-DRISCV_CPU=${RISCV_PLATFORM_ARCH}"
-  "-DIREE_ENABLE_ASSERTIONS=ON"
-  "-DIREE_BUILD_SAMPLES=ON"
-  "-DIREE_BUILD_COMPILER=OFF"
+
+  # Use `lld` for faster linking.
+  "-DIREE_ENABLE_LLD=ON"
+
+  # Cross compiling RISC-V
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
+  "-DIREE_BUILD_COMPILER=OFF"
+  "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
+  "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+  "-DRISCV_TOOLCHAIN_PREFIX=${RISCV_TOOLCHAIN_PREFIX}"
+  "-DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT}"
+
+  # Only enable RISC-V related drivers and targets.
+  "-DIREE_HAL_DRIVER_DEFAULTS=OFF"
+  "-DIREE_HAL_DRIVER_LOCAL_SYNC=ON"
+  "-DIREE_HAL_DRIVER_LOCAL_TASK=ON"
+  "-DIREE_TARGET_BACKEND_DEFAULTS=OFF"
+  "-DIREE_TARGET_BACKEND_LLVM_CPU=ON"
 )
 
-if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
-  args+=(
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
-    -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
-  )
-elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
-  args+=(
-    # TODO(#6353): Off until tools/ are refactored to support threadless config.
-    -DIREE_BUILD_TESTS=OFF
-    -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
-    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf"
-  )
-else
-  echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"
-  return -1
+"${CMAKE_BIN}" "${args[@]}"
+echo "Building all"
+echo "------------"
+"${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
+
+echo "Building 'install'"
+echo "------------------"
+"${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
+
+if (( IREE_BUILD_TEST_DEPS == 1 )); then
+  echo "Building test deps"
+  echo "------------------"
+  "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
 fi
 
-"${CMAKE_BIN}" "${args[@]}"
-
-"${CMAKE_BIN}" --build "${BUILD_DIR}" -- -k 0
-if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
-  echo "Building test deps for RISC-V"
-  echo "-----------------------------"
-  "${CMAKE_BIN}" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
 fi

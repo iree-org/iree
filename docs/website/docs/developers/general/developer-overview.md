@@ -247,6 +247,56 @@ For example, to inspect the module translated above:
 ../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
 ```
 
+### iree-tokenize
+
+`iree-tokenize` tokenizes text using
+[HuggingFace tokenizer.json](https://huggingface.co/docs/tokenizers/) files.
+This is useful for preprocessing text for LLM inference, testing tokenizer
+implementations, and debugging token-level issues.
+
+Tokenizer files can be downloaded from
+[HuggingFace Hub](https://huggingface.co/models?library=tokenizers) model
+repositories (look for `tokenizer.json` in the model files).
+
+Example encoding text to token IDs:
+
+```shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json "Hello, world!"
+{"ids":[101,7592,1010,2088,999,102]}
+```
+
+Example with raw output (comma-separated IDs, no JSON):
+
+```shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --raw "Hello, world!"
+101,7592,1010,2088,999,102
+```
+
+The `--raw` flag is useful for integration with `iree-run-module`:
+
+```shell
+$ ../iree-build/tools/iree-run-module --module=model.vmfb \
+    --input="6xi32=$(../iree-build/tools/iree-tokenize tokenizer.json --raw 'hello')"
+```
+
+Example decoding token IDs back to text:
+
+```shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --decode "101,7592,1010,2088,999,102"
+{"text":"Hello, world!"}
+```
+
+Example showing tokenizer metadata:
+
+```shell
+$ ../iree-build/tools/iree-tokenize tokenizer.json --info
+{"vocab_size":30522,"model_type":"WordPiece","unk_id":100,"cls_id":101,"sep_id":102}
+```
+
+Additional modes include `--batch` for processing multiple lines from stdin and
+`--stream` for continuous tokenization of large inputs. Run with `--help` for
+all options.
+
 ### Useful generic flags
 
 #### Read inputs from a file

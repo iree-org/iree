@@ -21,7 +21,8 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-// Check if an operation is a compute operation (tensor/linalg/linalgext).
+/// Check if an operation is a compute operation
+/// (linalg/linalgext/tensor/tensor_ext).
 static bool isComputeOp(Operation *op) {
   if (!op) {
     return false;
@@ -31,7 +32,8 @@ static bool isComputeOp(Operation *op) {
     return false;
   }
   return isa<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-             tensor::TensorDialect>(dialect);
+             tensor::TensorDialect, IREE::TensorExt::IREETensorExtDialect>(
+      dialect);
 }
 
 // Traverse forward along use-def chains starting from `val` to identify values
@@ -56,26 +58,6 @@ static void collectInputsToComputeRegion(Value val,
         collectInputsToComputeRegion(result, inputValues, visited);
       }
     }
-  }
-}
-
-// Traverse backward along use-def chains starting from `val` to identify values
-// produced by compute operations. These values are candidates for inserting
-// compute_barrier.end operations.
-static void
-collectOutputsFromComputeRegion(Value val, llvm::SetVector<Value> &outputValues,
-                                llvm::DenseSet<Value> &visited) {
-  Operation *definingOp = val.getDefiningOp();
-  if (!definingOp || !visited.insert(val).second) {
-    return;
-  }
-
-  if (isComputeOp(definingOp)) {
-    outputValues.insert(val);
-  } else {
-    llvm::for_each(definingOp->getOperands(), [&](Value operand) {
-      collectOutputsFromComputeRegion(operand, outputValues, visited);
-    });
   }
 }
 
@@ -104,28 +86,29 @@ struct InsertTensorBarriersPass final
       auto startOp = IREE::TensorExt::ComputeBarrierStartOp::create(
           builder, val.getLoc(), val);
       val.replaceUsesWithIf(startOp.getResult(), [&](OpOperand &use) {
-        return isComputeOp(use.getOwner()) &&
+        return use.getOwner() != startOp && isComputeOp(use.getOwner()) &&
                !isa<tensor::DimOp>(use.getOwner());
       });
     }
 
     // Insert compute_barrier.end operations for values that flow out of compute
-    // ops.
+    // ops. We find compute operation results that are used by non-compute
+    // operations. This approach works even when the function doesn't directly
+    // return tensor values (e.g., when they flow through HAL operations).
     llvm::SetVector<Value> needsEndBarrier;
-    visited.clear();
     funcOp.walk([&](Operation *op) {
-      if (!op->hasTrait<OpTrait::ReturnLike>()) {
+      if (!isComputeOp(op)) {
         return;
       }
-      for (Value operand : op->getOperands()) {
-        collectOutputsFromComputeRegion(operand, needsEndBarrier, visited);
+      for (Value result : op->getResults()) {
+        if (isa<RankedTensorType>(result.getType()) &&
+            llvm::none_of(result.getUsers(), isComputeOp)) {
+          needsEndBarrier.insert(result);
+        }
       }
     });
 
     for (Value val : needsEndBarrier) {
-      if (!isa<RankedTensorType>(val.getType())) {
-        continue;
-      }
       Operation *definingOp = val.getDefiningOp();
       if (!definingOp) {
         continue;
@@ -135,8 +118,7 @@ struct InsertTensorBarriersPass final
       auto endOp = IREE::TensorExt::ComputeBarrierEndOp::create(
           builder, val.getLoc(), val);
       val.replaceUsesWithIf(endOp.getResult(), [&](OpOperand &use) {
-        return !isComputeOp(use.getOwner()) && use.getOwner() != endOp &&
-               !isa<tensor::DimOp>(use.getOwner());
+        return !isComputeOp(use.getOwner()) && use.getOwner() != endOp;
       });
     }
   }

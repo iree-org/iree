@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
@@ -20,6 +21,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -38,6 +41,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -292,8 +296,9 @@ std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op) {
 
 bool isReadOnly(Value v) {
   Operation *definingOp = v.getDefiningOp();
-  if (!definingOp)
+  if (!definingOp) {
     return false;
+  }
   return TypeSwitch<Operation *, bool>(definingOp)
       .Case<arith::ConstantOp>(
           [&](arith::ConstantOp constantOp) { return true; })
@@ -532,8 +537,9 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   for (Operation &op : dummyFuncOp.getBody().front()) {
     auto currLoweringConfig =
         getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(&op);
-    if (!currLoweringConfig)
+    if (!currLoweringConfig) {
       continue;
+    }
 
     // Translate the lowering config to the original operation.
     if (std::optional<Operation *> originalOperation =
@@ -542,8 +548,9 @@ LogicalResult setDefaultCustomOpLoweringConfig(
     }
 
     auto currWorkgroupTileSizes = currLoweringConfig.getWorkgroupTileSizes();
-    if (currWorkgroupTileSizes.empty())
+    if (currWorkgroupTileSizes.empty()) {
       continue;
+    }
     workgroupTileSizes = currWorkgroupTileSizes;
     workgroupInterchange = currLoweringConfig.getWorkgroupInterchange();
   }
@@ -568,8 +575,9 @@ LogicalResult setDefaultCustomOpLoweringConfig(
 /// Returns the first of `exprs` which is of the type `T`.
 template <typename T>
 static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
-  if (auto it = llvm::find_if(exprs, llvm::IsaPred<T>); it != exprs.end())
+  if (auto it = llvm::find_if(exprs, llvm::IsaPred<T>); it != exprs.end()) {
     return *it;
+  }
   return nullptr;
 }
 
@@ -607,8 +615,9 @@ static std::optional<unsigned> getDimension(Operation *op) {
 }
 template <typename T1, typename T2, typename... T3>
 static std::optional<unsigned> getDimension(Operation *op) {
-  if (!op)
+  if (!op) {
     return std::nullopt;
+  }
   if (auto dimension = getDimension<T1>(op)) {
     return dimension;
   }
@@ -626,8 +635,9 @@ checkDimensions(ArrayRef<Value> vals,
                 std::optional<unsigned> refDimension = std::nullopt) {
   for (auto v : vals) {
     auto currDimension = getDimension<T...>(v.getDefiningOp());
-    if (!currDimension)
+    if (!currDimension) {
       return std::nullopt;
+    }
     if (refDimension) {
       if (refDimension.value() != currDimension.value()) {
         return std::nullopt;
@@ -887,8 +897,9 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
       countDim = ifx.getDimIndex();
     }
 
-    if (!idDim || !countDim)
+    if (!idDim || !countDim) {
       return std::nullopt;
+    }
 
     Builder b(forOp.getContext());
     loopInfo.untiledLowerBound = b.getIndexAttr(0);
@@ -1079,8 +1090,9 @@ FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
 /// Returns a small tiling factor for the given reduction `dimSize`.
 /// Returns 0 to avoid tiling.
 int getReductionTilingFactor(int64_t dimSize) {
-  if (dimSize % 4 == 0)
+  if (dimSize % 4 == 0) {
     return 4;
+  }
 
   // Try to find the smallest prime factor as the tiling factor. As a trade off
   // between generated code size and compilation time, only look at prime
@@ -1088,8 +1100,9 @@ int getReductionTilingFactor(int64_t dimSize) {
   static constexpr std::array<int, 15> primeNumbers = {
       2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47};
   for (int n : primeNumbers) {
-    if (dimSize % n == 0)
+    if (dimSize % n == 0) {
       return n;
+    }
   }
 
   return 1; // Otherwise just tile with size 1.
@@ -1108,6 +1121,32 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
   }
   return bitwidth;
 };
+
+//===---------------------------------------------------------------------===//
+// Integer range analysis utility functions
+//===---------------------------------------------------------------------===//
+
+FailureOr<int64_t> getDynamicUpperBound(Value value,
+                                        const DataFlowSolver &solver) {
+  // First try IntegerRangeAnalysis (cached, efficient).
+  if (auto *maybeRange =
+          solver.lookupState<dataflow::IntegerValueRangeLattice>(value)) {
+    IntegerValueRange range = maybeRange->getValue();
+    if (!range.isUninitialized() &&
+        range.getValue().smax() !=
+            IntegerValueRange::getMaxRange(value).getValue().smax()) {
+      return range.getValue().smax().getSExtValue();
+    }
+  }
+  // Fallback to ValueBoundsConstraintSet for complex cases.
+  auto ub = ValueBoundsConstraintSet::computeConstantBound(
+      presburger::BoundType::UB, {value, std::nullopt},
+      /*stopCondition=*/nullptr, /*closedUB=*/true);
+  if (succeeded(ub)) {
+    return ub.value();
+  }
+  return failure();
+}
 
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
@@ -1191,16 +1230,19 @@ Value findOrCreateSubspanBuffer(
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
   for (Operation &op : *block) {
-    if (&op == subspanOp.getOperation())
+    if (&op == subspanOp.getOperation()) {
       break;
+    }
     auto bufferSubspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(&op);
-    if (!bufferSubspanOp)
+    if (!bufferSubspanOp) {
       continue;
+    }
 
     auto bufferMemrefType =
         dyn_cast<MemRefType>(bufferSubspanOp.getResult().getType());
-    if (!bufferMemrefType)
+    if (!bufferMemrefType) {
       continue;
+    }
 
     if (bufferSubspanOp.getBinding() != subspanOp.getBinding() ||
         bufferSubspanOp.getDescriptorType() != subspanOp.getDescriptorType() ||
@@ -1208,14 +1250,16 @@ Value findOrCreateSubspanBuffer(
         !llvm::equal(bufferSubspanOp.getDynamicDims(),
                      subspanOp.getDynamicDims()) ||
         bufferSubspanOp.getAlignment() != subspanOp.getAlignment() ||
-        memRefType != bufferMemrefType)
+        memRefType != bufferMemrefType) {
       continue;
+    }
 
     if (useRocdlBuffers && bufferSubspanOp->hasOneUse()) {
       auto castOp = dyn_cast<amdgpu::FatRawBufferCastOp>(
           *bufferSubspanOp->getUsers().begin());
-      if (!castOp)
+      if (!castOp) {
         continue;
+      }
       return castOp.getResult();
     }
     return bufferSubspanOp.getResult();
@@ -1254,8 +1298,9 @@ Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
       definingOp =
           &cast<BlockArgument>(val).getOwner()->getOperations().front();
     }
-    if (!definingOp)
+    if (!definingOp) {
       continue;
+    }
     if (lastOp && definingOp == lastOp) {
       // Combine 'setInsertionPointBefore' by ANDing because we only want to set
       // the insertion point before the last op if all values this operation is
@@ -1263,8 +1308,9 @@ Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
       setInsertionPointBefore &= isa<BlockArgument>(val);
       continue;
     }
-    if (lastOp && domInfo.dominates(definingOp, lastOp))
+    if (lastOp && domInfo.dominates(definingOp, lastOp)) {
       continue;
+    }
     lastOp = definingOp;
 
     // For block arguments we want the insertion point to be at the start of
@@ -1561,12 +1607,14 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
   SmallVector<int64_t> result;
   std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (!exportOp)
+  if (!exportOp) {
     return result;
+  }
 
   Block *body = exportOp->getWorkgroupCountBody();
-  if (!body)
+  if (!body) {
     return result;
+  }
 
   auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
   assert(returnOp.getNumOperands() == 3);
@@ -1614,6 +1662,37 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return std::nullopt;
 }
 
+std::optional<SizesAndScalableFlags>
+getScalableTileSizesAndFlags(ArrayRef<OpFoldResult> mixedInnerTiles) {
+  SmallVector<int64_t> tileSizes(mixedInnerTiles.size(), 0);
+  IREE::Codegen::ScalableTileFlags scalableFlags(mixedInnerTiles.size(), false);
+  for (unsigned pos = 0; pos < mixedInnerTiles.size(); ++pos) {
+    // Check if we have SSA values that represent the inner tile sizes.
+    // This is the case for scalable tile sizes.
+    if (auto innerTileVal = dyn_cast<Value>(mixedInnerTiles[pos])) {
+      std::optional<int64_t> innerTile =
+          vector::getConstantVscaleMultiplier(innerTileVal);
+      if (!innerTile) {
+        LDBG() << "Found non-scalable dynamic inner tile!";
+        return std::nullopt;
+      }
+      tileSizes[pos] = innerTile.value();
+      scalableFlags[pos] = true;
+      continue;
+    }
+    // Check if we have integer attributes that represent the inner tile sizes.
+    // This is the case for static tile sizes.
+    std::optional<int64_t> innerTile =
+        getConstantIntValue(mixedInnerTiles[pos]);
+    if (!innerTile.has_value()) {
+      LDBG() << "Error while inferring static inner tile size!";
+      return std::nullopt;
+    }
+    tileSizes[pos] = innerTile.value();
+  }
+  return SizesAndScalableFlags{tileSizes, scalableFlags};
+}
+
 FailureOr<DimBoundSize>
 computeDimUpperBound(Value shapedValue, unsigned dimNum,
                      std::optional<vector::VscaleRange> vscaleRange,
@@ -1623,9 +1702,10 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {shapedValue, dimNum},
             /*stopCondition=*/nullptr, /*closedUB=*/true);
-    if (succeeded(maybeDimBoundSize))
+    if (succeeded(maybeDimBoundSize)) {
       return DimBoundSize{/*baseSize=*/*maybeDimBoundSize,
                           /*scalable=*/false};
+    }
     return failure();
   }
   FailureOr<DimBound> maybeDimBound =
@@ -1633,21 +1713,26 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
           shapedValue, dimNum,
           /*vscaleMin=*/vscaleRange->vscaleMin,
           /*vscaleMax=*/vscaleRange->vscaleMax, presburger::BoundType::UB);
-  if (failed(maybeDimBound))
+  if (failed(maybeDimBound)) {
     return failure();
+  }
   auto boundSize = maybeDimBound->getSize();
-  if (succeeded(boundSize))
+  if (succeeded(boundSize)) {
     return boundSize;
-  if (roundUp == RoundUpVscaleMultiple::No)
+  }
+  if (roundUp == RoundUpVscaleMultiple::No) {
     return failure();
+  }
   // If the upper bound map is of the form `add(subExpr, cst)` (cst <= 0),
   // round it up to `subExpr` (and try matching the bound again).
   auto binOp = dyn_cast<AffineBinaryOpExpr>(maybeDimBound->map.getResult(0));
-  if (!binOp || binOp.getKind() != AffineExprKind::Add)
+  if (!binOp || binOp.getKind() != AffineExprKind::Add) {
     return failure();
+  }
   auto cst = dyn_cast<AffineConstantExpr>(binOp.getRHS());
-  if (!cst || cst.getValue() > 0)
+  if (!cst || cst.getValue() > 0) {
     return failure();
+  }
   DimBound roundedDimBound{AffineMap::get(maybeDimBound->map.getNumDims(),
                                           maybeDimBound->map.getNumSymbols(),
                                           binOp.getLHS())};
@@ -1991,8 +2076,9 @@ std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
-  if (!val.getDefiningOp())
+  if (!val.getDefiningOp()) {
     return std::nullopt;
+  }
 
   std::optional<VectorizationTileSizes> result;
   LDBG() << "Inferring sizes for: " << val;
@@ -2015,20 +2101,23 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
 }
 
 std::optional<int64_t> getConstantIndex(Value value) {
-  if (!isa<IndexType>(value.getType()))
+  if (!isa<IndexType>(value.getType())) {
     return std::nullopt;
+  }
 
   APInt val;
-  if (!matchPattern(value, m_ConstantInt(&val)))
+  if (!matchPattern(value, m_ConstantInt(&val))) {
     return std::nullopt;
+  }
 
   return val.getSExtValue();
 }
 
 bool alwaysRunsFirstIteration(scf::ForOp op) {
   // Can't perform the analysis if the loops's bounds aren't index-typed.
-  if (!op.getInductionVar().getType().isIndex())
+  if (!op.getInductionVar().getType().isIndex()) {
     return false;
+  }
   FailureOr<bool> isLb = ValueBoundsConstraintSet::compare(
       getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::LT,
       getAsOpFoldResult(op.getUpperBound()));
@@ -2037,8 +2126,9 @@ bool alwaysRunsFirstIteration(scf::ForOp op) {
 
 bool neverRunsSecondIteration(scf::ForOp op) {
   // Can't perform the analysis if the loops's bounds aren't index-typed.
-  if (!op.getInductionVar().getType().isIndex())
+  if (!op.getInductionVar().getType().isIndex()) {
     return false;
+  }
   // If the upper bound (ub) is less than or equal to the loop step, then
   // lower bound  + step must be greater than the upper bound, assuming the
   // lower bound is non-negative.
@@ -2132,20 +2222,16 @@ std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
   SmallVector<int64_t> bounds = copyOp.getStaticLoopRanges();
   int64_t elementBitWidth = type.getElementTypeBitWidth();
   SmallVector<int64_t> tileSizes(bounds.size(), 1);
-  int64_t innerBound = bounds.back();
-  const int64_t preferredCopyNumElements =
-      kPreferredCopyNumBits / elementBitWidth;
-  if (ShapedType::isDynamic(innerBound) ||
-      innerBound >= preferredCopyNumElements) {
-    tileSizes[bounds.size() - 1] = preferredCopyNumElements;
-    return tileSizes;
-  }
+
   // Distribute the preferred number of elements being copied across multiple
-  // dimensions if possible.
-  int64_t remPreferredCopyNumElementsDiv = preferredCopyNumElements;
+  // dimensions if possible, starting from the innermost dimension.
+  int64_t remPreferredCopyNumElementsDiv =
+      kPreferredCopyNumBits / elementBitWidth;
   for (auto [i, b] : llvm::enumerate(llvm::reverse(bounds))) {
     size_t index = bounds.size() - i - 1;
-    if (remPreferredCopyNumElementsDiv < b) {
+    // If the bound is dynamic or larger than what we can distribute, use
+    // the remaining preferred elements and stop.
+    if (ShapedType::isDynamic(b) || remPreferredCopyNumElementsDiv < b) {
       tileSizes[index] = remPreferredCopyNumElementsDiv;
       break;
     }
@@ -2156,6 +2242,77 @@ std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
     }
   }
   return tileSizes;
+}
+
+//===----------------------------------------------------------------------===//
+// Utility functions for accumulating operations
+//===----------------------------------------------------------------------===//
+
+// Get the `iree_tensor_ext.dispatch.tensor.load` that this value is
+// populated with. This could potentially walk the use-def chain to get the load
+// operation, but for now it just returns the load op if that is the defining
+// operation for `v`.
+template <typename LoadOpTy>
+static std::optional<LoadOpTy> getLoadOp(Value v) {
+  if (auto loadOp = v.getDefiningOp<LoadOpTy>()) {
+    return loadOp;
+  }
+  return std::nullopt;
+}
+
+// Get the `iree_tensor_ext.dispatch.tensor.store` that this value is
+// populated writes to. This could potentially walk the use-def chain of DPS
+// init operands to get the store operation, but for now it just returns the
+// store op if the result has a single use and that use is the store op.
+template <typename StoreOpTy>
+static std::optional<StoreOpTy> getStoreOp(Value v) {
+  if (v.getNumUses() != 1) {
+    return std::nullopt;
+  }
+  if (auto storeOp = dyn_cast<StoreOpTy>(*(v.getUsers().begin()))) {
+    return storeOp;
+  }
+  return std::nullopt;
+}
+
+bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
+  assert(dpsOp.getNumDpsInits() == 1 &&
+         "expected op to have a single outs operand");
+  OpOperand *initValue = dpsOp.getDpsInitOperand(0);
+
+  // Case 1. Check for the case when reading/writing from the same buffer
+  // through `iree_codegen.load_from_buffer`/`iree_codegen.store_to_buffer`.
+  {
+    std::optional<IREE::Codegen::LoadFromBufferOp> loadOp =
+        getLoadOp<IREE::Codegen::LoadFromBufferOp>(initValue->get());
+    std::optional<IREE::Codegen::StoreToBufferOp> storeOp =
+        getStoreOp<IREE::Codegen::StoreToBufferOp>(dpsOp->getResult(0));
+    if (loadOp && storeOp && loadOp->getBuffer() == storeOp->getBuffer()) {
+      return true;
+    }
+  }
+
+  // Case 2. If the `outs` operand is from a read-write buffer, and the result
+  // is writing into the same buffer, do not convert to a non-accumulating gemm.
+  // This currently would only work for very simple cases, but could be
+  // generalized further.
+  {
+    std::optional<IREE::TensorExt::DispatchTensorLoadOp> initLoadOp =
+        getLoadOp<IREE::TensorExt::DispatchTensorLoadOp>(initValue->get());
+    std::optional<IREE::TensorExt::DispatchTensorStoreOp> resultStoreOp =
+        getStoreOp<IREE::TensorExt::DispatchTensorStoreOp>(dpsOp->getResult(0));
+    if (initLoadOp && resultStoreOp && initLoadOp->getSource() &&
+        resultStoreOp->getTarget()) {
+      // Check that the source and the result have a read/write tag. If they
+      // don't then its really a bug in the way the dispatch is formed, but
+      // check here for safety.
+      if (initLoadOp->getSourceType().getAccess() ==
+          IREE::TensorExt::TensorAccess::ReadWrite) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 } // namespace mlir::iree_compiler

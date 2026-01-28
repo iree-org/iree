@@ -209,8 +209,10 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
                               i, function_descriptor->bytecode_offset,
                               flatbuffers_uint8_vec_len(bytecode_data));
     }
-    if (function_descriptor->i32_register_count > IREE_I32_REGISTER_COUNT ||
-        function_descriptor->ref_register_count > IREE_REF_REGISTER_COUNT) {
+    if (function_descriptor->i32_register_count >
+            IREE_VM_ISA_I32_REGISTER_COUNT ||
+        function_descriptor->ref_register_count >
+            IREE_VM_ISA_REF_REGISTER_COUNT) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "functions[%zu] descriptor register count out of range", i);
@@ -268,8 +270,8 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     iree_vm_bytecode_verify_state_t* verify_state,
     iree_vm_FunctionSignatureDef_table_t function_signature,
     iree_vm_FunctionDescriptor_struct_t function_descriptor,
-    iree_const_byte_span_t bytecode_data, uint32_t pc, uint32_t max_pc,
-    uint32_t* out_next_pc);
+    iree_const_byte_span_t bytecode_data, iree_vm_source_offset_t pc,
+    iree_vm_source_offset_t max_pc, iree_vm_source_offset_t* out_next_pc);
 
 // NOTE: by the time this is called we have the module created and can assume
 // all information on it has been verified. The only thing this verifies is
@@ -334,11 +336,13 @@ iree_status_t iree_vm_bytecode_function_verify(
   // Ensure the register storage (rounded to the nearest power of 2) won't
   // exceed the maximum allowed registers.
   verify_state.i32_register_count = iree_math_round_up_to_pow2_u32(
-      VMMAX(1, function_descriptor->i32_register_count));
+      iree_max(1, function_descriptor->i32_register_count));
   verify_state.ref_register_count = iree_math_round_up_to_pow2_u32(
-      VMMAX(1, function_descriptor->ref_register_count));
-  if (IREE_UNLIKELY(verify_state.i32_register_count > IREE_I32_REGISTER_MASK) ||
-      IREE_UNLIKELY(verify_state.ref_register_count > IREE_REF_REGISTER_MASK)) {
+      iree_max(1, function_descriptor->ref_register_count));
+  if (IREE_UNLIKELY(verify_state.i32_register_count >
+                    IREE_VM_ISA_I32_REGISTER_MASK) ||
+      IREE_UNLIKELY(verify_state.ref_register_count >
+                    IREE_VM_ISA_REF_REGISTER_MASK)) {
     // Register count overflow. A valid compiler should never produce files that
     // hit this.
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -366,7 +370,8 @@ iree_status_t iree_vm_bytecode_function_verify(
   iree_const_byte_span_t bytecode_data = iree_make_const_byte_span(
       module->bytecode_data.data + function_descriptor->bytecode_offset,
       function_descriptor->bytecode_length);
-  const uint32_t max_pc = (uint32_t)function_descriptor->bytecode_length;
+  const iree_vm_source_offset_t max_pc =
+      (iree_vm_source_offset_t)function_descriptor->bytecode_length;
 
   // Reserve the block list. As we walk the bytecode we'll declare/define blocks
   // and then afterward verify all were found.
@@ -378,8 +383,10 @@ iree_status_t iree_vm_bytecode_function_verify(
   // Perform bytecode verification by performing a single-pass walk of all
   // function bytecode.
   iree_status_t status = iree_ok_status();
-  for (uint32_t pc = 0; pc < bytecode_data.data_length - 1;) {
-    uint32_t start_pc = pc;
+  const iree_vm_source_offset_t end_pc =
+      (iree_vm_source_offset_t)bytecode_data.data_length - 1;
+  for (iree_vm_source_offset_t pc = 0; pc < end_pc;) {
+    iree_vm_source_offset_t start_pc = pc;
     status = iree_vm_bytecode_function_verify_bytecode_op(
         module, &verify_state, function_signature_def, function_descriptor,
         bytecode_data, start_pc, max_pc, &pc);
@@ -398,11 +405,11 @@ iree_status_t iree_vm_bytecode_function_verify(
         status = iree_status_annotate_f(status, "at %.*s.%.*s+%08X",
                                         (int)module_name.size, module_name.data,
                                         (int)function_name.size,
-                                        function_name.data, start_pc);
+                                        function_name.data, (uint32_t)start_pc);
       } else {
         status = iree_status_annotate_f(status, "at %.*s@%u+%08X",
                                         (int)module_name.size, module_name.data,
-                                        function_ordinal, start_pc);
+                                        function_ordinal, (uint32_t)start_pc);
       }
 #endif  // IREE_STATUS_MODE
       break;
@@ -456,11 +463,8 @@ iree_status_t iree_vm_bytecode_function_verify(
   }
 
 // Bails if the register ordinal for the given register type is out of bounds.
-#define IREE_VM_VERIFY_REG_ORDINAL(name)                            \
-  IREE_VM_VERIFY_PC_RANGE(pc + IREE_REGISTER_ORDINAL_SIZE, max_pc); \
-  const uint32_t name = OP_I16(0);
 #define IREE_VM_VERIFY_REG_ORDINAL_X32(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
+  if (IREE_UNLIKELY(((ordinal) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) != 0)) {   \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -471,7 +475,7 @@ iree_status_t iree_vm_bytecode_function_verify(
                             (ordinal), verify_state->i32_register_count);      \
   }
 #define IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
+  if (IREE_UNLIKELY(((ordinal) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) != 0)) {   \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -496,19 +500,19 @@ iree_status_t iree_vm_bytecode_function_verify(
 #define IREE_VM_VERIFY_REG_F64(ordinal) \
   IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, "f64");
 #define IREE_VM_VERIFY_REG_REF(ordinal)                                      \
-  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) {        \
+  if (IREE_UNLIKELY(((ordinal) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) == 0)) { \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
                             "ref register required but non-ref %u provided", \
                             (ordinal));                                      \
-  } else if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_MASK) >=           \
+  } else if (IREE_UNLIKELY(((ordinal) & IREE_VM_ISA_REF_REGISTER_MASK) >=    \
                            verify_state->ref_register_count)) {              \
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
                             "ref register ordinal %u out of range %u",       \
                             (ordinal), verify_state->ref_register_count);    \
   }
 #define IREE_VM_VERIFY_REG_ANY(ordinal)                                       \
-  if (((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0) {                        \
-    int32_t ref_ordinal = (ordinal) & IREE_REF_REGISTER_MASK;                 \
+  if (((ordinal) & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) != 0) {                 \
+    int32_t ref_ordinal = (ordinal) & IREE_VM_ISA_REF_REGISTER_MASK;          \
     if (IREE_UNLIKELY(ref_ordinal >= verify_state->ref_register_count)) {     \
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                       \
                               "ref register ordinal %u out of range %u",      \
@@ -520,41 +524,130 @@ iree_status_t iree_vm_bytecode_function_verify(
                             (ordinal), verify_state->i32_register_count);     \
   }
 
-#define VM_VerifyConstI8(name)             \
-  IREE_VM_VERIFY_PC_RANGE(pc + 1, max_pc); \
-  uint8_t name = OP_I8(0);                 \
-  (void)(name);                            \
-  ++pc;
-#define VM_VerifyConstI16(name)            \
-  IREE_VM_VERIFY_PC_RANGE(pc + 2, max_pc); \
-  uint32_t name = OP_I16(0);               \
-  (void)(name);                            \
-  pc += 2;
-#define VM_VerifyConstI32(name)            \
-  IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc); \
-  uint32_t name = OP_I32(0);               \
-  (void)(name);                            \
-  pc += 4;
-#define VM_VerifyConstI64(name)            \
-  IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  uint64_t name = OP_I64(0);               \
-  (void)(name);                            \
-  pc += 8;
-#define VM_VerifyConstF32(name)            \
-  IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc); \
-  float name = OP_F32(0);                  \
-  (void)(name);                            \
-  pc += 4;
-#define VM_VerifyConstF64(name)            \
-  IREE_VM_VERIFY_PC_RANGE(pc + 8, max_pc); \
-  double name = OP_F64(0);                 \
-  (void)(name);                            \
-  pc += 8;
+//===----------------------------------------------------------------------===//
+// ISA decoding (verifier policy)
+//===----------------------------------------------------------------------===//
 
-#define VM_VerifyFuncAttr(name) VM_VerifyConstI32(name)
-#define VM_IsImportOrdinal(name) (((name) & 0x80000000u) != 0)
-#define VM_UnmaskImportOrdinal(name) name &= ~0x80000000u
-#define VM_VerifyImportOrdinal(name)                                          \
+#define IREE_VM_ISA_BYTECODE_DATA bytecode_data
+#define IREE_VM_ISA_PC pc
+#define IREE_VM_ISA_REQUIRE(bytes) IREE_VM_VERIFY_PC_RANGE(pc + (bytes), max_pc)
+
+// Verifier wants strict bounds checks on type IDs.
+#define IREE_VM_ISA_VERIFY_TYPE_ID(type_id)                       \
+  do {                                                            \
+    if (IREE_UNLIKELY((type_id) >= module->type_count)) {         \
+      return iree_make_status(                                    \
+          IREE_STATUS_OUT_OF_RANGE,                               \
+          "type id ordinal out of range: %u (table=%" PRIhsz ")", \
+          (uint32_t)(type_id), module->type_count);               \
+    }                                                             \
+  } while (0)
+
+// Type lookups in the verifier use pointers into the module type table.
+#define IREE_VM_ISA_TYPE_T const iree_vm_type_def_t*
+#define IREE_VM_ISA_LOOKUP_TYPE(type_id, out_type) \
+  do {                                             \
+    (out_type) = &module->type_table[(type_id)];   \
+  } while (0)
+
+// Register validation uses the verifier's current register-count limits.
+#define IREE_VM_ISA_VERIFY_REG_I32(ordinal) \
+  do {                                      \
+    IREE_VM_VERIFY_REG_I32(ordinal);        \
+  } while (0)
+#define IREE_VM_ISA_VERIFY_REG_I64(ordinal) \
+  do {                                      \
+    IREE_VM_VERIFY_REG_I64(ordinal);        \
+  } while (0)
+#define IREE_VM_ISA_VERIFY_REG_F32(ordinal) \
+  do {                                      \
+    IREE_VM_VERIFY_REG_F32(ordinal);        \
+  } while (0)
+#define IREE_VM_ISA_VERIFY_REG_F64(ordinal) \
+  do {                                      \
+    IREE_VM_VERIFY_REG_F64(ordinal);        \
+  } while (0)
+#define IREE_VM_ISA_VERIFY_REG_ANY(ordinal) \
+  do {                                      \
+    IREE_VM_VERIFY_REG_ANY(ordinal);        \
+  } while (0)
+
+// Ref register validation differs based on whether the op supports MOVE.
+#define IREE_VM_ISA_VERIFY_REG_REF_ALLOW_MOVE(ordinal) \
+  do {                                                 \
+    IREE_VM_VERIFY_REG_REF(ordinal);                   \
+  } while (0)
+#define IREE_VM_ISA_VERIFY_REG_REF_NO_MOVE(ordinal)                        \
+  do {                                                                     \
+    IREE_VM_VERIFY_REG_REF(ordinal);                                       \
+    if (IREE_UNLIKELY((ordinal) & IREE_VM_ISA_REF_REGISTER_MOVE_BIT)) {    \
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                \
+                              "ref register has MOVE bit but op does not " \
+                              "support MOVE");                             \
+    }                                                                      \
+  } while (0)
+
+#include "iree/vm/bytecode/utils/isa_decoder.inl"
+
+//===----------------------------------------------------------------------===//
+// Verifier-specific helpers for decoded aggregates
+//===----------------------------------------------------------------------===//
+
+#define IREE_VM_ISA_VERIFY_BRANCH_TARGET(name)             \
+  IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(name);               \
+  iree_vm_bytecode_block_t* name##_block = NULL;           \
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_block_list_insert( \
+      &verify_state->block_list, (name), &name##_block));  \
+  (void)(name##_block)
+
+#define IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(name)        \
+  IREE_VM_ISA_DECODE_BRANCH_OPERANDS(name);             \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {   \
+    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].src_reg); \
+    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].dst_reg); \
+  }
+
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name) \
+  IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(name)
+#define IREE_VM_ISA_VERIFY_VARIADIC_RESULTS(name) \
+  IREE_VM_ISA_DECODE_VARIADIC_RESULTS(name)
+
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I32(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
+    IREE_VM_VERIFY_REG_I32((name)->registers[__i]);    \
+  }
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I64(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
+    IREE_VM_VERIFY_REG_I64((name)->registers[__i]);    \
+  }
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F32(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
+    IREE_VM_VERIFY_REG_F32((name)->registers[__i]);    \
+  }
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F64(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
+    IREE_VM_VERIFY_REG_F64((name)->registers[__i]);    \
+  }
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_REF(name, type_def) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);                    \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {            \
+    IREE_VM_VERIFY_REG_REF((name)->registers[__i]);              \
+  }                                                              \
+  (void)(type_def)
+#define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
+    IREE_VM_VERIFY_REG_ANY((name)->registers[__i]);    \
+  }
+
+#define IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(name) \
+  IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(name)
+
+#define IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(name)                               \
   if (IREE_UNLIKELY((name) >= iree_vm_ImportFunctionDef_vec_len(              \
                                   verify_state->imported_functions))) {       \
     return iree_make_status(                                                  \
@@ -562,7 +655,7 @@ iree_status_t iree_vm_bytecode_function_verify(
         name,                                                                 \
         iree_vm_ImportFunctionDef_vec_len(verify_state->imported_functions)); \
   }
-#define VM_VerifyFunctionOrdinal(name)                                      \
+#define IREE_VM_ISA_VERIFY_FUNCTION_ORDINAL(name)                           \
   if (IREE_UNLIKELY((name)) >= iree_vm_FunctionDescriptor_vec_len(          \
                                    verify_state->function_descriptors)) {   \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                   \
@@ -570,8 +663,7 @@ iree_status_t iree_vm_bytecode_function_verify(
                             iree_vm_FunctionDescriptor_vec_len(             \
                                 verify_state->function_descriptors));       \
   }
-#define VM_VerifyGlobalAttr(name) VM_VerifyConstI32(name)
-#define VM_VerifyRwdataOffset(name, access_length)                          \
+#define IREE_VM_ISA_VERIFY_RWDATA_OFFSET(name, access_length)               \
   if (IREE_UNLIKELY(((name) + (access_length)) >                            \
                     verify_state->rwdata_storage_size)) {                   \
     return iree_make_status(                                                \
@@ -579,228 +671,102 @@ iree_status_t iree_vm_bytecode_function_verify(
         "global byte_offset out of range: %d (rwdata=%" PRIhsz ")", (name), \
         verify_state->rwdata_storage_size);                                 \
   }
-#define VM_VerifyGlobalRefOrdinal(name)                                    \
+#define IREE_VM_ISA_VERIFY_GLOBAL_REF_ORDINAL(name)                        \
   if (IREE_UNLIKELY((name) >= verify_state->global_ref_count)) {           \
     return iree_make_status(                                               \
         IREE_STATUS_OUT_OF_RANGE,                                          \
         "global ref ordinal out of range: %d (table=%" PRIhsz ")", (name), \
         verify_state->global_ref_count);                                   \
   }
-#define VM_VerifyRodataAttr(name) VM_VerifyConstI32(name)
-#define VM_VerifyRodataOrdinal(name)                                       \
+#define IREE_VM_ISA_VERIFY_RODATA_ORDINAL(name)                            \
   if (IREE_UNLIKELY((name) >= verify_state->rodata_ref_count)) {           \
     return iree_make_status(                                               \
         IREE_STATUS_OUT_OF_RANGE,                                          \
         "rodata ref ordinal out of range: %d (table=%" PRIhsz ")", (name), \
         verify_state->rodata_ref_count);                                   \
   }
-#define VM_VerifyType(name)                                                    \
-  IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc);                                     \
-  uint32_t name##_id = OP_I32(0);                                              \
-  if (IREE_UNLIKELY(name##_id >= module->type_count)) {                        \
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                          \
-                            "type id ordinal out of range: %d (table=%" PRIhsz \
-                            ")",                                               \
-                            name##_id, module->type_count);                    \
-  }                                                                            \
-  const iree_vm_type_def_t* name = &module->type_table[name##_id];             \
-  (void)(name);                                                                \
-  pc += 4;
-#define VM_VerifyTypeOf(name) VM_VerifyType(name)
-#define VM_VerifyAttrI32(name) VM_VerifyConstI32(name)
-#define VM_VerifyAttrI64(name) VM_VerifyConstI64(name)
-#define VM_VerifyAttrF32(name) VM_VerifyConstF32(name)
-#define VM_VerifyAttrF64(name) VM_VerifyConstF64(name)
-#define VM_VerifyStrAttr(name, out_str)                      \
-  IREE_VM_VERIFY_PC_RANGE(pc + 2, max_pc);                   \
-  (out_str)->size = (iree_host_size_t)OP_I16(0);             \
-  IREE_VM_VERIFY_PC_RANGE(pc + 2 + (out_str)->size, max_pc); \
-  (out_str)->data = (const char*)&bytecode_data[pc + 2];     \
-  pc += 2 + (out_str)->size;
-
-#define VM_VerifyBranchTarget(name)                        \
-  VM_VerifyConstI32(name##_pc);                            \
-  iree_vm_bytecode_block_t* name = NULL;                   \
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_block_list_insert( \
-      &verify_state->block_list, name##_pc, &name));
-#define VM_VerifyBranchOperands(name)                                         \
-  VM_AlignPC(pc, IREE_REGISTER_ORDINAL_SIZE);                                 \
-  IREE_VM_VERIFY_PC_RANGE(pc + IREE_REGISTER_ORDINAL_SIZE, max_pc);           \
-  const iree_vm_register_remap_list_t* name =                                 \
-      (const iree_vm_register_remap_list_t*)&bytecode_data[pc];               \
-  pc += IREE_REGISTER_ORDINAL_SIZE;                                           \
-  IREE_VM_VERIFY_PC_RANGE(pc + (name)->size * 2 * IREE_REGISTER_ORDINAL_SIZE, \
-                          max_pc);                                            \
-  pc += (name)->size * 2 * IREE_REGISTER_ORDINAL_SIZE;                        \
-  for (uint16_t i = 0; i < name->size; ++i) {                                 \
-    IREE_VM_VERIFY_REG_ANY(name->pairs[i].src_reg);                           \
-    IREE_VM_VERIFY_REG_ANY(name->pairs[i].dst_reg);                           \
-  }
-
-#define VM_VerifyOperandRegI32(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_I32(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyOperandRegI64(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_I64(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyOperandRegI64HostSize(name) VM_VerifyOperandRegI64(name)
-#define VM_VerifyOperandRegF32(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_F32(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyOperandRegF64(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_F32(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyOperandRegRef(name)          \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyVariadicOperands(name)                                   \
-  VM_AlignPC(pc, IREE_REGISTER_ORDINAL_SIZE);                             \
-  IREE_VM_VERIFY_PC_RANGE(pc + IREE_REGISTER_ORDINAL_SIZE, max_pc);       \
-  const iree_vm_register_list_t* name =                                   \
-      (const iree_vm_register_list_t*)&bytecode_data[pc];                 \
-  pc += IREE_REGISTER_ORDINAL_SIZE;                                       \
-  IREE_VM_VERIFY_PC_RANGE(pc + (name)->size * IREE_REGISTER_ORDINAL_SIZE, \
-                          max_pc);                                        \
-  pc += (name)->size * IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyVariadicOperandsI32(name)            \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_I32((name)->registers[__i]);   \
-  }
-#define VM_VerifyVariadicOperandsI64(name)            \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_I64((name)->registers[__i]);   \
-  }
-#define VM_VerifyVariadicOperandsF32(name)            \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_F32((name)->registers[__i]);   \
-  }
-#define VM_VerifyVariadicOperandsF64(name)            \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_F64((name)->registers[__i]);   \
-  }
-#define VM_VerifyVariadicOperandsRef(name, type_def)  \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_REF((name)->registers[__i]);   \
-  }
-#define VM_VerifyVariadicOperandsAny(name)            \
-  VM_VerifyVariadicOperands(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) { \
-    IREE_VM_VERIFY_REG_ANY((name)->registers[__i]);   \
-  }
-#define VM_VerifyResultRegI32(name)           \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_I32(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyResultRegI64(name)           \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_I64(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyResultRegF32(name)           \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_F32(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyResultRegF64(name)           \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_F64(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyResultRegRef(name)           \
-  IREE_VM_VERIFY_REG_ORDINAL(name##_ordinal); \
-  IREE_VM_VERIFY_REG_REF(name##_ordinal);     \
-  pc += IREE_REGISTER_ORDINAL_SIZE;
-#define VM_VerifyVariadicResultsAny(name) VM_VerifyVariadicOperandsAny(name)
-
-#define VERIFY_OP_CORE_UNARY_I32(op_name) \
-  VERIFY_OP(CORE, op_name, {              \
-    VM_VerifyOperandRegI32(operand);      \
-    VM_VerifyResultRegI32(result);        \
+#define IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_I32(operand);          \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);            \
   });
 
-#define VERIFY_OP_CORE_UNARY_I64(op_name) \
-  VERIFY_OP(CORE, op_name, {              \
-    VM_VerifyOperandRegI64(operand);      \
-    VM_VerifyResultRegI64(result);        \
+#define IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_I64(operand);          \
+    IREE_VM_ISA_DECODE_RESULT_I64(result);            \
   });
 
-#define VERIFY_OP_CORE_BINARY_I32(op_name) \
-  VERIFY_OP(CORE, op_name, {               \
-    VM_VerifyOperandRegI32(lhs);           \
-    VM_VerifyOperandRegI32(rhs);           \
-    VM_VerifyResultRegI32(result);         \
+#define IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {               \
+    IREE_VM_ISA_DECODE_OPERAND_I32(lhs);               \
+    IREE_VM_ISA_DECODE_OPERAND_I32(rhs);               \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);             \
   });
 
-#define VERIFY_OP_CORE_BINARY_I64(op_name) \
-  VERIFY_OP(CORE, op_name, {               \
-    VM_VerifyOperandRegI64(lhs);           \
-    VM_VerifyOperandRegI64(rhs);           \
-    VM_VerifyResultRegI64(result);         \
+#define IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {               \
+    IREE_VM_ISA_DECODE_OPERAND_I64(lhs);               \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs);               \
+    IREE_VM_ISA_DECODE_RESULT_I64(result);             \
   });
 
-#define VERIFY_OP_CORE_TERNARY_I32(op_name) \
-  VERIFY_OP(CORE, op_name, {                \
-    VM_VerifyOperandRegI32(a);              \
-    VM_VerifyOperandRegI32(b);              \
-    VM_VerifyOperandRegI32(c);              \
-    VM_VerifyResultRegI32(result);          \
+#define IREE_VM_ISA_VERIFY_OP_CORE_TERNARY_I32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {                \
+    IREE_VM_ISA_DECODE_OPERAND_I32(a);                  \
+    IREE_VM_ISA_DECODE_OPERAND_I32(b);                  \
+    IREE_VM_ISA_DECODE_OPERAND_I32(c);                  \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);              \
   });
 
-#define VERIFY_OP_CORE_TERNARY_I64(op_name) \
-  VERIFY_OP(CORE, op_name, {                \
-    VM_VerifyOperandRegI64(a);              \
-    VM_VerifyOperandRegI64(b);              \
-    VM_VerifyOperandRegI64(c);              \
-    VM_VerifyResultRegI64(result);          \
+#define IREE_VM_ISA_VERIFY_OP_CORE_TERNARY_I64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {                \
+    IREE_VM_ISA_DECODE_OPERAND_I64(a);                  \
+    IREE_VM_ISA_DECODE_OPERAND_I64(b);                  \
+    IREE_VM_ISA_DECODE_OPERAND_I64(c);                  \
+    IREE_VM_ISA_DECODE_RESULT_I64(result);              \
   });
 
-#define VERIFY_OP_EXT_F32_UNARY_F32(op_name) \
-  VERIFY_OP(EXT_F32, op_name, {              \
-    VM_VerifyOperandRegF32(operand);         \
-    VM_VerifyResultRegF32(result);           \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_F32(operand);             \
+    IREE_VM_ISA_DECODE_RESULT_F32(result);               \
   });
 
-#define VERIFY_OP_EXT_F32_BINARY_F32(op_name) \
-  VERIFY_OP(EXT_F32, op_name, {               \
-    VM_VerifyOperandRegF32(lhs);              \
-    VM_VerifyOperandRegF32(rhs);              \
-    VM_VerifyResultRegF32(result);            \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {               \
+    IREE_VM_ISA_DECODE_OPERAND_F32(lhs);                  \
+    IREE_VM_ISA_DECODE_OPERAND_F32(rhs);                  \
+    IREE_VM_ISA_DECODE_RESULT_F32(result);                \
   });
 
-#define VERIFY_OP_EXT_F32_TERNARY_F32(op_name) \
-  VERIFY_OP(EXT_F32, op_name, {                \
-    VM_VerifyOperandRegF32(a);                 \
-    VM_VerifyOperandRegF32(b);                 \
-    VM_VerifyOperandRegF32(c);                 \
-    VM_VerifyResultRegF32(result);             \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F32_TERNARY_F32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {                \
+    IREE_VM_ISA_DECODE_OPERAND_F32(a);                     \
+    IREE_VM_ISA_DECODE_OPERAND_F32(b);                     \
+    IREE_VM_ISA_DECODE_OPERAND_F32(c);                     \
+    IREE_VM_ISA_DECODE_RESULT_F32(result);                 \
   });
 
-#define VERIFY_OP_EXT_F64_UNARY_F64(op_name) \
-  VERIFY_OP(EXT_F64, op_name, {              \
-    VM_VerifyOperandRegF64(operand);         \
-    VM_VerifyResultRegF64(result);           \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F64, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_F64(operand);             \
+    IREE_VM_ISA_DECODE_RESULT_F64(result);               \
   });
 
-#define VERIFY_OP_EXT_F64_BINARY_F64(op_name) \
-  VERIFY_OP(EXT_F64, op_name, {               \
-    VM_VerifyOperandRegF64(lhs);              \
-    VM_VerifyOperandRegF64(rhs);              \
-    VM_VerifyResultRegF64(result);            \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F64, op_name, {               \
+    IREE_VM_ISA_DECODE_OPERAND_F64(lhs);                  \
+    IREE_VM_ISA_DECODE_OPERAND_F64(rhs);                  \
+    IREE_VM_ISA_DECODE_RESULT_F64(result);                \
   });
 
-#define VERIFY_OP_EXT_F64_TERNARY_F64(op_name) \
-  VERIFY_OP(EXT_F64, op_name, {                \
-    VM_VerifyOperandRegF64(a);                 \
-    VM_VerifyOperandRegF64(b);                 \
-    VM_VerifyOperandRegF64(c);                 \
-    VM_VerifyResultRegF64(result);             \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F64_TERNARY_F64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F64, op_name, {                \
+    IREE_VM_ISA_DECODE_OPERAND_F64(a);                     \
+    IREE_VM_ISA_DECODE_OPERAND_F64(b);                     \
+    IREE_VM_ISA_DECODE_OPERAND_F64(c);                     \
+    IREE_VM_ISA_DECODE_RESULT_F64(result);                 \
   });
 
 //===----------------------------------------------------------------------===//
@@ -999,9 +965,9 @@ static iree_status_t iree_vm_bytecode_function_verify_call(
 // Bytecode verification
 //===----------------------------------------------------------------------===//
 
-#define VERIFY_OP(ext, op_name, body)  \
-  case IREE_VM_OP_##ext##_##op_name: { \
-    body;                              \
+#define IREE_VM_ISA_VERIFY_OP(ext, op_name, body) \
+  case IREE_VM_OP_##ext##_##op_name: {            \
+    body;                                         \
   } break;
 
 #define BEGIN_VERIFY_PREFIX(op_name, ext)    \
@@ -1028,10 +994,10 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     iree_vm_bytecode_verify_state_t* verify_state,
     iree_vm_FunctionSignatureDef_table_t function_signature,
     iree_vm_FunctionDescriptor_struct_t function_descriptor,
-    iree_const_byte_span_t function_bytecode, uint32_t start_pc,
-    uint32_t max_pc, uint32_t* out_next_pc) {
+    iree_const_byte_span_t function_bytecode, iree_vm_source_offset_t start_pc,
+    iree_vm_source_offset_t max_pc, iree_vm_source_offset_t* out_next_pc) {
   *out_next_pc = 0;
-  uint32_t pc = start_pc;
+  iree_vm_source_offset_t pc = start_pc;
   const uint8_t* bytecode_data = function_bytecode.data;
 
   // NOTE: we keep this as simple as possible so that we can one day auto
@@ -1045,14 +1011,14 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     // If not in a block then the next opcode must be a block.
     if (bytecode_data[pc] != IREE_VM_OP_CORE_Block) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "op at pc %08X is not in a block", pc);
+                              "op at pc %08" PRIX64 " is not in a block", pc);
     }
   } else {
     // If in a block then the next opcode must not be a block.
     if (bytecode_data[pc] == IREE_VM_OP_CORE_Block) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "op at pc %08X is a block while still in a block",
-                              pc);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "op at pc %08" PRIX64 " is a block while still in a block", pc);
     }
   }
 
@@ -1062,489 +1028,502 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     // Globals
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, GlobalLoadI32, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyResultRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadI32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_RESULT_I32(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreI32, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreI32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
     });
 
-    VERIFY_OP(CORE, GlobalLoadIndirectI32, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadIndirectI32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyResultRegI32(value);
+      IREE_VM_ISA_DECODE_RESULT_I32(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreIndirectI32, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreIndirectI32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyOperandRegI32(value);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
     });
 
-    VERIFY_OP(CORE, GlobalLoadI64, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 8);
-      VM_VerifyResultRegI64(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadI64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 8);
+      IREE_VM_ISA_DECODE_RESULT_I64(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreI64, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 8);
-      VM_VerifyOperandRegI64(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreI64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 8);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value);
     });
 
-    VERIFY_OP(CORE, GlobalLoadIndirectI64, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadIndirectI64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyResultRegI64(value);
+      IREE_VM_ISA_DECODE_RESULT_I64(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreIndirectI64, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreIndirectI64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyOperandRegI64(value);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value);
     });
 
-    VERIFY_OP(CORE, GlobalLoadRef, {
-      VM_VerifyGlobalAttr(global);
-      VM_VerifyGlobalRefOrdinal(global);
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadRef, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_VERIFY_GLOBAL_REF_ORDINAL(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreRef, {
-      VM_VerifyGlobalAttr(global);
-      VM_VerifyGlobalRefOrdinal(global);
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreRef, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
+      IREE_VM_ISA_VERIFY_GLOBAL_REF_ORDINAL(global);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value);
     });
 
-    VERIFY_OP(CORE, GlobalLoadIndirectRef, {
-      VM_VerifyOperandRegI32(global);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalLoadIndirectRef, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(global);
       // NOTE: we have to verify the ordinal at runtime.
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(value);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value);
     });
 
-    VERIFY_OP(CORE, GlobalStoreIndirectRef, {
-      VM_VerifyOperandRegI32(global);
+    IREE_VM_ISA_VERIFY_OP(CORE, GlobalStoreIndirectRef, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(global);
       // NOTE: we have to verify the ordinal at runtime.
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(value);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value);
     });
 
     //===------------------------------------------------------------------===//
     // Constants
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, ConstI32, {
-      VM_VerifyAttrI32(value);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstI32, {
+      IREE_VM_ISA_DECODE_ATTR_I32(value);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, ConstI32Zero, { VM_VerifyResultRegI32(result); });
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstI32Zero,
+                          { IREE_VM_ISA_DECODE_RESULT_I32(result); });
 
-    VERIFY_OP(CORE, ConstI64, {
-      VM_VerifyAttrI64(value);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstI64, {
+      IREE_VM_ISA_DECODE_ATTR_I64(value);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, ConstI64Zero, { VM_VerifyResultRegI64(result); });
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstI64Zero,
+                          { IREE_VM_ISA_DECODE_RESULT_I64(result); });
 
-    VERIFY_OP(CORE, ConstRefZero, { VM_VerifyResultRegRef(result); });
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstRefZero,
+                          { IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result); });
 
-    VERIFY_OP(CORE, ConstRefRodata, {
-      VM_VerifyRodataAttr(rodata);
-      VM_VerifyRodataOrdinal(rodata);
-      VM_VerifyResultRegRef(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, DiscardRefs,
+                          { IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(refs); });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, AssignRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(source);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
+    });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, ConstRefRodata, {
+      IREE_VM_ISA_DECODE_RODATA_ATTR(rodata);
+      IREE_VM_ISA_VERIFY_RODATA_ORDINAL(rodata);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value);
     });
 
     //===------------------------------------------------------------------===//
     // Buffers
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, BufferAlloc, {
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI32(alignment);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferAlloc, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I32(alignment);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
-    VERIFY_OP(CORE, BufferClone, {
-      VM_VerifyOperandRegRef(source);
-      VM_VerifyOperandRegI64HostSize(offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI32(alignment);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferClone, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source);  // Source buffer - no MOVE.
+      IREE_VM_ISA_DECODE_OPERAND_I64(offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I32(alignment);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
-    VERIFY_OP(CORE, BufferLength, {
-      VM_VerifyOperandRegRef(buffer);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLength, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(buffer);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, BufferCopy, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferCopy, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
     });
 
-    VERIFY_OP(CORE, BufferCompare, {
-      VM_VerifyOperandRegRef(lhs_buffer);
-      VM_VerifyOperandRegI64HostSize(lhs_offset);
-      VM_VerifyOperandRegRef(rhs_buffer);
-      VM_VerifyOperandRegI64HostSize(rhs_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferCompare, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(lhs_offset);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(rhs_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, BufferFillI8, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferFillI8, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
     });
-    VERIFY_OP(CORE, BufferFillI16, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferFillI16, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
     });
-    VERIFY_OP(CORE, BufferFillI32, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferFillI32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
     });
-    VERIFY_OP(CORE, BufferFillI64, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegI64(value);
-    });
-
-    VERIFY_OP(CORE, BufferLoadI8U, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI32(result);
-    });
-    VERIFY_OP(CORE, BufferLoadI8S, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI32(result);
-    });
-    VERIFY_OP(CORE, BufferLoadI16U, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI32(result);
-    });
-    VERIFY_OP(CORE, BufferLoadI16S, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI32(result);
-    });
-    VERIFY_OP(CORE, BufferLoadI32, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI32(result);
-    });
-    VERIFY_OP(CORE, BufferLoadI64, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferFillI64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value);
     });
 
-    VERIFY_OP(CORE, BufferStoreI8, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI8U, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, BufferStoreI16, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI8S, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, BufferStoreI32, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI32(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI16U, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, BufferStoreI64, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI16S, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, BufferHash, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
+    });
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferLoadI64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
+    });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferStoreI8, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
+    });
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferStoreI16, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
+    });
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferStoreI32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I32(value);
+    });
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferStoreI64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value);
+    });
+    IREE_VM_ISA_VERIFY_OP(CORE, BufferHash, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
     //===------------------------------------------------------------------===//
     // Lists
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, ListAlloc, {
-      VM_VerifyTypeOf(element_type);
-      VM_VerifyOperandRegI32(initial_capacity);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListAlloc, {
+      IREE_VM_ISA_DECODE_TYPE_OF(element_type);
+      IREE_VM_ISA_DECODE_OPERAND_I32(initial_capacity);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
-    VERIFY_OP(CORE, ListReserve, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(minimum_capacity);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListReserve, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(minimum_capacity);
     });
 
-    VERIFY_OP(CORE, ListSize, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListSize, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, ListResize, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(new_size);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListResize, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(new_size);
     });
 
-    VERIFY_OP(CORE, ListGetI32, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListGetI32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, ListSetI32, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegI32(raw_value);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListSetI32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_I32(raw_value);
     });
 
-    VERIFY_OP(CORE, ListGetI64, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListGetI64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, ListSetI64, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegI64(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListSetI64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_I64(value);
     });
 
-    VERIFY_OP(CORE, ListGetRef, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListGetRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);  // List operand - no MOVE.
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
-    VERIFY_OP(CORE, ListSetRef, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegRef(value);
+    IREE_VM_ISA_VERIFY_OP(CORE, ListSetRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);  // List operand - no MOVE.
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value);
     });
 
     //===------------------------------------------------------------------===//
     // Conditional assignment
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, SelectI32, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyOperandRegI32(true_value);
-      VM_VerifyOperandRegI32(false_value);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, SelectI32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DECODE_OPERAND_I32(true_value);
+      IREE_VM_ISA_DECODE_OPERAND_I32(false_value);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, SelectI64, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyOperandRegI64(true_value);
-      VM_VerifyOperandRegI64(false_value);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, SelectI64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DECODE_OPERAND_I64(true_value);
+      IREE_VM_ISA_DECODE_OPERAND_I64(false_value);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, SelectRef, {
-      VM_VerifyOperandRegI32(condition);
+    IREE_VM_ISA_VERIFY_OP(CORE, SelectRef, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
       // TODO(benvanik): remove the type_id and use either LHS/RHS (if both are
       // null then output is always null so no need to know the type).
-      VM_VerifyTypeOf(true_value_type_def);
-      VM_VerifyOperandRegRef(true_value);
-      VM_VerifyOperandRegRef(false_value);
-      VM_VerifyResultRegRef(result);
+      IREE_VM_ISA_DECODE_TYPE_OF(true_value_type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(true_value);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(false_value);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
-    VERIFY_OP(CORE, SwitchI32, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegI32(default_value);
-      VM_VerifyVariadicOperandsI32(values);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, SwitchI32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_I32(default_value);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I32(values);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, SwitchI64, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegI64(default_value);
-      VM_VerifyVariadicOperandsI64(values);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, SwitchI64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_I64(default_value);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I64(values);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, SwitchRef, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyTypeOf(type_def);
-      VM_VerifyOperandRegRef(default_value);
-      VM_VerifyVariadicOperandsRef(values, type_def);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, SwitchRef, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(default_value);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_REF(
+          values,
+          type_def);  // TODO: add Move variant.
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
     //===------------------------------------------------------------------===//
     // Native integer arithmetic
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP_CORE_BINARY_I32(AddI32);
-    VERIFY_OP_CORE_BINARY_I32(SubI32);
-    VERIFY_OP_CORE_BINARY_I32(MulI32);
-    VERIFY_OP_CORE_BINARY_I32(DivI32S);
-    VERIFY_OP_CORE_BINARY_I32(DivI32U);
-    VERIFY_OP_CORE_BINARY_I32(RemI32S);
-    VERIFY_OP_CORE_BINARY_I32(RemI32U);
-    VERIFY_OP_CORE_TERNARY_I32(FMAI32);
-    VERIFY_OP_CORE_UNARY_I32(AbsI32);
-    VERIFY_OP_CORE_BINARY_I32(MinI32S);
-    VERIFY_OP_CORE_BINARY_I32(MinI32U);
-    VERIFY_OP_CORE_BINARY_I32(MaxI32S);
-    VERIFY_OP_CORE_BINARY_I32(MaxI32U);
-    VERIFY_OP_CORE_UNARY_I32(NotI32);
-    VERIFY_OP_CORE_BINARY_I32(AndI32);
-    VERIFY_OP_CORE_BINARY_I32(OrI32);
-    VERIFY_OP_CORE_BINARY_I32(XorI32);
-    VERIFY_OP_CORE_UNARY_I32(CtlzI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(AddI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(SubI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(MulI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(DivI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(DivI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(RemI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(RemI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_TERNARY_I32(FMAI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(AbsI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(MinI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(MinI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(MaxI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(MaxI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(NotI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(AndI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(OrI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(XorI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(CtlzI32);
 
-    VERIFY_OP_CORE_BINARY_I64(AddI64);
-    VERIFY_OP_CORE_BINARY_I64(SubI64);
-    VERIFY_OP_CORE_BINARY_I64(MulI64);
-    VERIFY_OP_CORE_BINARY_I64(DivI64S);
-    VERIFY_OP_CORE_BINARY_I64(DivI64U);
-    VERIFY_OP_CORE_BINARY_I64(RemI64S);
-    VERIFY_OP_CORE_BINARY_I64(RemI64U);
-    VERIFY_OP_CORE_TERNARY_I64(FMAI64);
-    VERIFY_OP_CORE_UNARY_I64(AbsI64);
-    VERIFY_OP_CORE_BINARY_I64(MinI64S);
-    VERIFY_OP_CORE_BINARY_I64(MinI64U);
-    VERIFY_OP_CORE_BINARY_I64(MaxI64S);
-    VERIFY_OP_CORE_BINARY_I64(MaxI64U);
-    VERIFY_OP_CORE_UNARY_I64(NotI64);
-    VERIFY_OP_CORE_BINARY_I64(AndI64);
-    VERIFY_OP_CORE_BINARY_I64(OrI64);
-    VERIFY_OP_CORE_BINARY_I64(XorI64);
-    VERIFY_OP_CORE_UNARY_I64(CtlzI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(AddI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(SubI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(MulI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(DivI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(DivI64U);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(RemI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(RemI64U);
+    IREE_VM_ISA_VERIFY_OP_CORE_TERNARY_I64(FMAI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I64(AbsI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(MinI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(MinI64U);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(MaxI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(MaxI64U);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I64(NotI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(AndI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(OrI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I64(XorI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I64(CtlzI64);
 
     //===------------------------------------------------------------------===//
     // Casting and type conversion/emulation
     //===------------------------------------------------------------------===//
 
     // NOTE: these all operate on 32-bit registers.
-    VERIFY_OP_CORE_UNARY_I32(TruncI32I8);
-    VERIFY_OP_CORE_UNARY_I32(TruncI32I16);
-    VERIFY_OP_CORE_UNARY_I32(ExtI8I32S);
-    VERIFY_OP_CORE_UNARY_I32(ExtI8I32U);
-    VERIFY_OP_CORE_UNARY_I32(ExtI16I32S);
-    VERIFY_OP_CORE_UNARY_I32(ExtI16I32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(TruncI32I8);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(TruncI32I16);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(ExtI8I32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(ExtI8I32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(ExtI16I32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(ExtI16I32U);
 
     // NOTE: 64-bit ones are actually changing register widths.
-    VERIFY_OP(CORE, TruncI64I32, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, TruncI64I32, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, ExtI32I64S, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ExtI32I64S, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
-    VERIFY_OP(CORE, ExtI32I64U, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, ExtI32I64U, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
-    VERIFY_OP(CORE, CastAnyRef, {
-      VM_VerifyOperandRegRef(operand);
-      VM_VerifyTypeOf(result);
-      VM_VerifyResultRegRef(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, CastAnyRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(operand);
+      IREE_VM_ISA_DECODE_TYPE_OF(result_type);
+      IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result);
     });
 
     //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 
-#define VERIFY_OP_CORE_SHIFT_I32(op_name) \
-  VERIFY_OP(CORE, op_name, {              \
-    VM_VerifyOperandRegI32(operand);      \
-    VM_VerifyOperandRegI32(amount);       \
-    VM_VerifyResultRegI32(result);        \
+#define IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_I32(operand);          \
+    IREE_VM_ISA_DECODE_OPERAND_I32(amount);           \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);            \
   });
 
-    VERIFY_OP_CORE_SHIFT_I32(ShlI32);
-    VERIFY_OP_CORE_SHIFT_I32(ShrI32S);
-    VERIFY_OP_CORE_SHIFT_I32(ShrI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I32(ShlI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I32(ShrI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I32(ShrI32U);
 
-#define VERIFY_OP_CORE_SHIFT_I64(op_name) \
-  VERIFY_OP(CORE, op_name, {              \
-    VM_VerifyOperandRegI64(operand);      \
-    VM_VerifyOperandRegI32(amount);       \
-    VM_VerifyResultRegI64(result);        \
+#define IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {              \
+    IREE_VM_ISA_DECODE_OPERAND_I64(operand);          \
+    IREE_VM_ISA_DECODE_OPERAND_I32(amount);           \
+    IREE_VM_ISA_DECODE_RESULT_I64(result);            \
   });
 
-    VERIFY_OP_CORE_SHIFT_I64(ShlI64);
-    VERIFY_OP_CORE_SHIFT_I64(ShrI64S);
-    VERIFY_OP_CORE_SHIFT_I64(ShrI64U);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I64(ShlI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I64(ShrI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_SHIFT_I64(ShrI64U);
 
     //===------------------------------------------------------------------===//
     // Comparison ops
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP_CORE_BINARY_I32(CmpEQI32);
-    VERIFY_OP_CORE_BINARY_I32(CmpNEI32);
-    VERIFY_OP_CORE_BINARY_I32(CmpLTI32S);
-    VERIFY_OP_CORE_BINARY_I32(CmpLTI32U);
-    VERIFY_OP_CORE_UNARY_I32(CmpNZI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(CmpEQI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(CmpNEI32);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(CmpLTI32S);
+    IREE_VM_ISA_VERIFY_OP_CORE_BINARY_I32(CmpLTI32U);
+    IREE_VM_ISA_VERIFY_OP_CORE_UNARY_I32(CmpNZI32);
 
-#define VERIFY_OP_CORE_CMP_I64(op_name) \
-  VERIFY_OP(CORE, op_name, {            \
-    VM_VerifyOperandRegI64(lhs);        \
-    VM_VerifyOperandRegI64(rhs);        \
-    VM_VerifyResultRegI32(result);      \
+#define IREE_VM_ISA_VERIFY_OP_CORE_CMP_I64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(CORE, op_name, {            \
+    IREE_VM_ISA_DECODE_OPERAND_I64(lhs);            \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs);            \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);          \
   });
 
-    VERIFY_OP_CORE_CMP_I64(CmpEQI64);
-    VERIFY_OP_CORE_CMP_I64(CmpNEI64);
-    VERIFY_OP_CORE_CMP_I64(CmpLTI64S);
-    VERIFY_OP_CORE_CMP_I64(CmpLTI64U);
-    VERIFY_OP(CORE, CmpNZI64, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP_CORE_CMP_I64(CmpEQI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_CMP_I64(CmpNEI64);
+    IREE_VM_ISA_VERIFY_OP_CORE_CMP_I64(CmpLTI64S);
+    IREE_VM_ISA_VERIFY_OP_CORE_CMP_I64(CmpLTI64U);
+    IREE_VM_ISA_VERIFY_OP(CORE, CmpNZI64, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
-    VERIFY_OP(CORE, CmpEQRef, {
-      VM_VerifyOperandRegRef(lhs);
-      VM_VerifyOperandRegRef(rhs);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, CmpEQRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, CmpNERef, {
-      VM_VerifyOperandRegRef(lhs);
-      VM_VerifyOperandRegRef(rhs);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, CmpNERef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(lhs);
+      IREE_VM_ISA_DECODE_OPERAND_REF(rhs);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(CORE, CmpNZRef, {
-      VM_VerifyOperandRegRef(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(CORE, CmpNZRef, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
     //===------------------------------------------------------------------===//
     // Control flow
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, Block, {
+    IREE_VM_ISA_VERIFY_OP(CORE, Block, {
       // Define the new block in the block list. It may already be declared from
       // a prior branch.
       iree_vm_bytecode_block_t* block = NULL;
@@ -1554,40 +1533,40 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       verify_state->in_block = 1;
     });
 
-    VERIFY_OP(CORE, Branch, {
-      VM_VerifyBranchTarget(dest_pc);
-      VM_VerifyBranchOperands(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, Branch, {
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(operands);
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, CondBranch, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyBranchTarget(true_dest_pc);
-      VM_VerifyBranchOperands(true_operands);
-      VM_VerifyBranchTarget(false_dest_pc);
-      VM_VerifyBranchOperands(false_operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, CondBranch, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(true_dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(true_operands);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(false_dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(false_operands);
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, BranchTable, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyBranchTarget(default_dest_pc);
-      VM_VerifyBranchOperands(default_operands);
-      VM_VerifyConstI16(table_size);
+    IREE_VM_ISA_VERIFY_OP(CORE, BranchTable, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(default_dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(default_operands);
+      IREE_VM_ISA_DECODE_CONST_I16(table_size);
       for (uint16_t i = 0; i < table_size; ++i) {
-        VM_VerifyBranchTarget(case_dest_pc);
-        VM_VerifyBranchOperands(case_operands);
+        IREE_VM_ISA_VERIFY_BRANCH_TARGET(case_dest_pc);
+        IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(case_operands);
       }
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, Call, {
-      VM_VerifyFuncAttr(callee_ordinal);
-      VM_VerifyVariadicOperandsAny(operands);
-      VM_VerifyVariadicResultsAny(results);
-      if (VM_IsImportOrdinal(callee_ordinal)) {
-        VM_UnmaskImportOrdinal(callee_ordinal);
-        VM_VerifyImportOrdinal(callee_ordinal);
+    IREE_VM_ISA_VERIFY_OP(CORE, Call, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (iree_vm_isa_function_ordinal_is_import(callee_ordinal)) {
+        callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+        IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
         iree_vm_ImportFunctionDef_table_t import_def =
             iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
                                              callee_ordinal);
@@ -1598,7 +1577,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
             "call to import '%s'",
             iree_vm_ImportFunctionDef_full_name(import_def));
       } else {
-        VM_VerifyFunctionOrdinal(callee_ordinal);
+        IREE_VM_ISA_VERIFY_FUNCTION_ORDINAL(callee_ordinal);
         IREE_RETURN_IF_ERROR(
             iree_vm_bytecode_function_verify_call(
                 verify_state,
@@ -1609,19 +1588,20 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       }
     });
 
-    VERIFY_OP(CORE, CallVariadic, {
-      VM_VerifyFuncAttr(callee_ordinal);
-      VM_VerifyVariadicOperands(segment_sizes);
-      VM_VerifyVariadicOperandsAny(operands);
-      VM_VerifyVariadicResultsAny(results);
-      if (IREE_UNLIKELY(!VM_IsImportOrdinal(callee_ordinal))) {
+    IREE_VM_ISA_VERIFY_OP(CORE, CallVariadic, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_sizes);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (IREE_UNLIKELY(
+              !iree_vm_isa_function_ordinal_is_import(callee_ordinal))) {
         // Variadic calls are currently only supported for import functions.
         return iree_make_status(
             IREE_STATUS_FAILED_PRECONDITION,
             "variadic calls only supported for internal callees");
       }
-      VM_UnmaskImportOrdinal(callee_ordinal);
-      VM_VerifyImportOrdinal(callee_ordinal);
+      callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+      IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
       iree_vm_ImportFunctionDef_table_t import_def =
           iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
                                            callee_ordinal);
@@ -1633,40 +1613,96 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
           iree_vm_ImportFunctionDef_full_name(import_def));
     });
 
-    VERIFY_OP(CORE, Return, {
-      VM_VerifyVariadicOperandsAny(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, CallYieldable, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (iree_vm_isa_function_ordinal_is_import(callee_ordinal)) {
+        callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+        IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
+        iree_vm_ImportFunctionDef_table_t import_def =
+            iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
+                                             callee_ordinal);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_bytecode_function_verify_call(
+                verify_state, iree_vm_ImportFunctionDef_signature(import_def),
+                /*segment_sizes=*/NULL, operands, results),
+            "yieldable call to import '%s'",
+            iree_vm_ImportFunctionDef_full_name(import_def));
+      } else {
+        IREE_VM_ISA_VERIFY_FUNCTION_ORDINAL(callee_ordinal);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_bytecode_function_verify_call(
+                verify_state,
+                iree_vm_FunctionSignatureDef_vec_at(
+                    verify_state->function_signatures, callee_ordinal),
+                /*segment_sizes=*/NULL, operands, results),
+            "yieldable call to internal function %d", callee_ordinal);
+      }
+      verify_state->in_block = 0;  // terminator
+    });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, CallVariadicYieldable, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(callee_ordinal);
+      IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_sizes);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(results);
+      if (IREE_UNLIKELY(
+              !iree_vm_isa_function_ordinal_is_import(callee_ordinal))) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "variadic yieldable calls only supported for imports");
+      }
+      callee_ordinal = iree_vm_isa_function_ordinal_as_import(callee_ordinal);
+      IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(callee_ordinal);
+      iree_vm_ImportFunctionDef_table_t import_def =
+          iree_vm_ImportFunctionDef_vec_at(verify_state->imported_functions,
+                                           callee_ordinal);
+      IREE_RETURN_IF_ERROR(
+          iree_vm_bytecode_function_verify_call(
+              verify_state, iree_vm_ImportFunctionDef_signature(import_def),
+              segment_sizes, operands, results),
+          "variadic yieldable call to import '%s'",
+          iree_vm_ImportFunctionDef_full_name(import_def));
+      verify_state->in_block = 0;  // terminator
+    });
+
+    IREE_VM_ISA_VERIFY_OP(CORE, Return, {
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_verify_cconv_registers(
           verify_state, verify_state->cconv_results, /*segment_sizes=*/NULL,
           operands));
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, Fail, {
-      VM_VerifyOperandRegI32(status);
-      iree_string_view_t message;
-      VM_VerifyStrAttr(message, &message);
+    IREE_VM_ISA_VERIFY_OP(CORE, Fail, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(status);
+      IREE_VM_ISA_DECODE_STRING_ATTR(message);
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, ImportResolved, {
-      VM_VerifyFuncAttr(import_ordinal);
-      if (IREE_UNLIKELY(!VM_IsImportOrdinal(import_ordinal))) {
+    IREE_VM_ISA_VERIFY_OP(CORE, ImportResolved, {
+      IREE_VM_ISA_DECODE_FUNC_ATTR(import_ordinal);
+      if (IREE_UNLIKELY(
+              !iree_vm_isa_function_ordinal_is_import(import_ordinal))) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "function ordinal %u is not an import ordinal",
                                 import_ordinal);
       }
-      VM_UnmaskImportOrdinal(import_ordinal);
-      VM_VerifyImportOrdinal(import_ordinal);
-      VM_VerifyResultRegI32(result);
+      import_ordinal = iree_vm_isa_function_ordinal_as_import(import_ordinal);
+      IREE_VM_ISA_VERIFY_IMPORT_ORDINAL(import_ordinal);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
     //===------------------------------------------------------------------===//
     // Async/fiber ops
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, Yield, {
-      VM_VerifyBranchTarget(dest_pc);
-      VM_VerifyBranchOperands(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, Yield, {
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(operands);
       verify_state->in_block = 0;  // terminator
     });
 
@@ -1674,28 +1710,26 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     // Debugging
     //===------------------------------------------------------------------===//
 
-    VERIFY_OP(CORE, Trace, {
-      iree_string_view_t event_name;
-      VM_VerifyStrAttr(event_name, &event_name);
-      VM_VerifyVariadicOperandsAny(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, Trace, {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
     });
 
-    VERIFY_OP(CORE, Print, {
-      iree_string_view_t event_name;
-      VM_VerifyStrAttr(event_name, &event_name);
-      VM_VerifyVariadicOperandsAny(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, Print, {
+      IREE_VM_ISA_DECODE_STRING_ATTR(event_name);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(operands);
     });
 
-    VERIFY_OP(CORE, Break, {
-      VM_VerifyBranchTarget(dest_pc);
-      VM_VerifyBranchOperands(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, Break, {
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest_pc);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(operands);
       verify_state->in_block = 0;  // terminator
     });
 
-    VERIFY_OP(CORE, CondBreak, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyBranchTarget(dest);
-      VM_VerifyBranchOperands(operands);
+    IREE_VM_ISA_VERIFY_OP(CORE, CondBreak, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_VERIFY_BRANCH_TARGET(dest);
+      IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(operands);
       verify_state->in_block = 0;  // terminator
     });
 
@@ -1710,201 +1744,202 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     // ExtF32: Globals
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, GlobalLoadF32, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyResultRegF32(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, GlobalLoadF32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_RESULT_F32(value);
     });
 
-    VERIFY_OP(EXT_F32, GlobalStoreF32, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyOperandRegF32(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, GlobalStoreF32, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value);
     });
 
-    VERIFY_OP(EXT_F32, GlobalLoadIndirectF32, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, GlobalLoadIndirectF32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyResultRegF32(value);
+      IREE_VM_ISA_DECODE_RESULT_F32(value);
     });
 
-    VERIFY_OP(EXT_F32, GlobalStoreIndirectF32, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, GlobalStoreIndirectF32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyOperandRegF32(value);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Constants
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, ConstF32, {
-      VM_VerifyAttrF32(value);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, ConstF32, {
+      IREE_VM_ISA_DECODE_ATTR_F32(value);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
 
-    VERIFY_OP(EXT_F32, ConstF32Zero, { VM_VerifyResultRegF32(result); });
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, ConstF32Zero,
+                          { IREE_VM_ISA_DECODE_RESULT_F32(result); });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Lists
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, ListGetF32, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, ListGetF32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
 
-    VERIFY_OP(EXT_F32, ListSetF32, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegF32(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, ListSetF32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Conditional assignment
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, SelectF32, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyOperandRegF32(true_value);
-      VM_VerifyOperandRegF32(false_value);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, SelectF32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DECODE_OPERAND_F32(true_value);
+      IREE_VM_ISA_DECODE_OPERAND_F32(false_value);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
 
-    VERIFY_OP(EXT_F32, SwitchF32, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegF32(default_value);
-      VM_VerifyVariadicOperandsF32(values);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, SwitchF32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_F32(default_value);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F32(values);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Native floating-point arithmetic
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP_EXT_F32_BINARY_F32(AddF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(SubF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(MulF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(DivF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(RemF32);
-    VERIFY_OP_EXT_F32_TERNARY_F32(FMAF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(AbsF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(NegF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
-    VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(AddF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(SubF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(MulF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(DivF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(RemF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_TERNARY_F32(FMAF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(AbsF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(NegF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(CeilF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(FloorF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(RoundF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(RoundF32Even);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(MinF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(MaxF32);
 
-    VERIFY_OP_EXT_F32_UNARY_F32(AtanF32);
-    VERIFY_OP_EXT_F32_BINARY_F32(Atan2F32);
-    VERIFY_OP_EXT_F32_UNARY_F32(CosF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(SinF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(ExpF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(Exp2F32);
-    VERIFY_OP_EXT_F32_UNARY_F32(ExpM1F32);
-    VERIFY_OP_EXT_F32_UNARY_F32(LogF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(Log10F32);
-    VERIFY_OP_EXT_F32_UNARY_F32(Log1pF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(Log2F32);
-    VERIFY_OP_EXT_F32_BINARY_F32(PowF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(RsqrtF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(SqrtF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(TanhF32);
-    VERIFY_OP_EXT_F32_UNARY_F32(ErfF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(AtanF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(Atan2F32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(CosF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(SinF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(ExpF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Exp2F32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(ExpM1F32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(LogF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Log10F32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Log1pF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Log2F32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(PowF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(RsqrtF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(SqrtF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(TanhF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(ErfF32);
 
     //===----------------------------------------------------------------===//
     // ExtF32: Casting and type conversion/emulation
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, CastSI32F32, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastSI32F32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F32, CastSI64F32, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastSI64F32, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F32, CastUI32F32, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastUI32F32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F32, CastUI64F32, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastUI64F32, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F32, CastF32SI32, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastF32SI32, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(EXT_F32, CastF32SI64, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastF32SI64, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
-    VERIFY_OP(EXT_F32, CastF32UI32, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastF32UI32, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(EXT_F32, CastF32UI64, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CastF32UI64, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
-    VERIFY_OP(EXT_F32, BitcastI32F32, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, BitcastI32F32, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F32, BitcastF32I32, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, BitcastF32I32, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Comparison ops
     //===----------------------------------------------------------------===//
 
-#define VERIFY_OP_EXT_F32_CMP_F32(op_name) \
-  VERIFY_OP(EXT_F32, op_name, {            \
-    VM_VerifyOperandRegF32(lhs);           \
-    VM_VerifyOperandRegF32(rhs);           \
-    VM_VerifyResultRegI32(result);         \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {            \
+    IREE_VM_ISA_DECODE_OPERAND_F32(lhs);               \
+    IREE_VM_ISA_DECODE_OPERAND_F32(rhs);               \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);             \
   });
 
-    VERIFY_OP_EXT_F32_CMP_F32(CmpEQF32O);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpEQF32U);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpNEF32O);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpNEF32U);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpLTF32O);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpLTF32U);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpLTEF32O);
-    VERIFY_OP_EXT_F32_CMP_F32(CmpLTEF32U);
-    VERIFY_OP(EXT_F32, CmpNaNF32, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpEQF32O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpEQF32U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpNEF32O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpNEF32U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpLTF32O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpLTF32U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpLTEF32O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_CMP_F32(CmpLTEF32U);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, CmpNaNF32, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF32: Buffers
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F32, BufferFillF32, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegF32(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, BufferFillF32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value);
     });
 
-    VERIFY_OP(EXT_F32, BufferLoadF32, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, BufferLoadF32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
 
-    VERIFY_OP(EXT_F32, BufferStoreF32, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegF32(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F32, BufferStoreF32, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_F32(value);
     });
 
     END_VERIFY_PREFIX(PrefixExtF32, iree_vm_FeatureBits_EXT_F32);
@@ -1919,209 +1954,210 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     // ExtF64: Globals
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, GlobalLoadF64, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyResultRegF64(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalLoadF64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_RESULT_F64(value);
     });
 
-    VERIFY_OP(EXT_F64, GlobalStoreF64, {
-      VM_VerifyGlobalAttr(byte_offset);
-      VM_VerifyRwdataOffset(byte_offset, 4);
-      VM_VerifyOperandRegF64(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalStoreF64, {
+      IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 
-    VERIFY_OP(EXT_F64, GlobalLoadIndirectF64, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalLoadIndirectF64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyResultRegF64(value);
+      IREE_VM_ISA_DECODE_RESULT_F64(value);
     });
 
-    VERIFY_OP(EXT_F64, GlobalStoreIndirectF64, {
-      VM_VerifyOperandRegI32(byte_offset);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalStoreIndirectF64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(byte_offset);
       // NOTE: we have to verify the offset at runtime.
-      VM_VerifyOperandRegF64(value);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Constants
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, ConstF64, {
-      VM_VerifyAttrF64(value);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, ConstF64, {
+      IREE_VM_ISA_DECODE_ATTR_F64(value);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
 
-    VERIFY_OP(EXT_F64, ConstF64Zero, { VM_VerifyResultRegF64(result); });
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, ConstF64Zero,
+                          { IREE_VM_ISA_DECODE_RESULT_F64(result); });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Lists
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, ListGetF64, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, ListGetF64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
 
-    VERIFY_OP(EXT_F64, ListSetF64, {
-      VM_VerifyOperandRegRef(list);
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegF64(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, ListSetF64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(list);
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Conditional assignment
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, SelectF64, {
-      VM_VerifyOperandRegI32(condition);
-      VM_VerifyOperandRegF64(true_value);
-      VM_VerifyOperandRegF64(false_value);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, SelectF64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(condition);
+      IREE_VM_ISA_DECODE_OPERAND_F64(true_value);
+      IREE_VM_ISA_DECODE_OPERAND_F64(false_value);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
 
-    VERIFY_OP(EXT_F64, SwitchF64, {
-      VM_VerifyOperandRegI32(index);
-      VM_VerifyOperandRegF64(default_value);
-      VM_VerifyVariadicOperandsF64(values);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, SwitchF64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(index);
+      IREE_VM_ISA_DECODE_OPERAND_F64(default_value);
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F64(values);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Native floating-point arithmetic
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP_EXT_F64_BINARY_F64(AddF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(SubF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(MulF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(DivF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(RemF64);
-    VERIFY_OP_EXT_F64_TERNARY_F64(FMAF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(AbsF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(NegF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(CeilF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(FloorF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(RoundF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(RoundF64Even);
-    VERIFY_OP_EXT_F64_BINARY_F64(MinF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(MaxF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(AddF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(SubF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(MulF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(DivF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(RemF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_TERNARY_F64(FMAF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(AbsF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(NegF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(CeilF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(FloorF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(RoundF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(RoundF64Even);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(MinF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(MaxF64);
 
-    VERIFY_OP_EXT_F64_UNARY_F64(AtanF64);
-    VERIFY_OP_EXT_F64_BINARY_F64(Atan2F64);
-    VERIFY_OP_EXT_F64_UNARY_F64(CosF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(SinF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(ExpF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(Exp2F64);
-    VERIFY_OP_EXT_F64_UNARY_F64(ExpM1F64);
-    VERIFY_OP_EXT_F64_UNARY_F64(LogF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(Log10F64);
-    VERIFY_OP_EXT_F64_UNARY_F64(Log1pF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(Log2F64);
-    VERIFY_OP_EXT_F64_BINARY_F64(PowF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(RsqrtF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(SqrtF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(TanhF64);
-    VERIFY_OP_EXT_F64_UNARY_F64(ErfF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(AtanF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(Atan2F64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(CosF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(SinF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(ExpF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Exp2F64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(ExpM1F64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(LogF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Log10F64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Log1pF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Log2F64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(PowF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(RsqrtF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(SqrtF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(TanhF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(ErfF64);
 
     //===----------------------------------------------------------------===//
     // ExtF64: Casting and type conversion/emulation
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, TruncF64F32, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegF32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, TruncF64F32, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F32(result);
     });
-    VERIFY_OP(EXT_F64, ExtF32F64, {
-      VM_VerifyOperandRegF32(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, ExtF32F64, {
+      IREE_VM_ISA_DECODE_OPERAND_F32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, CastSI32F64, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastSI32F64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, CastUI32F64, {
-      VM_VerifyOperandRegI32(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastUI32F64, {
+      IREE_VM_ISA_DECODE_OPERAND_I32(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, CastF64SI32, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastF64SI32, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(EXT_F64, CastF64UI32, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastF64UI32, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
-    VERIFY_OP(EXT_F64, CastSI64F64, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastSI64F64, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, CastUI64F64, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastUI64F64, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, CastF64SI64, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastF64SI64, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
-    VERIFY_OP(EXT_F64, CastF64UI64, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CastF64UI64, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
-    VERIFY_OP(EXT_F64, BitcastI64F64, {
-      VM_VerifyOperandRegI64(operand);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, BitcastI64F64, {
+      IREE_VM_ISA_DECODE_OPERAND_I64(operand);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
-    VERIFY_OP(EXT_F64, BitcastF64I64, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, BitcastF64I64, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I64(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Comparison ops
     //===----------------------------------------------------------------===//
 
-#define VERIFY_OP_EXT_F64_CMP_F64(op_name) \
-  VERIFY_OP(EXT_F64, op_name, {            \
-    VM_VerifyOperandRegF64(lhs);           \
-    VM_VerifyOperandRegF64(rhs);           \
-    VM_VerifyResultRegI32(result);         \
+#define IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F64, op_name, {            \
+    IREE_VM_ISA_DECODE_OPERAND_F64(lhs);               \
+    IREE_VM_ISA_DECODE_OPERAND_F64(rhs);               \
+    IREE_VM_ISA_DECODE_RESULT_I32(result);             \
   });
 
-    VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64O);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64U);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64O);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64U);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64O);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64U);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64O);
-    VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64U);
-    VERIFY_OP(EXT_F64, CmpNaNF64, {
-      VM_VerifyOperandRegF64(operand);
-      VM_VerifyResultRegI32(result);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64U);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64O);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64U);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, CmpNaNF64, {
+      IREE_VM_ISA_DECODE_OPERAND_F64(operand);
+      IREE_VM_ISA_DECODE_RESULT_I32(result);
     });
 
     //===----------------------------------------------------------------===//
     // ExtF64: Buffers
     //===----------------------------------------------------------------===//
 
-    VERIFY_OP(EXT_F64, BufferFillF64, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegI64HostSize(length);
-      VM_VerifyOperandRegF64(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, BufferFillF64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_I64(length);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 
-    VERIFY_OP(EXT_F64, BufferLoadF64, {
-      VM_VerifyOperandRegRef(source_buffer);
-      VM_VerifyOperandRegI64HostSize(source_offset);
-      VM_VerifyResultRegF64(result);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, BufferLoadF64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(source_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(source_offset);
+      IREE_VM_ISA_DECODE_RESULT_F64(result);
     });
 
-    VERIFY_OP(EXT_F64, BufferStoreF64, {
-      VM_VerifyOperandRegRef(target_buffer);
-      VM_VerifyOperandRegI64HostSize(target_offset);
-      VM_VerifyOperandRegF64(value);
+    IREE_VM_ISA_VERIFY_OP(EXT_F64, BufferStoreF64, {
+      IREE_VM_ISA_DECODE_OPERAND_REF(target_buffer);
+      IREE_VM_ISA_DECODE_OPERAND_I64(target_offset);
+      IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 
     END_VERIFY_PREFIX(PrefixExtF64, iree_vm_FeatureBits_EXT_F64);

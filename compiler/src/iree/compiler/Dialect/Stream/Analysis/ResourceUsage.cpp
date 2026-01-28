@@ -132,37 +132,50 @@ public:
 
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
-    if (!isValidState())
+    if (!isValidState()) {
       return "*";
+    }
     auto append = [&](const char *part) {
-      if (!str.empty())
+      if (!str.empty()) {
         str += '|';
+      }
       str += part;
     };
-    if (!this->isAssumed(NOT_INDIRECT))
+    if (!this->isAssumed(NOT_INDIRECT)) {
       append("indirect");
+    }
     append(this->isAssumed(NOT_EXTERNAL) ? "internal" : "external");
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
-    if (!this->isAssumed(NOT_CONSTANT))
+    if (!this->isAssumed(NOT_CONSTANT)) {
       append("constant");
-    if (!this->isAssumed(NOT_TRANSFER_READ))
+    }
+    if (!this->isAssumed(NOT_TRANSFER_READ)) {
       append("transfer_read");
-    if (!this->isAssumed(NOT_TRANSFER_WRITE))
+    }
+    if (!this->isAssumed(NOT_TRANSFER_WRITE)) {
       append("transfer_write");
-    if (!this->isAssumed(NOT_STAGING_READ))
+    }
+    if (!this->isAssumed(NOT_STAGING_READ)) {
       append("staging_read");
-    if (!this->isAssumed(NOT_STAGING_WRITE))
+    }
+    if (!this->isAssumed(NOT_STAGING_WRITE)) {
       append("staging_write");
-    if (!this->isAssumed(NOT_DISPATCH_READ))
+    }
+    if (!this->isAssumed(NOT_DISPATCH_READ)) {
       append("dispatch_read");
-    if (!this->isAssumed(NOT_DISPATCH_WRITE))
+    }
+    if (!this->isAssumed(NOT_DISPATCH_WRITE)) {
       append("dispatch_write");
-    if (!this->isAssumed(NOT_GLOBAL_READ))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_READ)) {
       append("global_read");
-    if (!this->isAssumed(NOT_GLOBAL_WRITE))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_WRITE)) {
       append("global_write");
-    if (!this->isAssumed(NOT_GLOBAL_STORAGE))
+    }
+    if (!this->isAssumed(NOT_GLOBAL_STORAGE)) {
       append("global_storage");
+    }
     return str.empty() ? "*" : str;
   }
 
@@ -250,8 +263,9 @@ private:
   // itself is under analysis.
   void updateFromDefiningOp(Value value, OpResult result, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(result.getType()))
+    if (!isa<IREE::Stream::ResourceType>(result.getType())) {
       return;
+    }
 
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::arith::SelectOp op) {
@@ -510,6 +524,41 @@ private:
                 getState() ^= tiedUsage.getState();
               }
             })
+        .Case([&](IREE::Stream::AsyncParameterLoadOp op) {
+          removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+          removeAssumedBits(NOT_TRANSFER_WRITE);
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getTarget()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= targetUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getSource()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= sourceUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+          removeAssumedBits(NOT_TRANSFER_WRITE);
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getTarget()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= targetUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getSource()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= sourceUsage.getState();
+        })
         .Default([&](Operation *op) {});
   }
 
@@ -517,8 +566,9 @@ private:
   // This walks through tied uses as well.
   void updateFromUse(Value value, OpOperand &operand, DFX::Solver &solver) {
     // Some tied uses route through ops that change types - ignore those.
-    if (!isa<IREE::Stream::ResourceType>(operand.get().getType()))
+    if (!isa<IREE::Stream::ResourceType>(operand.get().getType())) {
       return;
+    }
 
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
@@ -864,6 +914,26 @@ private:
                 getState() ^= resultUsage.getState();
               }
             })
+        .Case([&](IREE::Stream::AsyncParameterReadOp op) {
+          removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterWriteOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+        })
+        .Case([&](IREE::Stream::AsyncParameterGatherOp op) {
+          removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
+        })
+        .Case([&](IREE::Stream::AsyncParameterScatterOp op) {
+          removeAssumedBits(NOT_TRANSFER_READ);
+        })
         .Case([&](IREE::Stream::YieldOp op) {
           // Take on the traits of the result of the parent operation.
           Value result = op->getParentOp()->getResult(operandIdx);
@@ -910,14 +980,7 @@ private:
 const char ValueResourceUsage::ID = 0;
 
 ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
-    : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
-  explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-      TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
-  explorer.setDialectAction<IREE::Stream::StreamDialect>(
-      TraversalAction::RECURSE);
+    : explorer(rootOp, TraversalAction::RECURSE), solver(explorer, allocator) {
   // Ignore the contents of executables (linalg goo, etc).
   explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
   explorer.initialize();
@@ -929,8 +992,9 @@ std::optional<ResourceUsageBitfield>
 ResourceUsageAnalysis::tryLookupResourceUsage(Value value) {
   auto resourceUsage =
       solver.lookupElementFor<ValueResourceUsage>(Position::forValue(value));
-  if (!resourceUsage)
+  if (!resourceUsage) {
     return std::nullopt;
+  }
   return resourceUsage->getAssumedUsage();
 }
 

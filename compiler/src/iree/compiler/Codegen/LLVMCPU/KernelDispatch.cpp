@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -20,6 +21,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -49,6 +51,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <numeric>
+#include <optional>
 
 #define DEBUG_TYPE "kernel-dispatch"
 
@@ -75,23 +78,34 @@ static llvm::cl::opt<int>
                           llvm::cl::desc("default distribution tile size"),
                           llvm::cl::init(64));
 
-static llvm::cl::opt<int> clNarrowMatmulTileBytes(
-    "iree-llvmcpu-narrow-matmul-tile-bytes",
+static llvm::cl::opt<int> clMatmulTileBytes(
+    "iree-llvmcpu-matmul-tile-bytes",
     llvm::cl::desc(
-        "target distribution tile size for wide matrix operand of narrow "
-        "matmuls, expressed in bytes. Currently only used in data-tiled "
-        "matmuls (mmt4d). Since this is only used for narrow matmuls, which "
-        "traverse their wide matrix operand once, there is no reuse here and "
-        "this doesn't have to be sized to fit in some CPU cache. This is more "
-        "about distributing work to threads."),
-    llvm::cl::init(64 * 1024));
+        "default target distribution tile size for matrix operands of general "
+        "matmuls, in bytes, when tuning is not used. Currently only used in "
+        "data-tiled matmuls. Users are encouraged to look into "
+        "tuning instead: iree.dev/reference/tuning. Otherwise, this value can "
+        "be used for coarse tuning. Lower values can help use more threads, "
+        "can improve codegen in fusions and can help fit into smaller caches. "
+        "Larger values can help utilize larger caches. There is no universal "
+        "rule linking the optimal value to the size of a particular cache. "
+        "Even on one particular system, the ideal value will be sometimes "
+        "smaller than L2 cache size, sometimes larger than L2 cache size, "
+        "depending on the whole workload, with isolated large matmuls more "
+        "likely to benefit from a larger value, which is why ultimately only "
+        "tuning can find optimal values."),
+    llvm::cl::init(256 * 1024));
 
-static llvm::cl::opt<int> clGeneralMatmulTileBytes(
-    "iree-llvmcpu-general-matmul-tile-bytes",
-    llvm::cl::desc("target distribution tile size for matrix operands of "
-                   "general matmuls, expressed in bytes. Currently only used "
-                   "in data-tiled matmuls (mmt4d)."),
-    llvm::cl::init(64 * 1024));
+static llvm::cl::opt<float> clMatmulTileUndercountWholeMatrix(
+    "iree-llvmcpu-matmul-tile-undercount-whole-matrix",
+    llvm::cl::desc(
+        "It is worth going a little over the iree-llvmcpu-matmul-tile-bytes "
+        "limit when that allows fitting a whole matrix in one tile, since this "
+        "allows repeated traversals. This factor controls by how much we are "
+        "willing to underaccount tile bytes for that purpose. For example, "
+        "a value of 0.5 means that we would go as high as 2x the limit if that "
+        "allowed fitting all matrix operands in one tile each."),
+    llvm::cl::init(0.5f));
 
 static llvm::cl::opt<bool> clDisableVectorPeeling(
     "iree-llvmcpu-disable-vector-peeling",
@@ -198,8 +212,9 @@ static void getRangeBounds(TilingInterface op, SmallVectorImpl<int64_t> &lb,
   SmallVector<Range> loopRange = op.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     std::optional<int64_t> intVal = getConstantIntValue(ofr);
-    if (!intVal)
+    if (!intVal) {
       return ShapedType::kDynamic;
+    }
     return intVal.value();
   };
   lb = llvm::map_to_vector(loopRange,
@@ -329,8 +344,9 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
 static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
-  if (!elementType.isIntOrFloat())
+  if (!elementType.isIntOrFloat()) {
     return 1;
+  }
   unsigned byteWidth = IREE::Util::getRoundedElementByteWidth(elementType);
   return getVectorSize(entryPointFn, byteWidth);
 }
@@ -382,12 +398,14 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
   for (auto [index, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
     // of the corresponding loop to the vector size.
-    if (map.getNumResults() == 0)
+    if (map.getNumResults() == 0) {
       continue;
+    }
     auto fastestVaryingDimExpr =
         dyn_cast<AffineDimExpr>(map.getResults().back());
-    if (!fastestVaryingDimExpr)
+    if (!fastestVaryingDimExpr) {
       continue;
+    }
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
 
     // If the indexing map has result it has to be a shaped type.
@@ -769,10 +787,10 @@ static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
       }
 
       if (oldVal == 0) {
-        // Skip updating tile sizes of 0, we want to preserve these values.
-        if (!bounds.empty()) {
-          // If we have enough information about the upper bound of this tile
-          // size, use it.
+        // Skip updating tile sizes of 0, we want to preserve these values. If
+        // we do not have enough information about the upper bound of this tile
+        // size, don't use it.
+        if (!bounds.empty() && !ShapedType::isDynamic(bounds[loopNum])) {
           tileBits[i] *= bounds[loopNum];
         }
       } else {
@@ -920,8 +938,9 @@ getDefaultDistributedLevelTileSizes(Operation *op,
   // Final fix up of the tile sizes to make sure that they divide the problem
   // size to make it vectorizable.
   for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
-    if (!distributedTileSizes[i])
+    if (!distributedTileSizes[i]) {
       continue;
+    }
     distributedTileSizes[i] = getMaxDistributionTileSize(
         lbs[i], ubs[i], distributedTileSizes[i], adjustedMinTileSizes[i],
         config.allowIncompleteTile);
@@ -947,12 +966,14 @@ static void splitParallelAndReductionTiles(
        llvm::enumerate(tilingOp.getLoopIteratorTypes())) {
     if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
-      if (reductionScalableFlags)
+      if (reductionScalableFlags) {
         (*reductionScalableFlags)[index] = false;
+      }
     } else {
       parallelSizes[index] = 0;
-      if (parallelScalableFlags)
+      if (parallelScalableFlags) {
         (*parallelScalableFlags)[index] = false;
+      }
     }
   }
 }
@@ -962,8 +983,9 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
   SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, size, iterType] :
        llvm::enumerate(staticLoopRanges, op.getIteratorTypesArray())) {
-    if (ShapedType::isStatic(size))
+    if (ShapedType::isStatic(size)) {
       continue;
+    }
     vecTileSizes[index] = 1;
   }
   LDBG() << "Set always-vectorize sizes: " << vecTileSizes;
@@ -1369,8 +1391,9 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
   // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
   // hence the extra rounding up.
   for (auto [index, size] : llvm::enumerate(roundedVecTileSizes)) {
-    if (!size)
+    if (!size) {
       continue;
+    }
     roundedVecTileSizes[index] =
         roundUpToPow2(size,
                       /*predicate=*/inputVecScalableTileFlags[index]);
@@ -1498,8 +1521,9 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   }
   assert(!inputAndOutputElementTypes.empty() &&
          "expected linalg op to have input and output types");
-  if (!llvm::all_equal(inputAndOutputElementTypes))
+  if (!llvm::all_equal(inputAndOutputElementTypes)) {
     return failure();
+  }
   return inputAndOutputElementTypes[0];
 }
 
@@ -1519,8 +1543,9 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
     mlir::FunctionOpInterface entryPointFn, linalg::LinalgOp op,
     int64_t vectorSize, SmallVectorImpl<int64_t> &sizes,
     SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (sizes.empty())
+  if (sizes.empty()) {
     getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+  }
 
   // Find the smallest type size in the matmul.
   SmallVector<Type> matmulTypes;
@@ -1531,11 +1556,13 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
 
   int64_t minSize = std::numeric_limits<int64_t>::max();
   for (Type mmType : matmulTypes) {
-    if (auto shType = dyn_cast<ShapedType>(mmType))
+    if (auto shType = dyn_cast<ShapedType>(mmType)) {
       mmType = shType.getElementType();
+    }
 
-    if (mmType.isSignlessIntOrFloat())
+    if (mmType.isSignlessIntOrFloat()) {
       minSize = std::min(minSize, int64_t{mmType.getIntOrFloatBitWidth()});
+    }
   }
 
   LDBG() << "Smallest type found: " << minSize << " bits";
@@ -1564,14 +1591,16 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
                           linalg::LinalgOp op, int64_t vectorSize,
                           SmallVectorImpl<int64_t> &sizes,
                           SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (sizes.empty())
+  if (sizes.empty()) {
     getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+  }
   // TODO: support widening matmul.
   // Determines n dimension tile size with VLEN for
   // nonWideningLinalgElementType.
   FailureOr<Type> elementType = nonWideningLinalgElementType(op);
-  if (failed(elementType))
+  if (failed(elementType)) {
     return;
+  }
 
   // nativeVectorSize is cacluated with VLEN and LMUL=2.
   int64_t nativeVectorSize = getNativeVectorSizeInBytes(entryPointFn);
@@ -1588,8 +1617,9 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
   }
   FailureOr<linalg::ContractionDimensions> cDims =
       linalg::inferContractionDims(op);
-  if (failed(cDims) || cDims->m.size() != 1)
+  if (failed(cDims) || cDims->m.size() != 1) {
     return;
+  }
   // Use 7 x lmul4 to fully utilize vector registers.
   sizes[0] = 7;
   // Calculate tile size for the main vector dimension (N).
@@ -1617,12 +1647,14 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
   // Double-check the operation is one that is supported for lowering to ArmSME.
   Operation *rawOp = op.getOperation();
   if (!(IREE::LinalgExt::isPureMatmul(rawOp) ||
-        isa<linalg::MatmulTransposeAOp>(rawOp)))
+        isa<linalg::MatmulTransposeAOp>(rawOp))) {
     return;
+  }
 
   auto elementType = nonWideningLinalgElementType(op);
-  if (failed(elementType))
+  if (failed(elementType)) {
     return;
+  }
 
   // TODO(macdue): Come up with some heuristics to pick the appropriate tiling
   // for SME, i.e. optimal layout based on static sizes.
@@ -1873,72 +1905,256 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
                              vecPreProcStrategy);
 }
 
-static IREE::Codegen::LoweringConfigAttrInterface
-getMmt4dLoweringConfig(linalg::LinalgOp op) {
-  DistributionHeuristicConfig distConfig;
-  distConfig.allowIncompleteTile = true;
-  distConfig.minTileSizes.resize(op.getNumLoops(), 0);
-  distConfig.maxTileSizes.resize(op.getNumLoops(), 0);
+// Utility function to return the result inner tile sizes associated with the
+// mmt4d op. I.e. returns the M0 and N0 dimensions of the result shape
+// BxM1xN1xM0xN0. It also explicitly checks for scalable dimensions of the form
+// %cst * vscale, returns the constant and sets the scalable flag of the
+// corresponding dimension to true. For example, if we have the inner tile sizes
+// [8, 8*vscale], this method returns [8, 8] as tile sizes and [false, true] as
+// scalable flags.
+// TODO: By using the IterationDimTracker, extend the logic to
+// infer all inner tile sizes - including the inner K dimension, if possible.
+static std::optional<SizesAndScalableFlags>
+getMmt4dInnerTileSizes(linalg::LinalgOp op) {
+  Value destValue = op.getDpsInitOperand(0)->get();
+  ArrayRef<int64_t> destShape =
+      cast<ShapedType>(destValue.getType()).getShape();
+  // In case of static tiles, we just return the last two dim sizes.
+  if (ShapedType::isStaticShape(destShape)) {
+    return SizesAndScalableFlags{destShape.take_back(2),
+                                 IREE::Codegen::ScalableTileFlags(2, false)};
+  }
+  Operation *destOp = destValue.getDefiningOp();
+  SmallVector<OpFoldResult> innerDims;
+  // Currently, the only init tensor of the mmt4d seems to be linalg.fill ops
+  // or the bindings. Otherwise, bail out.
+  // TODO: implement ShapeAwareOpInterface for tensor.empty and track the IR
+  // until it reaches an operation that implements that interface instead of
+  // hard-coding these ops.
+  if (!isa_and_present<linalg::FillOp, IREE::TensorExt::DispatchTensorLoadOp>(
+          destOp)) {
+    LDBG() << "Mmt4d with non-fill or tensor load init buffer, cannot infer "
+              "inner tile sizes!";
+    return std::nullopt;
+  }
+  if (auto fillOp = dyn_cast<linalg::FillOp>(destOp)) {
+    auto emptyOp = dyn_cast<tensor::EmptyOp>(
+        fillOp.getDpsInitOperand(0)->get().getDefiningOp());
+    if (!emptyOp) {
+      LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
+      return std::nullopt;
+    }
+    innerDims = emptyOp.getMixedSizes();
+  }
+  if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
+    innerDims = loadOp.getMixedSizes();
+  }
+  // We only need the innermost M0 and N0 dims.
+  innerDims.erase(innerDims.begin(), innerDims.end() - 2);
+  return getScalableTileSizesAndFlags(innerDims);
+}
 
+// Adjusts the tile sizes and scalable flags for SVE in-place.
+// Returns false if it does not need to adjust tile sizes.
+static bool adjustVectorSizesForScalableVectorization(
+    linalg::LinalgOp op, DictionaryAttr targetConfig, int64_t m0, int64_t n0,
+    SmallVectorImpl<int64_t> &vecTileSizes,
+    IREE::Codegen::ScalableTileFlags &vecScalableTileFlags) {
+  int64_t mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  std::optional<SizesAndScalableFlags> scalableInnerTilesAndFlags =
+      getMmt4dInnerTileSizes(op);
+  if (!scalableInnerTilesAndFlags) {
+    LDBG() << "Scalable tile sizes cannot be inferred!";
+    return false;
+  }
+  // TODO: Enable materialization and add corresponding mechanisms for SME.
+  if (hasSMEFeature(targetConfig) && !clDisableArmSMETiling) {
+    LDBG() << "SME is not supported yet!";
+    return false;
+  }
+  if (hasAnySVEFeature(targetConfig) && ShapedType::isDynamic(n0)) {
+    // Set the corresponding scalable tile size and flag for the inner N
+    // dimension, i.e. N0 from the iteration domain ([b,] M1, N1, K1, M0, N0,
+    // K0). The inner M dimension is not considered here, because SVE currently
+    // only makes the N dimension scalable.
+    vecTileSizes[mmt4dDimBase + 4] =
+        scalableInnerTilesAndFlags.value().first[1];
+    vecScalableTileFlags[mmt4dDimBase + 4] =
+        scalableInnerTilesAndFlags.value().second[1];
+    return true;
+  }
+  return false;
+}
+
+// Given a positive integer `n`, returns a list of all pairs of positive
+// integers `(a, b)` such that `a * b = n`, sorted by increasing `a`.
+//
+// The current single user (getMmt4dLoweringConfig) does not strongly rely on
+// the sorting. The sorting only affects tie-breaks in its selection of a tile
+// candidate, as the first tile considered takes precedence in case of a tie.
+// The purpose of sorting is thus only to prevent implementation changes in this
+// function from resulting in observable differences. It's also cheap anyway.
+static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
+  SmallVector<std::pair<int64_t, int64_t>> divisors;
+  for (int64_t i = 1; i * i <= n; ++i) {
+    int64_t j = n / i;
+    if (i * j == n) {
+      divisors.push_back({i, j});
+      if (j != i) {
+        divisors.push_back({j, i});
+      }
+    }
+  }
+  llvm::sort(divisors, llvm::less_first{});
+  return divisors;
+}
+
+static IREE::Codegen::LoweringConfigAttrInterface
+getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   Value lhs = op.getDpsInputs()[0];
   Value rhs = op.getDpsInputs()[1];
-  ShapedType lhsType = cast<ShapedType>(lhs.getType());
-  ShapedType rhsType = cast<ShapedType>(rhs.getType());
-  int mmt4dDimBase = 0;
-  if (isa<linalg::BatchMmt4DOp>(op)) {
-    mmt4dDimBase = 1;
-    distConfig.minTileSizes[0] = 1;
-    distConfig.maxTileSizes[0] = 1; // Force batch dimension tile size 1.
+  Value acc = op.getDpsInits()[0];
+
+  const ShapedType lhsType = cast<ShapedType>(lhs.getType());
+  const ShapedType rhsType = cast<ShapedType>(rhs.getType());
+  const ShapedType accType = cast<ShapedType>(acc.getType());
+  const int lhsTypeBits = lhsType.getElementTypeBitWidth();
+  const int rhsTypeBits = rhsType.getElementTypeBitWidth();
+  const int accTypeBits = accType.getElementTypeBitWidth();
+
+  SmallVector<int64_t> distTileSizes(op.getNumLoops(), 0);
+  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  if (mmt4dDimBase == 1) {
+    distTileSizes[0] = 1;
   }
-  distConfig.minTileSizes[mmt4dDimBase + 0] = 1;
-  distConfig.minTileSizes[mmt4dDimBase + 1] = 1;
-  auto lhsShape = lhsType.getShape();
-  auto rhsShape = rhsType.getShape();
-  int64_t M1 = lhsShape[mmt4dDimBase + 0];
-  int64_t N1 = rhsShape[mmt4dDimBase + 0];
-  int64_t K1 = lhsShape[mmt4dDimBase + 1];
+  const auto lhsShape = lhsType.getShape();
+  const auto rhsShape = rhsType.getShape();
   int64_t M0 = lhsShape[mmt4dDimBase + 2];
   int64_t N0 = rhsShape[mmt4dDimBase + 2];
   int64_t K0 = lhsShape[mmt4dDimBase + 3];
-  // Unfortunately we have to compute some tile size at compile-time, even
-  // though that can't be done meaningfully in general, unless specializing the
-  // compilation to fine details of the runtime workload including number of
-  // threads and cache sizes. Another thing that we need to know and can't
-  // really know at compile time is the values of dynamic sizes. Here we have to
-  // guess a reasonable default for the reduction dimension size.
-  int64_t reductionSize = ShapedType::isDynamic(K1) ? 1024 : K0 * K1;
-  auto getMatmulTileSize = [](int64_t targetTileBytes, int bitWidth,
-                              int64_t reductionSize, int64_t tile0Size) {
-    int64_t targetRhsTileElems = targetTileBytes * 8 / bitWidth;
-    int64_t targetRhsTileNSize = targetRhsTileElems / reductionSize;
-    int64_t tileSize = llvm::divideCeil(targetRhsTileNSize, tile0Size);
-    tileSize = std::max(tileSize, int64_t{1});
-    return tileSize;
-  };
-  int64_t tileBytes =
-      (M1 == 1 || N1 == 1) ? clNarrowMatmulTileBytes : clGeneralMatmulTileBytes;
-  distConfig.maxTileSizes[mmt4dDimBase + 0] =
-      M1 == 1 ? 1
-              : getMatmulTileSize(tileBytes, lhsType.getElementTypeBitWidth(),
-                                  reductionSize, M0);
-  distConfig.maxTileSizes[mmt4dDimBase + 1] =
-      N1 == 1 ? 1
-              : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
-                                  reductionSize, N0);
+  int64_t M1 = lhsShape[mmt4dDimBase + 0];
+  int64_t N1 = rhsShape[mmt4dDimBase + 0];
+  int64_t K1 = lhsShape[mmt4dDimBase + 1];
 
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, distConfig);
+  //
+  // Part 1: set the vectorization tile sizes, vecTileSizes.
+  // Normally these are just the M0, N0, K0 dimension sizes, as long as these
+  // are static. The difficulty is the possibility of dynamic tile sizes, which
+  // currently occurs with Arm SVE. In that case, these dimensions need to be
+  // resolved to static upper bounds. This needs to happen before we get to
+  // distribution tiles (Part 2) because the latter depends on the vectorization
+  // tile sizes.
+  //
+
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
   vecTileSizes[mmt4dDimBase + 3] = M0;
   vecTileSizes[mmt4dDimBase + 4] = N0;
   vecTileSizes[mmt4dDimBase + 5] = K0;
-  limitVectorTileSizes(op, vecTileSizes);
+  IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
+                                                        false);
+  bool scalableTilesFound = false;
+  // If scalable vectorization is enabled, adjust the vector tile sizes and the
+  // corresponding scalable flags.
+  if (targetConfig && isScalableVectorizationEnabled()) {
+    scalableTilesFound = adjustVectorSizesForScalableVectorization(
+        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
+  }
+  // In the existence of scalable tiles, we do not yet support limiting vector
+  // sizes as this assumes static tile sizes.
+  // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
+  if (!scalableTilesFound) {
+    limitVectorTileSizes(op, vecTileSizes);
+  }
+  // Query back the final M0, N0, K0 values.
+  M0 = vecTileSizes[mmt4dDimBase + 3];
+  N0 = vecTileSizes[mmt4dDimBase + 4];
+  K0 = vecTileSizes[mmt4dDimBase + 5];
+  // By now, if any of these is still dynamic, that's an internal bug.
+  assert(!ShapedType::isDynamic(M0) && !ShapedType::isDynamic(N0) &&
+         !ShapedType::isDynamic(K0));
+
+  //
+  // Part 2: set the distribution tile sizes, distTileSizes.
+  // These are tilings along the M1, N1, K1 dimensions. We do not currently tile
+  // the K (reduction) dimension on CPU, so this is effectively only the tilings
+  // of the M1 and N1 dimensions. To avoid incurring padding or requiring
+  // mixed tiles, we select the tile sizes among the divisors of M1, N1.
+  //
+
+  const int64_t kTypicalDynamicSize = 1024;
+  if (ShapedType::isDynamic(M1)) {
+    M1 = kTypicalDynamicSize / M0;
+  }
+  if (ShapedType::isDynamic(N1)) {
+    N1 = kTypicalDynamicSize / N0;
+  }
+  if (ShapedType::isDynamic(K1)) {
+    K1 = kTypicalDynamicSize / K0;
+  }
+  // By now, all 6 size parameters {M,N,K}{0,1} are static.
+  assert(!ShapedType::isDynamic(M1) && !ShapedType::isDynamic(N1) &&
+         !ShapedType::isDynamic(K1));
+
+  const int64_t M = M0 * M1;
+  const int64_t N = N0 * N1;
+
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(M1);
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(N1);
+
+  // Helper to associate a cost to a candidate pair or tile sizes along the M
+  // and N dimensions.
+  auto evalTraversalCost = [=](int64_t numTilesM,
+                               int64_t numTilesN) -> int64_t {
+    // The cost model is a lower bound on the amount of data
+    // that will need to be loaded over the entire matmul. Note that each matrix
+    // (LHS, RHS) is traversed a number of times equal to the number of tiles
+    // of the opposite (RHS, LHS) matrix.
+    return numTilesN * M * lhsTypeBits + numTilesM * N * rhsTypeBits;
+  };
+
+  int64_t selectedTileM = 1;
+  int64_t selectedTileN = 1;
+  int64_t selectedCost = evalTraversalCost(M1, N1);
+
+  // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
+  for (auto [tileM, numTilesM] : divisorsOfM1) {
+    for (auto [tileN, numTilesN] : divisorsOfN1) {
+      // Compute candidate tile size in bytes.
+      int64_t lhsBytes = tileM * M0 * K1 * K0 * lhsTypeBits / 8;
+      int64_t rhsBytes = tileN * N0 * K1 * K0 * rhsTypeBits / 8;
+      int64_t accBytes = tileM * N0 * tileN * M0 * accTypeBits / 8;
+      // Adjust the tile size to favor fitting whole matrices in one tile.
+      if (numTilesM == 1) {
+        lhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numTilesN == 1) {
+        rhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numTilesM == 1 && numTilesN == 1) {
+        accBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      // Filter out too-large tiles.
+      if (lhsBytes + rhsBytes + accBytes > clMatmulTileBytes) {
+        continue;
+      }
+      // Evaluate the cost model and retain the better candidate.
+      int64_t candidateCost = evalTraversalCost(numTilesM, numTilesN);
+      if (candidateCost < selectedCost) {
+        selectedCost = candidateCost;
+        selectedTileM = tileM;
+        selectedTileN = tileN;
+      }
+    }
+  }
+  // Finally store the preferred tile shape.
+  distTileSizes[mmt4dDimBase + 0] = selectedTileM;
+  distTileSizes[mmt4dDimBase + 1] = selectedTileN;
 
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
-  generator.setVectorTileSizes(vecTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);
   return generator.generateCPULoweringConfig();
 }
 
@@ -1947,8 +2163,12 @@ getMmt4dLoweringConfig(linalg::LinalgOp op) {
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
   assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, mmt4dOp, getMmt4dLoweringConfig(mmt4dOp),
+      entryPointFn, mmt4dOp, getMmt4dLoweringConfig(mmt4dOp, targetConfig),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
@@ -1958,8 +2178,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::BatchMmt4DOp batchMmt4dOp) {
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, batchMmt4dOp, getMmt4dLoweringConfig(batchMmt4dOp),
+      entryPointFn, batchMmt4dOp,
+      getMmt4dLoweringConfig(batchMmt4dOp, targetConfig),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
@@ -2004,6 +2229,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int srcRank = op.getSourceRank();
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  // Try to infer scalable tile sizes. This is a no-op in case of static inner
+  // tiles or if dynamic tile sizes are found, but scalable tile sizes cannot be
+  // inferred.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(op.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+  }
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
 
@@ -2021,8 +2253,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // but it does not know that it is working on packed domain. We need to take
   // inner tile sizes into account and adjust the distribution tile sizes.
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
       continue;
+    }
     distTileSizes[pos] = distTileSizes[pos] / size;
     distTileSizes[pos] = std::max(distTileSizes[pos], int64_t{1});
   }
@@ -2059,34 +2292,62 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
 
-  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  IREE::Codegen::ScalableTileFlags scalableFlags(innerTiles.size(), false);
+  // Try to infer scalable tile sizes and flags. This is a no-op in case of
+  // static inner tiles or if dynamic tile sizes are found, but scalable tile
+  // sizes and flags cannot be inferred.
+  std::optional<SizesAndScalableFlags> sizesAndScalableFlags =
+      getScalableTileSizesAndFlags(op.getMixedTiles());
+  if (sizesAndScalableFlags) {
+    innerTiles = sizesAndScalableFlags->first;
+    scalableFlags = sizesAndScalableFlags->second;
+  }
+  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
+  // In case of scalable tile sizes, we align the distribution tile size with
+  // the static constant of the scalable tile size and round up to the next
+  // power of 2. Since vscale is a power of 2, this makes sure
+  // that the selected distribution size is divisible by or less than the
+  // effective scalable inner tile size.
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
       continue;
-    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
+    }
+    int64_t alignedTileSize = llvm::alignTo(distTileSizes[pos], size);
+    distTileSizes[pos] = roundUpToPow2(alignedTileSize, scalable);
   }
 
   SmallVector<int64_t> vecTileSizes(op.getDestRank(), 1);
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    vecTileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
+  IREE::Codegen::ScalableTileFlags vecScalableFlags(op.getDestRank(), false);
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+    if (ShapedType::isDynamic(size)) {
+      continue;
+    }
+    vecTileSizes[pos] = size;
+    vecScalableFlags[pos] = scalable;
   }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
   // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
-  // backends prefer to not decompose the ops.
+  // backends, as well as the aarch64 backend in case of scalable inner tiles,
+  // prefer to not decompose the ops.
+  // TODO: Enable scalable vectorization of unpack ops and adjust the below
+  // condition to account for dynamic and scalable inner tiles separately.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  bool hasDynamicInnerTile =
+  bool hasDynamicOrScalableInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && target && !isX86(target.getConfiguration()) &&
+  if (!hasDynamicOrScalableInnerTile && target &&
+      !isX86(target.getConfiguration()) &&
       !isRISCV(target.getConfiguration())) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
-  generator.setVectorTileSizes(vecTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
@@ -2381,8 +2642,9 @@ static void getTransposeX86VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     ArrayRef<int64_t> minTileSizes, SmallVectorImpl<int64_t> &sizes) {
   if (!targetAttr || !hasAVX2Feature(targetAttr.getConfiguration()) ||
-      !x86TransposeLoweringPrecondition(genericOp))
+      !x86TransposeLoweringPrecondition(genericOp)) {
     return;
+  }
 
   if (llvm::count_if(minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
@@ -2422,12 +2684,14 @@ static void getTransposeX86VectorSizes(
 static void getTransposeAArch64VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableFlags) {
-  if (!targetAttr || !isLinalgGeneric2DTranspose(genericOp))
+  if (!targetAttr || !isLinalgGeneric2DTranspose(genericOp)) {
     return;
+  }
 
   auto elementType = nonWideningLinalgElementType(genericOp);
-  if (failed(elementType))
+  if (failed(elementType)) {
     return;
+  }
 
   if (hasSMEFeature(targetAttr.getConfiguration()) &&
       isScalableVectorizationEnabled() && !clDisableArmSMETiling) {
@@ -2460,12 +2724,14 @@ getTransposeVectorSizes(mlir::FunctionOpInterface entryPointFn,
                                    scalableFlags);
   }
 
-  if (tileSizes.empty())
+  if (tileSizes.empty()) {
     return std::nullopt;
+  }
 
   // If scalable flags are empty, assume target doesn't care about scalability.
-  if (scalableFlags.empty())
+  if (scalableFlags.empty()) {
     scalableFlags = SmallVector<bool>(tileSizes.size(), false);
+  }
 
   LDBG() << "Transpose vector sizes: " << tileSizes;
   LDBG() << "Transpose vector scalable flags: " << scalableFlags;
@@ -2482,15 +2748,17 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
 
-  if (!linalgOpInfo.isTranspose())
+  if (!linalgOpInfo.isTranspose()) {
     return failure();
+  }
 
   LDBG() << "Setting transpose-like op root configuration";
 
   std::optional<SizesAndScalableFlags> vecDims = getTransposeVectorSizes(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  if (!vecDims)
+  if (!vecDims) {
     return failure();
+  }
 
   auto [vecSizes, vecScalableDims] = *vecDims;
 
@@ -2528,10 +2796,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   LDBG() << "Setting elementwise generic op root configuration";
 
   unsigned numLoops = genericOp.getNumLoops();
-  if (numLoops == 0)
+  if (numLoops == 0) {
     return failure();
-  if (!linalg::isElementwise(genericOp))
+  }
+  if (!linalg::isElementwise(genericOp)) {
     return failure();
+  }
 
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
@@ -2658,13 +2928,15 @@ enum class Conv2DDimOrder {
 
 static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
   if (isa<linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp,
-          linalg::PoolingNchwMaxOp>(op))
+          linalg::PoolingNchwMaxOp>(op)) {
     return Conv2DDimOrder::Nchw;
+  }
   if (isa<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
           linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
           linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-          linalg::DepthwiseConv2DNhwcHwcOp>(op))
+          linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
     return Conv2DDimOrder::Nhwc;
+  }
   llvm::llvm_unreachable_internal("unsupported conv op");
 }
 
@@ -2751,42 +3023,54 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
   if (targetAttr) {
     DictionaryAttr targetConfig = targetAttr.getConfiguration();
     if (isX86(targetConfig)) {
-      if (is2DConvOp(op))
+      if (is2DConvOp(op)) {
         return {1, 1, 8, vectorSize, 1, 1, 8};
-      if (is2DDepthConvOp(op))
+      }
+      if (is2DDepthConvOp(op)) {
         return {1, 1, 8, vectorSize, 1, 3};
-      if (is2DPoolingOp(op))
+      }
+      if (is2DPoolingOp(op)) {
         return {1, 1, 8, vectorSize, 1, 8};
+      }
       llvm_unreachable("unsupported conv");
     }
     if (isRISCV(targetConfig)) {
-      if (is2DConvOp(op))
+      if (is2DConvOp(op)) {
         return {1, 1, 8, vectorSize * 2, 1, 1, 8};
-      if (is2DDepthConvOp(op))
+      }
+      if (is2DDepthConvOp(op)) {
         return {1, 1, 8, vectorSize, 1, 3};
-      if (is2DPoolingOp(op))
+      }
+      if (is2DPoolingOp(op)) {
         return {1, 1, 8, vectorSize * 2, 1, 8};
+      }
       llvm_unreachable("unsupported conv");
     }
     if (isAArch64(targetConfig)) {
-      if (is2DConvOp(op))
+      if (is2DConvOp(op)) {
         return {1, 1, 32, 64, 1, 1, 16};
-      if (is2DDepthConvOp(op))
+      }
+      if (is2DDepthConvOp(op)) {
         return {1, 1, 4, 4, 1, 4};
-      if (is2DPoolingOp(op))
+      }
+      if (is2DPoolingOp(op)) {
         return {1, 1, 32, 64, 1, 16};
+      }
       llvm_unreachable("unsupported conv");
     }
   }
 
   // Get default hard-coded tile sizes if we couldn't compute anything
   // better.
-  if (is2DConvOp(op))
+  if (is2DConvOp(op)) {
     return {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
-  if (is2DDepthConvOp(op))
+  }
+  if (is2DDepthConvOp(op)) {
     return {1, 1, vectorSize, vectorSize, 1, vectorSize};
-  if (is2DPoolingOp(op))
+  }
+  if (is2DPoolingOp(op)) {
     return {1, 1, vectorSize, vectorSize, 1, vectorSize};
+  }
   llvm_unreachable("unsupported conv");
 }
 
@@ -2937,20 +3221,34 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 ///
 /// Steps:
 /// 1. Divide the tile sizes of inner dimensions by the corresponding inner
-///    tile factors (ignores dynamic sizes).
+///    tile factors. Handles static and scalable sizes but ignores dynamic
+///    sizes.
 /// 2. Apply the outer dimension permutation, if present.
 static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                              SmallVector<int64_t> &tileSizes,
                                              SmallVector<bool> &scalableFlags) {
-  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
+  SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
+  // Infer scalable tile sizes and flags if present.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+    innerTileScalableFlags = sizesAndScalableFlags->second;
+  }
   ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
   // First scale tile sizes by dividing by the inner tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(innerDimPos, innerTiles, innerTileScalableFlags)) {
+    // Ignore non-scalable dynamic sizes.
     if (ShapedType::isDynamic(size)) {
       continue;
     }
     tileSizes[pos] /= size;
+    // Division by vscale by setting the scalable flag to false.
+    if (scalable) {
+      scalableFlags[pos] = false;
+    }
   }
   // Then apply dimension permutation if present.
   if (!outerDimsPerm.empty()) {
@@ -2967,12 +3265,20 @@ static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
 /// 1. Undo the outer dimension permutation, if present, by applying the
 ///    inverted permutation.
 /// 2. Multiply the inner dimension tile sizes by the corresponding inner
-///    tile factors (ignores dynamic sizes).
+///    tile factors. Handles static and scalable tile sizes but ignores dynamic
+///    sizes.
 static void
 undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                      SmallVector<int64_t> &tileSizes,
                                      SmallVector<bool> &scalableFlags) {
-  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
+  SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
+  // Infer scalable tile sizes and flags if present.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
+    innerTiles = sizesAndScalableFlags->first;
+    innerTileScalableFlags = sizesAndScalableFlags->second;
+  }
   ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
   // First undo dimension permutation if present.
@@ -2981,12 +3287,16 @@ undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
     applyPermutationToVector(tileSizes, invertedPerm);
     applyPermutationToVector(scalableFlags, invertedPerm);
   }
-  // Then unscale tile sizes by multiplying the inner tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+  // Then unscale tile sizes by multiplying the inner tile sizes and setting the
+  // corresponding scalable flags to true.
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(innerDimPos, innerTiles, innerTileScalableFlags)) {
+    // Ignore non-scalable dynamic inner tile sizes.
     if (ShapedType::isDynamic(size)) {
       continue;
     }
     tileSizes[pos] *= size;
+    scalableFlags[pos] = scalableFlags[pos] || scalable;
   }
 }
 
@@ -3073,7 +3383,7 @@ private:
   /// As a result, the Pack op expects its producer (potentially the root op) to
   /// use tile sizes `[1, 16]` for those two dimensions, enabling tile-and-fuse
   /// optimizations.
-  SmallVector<int64_t>
+  SizesAndScalableFlags
   getVecTileSizesForNonRootPackOp(mlir::FunctionOpInterface entryPointFn,
                                   linalg::PackOp packOp);
 
@@ -3081,7 +3391,7 @@ private:
   /// help fusion. Dynamic sizes are replaced with 0 to indicate that tiling
   /// size is unknown. Note: the method is designed for fusion cases in
   /// data-tiling, like `matmul->generic->unpack`.
-  SmallVector<int64_t>
+  SizesAndScalableFlags
   getVecTileSizesForNonRootUnPackOp(linalg::UnPackOp unpackOp);
 
   /// Returns tile sizes for a non-root `GenericOp`.
@@ -3107,6 +3417,10 @@ private:
   // Store the vector parallel tile sizes preferred by non-root operations.
   // Operation -> (global loop dimension index -> tile size)
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> nonRootOpVecTileSizes;
+
+  // Store the vector parallel scalable flags preferred by non-root operations.
+  // Operation -> (global loop dimension index -> scalable flag)
+  llvm::SmallDenseMap<Operation *, SmallVector<bool>> nonRootOpScalableFlags;
 };
 
 std::unique_ptr<MultiLoweringConfigGenerator>
@@ -3198,10 +3512,11 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
       continue;
     }
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-      nonRootOpVecTileSizes[op] =
+      std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
           getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      nonRootOpVecTileSizes[op] = getVecTileSizesForNonRootUnPackOp(unpackOp);
+      std::tie(nonRootOpVecTileSizes[op], nonRootOpScalableFlags[op]) =
+          getVecTileSizesForNonRootUnPackOp(unpackOp);
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
@@ -3226,24 +3541,39 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
           updater(globalTileSizes[level][globalDimIdx], size);
     }
   };
+  auto adjustScalableFlags = [&](Operation *op, ArrayRef<bool> scalableFlags,
+                                 IREE::CPU::TilingLevel level,
+                                 llvm::function_ref<bool(bool, bool)> updater) {
+    for (auto [pos, flag] : llvm::enumerate(scalableFlags)) {
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+      if (!flag || !llvm::is_contained(rootOpGlobalDims, globalDimIdx)) {
+        continue;
+      }
+      globalScalableTileFlags[level][globalDimIdx] =
+          updater(globalScalableTileFlags[level][globalDimIdx], flag);
+    }
+  };
   auto align = [](int64_t oldSize, int64_t newSize) {
     return llvm::alignTo(oldSize, newSize);
   };
-  auto overwrite = [](int64_t oldSize, int64_t newSize) { return newSize; };
+  auto overwrite = [](auto oldVal, auto newVal) { return newVal; };
   // Adjust root op tiling sizes with non-root op.
   for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
     if (isa<linalg::PackOp>(op)) {
       // For pack op, align the distribution tile size and overwrite the
-      // vector parallel tile size.
+      // vector parallel tile size and scalable flag.
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
+      adjustScalableFlags(op, nonRootOpScalableFlags.lookup(op),
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+                          overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-      // For unpack op, just overwrite the vector parallel tile size.
-      // However, dimension tracking is expected be broken in the case of
-      // `generic -> unpack`, since only the unpacked dimensions are propagated.
-      // To correct this, use the generic op result indexing map to update the
-      // tracking.
+      // For unpack op, just overwrite the vector parallel tile size and the
+      // scalable flag. However, dimension tracking is expected be broken in the
+      // case of `generic -> unpack`, since only the unpacked dimensions are
+      // propagated. To correct this, use the generic op result indexing map to
+      // update the tracking.
       //
       // Example: If the generic op result has an affine map
       //          (d0, d1, d2, d3) -> (d0, d1, d2, d3),
@@ -3255,17 +3585,23 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
       AffineMap indexingMap = linalgOp.getIndexingMapMatchingResult(
           cast<OpResult>(unpackOp.getSource()));
       SmallVector<int64_t> adjustedTileSize(linalgOp.getNumLoops(), 0);
-      for (auto [expr, tileSize] : llvm::zip_equal(
+      SmallVector<bool> adjustedScalableFlags(linalgOp.getNumLoops(), false);
+      SmallVector<bool> scalableFlags = nonRootOpScalableFlags.lookup(op);
+      for (auto [expr, tileSize, flag] : llvm::zip_equal(
                indexingMap.getResults().take_back(vecTileSize.size()),
-               vecTileSize)) {
+               vecTileSize, scalableFlags)) {
         auto dimExpr = dyn_cast<AffineDimExpr>(expr);
         if (!dimExpr) {
           continue;
         }
         adjustedTileSize[dimExpr.getPosition()] = tileSize;
+        adjustedScalableFlags[dimExpr.getPosition()] = flag;
       }
       adjust(linalgOp.getOperation(), adjustedTileSize,
              IREE::CPU::TilingLevel::VectorCommonParallelTiles, overwrite);
+      adjustScalableFlags(linalgOp.getOperation(), adjustedScalableFlags,
+                          IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+                          overwrite);
     }
   }
 
@@ -3315,6 +3651,12 @@ void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
       // Only set the tile size if it hasn't been assigned yet.
       if (tile == 0 && size > 0) {
         tile = size;
+        auto it = nonRootOpScalableFlags.find(op);
+        if (it != nonRootOpScalableFlags.end() && pos < it->second.size()) {
+          globalScalableTileFlags
+              [IREE::CPU::TilingLevel::VectorCommonParallelTiles]
+              [globalDimIdx] = it->second[pos];
+        }
       }
     }
   }
@@ -3437,7 +3779,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
   }
 }
 
-SmallVector<int64_t>
+SizesAndScalableFlags
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
     mlir::FunctionOpInterface entryPointFn, linalg::PackOp packOp) {
   SmallVector<int64_t> vecTileSizes =
@@ -3445,21 +3787,27 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   SmallVector<bool> scalableFlags(vecTileSizes.size(), false);
   // Invert the Pack op's `outer_dims_perm` on `vecTileSizes` and
   // `scalableFlags`, then multiply `vecTileSizes` by the Pack op's
-  // `inner_tiles`.
+  // `inner_tiles` and set the corresponding `scalableFlags`.
   undoScaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags);
-  return vecTileSizes;
+  return {vecTileSizes, scalableFlags};
 }
 
-SmallVector<int64_t>
+SizesAndScalableFlags
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootUnPackOp(
     linalg::UnPackOp unpackOp) {
+  // If we have static or scalable inner tile sizes, return these.
+  if (auto sizesAndScalableFlags =
+          getScalableTileSizesAndFlags(unpackOp.getMixedTiles())) {
+    return *sizesAndScalableFlags;
+  }
+  // In case we have dynamic inner tile sizes, zero these out.
   SmallVector<int64_t> vecTileSizes(unpackOp.getStaticInnerTiles());
   for (auto &size : vecTileSizes) {
     if (ShapedType::isDynamic(size)) {
       size = 0;
     }
   }
-  return vecTileSizes;
+  return {vecTileSizes, SmallVector<bool>(vecTileSizes.size(), false)};
 }
 
 SmallVector<int64_t>
@@ -3506,10 +3854,13 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
 
   bool foundUnPackOp = false;
   SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
+  IREE::Codegen::ScalableTileFlags vecParallelScalableTileFlags(
+      linalgOp.getNumLoops(), false);
   for (OpOperand *opOperand : linalgOp.getDpsInputOperands()) {
     auto unpackOp = opOperand->get().getDefiningOp<linalg::UnPackOp>();
-    if (!unpackOp)
+    if (!unpackOp) {
       continue;
+    }
 
     foundUnPackOp = true;
     auto idxMap = linalgOp.getMatchingIndexingMap(opOperand);
@@ -3517,33 +3868,60 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
     LDBG() << "The corresponding indexing map is: " << idxMap;
 
     SmallVector<int64_t> innerTiles = unpackOp.getStaticTiles();
+    IREE::Codegen::ScalableTileFlags scalableFlags(innerTiles.size(), false);
+    std::optional<SizesAndScalableFlags> sizesAndScalableFlags =
+        getScalableTileSizesAndFlags(unpackOp.getMixedTiles());
+    if (sizesAndScalableFlags) {
+      innerTiles = sizesAndScalableFlags->first;
+      scalableFlags = sizesAndScalableFlags->second;
+    }
     ArrayRef<int64_t> dimPos = unpackOp.getInnerDimsPos();
-    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-      if (ShapedType::isDynamic(size))
+    for (auto [pos, size, scalable] :
+         llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+      if (ShapedType::isDynamic(size)) {
         continue;
+      }
       auto dimExpr = dyn_cast<AffineDimExpr>(idxMap.getResult(pos));
-      if (!dimExpr)
+      if (!dimExpr) {
         return failure();
+      }
       int mappedPos = dimExpr.getPosition();
       alignedSizes[mappedPos] = std::lcm(alignedSizes[mappedPos], size);
+      vecParallelScalableTileFlags[mappedPos] = scalable;
     }
   }
 
-  if (!foundUnPackOp)
+  if (!foundUnPackOp) {
     return success();
+  }
 
   LDBG() << "The tile sizes for each dimension should be aligned to "
          << alignedSizes;
 
-  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  // Fixup for making tileSizes be multiple of inner_tile_sizes. In case of
+  // scalable inner tiles, we align the distribution tile sizes with the static
+  // constant of the scalable inner tile size and round up to the next power of
+  // 2 to ensure alignment.
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       loweringConfig.getAvailableTilingInfo();
   for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
     SmallVector<int64_t> &tileSizes = info.sizes;
     for (auto idx : llvm::seq<int64_t>(0, tileSizes.size())) {
-      if (tileSizes[idx] == 0)
+      if (tileSizes[idx] == 0) {
         continue;
-      tileSizes[idx] = llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
+      }
+      int64_t alignedTileSize =
+          llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
+      tileSizes[idx] = roundUpToPow2(
+          alignedTileSize,
+          vecParallelScalableTileFlags[idx] &&
+              info.level == IREE::CPU::TilingLevel::DistributionTiles);
+    }
+    // Fixup for the scalable tile flags.
+    if (info.level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
+      for (auto [idx, scalable] : enumerate(vecParallelScalableTileFlags)) {
+        info.scalableFlags[idx] |= scalable;
+      }
     }
   }
 
@@ -3710,13 +4088,15 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
                                 ArrayRef<Operation *> computeOps) {
   // Make sure that lowering_config is not preset on any compute ops.
   for (auto computeOp : computeOps) {
-    if (getLoweringConfig(computeOp))
+    if (getLoweringConfig(computeOp)) {
       return failure();
+    }
   }
 
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp))
+  if (failed(rootOp)) {
     return failure();
+  }
   Operation *rootOperation = rootOp.value();
 
   // Handle the case with no known root operation.

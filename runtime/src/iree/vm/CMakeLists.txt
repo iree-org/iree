@@ -129,6 +129,7 @@ iree_cc_library(
   HDRS
     "native_module_test.h"
   DEPS
+    ::cc
     ::impl
     iree::base
   PUBLIC

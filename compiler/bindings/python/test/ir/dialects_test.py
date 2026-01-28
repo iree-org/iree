@@ -58,6 +58,7 @@ from iree.compiler.dialects import (
     util,
     iree_codegen,
     iree_gpu,
+    iree_tensor_ext,
     preprocessing_transform,
 )
 
@@ -162,51 +163,51 @@ def gpu_pipeline_options_attr():
     assert reorder_attr.value == iree_gpu.ReorderWorkgroupsStrategy.Transpose
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
-        True,
+        2,
         False,
         False,
         reorder_attr,
     )
     assert type(gpu_attr) is iree_gpu.PipelineOptionsAttr
-    assert gpu_attr.prefetch_shared_memory
+    assert gpu_attr.prefetch_num_stages == 2
     assert not gpu_attr.no_reduce_shared_memory_bank_conflicts
     assert not gpu_attr.use_igemm_convolution
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
-        False,
+        0,
         True,
         True,
         iree_gpu.ReorderWorkgroupsStrategyAttr.get(
             iree_gpu.ReorderWorkgroupsStrategy.Transpose
         ),
     )
-    assert not gpu_attr.prefetch_shared_memory
+    assert gpu_attr.prefetch_num_stages == 0
     assert gpu_attr.no_reduce_shared_memory_bank_conflicts
     assert gpu_attr.use_igemm_convolution
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get()
     assert (
-        gpu_attr.prefetch_shared_memory is None
+        gpu_attr.prefetch_num_stages is None
         and gpu_attr.no_reduce_shared_memory_bank_conflicts is None
         and gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True)
-    assert gpu_attr.prefetch_shared_memory
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2)
+    assert gpu_attr.prefetch_num_stages == 2
     assert (
         gpu_attr.no_reduce_shared_memory_bank_conflicts is None
         and gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True, False)
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2, False)
     assert (
         gpu_attr.use_igemm_convolution is None
         and gpu_attr.reorder_workgroups_strategy is None
     )
 
-    gpu_attr = iree_gpu.PipelineOptionsAttr.get(True, False, False)
+    gpu_attr = iree_gpu.PipelineOptionsAttr.get(2, False, False)
     assert gpu_attr.reorder_workgroups_strategy is None
 
     gpu_attr = iree_gpu.PipelineOptionsAttr.get(
@@ -216,7 +217,7 @@ def gpu_pipeline_options_attr():
         gpu_attr.no_reduce_shared_memory_bank_conflicts is not None
         and not gpu_attr.no_reduce_shared_memory_bank_conflicts
     )
-    assert gpu_attr.prefetch_shared_memory is None
+    assert gpu_attr.prefetch_num_stages is None
     assert gpu_attr.use_igemm_convolution is None
     assert gpu_attr.reorder_workgroups_strategy is None
 
@@ -688,6 +689,17 @@ def gpu_target_info_constructor_error_cases():
         assert False, "Expected TypeError for wrong MMA intrinsic object type"
     except TypeError:
         pass
+
+
+# ======================================================================
+# IREE TensorExt Dialect
+# ======================================================================
+
+
+@run
+def iree_tensor_ext_smoke_test():
+    # Make sure that generated op bindings are accessible.
+    assert issubclass(iree_tensor_ext.ComputeBarrierStartOp, ir.OpView)
 
 
 # ======================================================================

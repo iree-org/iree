@@ -99,7 +99,7 @@ EXPORTS
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
-  ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory
+  ireeGPUPipelineOptionsAttrGetPrefetchNumStages
   ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy
   ireeGPUPipelineOptionsAttrGetTypeID
   ireeGPUPipelineOptionsAttrGetUseIgemmConvolution

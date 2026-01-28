@@ -176,3 +176,27 @@ func.func @linalg_ext_gather_masked(%source : tensor<?x128xi32>, %indices : tens
 //  CHECK: %[[MASK:.+]] = vector.create_mask %[[DIM_UB]], %[[C128]]
 //  CHECK: iree_vector_ext.transfer_gather %[[SOURCE]]
 //  CHECK-SAME: %[[MASK]]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [64, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @vectorize_to_layout(%A: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %AL = iree_vector_ext.to_layout %A to layout(#layout) : tensor<64x64xf32>
+  return %AL : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @vectorize_to_layout
+// CHECK-SAME: %[[AT:.+]]: tensor<64x64xf32>
+// CHECK: %[[A_READ:.+]] = vector.transfer_read %[[AT]]
+// CHECK: %[[A:.+]] = iree_vector_ext.to_layout %[[A_READ]]
+// CHECK: %[[A_WRITE:.+]] = vector.transfer_write %[[A]], %[[AT]]

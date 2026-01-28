@@ -26,7 +26,6 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToArmSME/VectorToArmSME.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
-#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -619,7 +618,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass)
       // (HAL, IREE, Linalg, CF) -> LLVM
       .addPass(memref::createFoldMemRefAliasOpsPass)
-      .addPass(affine::createAffineExpandIndexOpsPass)
+      .addPass(createIREECodegenAffineExpandIndexOpsPass)
       .addPass([&]() {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
@@ -631,7 +630,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPredicatedPass(clInstrumentMemoryAccesses,
-                         createInstrumentMemoryAccessesPass);
+                         createInstrumentMemoryAccessesPass)
+      .addPass(createConvertUnsupportedFloatArithPass);
 
   if (enableAArch64SME) {
     FunctionLikeNest(modulePassManager).addPass([&] {
@@ -702,7 +702,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   }
 
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createLowerAffinePass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
+  variantPassManager.addPass(createIREECodegenLowerAffinePass());
   variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   // Run conversion to LLVM at `ModuleOp` granularity.

@@ -193,6 +193,10 @@ void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 /// `tensor.expand_shape(tensor.extract_slice)`.
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 
+/// Populate pattern to fold `tensor.extract_slice(linalg.broadcast)` into the
+/// broadcast input when the extract_slice undoes the broadcast.
+void populateFoldExtractSliceOfBroadcastPattern(RewritePatternSet &patterns);
+
 /// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
 /// `tensor.collapse_shape(tensor.extract_slice)`.
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
@@ -206,6 +210,20 @@ void populateCombineRelayoutOpPatterns(
 
 /// Populate patterns to fuse tilable consumers of forall ops into it.
 void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
+
+//===----------------------------------------------------------------------===//
+// Utilities for iteration space expansion transformations
+//===----------------------------------------------------------------------===//
+
+/// Helper struct to hold the expand/collapse shape ops created for dimension
+/// expansion or blocking transformations.
+struct ReshapeOps {
+  tensor::ExpandShapeOp expandShapeOp;
+  tensor::CollapseShapeOp collapseShapeOp;
+};
+
+/// Populate patterns to remove optimization barriers.
+void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

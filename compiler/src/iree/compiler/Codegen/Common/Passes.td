@@ -99,9 +99,21 @@ def ConvertBf16ToUInt16BuffersPass :
 def ConvertUnsupportedFloatArithPass
     : InterfacePass<"iree-convert-unsupported-float-arith",
                     "mlir::FunctionOpInterface"> {
-  let summary = "Convert arith operations on unsupported(source types) float "
-                "types to the target type. Populates the source and target "
-                "based on the target architecture.";
+  let summary = "Emulate arith operations on unsupported float types (e.g., fp8).";
+  let description = [{
+    Emulates floating-point operations on types not natively supported by the
+    target backend. The pass:
+
+    1. Wraps unsupported float operations with extf/truncf pairs to perform
+       arithmetic in a supported type (e.g., f32).
+
+    2. For CPU targets, emulates extf/truncf operations themselves using integer
+       bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.
+
+    The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
+    IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
+    NaN, Inf, and special encodings (FNUZ types).
+  }];
 }
 
 def ConvertToDestinationPassingStylePass :
@@ -121,6 +133,26 @@ def ConvertToDestinationPassingStylePass :
            "bool", /*default=*/"false",
            "WAR for failure in Cooperative matrix codegen pipelines. See #10648.">
   ];
+}
+
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let description = [{
+    Converts `scf.forall` ops with `#iree_codegen.workgroup_mapping` attributes
+    to `pcf.loop` ops with workgroup scope.
+
+    The input is IR containing `scf.forall` ops mapped to workgroups via
+    `#iree_codegen.workgroup_mapping<x/y/z>` attributes. The pass linearizes
+    all workgroup IDs down to a single dimension to handle cases where multiple
+    foralls have incompatible delinearization bases.
+
+    The output replaces each matching forall with a `pcf.loop` using
+    `#iree_codegen.workgroup_scope<linearize>` scope. Additionally, an
+    `iree_codegen.workgroup_count_hint` is inserted before each loop to
+    communicate the required workgroup count to the export's count region.
+  }];
+  let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
 }
 
 def CombineLayoutTransformationPass :
@@ -150,6 +182,7 @@ def CombineLayoutTransformationPass :
   ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
   ];
@@ -307,6 +340,92 @@ def ReconcileTranslationInfoPass
   ];
 }
 
+def ResolveWorkgroupCountHintsPass
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Materialize workgroup count hints in the workgroup count region per export.";
+  let description = [{
+    Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
+    agreeable workgroup count per export. This pass performs a depth-first walk
+    of the target variant's call graph constructing the necessary information to
+    materialize workgroup count hints for that function.
+
+    #### Supported IR Structure
+
+    The pass expects executable variants containing exports with associated
+    entry point functions. Each entry point function (or functions it calls)
+    may contain `iree_codegen.workgroup_count_hint` ops:
+
+    ```mlir
+    hal.executable.export @entry_point
+        count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %workload
+      hal.return %x, %y, %z : index, index, index
+    }
+    module {
+      func.func @entry_point(%device: !hal.device) {
+        %workload = iree_tensor_ext.dispatch.workload.ordinal %val, 0 : index
+        iree_codegen.workgroup_count_hint sizes(%workload)
+      }
+    }
+    ```
+
+    #### Supported Control Flow
+
+    The pass handles the following control flow patterns:
+
+    1. **Direct hints**: Workgroup count hints directly in entry point functions.
+
+    2. **Transitive function calls**: Hints in functions called (directly or
+       transitively) from the entry point. The backward slice of operands
+       required to compute the hint is tracked across call boundaries.
+
+    3. **Conditional hints (`scf.if`)**: When hints are wrapped in `scf.if`
+       operations, the conditions are preserved in the workgroup count region
+       if possible.
+       ```mlir
+       %o0 = iree_tensor_ext.dispatch.workload.ordinal ...
+       %o1 = iree_tensor_ext.dispatch.workload.ordinal ...
+       %cond = arith.cmpi ..., %o0, %o1
+       scf.if %cond {
+         iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+       } else {
+         iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+       }
+       ```
+       This generates an `scf.if` in the workgroup count region rather than
+       pessimistically taking the maximum.
+
+    #### Resolution of Multiple Hints
+
+    When multiple `workgroup_count_hint` ops contribute to the same export
+    (either directly or through function calls), the final workgroup count
+    is computed as the **elementwise maximum** across all hints:
+
+    ```mlir
+    // Given:
+    iree_codegen.workgroup_count_hint sizes(%x, %y, %z)
+    iree_codegen.workgroup_count_hint sizes(%a, %b, %c)
+
+    // Resolves to:
+    %wx = arith.maxsi %x, %a
+    %wy = arith.maxsi %y, %b
+    %wz = arith.maxsi %z, %c
+    hal.return %wx, %wy, %wz
+    ```
+
+    #### Backward Slice Requirements
+
+    The backward slice of hint operands must consist only of:
+    - `iree_tensor_ext.dispatch.workload.ordinal` ops (leaf values)
+    - Pure/side-effect-free operations
+    - Function arguments (for transitive call support)
+
+    Operations with memory effects or that depend on device-local values
+    (e.g., `hal.interface.*` ops, workgroup/thread IDs) result in a compiler
+    error for hint operands and omit conditionals for `scf.if` operands.
+  }];
+}
+
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =
@@ -388,6 +507,11 @@ def FlattenMemRefSubspanPass : Pass<"iree-codegen-flatten-memref-subspan", "Modu
     on subspan ops to the consumer load/store ops, in preparation for lowering
     to backends that require linearized access.
   }];
+}
+
+def FlattenSwizzleHintAllocsPass :
+    InterfacePass<"iree-codegen-flatten-swizzle-hint-allocs", "mlir::FunctionOpInterface"> {
+  let summary = "Flattens allocations associated with iree_codegen.swizzle_hint ops";
 }
 
 def FoldAffineMinInDistributedLoopsPass :
@@ -503,6 +627,11 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
+def IREECodegenAffineExpandIndexOpsPass :
+    Pass<"iree-codegen-affine-expand-index-ops", ""> {
+  let summary = "Expand affine index ops with region simplification config";
+}
+
 def IREECodegenCanonicalizerPass :
     Pass<"iree-codegen-canonicalize", ""> {
   let summary = "Codegen canonicalization pass with IREE specific patterns";
@@ -510,6 +639,16 @@ def IREECodegenCanonicalizerPass :
     Option<"testConvergence", "test-convergence", "bool",
            /*default=*/"false", "Fails if the patterns fail to converge">
   ];
+}
+
+def IREECodegenFoldMemRefAliasOpsPass :
+    Pass<"iree-codegen-fold-memref-alias-ops", ""> {
+  let summary = "Fold memref alias ops with region simplification config";
+}
+
+def IREECodegenLowerAffinePass :
+    Pass<"iree-codegen-lower-affine", ""> {
+  let summary = "Lower affine operations to standard with region simplification config";
 }
 
 def IREEComprehensiveBufferizePass :
@@ -758,6 +897,21 @@ def PropagateReshapesByExpansionPass :
 def RematerializeParallelOpsPass :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";
+}
+
+def RemoveIndexHintsPass :
+    InterfacePass<"iree-codegen-remove-index-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Remove iree_codegen.index_hint operations";
+  let description = [{
+    This pass removes all iree_codegen.index_hint operations by replacing
+    them with their input values (pass-through semantics).
+
+    Index hints are used to convey optimization information to downstream
+    passes and should be cleaned up once that information has been consumed.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect"
+  ];
 }
 
 def RemoveSingleIterationLoopPass :

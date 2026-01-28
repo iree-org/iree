@@ -30,7 +30,7 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 
 // CHECK-LABEL: func.func @expanded_matmul_transpose_b(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
 
 // Verify that the fill does not have the lowering config propagated to it.
 //       CHECK:   linalg.fill ins
@@ -67,7 +67,7 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 
 // CHECK-LABEL: func.func @multi_dim_mma_schedule(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -104,7 +104,7 @@ func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: t
 
 // CHECK-LABEL: func.func @dynamic_multi_dim_mma_schedule(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
@@ -125,7 +125,7 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
 
 // Verify that the fill does not have the lowering config propagated to it.
 //       CHECK:   linalg.fill ins
@@ -305,7 +305,7 @@ func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
 
 // CHECK-LABEL: func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
+//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     reduction = [0, 0, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 0]
@@ -322,7 +322,7 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x8x577xf32>, %r
 
 // CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul(
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
-// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:     reduction = [0, 0, 0, 1]
 // CHECK-SAME:     subgroup = [0, 1, 2, 0]
@@ -419,7 +419,7 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 
 // CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:      padding = [1, 64, 128, 4]
 // CHECK-SAME:      promote_operands = [0, 1]
@@ -442,7 +442,7 @@ func.func @unaligned_matmul_nn_layout(%lhs : tensor<513x513xf16>, %rhs : tensor<
 
 // CHECK-LABEL: func.func @unaligned_matmul_nn_layout(
 // CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:      padding = [64, 128, 16]
@@ -1068,3 +1068,108 @@ func.func @producer_broadcasted_and_stored_to_buffer2(%arg0: tensor<4xi64>, %arg
 //       CHECK:     reduction = [0, 4]
 //  CHECK-SAME:     thread = [1, 0]
 //  CHECK-SAME:     workgroup = [64, 0]
+
+// -----
+// This test is to check that we c promote in such cases since we have codegen issues with this case
+// see https://github.com/iree-org/iree/issues/23038
+func.func @unaligned_matmul_biasadd(%lhs : tensor<513x513xf16>, %rhs : tensor<513x513xf16>, %bias : tensor<513x513xf32>) -> tensor<513x513xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<513x513xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<513x513xf16>, tensor<513x513xf16>) outs(%fill : tensor<513x513xf32>) -> tensor<513x513xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+         ins(%mm, %bias : tensor<513x513xf32>, tensor<513x513xf32>) outs(%empty : tensor<513x513xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<513x513xf32>
+    return %mm : tensor<513x513xf32>
+}
+// CHECK-LABEL: func.func @unaligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+// Dont c promote if the shape is aligned even with bias add.
+func.func @aligned_matmul_biasadd(%lhs : tensor<512x512xf16>, %rhs : tensor<512x512xf16>, %bias : tensor<512x512xf32>) -> tensor<512x512xf32> {
+    %c0 = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<512x512xf32>
+    %fill = linalg.fill ins(%c0 : f32) outs(%empty : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<512x512xf16>, tensor<512x512xf16>) outs(%fill : tensor<512x512xf32>) -> tensor<512x512xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>,
+                                          affine_map<(d0, d1) -> (d0, d1)>],
+                        iterator_types = ["parallel", "parallel"]}
+        ins(%mm, %bias : tensor<512x512xf32>, tensor<512x512xf32>) outs(%empty : tensor<512x512xf32>)   {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %18 = arith.addf %in, %in_0 : f32
+      linalg.yield %18 : f32
+    }  -> tensor<512x512xf32>
+    return %mm : tensor<512x512xf32>
+}
+
+// CHECK-LABEL: func.func @aligned_matmul_biasadd(
+//           CHECK: promote_operands = [0, 1]
+
+// -----
+
+// Currently falls back to non-MMA path since MMA intrinsics require matching
+// operand types.
+func.func @mixed_precision_matmul_f32xbf16(%lhs: tensor<16x64xf32>, %rhs: tensor<64x32xbf16>) -> tensor<16x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x32xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x32xf32>) -> tensor<16x32xf32>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d2, d1)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<16x64xf32>, tensor<64x32xbf16>)
+    outs(%fill : tensor<16x32xf32>) {
+  ^bb0(%in: f32, %in_0: bf16, %out: f32):
+    %0 = arith.extf %in_0 : bf16 to f32
+    %1 = arith.mulf %in, %0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<16x32xf32>
+  return %result : tensor<16x32xf32>
+}
+
+// CHECK-LABEL: func.func @mixed_precision_matmul_f32xbf16(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//   CHECK-NOT:     mma_kind
+
+// -----
+
+func.func @gemm_with_dps_init_producer(
+    %lhs: tensor<127x512xf32>, %rhs: tensor<63x512xf32>,
+    %init: tensor<127x63xf32>) -> tensor<127x63xf32> {
+  %cst1 = arith.constant 1.0 : f32
+  %0 = tensor.empty() : tensor<127x63xf32>
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%init : tensor<127x63xf32>) outs(%0 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %add = arith.addf %in, %cst1 : f32
+    linalg.yield %add : f32
+  } -> tensor<127x63xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                     affine_map<(d0, d1, d2) -> (d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<127x512xf32>, tensor<63x512xf32>) outs(%1 : tensor<127x63xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.mulf %in, %in_0 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<127x63xf32>
+  return %2 : tensor<127x63xf32>
+}
+
+//     CHECK-LABEL: gemm_with_dps_init_producer
+//           CHECK: promote_operands = [0, 1, 2]

@@ -180,3 +180,48 @@ module {
 }
 // CHECK-LABEL: func @test_cache_swizzle_promotion
 //  CHECK-SAME:   promotion_types = [#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>]
+
+module {
+  func.func @test_lane_constant() attributes {
+      lane_constant = #iree_gpu.lane_constant<16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_constant
+//  CHECK-SAME:   lane_constant = #iree_gpu.lane_constant<16>
+
+module {
+  func.func @test_lane_increment() attributes {
+      lane_increment = #iree_gpu.lane_increment<16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<16>
+
+module {
+  func.func @test_lane_increment_with_step() attributes {
+      lane_increment = #iree_gpu.lane_increment<16, step = 2>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment_with_step
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<16, step = 2>
+
+module {
+  func.func @test_lane_increment_aligned() attributes {
+      lane_increment = #iree_gpu.lane_increment<64, aligned>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment_aligned
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<64, aligned>
+
+module {
+  func.func @test_lane_increment_step_and_aligned() attributes {
+      lane_increment = #iree_gpu.lane_increment<64, step = 2, aligned>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lane_increment_step_and_aligned
+//  CHECK-SAME:   lane_increment = #iree_gpu.lane_increment<64, step = 2, aligned>

@@ -52,8 +52,6 @@ public:
 
   // Creates a string with the given string contents (including zeros).
   flatbuffers_string_ref_t createString(StringRef value) {
-    if (value.empty())
-      return 0;
     return flatbuffers_string_create(*this, value.data(), value.size());
   }
 
@@ -63,8 +61,9 @@ public:
     auto stringRefs = llvm::map_to_vector<8>(Range, [&](StringRef value) {
       return flatbuffers_string_create(*this, value.data(), value.size());
     });
-    if (stringRefs.empty())
+    if (stringRefs.empty()) {
       return 0;
+    }
     return flatbuffers_string_vec_create(*this, stringRefs.data(),
                                          stringRefs.size());
   }
@@ -72,8 +71,9 @@ public:
   // Creates an offset vector with the given values. The source values will not
   // be modified.
   flatbuffers_vec_ref_t createOffsetVec(ArrayRef<flatcc_builder_ref_t> values) {
-    if (values.empty())
+    if (values.empty()) {
       return 0;
+    }
     return flatcc_builder_create_offset_vector(*this, values.data(),
                                                values.size());
   }
@@ -83,8 +83,9 @@ public:
   // serialization but be much faster.
   flatbuffers_vec_ref_t
   createOffsetVecDestructive(SmallVectorImpl<flatcc_builder_ref_t> &values) {
-    if (values.empty())
+    if (values.empty()) {
       return 0;
+    }
     return flatcc_builder_create_offset_vector_direct(*this, values.data(),
                                                       values.size());
   }
@@ -92,8 +93,9 @@ public:
   // Creates an [int32] vec with the contents of the given range.
   template <typename RangeTy>
   flatbuffers_int32_vec_ref_t createInt32Vec(RangeTy &&Range) {
-    if (Range.empty())
+    if (Range.empty()) {
       return 0;
+    }
     flatbuffers_int32_vec_start(*this);
     for (int32_t v : Range) {
       flatbuffers_int32_vec_push_create(*this, v);

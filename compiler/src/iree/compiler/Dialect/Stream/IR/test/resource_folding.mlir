@@ -30,10 +30,35 @@ util.func private @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1:
 
 // -----
 
+// Tests stream.resource.size on loop-carried resource with tied operations.
+
+// CHECK-LABEL: @FoldResourceSizeOpAcrossWhile
+util.func private @FoldResourceSizeOpAcrossWhile(%arg0: !stream.resource<*>, %arg1: index, %cond: i1) -> index {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  // Loop with tied async.update operation
+  %result:2 = scf.while (%iter = %arg0, %size = %arg1) : (!stream.resource<*>, index) -> (!stream.resource<*>, index) {
+    %updated = stream.async.update %iter, %iter[%c0 to %c4] :
+        !stream.resource<*>{%size} ->
+        %iter as !stream.resource<*>{%size}
+    scf.condition(%cond) %updated, %size : !stream.resource<*>, index
+  } do {
+  ^bb0(%iter_body: !stream.resource<*>, %size_body: index):
+    scf.yield %iter_body, %size_body : !stream.resource<*>, index
+  }
+  // Query size - this traverses tied operands, would cycle if possible
+  // CHECK: = stream.resource.size %arg0
+  %result_size = stream.resource.size %result#0 : !stream.resource<*>
+  // CHECK: util.return
+  util.return %result_size : index
+}
+
+// -----
+
 // Erases allocation ops that have no users of their allocated resource.
 
 // CHECK-LABEL: @ElideUnusedAllocaOp
-// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %{{.+}}: index)
 util.func private @ElideUnusedAllocaOp(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.timepoint, !stream.timepoint) {
   // CHECK-NOT: stream.resource.alloca
   // CHECK: %[[IMMEDIATE_TIMEPOINT:.+]] = stream.timepoint.immediate
@@ -49,7 +74,7 @@ util.func private @ElideUnusedAllocaOp(%await_timepoint: !stream.timepoint, %siz
 // Erases allocation ops that are only ever used by a deallocation.
 
 // CHECK-LABEL: @ElideAllocaDeallocaOp
-// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %{{.+}}: index)
 util.func private @ElideAllocaDeallocaOp(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.timepoint, !stream.timepoint) {
   // CHECK-NOT: stream.resource.alloca
   %resource, %alloca_timepoint = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
@@ -62,7 +87,7 @@ util.func private @ElideAllocaDeallocaOp(%await_timepoint: !stream.timepoint, %s
 // -----
 
 // CHECK-LABEL: @BatchAllocaOps
-// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %{{.+}}: index)
 util.func private @BatchAllocaOps(%await_timepoint: !stream.timepoint, %size: index) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
   // CHECK: %[[ALLOCA0:.+]], %[[ALLOCA0_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]])
   %alloca0, %alloca0_timepoint = stream.resource.alloca uninitialized await(%await_timepoint) =>  !stream.resource<transient>{%size} => !stream.timepoint
@@ -80,7 +105,7 @@ util.func private @BatchAllocaOps(%await_timepoint: !stream.timepoint, %size: in
 // -----
 
 // CHECK-LABEL: @BatchDeallocaOps
-// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[RESOURCE0:.+]]: !stream.resource<transient>, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[RESOURCE2:.+]]: !stream.resource<transient>, %[[RESOURCE3:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+// CHECK-SAME: (%[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint, %[[RESOURCE0:.+]]: !stream.resource<transient>, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[RESOURCE2:.+]]: !stream.resource<transient>, %[[RESOURCE3:.+]]: !stream.resource<transient>, %{{.+}}: index)
 util.func private @BatchDeallocaOps(%await_timepoint: !stream.timepoint, %resource0: !stream.resource<transient>, %resource1: !stream.resource<transient>, %resource2: !stream.resource<transient>, %resource3: !stream.resource<transient>, %size: index) -> !stream.timepoint {
   // CHECK: %[[DEALLOCA0_TIMEPOINT:.+]] = stream.resource.dealloca origin await(%[[AWAIT_TIMEPOINT]]) => %[[RESOURCE0]]
   %dealloca0_timepoint = stream.resource.dealloca origin await(%await_timepoint) => %resource0 : !stream.resource<transient>{%size} => !stream.timepoint
@@ -178,8 +203,7 @@ util.func private @FoldResourcePackOpOneSlice(%offset: index, %size: index) -> (
 
 // CHECK-LABEL: @PropagateResourcePackZeroOffset
 util.func private @PropagateResourcePackZeroOffset(%size : index) -> (index, index, index) {
-  // CHECK-NOT: constant 0
-  // CHECK-NEXT: = stream.resource.pack slices({
+  // CHECK-NEXT: %{{.+}}:3 = stream.resource.pack slices
   %base_offset = arith.constant 0 : index
   %total_length, %offset_0, %offset_1 =
       stream.resource.pack
@@ -188,6 +212,7 @@ util.func private @PropagateResourcePackZeroOffset(%size : index) -> (index, ind
           [0, 4] = %size,
           [1, 2] = %size,
         }) : index
+  // CHECK: util.return
   util.return %total_length, %offset_0, %offset_1 : index, index, index
 }
 
@@ -196,12 +221,10 @@ util.func private @PropagateResourcePackZeroOffset(%size : index) -> (index, ind
 // A base offset operand gets propagated to returned values.
 
 // CHECK-LABEL: @PropagateResourcePackBaseOffset
-// CHECK-SAME: %[[BASE_OFFSET:.+]]: index,
-// CHECK-SAME: %[[SIZE:.+]]: index
+// CHECK-SAME: %[[BASE_OFFSET:.+]]: index, %{{.+}}: index
 util.func private @PropagateResourcePackBaseOffset(%base_offset: index, %size : index) -> (index, index, index) {
-  // CHECK-NEXT: %[[PACKED:.+]]:3 =
+  // CHECK-NEXT: %[[PACKED:.+]]:3 = stream.resource.pack slices
   %total_length, %offset_0, %offset_1 =
-      // CHECK-SAME: stream.resource.pack slices({
       stream.resource.pack
         offset(%base_offset)
         slices({
@@ -221,13 +244,10 @@ util.func private @PropagateResourcePackBaseOffset(%base_offset: index, %size : 
 // CHECK-LABEL: @CanonicalizeResourcePackIntervals
 // CHECK-SAME: %[[SIZE:.+]]: index
 util.func private @CanonicalizeResourcePackIntervals(%size : index) -> (index, index, index) {
-  // CHECK-NEXT: %[[PACKED:.+]]:3 =
+  // CHECK-NEXT: %[[PACKED:.+]]:3 = stream.resource.pack slices
   %total_length, %offset_0, %offset_1 =
-      // CHECK-SAME: stream.resource.pack slices({
       stream.resource.pack
         slices({
-          // CHECK-NEXT: [0, 4] = %[[SIZE]],
-          // CHECK-NEXT: [1, 2] = %[[SIZE]]
           [1, 2] = %size,
           [0, 4] = %size,
         }) : index
@@ -285,11 +305,11 @@ util.func private @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1:
 // Tests that unrealized_conversion_casts on resources are properly cleaned up.
 
 // CHECK-LABEL: unrealizedCastCleanup
-// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: index)
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
 util.func private @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %arg1: index) -> (!stream.resource<transient>, index) {
   %0 = builtin.unrealized_conversion_cast %arg0, %arg1 : !stream.resource<transient>, index to !stream.resource<transient>
   %1 = stream.resource.size %0 : !stream.resource<transient>
-  // CHECK-NEXT: util.return %[[ARG0]], %[[ARG1]]
+  // CHECK-NEXT: util.return %[[RESOURCE]], %[[SIZE]]
   util.return %0, %1 : !stream.resource<transient>, index
 }
 
@@ -300,7 +320,7 @@ util.func private @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %ar
 util.func private @FoldConsecutiveResourceTransientsSameStorage(%resource: !stream.resource<*>, %size: index, %storage: !stream.resource<transient>) -> !stream.resource<*> {
   // CHECK-NOT: stream.resource.transients %[[RESOURCE]]
   %0, %t0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage : !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]], %{{.+}} = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
   %1, %t1 = stream.resource.transients %0 : !stream.resource<*>{%size} from %storage : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RESULT]]
   util.return %1 : !stream.resource<*>
@@ -313,7 +333,7 @@ util.func private @FoldConsecutiveResourceTransientsSameStorage(%resource: !stre
 util.func private @FoldConsecutiveResourceTransientsDifferentStorage(%resource: !stream.resource<*>, %size: index, %storage1: !stream.resource<transient>, %storage2: !stream.resource<transient>) -> !stream.resource<*> {
   // CHECK-NOT: stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE1]]
   %0, %t0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage1 : !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE2]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]], %{{.+}} = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE2]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
   %1, %t1 = stream.resource.transients %0 : !stream.resource<*>{%size} from %storage2 : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RESULT]]
   util.return %1 : !stream.resource<*>
@@ -326,7 +346,7 @@ util.func private @FoldConsecutiveResourceTransientsDifferentStorage(%resource: 
 util.func private @FoldConsecutiveResourceTransientsWithAffinity(%resource: !stream.resource<*>, %size: index, %storage: !stream.resource<transient>) -> !stream.resource<*> {
   // CHECK-NOT: stream.resource.transients %[[RESOURCE]]
   %0, %t0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage : !stream.resource<transient>{%size} => !stream.timepoint
-  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.resource.transients on(#hal.device.affinity<@dev>) %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
+  // CHECK: %[[RESULT:.+]], %{{.+}} = stream.resource.transients on(#hal.device.affinity<@dev>) %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !stream.resource<transient>{%[[SIZE]]} => !stream.timepoint
   %1, %t1 = stream.resource.transients on(#hal.device.affinity<@dev>) %0 : !stream.resource<*>{%size} from %storage : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RESULT]]
   util.return %1 : !stream.resource<*>

@@ -58,10 +58,10 @@ iree_status_t iree_vm_bytecode_block_list_insert(
   IREE_ASSERT_ARGUMENT(block_list);
   *out_block = NULL;
 
-  if (IREE_UNLIKELY(pc >= IREE_VM_PC_BLOCK_MAX)) {
+  if (IREE_UNLIKELY(pc >= IREE_VM_ISA_PC_BLOCK_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "block pc %08X greater than max %08X", pc,
-                            IREE_VM_PC_BLOCK_MAX);
+                            IREE_VM_ISA_PC_BLOCK_MAX);
   }
 
   // Try to find the block or the next block greater than it in the list in case

@@ -155,8 +155,9 @@ static SmallVector<unsigned> findDuplicateRegionResults(Region &region) {
   auto uniformDupeIndexMap =
       llvm::to_vector(llvm::seq(0u, resultCount)); // old -> new
   for (unsigned idx = 0; idx < resultCount; ++idx) {
-    if (deadResultsMap.test(idx))
+    if (deadResultsMap.test(idx)) {
       continue;
+    }
     // Each bit represents a result that duplicates the result at idx.
     // We walk all the sites and AND their masks together to get the safe
     // set of duplicate results.
@@ -257,15 +258,17 @@ static void inlineClosureOperands(const ClosureOptimizationOptions &options,
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
-    if (!sourceOp)
+    if (!sourceOp) {
       continue; // can't clone block arguments into closures
+    }
 
     // We cannot just simply inline and replace all users if this is an
     // argument that can be written; for example, the region might perform
     // work after loading a initial constant from the argument and then
     // write back.
-    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly())
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) {
       continue;
+    }
 
     if (closureOp.canClosureContainOp(sourceOp) &&
         shouldInlineIntoClosure(options, outerValue)) {

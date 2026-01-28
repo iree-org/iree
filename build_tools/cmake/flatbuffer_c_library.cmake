@@ -85,11 +85,17 @@ function(flatbuffer_c_library)
   endforeach()
   list(TRANSFORM _OUTS PREPEND "${CMAKE_CURRENT_BINARY_DIR}/")
 
+  # When cross-compiling execute the binary from the host build.
+  set(IREE_FLATCC_TOOL_BINARY iree-flatcc-cli)
+  if (IREE_HOST_BIN_DIR)
+    set(IREE_FLATCC_TOOL_BINARY "${IREE_HOST_BIN_DIR}/iree-flatcc-cli")
+  endif()
+
   add_custom_command(
     OUTPUT
       ${_OUTS}
     COMMAND
-      iree-flatcc-cli
+      ${IREE_FLATCC_TOOL_BINARY}
           -o "${CMAKE_CURRENT_BINARY_DIR}"
           -I "${IREE_ROOT_DIR}"
           -I "${IREE_ROOT_DIR}/runtime/src"
@@ -100,6 +106,7 @@ function(flatbuffer_c_library)
     MAIN_DEPENDENCY
       ${_RULE_SRCS}
     DEPENDS
+      ${IREE_FLATCC_TOOL_BINARY}
       ${_RULE_SRCS}
     COMMAND_EXPAND_LISTS
   )

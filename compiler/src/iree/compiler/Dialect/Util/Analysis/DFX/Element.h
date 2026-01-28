@@ -143,8 +143,9 @@ struct TypedOperationElement : public AbstractElement {
   ChangeStatus updateImpl(Solver &solver) override {
     if (isOperation()) {
       auto op = dyn_cast<OpT>(getOperation());
-      if (op)
+      if (op) {
         return updateOperation(op, solver);
+      }
     }
     return getState().indicatePessimisticFixpoint();
   }

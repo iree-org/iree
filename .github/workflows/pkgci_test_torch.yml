@@ -37,6 +37,9 @@ jobs:
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
+          - name: amdgpu_hip_gfx1201_O3
+            config-file: torch_ops_gpu_hip_gfx1201_O3.json
+            runs-on: [Linux, X64, gfx1201]
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
@@ -52,14 +55,14 @@ jobs:
       CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: false
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
@@ -71,16 +74,19 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
           path: iree-test-suites
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Run Torch ops test suite
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest iree-test-suites/torch_ops/ \
@@ -119,26 +125,26 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: false
 
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v5.4.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
 
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           repository: iree-org/iree-test-suites
-          ref: 17a391dc3882f136e567bf2687806ef6af46ad64
+          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
@@ -154,6 +160,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Torch Model tests
+        env:
+          # Enable hip logging on errors.
+          AMD_LOG_LEVEL: 1
         run: |
           source ${VENV_DIR}/bin/activate
           pytest \
@@ -178,7 +187,7 @@ jobs:
 
       - name: Upload Torch Models JSON Summary
         if: always()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ${{ matrix.summary-file }}
           path: ${{ github.workspace }}/iree-test-suites/job_summary.json

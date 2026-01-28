@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
@@ -222,7 +223,11 @@ static bool isEligibleForCollapse(Operation *op) {
 
   auto hasEncoding = [](Type type) -> bool {
     auto rankedTensorType = dyn_cast<RankedTensorType>(type);
-    return rankedTensorType && rankedTensorType.getEncoding();
+    if (!rankedTensorType || !rankedTensorType.getEncoding()) {
+      return false;
+    }
+    // TODO(#21185): Remove special casing and replace with more generic logic.
+    return !IREE::Encoding::hasPackedStorageAttr(rankedTensorType);
   };
   if (llvm::any_of(op->getOperandTypes(), hasEncoding)) {
     return false;
@@ -291,8 +296,9 @@ populateReassocAndMaps(tensor::ExtractSliceOp sliceOp,
 
     auto isZeroOffsetAndFullSize =
         [&](OpFoldResult offset, OpFoldResult sliceSize, int64_t inputDim) {
-          if (!isZeroInteger(offset))
+          if (!isZeroInteger(offset)) {
             return false;
+          }
           ValueBoundsConstraintSet::Variable inputSize(sliceOp.getSource(),
                                                        inputDim);
           FailureOr<bool> maybeEqual =

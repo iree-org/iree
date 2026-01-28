@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -16,6 +17,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-combine-layout-transformation"
@@ -170,9 +172,10 @@ foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
   return foldReshapeIntoMapScatter(rewriter, collapseShapeOp, mapScatterOp);
 }
 
-/// Fold an `extractSliceOp` into a consumer `mapScatterOp` by applying a mask
-/// based on the bounds of the extractSliceOp. Currently, only zero offsets and
-/// unit strides are supported.
+/// Fold an `extractSliceOp` into a consumer `mapScatterOp`. If the
+/// extract_slice is an identity operation, the input is replaced directly.
+/// Otherwise, a mask is applied based on the bounds of the extractSliceOp.
+/// Currently, only zero offsets and unit strides are supported.
 ///
 /// For a given `%mask` value, and slice sizes of `%size0`, `%size1`, ...,
 /// `%sizeN`, the `%new_mask` becomes:
@@ -206,6 +209,29 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(extractSliceOp,
                                        "non-unit strides are not supported");
   }
+
+  // Check if this is an identity extract_slice (all sizes match the source).
+  // If so, just replace the input without adding any masking.
+  SmallVector<OpFoldResult> sliceSizes = extractSliceOp.getMixedSizes();
+  Value source = extractSliceOp.getSource();
+  bool isIdentity = true;
+  for (auto [dim, sliceSize] : llvm::enumerate(sliceSizes)) {
+    ValueBoundsConstraintSet::Variable sourceDimVar(source, dim);
+    FailureOr<bool> areEqual =
+        ValueBoundsConstraintSet::areEqual(sliceSize, sourceDimVar);
+    if (!succeeded(areEqual) || !*areEqual) {
+      isIdentity = false;
+      break;
+    }
+  }
+
+  if (isIdentity) {
+    // Identity extract_slice: just replace the input without any masking.
+    rewriter.modifyOpInPlace(
+        mapScatterOp, [&]() { mapScatterOp.getInputMutable().assign(source); });
+    return mapScatterOp;
+  }
+
   SmallVector<OpFoldResult> bounds(extractSliceOp.getMixedSizes());
   Block &transformBody = mapScatterOp.getTransformationRegion().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
@@ -332,6 +358,39 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     scf::IfOp::create(b, loopLoc, mask, thenBuilder);
   };
 
+  auto stopConditionFn = [](Value /*v*/, std::optional<int64_t> /*dim*/,
+                            ValueBoundsConstraintSet & /*cstr*/) -> bool {
+    return false;
+  };
+
+  // Prove that range [lb, ub) is empty (lb >= ub).
+  //
+  // For high padding, we have:
+  //   lb = low + srcSize
+  //   ub = resultSize
+  // and for a well-formed pad, resultSize = srcSize + low + high, so:
+  //   ub - lb = high
+  // Therefore "lb >= ub" -> "high == 0". Expressing the check in terms of lb/ub
+  // keeps it robust even when pad amount has been rewritten into a complex
+  // form.
+  auto proveEmptyRange = [&](RewriterBase &rewriter, Location loc, Value lb,
+                             Value ub) -> bool {
+    // Model diff = ub - lb  as an affine map (d0, d1) -> (d0 - d1)
+    // and ask for a constant upper bound on diff.
+    // If we can prove UB(diff) <= 0, then "diff <= 0" -> "ub - lb <= 0" ->
+    // "lb >= ub".
+    MLIRContext *ctx = rewriter.getContext();
+    auto diffMap = AffineMap::get(
+        /*dimCount=*/2, /*symbolCount=*/0,
+        {getAffineDimExpr(0, ctx) - getAffineDimExpr(1, ctx)}, ctx);
+    auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB,
+        ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
+        /*stopCondition=*/stopConditionFn,
+        /*addConservativeSemiAffineBounds=*/true);
+    return succeeded(ubConstantBound) && *ubConstantBound <= 0;
+  };
+
   // Distribute the padding of each dimension separately. This causes some
   // overlap of the iteration spaces across the loops, but simplifies the
   // implementation. The trade-off is expected to be okay because we expect
@@ -367,7 +426,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   // computation in order to have a more simplified kernel.
   for (auto [idx, low, high] :
        llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
-    // Create a distributed loop for the low padding
+    // Create a distributed loop for the low padding.
     if (!isConstantIntValue(low, 0)) {
       SmallVector<OpFoldResult> ubs(padResultSizes);
       SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
@@ -379,7 +438,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
       buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
                                    ubs, distConfigs, innerLoopBuilder);
     }
-    // Create a distributed loop for the high padding
+    // Create a distributed loop for the high padding.
     if (isConstantIntValue(high, 0)) {
       continue;
     }
@@ -388,6 +447,27 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     SmallVector<int64_t> shape(padOp.getSourceType().getShape());
     shape[idx] = padOp.getStaticHigh()[idx];
     lbs[idx] = IREE::LinalgExt::addOfrs(rewriter, loc, low, padSrcSizes[idx]);
+    // ubs[idx] is padResultSizes[idx] already (since ubs initialized from
+    // padResultSizes)
+
+    // Fallback: Even if we couldn't prove the pad amount is exactly 0, the
+    // derived half-open iteration space [lb, ub) may still be empty. For
+    // well-formed pads this typically means lb == ub (i.e., the high pad is 0),
+    // but we phrase it as the general condition lb >= ub for half-open ranges.
+    // If it's empty, skip generating this loop nest.
+    {
+      Value lbV = getValueOrCreateConstantIndexOp(rewriter, loc, lbs[idx]);
+      Value ubV = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[idx]);
+
+      if (lbV == ubV) {
+        continue;
+      }
+
+      if (proveEmptyRange(rewriter, loc, lbV, ubV)) {
+        continue;
+      }
+    }
+
     SmallVector<DistributionConfig> distConfigs =
         padDistributionConfigFn(shape, rewriter.getContext());
     buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
@@ -568,6 +648,19 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   // ops like pack and unpack into simpler supported ops.
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
+
+  // Resolve dims aggressively and canonicalize to simplify the IR.
+  // This improves pattern matching and makes it easier for subsequent
+  // rewrites/proofs to recognize identity/no-op cases.
+  {
+    RewritePatternSet patterns(ctx);
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    IREE::Util::AssumeIntOp::getCanonicalizationPatterns(patterns, ctx);
+
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return failure();
+    }
+  }
 
   // Combine relayout operations into new the map_scatter ops.
   RewritePatternSet relayoutCombinationPatterns(ctx);

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -76,6 +78,48 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   // Get subgroup size from translation_info.
   std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
   if (!subgroupSize) {
+    return {};
+  }
+
+  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
+  // transfer size. The minimum transfer size is subgroupSize *
+  // minElementsPerLane.
+  int64_t rank = outputType.getRank();
+  int64_t innermostDim = outputType.getShape()[rank - 1];
+  if (ShapedType::isDynamic(innermostDim)) {
+    return {};
+  }
+
+  // Get element type bit width.
+  Type elementType = outputType.getElementType();
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  // Get DMA sizes from target to compute minimum transfer size.
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target) {
+    return {};
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  // Find minimum elements per transfer across all DMA sizes.
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  // If no valid DMA size found or innermost dim is too small, skip.
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+      innermostDim < minElementsPerTransfer) {
     return {};
   }
 
@@ -357,6 +401,44 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
+    // Validate that innermost dimension is large enough for coalesced DMA.
+    auto outputType =
+        cast<RankedTensorType>(gatherOp.getOutputs()[0].getType());
+    int64_t rank = outputType.getRank();
+    int64_t innermostDim = outputType.getShape()[rank - 1];
+    if (ShapedType::isDynamic(innermostDim)) {
+      return failure();
+    }
+
+    Type elementType = outputType.getElementType();
+    int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target) {
+      return failure();
+    }
+
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+
+    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+    for (int64_t dmaSize : dmaSizes) {
+      if (dmaSize % elementBits != 0) {
+        continue;
+      }
+      int64_t elementsPerLane = dmaSize / elementBits;
+      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+      minElementsPerTransfer =
+          std::min(minElementsPerTransfer, elementsPerTransfer);
+    }
+
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+        innermostDim < minElementsPerTransfer) {
+      return failure();
+    }
+
     SmallVector<OpFoldResult> threadNumThreads;
     threadNumThreads.push_back(rewriter.getIndexAttr(*subgroupSize));
 
@@ -480,6 +562,50 @@ struct GPUConvertToCoalescedDMAPass final
   }
 
 private:
+  /// Compute tile sizes for subgroup-level distribution.
+  /// Returns {tileSizes, numTiledDims}.
+  ///
+  /// We keep the innermost dimension whole (not tiled) to ensure contiguous
+  /// memory access patterns, and greedily redistribute warps to outer
+  /// dimensions.
+  std::pair<SmallVector<OpFoldResult>, int64_t>
+  computeSubgroupTileSizes(IRRewriter &rewriter, ArrayRef<int64_t> shape,
+                           ArrayRef<int64_t> numWarps) {
+    SmallVector<OpFoldResult> tileSizes;
+    int64_t numTiledDims = 0;
+    int64_t rank = shape.size();
+
+    // Calculate total number of warps available.
+    // Note: numWarps may contain 0s for dimensions where wgSize < subgroupSize.
+    // We treat 0 as 1 for the purpose of counting total warps.
+    auto positiveWarps =
+        llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+    int64_t totalWarps = llvm::product_of(positiveWarps);
+
+    // Greedily distribute warps to outer dimensions, keeping innermost whole.
+    int64_t remainingWarps = totalWarps;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i == rank - 1) {
+        // Keep innermost dimension whole (tile size = full dimension).
+        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+        ++numTiledDims;
+      } else if (remainingWarps > 1 && ShapedType::isStatic(shape[i])) {
+        // Distribute remaining warps to this outer dimension.
+        int64_t warpsForThisDim = std::min(remainingWarps, shape[i]);
+        int64_t tileSize = llvm::divideCeil(shape[i], warpsForThisDim);
+        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
+        // Update remaining parallelism for subsequent dimensions.
+        remainingWarps = llvm::divideCeil(remainingWarps, warpsForThisDim);
+        ++numTiledDims;
+      } else {
+        // No parallelism to distribute; skip tiling this dimension.
+        tileSizes.push_back(rewriter.getIndexAttr(0));
+      }
+    }
+
+    return {tileSizes, numTiledDims};
+  }
+
   /// Tile operation at subgroup level using workgroup_size and subgroup_size
   /// from translation_info.
   template <typename OpTy>
@@ -487,20 +613,23 @@ private:
                                                       OpTy op) {
     MLIRContext *context = &getContext();
     auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
-    if (!dmaConfig)
+    if (!dmaConfig) {
       return failure();
+    }
 
     // Get the function containing this operation.
     auto funcOp = op->template getParentOfType<FunctionOpInterface>();
-    if (!funcOp)
+    if (!funcOp) {
       return failure();
+    }
 
     // Get workgroup size and subgroup size from translation_info.
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
     std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!workgroupSize || !subgroupSize)
+    if (!workgroupSize || !subgroupSize) {
       return failure();
+    }
 
     // Calculate number of subgroups per dimension.
     // workgroupSize is [X, Y, Z], and we divide by subgroupSize to get warps.
@@ -518,27 +647,56 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Compute tile sizes: divide the shape by number of warps.
-    // This distributes the work across warps in each dimension.
-    SmallVector<OpFoldResult> tileSizes;
-    int64_t numTiledDims = 0;
-    for (int64_t i = 0; i < rank; ++i) {
-      // Map dimensions: innermost dims map to innermost workgroup dims.
-      // For 2D: dim 0 (rows) -> wgSize[1], dim 1 (cols) -> wgSize[0].
-      int64_t warpDim =
-          (rank - 1 - i) < numWarps.size() ? numWarps[rank - 1 - i] : 1;
-      if (warpDim > 1 && shape[i] != ShapedType::kDynamic) {
-        int64_t tileSize = (shape[i] + warpDim - 1) / warpDim;
-        tileSizes.push_back(rewriter.getIndexAttr(tileSize));
-        numTiledDims++;
-      } else {
-        tileSizes.push_back(rewriter.getIndexAttr(0));
-      }
+    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
+    // transfer size. The minimum transfer size is subgroupSize *
+    // minElementsPerLane, where minElementsPerLane is determined by the
+    // smallest DMA size and element type.
+    int64_t innermostDim = shape[rank - 1];
+    if (ShapedType::isDynamic(innermostDim)) {
+      return failure();
     }
 
-    // Check if we have any non-zero tile sizes.
-    if (numTiledDims == 0)
+    // Get the element type bit width.
+    Type elementType = outputType.getElementType();
+    int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+    // Get DMA sizes from target to compute minimum transfer size.
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target) {
       return failure();
+    }
+
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+
+    // Find minimum elements per transfer across all DMA sizes.
+    // We need innermostDim >= subgroupSize * minElementsPerLane.
+    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+    for (int64_t dmaSize : dmaSizes) {
+      if (dmaSize % elementBits != 0) {
+        continue;
+      }
+      int64_t elementsPerLane = dmaSize / elementBits;
+      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+      minElementsPerTransfer =
+          std::min(minElementsPerTransfer, elementsPerTransfer);
+    }
+
+    // If no valid DMA size found or innermost dim is too small, skip.
+    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+        innermostDim < minElementsPerTransfer) {
+      return failure();
+    }
+
+    // Compute tile sizes for subgroup-level distribution.
+    auto [tileSizes, numTiledDims] =
+        computeSubgroupTileSizes(rewriter, shape, numWarps);
+
+    if (numTiledDims == 0) {
+      return failure();
+    }
 
     scf::SCFTilingOptions tilingOptions;
     tilingOptions.setTileSizes(tileSizes);
@@ -584,8 +742,9 @@ private:
               })
               .Default([](Operation *) { return failure(); });
 
-      if (failed(tilingResult))
+      if (failed(tilingResult)) {
         continue;
+      }
 
       // Replace the original op with the tiled version.
       rewriter.replaceOp(op, tilingResult->replacements);

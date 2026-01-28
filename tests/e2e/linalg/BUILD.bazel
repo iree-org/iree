@@ -29,6 +29,7 @@ LLVM_SRCS = enforce_glob(
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
@@ -73,8 +74,10 @@ iree_check_single_backend_test_suite(
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "conv2d.mlir",
         "gather_like_ops.mlir",
+        "index.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -84,11 +87,10 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "argmax.mlir",
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
-        "index.mlir",
         "large_linalg_matmul.mlir",
+        "small_float_arith.mlir",
         "subbyte_to_fp.mlir",
     ],
 )
@@ -124,22 +126,23 @@ iree_check_single_backend_test_suite(
 VULKAN_SRCS = enforce_glob(
     # keep sorted
     [
+        "argmax.mlir",
         "conv2d.mlir",
         "gather_like_ops.mlir",
+        "index.mlir",
         "narrow_n_matmuls.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "argmax.mlir",
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
-        "index.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "unpack.mlir",
     ],
 )
@@ -199,6 +202,7 @@ CUDA_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "small_float_arith.mlir",
     ],
 )
 
@@ -221,29 +225,32 @@ ROCM_SRCS = enforce_glob(
     # keep sorted
     [
         "argmax.mlir",
+        "conv2d.mlir",
+        "fp4_f32_conversion.mlir",
+        "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
+        "index.mlir",
+        "narrow_n_matmuls.mlir",
         "pack_i8.mlir",
         "softmax.mlir",
+        "subbyte_to_fp.mlir",
         "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "conv2d.mlir",
-        "fp_to_subbyte.mlir",
-        "fp4_f32_conversion.mlir",
-        "index.mlir",
         "large_linalg_matmul.mlir",
-        "narrow_n_matmuls.mlir",
-        "subbyte_to_fp.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "small_float_arith.mlir",
     ],
 )
 
 iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
+    # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
+    timeout = "moderate",
     srcs = ROCM_SRCS,
     driver = "hip",
     target_backend = "rocm",

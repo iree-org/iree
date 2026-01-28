@@ -588,6 +588,114 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// MapGatherOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult MapGatherOp::verify() {
+  if (getSourceType().getElementType() != getOutputType().getElementType()) {
+    return emitOpError("expected source and output element types to match");
+  }
+  Region &transformRegion = getTransformationRegion();
+  Block &transformBody = transformRegion.getBlocks().front();
+  if (transformBody.getNumArguments() != getOutputRank()) {
+    return emitOpError("expected number of block arguments to be equal "
+                       "to the output rank");
+  }
+  if (!llvm::all_of(transformBody.getArgumentTypes(),
+                    llvm::IsaPred<IndexType>)) {
+    return emitOpError("expected block arguments to be index types");
+  }
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  if (yieldOp->getNumOperands() != getSourceRank() + 1) {
+    return yieldOp.emitOpError(
+        "expected transformation_region to yield a "
+        "value for each source dimension and a padding value");
+  }
+  for (int operandIdx = 0; operandIdx < getSourceRank(); ++operandIdx) {
+    if (!isa<IndexType>(yieldOp.getOperandTypes()[operandIdx])) {
+      return yieldOp.emitOpError("expected yielded indices to be index types");
+    }
+  }
+  Type paddingType = yieldOp.getOperandTypes()[getSourceRank()];
+  Type elementType = getSourceType().getElementType();
+  if (paddingType != elementType) {
+    return yieldOp.emitOpError("expected yielded padding value type to match "
+                               "source element type");
+  }
+  return success();
+}
+
+void MapGatherOp::insertTransformationAtStart(
+    OpBuilder &builder,
+    function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+        transformationBuilder,
+    int64_t numOutputIndices) {
+  Block &transformBody = getTransformationRegion().front();
+  SmallVector<BlockArgument> oldOutputIndices(transformBody.getArguments());
+  SmallVector<Type> indexTypes(numOutputIndices, builder.getIndexType());
+  SmallVector<Location> locs(numOutputIndices, getLoc());
+
+  // Create the new block arguments for the new output indices, and transform
+  // them using the callback.
+  SmallVector<BlockArgument> newOutputIndices(
+      transformBody.addArguments(indexTypes, locs));
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPointToStart(&transformBody);
+  SmallVector<Value> newOutputIndicesTransformed(
+      transformationBuilder(newOutputIndices));
+
+  // Replace the old output indices with the results of the transformation on
+  // the new output indices.
+  assert(oldOutputIndices.size() == newOutputIndicesTransformed.size() &&
+         "expected transformation to produce the same number of Values as the "
+         "previous number of output indices.");
+  for (auto [oldIdx, newIdx] :
+       llvm::zip_equal(oldOutputIndices, newOutputIndicesTransformed)) {
+    oldIdx.replaceAllUsesWith(newIdx);
+  }
+  transformBody.eraseArguments(0, oldOutputIndices.size());
+}
+
+/// Shared implementation for inlining the transformation body of map_gather
+/// and map_scatter ops.
+static void inlineMapGatherScatterBodyImpl(
+    OpBuilder &b, Location loc, Region &transformRegion,
+    ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBlock = transformRegion.front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, transformBodyIndices[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to pass
+  // to the bodyBuilder.
+  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
+  bodyBuilder(b, loc, mappedYieldedValues);
+}
+
+void MapGatherOp::inlineMapGatherBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  inlineMapGatherScatterBodyImpl(b, loc, getTransformationRegion(),
+                                 transformBodyIndices, bodyBuilder);
+}
+
+//===----------------------------------------------------------------------===//
 // MapScatterOp
 //===----------------------------------------------------------------------===//
 
@@ -636,6 +744,11 @@ LogicalResult MapScatterOp::verify() {
                     llvm::IsaPred<IndexType>)) {
     return emitOpError("expected block arguments to be index types");
   }
+  return success();
+}
+
+LogicalResult MapScatterOp::verifyRegions() {
+  Block &transformBody = getTransformationRegion().getBlocks().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
   if (yieldOp->getNumOperands() != getOutputRank() + 1) {
     return yieldOp.emitOpError("expected transformation_region to yield a "
@@ -713,31 +826,8 @@ void MapScatterOp::insertTransformationAtStart(
 void MapScatterOp::inlineMapScatterBody(
     OpBuilder &b, Location loc, ValueRange transformBodyIndices,
     function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
-  Block &transformBlock = getTransformationRegion().front();
-  IRMapping mapping;
-  // Map the induction variables of the loop nest to the block arguments of the
-  // transformation body. The induction variables are the indices looping over
-  // the elements of input operand.
-  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
-    mapping.map(arg, transformBodyIndices[idx]);
-  }
-  // Clone the operations within the transformation body to the current
-  // insertion point, and map their results to the new cloned operations'
-  // results.
-  for (Operation &op : transformBlock.without_terminator()) {
-    Operation *clonedOp = b.clone(op, mapping);
-    for (auto [result, clonedResult] :
-         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
-      mapping.map(result, clonedResult);
-    }
-  }
-
-  // Get the cloned values that were yielded by the transformation body to pass
-  // to the bodyBuilder.
-  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
-      transformBlock.getTerminator()->getOperands(),
-      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
-  bodyBuilder(b, loc, mappedYieldedValues);
+  inlineMapGatherScatterBodyImpl(b, loc, getTransformationRegion(),
+                                 transformBodyIndices, bodyBuilder);
 }
 
 bool MapScatterOp::isIdentity() {
@@ -765,6 +855,8 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 namespace {
+/// Convert an identity map_scatter to a copy operation. We keep the copy to
+/// preserve DPS semantics.
 struct ConvertIdentityMapScatterToCopy
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using Base::Base;
@@ -956,8 +1048,9 @@ LogicalResult FftOp::verify() {
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (ShapedType::isDynamic(length))
+  if (ShapedType::isDynamic(length)) {
     return success();
+  }
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
   }
@@ -1154,12 +1247,17 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  unsigned numInputVals = llvm::size(getInputs());
-  if (numInputVals != 1) {
-    return op->emitOpError(
-               "expected exactly one tensor input operand, but got ")
-           << numInputVals;
+  // The operation supports two modes based on the number of inputs:
+  // - Implicit-index mode (1 input): Computes indices from iteration variables.
+  // - Explicit-index mode (2 inputs): Uses pre-existing (value, index) pairs.
+  unsigned numInputs = llvm::size(getInputs());
+  if (numInputs != 1 && numInputs != 2) {
+    return op->emitOpError("expected 1 or 2 input operands, but got ")
+           << numInputs;
   }
+
+  ShapedType inputValueType = getInputType();
+  Type inputValueElemType = inputValueType.getElementType();
 
   unsigned numOutputs = getNumDpsInits();
   if (numOutputs != 2) {
@@ -1168,21 +1266,56 @@ LogicalResult ArgCompareOp::verify() {
            << numOutputs;
   }
 
-  uint64_t dim = getDimension();
-  int64_t rank = getInputRank();
-  if (dim >= rank) {
-    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
-           << "got dimension: " << dim << ", but input rank is: " << rank;
-  }
-
-  ShapedType inputType = getInputType();
   auto outputValueType = getOutputValueType();
   auto outputIndexType = getOutputIndexType();
+  Type outputIndexElemType = getOutputIndexElementType();
 
-  if (inputType.getElementType() != outputValueType.getElementType()) {
+  if (hasExplicitIndexInput()) {
+    ShapedType inputIndexType = getInputIndexType();
+    Type inputIndexElemType = getInputIndexElementType();
+
+    if (inputValueType.getShape() != inputIndexType.getShape()) {
+      return op->emitOpError(
+                 "explicit-index mode: value and index inputs must have "
+                 "the same shape. ")
+             << "Value shape: "
+             << llvm::interleaved_array(inputValueType.getShape())
+             << ", index shape: "
+             << llvm::interleaved_array(inputIndexType.getShape());
+    }
+
+    if (!isa<IntegerType, IndexType>(inputIndexElemType)) {
+      return op->emitOpError(
+                 "explicit-index mode: index input must have integer or index "
+                 "element type, but got ")
+             << inputIndexElemType;
+    }
+
+    if (inputIndexElemType != outputIndexElemType) {
+      return op->emitOpError(
+                 "explicit-index mode: input and output index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexElemType
+             << ", output index type: " << outputIndexElemType;
+    }
+
+    if (getIndexBase()) {
+      return op->emitOpError(
+          "index_base must not be used with explicit indices");
+    }
+  }
+
+  Type outputValueElemType = outputValueType.getElementType();
+  if (inputValueElemType != outputValueElemType) {
     return op->emitOpError("input and output value element types must match. ")
-           << "Input type: " << inputType.getElementType()
-           << ", output value type: " << outputValueType.getElementType();
+           << "Input type: " << inputValueElemType
+           << ", output value type: " << outputValueElemType;
+  }
+
+  if (!isa<IntegerType, IndexType>(outputIndexElemType)) {
+    return op->emitOpError(
+               "output index must have integer or index element type, but got ")
+           << outputIndexElemType;
   }
 
   if (failed(verifyCompatibleShape(outputValueType, outputIndexType))) {
@@ -1193,10 +1326,18 @@ LogicalResult ArgCompareOp::verify() {
            << llvm::interleaved_array(outputIndexType.getShape());
   }
 
+  uint64_t dim = getDimension();
+  int64_t rank = getInputRank();
+  if (dim >= rank) {
+    return op->emitOpError("reduction dimension exceeds or equals input rank. ")
+           << "got dimension: " << dim << ", but input rank is: " << rank;
+  }
+
   SmallVector<int64_t> expectedShape;
   for (int64_t i = 0; i < rank; ++i) {
-    if (i != dim)
-      expectedShape.push_back(inputType.getDimSize(i));
+    if (i != dim) {
+      expectedShape.push_back(inputValueType.getDimSize(i));
+    }
   }
   if (!llvm::equal(expectedShape, outputValueType.getShape())) {
     return op->emitOpError("output shape must match input shape with reduction "
@@ -1213,14 +1354,14 @@ LogicalResult ArgCompareOp::verify() {
     return op->emitOpError("region block should have 2 arguments, but got ")
            << numArgs;
   }
-  Type inputElemType = inputType.getElementType();
+
   Type arg0Type = block.getArgument(0).getType();
   Type arg1Type = block.getArgument(1).getType();
 
-  if (arg0Type != inputElemType || arg1Type != inputElemType) {
+  if (arg0Type != inputValueElemType || arg1Type != inputValueElemType) {
     return op->emitOpError(
-               "comparator region arguments must match input element type. ")
-           << "Expected: " << inputElemType << ", but got: " << arg0Type
+               "comparator arguments must match input value element type. ")
+           << "Expected: " << inputValueElemType << ", but got: " << arg0Type
            << " and " << arg1Type;
   }
 
@@ -1264,6 +1405,11 @@ SmallVector<AffineMap> IREE::LinalgExt::ArgCompareOp::getIndexingMapsArray() {
     proj.push_back(getAffineDimExpr(i, ctx));
   }
   AffineMap resultMap = AffineMap::get(rank, 0, proj, ctx);
+
+  if (hasExplicitIndexInput()) {
+    return {inputMap, inputMap, resultMap, resultMap};
+  }
+
   return {inputMap, resultMap, resultMap};
 }
 
@@ -1300,15 +1446,18 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
                 DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (ShapedType::isDynamic(inputShape[dim]))
+    if (ShapedType::isDynamic(inputShape[dim])) {
       continue;
+    }
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
       std::optional<int64_t> constantTile = getConstantIntValue(it->second);
-      if (!constantTile)
+      if (!constantTile) {
         continue;
-      if (inputShape[dim] % (*constantTile) != 0)
+      }
+      if (inputShape[dim] % (*constantTile) != 0) {
         return true;
+      }
     }
   }
   return false;
@@ -2035,8 +2184,9 @@ LogicalResult AttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap))) {
       return failure();
+    }
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -2061,14 +2211,16 @@ LogicalResult AttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkDomain("Mask", *maskMap)))
+    if (failed(checkDomain("Mask", *maskMap))) {
       return failure();
+    }
   }
 
   auto &block = getRegion().front();
   auto blockTys = block.getArgumentTypes();
-  if (!isa<FloatType>(blockTys[0]))
+  if (!isa<FloatType>(blockTys[0])) {
     return attnOp->emitOpError("block argument 0 should be float");
+  }
 
   auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
   if (!yieldOp) {
@@ -2212,8 +2364,9 @@ LogicalResult OnlineAttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap)))
+    if (failed(checkShape("Mask", getMask().getType().getShape(), *maskMap))) {
       return failure();
+    }
   }
 
   int expectedSymbols = getQueryMap().getNumInputs();
@@ -2240,8 +2393,9 @@ LogicalResult OnlineAttentionOp::verify() {
 
   // Additional check case if mask exists
   if (auto maskMap = getMaskMap()) {
-    if (failed(checkDomain("Mask", *maskMap)))
+    if (failed(checkDomain("Mask", *maskMap))) {
       return failure();
+    }
   }
 
   Block &block = attnOp.getRegion().front();
@@ -2808,14 +2962,20 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 //===---------------------------------------------------------------------===//
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
-  auto customOp = dyn_cast<CustomOp>(getOperation()->getParentOp());
-  if (!customOp) {
-    return emitOpError("expected parent op to be `iree_linalg_ext.custom_op`");
+  auto parentOp = getOperation()->getParentOp();
+  if (!isa<CustomOp, AttentionOp>(parentOp)) {
+    return emitOpError(
+        "expected parent op to be one of `iree_linalg_ext.custom_op`, "
+        "`iree_linalg_ext.attention`");
   }
-  if (customOp.getNumLoops() <= getDim()) {
+  auto customOp = dyn_cast<CustomOp>(parentOp);
+  auto attentionOp = dyn_cast<AttentionOp>(parentOp);
+  int64_t numLoops =
+      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+  if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
-           << getDim() << ") to be lower than the number of loops ("
-           << customOp.getNumLoops() << ") of the enclosing CustomOp";
+           << getDim() << ") to be lower than the number of loops (" << numLoops
+           << ") of the enclosing CustomOp/AttentionOp";
   }
   return success();
 }
@@ -2834,6 +2994,7 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
 DEFINE_OP_GET_EFFECTS(MapScatterOp)
+DEFINE_OP_GET_EFFECTS(MapGatherOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)

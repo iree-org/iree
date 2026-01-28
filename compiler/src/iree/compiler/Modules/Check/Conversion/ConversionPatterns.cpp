@@ -37,8 +37,9 @@ struct OptionalCheckImportConversion : public VMImportOpConversion<T, Adaptor> {
     rewriter.setInsertionPointToStart(callBlock);
     auto results = rewriteToCall(op, adaptor, this->importOp,
                                  *this->getTypeConverter(), rewriter);
-    if (!results.has_value())
+    if (!results.has_value()) {
       return failure();
+    }
     rewriter.replaceOp(op, results.value());
     IREE::VM::BranchOp::create(rewriter, op.getLoc(), followingBlock);
     return success();

@@ -73,8 +73,9 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
       interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != utils::IteratorType::parallel)
+    if (iteratorType.value() != utils::IteratorType::parallel) {
       break;
+    }
     parallelLoops.set(iteratorType.index());
   }
   return parallelLoops;
@@ -204,6 +205,9 @@ public:
                         });
   }
 
+  // Check if adding `op` would exceed the operand limit.
+  bool wouldExceedOperandLimit(Operation *op) const;
+
 private:
   Operation *rootOp;
   // All operations to be fused with the root op. This does not include
@@ -230,6 +234,42 @@ void FusionGroup::insert(Operation *op) {
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
   }
+}
+
+bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
+  llvm::SmallSetVector<Operation *, kIreeMaxOperandCount> dispatchOperands;
+  int64_t numResults = 0;
+
+  auto visitOp = [&](Operation *op) {
+    auto visitOperand = [&](OpOperand *operand) {
+      if (!isa<RankedTensorType>(operand->get().getType())) {
+        return;
+      }
+      Operation *definingOp = operand->get().getDefiningOp();
+      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
+        return;
+      }
+      if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
+        dispatchOperands.insert(definingOp);
+      }
+    };
+    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
+    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
+
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return user != newOp && !loopMaps.contains(user);
+          })) {
+        ++numResults;
+      }
+    }
+  };
+
+  visitOp(newOp);
+  for (auto [op, map] : this->loopMaps) {
+    visitOp(op);
+  }
+  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
 }
 
 FailureOr<AffineMap>
@@ -303,6 +343,10 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       if (failed(composedMap) || (newMap && composedMap != newMap)) {
         return failure();
       }
+      if (composedMap.value().getNumResults() ==
+          composedMap.value().getNumOfZeroResults()) {
+        return failure();
+      }
       newMap = composedMap.value();
     }
   } else {
@@ -336,6 +380,8 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       }
     }
   }
+
+  // Fail if there is no mapping or if there are no parallel loops in common.
   if (!newMap) {
     return failure();
   }
@@ -520,8 +566,9 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Check that the owner is a `generic` op.
   auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
-  if (!genericOp)
+  if (!genericOp) {
     return false;
+  }
 
   // All loops to be parallel.
   if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
@@ -529,13 +576,15 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   }
 
   /// The input operand cannot be an init operand already.
-  if (genericOp.isDpsInit(inOperand))
+  if (genericOp.isDpsInit(inOperand)) {
     return false;
+  }
 
   // If the init operand value is used it cannot be reused for the input
   // operand.
-  if (genericOp.payloadUsesValueFromOperand(initOperand))
+  if (genericOp.payloadUsesValueFromOperand(initOperand)) {
     return false;
+  }
 
   // Indexing map used to access the input and init have to match.
   if (genericOp.getMatchingIndexingMap(inOperand) !=
@@ -545,8 +594,9 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 
   // Types have to match for the input operand to reuse the buffer from the init
   // operand
-  if (inOperand->get().getType() != initOperand->get().getType())
+  if (inOperand->get().getType() != initOperand->get().getType()) {
     return false;
+  }
 
   return true;
 }
@@ -561,7 +611,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  if (IREE::LinalgExt::isBitExtendOp(consumer)) {
+  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
+  clonableOptions.aggressive = options.aggressiveFusion;
+  if (IREE::Flow::isClonableIntoDispatchOp(consumer, clonableOptions)) {
     return false;
   }
 
@@ -629,8 +681,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
       dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(producer);
   auto consumerFusionOp =
       dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(consumer);
-  if (!producerFusionOp || !consumerFusionOp)
+  if (!producerFusionOp || !consumerFusionOp) {
     return false;
+  }
 
   // Check that the consumer is all parallel.
   if (consumerFusionOp.getNumLoops() !=
@@ -639,6 +692,11 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   }
 
   if (!tracker.getFusionGroup(producer).isFusable(consumer)) {
+    return false;
+  }
+
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(producer).wouldExceedOperandLimit(consumer)) {
     return false;
   }
 
@@ -675,10 +733,11 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   }
 
   for (OpOperand *inputOperand : consumerDstOp.getDpsInputOperands()) {
-    if (inputOperand->get().getDefiningOp() != producer)
+    if (inputOperand->get().getDefiningOp() != producer) {
       continue;
+    }
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
-        !llvm::any_of(
+        llvm::none_of(
             consumerDstOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
@@ -711,17 +770,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      // For now prune the fusable uses due to codegen failures. Ideally we
-      // should just be taking the whole set of fusable uses.
-      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
-        fusableUses =
-            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
-              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
-            });
-      } else {
-        fusableUses.resize(1);
-      }
-
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
@@ -739,8 +787,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         if (isFusableWithConsumer(*fusableUse, tracker, options)) {
           tracker.appendToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
-        } else {
-          break;
         }
       }
     }
@@ -812,6 +858,12 @@ static bool isFusableWithProducer(OpOperand &operand,
   if (!tracker.getFusionGroup(consumer).isFusable(producer)) {
     return false;
   }
+
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(consumer).wouldExceedOperandLimit(producer)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -831,8 +883,9 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
       Operation *producer = operand.get().getDefiningOp();
-      if (!producer)
+      if (!producer) {
         continue;
+      }
       if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
           tracker.isFusedOp(producer) || tracker.isRootOp(producer)) {
         continue;
@@ -845,8 +898,9 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
       SmallVector<OpOperand *> fusableUses =
           getFusableUses(context, producer, dominanceInfo,
                          /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate)
+      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate) {
         continue;
+      }
 
       tracker.appendToFusionGroup(producer, fusionGroup);
       worklist.push_back(producer);
@@ -881,8 +935,9 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       }
 
       // Start with a root operation and fuse its producers.
-      if (tracker.isFusedOp(&op) || !isRootLikeOp(&op))
+      if (tracker.isFusedOp(&op) || !isRootLikeOp(&op)) {
         continue;
+      }
       FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
                              tracker,
@@ -905,8 +960,9 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
-      if (tracker.isFusedOp(&op) || tracker.isRootOp(&op))
+      if (tracker.isFusedOp(&op) || tracker.isRootOp(&op)) {
         continue;
+      }
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats. Also avoid moving dequantization-like ops
@@ -923,9 +979,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isClonableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(), [](Operation *op) {
-            return isa<IREE::LinalgExt::AttentionOp>(op);
-          })) {
+          llvm::all_of(op.getUsers(),
+                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
         continue;
       }
 
@@ -1044,7 +1099,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        return consumer->emitOpError("failed to move consumer into region");
+        consumer->emitWarning("failed to move consumer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }

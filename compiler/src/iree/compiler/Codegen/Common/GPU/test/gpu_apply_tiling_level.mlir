@@ -71,9 +71,9 @@ module {
 func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7: tensor<64x1280xf16>) -> tensor<64x64xf32> {
   %c4 = arith.constant 4 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0.000000e+00 : f16
+  %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %8 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
   %9 = tensor.empty() : tensor<64x1280xf16>
   %10 = tensor.empty() : tensor<64x1280xf16>
   %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
@@ -639,7 +639,7 @@ func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf
 // -----
 
 #config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
-func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
+func.func @no_swap_collapse_shape_with_extract_slice_dynamic(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
   %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3]] : tensor<288x3x3x32xf32> into tensor<2592x32xf32>
   %empty = tensor.empty() : tensor<2592x32xf32>
   %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<2592x32xf32>) outs(%empty : tensor<2592x32xf32>) -> tensor<2592x32xf32>
@@ -647,12 +647,37 @@ func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf3
 }
 
 // No swap would happen when both the collapsed size and offset are dynamic after tiling.
-// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_dynamic
 //       NORM-REDUCTION:   tensor.collapse_shape
 //       NORM-REDUCTION:   scf.for
 //       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
 //   NORM-REDUCTION-NOT:     tensor.collapse_shape
 //       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 0, 1]}>
+func.func @no_swap_collapse_shape_with_extract_slice_3(%arg0: tensor<8x1x4x16x16xf32>) -> tensor<512x48x48xf32> {
+  %0 = tensor.empty() : tensor<512x48x48xf32>
+  %1 = scf.forall (%arg1, %arg2, %arg3) in (4, 48, 1) shared_outs(%arg4 = %0) -> (tensor<512x48x48xf32>) {
+    %2 = tensor.empty() : tensor<8x16x1x4x16xf32>
+    %transposed = linalg.transpose ins(%arg0 : tensor<8x1x4x16x16xf32>) outs(%2 : tensor<8x16x1x4x16xf32>) permutation = [0, 3, 1, 2, 4]
+    %3 = linalg.copy {lowering_config = #config} ins(%transposed : tensor<8x16x1x4x16xf32>) outs(%2 : tensor<8x16x1x4x16xf32>) -> tensor<8x16x1x4x16xf32>
+    %collapsed = tensor.collapse_shape %3 [[0, 1], [2], [3, 4]] : tensor<8x16x1x4x16xf32> into tensor<128x1x64xf32>
+    %extracted_slice = tensor.extract_slice %collapsed[0, 0, 0] [128, 1, 48] [1, 1, 1] : tensor<128x1x64xf32> to tensor<128x1x48xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %extracted_slice into %arg4[0, 0, 0] [128, 1, 48] [1, 1, 1] : tensor<128x1x48xf32> into tensor<512x48x48xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  return %1 : tensor<512x48x48xf32>
+}
+
+// No swap would happen when extract_slice and collapse_shape ops are within the same block.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_3
+//       NORM-REDUCTION:   scf.forall
+//       NORM-REDUCTION:     linalg.copy
+//       NORM-REDUCTION:     tensor.collapse_shape
+//       NORM-REDUCTION:     tensor.extract_slice
 
 // -----
 
@@ -710,3 +735,42 @@ module {
 // SERIAL: linalg.generic
 // SERIAL: scf.forall.in_parallel
 // SERIAL-NOT: mapping
+
+// -----
+
+func.func @matmul_transpose_b_with_swizzle(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7: tensor<64x1280xf16>) -> tensor<64x64xf32> {
+  %c4 = arith.constant 4 : index
+  %c1280 = arith.constant 1280 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %9 = tensor.empty() : tensor<64x1280xf16>
+  %swizzle_9 = iree_codegen.swizzle_hint %9[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %10 = tensor.empty() : tensor<64x1280xf16>
+  %swizzle_10 = iree_codegen.swizzle_hint %10[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x1280xf16>
+  %11 = scf.for %arg0 = %c0 to %c1280 step %c4 iter_args(%arg1 = %8) -> (tensor<64x64xf32>) {
+    %extracted_slice = tensor.extract_slice %6[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %extracted_slice_0 = tensor.extract_slice %swizzle_9[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %12 = linalg.copy {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1]}>} ins(%extracted_slice : tensor<64x4xf16>) outs(%extracted_slice_0 : tensor<64x4xf16>) -> tensor<64x4xf16>
+    %extracted_slice_1 = tensor.extract_slice %7[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %extracted_slice_2 = tensor.extract_slice %swizzle_10[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
+    %13 = linalg.copy {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1]}>} ins(%extracted_slice_1 : tensor<64x4xf16>) outs(%extracted_slice_2 : tensor<64x4xf16>) -> tensor<64x4xf16>
+    %14 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      {lowering_config = #iree_gpu.lowering_config<{thread = [4, 4]}>}
+      ins(%12, %13 : tensor<64x4xf16>, tensor<64x4xf16>)
+      outs(%arg1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+    scf.yield %14 : tensor<64x64xf32>
+  }
+  return %11 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func.func @matmul_transpose_b_with_swizzle
+
+// THREAD-LABEL: func.func @matmul_transpose_b_with_swizzle
+//       THREAD:     %2 = tensor.empty() : tensor<64x4xf16>
+//       THREAD:     %3 = iree_codegen.swizzle_hint %2[#iree_codegen.xor_shuffle<256, 32>] : tensor<64x4xf16>

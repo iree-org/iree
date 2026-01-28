@@ -71,8 +71,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
-  if (!translationInfo)
+  if (!translationInfo) {
     return;
+  }
 
   std::optional<OpPassManager> maybePipeline =
       getFunctionOpInterfacePassManager(funcOp);
@@ -101,9 +102,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
     addGPUWinogradVectorizePassPipeline(pipeline);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-    addGPUTransposePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);

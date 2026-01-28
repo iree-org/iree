@@ -839,3 +839,108 @@ func.func @fusion_through_non_dominating_loop_user(%arg0: tensor<1xf32>, %arg1: 
 //   CHECK-DAG:     tensor.parallel_insert_slice %[[GENERIC]] into %[[OUT1]]
 //       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[FORALL]]#0
 //       CHECK:   return %[[BARRIER]], %[[FORALL]]#1
+
+// -----
+
+// Test fusing warp and lane foralls when the lane forall uses coalesced_gather_dma
+// instead of parallel_insert_slice.
+
+func.func @fuse_warp_and_lane_foralls_with_coalesced_dma(%src: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %result = scf.forall (%warp0, %warp1) in (2, 2) shared_outs(%warp_out = %empty) -> (tensor<2x2x64xf32>) {
+    %warp_slice = tensor.extract_slice %warp_out[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %src_slice = tensor.extract_slice %src[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    %lane_result = scf.forall (%lane) in (64) shared_outs(%lane_out = %warp_slice) -> (tensor<1x1x64xf32>) {
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src_slice into %lane_out lane(%lane) : tensor<1x1x64xf32>, tensor<1x1x64xf32>, index
+      }
+    } {mapping = [#iree_gpu.lane_id<0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %lane_result into %warp_out[%warp0, %warp1, 0] [1, 1, 64] [1, 1, 1] : tensor<1x1x64xf32> into tensor<2x2x64xf32>
+    }
+  } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  return %result : tensor<2x2x64xf32>
+}
+
+// CHECK-LABEL: func @fuse_warp_and_lane_foralls_with_coalesced_dma
+//  CHECK-SAME:   %[[SRC:.+]]: tensor<2x2x64xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x64xf32>
+//       CHECK:   %[[THREAD_FORALL:.+]] = scf.forall (%[[TID0:.+]], %[[TID1:.+]], %[[TID2:.+]]) in (2, 2, 64)
+//  CHECK-SAME:       shared_outs(%[[INIT_ARG:.+]] = %[[EMPTY]])
+//   CHECK-DAG:     %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
+//   CHECK-DAG:     %[[DEST_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0] [1, 1, 64]
+//       CHECK:     %[[DMA_RESULT:.+]] = iree_gpu.coalesced_gather_dma %[[SRC_SLICE]] into %[[DEST_SLICE]] lane(%[[TID2]])
+//       CHECK:     scf.forall.in_parallel {
+//       CHECK:       tensor.parallel_insert_slice %[[DMA_RESULT]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], 0]
+//       CHECK:     }
+//       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+//       CHECK:   return %[[THREAD_FORALL]]
+
+// -----
+
+// Check that we dont make a zeroslice guard when fusing pad.
+#map = affine_map<(d0) -> (d0 * 64)>
+func.func @fuse_pad(%arg0: tensor<?xf16>, %arg1: index) -> tensor<128xf16> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = tensor.empty() : tensor<128xf16>
+  %padded = tensor.pad %arg0 low[0] high[%arg1] {
+    ^bb0(%arg10: index):
+      tensor.yield %cst : f16
+  } : tensor<?xf16> to tensor<128xf16>
+  %1 = scf.forall (%arg2) in (2) shared_outs(%arg3 = %0) -> (tensor<128xf16>) {
+    %2 = affine.apply #map(%arg2)
+    %extracted_slice = tensor.extract_slice %padded[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
+    %extracted_slice_0 = tensor.extract_slice %arg3[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
+    %3 = linalg.copy ins(%extracted_slice : tensor<64xf16>) outs(%extracted_slice_0 : tensor<64xf16>) -> tensor<64xf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg3[%2] [64] [1] : tensor<64xf16> into tensor<128xf16>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return %1 : tensor<128xf16>
+}
+
+// CHECK-LABEL: func @fuse_pad
+//       CHECK:   scf.forall
+//   CHECK-NOT:     scf.if
+//       CHECK:     tensor.pad
+//       CHECK:     linalg.copy
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   return
+
+// -----
+
+// Check that we can fuse padded destinations.
+#map = affine_map<(d0) -> (d0 * 64)>
+func.func @fuse_pad_dest(%arg0: tensor<128xf16>, %arg1: index) -> tensor<128xf16> {
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = tensor.empty() : tensor<128xf16>
+  %padded = tensor.pad %arg0 low[0] high[1] {
+    ^bb0(%arg10: index):
+      tensor.yield %cst : f16
+  } : tensor<128xf16> to tensor<129xf16>
+  %extracted_slice_dest = tensor.extract_slice %padded[0] [128] [1] : tensor<129xf16> to tensor<128xf16>
+  %1 = scf.forall (%arg2) in (2) shared_outs(%arg3 = %extracted_slice_dest) -> (tensor<128xf16>) {
+    %2 = affine.apply #map(%arg2)
+    %extracted_slice = tensor.extract_slice %0[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
+    %extracted_slice_0 = tensor.extract_slice %arg3[%2] [64] [1] : tensor<128xf16> to tensor<64xf16>
+    %3 = linalg.copy ins(%extracted_slice : tensor<64xf16>) outs(%extracted_slice_0 : tensor<64xf16>) -> tensor<64xf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %3 into %arg3[%2] [64] [1] : tensor<64xf16> into tensor<128xf16>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return %1 : tensor<128xf16>
+}
+
+// CHECK-LABEL: func @fuse_pad_dest
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   scf.forall
+//   CHECK-NOT:     tensor.pad
+//       CHECK:     linalg.copy
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   return

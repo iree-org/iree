@@ -21,28 +21,28 @@ namespace internal {
 // status and that the contained T value matches another matcher.
 template <typename T>
 class IsOkAndHoldsMatcher
-    : public ::testing::MatcherInterface<const StatusOr<T> &> {
+    : public ::testing::MatcherInterface<const StatusOr<T>&> {
  public:
   template <typename MatcherT>
-  IsOkAndHoldsMatcher(MatcherT &&value_matcher)
-      : value_matcher_(::testing::SafeMatcherCast<const T &>(value_matcher)) {}
+  IsOkAndHoldsMatcher(MatcherT&& value_matcher)
+      : value_matcher_(::testing::SafeMatcherCast<const T&>(value_matcher)) {}
 
   // From testing::MatcherInterface.
-  void DescribeTo(std::ostream *os) const override {
+  void DescribeTo(std::ostream* os) const override {
     *os << "is OK and contains a value that ";
     value_matcher_.DescribeTo(os);
   }
 
   // From testing::MatcherInterface.
-  void DescribeNegationTo(std::ostream *os) const override {
+  void DescribeNegationTo(std::ostream* os) const override {
     *os << "is not OK or contains a value that ";
     value_matcher_.DescribeNegationTo(os);
   }
 
   // From testing::MatcherInterface.
   bool MatchAndExplain(
-      const StatusOr<T> &status_or,
-      ::testing::MatchResultListener *listener) const override {
+      const StatusOr<T>& status_or,
+      ::testing::MatchResultListener* listener) const override {
     if (!status_or.ok()) {
       *listener << "which is not OK";
       return false;
@@ -60,7 +60,7 @@ class IsOkAndHoldsMatcher
   }
 
  private:
-  const ::testing::Matcher<const T &> value_matcher_;
+  const ::testing::Matcher<const T&> value_matcher_;
 };
 
 // A polymorphic IsOkAndHolds() matcher.
@@ -79,7 +79,7 @@ class IsOkAndHoldsGenerator {
       : value_matcher_(std::move(value_matcher)) {}
 
   template <typename T>
-  operator ::testing::Matcher<const StatusOr<T> &>() const {
+  operator ::testing::Matcher<const StatusOr<T>&>() const {
     return ::testing::MakeMatcher(new IsOkAndHoldsMatcher<T>(value_matcher_));
   }
 
@@ -98,7 +98,7 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
   // From testing::MatcherInterface.
   //
   // Describes the expected error code.
-  void DescribeTo(std::ostream *os) const override {
+  void DescribeTo(std::ostream* os) const override {
     *os << "error code " << StatusCodeToString(code_);
     if (!message_.empty()) {
       *os << "::'" << message_ << "'";
@@ -112,8 +112,8 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
   // also tests that |matchee| has an error message that matches that
   // expectation.
   bool MatchAndExplain(
-      Matchee &matchee,
-      ::testing::MatchResultListener *listener) const override {
+      Matchee& matchee,
+      ::testing::MatchResultListener* listener) const override {
     if (GetCode(matchee) != code_) {
       *listener << "whose error code is "
                 << StatusCodeToString(GetCode(matchee)) << ": "
@@ -129,30 +129,30 @@ class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
 
  private:
   template <typename T>
-  StatusCode GetCode(const T &matchee) const {
+  StatusCode GetCode(const T& matchee) const {
     return GetCode(matchee.status());
   }
 
-  StatusCode GetCode(const iree_status_code_t &status_code) const {
+  StatusCode GetCode(const iree_status_code_t& status_code) const {
     return static_cast<StatusCode>(status_code);
   }
 
-  StatusCode GetCode(const iree_status_t &status) const {
+  StatusCode GetCode(const iree_status_t& status) const {
     return static_cast<StatusCode>(iree_status_code(status));
   }
 
-  StatusCode GetCode(const Status &status) const { return status.code(); }
+  StatusCode GetCode(const Status& status) const { return status.code(); }
 
   template <typename T>
-  std::string GetMessage(const T &matchee) const {
+  std::string GetMessage(const T& matchee) const {
     return GetMessage(matchee.status());
   }
 
-  std::string GetMessage(const iree_status_t &status) const {
+  std::string GetMessage(const iree_status_t& status) const {
     return Status::ToString(status);
   }
 
-  std::string GetMessage(const Status &status) const {
+  std::string GetMessage(const Status& status) const {
     return status.ToString();
   }
 
@@ -175,27 +175,26 @@ class StatusIsMatcherGenerator {
   StatusIsMatcherGenerator(Enum code, std::string message)
       : code_(code), message_(std::move(message)) {}
 
-  operator ::testing::Matcher<const StatusCode &>() const {
+  operator ::testing::Matcher<const StatusCode&>() const {
     return ::testing::MakeMatcher(
-        new internal::StatusMatcher<Enum, const StatusCode &>(code_, message_));
+        new internal::StatusMatcher<Enum, const StatusCode&>(code_, message_));
   }
 
-  operator ::testing::Matcher<const iree_status_t &>() const {
+  operator ::testing::Matcher<const iree_status_t&>() const {
     return ::testing::MakeMatcher(
-        new internal::StatusMatcher<Enum, const iree_status_t &>(code_,
-                                                                 message_));
+        new internal::StatusMatcher<Enum, const iree_status_t&>(code_,
+                                                                message_));
   }
 
-  operator ::testing::Matcher<const Status &>() const {
+  operator ::testing::Matcher<const Status&>() const {
     return ::testing::MakeMatcher(
-        new internal::StatusMatcher<Enum, const Status &>(code_, message_));
+        new internal::StatusMatcher<Enum, const Status&>(code_, message_));
   }
 
   template <class T>
-  operator ::testing::Matcher<const StatusOr<T> &>() const {
+  operator ::testing::Matcher<const StatusOr<T>&>() const {
     return ::testing::MakeMatcher(
-        new internal::StatusMatcher<Enum, const StatusOr<T> &>(code_,
-                                                               message_));
+        new internal::StatusMatcher<Enum, const StatusOr<T>&>(code_, message_));
   }
 
  private:
@@ -216,12 +215,12 @@ class IsOkMatcherImpl : public ::testing::MatcherInterface<T> {
   // From testing::MatcherInterface.
   //
   // Describes the OK expectation.
-  void DescribeTo(std::ostream *os) const override { *os << "is OK"; }
+  void DescribeTo(std::ostream* os) const override { *os << "is OK"; }
 
   // From testing::MatcherInterface.
   //
   // Describes the negative OK expectation.
-  void DescribeNegationTo(std::ostream *os) const override {
+  void DescribeNegationTo(std::ostream* os) const override {
     *os << "is not OK";
   }
 
@@ -230,8 +229,8 @@ class IsOkMatcherImpl : public ::testing::MatcherInterface<T> {
   // Tests whether |status_container|'s OK value meets this matcher's
   // expectation.
   bool MatchAndExplain(
-      const T &status_container,
-      ::testing::MatchResultListener *listener) const override {
+      const T& status_container,
+      ::testing::MatchResultListener* listener) const override {
     if (!::iree::IsOk(status_container)) {
       *listener << "which is not OK";
       return false;
@@ -247,22 +246,48 @@ class IsOkMatcherImpl : public ::testing::MatcherInterface<T> {
 // container.
 class IsOkMatcherGenerator {
  public:
-  operator ::testing::Matcher<const iree_status_t &>() const {
+  operator ::testing::Matcher<const iree_status_t&>() const {
     return ::testing::MakeMatcher(
-        new internal::IsOkMatcherImpl<const iree_status_t &>());
+        new internal::IsOkMatcherImpl<const iree_status_t&>());
   }
 
-  operator ::testing::Matcher<const Status &>() const {
+  operator ::testing::Matcher<const Status&>() const {
     return ::testing::MakeMatcher(
-        new internal::IsOkMatcherImpl<const Status &>());
+        new internal::IsOkMatcherImpl<const Status&>());
   }
 
   template <class T>
-  operator ::testing::Matcher<const StatusOr<T> &>() const {
+  operator ::testing::Matcher<const StatusOr<T>&>() const {
     return ::testing::MakeMatcher(
-        new internal::IsOkMatcherImpl<const StatusOr<T> &>());
+        new internal::IsOkMatcherImpl<const StatusOr<T>&>());
   }
 };
+
+// Takes ownership of an lvalue iree_status_t for testing. Clears the source
+// to a code-only value so any subsequent iree_status_ignore/free is a no-op.
+inline Status ConsumeForTest(iree_status_t& status) {
+  iree_status_t owned = status;
+  status = iree_status_from_code(iree_status_code(status));
+  return Status(std::move(owned));
+}
+
+// Takes ownership of an rvalue iree_status_t (e.g. function call return).
+inline Status ConsumeForTest(iree_status_t&& status) {
+  return Status(std::move(status));
+}
+
+// Consumes a non-const Status via the existing consuming copy constructor.
+inline Status ConsumeForTest(Status& status) { return Status(status); }
+
+// Moves from a Status rvalue.
+inline Status ConsumeForTest(Status&& status) {
+  return Status(std::move(status));
+}
+
+// Code-only copy from const Status& (cannot steal storage from const).
+inline Status ConsumeForTest(const Status& status) {
+  return Status(status.code());
+}
 
 }  // namespace internal
 
@@ -316,20 +341,24 @@ inline internal::IsOkMatcherGenerator IsOk() {
 }  // namespace status
 }  // namespace testing
 
-// Macros for testing the results of functions that return iree::Status or
-// iree::StatusOr<T> (for any type T).
-#define IREE_EXPECT_OK(rexpr) \
-  EXPECT_THAT((rexpr),        \
+// Macros for testing the results of functions that return iree_status_t,
+// iree::Status, or iree::StatusOr<T>. These macros take ownership of raw
+// iree_status_t values and free them automatically via the Status destructor,
+// preventing leaks on test failure.
+#define IREE_EXPECT_OK(rexpr)                          \
+  EXPECT_THAT(::iree::internal::ConsumeForTest(rexpr), \
               ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
-#define IREE_ASSERT_OK(rexpr) \
-  ASSERT_THAT((rexpr),        \
+#define IREE_ASSERT_OK(rexpr)                          \
+  ASSERT_THAT(::iree::internal::ConsumeForTest(rexpr), \
               ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
-#define IREE_EXPECT_STATUS_IS(expected_code, expr)       \
-  EXPECT_THAT((expr), ::iree::testing::status::StatusIs( \
-                          static_cast<::iree::StatusCode>(expected_code)))
-#define IREE_ASSERT_STATUS_IS(expected_code, expr)       \
-  ASSERT_THAT((expr), ::iree::testing::status::StatusIs( \
-                          static_cast<::iree::StatusCode>(expected_code)))
+#define IREE_EXPECT_STATUS_IS(expected_code, expr)    \
+  EXPECT_THAT(::iree::internal::ConsumeForTest(expr), \
+              ::iree::testing::status::StatusIs(      \
+                  static_cast<::iree::StatusCode>(expected_code)))
+#define IREE_ASSERT_STATUS_IS(expected_code, expr)    \
+  ASSERT_THAT(::iree::internal::ConsumeForTest(expr), \
+              ::iree::testing::status::StatusIs(      \
+                  static_cast<::iree::StatusCode>(expected_code)))
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.
@@ -348,9 +377,10 @@ inline internal::IsOkMatcherGenerator IsOk() {
       IREE_STATUS_MACROS_CONCAT_NAME(_status_or_value, __COUNTER__), lhs, \
       rexpr);
 
-#define IREE_ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr) \
-  auto statusor = (rexpr);                                   \
-  IREE_ASSERT_OK(statusor.status());                         \
+#define IREE_ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr)               \
+  auto statusor = (rexpr);                                                 \
+  ASSERT_THAT(statusor.status(),                                           \
+              ::iree::testing::status::StatusIs(::iree::StatusCode::kOk)); \
   lhs = std::move(statusor.value())
 #define IREE_STATUS_MACROS_CONCAT_NAME(x, y) \
   IREE_STATUS_MACROS_CONCAT_IMPL(x, y)
@@ -361,7 +391,7 @@ inline internal::IsOkMatcherGenerator IsOk() {
 // implementation relies on gUnit for printing values of T when a
 // iree::StatusOr<T> object is OK and contains a value.
 template <typename T>
-void PrintTo(const StatusOr<T> &statusor, std::ostream *os) {
+void PrintTo(const StatusOr<T>& statusor, std::ostream* os) {
   if (!statusor.ok()) {
     *os << statusor.status().ToString();
   } else {

@@ -16,6 +16,7 @@ package(
 iree_td_library(
     name = "td_files",
     srcs = enforce_glob(
+        # keep sorted
         [
             "EncodingAttrs.td",
             "EncodingBase.td",
@@ -68,7 +69,9 @@ iree_compiler_cc_library(
         ":EncodingInterfacesGen",
         ":EncodingOpsIncGen",
         ":EncodingTypesGen",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
@@ -76,6 +79,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:InliningUtils",
         "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:LinalgUtils",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",

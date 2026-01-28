@@ -299,11 +299,13 @@ static Value generateEncodingTransferOps(RewriterBase &rewriter, Value src,
   Value value = src;
   if (srcType.getEncoding()) {
     value = IREE::Encoding::UnsetEncodingOp::create(
-        rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims);
+        rewriter, src.getLoc(), srcType.dropEncoding(), value, dynamicDims,
+        /*encoding_dims=*/ValueRange{});
   }
   if (destType.getEncoding()) {
-    value = IREE::Encoding::SetEncodingOp::create(rewriter, src.getLoc(),
-                                                  destType, value);
+    value = IREE::Encoding::SetEncodingOp::create(
+        rewriter, src.getLoc(), destType, value,
+        /*encoding_dims=*/ValueRange{});
   }
   return value;
 }
@@ -460,8 +462,9 @@ struct MaterializeOperation : public OpConversionPattern<OpTy> {
         this->template getTypeConverter<MaterializeEncodingTypeConverter>();
     FailureOr<Operation *> convertedOp =
         lowerOpWithEncoding(rewriter, op, adaptor.getOperands(), *converter);
-    if (failed(convertedOp))
+    if (failed(convertedOp)) {
       return failure();
+    }
 
     rewriter.replaceOp(op, convertedOp.value());
     return success();
@@ -704,8 +707,9 @@ void populateMaterializeEncodingPatterns(
         auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             subspanOp.getResult().getType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
-        if (!resultType)
+        if (!resultType) {
           return true;
+        }
         return resultType == typeConverter.convertType(resultType);
       });
   target.addIllegalOp<IREE::Encoding::SetEncodingOp,
@@ -715,8 +719,9 @@ void populateMaterializeEncodingPatterns(
         auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             storeOp.getTargetType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
-        if (!resultType)
+        if (!resultType) {
           return true;
+        }
         return resultType == typeConverter.convertType(resultType);
       });
   target.addDynamicallyLegalOp<IREE::TensorExt::DispatchTensorLoadOp>(
@@ -724,12 +729,13 @@ void populateMaterializeEncodingPatterns(
         auto resultType = dyn_cast<IREE::TensorExt::DispatchTensorType>(
             loadOp.getSourceType());
         // For types that are not `TensorExt::DispatchTensorType` mark as legal.
-        if (!resultType)
+        if (!resultType) {
           return true;
+        }
         return resultType == typeConverter.convertType(resultType);
       });
   target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp returnOp) {
-    return !llvm::any_of(returnOp.getOperandTypes(),
+    return llvm::none_of(returnOp.getOperandTypes(),
                          isRankedTensorTypeWithEncoding);
   });
 

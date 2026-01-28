@@ -41,6 +41,24 @@ namespace {
 // Resource usage query/application patterns
 //===----------------------------------------------------------------------===//
 
+// Returns the default affinity of |fromOp| or its ancestors, if available.
+// Note that default affinities are optional (and generally discouraged) but
+// useful for quick hacking/testing - by this point in the full pipeline we
+// assume all ops have explicit affinities assigned.
+//
+// TODO(benvanik): hide this implementation detail; it's currently hoisted from
+// AffinityAnalysis (and I hate that).
+static IREE::Stream::AffinityAttr tryLookupDefaultAffinity(Operation *fromOp) {
+  while (fromOp) {
+    if (auto affinityAttr = fromOp->getAttrOfType<IREE::Stream::AffinityAttr>(
+            "stream.affinity.default")) {
+      return affinityAttr;
+    }
+    fromOp = fromOp->getParentOp();
+  }
+  return nullptr;
+}
+
 // TODO(benvanik): change this to just be an AbstractState - there's no real
 // need for PVS as we don't track dynamically and are just using this as a
 // cache.
@@ -155,8 +173,9 @@ public:
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
     auto append = [&](const char *part) {
-      if (!str.empty())
+      if (!str.empty()) {
         str += '|';
+      }
       str += part;
     };
     append(this->isAssumed(NOT_MUTATED) ? "immutable" : "mutable");
@@ -172,8 +191,9 @@ private:
   static bool isTiedUse(OpOperand &operand) {
     if (auto tiedOp =
             dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
-      if (tiedOp.isOperandTied(operand.getOperandNumber()))
+      if (tiedOp.isOperandTied(operand.getOperandNumber())) {
         return true;
+      }
     }
     return false;
   }
@@ -215,6 +235,22 @@ private:
       getState() ^= argumentSemantics.getState();
     }
 
+    // Check if the source is a stream.tensor.import with the consume attribute.
+    // This indicates transfer of ownership (by-value semantics).
+    //
+    // We should probably make this part of an interface, but today the tensor
+    // import op is the only thing we support this on.
+    if (auto importOp =
+            operand.get().getDefiningOp<IREE::Stream::TensorImportOp>()) {
+      if (importOp.getConsume()) {
+        // Consume attribute present - value is owned by importer (by-value).
+        // Already in BEST_STATE (NOT_MUTATED | NOT_BY_REFERENCE).
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  stream.tensor.import with consume attribute\n");
+        return;
+      }
+    }
+
     auto &lastUsers = solver.getElementFor<LastUsers>(
         *this, Position::forValue(operand.get()), DFX::Resolution::REQUIRED);
     bool isLastUser = lastUsers.isAssumedLastUser(operand.getOwner());
@@ -236,19 +272,58 @@ private:
     auto arg = cast<BlockArgument>(value);
     bool isEntryArg = arg.getParentBlock()->isEntryBlock();
     if (isEntryArg) {
-      // Call argument.
-      auto callableOp =
-          cast<mlir::CallableOpInterface>(arg.getParentBlock()->getParentOp());
-      traversalResult |= solver.getExplorer().walkIncomingCalls(
-          callableOp, [&](mlir::CallOpInterface callOp) -> WalkResult {
-            unsigned baseIdx = callOp.getArgOperands().getBeginOperandIndex();
-            auto &sourceOperand =
-                callOp->getOpOperand(baseIdx + arg.getArgNumber());
-            updateFromPredecessorUse(sourceOperand, solver);
-            return WalkResult::advance();
-          });
+      // Entry block argument - could be a callable function argument or
+      // an SCF/region operation argument (scf.for iter_args, scf.if, etc).
+      auto *parentOp = arg.getParentBlock()->getParentOp();
+      if (auto callableOp = dyn_cast<mlir::CallableOpInterface>(parentOp)) {
+        // Call argument.
+        traversalResult |= solver.getExplorer().walkIncomingCalls(
+            callableOp, [&](mlir::CallOpInterface callOp) -> WalkResult {
+              unsigned baseIdx = callOp.getArgOperands().getBeginOperandIndex();
+              auto &sourceOperand =
+                  callOp->getOpOperand(baseIdx + arg.getArgNumber());
+              updateFromPredecessorUse(sourceOperand, solver);
+              return WalkResult::advance();
+            });
+      } else {
+        // SCF or other region operation argument (scf.for iter_args, CFG
+        // blocks, etc). We use the explorer to get the incoming values from
+        // parent/incoming CFG edges. Note that we can't tell in a multi-region
+        // op which region will execute so behavior is the same regardless (e.g.
+        // consuming in the then/else region of an scf.if will both walk to
+        // producers).
+        traversalResult |= solver.getExplorer().walkIncomingBlockArgument(
+            arg, [&](Block *sourceBlock, Value operand) -> WalkResult {
+              // |operand| is the produced value feeding this argument and we
+              // need to find the OpOperand that corresponds to this use.
+              // For scf.for this could be from the ForOp (init args) or
+              // from the yield terminator (loop-back).
+              Operation *sourceOp = arg.getParentBlock()->getParentOp();
+              if (sourceBlock == sourceOp->getBlock()) {
+                // Init args case: operand is from the region op itself.
+                for (unsigned i = 0; i < sourceOp->getNumOperands(); ++i) {
+                  if (sourceOp->getOperand(i) == operand) {
+                    updateFromPredecessorUse(sourceOp->getOpOperand(i), solver);
+                    return WalkResult::advance();
+                  }
+                }
+              } else {
+                // Loop-back case: operand is from a terminator in the region.
+                auto *terminator = sourceBlock->getTerminator();
+                for (unsigned i = 0; i < terminator->getNumOperands(); ++i) {
+                  if (terminator->getOperand(i) == operand) {
+                    updateFromPredecessorUse(terminator->getOpOperand(i),
+                                             solver);
+                    return WalkResult::advance();
+                  }
+                }
+              }
+              // Fallback: couldn't find the operand.
+              return WalkResult::advance();
+            });
+      }
     } else {
-      // Branch argument.
+      // Non-entry block branch argument.
       traversalResult |= solver.getExplorer().walkIncomingBranchOperands(
           arg.getParentBlock(),
           [&](Block *sourceBlock, OperandRange operands,
@@ -426,13 +501,13 @@ const char ResourceMutationSemantics::ID = 0;
 class ElisionAnalysis {
 public:
   explicit ElisionAnalysis(Operation *rootOp)
-      : explorer(rootOp, TraversalAction::SHALLOW),
+      : explorer(rootOp, TraversalAction::RECURSE),
         solver(explorer, allocator) {
-    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-        TraversalAction::RECURSE);
-    explorer.setDialectAction<IREE::Stream::StreamDialect>(
-        TraversalAction::RECURSE);
-    // Ignore the contents of executables (linalg goo, etc).
+    // Default is RECURSE to support arbitrary other dialects that may use
+    // stream resources in their bodies (SCF, etc). We explicitly ignore
+    // stream.executable here for clarity but the explorer will ignore all
+    // ObjectLike ops (hal.executable, etc) that may exist in the IR
+    // automatically.
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
     explorer.initialize();
 
@@ -446,20 +521,22 @@ public:
   // Runs analysis and populates the state cache.
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
   LogicalResult run() {
-    // Seed all block arguments throughout the program.
+    // Seed all block arguments throughout the program (including nested
+    // regions). This ensures SCF operations (scf.for, scf.if, scf.while) and
+    // other region-bearing ops have their block arguments analyzed.
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
       if (!region) {
         continue;
       }
-      for (auto &block : *region) {
-        for (auto arg : block.getArguments()) {
+      region->walk([&](Block *block) {
+        for (auto arg : block->getArguments()) {
           if (isa<IREE::Stream::ResourceType>(arg.getType())) {
             solver.getOrCreateElementFor<ArgumentSemantics>(
                 Position::forValue(arg));
           }
         }
-      }
+      });
     }
 
     // Seed ResourceMutationSemantics for all Stream resource values.
@@ -498,8 +575,9 @@ public:
   bool isArgMoved(BlockArgument arg) {
     auto argumentSemantics =
         solver.lookupElementFor<ArgumentSemantics>(Position::forValue(arg));
-    if (!argumentSemantics)
+    if (!argumentSemantics) {
       return false;
+    }
     return argumentSemantics->getAssumedByValue();
   }
 
@@ -519,6 +597,61 @@ public:
         solver.getOrCreateElementFor<ResourceMutationSemantics>(
             Position::forValue(value));
     return mutationSemantics.isAssumedNotMutated();
+  }
+
+  // Attempts to infer the affinity of |value| by walking up its defining ops
+  // and checking for explicit affinity annotations or default affinities.
+  // Returns nullptr if no affinity can be determined.
+  IREE::Stream::AffinityAttr tryInferValueAffinity(Value value) {
+    // Fast path: check if defining op has explicit affinity.
+    if (auto definingOp = value.getDefiningOp()) {
+      if (auto affinityOp =
+              dyn_cast<IREE::Stream::AffinityOpInterface>(definingOp)) {
+        if (auto affinity = affinityOp.getResultAffinityAttr()) {
+          return affinity;
+        }
+      }
+    }
+
+    // Walk defining ops using Explorer to find an affinity-annotated producer.
+    IREE::Stream::AffinityAttr foundAffinity;
+    explorer.walkDefiningOps(
+        value,
+        [&](OpResult result) {
+          Operation *op = result.getOwner();
+
+          // Check if this defining op has an explicit affinity.
+          if (auto affinityOp =
+                  dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+            if (auto affinity = affinityOp.getResultAffinityAttr()) {
+              // Found explicit affinity, stop.
+              foundAffinity = affinity;
+              return WalkResult::interrupt();
+            }
+          }
+
+          // Check op for explicit affinity attribute.
+          if (auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op)) {
+            foundAffinity = affinityAttr;
+            return WalkResult::interrupt();
+          }
+
+          // Keep searching for explicit affinity.
+          return WalkResult::advance();
+        },
+        TraversalBehavior::DEFAULT);
+    if (foundAffinity) {
+      return foundAffinity;
+    }
+
+    // No explicit affinity found anywhere in the producer chain.
+    // Fall back to default affinity at the value's location.
+    if (auto definingOp = value.getDefiningOp()) {
+      return tryLookupDefaultAffinity(definingOp);
+    } else if (auto arg = dyn_cast<BlockArgument>(value)) {
+      return tryLookupDefaultAffinity(arg.getParentBlock()->getParentOp());
+    }
+    return nullptr;
   }
 
 private:
@@ -566,8 +699,8 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
       cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
   if (sourceType.getLifetime() != targetType.getLifetime()) {
     LLVM_DEBUG(llvm::dbgs()
-               << "  - clone is a resource lifetime cast (" << sourceType
-               << " to " << targetType << "); cannot elide\n");
+               << "  - clone is a resource type cast (" << sourceType << " to "
+               << targetType << "); cannot elide\n");
     return false;
   }
 
@@ -641,6 +774,179 @@ static void elideCloneOp(IREE::Stream::AsyncCloneOp cloneOp) {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncTransferOp elision
+//===----------------------------------------------------------------------===//
+
+// Returns true if |transferOp| performs no work or is safe to elide as a copy.
+//
+// This handles several common cases:
+// 1. No-op transfers (same affinity + same type)
+// 2. Lifetime-changing copies (same affinity, different type)
+// 3. Transfer chain collapsing (A->B->C becomes A->C)
+// 4. Topology-based elision (unified memory between devices)
+//
+// The analysis must ensure we don't elide protective copies needed for:
+// - Tied operations (in-place mutations)
+// - Values with multiple users (fork semantics)
+// - Block arguments passed by-reference
+static bool isSafeToElideTransferOp(
+    IREE::Stream::AsyncTransferOp transferOp, ElisionAnalysis &analysis,
+    IREE::Stream::AffinityTopologyAttrInterface topologyAttr) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "isSafeToElideTransferOp:\n";
+    llvm::dbgs() << "  ";
+    transferOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  auto source = transferOp.getSource();
+  auto result = transferOp.getResult();
+  auto sourceType = cast<IREE::Stream::ResourceType>(source.getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(result.getType());
+
+  // Don't elide transfers that change lifetime (usage casts).
+  // These encode important semantic information about how the resource is used.
+  if (sourceType.getLifetime() != resultType.getLifetime()) {
+    LLVM_DEBUG(llvm::dbgs() << "  - transfer changes lifetime; cannot elide\n");
+    return false;
+  }
+
+  // Infer source affinity if not explicitly specified.
+  // Source affinity inference walks defining ops and checks for result affinity
+  // annotations. At this point in the pipeline most ops have explicit
+  // affinities or use defaults so this covers the remaining edge cases without
+  // requiring full affinity analysis integration (which is expensive).
+  auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
+  if (!sourceAffinityAttr) {
+    sourceAffinityAttr = analysis.tryInferValueAffinity(source);
+  }
+  auto resultAffinityAttr = transferOp.getResultAffinityAttr();
+
+  // Track whether topology analysis allows elision.
+  bool topologyAllowsElision = false;
+
+  // Check if topology allows elision (unified memory, etc).
+  // This check happens first as it's the primary gate for whether to remove
+  // transfers that the hardware topology doesn't require.
+  if (sourceAffinityAttr && resultAffinityAttr && topologyAttr) {
+    // Check if we can elide based on topology (unified memory, transparent
+    // access, etc).
+    // Note that even with unified memory we may need the transfer for other
+    // reasons (protective copy, etc) and continue checking below.
+    if (topologyAttr.hasUnifiedMemory(sourceAffinityAttr, resultAffinityAttr) ||
+        topologyAttr.hasTransparentAccess(sourceAffinityAttr,
+                                          resultAffinityAttr)) {
+      LLVM_DEBUG(llvm::dbgs() << "  + topology allows elision (unified memory "
+                                 "or transparent access)\n");
+      topologyAllowsElision = true;
+    } else {
+      // Topology requires an actual transfer - cannot elide.
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - topology requires transfer; cannot elide\n");
+      return false;
+    }
+  }
+
+  // Different affinity without topology info = real transfer operation.
+  // These must be preserved as they represent data movement and we don't have
+  // topology information to determine if they're needed.
+  if (!topologyAllowsElision && transferOp.getSourceAffinityAttr() !=
+                                    transferOp.getResultAffinityAttr()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - transfer changes affinity and no topology info; cannot "
+                  "elide\n");
+    return false;
+  }
+
+  // Same affinity = either no-op (same type) or lifetime change.
+  // Only elide if this is truly a no-op or if we can prove it's safe.
+  const bool isSameType =
+      (sourceType.getLifetime() == resultType.getLifetime());
+
+  // If the immediate source is a block argument we have to look into the
+  // analysis cache to see if it's been classified as a last use/by-value move.
+  // However, same-type transfers are always safe to elide regardless of move
+  // semantics, since they're true no-ops.
+  if (auto arg = llvm::dyn_cast<BlockArgument>(transferOp.getSource())) {
+    if (!analysis.isArgMoved(arg) && !isSameType) {
+      LLVM_DEBUG(llvm::dbgs() << "  - transfer source is a by-ref arg and "
+                                 "changes type; cannot elide\n");
+      return false;
+    }
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  ? transfer source is a by-value arg or same-type; may elide\n");
+  }
+
+  // If there's only one user of the source we know it's this transfer and can
+  // bypass all the more expensive liveness analysis. Single-use transfers can
+  // usually be elided (they compose with downstream transfers) but we need to
+  // check if the result type is constrained by the user (e.g., return type).
+  if (transferOp.getSource().hasOneUse()) {
+    // Check if this transfer is the only thing preventing a type mismatch.
+    // This happens when the source and result have different types and the
+    // result type is required by the context (return, call, etc).
+    if (!isSameType) {
+      // For type-changing transfers we need to be conservative.
+      // Many operations have specific type requirements (e.g.,
+      // stream.async.load requires staging resources). Rather than try to
+      // enumerate all such cases we conservatively preserve type-changing
+      // single-use transfers unless:
+      // - The user is another transfer (chain collapsing is safe)
+      // - The user explicitly accepts * (unknown) resources
+      for (auto &use : transferOp.getResult().getUses()) {
+        Operation *user = use.getOwner();
+        // Allow elision if the user is another transfer (chain collapsing).
+        if (isa<IREE::Stream::AsyncTransferOp>(user)) {
+          continue;
+        }
+        // Conservative: preserve type-changing transfers for other users.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  - type-changing transfer with non-transfer "
+                      "user; cannot elide\n");
+        return false;
+      }
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + transfer source SSA value has one use; can elide\n");
+    return true;
+  }
+
+  // If this is the last user of the source SSA value then we can elide the
+  // transfer knowing that any mutations won't impact the source but only
+  // for same-type transfers since type changes may encode required semantics.
+  if (isSameType && analysis.isLastUser(transferOp.getSource(), transferOp)) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  + transfer source use is the last and same type; can elide\n");
+    return true;
+  }
+
+  // Special case: same-type transfers are always safe to elide regardless of
+  // multiple users since they're true no-ops. The transfer result can be
+  // replaced with the source without any semantic changes.
+  if (isSameType) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + same-type transfer (true no-op); can always elide\n");
+    return true;
+  }
+
+  // Now we have multiple users, are not the last user, or have a type-changing
+  // transfer. At this point all elision opportunities have been exhausted.
+  // Type-changing transfers with multiple non-last users cannot be safely
+  // elided as the type change encodes semantic information needed by those
+  // users.
+  LLVM_DEBUG(llvm::dbgs() << "  - transfer source cannot be elided\n");
+  return false;
+}
+
+// Elides a stream.async.transfer op by replacing all uses with the source.
+static void elideTransferOp(IREE::Stream::AsyncTransferOp transferOp) {
+  transferOp.replaceAllUsesWith(transferOp.getSource());
+  transferOp.erase();
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::AsyncSliceOp elision
 //===----------------------------------------------------------------------===//
 
@@ -703,16 +1009,18 @@ static bool isSafeToElideSliceOp(IREE::Stream::AsyncSliceOp sliceOp,
   SmallVector<AsyncAccessRange> consumerRanges;
   SmallVector<AsyncAccessRange> queryRanges;
   for (auto user : source.getUsers()) {
-    if (user == sliceOp)
+    if (user == sliceOp) {
       continue;
+    }
     if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
       // Async op consuming part of the resource. We can query it to see what
       // it's doing to its operands/results and filter to just the accesses of
       // the source value.
       accessOp.getAsyncAccessRanges(queryRanges);
       for (auto range : queryRanges) {
-        if (range.resource == source)
+        if (range.resource == source) {
           consumerRanges.push_back(range);
+        }
       }
       queryRanges.clear();
     } else {
@@ -755,10 +1063,12 @@ static bool isSafeToElideSliceOp(IREE::Stream::AsyncSliceOp sliceOp,
 // arith.addi folders are terrible and don't handle adds of 0 so we handle that
 // here and then avoid doing the folding.
 static Value addOffset(Value lhs, Value rhs, OpBuilder &builder) {
-  if (matchPattern(lhs, m_Zero()))
+  if (matchPattern(lhs, m_Zero())) {
     return rhs;
-  if (matchPattern(rhs, m_Zero()))
+  }
+  if (matchPattern(rhs, m_Zero())) {
     return lhs;
+  }
   return builder.createOrFold<arith::AddIOp>(
       builder.getFusedLoc(lhs.getLoc(), rhs.getLoc()), lhs, rhs);
 }
@@ -808,8 +1118,9 @@ static void foldSliceIntoDispatch(IREE::Stream::AsyncSliceOp sliceOp,
 // Elides a stream.async.slice op (assuming able) by folding it into consumers.
 static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
   SmallVector<std::pair<Operation *, unsigned>> consumers;
-  for (auto &use : sliceOp.getResult().getUses())
+  for (auto &use : sliceOp.getResult().getUses()) {
     consumers.push_back(std::make_pair(use.getOwner(), use.getOperandNumber()));
+  }
   for (auto [owner, operandNumberIt] : consumers) {
     unsigned operandNumber = operandNumberIt; // need C++20 to avoid this :|
     TypeSwitch<Operation *>(owner)
@@ -825,20 +1136,274 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncUpdateOp elision
+//===----------------------------------------------------------------------===//
+
+// Returns true if |user| is a tied operation that fully overwrites the region
+// written by |updateOp|. When a tied operation's result aliases the update's
+// target buffer, downstream reads might access the update region. This is only
+// safe if the tied operation writes to the exact same region (fully
+// overwriting the update's data).
+static bool doesTiedOpFullyOverwriteUpdate(Operation *user,
+                                           IREE::Stream::AsyncUpdateOp updateOp,
+                                           Value target, Value result) {
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
+  if (!tiedOp) {
+    return true; // Not a tied op, no aliasing concern.
+  }
+
+  // Check if any operand using our result is tied.
+  for (auto &operand : user->getOpOperands()) {
+    if (operand.get() != result) {
+      continue;
+    }
+    if (!tiedOp.isOperandTied(operand.getOperandNumber())) {
+      continue;
+    }
+
+    // Result is tied - the operation's result aliases our buffer.
+    // Check if the operation fully overwrites our update region.
+    auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user);
+    if (!accessOp) {
+      // Tied but no access info - conservatively assume it doesn't overwrite.
+      return false;
+    }
+
+    SmallVector<AsyncAccessRange> ranges;
+    accessOp.getAsyncAccessRanges(ranges);
+    for (auto &range : ranges) {
+      // Only check writes to our result/target.
+      if (range.resource != result && range.resource != target) {
+        continue;
+      }
+      if (range.isReadOnly()) {
+        continue;
+      }
+      // Check if this write fully covers our update region.
+      bool sameStart = (range.start == updateOp.getTargetOffset());
+      bool sameEnd = (range.end == updateOp.getTargetEnd());
+      if (sameStart && sameEnd) {
+        return true; // Found a write that fully overwrites.
+      }
+    }
+
+    // Tied operand but no write fully covers the update region.
+    return false;
+  }
+
+  return true; // No tied operands using our result.
+}
+
+// Returns true if |updateOp| is safe to elide by proving the mutation has no
+// observable effect. An update is not observable if no subsequent operation
+// reads from the mutated region.
+static bool isSafeToElideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp,
+                                  ElisionAnalysis &analysis) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "isSafeToElideUpdateOp:\n";
+    llvm::dbgs() << "  ";
+    updateOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  // Check if target (or its base through tied chains) is a block argument
+  // with reference semantics. If passed by-reference, mutation might be
+  // observable to caller.
+  Value target = updateOp.getTarget();
+  Value targetBase = IREE::Util::TiedOpInterface::findTiedBaseValue(target);
+  if (auto arg = llvm::dyn_cast<BlockArgument>(targetBase)) {
+    if (!analysis.isArgMoved(arg)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - update target traces to by-ref arg; cannot elide\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "  ? update target traces to by-value arg; may elide\n");
+  }
+
+  // Verify target has no other users that might observe mutation through
+  // the shared underlying buffer. In well-formed CoW IR, target should
+  // only be used by this update, but we check defensively.
+  if (!target.hasOneUse()) {
+    LLVM_DEBUG(llvm::dbgs() << "  - target has multiple users; cannot elide\n");
+    return false;
+  }
+
+  // Build access range for the update operation.
+  // The update writes to target[offset, end), and result aliases target.
+  // We use result as the resource since we're checking against users of result.
+  Value result = updateOp.getResult();
+  AsyncAccessRange updateRange;
+  updateRange.access = ResourceAccessBitfield::Write;
+  updateRange.resource = result; // Use result, not target, for alias matching.
+  updateRange.start = updateOp.getTargetOffset();
+  updateRange.end = updateOp.getTargetEnd();
+  updateRange.length = updateOp.getUpdateSize();
+
+  // Check all uses of the result to see if they read the mutated region.
+  SmallVector<AsyncAccessRange> queryRanges;
+  LLVM_DEBUG(llvm::dbgs() << "  Checking users of update result\n");
+  for (auto user : result.getUsers()) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "  Examining user: ";
+      user->print(llvm::dbgs(), analysis.getAsmState());
+      llvm::dbgs() << "\n";
+    });
+
+    // Check if result is used as target of another update.
+    // If so, that update's result will alias our written region, and
+    // downstream reads of that result will read our region indirectly.
+    if (auto nextUpdate = dyn_cast<IREE::Stream::AsyncUpdateOp>(user)) {
+      if (nextUpdate.getTarget() == result) {
+        // Check if the next update fully overwrites our write region.
+        // This handles patterns like: alloca -> update[0:4] -> update[0:4]
+        // where the second update completely replaces the first.
+        bool sameStart =
+            (nextUpdate.getTargetOffset() == updateOp.getTargetOffset());
+        bool sameEnd = (nextUpdate.getTargetEnd() == updateOp.getTargetEnd());
+        if (sameStart && sameEnd) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "  ? chained update fully overwrites same region; "
+                        "continuing analysis\n");
+          // This chained update overwrites our write - safe to continue
+          // checking other users.
+          continue;
+        }
+        // Different regions or can't prove full coverage - be conservative.
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "  - result used as target of chained update; cannot elide\n");
+        return false;
+      }
+    }
+
+    // Check if result is used by a tied operation. When a tied operation's
+    // result aliases our buffer, downstream reads of that result might access
+    // our update region even if the operation itself writes to a different
+    // region. Block elision unless the operation fully overwrites our update
+    // region.
+    if (!doesTiedOpFullyOverwriteUpdate(user, updateOp, target, result)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - result used by tied op; cannot elide (downstream "
+                    "reads may access update region through tied result)\n");
+      return false;
+    }
+
+    if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
+      // Query the user operation for its access ranges.
+      accessOp.getAsyncAccessRanges(queryRanges);
+      LLVM_DEBUG(llvm::dbgs() << "    Got " << queryRanges.size()
+                              << " access ranges from user\n");
+      for (auto &userRange : queryRanges) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "    Range: ";
+          userRange.print(llvm::dbgs(), analysis.getAsmState());
+          llvm::dbgs() << "\n";
+          llvm::dbgs() << "      resource == target? "
+                       << (userRange.resource == target) << "\n";
+          llvm::dbgs() << "      resource == result? "
+                       << (userRange.resource == result) << "\n";
+        });
+        // Only check accesses to the same resource.
+        // Note: result aliases target (tied operand), so check both.
+        if (userRange.resource != target && userRange.resource != result) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Skipping range - different resource\n");
+          continue;
+        }
+
+        LLVM_DEBUG(llvm::dbgs() << "    Checking overlap...\n");
+        // TODO(benvanik): use integer range analysis (Presburger) to prove
+        // disjoint constant ranges don't overlap. Currently we conservatively
+        // assume overlap unless start == end (adjacent) or different resources.
+        // Check for overlap with the updated region.
+        if (IREE::Stream::AsyncAccessRange::mayOverlap(updateRange,
+                                                       userRange)) {
+          LLVM_DEBUG(llvm::dbgs() << "    Ranges overlap!\n");
+          // If the overlapping access has a read component, mutation is
+          // observable. Only pure writes (overwrites) are safe.
+          if (!userRange.isWriteOnly()) {
+            LLVM_DEBUG(
+                {
+                  llvm::dbgs()
+                      << "  - user reads from mutated region; cannot elide\n";
+                  llvm::dbgs() << "    v update ";
+                  updateRange.print(llvm::dbgs(), analysis.getAsmState());
+                  llvm::dbgs() << "\n";
+                  llvm::dbgs() << "    ^ conflict ";
+                  userRange.print(llvm::dbgs(), analysis.getAsmState());
+                  llvm::dbgs() << "\n";
+                });
+            return false;
+          }
+          // If the overlapping access is write-only, mutation is overwritten
+          // (safe to elide).
+        }
+      }
+      queryRanges.clear();
+    } else {
+      // Unknown user - conservatively assume it reads the mutation.
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "  - analysis failure on unhandled user of update result:\n";
+        user->print(llvm::dbgs(), analysis.getAsmState());
+      });
+      return false;
+    }
+  }
+
+  // No overlapping reads found - mutation is not observable.
+  LLVM_DEBUG(llvm::dbgs() << "  + update can be elided\n");
+  return true;
+}
+
+// Elides an update operation by proving the mutation has no observable effect.
+static void elideUpdateOp(IREE::Stream::AsyncUpdateOp updateOp) {
+  Value source = updateOp.getUpdate();
+  Value target = updateOp.getTarget();
+  Value result = updateOp.getResult();
+
+  // If this is a full-buffer update with matching types, replace with source.
+  // This handles patterns like: alloca -> full-buffer update -> use
+  // where we can bypass the staging buffer entirely.
+  if (updateOp.getUpdateSize() == updateOp.getTargetSize() &&
+      source.getType() == result.getType()) {
+    // Replace result with source (bypass staging buffer).
+    result.replaceAllUsesWith(source);
+  } else {
+    // Replace result with target (mutation didn't matter).
+    result.replaceAllUsesWith(target);
+  }
+  updateOp.erase();
+}
+
+//===----------------------------------------------------------------------===//
 // --iree-stream-elide-async-copies
 //===----------------------------------------------------------------------===//
 
 // Results from trying to elide copies in a region.
 struct ElisionResults {
   unsigned clonesElided = 0;
+  unsigned transfersElided = 0;
   unsigned slicesElided = 0;
-  bool didChange() const { return clonesElided > 0 || slicesElided > 0; }
+  unsigned updatesElided = 0;
+  bool didChange() const {
+    return clonesElided > 0 || transfersElided > 0 || slicesElided > 0 ||
+           updatesElided > 0;
+  }
+  void add(ElisionResults &other) {
+    clonesElided += other.clonesElided;
+    transfersElided += other.transfersElided;
+    slicesElided += other.slicesElided;
+    updatesElided += other.updatesElided;
+  }
 };
 
 // Tries to elide copies nested within |region| when safe.
-// Returns counts of clones and slices elided.
-static ElisionResults tryElideAsyncCopiesInRegion(Region &region,
-                                                  ElisionAnalysis &analysis) {
+// Returns true if any ops were elided.
+static ElisionResults tryElideAsyncCopiesInRegion(
+    Region &region, ElisionAnalysis &analysis,
+    IREE::Stream::AffinityTopologyAttrInterface topologyAttr) {
   ElisionResults results;
   for (auto &block : region) {
     block.walk([&](Operation *op) {
@@ -850,10 +1415,24 @@ static ElisionResults tryElideAsyncCopiesInRegion(Region &region,
             }
             return WalkResult::advance();
           })
+          .Case<IREE::Stream::AsyncTransferOp>([&](auto transferOp) {
+            if (isSafeToElideTransferOp(transferOp, analysis, topologyAttr)) {
+              elideTransferOp(transferOp);
+              ++results.transfersElided;
+            }
+            return WalkResult::advance();
+          })
           .Case<IREE::Stream::AsyncSliceOp>([&](auto sliceOp) {
             if (isSafeToElideSliceOp(sliceOp, analysis)) {
               elideSliceOp(sliceOp);
               ++results.slicesElided;
+            }
+            return WalkResult::advance();
+          })
+          .Case<IREE::Stream::AsyncUpdateOp>([&](auto updateOp) {
+            if (isSafeToElideUpdateOp(updateOp, analysis)) {
+              elideUpdateOp(updateOp);
+              ++results.updatesElided;
             }
             return WalkResult::advance();
           })
@@ -887,9 +1466,17 @@ struct ElideAsyncCopiesPass
       return;
     }
 
+    // Get the topology attribute from the module (if present).
+    // This enables topology-based transfer elision (unified memory, etc).
+    //
+    // TODO(benvanik): add a helper for this (we do this lookup in a few
+    // places).
+    auto topologyAttr =
+        moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>(
+            "stream.topology");
+
     // Track total elisions across all iterations.
-    unsigned totalClonesElided = 0;
-    unsigned totalSlicesElided = 0;
+    ElisionResults totalResults;
 
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
@@ -910,23 +1497,20 @@ struct ElideAsyncCopiesPass
       for (auto callableOp : analysis.getTopLevelOps()) {
         if (auto *region = callableOp.getCallableRegion()) {
           ElisionResults regionResults =
-              tryElideAsyncCopiesInRegion(*region, analysis);
-          iterationResults.clonesElided += regionResults.clonesElided;
-          iterationResults.slicesElided += regionResults.slicesElided;
+              tryElideAsyncCopiesInRegion(*region, analysis, topologyAttr);
+          iterationResults.add(regionResults);
         }
       }
-
-      totalClonesElided += iterationResults.clonesElided;
-      totalSlicesElided += iterationResults.slicesElided;
-
+      totalResults.add(iterationResults);
       if (!iterationResults.didChange()) {
         break; // quiesced
       }
     }
 
     // Update pass statistics.
-    numClonesElided += totalClonesElided;
-    numSlicesElided += totalSlicesElided;
+    numClonesElided += totalResults.clonesElided;
+    numTransfersElided += totalResults.transfersElided;
+    numSlicesElided += totalResults.slicesElided;
     numIterations += iterationCount;
 
     if (iterationCount == maxIterationCount) {

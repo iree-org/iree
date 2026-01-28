@@ -113,6 +113,37 @@ def OrdinalAllocationPass :
   }];
 }
 
+def AnnotateFunctionsPass :
+    Pass<"iree-vm-annotate-functions", "IREE::VM::ModuleOp"> {
+  let summary = "Annotates VM functions with yield/unwind requirements.";
+  let description = [{
+    Analyzes the call graph to propagate function attributes:
+    - vm.yield: Function may yield, requires resumable execution
+    - vm.unwind: Function requires stack unwinding with ref cleanup
+
+    This pass uses SCC-based propagation for efficiency:
+    1. Single walk per function to collect initial bits and callees
+    2. Process SCCs in reverse topological order
+    3. Propagate bits from callees to callers
+  }];
+}
+
+def ConvertToYieldableCallsPass :
+    Pass<"iree-vm-convert-to-yieldable-calls", "IREE::VM::ModuleOp"> {
+  let summary = "Converts calls to yieldable functions to vm.call.yieldable.";
+  let description = [{
+    Converts vm.call ops that target functions marked with vm.yield to
+    vm.call.yieldable ops. This makes yield points explicit in the IR,
+    enabling proper async handling in the bytecode interpreter and C export.
+
+    This pass must run after AnnotateFunctionsPass which marks functions
+    with vm.yield based on call graph analysis.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::VM::VMDialect"
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Optimization passes
 //===----------------------------------------------------------------------===//
@@ -127,6 +158,16 @@ def DropUnusedCallsPass :
   let summary = "Drops vm.call ops that have no side effects and are unused.";
 }
 
+def DropOptimizationBarriersPass :
+    Pass<"iree-vm-drop-optimization-barriers", "IREE::VM::ModuleOp"> {
+  let summary = "Drops vm.optimization_barrier ops.";
+  let description = [{
+    Removes vm.optimization_barrier ops by replacing them with their operands.
+    This pass should run after all optimization passes that could fold through
+    the barriers.
+  }];
+}
+
 def SinkDefiningOpsPass :
     Pass<"iree-vm-sink-defining-ops", "IREE::VM::ModuleOp"> {
   let summary = "Sinks defining ops with few uses to their use-sites.";
@@ -134,6 +175,19 @@ def SinkDefiningOpsPass :
     Sinks defining ops with few uses to their use-sites to reduce the total
     number of live registers at the cost of additional storage requirements.
   }];
+}
+
+def MaterializeRefDiscardsPass :
+    Pass<"iree-vm-materialize-ref-discards", "IREE::VM::ModuleOp"> {
+  let summary = "Inserts vm.discard.refs ops at ref death points.";
+  let description = [{
+    Analyzes value liveness and inserts explicit vm.discard.refs operations
+    at points where ref values are no longer needed. This enables functions
+    to be marked as "refs clean" so the runtime can skip cleanup on success.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::VM::VMDialect"
+  ];
 }
 
 #endif  // IREE_DIALECT_VM_PASSES

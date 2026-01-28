@@ -97,8 +97,9 @@ findPermutationsIndexingOperand(AffineMap indexingMap,
       if (iterators[d.getPosition()] == iter &&
           llvm::count_if(indexingMap.getResults(), [d](AffineExpr e) {
             return e.isFunctionOfDim(d.getPosition());
-          }) == 1)
+          }) == 1) {
         res.insert(d.getPosition());
+      }
     }
   }
   return res;

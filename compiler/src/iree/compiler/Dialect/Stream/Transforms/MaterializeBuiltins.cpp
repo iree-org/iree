@@ -351,8 +351,9 @@ struct MaterializeBuiltinsPass
           MaterializeBuiltinsPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    if (moduleOp.getBody()->empty()) {
       return;
+    }
 
     // Find and replace (if needed) ops that we want to turn into builtins
     // across the entire program.

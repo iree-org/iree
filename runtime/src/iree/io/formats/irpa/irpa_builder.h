@@ -57,6 +57,13 @@ IREE_API_EXPORT void iree_io_parameter_archive_builder_deinitialize(
 IREE_API_EXPORT bool iree_io_parameter_archive_builder_is_empty(
     const iree_io_parameter_archive_builder_t* builder);
 
+// Returns the size required to store the parameter archive header and
+// associated metadata (excluding parameters). Adding new parameters will
+// invalidate this value.
+IREE_API_EXPORT iree_io_physical_size_t
+iree_io_parameter_archive_builder_header_size(
+    const iree_io_parameter_archive_builder_t* builder);
+
 // Returns the total file size required to store the parameter archive header
 // and contents of all added parameters. Adding new parameters will invalidate
 // this value.

@@ -9,12 +9,17 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <memory>
+
 #include "iree/base/api.h"
+#include "iree/vm/buffer.h"
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module.h"
+#include "iree/vm/native_module_cc.h"
 #include "iree/vm/ref.h"
+#include "iree/vm/shims.h"
 #include "iree/vm/stack.h"
 
 // Wrapper for calling the import functions with type (i32)->i32.
@@ -329,4 +334,381 @@ static iree_status_t module_b_create(iree_vm_instance_t* instance,
   interface.resolve_import = module_b_resolve_import;
   return iree_vm_native_module_create(&interface, &module_b_descriptor_,
                                       instance, allocator, out_module);
+}
+
+//===----------------------------------------------------------------------===//
+// module_c_align
+//===----------------------------------------------------------------------===//
+// C implementation to test alignment-sensitive parameter unpacking and result
+// packing patterns. This module implements the same functions as module_cpp
+// using the C native module API.
+
+typedef struct module_c_align_t {
+  iree_allocator_t allocator;
+} module_c_align_t;
+
+typedef struct module_c_align_state_t {
+  iree_allocator_t allocator;
+  int counter;
+} module_c_align_state_t;
+
+static void IREE_API_PTR module_c_align_destroy(void* self) {
+  module_c_align_t* module = (module_c_align_t*)self;
+  iree_allocator_free(module->allocator, module);
+}
+
+static iree_status_t IREE_API_PTR
+module_c_align_alloc_state(void* self, iree_allocator_t allocator,
+                           iree_vm_module_state_t** out_module_state) {
+  module_c_align_state_t* state = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, sizeof(*state), (void**)&state));
+  memset(state, 0, sizeof(*state));
+  state->allocator = allocator;
+  *out_module_state = (iree_vm_module_state_t*)state;
+  return iree_ok_status();
+}
+
+static void IREE_API_PTR
+module_c_align_free_state(void* self, iree_vm_module_state_t* module_state) {
+  module_c_align_state_t* state = (module_c_align_state_t*)module_state;
+  iree_allocator_free(state->allocator, state);
+}
+
+// (i32) -> i32 - basic entry point.
+IREE_VM_ABI_EXPORT(module_c_align_entry, module_c_align_state_t, i, i) {
+  state->counter += args->i0 + 1;
+  rets->i0 = state->counter - 1;
+  return iree_ok_status();
+}
+
+// (i32, ref<buffer>) -> i32 - ref after i32 triggers alignment.
+IREE_VM_ABI_EXPORT(module_c_align_mixed_i32_ref, module_c_align_state_t, ir,
+                   i) {
+  iree_host_size_t buf_len =
+      iree_vm_ref_is_null(&args->r1)
+          ? 0
+          : iree_vm_buffer_length((iree_vm_buffer_t*)args->r1.ptr);
+  rets->i0 = args->i0 + (int32_t)buf_len;
+  return iree_ok_status();
+}
+
+// (ref<buffer>, i32, ref<buffer>) -> i32 - ref/i32/ref pattern.
+IREE_VM_ABI_EXPORT(module_c_align_mixed_ref_i32_ref, module_c_align_state_t,
+                   rir, i) {
+  iree_host_size_t len1 =
+      iree_vm_ref_is_null(&args->r0)
+          ? 0
+          : iree_vm_buffer_length((iree_vm_buffer_t*)args->r0.ptr);
+  iree_host_size_t len2 =
+      iree_vm_ref_is_null(&args->r2)
+          ? 0
+          : iree_vm_buffer_length((iree_vm_buffer_t*)args->r2.ptr);
+  rets->i0 = (int32_t)len1 + args->i1 + (int32_t)len2;
+  return iree_ok_status();
+}
+
+// (i32, i64) -> i64 - i64 after i32 triggers alignment.
+IREE_VM_ABI_EXPORT(module_c_align_mixed_i32_i64, module_c_align_state_t, iI,
+                   I) {
+  rets->i0 = args->i0 + args->i1;
+  return iree_ok_status();
+}
+
+// (i32, i32, i32, ref<buffer>) -> i32 - ref after 3 i32s (12 bytes).
+IREE_VM_ABI_EXPORT(module_c_align_mixed_i32x3_ref, module_c_align_state_t, iiir,
+                   i) {
+  iree_host_size_t buf_len =
+      iree_vm_ref_is_null(&args->r3)
+          ? 0
+          : iree_vm_buffer_length((iree_vm_buffer_t*)args->r3.ptr);
+  rets->i0 = args->i0 + args->i1 + args->i2 + (int32_t)buf_len;
+  return iree_ok_status();
+}
+
+// (i64, i32) -> i32 - i32 after i64.
+IREE_VM_ABI_EXPORT(module_c_align_mixed_i64_i32, module_c_align_state_t, Ii,
+                   i) {
+  rets->i0 = (int32_t)args->i0 + args->i1;
+  return iree_ok_status();
+}
+
+// (i32, i64, i32) -> i64 - i64 sandwiched between i32s.
+IREE_VM_ABI_EXPORT(module_c_align_mixed_i32_i64_i32, module_c_align_state_t,
+                   iIi, I) {
+  rets->i0 = args->i0 + args->i1 + args->i2;
+  return iree_ok_status();
+}
+
+// Exports must be sorted alphabetically by name.
+static const iree_vm_native_export_descriptor_t module_c_align_exports_[] = {
+    {IREE_SV("entry"), IREE_SV("0i_i"), 0, NULL},
+    {IREE_SV("mixed_i32_i64"), IREE_SV("0iI_I"), 0, NULL},
+    {IREE_SV("mixed_i32_i64_i32"), IREE_SV("0iIi_I"), 0, NULL},
+    {IREE_SV("mixed_i32_ref"), IREE_SV("0ir_i"), 0, NULL},
+    {IREE_SV("mixed_i32x3_ref"), IREE_SV("0iiir_i"), 0, NULL},
+    {IREE_SV("mixed_i64_i32"), IREE_SV("0Ii_i"), 0, NULL},
+    {IREE_SV("mixed_ref_i32_ref"), IREE_SV("0rir_i"), 0, NULL},
+};
+
+static const iree_vm_native_function_ptr_t module_c_align_funcs_[] = {
+    {(iree_vm_native_function_shim_t)iree_vm_shim_i_i,
+     (iree_vm_native_function_target_t)module_c_align_entry},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_iI_I,
+     (iree_vm_native_function_target_t)module_c_align_mixed_i32_i64},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_iIi_I,
+     (iree_vm_native_function_target_t)module_c_align_mixed_i32_i64_i32},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_ir_i,
+     (iree_vm_native_function_target_t)module_c_align_mixed_i32_ref},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_iiir_i,
+     (iree_vm_native_function_target_t)module_c_align_mixed_i32x3_ref},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_Ii_i,
+     (iree_vm_native_function_target_t)module_c_align_mixed_i64_i32},
+    {(iree_vm_native_function_shim_t)iree_vm_shim_rir_i,
+     (iree_vm_native_function_target_t)module_c_align_mixed_ref_i32_ref},
+};
+
+static_assert(IREE_ARRAYSIZE(module_c_align_funcs_) ==
+                  IREE_ARRAYSIZE(module_c_align_exports_),
+              "function pointer table must be 1:1 with exports");
+
+static const iree_vm_native_module_descriptor_t module_c_align_descriptor_ = {
+    /*name=*/IREE_SV("module_c"),
+    /*version=*/0,
+    /*attr_count=*/0,
+    /*attrs=*/NULL,
+    /*dependency_count=*/0,
+    /*dependencies=*/NULL,
+    /*import_count=*/0,
+    /*imports=*/NULL,
+    /*export_count=*/IREE_ARRAYSIZE(module_c_align_exports_),
+    /*exports=*/module_c_align_exports_,
+    /*function_count=*/IREE_ARRAYSIZE(module_c_align_funcs_),
+    /*functions=*/module_c_align_funcs_,
+};
+
+static iree_status_t module_c_align_create(iree_vm_instance_t* instance,
+                                           iree_allocator_t allocator,
+                                           iree_vm_module_t** out_module) {
+  module_c_align_t* module = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, sizeof(*module), (void**)&module));
+  memset(module, 0, sizeof(*module));
+  module->allocator = allocator;
+
+  iree_vm_module_t interface;
+  iree_status_t status = iree_vm_module_initialize(&interface, module);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(allocator, module);
+    return status;
+  }
+  interface.destroy = module_c_align_destroy;
+  interface.alloc_state = module_c_align_alloc_state;
+  interface.free_state = module_c_align_free_state;
+  return iree_vm_native_module_create(&interface, &module_c_align_descriptor_,
+                                      instance, allocator, out_module);
+}
+
+//===----------------------------------------------------------------------===//
+// module_cpp
+//===----------------------------------------------------------------------===//
+// C++ implementation using native_module_cc.h to test alignment-sensitive
+// parameter unpacking and result packing patterns. This module implements
+// functions with mixed type signatures that can trigger alignment issues.
+
+namespace {
+
+struct ModuleCppState final {
+  int counter = 0;
+
+  // Same signature as C module_b.entry: (i32) -> i32
+  iree::StatusOr<int32_t> Entry(int32_t arg0) {
+    counter += arg0 + 1;  // Equivalent to add_1
+    return counter - 1;   // Equivalent to sub_1
+  }
+
+  // (i32, ref<buffer>) -> i32 - tests ref after i32
+  iree::StatusOr<int32_t> MixedI32Ref(int32_t arg0,
+                                      iree::vm::ref<iree_vm_buffer_t> buf) {
+    // Return arg0 + buffer length (or 0 if null).
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf.get()) : 0;
+    return arg0 + static_cast<int32_t>(buf_len);
+  }
+
+  // (ref<buffer>, i32, ref<buffer>) -> i32 - tests ref after i32 after ref
+  iree::StatusOr<int32_t> MixedRefI32Ref(iree::vm::ref<iree_vm_buffer_t> buf1,
+                                         int32_t arg0,
+                                         iree::vm::ref<iree_vm_buffer_t> buf2) {
+    iree_host_size_t len1 = buf1 ? iree_vm_buffer_length(buf1.get()) : 0;
+    iree_host_size_t len2 = buf2 ? iree_vm_buffer_length(buf2.get()) : 0;
+    return static_cast<int32_t>(len1) + arg0 + static_cast<int32_t>(len2);
+  }
+
+  // (i32, i64) -> i64 - tests i64 after i32
+  iree::StatusOr<int64_t> MixedI32I64(int32_t a, int64_t b) { return a + b; }
+
+  // (i32, i32, i32, ref<buffer>) -> i32 - tests ref after 3 i32s (12 bytes)
+  iree::StatusOr<int32_t> MixedI32x3Ref(int32_t a, int32_t b, int32_t c,
+                                        iree::vm::ref<iree_vm_buffer_t> buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf.get()) : 0;
+    return a + b + c + static_cast<int32_t>(buf_len);
+  }
+
+  // (i64, i32) -> i32 - tests i32 after i64
+  iree::StatusOr<int32_t> MixedI64I32(int64_t a, int32_t b) {
+    return static_cast<int32_t>(a) + b;
+  }
+
+  // (i32, i64, i32) -> i64 - tests i64 sandwiched between i32s
+  iree::StatusOr<int64_t> MixedI32I64I32(int32_t a, int64_t b, int32_t c) {
+    return a + b + c;
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Borrowed pointer (T*) variants - tests ParamUnpack<T*> alignment
+  //===--------------------------------------------------------------------===//
+  // These use raw pointers instead of vm::ref<T> to test the borrowed pointer
+  // unpacking path which had a missing alignment bug.
+
+  // (i32, buffer*) -> i32 - borrowed ref after i32 (4 bytes, needs alignment)
+  iree::StatusOr<int32_t> BorrowedI32Ref(int32_t arg0, iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return arg0 + static_cast<int32_t>(buf_len);
+  }
+
+  // (i32, i32, buffer*) -> i32 - borrowed ref after 8 bytes (already aligned)
+  iree::StatusOr<int32_t> BorrowedI32x2Ref(int32_t a, int32_t b,
+                                           iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return a + b + static_cast<int32_t>(buf_len);
+  }
+
+  // (i32, i32, i32, buffer*) -> i32 - borrowed ref after 12 bytes (needs align)
+  // This is the pattern that crashed in e2e tests!
+  iree::StatusOr<int32_t> BorrowedI32x3Ref(int32_t a, int32_t b, int32_t c,
+                                           iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return a + b + c + static_cast<int32_t>(buf_len);
+  }
+
+  // (i32, i32, i32, i32, buffer*) -> i32 - borrowed ref after 16 bytes
+  // (aligned)
+  iree::StatusOr<int32_t> BorrowedI32x4Ref(int32_t a, int32_t b, int32_t c,
+                                           int32_t d, iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return a + b + c + d + static_cast<int32_t>(buf_len);
+  }
+
+  // (i32, i32, i32, i32, i32, buffer*) -> i32 - after 20 bytes (needs align)
+  iree::StatusOr<int32_t> BorrowedI32x5Ref(int32_t a, int32_t b, int32_t c,
+                                           int32_t d, int32_t e,
+                                           iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return a + b + c + d + e + static_cast<int32_t>(buf_len);
+  }
+
+  // (buffer*, i32, buffer*) -> i32 - borrowed ref/i32/ref pattern
+  iree::StatusOr<int32_t> BorrowedRefI32Ref(iree_vm_buffer_t* buf1,
+                                            int32_t arg0,
+                                            iree_vm_buffer_t* buf2) {
+    iree_host_size_t len1 = buf1 ? iree_vm_buffer_length(buf1) : 0;
+    iree_host_size_t len2 = buf2 ? iree_vm_buffer_length(buf2) : 0;
+    return static_cast<int32_t>(len1) + arg0 + static_cast<int32_t>(len2);
+  }
+
+  // (buffer*, buffer*) -> i32 - two consecutive borrowed refs
+  iree::StatusOr<int32_t> BorrowedRefRef(iree_vm_buffer_t* buf1,
+                                         iree_vm_buffer_t* buf2) {
+    iree_host_size_t len1 = buf1 ? iree_vm_buffer_length(buf1) : 0;
+    iree_host_size_t len2 = buf2 ? iree_vm_buffer_length(buf2) : 0;
+    return static_cast<int32_t>(len1) + static_cast<int32_t>(len2);
+  }
+
+  // (i64, buffer*) -> i32 - borrowed ref after i64 (already aligned)
+  iree::StatusOr<int32_t> BorrowedI64Ref(int64_t a, iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return static_cast<int32_t>(a) + static_cast<int32_t>(buf_len);
+  }
+
+  // (i32, i64, buffer*) -> i32 - borrowed ref after i32+i64
+  iree::StatusOr<int32_t> BorrowedI32I64Ref(int32_t a, int64_t b,
+                                            iree_vm_buffer_t* buf) {
+    iree_host_size_t buf_len = buf ? iree_vm_buffer_length(buf) : 0;
+    return a + static_cast<int32_t>(b) + static_cast<int32_t>(buf_len);
+  }
+
+  // (buffer*, i64, buffer*) -> i32 - i64 between two borrowed refs
+  iree::StatusOr<int32_t> BorrowedRefI64Ref(iree_vm_buffer_t* buf1, int64_t a,
+                                            iree_vm_buffer_t* buf2) {
+    iree_host_size_t len1 = buf1 ? iree_vm_buffer_length(buf1) : 0;
+    iree_host_size_t len2 = buf2 ? iree_vm_buffer_length(buf2) : 0;
+    return static_cast<int32_t>(len1) + static_cast<int32_t>(a) +
+           static_cast<int32_t>(len2);
+  }
+};
+
+static const iree::vm::NativeFunction<ModuleCppState> kModuleCppFunctions[] = {
+    // Owned ref (vm::ref<T>) functions.
+    iree::vm::MakeNativeFunction("entry", &ModuleCppState::Entry),
+    iree::vm::MakeNativeFunction("mixed_i32_ref", &ModuleCppState::MixedI32Ref),
+    iree::vm::MakeNativeFunction("mixed_ref_i32_ref",
+                                 &ModuleCppState::MixedRefI32Ref),
+    iree::vm::MakeNativeFunction("mixed_i32_i64", &ModuleCppState::MixedI32I64),
+    iree::vm::MakeNativeFunction("mixed_i32x3_ref",
+                                 &ModuleCppState::MixedI32x3Ref),
+    iree::vm::MakeNativeFunction("mixed_i64_i32", &ModuleCppState::MixedI64I32),
+    iree::vm::MakeNativeFunction("mixed_i32_i64_i32",
+                                 &ModuleCppState::MixedI32I64I32),
+    // Borrowed pointer (T*) functions - tests ParamUnpack<T*> alignment.
+    iree::vm::MakeNativeFunction("borrowed_i32_ref",
+                                 &ModuleCppState::BorrowedI32Ref),
+    iree::vm::MakeNativeFunction("borrowed_i32x2_ref",
+                                 &ModuleCppState::BorrowedI32x2Ref),
+    iree::vm::MakeNativeFunction("borrowed_i32x3_ref",
+                                 &ModuleCppState::BorrowedI32x3Ref),
+    iree::vm::MakeNativeFunction("borrowed_i32x4_ref",
+                                 &ModuleCppState::BorrowedI32x4Ref),
+    iree::vm::MakeNativeFunction("borrowed_i32x5_ref",
+                                 &ModuleCppState::BorrowedI32x5Ref),
+    iree::vm::MakeNativeFunction("borrowed_ref_i32_ref",
+                                 &ModuleCppState::BorrowedRefI32Ref),
+    iree::vm::MakeNativeFunction("borrowed_ref_ref",
+                                 &ModuleCppState::BorrowedRefRef),
+    iree::vm::MakeNativeFunction("borrowed_i64_ref",
+                                 &ModuleCppState::BorrowedI64Ref),
+    iree::vm::MakeNativeFunction("borrowed_i32_i64_ref",
+                                 &ModuleCppState::BorrowedI32I64Ref),
+    iree::vm::MakeNativeFunction("borrowed_ref_i64_ref",
+                                 &ModuleCppState::BorrowedRefI64Ref),
+};
+
+class ModuleCpp final : public iree::vm::NativeModule<ModuleCppState> {
+ public:
+  using iree::vm::NativeModule<ModuleCppState>::NativeModule;
+
+ protected:
+  iree::StatusOr<std::unique_ptr<ModuleCppState>> CreateState(
+      iree_allocator_t allocator) override {
+    return std::make_unique<ModuleCppState>();
+  }
+
+  iree::StatusOr<std::unique_ptr<ModuleCppState>> ForkState(
+      ModuleCppState* parent_state, iree_allocator_t allocator) override {
+    auto child_state = std::make_unique<ModuleCppState>();
+    child_state->counter = parent_state->counter;
+    return child_state;
+  }
+};
+
+}  // namespace
+
+static iree_status_t module_cpp_create(iree_vm_instance_t* instance,
+                                       iree_allocator_t allocator,
+                                       iree_vm_module_t** out_module) {
+  auto module = std::make_unique<ModuleCpp>(
+      "module_cpp", /*version=*/0, instance, allocator,
+      iree::span<const iree::vm::NativeFunction<ModuleCppState>>{
+          kModuleCppFunctions});
+  *out_module = module.release()->interface();
+  return iree_ok_status();
 }

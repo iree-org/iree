@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "jit_globals_vmvx_errors.mlir"
     "scalar_values.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree-opt
   TIMEOUT

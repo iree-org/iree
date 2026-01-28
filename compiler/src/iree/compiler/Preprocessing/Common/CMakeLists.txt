@@ -38,7 +38,6 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
-    "SinkTransposeThroughPad.cpp"
     "TransposeMatmul.cpp"
   DEPS
     ::PassesIncGen

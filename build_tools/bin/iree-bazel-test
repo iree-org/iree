@@ -1,0 +1,169 @@
+#!/bin/bash
+# Run IREE tests with Bazel.
+#
+# Usage: iree-bazel-test [options] [target] [bazel-args...]
+#
+# Examples:
+#   iree-bazel-test                       # Run all tests (CPU only)
+#   iree-bazel-test //compiler/...        # Test compiler only
+#   iree-bazel-test --config=asan         # Test with AddressSanitizer
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-test"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-test - Run IREE tests with Bazel
+
+USAGE
+    iree-bazel-test [options] [target] [bazel-args...]
+
+OPTIONS
+    -n, --dry_run    Show the bazel command without executing
+    -v, --verbose    Show the bazel command before executing
+    -w, --watch      Watch mode: rerun tests on file changes
+    -h, --help       Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+    NOTE: --keep_going is always enabled for test runs.
+
+ARGUMENTS
+    target       Bazel target (required)
+    bazel-args   Additional arguments passed to bazel test
+
+EXAMPLES
+    # Test all compiler components
+    iree-bazel-test //compiler/...
+
+    # Test a specific test target
+    iree-bazel-test //runtime/src/iree/base:status_test
+
+    # Test all tools
+    iree-bazel-test //tools/...
+
+    # Test with AddressSanitizer
+    iree-bazel-test //compiler/... --config=asan
+
+    # Watch and rerun on changes (great for TDD)
+    iree-bazel-test -w //runtime/src/iree/base:status_test
+
+    # Show command without executing (verbose dry-run)
+    iree-bazel-test -nv //compiler/...
+
+DEFAULT BEHAVIOR
+    - Runs tests using drivers configured in 'iree-bazel-configure'
+    - Continues on test failures (--keep_going)
+
+CONFIGURING DRIVERS
+    Configure drivers ONCE, then test repeatedly:
+
+    IREE_HAL_DRIVER_CUDA=ON iree-bazel-configure   # Enable CUDA
+    iree-bazel-test //runtime/...                   # Tests include CUDA
+
+    IREE_HAL_DRIVER_CUDA=OFF iree-bazel-configure  # Disable CUDA
+    iree-bazel-test //runtime/...                   # CUDA tests skipped
+
+    All configuration happens during 'iree-bazel-configure'.
+
+CONFIGURATIONS
+    --config=localdev        Local dev optimizations (disk cache, skymeld)
+    --config=debug           Debug build tests
+    --config=asan            Address Sanitizer
+    --config=msan            Memory Sanitizer
+    --config=tsan            Thread Sanitizer
+
+SEE ALSO
+    iree-bazel-configure, iree-bazel-build
+EOF
+}
+
+# Parse arguments.
+WATCH_MODE=0
+TARGET=""
+BAZEL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            IREE_BAZEL_DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -w|--watch)
+            WATCH_MODE=1
+            shift
+            ;;
+        -*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        *)
+            if [[ -z "${TARGET}" ]]; then
+                TARGET="${1}"
+            else
+                BAZEL_ARGS+=("${1}")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Set up worktree (after arg parsing so --help works anywhere).
+iree_setup_worktree
+
+# Target is required.
+if [[ -z "${TARGET}" ]]; then
+    iree_error "Target is required for bazel test"
+    echo ""
+    echo "Examples:"
+    echo "  iree-bazel-test //compiler/..."
+    echo "  iree-bazel-test //runtime/src/iree/base:status_test"
+    echo "  iree-bazel-test //tools/..."
+    exit 1
+fi
+
+# Build tag filters based on environment.
+TAG_FILTERS="-nodocker"
+BUILD_FILTERS=""
+
+# Driver filtering is controlled by configured.bazelrc (written by iree-bazel-configure).
+# No runtime env var checks - configuration happens once during configure.
+
+# Build the command with default configs before user args.
+iree_bazel_build_default_configs
+BAZEL_BIN=$(iree_get_bazel_command "${WATCH_MODE}")
+CMD=("${BAZEL_BIN}" test "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" --keep_going "${TARGET}"
+    --test_tag_filters="${TAG_FILTERS}"
+    --build_tag_filters="${BUILD_FILTERS}"
+    "${BAZEL_ARGS[@]}")
+
+# Execute or show.
+if iree_is_verbose || iree_is_dry_run; then
+    iree_info "Command: ${CMD[*]}"
+fi
+
+if iree_is_dry_run; then
+    exit 0
+fi
+
+iree_info "Testing ${TARGET}"
+iree_info "Tag filters: ${TAG_FILTERS}"
+exec "${CMD[@]}"

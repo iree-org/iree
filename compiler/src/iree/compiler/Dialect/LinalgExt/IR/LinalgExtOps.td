@@ -272,6 +272,89 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let hasCanonicalizer = 1;
 }
 
+def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
+    [DeclareOpInterfaceMethods<TilingInterface,
+        ["getIterationDomain",
+         "getLoopIteratorTypes",
+         "getResultTilePosition",
+         "getTiledImplementation",
+         "generateResultTileValue",
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles",
+         "generateScalarImplementation"]>]> {
+  let summary = [{Gather with a mapping from result indices to source indices.}];
+  let description = [{
+    Takes two operands, `source` and `output`, and reads every element from
+    the `source` based on a computed index mapping to store into the `output`.
+    If the operands are tensors, the op will also return a Value for the result.
+    For an element of the `output`, the index to read from the `source` is
+    determined by index computation mapping the index in the `output` value to
+    an index in the `source` value. This computation is contained in the
+    `transformation_region`, which contains a single block, with one argument
+    for each dimension in the `output` value. The block arguments represent the
+    index of a given element along the corresponding dimension (i.e., block arg
+    `i` represents the index along dimension `i` of the `output` value). The
+    block is terminated by an iree_linalg_ext.yield op, which yields one index
+    for each dimension in the `source`, and an additional padding value which
+    represents the value to use if the computed source indices are out of bounds.
+  }];
+  let arguments = (ins
+      AnyShaped:$source,
+      AnyRankedTensorOrMemRef:$output
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$transformation_region);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict $source `into` $output
+    $transformation_region
+    `:` type($source) `into` type($output) (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    ShapedType getSourceType() {
+      return cast<ShapedType>(getSource().getType());
+    }
+    int64_t getSourceRank() {
+      return getSourceType().getRank();
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+
+    // Helper to apply transformations to the output index block arguments of
+    // the transformation body, and replace the uses of the previous output
+    // indices with the values returned by `transformationBuilder`. The argument
+    // to `transformationBuilder` function will be an ArrayRef of the new block
+    // arguments, the number of which is determined by `numOutputIndices`. The
+    // `transformationBuilder` should return the replacements for the old block
+    // arguments.
+    void insertTransformationAtStart(
+        OpBuilder &builder,
+        function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
+            transformationBuilder,
+        int64_t numOutputIndices);
+
+    // Inline the transformation region of the map_gather op without its
+    // terminator, replacing the block arguments with the passed
+    // `transformBodyIndices`. The `bodyBuilder` function is called with the
+    // cloned `Value`s that would have been yielded by the terminator of
+    // the inlined transformation body (source indices and padding value).
+    void inlineMapGatherBody(
+      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputMutable();
+    }
+  }];
+}
+
 def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
     [DeclareOpInterfaceMethods<TilingInterface,
         ["getIterationDomain",
@@ -305,6 +388,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);
   let hasVerifier = 1;
+  let hasRegionVerifier = 1;
   let hasCanonicalizer = 1;
   let assemblyFormat = [{
     attr-dict $input `into` $output
@@ -668,14 +752,24 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     returning both the selected value and its corresponding index. The selection
     logic is defined by a user-specified comparator region.
 
-    The comparator region receives two candidate values and returns a single `i1`
-    result indicating whether the first argument should be preferred over the second.
+    The operation supports two modes:
 
-    This region defines the sorting rule, e.g., "greater than" for argmax or
-    "less than" for argmin. It allows for generalization beyond simple argmax-style
+    1. Implicit-index mode (single input): Computes (value, index) pairs from scratch.
+       Indices are implicitly computed from the reduction dimension's iteration index
+       (using linalg.index on the reduction dimension). The comparator
+       region receives two candidate values and returns a single `i1` result indicating
+       whether the first argument should be preferred.
+
+    2. Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
+       Indices are explicitly provided as input. The comparator region receives
+       two candidate values and returns `i1` to select the preferred value.
+       This mode is used to combine results from split-reduction operations.
+
+    The comparator region defines the sorting rule, e.g., "greater than" for argmax or
+    "less than" for argmin, allowing for generalization beyond simple argmax-style
     behavior.
 
-    Example (argmax over dim 1):
+    Example (implicit-index mode - argmax over dim 1):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -690,7 +784,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     }
     ```
 
-    Example with index_base = 5 (i.e., indices start counting from 5):
+    Example (implicit-index mode with index_base = 5):
     ```mlir
     %input = memref<2x10xf32>
     %out_val = memref<2xf32>
@@ -701,6 +795,22 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       ins(%input : memref<2x10xf32>)
       outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>)
       index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    }
+    ```
+
+    Example (explicit-index mode - combining partial results):
+    ```mlir
+    %partial_vals = memref<2x4xf32>
+    %partial_idxs = memref<2x4xi32>
+    %out_val = memref<2xf32>
+    %out_idx = memref<2xi32>
+    iree_linalg_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : memref<2x4xf32>, memref<2x4xi32>)
+      outs(%out_val, %out_idx : memref<2xf32>, memref<2xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
       iree_linalg_ext.yield %cmp : i1
@@ -736,6 +846,20 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
       return getDpsInputOperand(0)->get();
     }
 
+    // Returns true when the operation is in explicit-index mode, which occurs
+    // when a second input operand provides pre-computed indices.
+    bool hasExplicitIndexInput() {
+      return getInputs().size() == 2;
+    }
+
+    // Returns the index input operand, or nullptr if not in explicit-index mode.
+    Value getInputIndex() {
+      if (!hasExplicitIndexInput()){
+        return nullptr;
+      }
+      return getDpsInputOperand(1)->get();
+    }
+
     Value outputValue() {
       return getDpsInitOperand(0)->get();
     }
@@ -754,6 +878,28 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 
     ShapedType getOutputIndexType() {
       return cast<ShapedType>(outputIndex().getType());
+    }
+
+    // Returns the ShapedType of the index input, or nullptr if not in
+    // explicit-index mode.
+    ShapedType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<ShapedType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    // Returns the element type of the index input, or nullptr if not in
+    // explicit-index mode.
+    Type getInputIndexElementType() {
+      if (ShapedType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getOutputIndexElementType() {
+      return getOutputIndexType().getElementType();
     }
 
     int64_t getInputRank() {
@@ -923,6 +1069,16 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     it over the entire softmax reduction dimension by:
       x, _, sum : results
       x = (1 / sum) * x
+
+    Decomposition Configuration:
+    The `decomposition_config` attribute is a DictionaryAttr that controls how
+    this operation is decomposed into lower-level operations. It supports:
+      - "qk_attrs": DictionaryAttr - Attributes to attach to the Q@K matmul
+        operation after decomposition (e.g., lowering_config, attention markers)
+      - "pv_attrs": DictionaryAttr - Attributes to attach to the P@V matmul
+        operation after decomposition
+      - "use_exp2": BoolAttr - If true, uses exp2 with log2(e) scaling instead
+        of exp. (Gives better perf on some hardware, but trades off accuracy)
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1007,6 +1163,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     // Attributes to set on QK and PV matmul after decomposition.
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
+    // Flag to control whether to use exp2 (with log2(e) scaling) or exp.
+    static StringRef getUseExp2AttrStr() { return "use_exp2"; }
   }];
 
   let hasCanonicalizer = 1;
@@ -1018,6 +1176,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
 
 def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
   AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
   DeclareOpInterfaceMethods<IndexingMapOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   [
@@ -1065,10 +1224,12 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     - `nmax` is the new maximum, read from the current element from the input
       tensor
 
-    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
-    before executing the basic block.
+    The other input operands are unaffected.
 
-    For example,
+    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
+    before executing the basic block. Other output operands are unaffected.
+
+    For example, we write the online normalized softmax algorithm as follows:
 
     ```mlir
     // compute the exponentials and the sum
@@ -1081,7 +1242,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
       iterator_types = [
         #iree_linalg_ext.iterator_type<reduction>
       ],
-      exp_reduced_operands = [ 1 ]
+      exp_reduced_operands = [ 1 ]  // 1 corresponds to %s being normalized by %m
     } ins(%V: tensor<256xf32>)
       outs(%M_init, %S: tensor<f32>, tensor<f32>) {
       ^bb0(%exp_v: f32, %m: f32, %s: f32):
@@ -1092,39 +1253,33 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     } -> tensor<f32>, tensor<f32>
   ```
 
-  Encodes the following computation
+  This encodes the following computation, sans handling of the norms
 
   ```
   %M, %O = linalg.generic {
-    indexing_maps = [
-      affine_map<(i) -> (i)>,
-      affine_map<(i) -> ()>,
-      affine_map<(i) -> ()>
-    ],
-    iterator_types = [
-      "reduction"
-    ],
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %m: f32, %s: f32):
       %exp_v = math.exp2 %v       : f32
-      %add = arith.addf %norm, %s : f32
+      %add = arith.addf %exp_v, %s : f32
       linalg.yield %m, %add       : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
 
-  And transforms it into operations equivalent to the following:
+  And decomposes into operations equivalent to the following:
 
   ```
   %M, %O = linalg.generic {
-    indexing_maps = [
-      affine_map<(i) -> (i)>,
-      affine_map<(i) -> ()>,
-      affine_map<(i) -> ()>
-    ],
-    iterator_types = [
-      "reduction"
-    ],
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
   } ins(%V: tensor<256xf32>)
     outs(%M_init, %S: tensor<f32>, tensor<f32>) {
     ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
@@ -1136,7 +1291,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
       %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
       %add    = arith.addf %exp_v, %s      : f32
       linalg.yield %m, %add                : f32, f32
-  } -> tensor<256xf32>, tensor<f32>
+  } -> tensor<f32>, tensor<f32>
   ```
   }];
 
@@ -1173,6 +1328,10 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     // DestinationStyleOpInterface methods.
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
+    }
+
+    int64_t getReducingOpIndex() {
+      return 0;
     }
   }];
 }

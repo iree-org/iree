@@ -245,6 +245,7 @@ nav:
           - "developers/debugging/model-development.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"
+          - "developers/debugging/fuzzing.md"
       - "Performance":
           - "developers/performance/benchmarking.md"
           - "developers/performance/profiling.md"

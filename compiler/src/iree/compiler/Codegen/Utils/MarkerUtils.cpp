@@ -124,8 +124,9 @@ StringRef getDeleteMarker() { return "delete"; }
 StringRef getMarkerOrNull(Operation *op) {
   StringAttr attr =
       op->getAttrOfType<StringAttr>(LinalgTransforms::kLinalgTransformMarker);
-  if (!attr)
+  if (!attr) {
     return "";
+  }
   return attr.getValue();
 }
 

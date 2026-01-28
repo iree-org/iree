@@ -12,15 +12,19 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-stream-automatic-reference-counting"
 
@@ -35,18 +39,20 @@ namespace {
 // Local analysis
 //===----------------------------------------------------------------------===//
 
-// Block-local analysis for timepoint coverage.
-struct LocalTimepointCoverage {
+// Analysis for timepoint coverage within the current recursive analysis scope
+// (e.g., a function or nested region).
+struct ScopedTimepointCoverage {
   // Must be provided if LLVM_DEBUG is enabled.
   AsmState *asmState;
   // A map of timepoint SSA values to indices within the coverage map.
-  // Values from other blocks are omitted. Order is that of the appearance
-  // in the block but is not guaranteed and the value should only be used
-  // for indexing into the map.
+  // This map accumulates timepoints from the current analysis scope, including
+  // those from parent blocks/regions when the object is passed down.
+  // Order is that of the appearance in the block but is not guaranteed and the
+  // value should only be used for indexing into the map.
   DenseMap<Value, unsigned> timepoints;
 
-  LocalTimepointCoverage() = delete;
-  LocalTimepointCoverage(AsmState *asmState) : asmState(asmState) {}
+  ScopedTimepointCoverage() = delete;
+  ScopedTimepointCoverage(AsmState *asmState) : asmState(asmState) {}
 
   // A matrix of timepoints by index to bits indicating whether another
   // timepoint (column) covers the entry (row).
@@ -177,7 +183,7 @@ struct LastUseSet {
   // Must be provided if LLVM_DEBUG is enabled.
   AsmState *asmState;
   // Timepoint coverage map.
-  LocalTimepointCoverage &coverage;
+  ScopedTimepointCoverage &coverage;
   // Resource base value to a set of signal timepoints from users.
   // Each set of timepoints is maintained as only those not covered by
   // others. Multiple values indicates a fork.
@@ -189,7 +195,7 @@ struct LastUseSet {
   SmallVector<Value> baseResourceOrder;
 
   LastUseSet() = delete;
-  LastUseSet(AsmState *asmState, LocalTimepointCoverage &coverage)
+  LastUseSet(AsmState *asmState, ScopedTimepointCoverage &coverage)
       : asmState(asmState), coverage(coverage) {}
 
   // Calls |fn| for each base resource produced within the analysis scope with
@@ -300,31 +306,40 @@ struct LastUseSet {
   }
 };
 
-// Returns the last defined SSA value in the block in |timepoints|.
+// Returns the timepoints sorted by their order in the block (textual order).
 // All timepoints must be in the same block.
+static SmallVector<Value> getSortedTimepointsInBlock(TimepointSet &timepoints) {
+  auto sorted = llvm::to_vector_of<Value>(timepoints);
+  llvm::sort(sorted, [](Value a, Value b) {
+    Operation *opA = a.getDefiningOp();
+    Operation *opB = b.getDefiningOp();
+    if (!opA && !opB) {
+      // Both are block arguments, compare by argument number.
+      return cast<BlockArgument>(a).getArgNumber() <
+             cast<BlockArgument>(b).getArgNumber();
+    }
+    if (!opA) {
+      return true; // Block argument comes before operation.
+    }
+    if (!opB) {
+      return false; // Operation comes before block argument.
+    }
+    return opA->isBeforeInBlock(opB);
+  });
+  return sorted;
+}
+
+// Returns the last defined SSA value in the block in |timepoints| (textual
+// order within the block). All timepoints must be in the same block.
 static Value getLastTimepointInBlock(TimepointSet &timepoints) {
   if (timepoints.empty()) {
     return nullptr;
-  } else if (timepoints.size() == 1) {
+  }
+  if (timepoints.size() == 1) {
     return *timepoints.begin();
   }
-  Value lastTimepoint;
-  for (auto timepoint : timepoints) {
-    if (!lastTimepoint) {
-      lastTimepoint = timepoint;
-    } else {
-      auto *timepointOp = timepoint.getDefiningOp();
-      auto *lastTimepointOp = lastTimepoint.getDefiningOp();
-      if (!timepointOp) {
-        continue; // block arg
-      } else if (!lastTimepointOp) {
-        lastTimepoint = timepoint; // last found was a block arg, this isn't
-      } else if (lastTimepointOp->isBeforeInBlock(timepointOp)) {
-        lastTimepoint = timepoint;
-      }
-    }
-  }
-  return lastTimepoint;
+  SmallVector<Value> sorted = getSortedTimepointsInBlock(timepoints);
+  return sorted.back();
 }
 
 // Returns a FusedLoc with the location of all |timepoints| and the base |loc|.
@@ -346,6 +361,640 @@ static StringRef getFuncName(FunctionOpInterface funcOp) {
   } else {
     return funcOp.getName();
   }
+}
+
+// Conservatively marks all resources touched by an operation and its nested
+// regions as indeterminate. Used as fallback for control flow we cannot
+// analyze precisely.
+static void markAllResourcesIndeterminateInOpAndRegions(
+    Operation &op, LastUseSet &lastUseSet,
+    DenseSet<Value> &indeterminateResources) {
+  // Mark all currently tracked resources.
+  lastUseSet.forEachResource([&](Value resource, TimepointSet &timepoints) {
+    indeterminateResources.insert(resource);
+  });
+
+  // Walk nested operations to find all resources used within regions.
+  op.walk([&](Operation *nestedOp) {
+    for (auto operand : nestedOp->getOperands()) {
+      if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+        Value baseResource = lastUseSet.lookupResource(operand);
+        indeterminateResources.insert(baseResource);
+      }
+    }
+    for (auto result : nestedOp->getResults()) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
+        Value baseResource = lastUseSet.lookupResource(result);
+        indeterminateResources.insert(baseResource);
+      }
+    }
+  });
+}
+
+// Forward declarations for mutual recursion.
+static bool analyzeRegionBranchOp(RegionBranchOpInterface regionBranchOp,
+                                  AsmState *asmState, LastUseSet &lastUseSet,
+                                  ScopedTimepointCoverage &coverage,
+                                  DenseSet<Value> &indeterminateResources,
+                                  DenseSet<Value> &handledResources);
+
+// Analyzes operations in a block, handling both timeline ops and nested
+// control flow recursively.
+static bool analyzeBlockOps(Block &block, AsmState *asmState,
+                            LastUseSet &lastUseSet,
+                            ScopedTimepointCoverage &coverage,
+                            DenseSet<Value> &indeterminateResources,
+                            DenseSet<Value> &handledResources) {
+  for (Operation &op : block) {
+    // Special case ops that are not timeline-aware but interoperate.
+    if (auto immediateOp = dyn_cast<IREE::Stream::TimepointImmediateOp>(op)) {
+      coverage.add(immediateOp.getResultTimepoint());
+      continue;
+    } else if (auto importOp = dyn_cast<IREE::Stream::TimepointImportOp>(op)) {
+      coverage.add(importOp.getResultTimepoint());
+      continue;
+    }
+
+    // Handle resource lifetime management ops.
+    if (auto retainOp = dyn_cast<IREE::Stream::ResourceRetainOp>(op)) {
+      handledResources.insert(lastUseSet.lookupResource(retainOp.getOperand()));
+      continue;
+    } else if (auto releaseOp = dyn_cast<IREE::Stream::ResourceReleaseOp>(op)) {
+      handledResources.insert(
+          lastUseSet.lookupResource(releaseOp.getOperand()));
+      continue;
+    }
+
+    // Timeline ops are handled via the standard analysis.
+    // IMPORTANT: Check TimelineOpInterface BEFORE RegionBranchOpInterface
+    // because stream.cmd.execute implements both, and should be handled as a
+    // timeline op.
+    auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(op);
+    if (!timelineOp) {
+      // Handle structured control flow recursively (scf.for, scf.if, etc.).
+      if (auto regionBranchOp = dyn_cast<RegionBranchOpInterface>(op)) {
+        if (!analyzeRegionBranchOp(regionBranchOp, asmState, lastUseSet,
+                                   coverage, indeterminateResources,
+                                   handledResources)) {
+          // Unknown control flow - fallback to conservative marking.
+          LLVM_DEBUG(
+              llvm::dbgs()
+              << "[arc] failed to analyze nested RegionBranchOpInterface "
+              << op.getName() << "; using conservative fallback\n");
+          markAllResourcesIndeterminateInOpAndRegions(op, lastUseSet,
+                                                      indeterminateResources);
+        }
+        continue;
+      }
+
+      // Non-timeline, non-control-flow ops: mark resources indeterminate.
+      for (auto operand : op.getOperands()) {
+        if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+          indeterminateResources.insert(lastUseSet.lookupResource(operand));
+        }
+      }
+      for (auto result : op.getResults()) {
+        if (isa<IREE::Stream::ResourceType>(result.getType())) {
+          indeterminateResources.insert(lastUseSet.lookupResource(result));
+        }
+      }
+      continue;
+    }
+
+    // Process timeline op.
+    Value resultTimepoint = timelineOp.getResultTimepoint();
+    if (!resultTimepoint) {
+      continue;
+    }
+
+    // Populate coverage.
+    auto awaitTimepoints = timelineOp.getAwaitTimepoints();
+    if (awaitTimepoints.empty()) {
+      coverage.add(resultTimepoint);
+    } else {
+      for (Value awaitTimepoint : awaitTimepoints) {
+        coverage.add(awaitTimepoint, resultTimepoint);
+      }
+    }
+
+    // Check for explicitly indeterminate allocas.
+    if (auto allocaOp = dyn_cast<IREE::Stream::ResourceAllocaOp>(op)) {
+      if (allocaOp.getIndeterminateLifetime()) {
+        indeterminateResources.insert(allocaOp.getResult());
+      }
+    }
+
+    // Track existing deallocations.
+    if (auto deallocaOp = dyn_cast<IREE::Stream::ResourceDeallocaOp>(op)) {
+      handledResources.insert(
+          lastUseSet.lookupResource(deallocaOp.getOperand()));
+    }
+
+    // Track resource consumption/production.
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+    for (auto operand : op.getOperands()) {
+      if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+        lastUseSet.consume(operand, resultTimepoint);
+      }
+    }
+    for (auto result : op.getResults()) {
+      if (isa<IREE::Stream::ResourceType>(result.getType())) {
+        Value operand = tiedOp ? tiedOp.getTiedResultOperand(result) : nullptr;
+        if (operand) {
+          lastUseSet.tie(operand, result, resultTimepoint);
+        } else {
+          lastUseSet.produce(result, resultTimepoint);
+          // Mark non-alloca producers as indeterminate (#20817).
+          if (!isa<IREE::Stream::ResourceAllocaOp>(op)) {
+            indeterminateResources.insert(result);
+          }
+        }
+      }
+    }
+  }
+  return true;
+}
+
+// Inserts deallocations for all resources tracked in the LastUseSet.
+// This is called after analysis is complete to insert deallocation operations.
+static void insertDeallocations(LastUseSet &lastUseSet, AsmState *asmState,
+                                DenseSet<Value> &indeterminateResources,
+                                DenseSet<Value> &handledResources) {
+  // Insert deallocations for all resources that we successfully analyzed.
+  lastUseSet.forEachResource([&](Value resource, TimepointSet &timepoints) {
+    assert(!timepoints.empty() && "all resources should have a timepoint");
+
+    // Skip anything we could not analyze.
+    Value baseResource = lastUseSet.lookupResource(resource);
+    if (indeterminateResources.contains(baseResource)) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[arc] skipping resource ";
+        baseResource.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " marked as indeterminate\n";
+      });
+      return;
+    } else if (handledResources.contains(baseResource)) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[arc] skipping resource ";
+        baseResource.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " marked as already handled\n";
+      });
+      return;
+    }
+
+    // Finds the last timepoint in the set (if >1) in SSA dominance order.
+    Value lastTimepoint = getLastTimepointInBlock(timepoints);
+    assert(lastTimepoint && "must have at least one timepoint");
+    OpBuilder builder(lastTimepoint.getContext());
+    builder.setInsertionPointAfterValue(lastTimepoint);
+
+    // Try to grab a resource size or insert a query.
+    // In almost all cases that this analysis can run we will have a
+    // size-aware op that provides it.
+    auto timepointsLoc =
+        getFusedLocFromTimepoints(resource.getLoc(), timepoints);
+    Value resourceSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
+        timepointsLoc, resource, builder);
+
+    // Lookup the affinity of the resource.
+    // This should likely be a global affinity analysis but since we are
+    // currently only processing locally we can assume this is only used when
+    // we have an op local with an affinity assigned.
+    IREE::Stream::AffinityAttr resourceAffinity;
+    if (auto *definingOp = resource.getDefiningOp()) {
+      resourceAffinity = IREE::Stream::AffinityAttr::lookup(definingOp);
+    }
+    UnitAttr preferOrigin =
+        resourceAffinity ? UnitAttr{} : builder.getUnitAttr();
+
+    if (timepoints.size() == 1) {
+      // Single last user; the resource can have a deallocation directly
+      // inserted as we have tracked both allocation and now deallocation to
+      // single code points.
+      LLVM_DEBUG({
+        llvm::dbgs() << "[arc] inserting deallocation for ";
+        resource.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " after timepoint ";
+        lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " directly\n";
+      });
+      auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+          builder, timepointsLoc,
+          builder.getType<IREE::Stream::TimepointType>(), resource,
+          resourceSize, preferOrigin, lastTimepoint, resourceAffinity);
+      lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
+                                         deallocaOp);
+    } else if (timepoints.size() > 1) {
+      // Multiple last users (fork); the resource still has a tracked
+      // allocation and deallocation but there are multiple code points where
+      // the deallocation may need to be inserted.
+      //
+      // Since this current analysis is local we can rely on SSA dominance to
+      // find the last SSA value and insert a join on all timepoints there to
+      // perform the deallocation, though this will cause extended lifetimes
+      // in cases where scheduled timeline operations complete out of order.
+      // We won't have correctness issues as all timepoints will be waited on.
+      LLVM_DEBUG({
+        llvm::dbgs() << "[arc] inserting forked deallocation for ";
+        resource.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " after last SSA timepoint ";
+        lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
+        llvm::dbgs() << " as a join\n";
+      });
+      auto joinOp = IREE::Stream::TimepointJoinOp::create(
+          builder, timepointsLoc,
+          builder.getType<IREE::Stream::TimepointType>(),
+          getSortedTimepointsInBlock(timepoints));
+      auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+          builder, timepointsLoc,
+          builder.getType<IREE::Stream::TimepointType>(), resource,
+          resourceSize, preferOrigin, joinOp.getResultTimepoint(),
+          resourceAffinity);
+      lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
+                                         joinOp);
+    }
+  });
+}
+
+// Collects all timepoint results from an operation and creates a join if there
+// are multiple. Returns the single timepoint or joined timepoint, or nullopt if
+// no timepoint results exist.
+static std::optional<Value> getOrJoinTimepointResults(Operation *op) {
+  SmallVector<Value> resultTimepoints;
+  for (Value result : op->getResults()) {
+    if (isa<IREE::Stream::TimepointType>(result.getType())) {
+      resultTimepoints.push_back(result);
+    }
+  }
+
+  if (resultTimepoints.empty()) {
+    return std::nullopt;
+  }
+
+  if (resultTimepoints.size() == 1) {
+    return resultTimepoints[0];
+  }
+
+  // Multiple timepoint results - create a join.
+  OpBuilder builder(op->getContext());
+  builder.setInsertionPointAfter(op);
+  auto joinOp = IREE::Stream::TimepointJoinOp::create(
+      builder, op->getLoc(), builder.getType<IREE::Stream::TimepointType>(),
+      resultTimepoints);
+  LLVM_DEBUG({
+    llvm::dbgs() << "[arc]   created join of " << resultTimepoints.size()
+                 << " timepoint results\n";
+  });
+  return joinOp.getResultTimepoint();
+}
+
+// Extends the lifetime of captured resources (defined above a region but used
+// within it) to a specified result timepoint.
+//
+// NOTE: This is a conservative over-approximation. Resources captured in a
+// control flow region have their lifetimes extended to the region's result
+// timepoint even if they are only used in one branch (scf.if) or only in the
+// first iteration (scf.for). More precise per-iteration/per-branch tracking
+// would require backward dataflow analysis which is not implemented.
+static void extendCapturedResourceLifetimes(Region &region,
+                                            Value resultTimepoint,
+                                            LastUseSet &lastUseSet,
+                                            AsmState *asmState) {
+  SetVector<Value> capturedValues;
+  getUsedValuesDefinedAbove(region, region, capturedValues);
+  for (Value captured : capturedValues) {
+    if (isa<IREE::Stream::ResourceType>(captured.getType())) {
+      lastUseSet.consume(captured, resultTimepoint);
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "[arc]   captured resource lifetime extended to result\n";
+      });
+    }
+  }
+}
+
+// Analyzes scf.for loop with captured resource tracking.
+static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
+                           LastUseSet &lastUseSet,
+                           ScopedTimepointCoverage &coverage,
+                           DenseSet<Value> &indeterminateResources,
+                           DenseSet<Value> &handledResources) {
+  // scf.for doesn't implement TimelineOpInterface, but its result may be a
+  // timepoint.
+  std::optional<Value> loopResultTimepointOpt =
+      getOrJoinTimepointResults(forOp);
+  if (!loopResultTimepointOpt) {
+    // No timepoint result, cannot track lifetimes through this loop.
+    return false;
+  }
+  Value loopResultTimepoint = *loopResultTimepointOpt;
+
+  // Register the loop result timepoint in the coverage map so that subsequent
+  // consume() calls can recognize and prune timepoints dominated by this one.
+  coverage.add(loopResultTimepoint);
+
+  LLVM_DEBUG(
+      { llvm::dbgs() << "[arc] recognized scf.for with timepoint result\n"; });
+
+  // Step 1: Find captured resources (defined outside, used inside).
+  // These need their lifetimes extended to the loop result in the parent block.
+  extendCapturedResourceLifetimes(forOp.getRegion(), loopResultTimepoint,
+                                  lastUseSet, asmState);
+
+  // Step 2: Recursively analyze the loop body for local allocations.
+  // Resources allocated and used entirely within the loop body should be
+  // deallocated inside the loop body, UNLESS they are yielded out.
+  for (Block &block : forOp.getRegion()) {
+    // Create a fresh LastUseSet for analysis within this block.
+    // This allows us to track and deallocate resources local to the loop body.
+    LastUseSet blockLastUseSet(asmState, coverage);
+
+    LLVM_DEBUG(llvm::dbgs() << "[arc]   analyzing loop body block\n");
+
+    // Recursively analyze operations in this block.
+    if (!analyzeBlockOps(block, asmState, blockLastUseSet, coverage,
+                         indeterminateResources, handledResources)) {
+      LLVM_DEBUG(llvm::dbgs() << "[arc]   failed to analyze loop body block\n");
+      return false;
+    }
+
+    // Check if any resources are yielded out of this block.
+    // Resources that escape via yield should NOT be deallocated locally.
+    // Instead, they must be registered in the parent scope so deallocations
+    // happen after the SCF operation completes.
+    auto *terminator = block.getTerminator();
+    if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+      for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
+        if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+          // Mark as handled to prevent local deallocation.
+          handledResources.insert(operand);
+          LLVM_DEBUG({
+            llvm::dbgs() << "[arc]   resource ";
+            operand.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs()
+                << " yielded from loop body; preventing local deallocation\n";
+          });
+
+          // Register the corresponding scf.for result in the parent scope.
+          // This ensures the resource gets deallocated after the loop even if
+          // the result is not used (dropped).
+          Value forResult = forOp.getResult(index);
+          lastUseSet.produce(forResult, loopResultTimepoint);
+          LLVM_DEBUG({
+            llvm::dbgs() << "[arc]   registered loop result ";
+            forResult.printAsOperand(llvm::dbgs(), *asmState);
+            llvm::dbgs() << " in parent scope for deallocation\n";
+          });
+        }
+      }
+    }
+
+    // Insert deallocations for resources local to this block (excluding yielded
+    // ones).
+    insertDeallocations(blockLastUseSet, asmState, indeterminateResources,
+                        handledResources);
+  }
+
+  return true;
+}
+
+// Analyzes scf.if conditional with captured resource tracking.
+static bool analyzeIfOp(scf::IfOp ifOp, AsmState *asmState,
+                        LastUseSet &lastUseSet,
+                        ScopedTimepointCoverage &coverage,
+                        DenseSet<Value> &indeterminateResources,
+                        DenseSet<Value> &handledResources) {
+  // scf.if doesn't implement TimelineOpInterface, but its result may be a
+  // timepoint.
+  std::optional<Value> ifResultTpOpt = getOrJoinTimepointResults(ifOp);
+  if (!ifResultTpOpt) {
+    // No timepoint result, cannot track lifetimes through this conditional.
+    return false;
+  }
+  Value ifResultTp = *ifResultTpOpt;
+
+  // Register the if result timepoint in the coverage map.
+  coverage.add(ifResultTp);
+
+  LLVM_DEBUG(
+      { llvm::dbgs() << "[arc] recognized scf.if with timepoint result\n"; });
+
+  // Step 1: Find captured resources in both branches.
+  // These need their lifetimes extended to the if result in the parent block.
+  extendCapturedResourceLifetimes(ifOp.getThenRegion(), ifResultTp, lastUseSet,
+                                  asmState);
+  if (!ifOp.getElseRegion().empty()) {
+    extendCapturedResourceLifetimes(ifOp.getElseRegion(), ifResultTp,
+                                    lastUseSet, asmState);
+  }
+
+  // Step 2: Recursively analyze each branch for local allocations.
+  // Resources allocated and used entirely within a branch should be
+  // deallocated inside that branch, UNLESS they are yielded out.
+  //
+  // Track which if results have been registered to avoid duplicates.
+  // Both branches may yield resources that map to the same result index.
+  DenseSet<Value> registeredIfResults;
+  auto analyzeRegion = [&](Region &region) -> bool {
+    for (Block &block : region) {
+      // Create a fresh LastUseSet for analysis within this block.
+      LastUseSet blockLastUseSet(asmState, coverage);
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "[arc]   analyzing conditional branch block\n");
+
+      // Recursively analyze operations in this block.
+      if (!analyzeBlockOps(block, asmState, blockLastUseSet, coverage,
+                           indeterminateResources, handledResources)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "[arc]   failed to analyze conditional branch block\n");
+        return false;
+      }
+
+      // Check if any resources are yielded out of this block.
+      // Resources that escape via yield should NOT be deallocated locally.
+      // Instead, they must be registered in the parent scope so deallocations
+      // happen after the SCF operation completes.
+      auto *terminator = block.getTerminator();
+      if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
+          if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+            // Mark as handled to prevent local deallocation.
+            handledResources.insert(operand);
+            LLVM_DEBUG({
+              llvm::dbgs() << "[arc]   resource ";
+              operand.printAsOperand(llvm::dbgs(), *asmState);
+              llvm::dbgs() << " yielded from conditional branch; preventing "
+                              "local deallocation\n";
+            });
+
+            // Register the corresponding scf.if result in the parent scope.
+            // Skip if already registered (e.g., from the other branch).
+            Value ifResult = ifOp.getResult(index);
+            if (!registeredIfResults.contains(ifResult)) {
+              registeredIfResults.insert(ifResult);
+              lastUseSet.produce(ifResult, ifResultTp);
+              LLVM_DEBUG({
+                llvm::dbgs() << "[arc]   registered if result ";
+                ifResult.printAsOperand(llvm::dbgs(), *asmState);
+                llvm::dbgs() << " in parent scope for deallocation\n";
+              });
+            }
+          }
+        }
+      }
+
+      // Insert deallocations for resources local to this block (excluding
+      // yielded ones).
+      insertDeallocations(blockLastUseSet, asmState, indeterminateResources,
+                          handledResources);
+    }
+    return true;
+  };
+
+  if (!analyzeRegion(ifOp.getThenRegion())) {
+    return false;
+  }
+  if (!ifOp.getElseRegion().empty() && !analyzeRegion(ifOp.getElseRegion())) {
+    return false;
+  }
+
+  return true;
+}
+
+// Analyzes scf.while loop with captured resource tracking.
+static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
+                           LastUseSet &lastUseSet,
+                           ScopedTimepointCoverage &coverage,
+                           DenseSet<Value> &indeterminateResources,
+                           DenseSet<Value> &handledResources) {
+  // scf.while has two regions: "before" (condition) and "after" (loop body).
+  std::optional<Value> whileResultTimepointOpt =
+      getOrJoinTimepointResults(whileOp);
+  if (!whileResultTimepointOpt) {
+    // No timepoint result, cannot track lifetimes through this loop.
+    return false;
+  }
+  Value whileResultTimepoint = *whileResultTimepointOpt;
+
+  // Register the while result timepoint in the coverage map.
+  coverage.add(whileResultTimepoint);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "[arc] recognized scf.while with timepoint result\n";
+  });
+
+  // Step 1: Find captured resources (defined outside, used inside either
+  // region).
+  extendCapturedResourceLifetimes(whileOp.getBefore(), whileResultTimepoint,
+                                  lastUseSet, asmState);
+  extendCapturedResourceLifetimes(whileOp.getAfter(), whileResultTimepoint,
+                                  lastUseSet, asmState);
+
+  // Step 2: Recursively analyze both regions for local allocations.
+  // For scf.while, we need to analyze both "before" and "after" regions.
+  auto analyzeRegion = [&](Region &region) -> bool {
+    for (Block &block : region) {
+      LastUseSet blockLastUseSet(asmState, coverage);
+
+      LLVM_DEBUG(llvm::dbgs() << "[arc]   analyzing while loop region block\n");
+
+      if (!analyzeBlockOps(block, asmState, blockLastUseSet, coverage,
+                           indeterminateResources, handledResources)) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "[arc]   failed to analyze while loop block\n");
+        return false;
+      }
+
+      // Check for yielded resources.
+      // Note: scf.while has TWO yield-like operations:
+      // - scf.condition in "before" region: args become while results
+      // - scf.yield in "after" region: args go back to "before" block args
+      auto *terminator = block.getTerminator();
+      if (auto conditionOp = dyn_cast<scf::ConditionOp>(terminator)) {
+        // "before" region ends with scf.condition - args become while results.
+        for (auto [index, operand] : llvm::enumerate(conditionOp.getArgs())) {
+          if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+            handledResources.insert(operand);
+            LLVM_DEBUG({
+              llvm::dbgs() << "[arc]   resource ";
+              operand.printAsOperand(llvm::dbgs(), *asmState);
+              llvm::dbgs() << " yielded via scf.condition; "
+                              "preventing local deallocation\n";
+            });
+
+            // Register the corresponding scf.while result in the parent scope.
+            Value whileResult = whileOp.getResult(index);
+            lastUseSet.produce(whileResult, whileResultTimepoint);
+            LLVM_DEBUG({
+              llvm::dbgs() << "[arc]   registered while result ";
+              whileResult.printAsOperand(llvm::dbgs(), *asmState);
+              llvm::dbgs() << " in parent scope for deallocation\n";
+            });
+          }
+        }
+      } else if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        // "after" region ends with scf.yield.
+        // These values go back to the "before" region, NOT to while results.
+        // Mark as handled to prevent local deallocation (no parent produce).
+        for (Value operand : yieldOp.getOperands()) {
+          if (isa<IREE::Stream::ResourceType>(operand.getType())) {
+            handledResources.insert(operand);
+            LLVM_DEBUG({
+              llvm::dbgs() << "[arc]   resource yielded from while body back "
+                              "to loop; preventing local deallocation\n";
+            });
+          }
+        }
+      }
+
+      insertDeallocations(blockLastUseSet, asmState, indeterminateResources,
+                          handledResources);
+    }
+    return true;
+  };
+
+  if (!analyzeRegion(whileOp.getBefore())) {
+    return false;
+  }
+  if (!analyzeRegion(whileOp.getAfter())) {
+    return false;
+  }
+
+  return true;
+}
+
+// Dispatches to pattern-specific handlers for RegionBranchOpInterface ops.
+static bool analyzeRegionBranchOp(RegionBranchOpInterface regionBranchOp,
+                                  AsmState *asmState, LastUseSet &lastUseSet,
+                                  ScopedTimepointCoverage &coverage,
+                                  DenseSet<Value> &indeterminateResources,
+                                  DenseSet<Value> &handledResources) {
+  Operation *op = regionBranchOp.getOperation();
+
+  // Dispatch to pattern-specific handlers using TypeSwitch.
+  return llvm::TypeSwitch<Operation *, bool>(op)
+      .Case<scf::ForOp>([&](scf::ForOp forOp) {
+        return analyzeForLoop(forOp, asmState, lastUseSet, coverage,
+                              indeterminateResources, handledResources);
+      })
+      .Case<scf::IfOp>([&](scf::IfOp ifOp) {
+        return analyzeIfOp(ifOp, asmState, lastUseSet, coverage,
+                           indeterminateResources, handledResources);
+      })
+      .Case<scf::WhileOp>([&](scf::WhileOp whileOp) {
+        return analyzeWhileOp(whileOp, asmState, lastUseSet, coverage,
+                              indeterminateResources, handledResources);
+      })
+      .Default([](Operation *) {
+        // Unknown RegionBranchOpInterface - cannot analyze.
+        // This includes scf.parallel and scf.reduce which we don't use in IREE
+        // today. If needed in the future, add explicit handlers for them.
+        // Returning false triggers the conservative fallback in analyzeBlockOps
+        // which marks all resources in the operation as indeterminate.
+        // TODO(#12345): Add handlers for scf.parallel/scf.reduce if needed.
+        return false;
+      });
 }
 
 static void processFuncOp(FunctionOpInterface funcOp) {
@@ -374,7 +1023,7 @@ static void processFuncOp(FunctionOpInterface funcOp) {
   DenseSet<Value> handledResources;
   for (auto [blockIndex, block] : llvm::enumerate(funcOp.getBlocks())) {
     LLVM_DEBUG(llvm::dbgs() << "[arc] processing ^bb" << blockIndex << ":\n");
-    LocalTimepointCoverage coverage(asmState.get());
+    ScopedTimepointCoverage coverage(asmState.get());
     LastUseSet lastUseSet(asmState.get(), coverage);
 
     // Add timepoint arguments as valid predecessors.
@@ -410,295 +1059,34 @@ static void processFuncOp(FunctionOpInterface funcOp) {
       }
     }
 
+    // Check for CallOpInterface before analyzing - we cannot handle calls yet.
+    // TODO(benvanik): global analysis is required to know if calls are
+    // side-effecting. We could annotate the calls as LLVM does so that we
+    // could do local analysis and only pay attention to the operands/results.
+    // util.call supports tied operands but does not have a way to associate
+    // timepoints and this pass may never be able to work without that
+    // information. The most common case of calls today is in external modules
+    // not using `stream.cmd.call` and those are rare.
     for (auto &op : block) {
-      // TODO(benvanik): global analysis is required to know if calls are
-      // side-effecting. We could annotate the calls as LLVM does so that we
-      // could do local analysis and only pay attention to the operands/results.
-      // util.call supports tied operands but does not have a way to associate
-      // timepoints and this pass may never be able to work without that
-      // information. The most common case of calls today is in external modules
-      // not using `stream.cmd.call` and those are rare.
       if (isa<CallOpInterface>(op)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "[arc] skipping function @" << getFuncName(funcOp)
                    << " as it contains call ops (" << op.getName() << ")\n");
         return;
       }
+    }
 
-      // TODO(benvanik): broader analysis or at least constrained handling of
-      // scf. For now we bail if any ops from control flow dialects are found.
-      // TODO(benvanik): maybe only skip the block containing the ops.
-      if (op.getDialect()->getNamespace() == "scf") {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "[arc] skipping function @" << getFuncName(funcOp)
-                   << " block ^bb" << blockIndex
-                   << " as it contains control flow ops (" << op.getName()
-                   << ")\n");
-        return;
-      }
-
-      // Special case ops that are not timeline-aware but interoperate.
-      if (auto immediateOp = dyn_cast<IREE::Stream::TimepointImmediateOp>(op)) {
-        coverage.add(immediateOp.getResultTimepoint());
-        continue;
-      } else if (auto importOp =
-                     dyn_cast<IREE::Stream::TimepointImportOp>(op)) {
-        coverage.add(importOp.getResultTimepoint());
-        continue;
-      }
-
-      // Bail on processing any particular resource which has lifetime
-      // management ops. They should not have been inserted yet and their
-      // presence likely indicates we've already run the pass on this input.
-      // We continue analysis for subsequent ops that may use different
-      // resources so that we can handle other resources.
-      if (auto retainOp = dyn_cast<IREE::Stream::ResourceRetainOp>(op)) {
-        Value handledResource =
-            lastUseSet.lookupResource(retainOp.getOperand());
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] existing retain of ";
-          handledResource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "; marking as handled\n";
-        });
-        handledResources.insert(handledResource);
-        continue;
-      } else if (auto releaseOp =
-                     dyn_cast<IREE::Stream::ResourceReleaseOp>(op)) {
-        Value handledResource =
-            lastUseSet.lookupResource(releaseOp.getOperand());
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] existing release of ";
-          handledResource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "; marking as handled\n";
-        });
-        handledResources.insert(handledResource);
-        continue;
-      }
-
-      // Analysis currently only works if all ops producing and consuming
-      // resources are timeline ops. Any resource accessed by non-timeline ops
-      // gets marked as indeterminate as the analysis does not know how they are
-      // used on the timeline.
-      auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(op);
-      if (!timelineOp) {
-        for (auto operand : op.getOperands()) {
-          if (isa<IREE::Stream::ResourceType>(operand.getType())) {
-            Value baseResource = lastUseSet.lookupResource(operand);
-            LLVM_DEBUG({
-              llvm::dbgs() << "[arc] non-timeline use of operand ";
-              baseResource.printAsOperand(llvm::dbgs(), *asmState);
-              llvm::dbgs() << "; marking as indeterminate\n";
-            });
-            indeterminateResources.insert(baseResource);
-          }
-        }
-        for (auto result : op.getResults()) {
-          if (isa<IREE::Stream::ResourceType>(result.getType())) {
-            Value baseResource = lastUseSet.lookupResource(result);
-            LLVM_DEBUG({
-              llvm::dbgs() << "[arc] non-timeline use of result ";
-              baseResource.printAsOperand(llvm::dbgs(), *asmState);
-              llvm::dbgs() << "; marking as indeterminate\n";
-            });
-            indeterminateResources.insert(baseResource);
-          }
-        }
-        continue;
-      }
-
-      // Consumer-only timepoint ops (like stream.timepoint.await) block
-      // propagation.
-      Value resultTimepoint = timelineOp.getResultTimepoint();
-      if (!resultTimepoint) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] terminating timeline use by " << op.getName()
-                       << "; stopping propagation\n";
-        });
-        continue;
-      }
-
-      // Populate coverage map for the declared timeline operation.
-      auto awaitTimepoints = timelineOp.getAwaitTimepoints();
-      if (awaitTimepoints.empty()) {
-        coverage.add(resultTimepoint);
-      } else {
-        for (Value awaitTimepoint : timelineOp.getAwaitTimepoints()) {
-          coverage.add(awaitTimepoint, resultTimepoint);
-        }
-      }
-
-      // Alloca ops may have been assigned as indeterminate when created.
-      if (auto allocaOp = dyn_cast<IREE::Stream::ResourceAllocaOp>(op)) {
-        if (allocaOp.getIndeterminateLifetime()) {
-          Value allocaResource = allocaOp.getResult();
-          LLVM_DEBUG({
-            llvm::dbgs() << "[arc] alloca producer explicitly states lifetime "
-                            "is indeterminate for ";
-            allocaResource.printAsOperand(llvm::dbgs(), *asmState);
-            llvm::dbgs() << "; marking as indeterminate\n";
-          });
-          indeterminateResources.insert(allocaResource);
-        }
-      }
-
-      // If a resource has a deallocation on it already then we cannot insert
-      // another. This can arise when the pass is run twice or when an earlier
-      // pass explicitly inserts deallocations to ensure they happen where they
-      // want instead of relying on this analysis.
-      if (auto deallocaOp = dyn_cast<IREE::Stream::ResourceDeallocaOp>(op)) {
-        Value handledResource =
-            lastUseSet.lookupResource(deallocaOp.getOperand());
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] existing deallocation of ";
-          handledResource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "; marking as handled\n";
-        });
-        handledResources.insert(handledResource);
-      }
-
-      // Track resources consumed/produced as part of the timeline operation.
-      // This gives us the last timepoint(s) using the resources (not the last
-      // SSA user). There may be multiple last timepoints if a fork occurs.
-      //
-      // Example:
-      //   %r0, %t0 = alloca
-      //   %t1 = exec %t0 => %r0
-      //   %t2 = exec %t0 => %r0
-      // The last timepoints of %r0 would be %t1 and %t2, indicating that after
-      // %t1 and %t2 have both been reached (joined) the resource is no longer
-      // live.
-      auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
-      for (auto operand : op.getOperands()) {
-        if (isa<IREE::Stream::ResourceType>(operand.getType())) {
-          lastUseSet.consume(operand, timelineOp.getResultTimepoint());
-        }
-      }
-      for (auto result : op.getResults()) {
-        if (isa<IREE::Stream::ResourceType>(result.getType())) {
-          Value operand =
-              tiedOp ? tiedOp.getTiedResultOperand(result) : nullptr;
-          if (operand) {
-            lastUseSet.tie(operand, result, timelineOp.getResultTimepoint());
-          } else {
-            lastUseSet.produce(result, timelineOp.getResultTimepoint());
-
-            // TODO(#20817): parameter loads (and potentially other ops) may
-            // cause far too many joins right now and will hit runtime errors
-            // and performance issues. Until we have a way to partition joins we
-            // need to avoid those. Parameter loads and other sources are things
-            // we likely want to handle with retain/release instead of
-            // deallocating anyway. Custom calls will also need a way to
-            // indicate whether they are alloca-like or not so we just exclude
-            // everything except alloca here.
-            if (!isa<IREE::Stream::ResourceAllocaOp>(op)) {
-              LLVM_DEBUG({
-                llvm::dbgs() << "[arc] non-alloca producer "
-                             << op.getName().getStringRef() << " of ";
-                result.printAsOperand(llvm::dbgs(), *asmState);
-                llvm::dbgs() << "; marking as indeterminate (#20817)\n";
-              });
-              indeterminateResources.insert(result);
-            }
-          }
-        }
-      }
+    // Delegate block analysis to the shared helper.
+    if (!analyzeBlockOps(block, asmState.get(), lastUseSet, coverage,
+                         indeterminateResources, handledResources)) {
+      LLVM_DEBUG(llvm::dbgs() << "[arc] failed to analyze function block\n");
+      // The existing indeterminateResources/handledResources will prevent
+      // deallocations for unanalyzable parts.
     }
 
     // Insert deallocations for all resources that we successfully analyzed.
-    lastUseSet.forEachResource([&](Value resource, TimepointSet &timepoints) {
-      assert(!timepoints.empty() && "all resources should have a timepoint");
-
-      // Skip anything we could not analyze.
-      Value baseResource = lastUseSet.lookupResource(resource);
-      if (indeterminateResources.contains(baseResource)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] skipping resource ";
-          baseResource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " marked as indeterminate\n";
-        });
-        return;
-      } else if (handledResources.contains(baseResource)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] skipping resource ";
-          baseResource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " marked as already handled\n";
-        });
-        return;
-      }
-
-      // Finds the last timepoint in the set (if >1) in SSA dominance order.
-      Value lastTimepoint = getLastTimepointInBlock(timepoints);
-      assert(lastTimepoint && "must have at least one timepoint");
-      OpBuilder builder(lastTimepoint.getContext());
-      builder.setInsertionPointAfterValue(lastTimepoint);
-
-      // Try to grab a resource size or insert a query.
-      // In almost all cases that this analysis can run we will have a
-      // size-aware op that provides it.
-      auto timepointsLoc =
-          getFusedLocFromTimepoints(resource.getLoc(), timepoints);
-      Value resourceSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
-          timepointsLoc, resource, builder);
-
-      // Lookup the affinity of the resource.
-      // This should likely be a global affinity analysis but since we are
-      // currently only processing locally we can assume this is only used when
-      // we have an op local with an affinity assigned.
-      IREE::Stream::AffinityAttr resourceAffinity;
-      if (auto *definingOp = resource.getDefiningOp()) {
-        resourceAffinity = IREE::Stream::AffinityAttr::lookup(definingOp);
-      }
-      UnitAttr preferOrigin =
-          resourceAffinity ? UnitAttr{} : builder.getUnitAttr();
-
-      if (timepoints.size() == 1) {
-        // Single last user; the resource can have a deallocation directly
-        // inserted as we have tracked both allocation and now deallocation to
-        // single code points.
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] inserting deallocation for ";
-          resource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " after timepoint ";
-          lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " directly\n";
-        });
-        auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
-            builder, timepointsLoc,
-            builder.getType<IREE::Stream::TimepointType>(), resource,
-            resourceSize, preferOrigin, lastTimepoint, resourceAffinity);
-        lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
-                                           deallocaOp);
-      } else if (timepoints.size() > 1) {
-        // Multiple last users (fork); the resource still has a tracked
-        // allocation and deallocation but there are multiple code points where
-        // the deallocation may need to be inserted.
-        //
-        // Since this current analysis is local we can rely on SSA dominance to
-        // find the last SSA value and insert a join on all timepoints there to
-        // perform the deallocation, though this will cause extended lifetimes
-        // in cases where scheduled timeline operations complete out of order.
-        // We won't have correctness issues as all timepoints will be waited on.
-        LLVM_DEBUG({
-          llvm::dbgs() << "[arc] inserting forked deallocation for ";
-          resource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " after last SSA timepoint ";
-          lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " as a join\n";
-        });
-        auto joinOp = IREE::Stream::TimepointJoinOp::create(
-            builder, timepointsLoc,
-            builder.getType<IREE::Stream::TimepointType>(),
-            llvm::map_to_vector(timepoints,
-                                [](Value timepoint) { return timepoint; }));
-        auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
-            builder, timepointsLoc,
-            builder.getType<IREE::Stream::TimepointType>(), resource,
-            resourceSize, preferOrigin, joinOp.getResultTimepoint(),
-            resourceAffinity);
-        lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
-                                           joinOp);
-      }
-    });
+    insertDeallocations(lastUseSet, asmState.get(), indeterminateResources,
+                        handledResources);
   }
 
   LLVM_DEBUG(llvm::dbgs() << "\n");

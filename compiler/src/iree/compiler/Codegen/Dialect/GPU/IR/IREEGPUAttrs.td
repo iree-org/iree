@@ -131,6 +131,51 @@ def IREEGPU_PromoteWithCacheSwizzle :
   );
 }
 
+def IREEGPU_SwizzleOperand :
+    AttrDef<IREEGPU_Dialect, "SwizzleOperand", [
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr, [
+        "promoteOperand",
+      ]>
+    ]> {
+  let mnemonic = "swizzle_operand";
+  let summary = [{
+    Indicate promotion of an operand with setting an xor swizzle value.
+  }];
+  let description = [{
+    During matmul operand promotion, we generate copies associated to a
+    particular matmul operand with specific lowering configuration optimized
+    for coalesced loads. This attribute carries information on how accesses to
+    memrefs or tensors associated to a particular copy should be swizzled.
+
+    This information is used to create a swizzle hint op on the alloc
+    associated with the copy. Ultimately, this aims to modify memory accesses
+    to minimize bank conflicts. For example,
+
+    ```mlir
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
+    %1 = linalg.matmul ins(%0, ...)
+    ```
+
+    Becomes with `#iree_gpu.swizzle_operand<#iree_gpu.use_global_load_dma>`
+
+    ```mlir
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
+    %1 = tensor.empty()
+    %2 = swizzle_hint_op %1 xor_shuffle(256, 32)
+    %3 = linalg.copy lowering_config = #iree_gpu.use_global_load_dma ins(%0) outs(%1)
+    %4 = linalg.matmul ins(%3, ...)
+    ```
+
+    With intelligent selection of `row_width` and `access_width`, this should
+    minimize bank conflicts.
+  }];
+  let assemblyFormat = "`<` struct(params) `>`";
+  let parameters = (ins
+    "Attribute":$copy_config,
+    IREECodegen_SwizzleAttrParameter:$swizzle
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
@@ -363,11 +408,14 @@ def IREEGPU_DataTiledMMAAttr :
     By default, intrinsic-level sub-tiles are contiguous and arranged
     side-by-side in the overall tile layout. When
     `operands_interleaving_intrinsics_{m,n,k}` is non-empty, each entry
-    indicates an operand (given by its operand index) for which the tile layout
-    has the corresponding intrinsics tiles interleaved. For example, when
-    `intrinsics_k = 2` and `operands_interleaving_intrinsics_k = [0, 1]`, there
-    are two intrinsics along the k-dimension and their layouts are interleaved
-    in operands 0 and 1, meaning LHS and RHS.
+    indicates an operand (given by its operand index) for which the
+    `intrinsics_{m,n,k}` tiles are interleaved to the innermost positions of
+    the entire swizzled layout. For example, when `intrinsics_k = 2` and
+    `operands_interleaving_intrinsics_k = [0, 1]`, there are two intrinsics
+    along the k-dimension and their layouts are interleaved in operands 0
+    and 1, meaning LHS and RHS. When multiple interleavings are applied,
+    `intrinsics_k` is placed innermost, then going outward `intrinsics_n`,
+    then `intrinsics_m`.
 
     The `subgroups_{m,n,k}` parameters control the number of subgroups and the
     layout of the tile accesses made by different subgroups. The product of the
@@ -917,8 +965,9 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];
   let description = [{
     This attributes describes lowering pipeline specific configuration options:
-    * prefetch_shared_memory: Boolean option indicating whether or not to run
-      the loop prefetching pass in the lowering pipeline.
+    * prefetch_num_stages: Integer option controlling the software pipelining
+      stages for shared memory prefetching. 0 or 1 disables prefetching, 2+
+      enables prefetching with that many pipeline stages.
     * no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
       or not to skip the bank conflict reduction pass in the lowering pipeline.
     * reorder_workgroups_strategy: Enum attribute indicating which strategy to
@@ -930,7 +979,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    OptionalParameter<"BoolAttr">:$prefetch_shared_memory,
+    OptionalParameter<"std::optional<int64_t>">:$prefetch_num_stages,
     OptionalParameter<"BoolAttr">:$no_reduce_shared_memory_bank_conflicts,
     OptionalParameter<"BoolAttr">:$use_igemm_convolution,
     OptionalParameter<"ReorderWorkgroupsStrategyAttr">:$reorder_workgroups_strategy
@@ -938,7 +987,7 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
 
   let builders = [
     AttrBuilder<(ins
-        CArg<"bool", "false">:$prefetch_shared_memory,
+        CArg<"unsigned", "0">:$prefetch_num_stages,
         CArg<"bool", "false">:$no_reduce_shared_memory_bank_conflicts,
         CArg<"bool", "false">:$use_igemm_convolution,
         CArg<"std::optional<ReorderWorkgroupsStrategy>", "{}">:$reorder_workgroups_strategy)>
@@ -953,6 +1002,110 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
       return "gpu_pipeline_options";
     }
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// iree_gpu.expand_dims
+//===----------------------------------------------------------------------===//
+def IREEGPU_DimensionExpansionAttr
+    : AttrDef<IREEGPU_Dialect, "DimensionExpansion"> {
+  let mnemonic = "expand_dims";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let summary = [{Attribute for describing static dimension expansion.}];
+  let description = [{
+    This attribute describes how dimensions in an iteration space should be
+    expanded. Each original dimension can either remain unchanged or be
+    split into multiple dimensions. The semantics are similar to the familiar
+    `tensor.expand_shape` operation.
+
+    The reassociations parameter specifies the mapping from original dimensions
+    to expanded dimensions. For example, [[0], [1], [2, 3]] means:
+    - Original dimension 0 maps to output dimension 0
+    - Original dimension 1 maps to output dimension 1
+    - Original dimension 2 is split into output dimensions 2 and 3
+
+    The output_shape parameter specifies the sizes of the expanded dimensions.
+    If the size is ShapedType::kDynamic, the size is determined from the product
+    of the rest of the static tile sizes in the respective reassociation group.
+    There can be at most one dynamic size per reassociation group.
+
+    Example: #iree_gpu.expand_dims<[[0], [1], [2, 3]], output_shape = [?, ?, ?, 8]>
+  }];
+
+  let parameters = (ins
+    "ArrayAttr":$reassociations,
+    "DenseI64ArrayAttr":$output_shape
+  );
+
+  let builders = [
+    AttrBuilder<(ins
+      "ArrayRef<ReassociationIndices>":$reassociations,
+      "ArrayRef<int64_t>":$outputShape)>
+  ];
+
+  let assemblyFormat = "`<` $reassociations `,` `output_shape` `=` custom<DynamicI64DenseArrayAttr>($output_shape) `>`";
+
+  let extraClassDeclaration = [{
+  SmallVector<ReassociationIndices> getReassociationIndices() {
+  return llvm::to_vector<4>(llvm::map_range(
+      getReassociations().getAsRange<ArrayAttr>(),
+      [](ArrayAttr arrayAttr) -> ReassociationIndices {
+        return llvm::to_vector<2>(llvm::map_range(
+            arrayAttr.getAsRange<IntegerAttr>(),
+            [](IntegerAttr idx) { return idx.getInt(); }));
+      }));
+  }
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+// Lane Index Hint Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_LaneConstantAttr : AttrDef<IREEGPU_Dialect, "LaneConstant"> {
+  let mnemonic = "lane_constant";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let summary = "Index is constant within groups of N lanes";
+  let description = [{
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it attribute indicates that the index value is constant (uniform)
+    across groups of N consecutive lanes. For example, with group_size=16, lanes
+    0-15 all have the same value, lanes 16-31 all have the same value, etc.
+
+    This hint is used to guide optimizations like transpose load lowering,
+    where row indices must be uniform within a 16-lane group.
+  }];
+  let parameters = (ins "int64_t":$group_size);
+  let assemblyFormat = "`<` $group_size `>`";
+}
+
+def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
+  let mnemonic = "lane_increment";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let summary = "Index increments by 1 within groups of N lanes";
+  let description = [{
+    This attribute is intended to be attached to the iree_codegen.index_hint op,
+    on which it indicates that the index value increments by `step` within
+    groups of N consecutive lanes. For example, with group_size=16 and a base
+    value B, lane i has value `B + (i % 16) * step`.
+
+    The `aligned` flag indicates that the base value (at lane 0 within each
+    group) is guaranteed to be a multiple of `group_size`. This is important
+    for propagating hints through operations like `affine.delinearize_index`,
+    where alignment ensures the delinearization doesn't cause wrap-around
+    within a lane group.
+
+    This hint is used to guide optimizations like transpose load lowering,
+    where the column index must increment by 1 across consecutive lanes.
+  }];
+  let parameters = (ins
+    "int64_t":$group_size,
+    "int64_t":$step,
+    DefaultValuedParameter<"bool", "false">:$aligned
+  );
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

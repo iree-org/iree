@@ -49,8 +49,9 @@ static std::string getHoistedName(Type type) {
     type.print(os);
   }
   str = sanitizeSymbolName(str);
-  if (str.substr(str.size() - 1) == "_")
+  if (str.substr(str.size() - 1) == "_") {
     str = str.substr(0, str.size() - 1); // strip trailing _
+  }
   return str;
 }
 
@@ -97,24 +98,36 @@ public:
       file.close();
     }
 
-    // Maps original values to newly materialized values.
-    HoistedValueMap hoistedMap;
-
     // Walk all operations in the program and hoist any escapes from
     // const-expr values into globals. Note that we must walk the const-exprs
     // in topological order so that corresponding initializers will be created
     // in order without depending on globals that have not been initialized
     // yet.
+    OpBuilder builder(&getContext());
     for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
       // Ignore initializers.
-      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation()))
+      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation())) {
         continue;
+      }
+
+      // Maps original values to newly materialized globals (per-function).
+      HoistedValueMap hoistedMap;
+
+      // Operation order for deterministic sorting (per-function).
+      llvm::DenseMap<Operation *, unsigned> opOrder;
+      unsigned orderIdx = 0;
+
       auto walkRes = funcOp.walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
         // We only want to look at const-expr ops (non roots) since they may
         // have interesting escapes. Early exit here for efficiency.
         auto *iterInfo = constExprs.lookup(iterOp);
-        if (!iterInfo)
+        if (!iterInfo) {
           return WalkResult::advance();
+        }
+
+        // Record operation order for deterministic sorting. Since we walk in
+        // PreOrder, producers are visited before their users.
+        opOrder[iterOp] = orderIdx++;
         for (Value constExprResult : iterOp->getResults()) {
           auto *resultInfo = constExprs.lookup(constExprResult);
           assert(resultInfo && "must have const-expr info");
@@ -123,43 +136,51 @@ public:
             continue;
           }
           if (failed(hoistConstExpr(constExprResult, hoistedMap, moduleSymbols,
-                                    constExprs))) {
+                                    constExprs, opOrder))) {
             return WalkResult::interrupt();
           }
         }
         return WalkResult::advance();
       });
-      if (walkRes.wasInterrupted())
+      if (walkRes.wasInterrupted()) {
         return signalPassFailure();
-    }
+      }
 
-    // Apply any remaining RAUW cleanups. We have to do these at the cleanup
-    // phase since modifying the source program can invalidate the analysis.
-    // Up to this point, we have only been cloning.
-    OpBuilder builder(&getContext());
-    for (auto [originalValue, globalOp] : hoistedMap) {
-      builder.setInsertionPointAfterValue(originalValue);
-      auto loadOp = globalOp.createLoadOp(globalOp->getLoc(), builder);
-      if (!originalValue.getDefiningOp()
-               ->getParentOfType<IREE::Util::InitializerOpInterface>()) {
-        loadOp.setGlobalImmutable(true);
+      // Apply RAUW cleanups for this function. We do this after cloning to
+      // avoid invalidating the analysis during the walk.
+      // Sort the hoisted values by program order for deterministic output.
+      using HoistedValue = std::pair<Value, GlobalOp>;
+      auto sortedHoisted = llvm::to_vector_of<HoistedValue>(hoistedMap);
+      llvm::sort(sortedHoisted,
+                 [&opOrder](const HoistedValue &lhs, const HoistedValue &rhs) {
+                   return opOrder[lhs.first.getDefiningOp()] <
+                          opOrder[rhs.first.getDefiningOp()];
+                 });
+
+      for (auto [originalValue, globalOp] : sortedHoisted) {
+        builder.setInsertionPointAfterValue(originalValue);
+        auto loadOp = globalOp.createLoadOp(globalOp->getLoc(), builder);
+        if (!originalValue.getDefiningOp()
+                 ->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+          loadOp.setGlobalImmutable(true);
+        }
+        Value loadedValue = loadOp.getLoadedGlobalValue();
+        // Call user hook to cast back to the original type.
+        if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+                originalValue.getType())) {
+          loadedValue = hoistableType.decodeStorageType(
+              builder, loadedValue.getLoc(), originalValue.getType(),
+              loadedValue);
+        }
+        if (loadedValue.getType() != originalValue.getType()) {
+          getOperation().emitError()
+              << "Unresolved conflict between casted global of type "
+              << loadedValue.getType() << " and original type "
+              << originalValue.getType();
+          return signalPassFailure();
+        }
+        originalValue.replaceAllUsesWith(loadedValue);
       }
-      Value loadedValue = loadOp.getLoadedGlobalValue();
-      // Call user hook to cast back to the original type.
-      if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
-              originalValue.getType())) {
-        loadedValue = hoistableType.decodeStorageType(
-            builder, loadedValue.getLoc(), originalValue.getType(),
-            loadedValue);
-      }
-      if (loadedValue.getType() != originalValue.getType()) {
-        getOperation().emitError()
-            << "Unresolved conflict between casted global of type "
-            << loadedValue.getType() << " and original type "
-            << originalValue.getType();
-        return signalPassFailure();
-      }
-      originalValue.replaceAllUsesWith(loadedValue);
     }
     cleanupDeadOps(constExprs);
   }
@@ -167,17 +188,21 @@ public:
   Operation *getTopLevelOp(Operation *childOp) {
     auto *moduleBlock = getOperation().getBody();
     auto *op = childOp;
-    while (op->getBlock() != moduleBlock)
+    while (op->getBlock() != moduleBlock) {
       op = op->getParentOp();
+    }
     return op;
   }
 
-  LogicalResult hoistConstExpr(Value originalValue, HoistedValueMap &hoistedMap,
-                               SymbolTable &moduleSymbols,
-                               const ConstExprAnalysis &constExprs) {
+  LogicalResult
+  hoistConstExpr(Value originalValue, HoistedValueMap &hoistedMap,
+                 SymbolTable &moduleSymbols,
+                 const ConstExprAnalysis &constExprs,
+                 const llvm::DenseMap<Operation *, unsigned> &opOrder) {
     IREE::Util::GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
-    if (existingGlobal)
+    if (existingGlobal) {
       return success();
+    }
 
     // Gather any dialect attributes we may need to preserve.
     auto *topLevelOp = getTopLevelOp(originalValue.getDefiningOp());
@@ -196,7 +221,7 @@ public:
     if (failed(cloneConstExprInto(initializerOp.getLoc(), moduleBuilder,
                                   initializerBuilder, originalValue,
                                   dialectAttrs, hoistedMap, moduleSymbols,
-                                  constExprs))) {
+                                  constExprs, opOrder))) {
       return failure();
     }
 
@@ -212,9 +237,11 @@ public:
   cloneProducerTreeInto(OpBuilder &initializerBuilder,
                         const ConstExprAnalysis::ConstValueInfo *producerInfo,
                         HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
-                        const ConstExprAnalysis &constExprs) {
-    if (cloneMapping.contains(producerInfo->constValue))
+                        const ConstExprAnalysis &constExprs,
+                        const llvm::DenseMap<Operation *, unsigned> &opOrder) {
+    if (cloneMapping.contains(producerInfo->constValue)) {
       return;
+    }
 
     // We either have a global associated already or we need to traverse
     // down and materialize producers.
@@ -236,10 +263,20 @@ public:
       return;
     }
 
-    // Materialize all producers recursively.
-    for (auto *producerInfo : producerInfo->producers) {
-      cloneProducerTreeInto(initializerBuilder, producerInfo, hoistedMap,
-                            cloneMapping, constExprs);
+    // Materialize all producers recursively. Sort producers by their program
+    // order for deterministic output.
+    auto sortedProducers =
+        llvm::to_vector_of<ConstExprAnalysis::ConstValueInfo *>(
+            producerInfo->producers);
+    llvm::sort(sortedProducers,
+               [&opOrder](ConstExprAnalysis::ConstValueInfo *lhs,
+                          ConstExprAnalysis::ConstValueInfo *rhs) {
+                 return opOrder.lookup(lhs->constValue.getDefiningOp()) <
+                        opOrder.lookup(rhs->constValue.getDefiningOp());
+               });
+    for (ConstExprAnalysis::ConstValueInfo *prodInfo : sortedProducers) {
+      cloneProducerTreeInto(initializerBuilder, prodInfo, hoistedMap,
+                            cloneMapping, constExprs, opOrder);
     }
 
     // And clone the requested op.
@@ -257,13 +294,13 @@ public:
   // Clones the const expr tree rooted at `constExprValue` into the given
   // initializer, noting any new hoisted value mappings that result. At
   // a minimum, a mapping will be created for the requested value.
-  LogicalResult cloneConstExprInto(Location loc, OpBuilder &moduleBuilder,
-                                   OpBuilder &initializerBuilder,
-                                   Value constExprValue,
-                                   NamedAttrList dialectAttrs,
-                                   HoistedValueMap &hoistedMap,
-                                   SymbolTable &moduleSymbols,
-                                   const ConstExprAnalysis &constExprs) {
+  LogicalResult
+  cloneConstExprInto(Location loc, OpBuilder &moduleBuilder,
+                     OpBuilder &initializerBuilder, Value constExprValue,
+                     NamedAttrList dialectAttrs, HoistedValueMap &hoistedMap,
+                     SymbolTable &moduleSymbols,
+                     const ConstExprAnalysis &constExprs,
+                     const llvm::DenseMap<Operation *, unsigned> &opOrder) {
     // Do a depth first traversal of the producers, emitting them in a valid
     // def-use order.
     Operation *rootOp = constExprValue.getDefiningOp();
@@ -274,7 +311,7 @@ public:
     // Clone the whole tree as needed.
     IRMapping cloneMapping;
     cloneProducerTreeInto(initializerBuilder, rootInfo, hoistedMap,
-                          cloneMapping, constExprs);
+                          cloneMapping, constExprs, opOrder);
 
     // And for each result, create a global and store into it.
     for (Value origResult : rootOp->getResults()) {
@@ -331,8 +368,9 @@ public:
     // longer be valid after this point.
     for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
       // Ignore initializers.
-      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation()))
+      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation())) {
         continue;
+      }
       funcOp.walk<WalkOrder::PostOrder, ReverseIterator>(
           [&](Operation *iterOp) {
             if (allOps.contains(iterOp) && iterOp->use_empty()) {
@@ -352,7 +390,7 @@ public:
 
 private:
   const std::optional<ExprHoistingOptions::RegisterDialectsFn>
-      registerDependentDialectsFn;
+      registerDependentDialectsFn = std::nullopt;
 };
 
 } // namespace

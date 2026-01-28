@@ -48,11 +48,14 @@ iree_cc_library(
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgUtils
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

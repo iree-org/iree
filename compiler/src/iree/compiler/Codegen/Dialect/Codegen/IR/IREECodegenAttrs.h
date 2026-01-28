@@ -103,8 +103,9 @@ template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
 FailureOr<Operation *>
 getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
   for (Operation *op : computeOps) {
-    if (getLoweringConfig<ConfigTy>(op))
+    if (getLoweringConfig<ConfigTy>(op)) {
       return op;
+    }
   }
   return failure();
 }
@@ -117,8 +118,9 @@ getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
 template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
 FailureOr<ConfigTy> getFirstLoweringConfig(ArrayRef<Operation *> computeOps) {
   FailureOr<Operation *> op = getLoweringConfigCarryingOp<ConfigTy>(computeOps);
-  if (failed(op))
+  if (failed(op)) {
     return failure();
+  }
   return getLoweringConfig<ConfigTy>(*op);
 }
 

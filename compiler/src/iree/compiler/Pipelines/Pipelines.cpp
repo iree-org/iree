@@ -58,15 +58,17 @@ IREEVMPipelineHooks::operator IREE::HAL::PipelineHooks() const {
   auto beforePhase = this->beforePhase;
   halHooks.beforePhase = [beforePhase](IREE::HAL::PipelinePhase phase,
                                        OpPassManager &passManager) {
-    if (beforePhase)
+    if (beforePhase) {
       beforePhase(getIREEVMPipelinePhase(phase), passManager);
+    }
   };
 
   auto afterPhase = this->afterPhase;
   halHooks.afterPhase = [afterPhase](IREE::HAL::PipelinePhase phase,
                                      OpPassManager &passManager) {
-    if (afterPhase)
+    if (afterPhase) {
       afterPhase(getIREEVMPipelinePhase(phase), passManager);
+    }
   };
 
   return halHooks;
@@ -76,6 +78,7 @@ void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
     GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
     InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -89,8 +92,9 @@ void buildIREEPrecompileTransformPassPipeline(
   if (compileFrom < IREEVMPipelinePhase::Input) { // late-entry
     auto inputType = inputOptions.parseInputTypeMnemonic();
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Input");
-    if (hooks.beforePhase)
+    if (hooks.beforePhase) {
       hooks.beforePhase(IREEVMPipelinePhase::Input, passManager);
+    }
     if (hooks.pipelineExtensions) {
       hooks.pipelineExtensions->extendInputConversionPreprocessingPassPipeline(
           passManager, inputType);
@@ -131,18 +135,21 @@ void buildIREEPrecompileTransformPassPipeline(
 
     InputConversion::buildCommonInputConversionPassPipeline(
         passManager, inputTransformOptions);
-    if (hooks.afterPhase)
+    if (hooks.afterPhase) {
       hooks.afterPhase(IREEVMPipelinePhase::Input, passManager);
+    }
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Input");
   }
-  if (compileTo == IREEVMPipelinePhase::Input)
+  if (compileTo == IREEVMPipelinePhase::Input) {
     return; // early-exit
+  }
 
   // Now that inputs are legalized, generate wrapper for entry functions.
   if (compileFrom < IREEVMPipelinePhase::ABI) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "ABI");
-    if (hooks.beforePhase)
+    if (hooks.beforePhase) {
       hooks.beforePhase(IREEVMPipelinePhase::ABI, passManager);
+    }
     IREE::ABI::InvocationOptions invocationOptions;
     invocationOptions.invocationModel =
         schedulingOptions.executionModel ==
@@ -155,12 +162,14 @@ void buildIREEPrecompileTransformPassPipeline(
     if (bindingOptions.tflite) {
       IREE::TFLite::buildTransformPassPipeline(passManager);
     }
-    if (hooks.afterPhase)
+    if (hooks.afterPhase) {
       hooks.afterPhase(IREEVMPipelinePhase::ABI, passManager);
+    }
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "ABI");
   }
-  if (compileTo == IREEVMPipelinePhase::ABI)
+  if (compileTo == IREEVMPipelinePhase::ABI) {
     return; // early-exit
+  }
 
   // If the user specified a set of target devices we attach them to the module
   // IR so that they are available for all passes that may want to use this
@@ -175,20 +184,20 @@ void buildIREEPrecompileTransformPassPipeline(
                                                   halAssignmentOptions);
 
   GlobalOptimization::TransformOptions globalTransformOptions;
-  globalTransformOptions.parameterImportPaths =
-      globalOptimizationOptions.parameterImportPaths;
-  globalTransformOptions.parameterImportKeys =
-      globalOptimizationOptions.parameterImportKeys;
+  globalTransformOptions.parameterImportPaths = parameterOptions.importPaths;
+  globalTransformOptions.parameterImportKeys = parameterOptions.importKeys;
   globalTransformOptions.parameterImportMaximumSize =
-      globalOptimizationOptions.parameterImportMaximumSize;
-  globalTransformOptions.parameterExportPath =
-      globalOptimizationOptions.parameterExportPath;
+      parameterOptions.importMaximumSize;
+  globalTransformOptions.parameterExportPath = parameterOptions.exportPath;
   globalTransformOptions.parameterExportMinimumSize =
-      globalOptimizationOptions.parameterExportMinimumSize;
-  globalTransformOptions.parameterSplatExportFile =
-      globalOptimizationOptions.parameterSplatExportFile;
+      parameterOptions.exportMinimumSize;
+  globalTransformOptions.parameterSplatPath = parameterOptions.splatPath;
   globalTransformOptions.aggressiveTransposePropagation =
       globalOptimizationOptions.aggressiveTransposePropagation;
+  globalTransformOptions.propagateTransposesThroughConv =
+      globalOptimizationOptions.propagateTransposesThroughConv;
+  globalTransformOptions.sinkTransposeThroughPad =
+      globalOptimizationOptions.sinkTransposeThroughPad;
   globalTransformOptions.outerDimConcat =
       globalOptimizationOptions.outerDimConcat;
   // The pipeline option has higher priority.
@@ -227,16 +236,19 @@ void buildIREEPrecompileTransformPassPipeline(
   default:
     if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
-      if (hooks.beforePhase)
+      if (hooks.beforePhase) {
         hooks.beforePhase(IREEVMPipelinePhase::Preprocessing, passManager);
+      }
       Preprocessing::buildPreprocessingPassPipeline(
           passManager, preprocessingOptions, hooks.pipelineExtensions);
-      if (hooks.afterPhase)
+      if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::Preprocessing, passManager);
+      }
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
     }
-    if (compileTo == IREEVMPipelinePhase::Preprocessing)
+    if (compileTo == IREEVMPipelinePhase::Preprocessing) {
       return; // early-exit
+    }
 
     if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
       // This pass pipeline recursively invokes the compiler if constEval is
@@ -254,20 +266,23 @@ void buildIREEPrecompileTransformPassPipeline(
       } else {
         IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
       }
-      if (hooks.beforePhase)
+      if (hooks.beforePhase) {
         hooks.beforePhase(IREEVMPipelinePhase::GlobalOptimization, passManager);
+      }
       GlobalOptimization::buildGlobalOptimizationPassPipeline(
           passManager, globalTransformOptions);
-      if (hooks.afterPhase)
+      if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::GlobalOptimization, passManager);
+      }
       if (globalOptimizationOptions.constEval) {
         IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimizationConst");
       } else {
         IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
       }
     }
-    if (compileTo == IREEVMPipelinePhase::GlobalOptimization)
+    if (compileTo == IREEVMPipelinePhase::GlobalOptimization) {
       return; // early-exit
+    }
 
     break;
   }
@@ -277,6 +292,7 @@ void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
     GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
     InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
+    ParameterOptions parameterOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -286,12 +302,13 @@ void buildIREEVMTransformPassPipeline(
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
       targetRegistry, pipelineOptions, bindingOptions, inputOptions,
-      preprocessingOptions, globalOptimizationOptions, dispatchCreationOptions,
-      schedulingOptions, halTargetOptions, hooks, passManager, compileFrom,
-      compileTo);
+      preprocessingOptions, parameterOptions, globalOptimizationOptions,
+      dispatchCreationOptions, schedulingOptions, halTargetOptions, hooks,
+      passManager, compileFrom, compileTo);
 
-  if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
+  if (compileTo <= IREEVMPipelinePhase::GlobalOptimization) {
     return; // early-exit
+  }
 
   IREE::Stream::TransformOptions streamOptions;
   // TODO(benvanik): find a way to share the enums w/o circular deps.
@@ -301,6 +318,18 @@ void buildIREEVMTransformPassPipeline(
   streamOptions.dumpStatisticsFormat =
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
+
+  // Set parameter encoder options. These are mapped to
+  // SplitParameterEncoderPassOptions when the pass is created in
+  // Stream/Transforms/Passes.cpp.
+  if (!parameterOptions.encoderOutputFile.empty()) {
+    streamOptions.parameterEncoderMode =
+        (IREE::Stream::ParameterEncoderMode)parameterOptions.encoderMode;
+    streamOptions.parameterEncoderOutputFile =
+        parameterOptions.encoderOutputFile;
+    streamOptions.parameterEncoderOutputScope =
+        parameterOptions.encoderOutputScope;
+  }
 
   switch (schedulingOptions.executionModel) {
   case SchedulingOptions::ExecutionModel::HostOnly:
@@ -330,48 +359,61 @@ void buildIREEVMTransformPassPipeline(
         dispatchCreationOptions.enableSplitReduction;
     dispatchTransformOptions.enableAggressiveReshapeMovement =
         dispatchCreationOptions.enableAggressiveReshapeMovement;
+    dispatchTransformOptions.enablePadHandling =
+        dispatchCreationOptions.enablePadHandling;
+    dispatchTransformOptions.enableFusePaddingIntoLinalgConsumerOps =
+        dispatchCreationOptions.enableFusePaddingIntoLinalgConsumerOps;
     dispatchTransformOptions.constExprMaxSizeIncreaseThreshold =
         pipelineOptions.constExprMaxSizeIncreaseThreshold;
     dispatchTransformOptions.constExprHoisting =
         pipelineOptions.constExprHoisting;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
-      if (hooks.beforePhase)
+      if (hooks.beforePhase) {
         hooks.beforePhase(IREEVMPipelinePhase::DispatchCreation, passManager);
+      }
       DispatchCreation::buildDispatchCreationPassPipeline(
           passManager, dispatchTransformOptions);
-      if (hooks.afterPhase)
+      if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::DispatchCreation, passManager);
+      }
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "DispatchCreation");
     }
-    if (compileTo == IREEVMPipelinePhase::DispatchCreation)
+    if (compileTo == IREEVMPipelinePhase::DispatchCreation) {
       return; // early-exit
+    }
 
     IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
-      if (hooks.beforePhase)
+      if (hooks.beforePhase) {
         hooks.beforePhase(IREEVMPipelinePhase::Flow, passManager);
+      }
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-      if (hooks.afterPhase)
+      if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::Flow, passManager);
+      }
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
     }
-    if (compileTo == IREEVMPipelinePhase::Flow)
+    if (compileTo == IREEVMPipelinePhase::Flow) {
       return; // early-exit
+    }
 
     if (compileFrom < IREEVMPipelinePhase::Stream) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Stream");
-      if (hooks.beforePhase)
+      if (hooks.beforePhase) {
         hooks.beforePhase(IREEVMPipelinePhase::Stream, passManager);
+      }
       IREE::Stream::buildStreamTransformPassPipeline(passManager,
                                                      streamOptions);
-      if (hooks.afterPhase)
+      if (hooks.afterPhase) {
         hooks.afterPhase(IREEVMPipelinePhase::Stream, passManager);
+      }
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Stream");
     }
-    if (compileTo == IREEVMPipelinePhase::Stream)
+    if (compileTo == IREEVMPipelinePhase::Stream) {
       return; // early-exit
+    }
     break;
   }
 
@@ -382,8 +424,9 @@ void buildIREEVMTransformPassPipeline(
 
   if (compileFrom < IREEVMPipelinePhase::HAL) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "HAL");
-    if (hooks.beforePhase)
+    if (hooks.beforePhase) {
       hooks.beforePhase(IREEVMPipelinePhase::HAL, passManager);
+    }
     switch (schedulingOptions.executionModel) {
     case SchedulingOptions::ExecutionModel::HostOnly:
       // No HAL required.
@@ -404,8 +447,9 @@ void buildIREEVMTransformPassPipeline(
           passManager, targetRegistry, halTargetOptions);
       break;
     }
-    if (hooks.afterPhase)
+    if (hooks.afterPhase) {
       hooks.afterPhase(IREEVMPipelinePhase::HAL, passManager);
+    }
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "HAL");
   }
   if (compileTo == IREEVMPipelinePhase::HAL ||
@@ -415,16 +459,18 @@ void buildIREEVMTransformPassPipeline(
 
   if (compileFrom < IREEVMPipelinePhase::VM) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
-    if (hooks.beforePhase)
+    if (hooks.beforePhase) {
       hooks.beforePhase(IREEVMPipelinePhase::VM, passManager);
+    }
     IREE::VM::buildVMTransformPassPipeline(passManager, vmTargetOptions);
-    passManager.addPass(IREE::Util::createDropCompilerHintsPass());
-    if (hooks.afterPhase)
+    if (hooks.afterPhase) {
       hooks.afterPhase(IREEVMPipelinePhase::VM, passManager);
+    }
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "VM");
   }
-  if (compileTo == IREEVMPipelinePhase::VM)
+  if (compileTo == IREEVMPipelinePhase::VM) {
     return; // early-exit
+  }
 }
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
@@ -444,7 +490,8 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
       IREE::HAL::TargetRegistry::getGlobal(),
       GlobalPipelineOptions::FromFlags::get(), BindingOptions::FromFlags::get(),
       InputDialectOptions::FromFlags::get(),
-      PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
+      PreprocessingOptions::FromFlags::get(),
+      ParameterOptions::FromFlags::get(), highLevelOptimizations,
       DispatchCreationOptions::FromFlags::get(),
       SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),

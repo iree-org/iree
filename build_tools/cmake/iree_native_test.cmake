@@ -139,6 +139,7 @@ function(iree_native_test)
         ${_TEST_NAME}
       COMMAND
         "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv_test.sh"
+        -L "${RISCV_TOOLCHAIN_ROOT}/sysroot"
         "$<TARGET_FILE:${_SRC_TARGET}>"
         ${_TEST_ARGS}
     )
@@ -169,7 +170,7 @@ function(iree_native_test)
     endif()
   endif()
 
-  if (NOT DEFINED _RULE_TIMEOUT)
+  if (NOT DEFINED _RULE_TIMEOUT OR "${_RULE_TIMEOUT}" STREQUAL "")
     set(_RULE_TIMEOUT 60)
   endif()
 

@@ -16,7 +16,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
+    "attention_i1_mask.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -36,26 +38,12 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-cpu_local-task_i1
-  SRCS
-    "attention_i1_mask.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-target-cpu=generic"
-    "--iree-experimental-packed-i1-storage"
-  LABELS
-    "nowasm"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vmvx_local-task
   SRCS
     "arg_compare.mlir"
+    "attention.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -99,6 +87,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "gather.mlir"
+    "map_gather.mlir"
     "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -134,9 +123,12 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "gather.mlir"
+    "map_gather.mlir"
+    "map_scatter.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "top-k.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND

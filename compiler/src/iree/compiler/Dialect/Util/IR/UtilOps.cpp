@@ -66,8 +66,9 @@ Value buildIfElseTree(
 
 ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
   SetVector<Attribute> attrsSet(arrayAttr.begin(), arrayAttr.end());
-  if (attrsSet.size() == arrayAttr.size())
+  if (attrsSet.size() == arrayAttr.size()) {
     return arrayAttr;
+  }
   return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
 }
 
@@ -202,8 +203,9 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
     needsSpace = true; // subsequent attr value needs a space separator
   }
   if (attr) {
-    if (needsSpace)
+    if (needsSpace) {
       p << ' ';
+    }
     p << "= ";
     p.printAttribute(attr);
   }
@@ -249,12 +251,14 @@ void printSymbolAlias(OpAsmPrinter &p, Operation *op, StringAttr sym_name,
 ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
                            Type &storageType) {
   Type encodingType;
-  if (failed(parser.parseType(encodingType)))
+  if (failed(parser.parseType(encodingType))) {
     return failure();
+  }
   storageType = encodingType;
   if (succeeded(parser.parseOptionalKeyword("as"))) {
-    if (failed(parser.parseType(storageType)))
+    if (failed(parser.parseType(storageType))) {
       return failure();
+    }
   }
   encodingTypeAttr = TypeAttr::get(encodingType);
   return success();
@@ -356,18 +360,22 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 
 ParseResult parseOperandTypeList(OpAsmParser &parser,
                                  SmallVectorImpl<Type> &operandTypes) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
-  if (succeeded(parser.parseOptionalRParen()))
+  }
+  if (succeeded(parser.parseOptionalRParen())) {
     return success(); // empty
+  }
   do {
     Type type;
-    if (failed(parser.parseType(type)))
+    if (failed(parser.parseType(type))) {
       return failure();
+    }
     operandTypes.push_back(type);
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen()))
+  if (failed(parser.parseRParen())) {
     return failure();
+  }
   return success();
 }
 
@@ -403,8 +411,9 @@ parseTiedResultList(OpAsmParser &parser,
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type)))
+        if (failed(parser.parseType(type))) {
           return failure();
+        }
       } else {
         // Use the operands type.
         type = operandTypes[tiedOperandIndex];
@@ -443,8 +452,9 @@ void printTiedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
     if (printType) {
       p.printType(resultType);
     }
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ", ";
+    }
   }
 }
 
@@ -476,8 +486,9 @@ parseTiedFunctionResultListImpl(OpAsmParser &parser,
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type)))
+        if (failed(parser.parseType(type))) {
           return failure();
+        }
       } else {
         // Use the operands type.
         type = arguments[tiedOperandIndex].type;
@@ -566,11 +577,13 @@ void printTiedFunctionResultList(OpAsmPrinter &p, Operation *op,
                                  ValueRange operands, TypeRange operandTypes,
                                  TypeRange resultTypes,
                                  ArrayAttr tiedOperands) {
-  if (resultTypes.size() != 1)
+  if (resultTypes.size() != 1) {
     p << "(";
+  }
   printTiedResultList(p, op, operands, operandTypes, resultTypes, tiedOperands);
-  if (resultTypes.size() != 1)
+  if (resultTypes.size() != 1) {
     p << ")";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -583,8 +596,9 @@ parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
                     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
-    if (failed(parser.parseType(type)))
+    if (failed(parser.parseType(type))) {
       return failure();
+    }
     if (auto shapedType = dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
         SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
@@ -639,8 +653,9 @@ ParseResult
 parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
                     SmallVectorImpl<Type> &types1,
                     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
-  if (failed(parseShapedTypeList(parser, types0, dims)))
+  if (failed(parseShapedTypeList(parser, types0, dims))) {
     return failure();
+  }
   types1 = types0;
   return success();
 }
@@ -672,11 +687,13 @@ ParseResult parseShapedTiedResult(
   int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   if (res.has_value() && succeeded(res.value())) {
     tiedOperandIndex = 0;
-    if (failed(parser.parseKeyword("as")))
+    if (failed(parser.parseKeyword("as"))) {
       return failure();
+    }
   }
-  if (failed(parser.parseType(resultType)))
+  if (failed(parser.parseType(resultType))) {
     return failure();
+  }
   if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
     if (!shapedType.hasStaticShape()) {
       SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
@@ -766,8 +783,9 @@ ParseResult parseShapedResultList(
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type)))
+        if (failed(parser.parseType(type))) {
           return failure();
+        }
       } else {
         // Use the operands type.
         type = operandTypes[tiedOperandIndex];
@@ -848,8 +866,9 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
       p << "}";
       resultDims = resultDims.drop_front(1);
     }
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ", ";
+    }
   }
 }
 
@@ -865,16 +884,18 @@ ParseResult parseShapedFunctionType(
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseShapedTypeList(parser, operandTypes, operandDims)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
   }
-  if (failed(parser.parseArrow()))
+  if (failed(parser.parseArrow())) {
     return failure();
+  }
   if (succeeded(parser.parseOptionalLParen())) {
     if (succeeded(parser.parseOptionalRParen())) {
       // Empty list/no results `()`.
@@ -905,12 +926,14 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
   p << "(";
   printShapedTypeList(p, op, operandTypes, operandDims);
   p << ") -> ";
-  if (resultTypes.size() != 1)
+  if (resultTypes.size() != 1) {
     p << "(";
+  }
   printShapedResultList(p, op, operands, operandTypes, operandDims, resultTypes,
                         resultDims, tiedOperands);
-  if (resultTypes.size() != 1)
+  if (resultTypes.size() != 1) {
     p << ")";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -961,8 +984,9 @@ static ParseResult parseShapedFunctionResultList(
       }
       if (succeeded(parser.parseOptionalKeyword("as"))) {
         // Type _may_ differ from the operand.
-        if (failed(parser.parseType(type)))
+        if (failed(parser.parseType(type))) {
           return failure();
+        }
       } else {
         // Use the operands type.
         type = argTypes[tiedOperandIndex];
@@ -1016,8 +1040,9 @@ static void printShapedFunctionResultList(OpAsmPrinter &p, Operation *op,
         p.printOptionalAttrDict(attrs.getValue());
       }
     }
-    if (i < resultTypes.size() - 1)
+    if (i < resultTypes.size() - 1) {
       p << ", ";
+    }
   }
 }
 
@@ -1029,8 +1054,9 @@ ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
   SmallVector<OpAsmParser::UnresolvedOperand> args;
   SmallVector<Type> argTypes;
   SmallVector<Type> resultTypes;
-  if (failed(parser.parseLParen()))
+  if (failed(parser.parseLParen())) {
     return failure();
+  }
   if (failed(parser.parseOptionalRParen())) {
     if (failed(parseShapedFunctionArgumentList(parser, args, argTypes,
                                                argAttrs)) ||
@@ -1074,8 +1100,9 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
     if (argAttrs) {
       auto attrs =
           dyn_cast_if_present<DictionaryAttr>(argAttrs.getValue()[argIndex]);
-      if (attrs && !attrs.empty())
+      if (attrs && !attrs.empty()) {
         p.printOptionalAttrDict(attrs.getValue());
+      }
     }
     ++argIndex;
   });
@@ -1087,12 +1114,14 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
         resultAttrs && !resultAttrs.empty() &&
         llvm::any_of(resultAttrs.getAsValueRange<DictionaryAttr>(),
                      [](auto attr) { return !attr.empty(); });
-    if (resultTypes.size() != 1 || anyResultAttrs)
+    if (resultTypes.size() != 1 || anyResultAttrs) {
       p << "(";
+    }
     printShapedFunctionResultList(p, op, functionType.getInputs(), resultTypes,
                                   resultAttrs, tiedOperands);
-    if (resultTypes.size() != 1 || anyResultAttrs)
+    if (resultTypes.size() != 1 || anyResultAttrs) {
       p << ")";
+    }
   }
 }
 
@@ -1121,24 +1150,27 @@ void AlignOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
     auto align = [&](APInt value, bool &invalid) -> APInt {
       APInt aligned = (value + alignmentM1) & alignmentM1Inv;
       // Detect overflow, which commonly happens at max range.
-      if (aligned.ult(value))
+      if (aligned.ult(value)) {
         invalid = true;
+      }
       return aligned;
     };
     bool invalid = false;
     auto alignedUmin = align(umin, invalid);
     auto alignedUmax = align(umax, invalid);
-    if (!invalid)
+    if (!invalid) {
       setResultRange(getResult(),
                      ConstantIntRanges::fromUnsigned(alignedUmin, alignedUmax));
+    }
   }
 }
 
 void AlignOp::inferResultDivisibility(ArrayRef<IntegerDivisibility> argDivs,
                                       SetIntDivisibilityFn setResultDivs) {
   auto alignmentDiv = argDivs[1];
-  if (alignmentDiv.isUninitialized())
+  if (alignmentDiv.isUninitialized()) {
     return;
+  }
   setResultDivs(getResult(), alignmentDiv.getValue());
 }
 
@@ -1186,8 +1218,9 @@ AssumeIntOp::getUnionedUnsignedRange(unsigned operandIndex) {
 static bool isConstantZero(IntAssumptionAttr assumption) {
   std::optional<uint64_t> umin = assumption.getUmin();
   std::optional<uint64_t> umax = assumption.getUmax();
-  if (!umin || !umax)
+  if (!umin || !umax) {
     return false;
+  }
   return *umin == 0 && *umax == 0;
 }
 
@@ -1199,14 +1232,16 @@ AssumeIntOp::getUnionedUnsignedDivisor(unsigned operandIndex) {
     auto divisor = assumption.getUdiv();
     if (!divisor) {
       // Constant zero is divisible by anything
-      if (isConstantZero(assumption))
+      if (isConstantZero(assumption)) {
         continue;
+      }
       return std::nullopt;
     }
-    if (divisorUnion)
+    if (divisorUnion) {
       divisorUnion = std::gcd(*divisor, *divisorUnion);
-    else
+    } else {
       divisorUnion = *divisor;
+    }
   }
   return divisorUnion;
 }
@@ -1216,19 +1251,22 @@ void AssumeIntOp::inferResultRanges(ArrayRef<ConstantIntRanges> argRanges,
   for (auto [index, result] : llvm::enumerate(getResults())) {
     Type type = result.getType();
     unsigned bitWidth;
-    if (isa<IndexType>(type))
+    if (isa<IndexType>(type)) {
       bitWidth = 64;
-    else if (auto intType = dyn_cast<IntegerType>(type))
+    } else if (auto intType = dyn_cast<IntegerType>(type)) {
       bitWidth = intType.getWidth();
-    else
+    } else {
       continue;
+    }
     auto [umin, umax] = getUnionedUnsignedRange(index);
     auto uminAp = APInt::getMinValue(bitWidth);
     auto umaxAp = APInt::getMaxValue(bitWidth);
-    if (umin)
+    if (umin) {
       uminAp = APInt(bitWidth, *umin);
-    if (umax)
+    }
+    if (umax) {
       umaxAp = APInt(bitWidth, *umax);
+    }
 
     setResultRange(result, ConstantIntRanges::fromUnsigned(uminAp, umaxAp));
   }
@@ -1238,8 +1276,9 @@ void AssumeIntOp::inferResultDivisibility(ArrayRef<IntegerDivisibility> argDivs,
                                           SetIntDivisibilityFn setResultDivs) {
   for (auto [index, result] : llvm::enumerate(getResults())) {
     Type type = result.getType();
-    if (!isa<IndexType>(type) && !isa<IntegerType>(type))
+    if (!isa<IndexType>(type) && !isa<IntegerType>(type)) {
       continue;
+    }
     auto udiv = getUnionedUnsignedDivisor(index);
     if (udiv) {
       setResultDivs(result,
@@ -1261,8 +1300,9 @@ void AssumeIntOp::build(OpBuilder &builder, OperationState &state,
                         ArrayRef<Value> operands,
                         ArrayRef<ArrayAttr> assumptions) {
   state.addOperands(operands);
-  for (auto operand : operands)
+  for (auto operand : operands) {
     state.addTypes({operand.getType()});
+  }
   state.addAttribute("assumptions",
                      ArrayAttr::get(builder.getContext(),
                                     ArrayRef<Attribute>(assumptions.begin(),
@@ -1282,12 +1322,14 @@ LogicalResult AssumeIntOp::verify() {
        llvm::enumerate(allOperandAssumptions)) {
     auto operandAssumptions = cast<ArrayAttr>(operandAssumptionsAttr);
     // We always allow a single row to broadcast to any requested size.
-    if (operandAssumptions.size() == 1)
+    if (operandAssumptions.size() == 1) {
       continue;
-    if (rank && *rank != operandAssumptions.size())
+    }
+    if (rank && *rank != operandAssumptions.size()) {
       return emitOpError() << "expected operand #" << index << " to have "
                            << *rank << " assumptions but it has "
                            << operandAssumptions.size();
+    }
     rank = operandAssumptions.size();
   }
 
@@ -1304,29 +1346,35 @@ ParseResult AssumeIntOp::parse(OpAsmParser &parser, OperationState &result) {
         OpAsmParser::UnresolvedOperand &parsedOperand = parsedOperands.back();
         SmallVector<Attribute> operandAssumptions;
 
-        if (parser.parseOperand(parsedOperand))
+        if (parser.parseOperand(parsedOperand)) {
           return failure();
+        }
 
         // Parse as a single assumption or a list.
         if (failed(parser.parseOptionalLSquare())) {
           // Single assumption.
           IntAssumptionAttr singleAssumption;
-          if (parser.parseCustomAttributeWithFallback(singleAssumption))
+          if (parser.parseCustomAttributeWithFallback(singleAssumption)) {
             return failure();
+          }
           operandAssumptions.push_back(singleAssumption);
         } else {
           // Multiple assumptions.
           if (failed(parser.parseOptionalRSquare())) {
             if (parser.parseCommaSeparatedList([&]() {
                   IntAssumptionAttr singleAssumption;
-                  if (parser.parseCustomAttributeWithFallback(singleAssumption))
+                  if (parser.parseCustomAttributeWithFallback(
+                          singleAssumption)) {
                     return failure();
+                  }
                   operandAssumptions.push_back(singleAssumption);
                   return success();
-                }))
+                })) {
               return failure();
-            if (parser.parseRSquare())
+            }
+            if (parser.parseRSquare()) {
               return failure();
+            }
           }
         }
 
@@ -1335,22 +1383,26 @@ ParseResult AssumeIntOp::parse(OpAsmParser &parser, OperationState &result) {
             parser.getBuilder().getArrayAttr(operandAssumptions));
 
         return success();
-      }))
+      })) {
     return failure();
+  }
 
   // Parse `:` type.
-  if (parser.parseColon() || parser.parseTypeList(parsedOperandTypes))
+  if (parser.parseColon() || parser.parseTypeList(parsedOperandTypes)) {
     return failure();
+  }
   result.addTypes(parsedOperandTypes);
 
   if (parser.resolveOperands(parsedOperands, parsedOperandTypes,
-                             parser.getNameLoc(), result.operands))
+                             parser.getNameLoc(), result.operands)) {
     return failure();
+  }
 
   result.attributes.append(
       "assumptions", parser.getBuilder().getArrayAttr(allOperandAssumptions));
-  if (parser.parseOptionalAttrDict(result.attributes))
+  if (parser.parseOptionalAttrDict(result.attributes)) {
     return failure();
+  }
 
   return success();
 }
@@ -1425,15 +1477,17 @@ ParseResult UnfoldableConstantOp::parse(OpAsmParser &parser,
                                         OperationState &state) {
   Attribute valueAttr;
   if (parser.parseOptionalAttrDict(state.attributes) ||
-      parser.parseAttribute(valueAttr, "value", state.attributes))
+      parser.parseAttribute(valueAttr, "value", state.attributes)) {
     return failure();
+  }
 
   // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
-  if (!isa<SymbolRefAttr>(valueAttr))
+  if (!isa<SymbolRefAttr>(valueAttr)) {
     type = cast<TypedAttr>(valueAttr).getType();
-  else if (parser.parseColonType(type))
+  } else if (parser.parseColonType(type)) {
     return failure();
+  }
 
   // Add the attribute type to the list.
   return parser.addTypeToList(type, state.types);
@@ -1444,13 +1498,15 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
   p << " ";
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (op->getAttrs().size() > 1)
+  if (op->getAttrs().size() > 1) {
     p << ' ';
+  }
   p << getValue();
 
   // If the value is a symbol reference, print a trailing type.
-  if (isa<SymbolRefAttr>(getValue()))
+  if (isa<SymbolRefAttr>(getValue())) {
     p << " : " << getType();
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1458,8 +1514,9 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
 //===----------------------------------------------------------------------===//
 
 bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
-  if (inputs.size() != 1 || outputs.size() != 1)
+  if (inputs.size() != 1 || outputs.size() != 1) {
     return false;
+  }
   Type a = inputs.front(), b = outputs.front();
   if (a == b) {
     // Both types are the same.
@@ -1509,8 +1566,9 @@ SmallVector<int64_t> CastOp::getTiedResultOperandIndices() {
 
 std::optional<std::pair<int64_t, int64_t>>
 NumericOptionalNarrowOp::getIntegerRange() {
-  if (!getMinValue() || !getMaxValue())
+  if (!getMinValue() || !getMaxValue()) {
     return {};
+  }
   bool signExtend = isSigned();
   // Note: Cannot sign extend 0 bit values.
   int64_t minValue = signExtend && getMinValue()->getBitWidth() > 0
@@ -1621,22 +1679,26 @@ parseFunctionArgumentList(OpAsmParser &parser,
         auto argPresent = parser.parseOptionalArgument(
             argument, /*allowType=*/true, /*allowAttrs=*/true);
         if (argPresent.has_value()) {
-          if (failed(argPresent.value()))
+          if (failed(argPresent.value())) {
             return failure(); // Present but malformed.
-          if (!arguments.empty() && arguments.back().ssaName.name.empty())
+          }
+          if (!arguments.empty() && arguments.back().ssaName.name.empty()) {
             return parser.emitError(argument.ssaName.location,
                                     "expected type instead of SSA identifier");
+          }
 
         } else {
           argument.ssaName.location = parser.getCurrentLocation();
-          if (!arguments.empty() && !arguments.back().ssaName.name.empty())
+          if (!arguments.empty() && !arguments.back().ssaName.name.empty()) {
             return parser.emitError(argument.ssaName.location,
                                     "expected SSA identifier");
+          }
           NamedAttrList attrs;
           if (parser.parseType(argument.type) ||
               parser.parseOptionalAttrDict(attrs) ||
-              parser.parseOptionalLocationSpecifier(argument.sourceLoc))
+              parser.parseOptionalLocationSpecifier(argument.sourceLoc)) {
             return failure();
+          }
           argument.attrs = attrs.getDictionary(parser.getContext());
         }
         arguments.push_back(argument);
@@ -1648,52 +1710,61 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
 
   StringAttr symVisibilityAttr;
-  if (failed(parseSymbolVisibility(parser, symVisibilityAttr)))
+  if (failed(parseSymbolVisibility(parser, symVisibilityAttr))) {
     return failure();
-  if (symVisibilityAttr)
+  }
+  if (symVisibilityAttr) {
     result.addAttribute(SymbolTable::getVisibilityAttrName(),
                         symVisibilityAttr);
+  }
 
   StringAttr nameAttr;
   if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
-                             result.attributes))
+                             result.attributes)) {
     return failure();
+  }
 
   SmallVector<OpAsmParser::Argument> arguments;
-  if (parseFunctionArgumentList(parser, arguments))
+  if (parseFunctionArgumentList(parser, arguments)) {
     return failure();
+  }
 
   SmallVector<Type> resultTypes;
   SmallVector<DictionaryAttr> resultAttrs;
   ArrayAttr tiedOperands;
   if (succeeded(parser.parseOptionalArrow())) {
     if (failed(parseTiedFunctionResultList(parser, arguments, resultTypes,
-                                           resultAttrs, tiedOperands)))
+                                           resultAttrs, tiedOperands))) {
       return failure();
+    }
   }
-  if (tiedOperands)
+  if (tiedOperands) {
     result.addAttribute("tied_operands", tiedOperands);
+  }
 
   SmallVector<Type> argumentTypes;
-  for (auto argument : arguments)
+  for (auto argument : arguments) {
     argumentTypes.push_back(argument.type);
+  }
   result.addAttribute("function_type", TypeAttr::get(builder.getFunctionType(
                                            argumentTypes, resultTypes)));
 
   NamedAttrList parsedAttributes;
   SMLoc attributeDictLocation = parser.getCurrentLocation();
-  if (parser.parseOptionalAttrDictWithKeyword(parsedAttributes))
+  if (parser.parseOptionalAttrDictWithKeyword(parsedAttributes)) {
     return failure();
+  }
   for (StringRef disallowed : {
            SymbolTable::getVisibilityAttrName(),
            SymbolTable::getSymbolAttrName(),
            StringRef("function_type"),
        }) {
-    if (parsedAttributes.get(disallowed))
+    if (parsedAttributes.get(disallowed)) {
       return parser.emitError(attributeDictLocation, "'")
              << disallowed
              << "' is an inferred attribute and should not be specified in the "
                 "explicit attribute dictionary";
+    }
   }
   result.attributes.append(parsedAttributes);
 
@@ -1707,10 +1778,12 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto parseResult = parser.parseOptionalRegion(*body, arguments,
                                                 /*enableNameShadowing=*/false);
   if (parseResult.has_value()) {
-    if (failed(*parseResult))
+    if (failed(*parseResult)) {
       return failure();
-    if (body->empty())
+    }
+    if (body->empty()) {
       return parser.emitError(loc, "expected non-empty function body");
+    }
   }
   return success();
 }
@@ -1745,8 +1818,9 @@ bool IREE::Util::FuncOp::canDiscardOnUseEmpty() {
 
 bool IREE::Util::FuncOp::hasAnyTiedOperands() {
   auto tiedOperandsAttr = getTiedOperandsAttr();
-  if (!tiedOperandsAttr)
+  if (!tiedOperandsAttr) {
     return false;
+  }
   return llvm::any_of(
       tiedOperandsAttr.getAsRange<IntegerAttr>(), [](IntegerAttr attr) {
         return attr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
@@ -1773,8 +1847,9 @@ void IREE::Util::FuncOp::expandSignature(
     expandArgument(oldIndex, argType, newArgumentTypes);
     size_t expandedCount = newArgumentTypes.size() - newIndex;
     for (size_t i = 0; i < adjustedTiedOperands.size(); ++i) {
-      if (adjustedTiedOperands[i] == oldIndex)
+      if (adjustedTiedOperands[i] == oldIndex) {
         adjustedTiedOperands[i] = newIndex;
+      }
     }
     newArgumentAttrs.push_back(oldArgumentAttrs[oldIndex]);
     newArgumentAttrs.append(expandedCount - 1,
@@ -1809,6 +1884,30 @@ void IREE::Util::FuncOp::expandSignature(
   }
 }
 
+LogicalResult FuncOp::verify() {
+  // Get the tied_operands attribute if it exists
+  if (auto tiedOperandsAttr = getTiedOperandsAttr()) {
+    // Each index must be valid
+    unsigned numOperands = getFunctionType().getNumInputs();
+    for (auto [resultIdx, attr] : llvm::enumerate(tiedOperandsAttr)) {
+      int64_t operandIdx = cast<IntegerAttr>(attr).getInt();
+
+      // Allow -1 (untied)
+      if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        continue;
+      }
+
+      // Check if operand index is in valid range
+      if (operandIdx < 0 || operandIdx >= static_cast<int64_t>(numOperands)) {
+        return emitOpError() << "result #" << resultIdx
+                             << " tied to invalid operand index " << operandIdx;
+      }
+    }
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // util.call
 //===----------------------------------------------------------------------===//
@@ -1819,8 +1918,9 @@ FunctionType CallOp::getCalleeType() {
 
 static bool areTiedOperandsEqual(ArrayAttr a, ArrayAttr b) {
   auto hasAnyTied = [](ArrayAttr tiedOperandsAttr) {
-    if (!tiedOperandsAttr)
+    if (!tiedOperandsAttr) {
       return false;
+    }
     return llvm::any_of(
         tiedOperandsAttr.getAsRange<IntegerAttr>(), [](IntegerAttr attr) {
           return attr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
@@ -1828,10 +1928,12 @@ static bool areTiedOperandsEqual(ArrayAttr a, ArrayAttr b) {
   };
   bool hasAnyTiedA = hasAnyTied(a);
   bool hasAnyTiedB = hasAnyTied(b);
-  if (hasAnyTiedA != hasAnyTiedB)
+  if (hasAnyTiedA != hasAnyTiedB) {
     return false;
-  if (!a || !b)
+  }
+  if (!a || !b) {
     return true;
+  }
   return a == b;
 }
 
@@ -1877,8 +1979,9 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
     size_t newIndex = newOperands.size();
     expandOperand(oldIndex, operand, newOperands);
     for (size_t i = 0; i < adjustedTiedOperands.size(); ++i) {
-      if (adjustedTiedOperands[i] == oldIndex)
+      if (adjustedTiedOperands[i] == oldIndex) {
         adjustedTiedOperands[i] = newIndex;
+      }
     }
   }
 
@@ -2026,8 +2129,9 @@ void GlobalLoadOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   // HACK: mlir doesn't have symbol side effects so we have to mark as a global
   // read if not immutable and not in an initializer.
-  if (!isGlobalImmutable())
+  if (!isGlobalImmutable()) {
     effects.emplace_back(MemoryEffects::Read::get());
+  }
 }
 
 LogicalResult
@@ -2219,6 +2323,58 @@ LogicalResult ListSetOp::verify() {
 void BufferConstantOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), getName().value_or("buffer_cst"));
+}
+
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             Attribute value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value", value);
+}
+
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             StringRef value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value", builder.getStringAttr(value));
+}
+
+void BufferConstantOp::build(OpBuilder &builder, OperationState &state,
+                             ArrayRef<uint8_t> value) {
+  state.addTypes({builder.getType<IREE::Util::BufferType>()});
+  state.addAttribute("value",
+                     DenseIntElementsAttr::get(
+                         VectorType::get(static_cast<int64_t>(value.size()),
+                                         builder.getI8Type()),
+                         value));
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     Attribute value) {
+  if (!value) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     StringRef value) {
+  if (value.empty()) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
+}
+
+// static
+Value BufferConstantOp::createOrNull(OpBuilder &builder, Location loc,
+                                     ArrayRef<uint8_t> value) {
+  if (value.empty()) {
+    auto bufferType = builder.getType<IREE::Util::BufferType>();
+    return IREE::Util::NullOp::create(builder, loc, bufferType).getResult();
+  }
+  return IREE::Util::BufferConstantOp::create(builder, loc, value);
 }
 
 LogicalResult BufferConstantOp::verify() {

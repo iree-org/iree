@@ -97,8 +97,9 @@ bool transform_ext::CapturingOpMatcher::checkAllTilableMatched(
     ArrayRef<transform_ext::CapturingOpMatcher *> matchers) {
   LLVM_DEBUG(DBGS() << "all tilable ops captured");
   int64_t numTilableOps = 0;
-  if (!parent)
+  if (!parent) {
     return false;
+  }
   parent->walk([&](TilingInterface Op) { ++numTilableOps; });
 
   llvm::SmallPtrSet<Operation *, 6> matched;
@@ -114,8 +115,7 @@ bool transform_ext::CapturingOpMatcher::checkAllTilableMatched(
 }
 
 bool transform_ext::CapturingOpMatcher::match(Operation *op) {
-  auto debugRAII =
-      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  auto debugRAII = llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
   LLVM_DEBUG(DBGS() << "matching: " << *op << "\n");
 
   if (getCaptured()) {
@@ -204,12 +204,14 @@ transform_ext::CapturingOpMatcher::operand(int64_t pos,
                                            CapturingOpMatcher &nested) {
   addPredicate([pos, &nested](Operation *op) {
     std::optional<int64_t> operandNo = remapNegativeOperandNumber(pos, op);
-    if (!operandNo)
+    if (!operandNo) {
       return false;
+    }
     LLVM_DEBUG(DBGS() << "operand #" << pos << " is defined by an operation");
     Operation *definingOp = op->getOperand(*operandNo).getDefiningOp();
-    if (!definingOp)
+    if (!definingOp) {
       return false;
+    }
     return recursiveMatch(nested, definingOp);
   });
   recordNestedMatcher(nested);
@@ -221,8 +223,9 @@ transform_ext::CapturingOpMatcher::operand(int64_t pos,
                                            CapturingValueMatcher &nested) {
   addPredicate([pos, &nested](Operation *op) {
     std::optional<int64_t> operandNo = remapNegativeOperandNumber(pos, op);
-    if (!operandNo)
+    if (!operandNo) {
       return false;
+    }
     LLVM_DEBUG(DBGS() << "operand #" << pos << " is");
     Value operand = op->getOperand(*operandNo);
     return recursiveMatch(nested, operand);
@@ -236,15 +239,17 @@ transform_ext::CapturingOpMatcher &transform_ext::CapturingOpMatcher::operand(
   addPredicate([position,
                 floatValueFn = std::move(floatValueFn)](Operation *op) -> bool {
     std::optional<int64_t> operandNo = remapNegativeOperandNumber(position, op);
-    if (!operandNo)
+    if (!operandNo) {
       return false;
+    }
 
     LLVM_DEBUG(DBGS() << "operand #" << *operandNo
                       << " is a special floating point constant");
     auto cstOp =
         op->getOperand(*operandNo).getDefiningOp<arith::ConstantFloatOp>();
-    if (!cstOp)
+    if (!cstOp) {
       return false;
+    }
     return floatValueFn(cstOp.value());
   });
 
@@ -315,8 +320,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   Operation *parentOp = parentRegion->getParentOp();
   if (!parentOp) {
     os << " of a detached region:\n";
-    for (Block &b : *parentRegion)
+    for (Block &b : *parentRegion) {
       b.print(os);
+    }
     return os;
   }
 
@@ -327,8 +333,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 } // namespace
 
 bool transform_ext::CapturingValueMatcher::match(Value value) {
-  auto debugRAII =
-      llvm::make_scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
+  auto debugRAII = llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "-------\n"); });
   LLVM_DEBUG(DBGS() << "matching " << DebugPrintValueWrapper{value} << "\n");
 
   if (getCaptured()) {
@@ -345,8 +350,9 @@ bool transform_ext::CapturingValueMatcher::match(Value value) {
   for (const PredicateFn &fn : predicates) {
     bool result = fn(value);
     LLVM_DEBUG(llvm::dbgs() << ": " << result << "\n");
-    if (!result)
+    if (!result) {
       return false;
+    }
   }
 
   captured = value;
@@ -453,11 +459,13 @@ transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
     for (auto dimension : dimensions) {
       int64_t transformedDimension =
           dimension >= 0 ? dimension : shape.size() + dimension;
-      if (transformedDimension < 0 || transformedDimension >= shape.size())
+      if (transformedDimension < 0 || transformedDimension >= shape.size()) {
         return false;
+      }
       if (ShapedType::isDynamic(shape[transformedDimension]) ^
-          (kind == ShapeKind::Static))
+          (kind == ShapeKind::Static)) {
         continue;
+      }
       return false;
     }
     return true;
@@ -487,12 +495,14 @@ transform_ext::StructuredOpMatcher::dim(SmallVector<int64_t> &&dimensions,
     for (auto dimension : dimensions) {
       int64_t transformedDimension =
           dimension >= 0 ? dimension : rank + dimension;
-      if (transformedDimension < 0 || transformedDimension >= rank)
+      if (transformedDimension < 0 || transformedDimension >= rank) {
         return false;
+      }
       utils::IteratorType iteratorKind =
           linalgOp.getIteratorTypesArray()[transformedDimension];
-      if (iteratorKind == kind)
+      if (iteratorKind == kind) {
         continue;
+      }
       return false;
     }
     return true;
@@ -519,10 +529,12 @@ transform_ext::StructuredOpMatcher::dim(AllDimsExcept &&dims,
 
     for (auto [index, type] :
          llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-      if (excludedDims.contains(index))
+      if (excludedDims.contains(index)) {
         continue;
-      if (type == kind)
+      }
+      if (type == kind) {
         continue;
+      }
       return false;
     }
     return true;
@@ -538,8 +550,9 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension,
     int64_t rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
-    if (transformedDimension >= rank)
+    if (transformedDimension >= rank) {
       return false;
+    }
 
     int64_t size = linalgOp.getStaticLoopRanges()[transformedDimension];
     return !ShapedType::isDynamic(size) && (size % divisibleBy.value == 0);
@@ -565,8 +578,9 @@ transform_ext::StructuredOpMatcher::dim(int64_t dimension, CaptureDim capture) {
     int64_t rank = linalgOp.getNumLoops();
     int64_t transformedDimension =
         dimension >= 0 ? dimension : rank + dimension;
-    if (transformedDimension >= rank)
+    if (transformedDimension >= rank) {
       return false;
+    }
 
     capture.value = linalgOp.getStaticLoopRanges()[transformedDimension];
     return true;
@@ -600,8 +614,9 @@ transform_ext::StructuredOpMatcher::contractionDims(
     StringRef convMessage = linalg::detail::getMatchContractionMessage(
         mlir::linalg::detail::isContractionInterfaceImpl(
             linalgOp, &contractionDims.value));
-    if (convMessage.empty())
+    if (convMessage.empty()) {
       return true;
+    }
     LLVM_DEBUG(llvm::dbgs() << " (" << convMessage << ")");
     return false;
   });
@@ -614,8 +629,9 @@ transform_ext::StructuredOpMatcher::convolutionDims(CaptureConvDims convDims) {
     StringRef convMessage = linalg::detail::getMatchConvolutionMessage(
         mlir::linalg::detail::isConvolutionInterfaceImpl(linalgOp,
                                                          &convDims.value));
-    if (convMessage.empty())
+    if (convMessage.empty()) {
       return true;
+    }
     LLVM_DEBUG(llvm::dbgs() << " (" << convMessage << ")");
     return false;
   });
@@ -627,17 +643,19 @@ transform_ext::StructuredOpMatcher::StructuredOpMatcher(
   addPredicate([&A, &B](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "start recursive lhs OR match {\n");
     {
-      auto debugRAII = llvm::make_scope_exit(
+      auto debugRAII = llvm::scope_exit(
           [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
-      if (A.match(linalgOp))
+      if (A.match(linalgOp)) {
         return true;
+      }
     }
     LLVM_DEBUG(DBGS() << "start recursive rhs OR match {\n");
     {
-      auto debugRAII = llvm::make_scope_exit(
+      auto debugRAII = llvm::scope_exit(
           [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
-      if (B.match(linalgOp))
+      if (B.match(linalgOp)) {
         return true;
+      }
     }
     return false;
   });
@@ -682,10 +700,11 @@ void transform_ext::StructuredOpMatcher::addInputMatcher(
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
-    if (matcher(linalgOp.getDpsInputOperand(transformedPosition)->get()))
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    if (matcher(linalgOp.getDpsInputOperand(transformedPosition)->get())) {
       return true;
+    }
     return optional.value;
   });
 }
@@ -696,8 +715,9 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag, IsPermutation) {
     LLVM_DEBUG(DBGS() << "all input operands have permutation maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+      if (!linalgOp.getMatchingIndexingMap(operand).isPermutation()) {
         return false;
+      }
     }
     return true;
   });
@@ -710,8 +730,9 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag,
     LLVM_DEBUG(DBGS() << "all input operands have projected permutation maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
+      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation()) {
         return false;
+      }
     }
     return true;
   });
@@ -719,13 +740,15 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag,
 
 /// Helper to check if the map is an identity map with a projected dim.
 static bool isProjectedMap(AffineMap map, int64_t projectedDim) {
-  if (!map.isProjectedPermutation())
+  if (!map.isProjectedPermutation()) {
     return false;
+  }
   int64_t dimCounter = 0;
   for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
     // Skip the project dim.
-    if (dimCounter == projectedDim)
+    if (dimCounter == projectedDim) {
       dimCounter++;
+    }
     if (map.getDimPosition(i) != dimCounter++) {
       return false;
     }
@@ -754,15 +777,20 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
                llvm::dbgs() << " have a permutation maps with " << dim.value
                             << " projected");
     int64_t updatedDim = dim.value;
-    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops()))
+    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops())) {
       return false;
+    }
     for (int64_t position : positions) {
       int64_t updatedPosition = position;
-      if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+      if (!makeValidPositiveIndex(updatedPosition,
+                                  linalgOp.getNumDpsInputs())) {
         return false;
+      }
       OpOperand *operand = linalgOp.getDpsInputOperand(updatedPosition);
-      if (!isProjectedMap(linalgOp.getMatchingIndexingMap(operand), updatedDim))
+      if (!isProjectedMap(linalgOp.getMatchingIndexingMap(operand),
+                          updatedDim)) {
         return false;
+      }
     }
     return true;
   });
@@ -774,8 +802,9 @@ transform_ext::StructuredOpMatcher::input(AllOperands tag, IsIdentity) {
     LLVM_DEBUG(DBGS() << "all input operands have identity maps");
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
+      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity()) {
         return false;
+      }
     }
     return true;
   });
@@ -791,11 +820,14 @@ transform_ext::StructuredOpMatcher::input(SmallVector<int64_t> &&positions,
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (int64_t position : positions) {
       int64_t updatedPosition = position;
-      if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+      if (!makeValidPositiveIndex(updatedPosition,
+                                  linalgOp.getNumDpsInputs())) {
         return false;
+      }
       OpOperand *operand = linalgOp.getDpsInputOperand(updatedPosition);
-      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
+      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity()) {
         return false;
+      }
     }
     return true;
   });
@@ -808,8 +840,9 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " has elemental type with bit width " << width.value);
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
     return shapedType && shapedType.getElementType().isIntOrFloat() &&
@@ -823,12 +856,14 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "input operand #" << position << " capture bitwidth");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
-    if (!shapedType || !shapedType.getElementType().isIntOrFloat())
+    if (!shapedType || !shapedType.getElementType().isIntOrFloat()) {
       return false;
+    }
     width.value = shapedType.getElementType().getIntOrFloatBitWidth();
     return true;
   });
@@ -841,8 +876,9 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " capture element type");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
     if (!shapedType) {
@@ -881,13 +917,15 @@ transform_ext::StructuredOpMatcher &transform_ext::StructuredOpMatcher::input(
     LLVM_DEBUG(DBGS() << "input operand #" << position
                       << " is a special floating point constant");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs())) {
       return false;
+    }
     auto cstOp = linalgOp.getDpsInputOperand(updatedPosition)
                      ->get()
                      .getDefiningOp<arith::ConstantFloatOp>();
-    if (!cstOp)
+    if (!cstOp) {
       return false;
+    }
     return floatValueFn(cstOp.value());
   });
 }
@@ -906,19 +944,22 @@ void transform_ext::StructuredOpMatcher::addOutputMatcher(
                                          : " (mandatory match) ")
                       << "is produced by\n");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits())) {
       return false;
+    }
     Operation *definingOp =
         linalgOp.getDpsInitOperand(updatedPosition)->get().getDefiningOp();
-    if (!definingOp)
+    if (!definingOp) {
       return optional.value;
+    }
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
-    if (matcher(definingOp))
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    if (matcher(definingOp)) {
       return true;
+    }
     return optional.value;
   });
 }
@@ -928,8 +969,9 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have permutation maps");
     for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
-      if (!linalgOp.getMatchingIndexingMap(&operand).isPermutation())
+      if (!linalgOp.getMatchingIndexingMap(&operand).isPermutation()) {
         return false;
+      }
     }
     return true;
   });
@@ -941,8 +983,9 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag,
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have projected permutation maps");
     for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
-      if (!linalgOp.getMatchingIndexingMap(&operand).isProjectedPermutation())
+      if (!linalgOp.getMatchingIndexingMap(&operand).isProjectedPermutation()) {
         return false;
+      }
     }
     return true;
   });
@@ -953,13 +996,15 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsProjected dim) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have a maps with projected");
     int64_t updatedDim = dim.value;
-    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops()))
+    if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops())) {
       return false;
+    }
     // all_of with a lambda requires const-casting dance, so using a loop.
     for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
       if (!isProjectedMap(linalgOp.getMatchingIndexingMap(&operand),
-                          updatedDim))
+                          updatedDim)) {
         return false;
+      }
     }
     return true;
   });
@@ -970,8 +1015,9 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsIdentity) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have identity permutation maps");
     for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
-      if (!linalgOp.getMatchingIndexingMap(&operand).isIdentity())
+      if (!linalgOp.getMatchingIndexingMap(&operand).isIdentity()) {
         return false;
+      }
     }
     return true;
   });
@@ -984,8 +1030,9 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " has elemental type with bit width " << width.value);
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     return shapedType && shapedType.getElementType().isIntOrFloat() &&
@@ -999,8 +1046,9 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "output operand #" << position << " capture bitwidth");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     if (!shapedType || !shapedType.getElementType().isIntOrFloat()) {
@@ -1019,8 +1067,9 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " capture element type");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits())) {
       return false;
+    }
     auto shapedType = dyn_cast<ShapedType>(
         linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     if (!shapedType) {
@@ -1039,8 +1088,9 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     LLVM_DEBUG(DBGS() << "output operand #" << position
                       << " is populated by a single-combiner reduction");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits())) {
       return false;
+    }
     SmallVector<Operation *> combinerOps;
     return matchReduction(linalgOp.getRegionOutputArgs(), updatedPosition,
                           combinerOps) &&
@@ -1070,14 +1120,15 @@ void transform_ext::StructuredOpMatcher::addResultMatcher(
                                          : " (mandatory match) ")
                       << "has a use\n");
     int64_t updatedPosition = position;
-    if (!makeValidPositiveIndex(updatedPosition, linalgOp->getNumResults()))
+    if (!makeValidPositiveIndex(updatedPosition, linalgOp->getNumResults())) {
       return false;
+    }
 
     // We MUST run the matcher at this point, even if the match is optional,
     // to allow for capture.
     LLVM_DEBUG(DBGS() << "start recursive match {\n");
-    auto debugRAII = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
+    auto debugRAII =
+        llvm::scope_exit([] { LLVM_DEBUG(DBGS() << "} end recursive match"); });
     if (llvm::any_of(linalgOp->getResult(updatedPosition).getUsers(),
                      [&matcher](Operation *op) { return matcher(op); })) {
       return true;
@@ -1094,34 +1145,42 @@ transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::singleOpWithCanonicaleArgs(
     StringRef opcode, bool commutative) {
   return addPredicate([=](linalg::LinalgOp linalgOp) {
-    if (linalgOp.getBlock()->getOperations().size() != 2)
+    if (linalgOp.getBlock()->getOperations().size() != 2) {
       return false;
+    }
     Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
     if (innerOp->getName().getStringRef() != opcode ||
-        innerOp->getNumResults() != 1)
+        innerOp->getNumResults() != 1) {
       return false;
+    }
     Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
+    if (yieldOp->getNumOperands() != 1) {
       return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+    }
+    if (yieldOp->getOperand(0).getDefiningOp() != innerOp) {
       return false;
+    }
     if (commutative && innerOp->getNumOperands() == 2) {
       auto arg0 = dyn_cast<BlockArgument>(innerOp->getOperand(0));
       auto arg1 = dyn_cast<BlockArgument>(innerOp->getOperand(1));
-      if (!arg0 || !arg1)
+      if (!arg0 || !arg1) {
         return false;
+      }
       if (arg0.getParentBlock() != linalgOp.getBlock() ||
-          arg1.getParentBlock() != linalgOp.getBlock())
+          arg1.getParentBlock() != linalgOp.getBlock()) {
         return false;
+      }
       if (!((arg0.getArgNumber() == 0 && arg1.getArgNumber() == 1) ||
-            (arg1.getArgNumber() == 0 && arg0.getArgNumber() == 1)))
+            (arg1.getArgNumber() == 0 && arg0.getArgNumber() == 1))) {
         return false;
+      }
     } else {
       for (auto [index, operand] : llvm::enumerate(innerOp->getOperands())) {
         auto arg = dyn_cast<BlockArgument>(operand);
         if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-            arg.getArgNumber() != index)
+            arg.getArgNumber() != index) {
           return false;
+        }
       }
     }
     return true;
@@ -1132,23 +1191,29 @@ transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::isFloatReciprocal() {
   return addPredicate([=](linalg::LinalgOp linalgOp) {
     LLVM_DEBUG(DBGS() << "op region represents a reciprocal operation");
-    if (linalgOp.getBlock()->getOperations().size() != 2)
+    if (linalgOp.getBlock()->getOperations().size() != 2) {
       return false;
+    }
     Operation *innerOp = &(*linalgOp.getBlock()->getOperations().begin());
-    if (!isa<arith::DivFOp>(innerOp) || innerOp->getNumResults() != 1)
+    if (!isa<arith::DivFOp>(innerOp) || innerOp->getNumResults() != 1) {
       return false;
+    }
     Operation *yieldOp = linalgOp.getBlock()->getTerminator();
-    if (yieldOp->getNumOperands() != 1)
+    if (yieldOp->getNumOperands() != 1) {
       return false;
-    if (yieldOp->getOperand(0).getDefiningOp() != innerOp)
+    }
+    if (yieldOp->getOperand(0).getDefiningOp() != innerOp) {
       return false;
+    }
     auto cst = innerOp->getOperand(0).getDefiningOp<arith::ConstantFloatOp>();
-    if (!cst || cst.value().convertToDouble() != 1.0)
+    if (!cst || cst.value().convertToDouble() != 1.0) {
       return false;
+    }
     auto arg = dyn_cast<BlockArgument>(innerOp->getOperand(1));
     if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-        arg.getArgNumber() != 0)
+        arg.getArgNumber() != 0) {
       return false;
+    }
     return true;
   });
 }
@@ -1156,14 +1221,16 @@ transform_ext::StructuredOpMatcher::isFloatReciprocal() {
 transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::passThroughOp() {
   return addPredicate([=](linalg::LinalgOp linalgOp) {
-    if (linalgOp.getBlock()->getOperations().size() != 1)
+    if (linalgOp.getBlock()->getOperations().size() != 1) {
       return false;
+    }
     Operation *yieldOp = linalgOp.getBlock()->getTerminator();
     for (auto [index, operand] : llvm::enumerate(yieldOp->getOperands())) {
       auto arg = dyn_cast<BlockArgument>(operand);
       if (!arg || arg.getParentBlock() != linalgOp.getBlock() ||
-          arg.getArgNumber() != index)
+          arg.getArgNumber() != index) {
         return false;
+      }
     }
     return true;
   });
@@ -1177,8 +1244,8 @@ transform_ext::StructuredOpMatcher::hasContractionBody(
   return addPredicate([=](linalg::LinalgOp linalgOp) {
     LLVM_DEBUG(DBGS() << "op region is a " << elemOpName << "/"
                       << reductionOpName << " contraction (");
-    auto scopeExitPrinter = llvm::make_scope_exit(
-        [] { LLVM_DEBUG(llvm::dbgs() << " check failed)"); });
+    auto scopeExitPrinter =
+        llvm::scope_exit([] { LLVM_DEBUG(llvm::dbgs() << " check failed)"); });
 
     Block *body = linalgOp.getBlock();
     if (!llvm::hasNItems(*body, 3)) {
@@ -1259,8 +1326,9 @@ transform_ext::TensorPadOpMatcher::low(ArrayRef<int64_t> sizes) {
       llvm::interleaveComma(sizes, llvm::dbgs());
     });
     for (auto [ofr, sz] : llvm::zip(tensorPad.getMixedLowPad(), sizes)) {
-      if (isConstantIntValue(ofr, sz))
+      if (isConstantIntValue(ofr, sz)) {
         return false;
+      }
     }
     return true;
   });
@@ -1284,8 +1352,9 @@ transform_ext::TensorPadOpMatcher::high(ArrayRef<int64_t> sizes) {
       llvm::interleaveComma(sizes, llvm::dbgs());
     });
     for (auto [ofr, sz] : llvm::zip(tensorPad.getMixedHighPad(), sizes)) {
-      if (isConstantIntValue(ofr, sz))
+      if (isConstantIntValue(ofr, sz)) {
         return false;
+      }
     }
     return true;
   });
@@ -1306,8 +1375,9 @@ transform_ext::TensorPadOpMatcher::yieldsExternalValue() {
   return addPredicate([=](tensor::PadOp tensorPad) {
     LLVM_DEBUG(DBGS() << "pad body yields an externally-defined value");
     Block *body = tensorPad.getBody();
-    if (!llvm::hasSingleElement(*body))
+    if (!llvm::hasSingleElement(*body)) {
       return false;
+    }
     return llvm::all_of(body->getTerminator()->getOperands(),
                         [body](Value operand) {
                           auto arg = dyn_cast<BlockArgument>(operand);
@@ -1444,8 +1514,9 @@ void transform_ext::makeReductionMatcher(
           .output(0, CaptureElementTypeBitWidth(
                          captures.maybeTrailingOutputElementalTypeBitWidth));
   reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
-  if (mustMatchEntireFunc)
+  if (mustMatchEntireFunc) {
     reduction = reduction.allTilableOpsCaptured<mlir::FunctionOpInterface>();
+  }
   trailingCapture = &trailing;
 }
 
@@ -1481,8 +1552,9 @@ void transform_ext::makeMatmulMatcher(
 
   auto &trailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
   matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch());
-  if (mustMatchEntireFunc)
+  if (mustMatchEntireFunc) {
     matmul = matmul.allTilableOpsCaptured<mlir::FunctionOpInterface>();
+  }
   trailingCapture = &trailing;
 }
 
@@ -1510,8 +1582,9 @@ void transform_ext::makeBatchMatmulMatcher(
   bmm = bmm.output(0, fill);
   fillCapture = &fill;
 
-  if (mustMatchEntireFunc)
+  if (mustMatchEntireFunc) {
     bmm = bmm.allTilableOpsCaptured<mlir::FunctionOpInterface>();
+  }
 }
 
 /// Match sum(%src, broadcast(%reduction))
@@ -1736,9 +1809,10 @@ void transform_ext::makeConvolutionMatcher(
   // Optional trailing can be any map, transpose, broadcast but not reduce or
   // windowing operation for now.
   convolution = convolution.result(0, HasAnyUse(), trailing, OptionalMatch());
-  if (mustMatchEntireFunc)
+  if (mustMatchEntireFunc) {
     convolution =
         convolution.allTilableOpsCaptured<mlir::FunctionOpInterface>();
+  }
   trailingCapture = &trailing;
 }
 
@@ -1764,7 +1838,8 @@ void transform_ext::makePadMatcher(MatcherContext &context,
                         .result(0, value)
                         .low(AllDims(), 0)
                         .yieldsExternalValue();
-  if (mustMatchEntireFunc)
+  if (mustMatchEntireFunc) {
     opMatcher = opMatcher.allTilableOpsCaptured<mlir::FunctionOpInterface>();
+  }
   padCapture = &opMatcher;
 }
