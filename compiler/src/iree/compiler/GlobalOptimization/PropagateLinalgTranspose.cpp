@@ -577,9 +577,13 @@ public:
 
     RankedTensorType expandedType = getPermutedTensorType(
         cast<RankedTensorType>(expandOp.getType()), newInvPerm);
+    // Permute the output shape to match the permuted type.
+    SmallVector<OpFoldResult> permutedOutputShape =
+        expandOp.getMixedOutputShape();
+    applyPermutationToVector(permutedOutputShape, newInvPerm);
     Value transposedReshape = tensor::ExpandShapeOp::create(
         rewriter, expandOp.getLoc(), expandedType, transposeOp.getInput(),
-        newReassociations);
+        newReassociations, permutedOutputShape);
     Value originalReshape =
         createTranspose(rewriter, transposedReshape, newPerm);
     rewriter.replaceOp(expandOp, originalReshape);
