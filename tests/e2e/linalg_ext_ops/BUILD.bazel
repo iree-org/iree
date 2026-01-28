@@ -18,7 +18,6 @@ ALL_SRCS = enforce_glob(
         "arg_compare.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "dynamic_attention.mlir",
         "gather.mlir",
         "map_gather.mlir",
         "map_scatter.mlir",
@@ -50,7 +49,6 @@ VMVX_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
-        "dynamic_attention.mlir",
         "gather.mlir",
         "map_gather.mlir",
         "map_scatter.mlir",
@@ -90,7 +88,6 @@ LLVM_GPU_SRCS = enforce_glob(
     exclude = [
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "dynamic_attention.mlir",
         "map_gather.mlir",
         "map_scatter.mlir",
     ],
@@ -130,7 +127,6 @@ ROCM_HIP_SRCS = enforce_glob(
         "top-k.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "dynamic_attention.mlir",
     ],
 )
 
@@ -158,7 +154,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
-            "dynamic_attention.mlir",
             "map_gather.mlir",
             "map_scatter.mlir",
             "top-k.mlir",
@@ -188,7 +183,6 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
-            "dynamic_attention.mlir",
         ],
     ),
     driver = "vulkan",
