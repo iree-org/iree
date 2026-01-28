@@ -59,6 +59,9 @@ jobs:
       - name: Run GPU tests
         env:
           CTEST_PARALLEL_LEVEL: 1
+          # TODO: https://github.com/iree-org/iree/issues/23242
+          # These tests are failing on the w7900 runner and are disabled
+          # until the issue is investigated further.
           IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE: |-
             iree/hal/drivers/hip/cts/hip_stream_buffer_mapping_test
             iree/hal/drivers/hip/cts/hip_stream_command_buffer_dispatch_constants_test
