@@ -601,6 +601,56 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+/// When fusing a broadcasting consumer with a producer that has reduction
+/// loops, ensure the iteration spaces match exactly to avoid losing
+/// parallelism. This prevents fusing cases where a small reduction result
+/// is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+/// Returns true if fusion is allowed for broadcasting consumers.
+static bool canFuseBroadcastingConsumer(
+    Operation *producer,
+    IREE::LinalgExt::LinalgFusionOpInterface producerFusionOp,
+    IREE::LinalgExt::LinalgFusionOpInterface consumerFusionOp) {
+  // Only block fusion if the producer is a reduction op (has reduction loops).
+  // Pure elementwise/parallel producers can always fuse with broadcasting
+  // consumers.
+  if (producerFusionOp.getNumLoops() ==
+      producerFusionOp.getNumParallelLoops()) {
+    return true;
+  }
+
+  // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+  if (isa<IREE::LinalgExt::CustomOp>(producer)) {
+    return true;
+  }
+
+  SmallVector<int64_t> producerIterationSpace =
+      producerFusionOp.getStaticLoopRanges();
+  SmallVector<int64_t> consumerIterationSpace =
+      consumerFusionOp.getStaticLoopRanges();
+
+  // Only check when consumer might be broadcasting.
+  if (producerIterationSpace.size() > consumerIterationSpace.size()) {
+    return true;
+  }
+
+  auto computeIterationSpaceSize = [](ArrayRef<int64_t> shape) -> int64_t {
+    return ShapedType::isDynamicShape(shape)
+               ? ShapedType::kDynamic
+               : ShapedType::getNumElements(shape);
+  };
+  int64_t producerSize = computeIterationSpaceSize(producerIterationSpace);
+  int64_t consumerSize = computeIterationSpaceSize(consumerIterationSpace);
+
+  // Only block fusion if we can statically determine the iteration spaces
+  // don't match. For dynamic shapes, allow fusion.
+  if (ShapedType::isDynamic(producerSize) ||
+      ShapedType::isDynamic(consumerSize)) {
+    return true;
+  }
+
+  return consumerSize == producerSize;
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -718,50 +768,8 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
-  // When fusing a broadcasting consumer with a producer that has reduction
-  // loops, ensure the iteration spaces match exactly to avoid losing
-  // parallelism. This prevents fusing cases where a small reduction result
-  // is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
-  auto doesBroadcastConsumerBlockFusion = [&]() -> bool {
-    if (producerFusionOp.getNumLoops() ==
-        producerFusionOp.getNumParallelLoops()) {
-      return false;
-    }
-
-    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
-    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
-      return false;
-    }
-
-    SmallVector<int64_t> producerIterationSpace =
-        producerFusionOp.getStaticLoopRanges();
-    SmallVector<int64_t> consumerIterationSpace =
-        consumerFusionOp.getStaticLoopRanges();
-
-    // Only check when consumer might be broadcasting.
-    if (producerIterationSpace.size() > consumerIterationSpace.size()) {
-      return false;
-    }
-
-    auto computeIterationSpaceSize = [](ArrayRef<int64_t> shape) -> int64_t {
-      return ShapedType::isDynamicShape(shape)
-                 ? ShapedType::kDynamic
-                 : ShapedType::getNumElements(shape);
-    };
-    int64_t producerSize = computeIterationSpaceSize(producerIterationSpace);
-    int64_t consumerSize = computeIterationSpaceSize(consumerIterationSpace);
-
-    // Only block fusion if we can statically determine the iteration spaces
-    // don't match. For dynamic shapes, allow fusion.
-    if (ShapedType::isDynamic(producerSize) ||
-        ShapedType::isDynamic(consumerSize)) {
-      return false;
-    }
-
-    return consumerSize != producerSize;
-  };
-
-  if (doesBroadcastConsumerBlockFusion()) {
+  if (!canFuseBroadcastingConsumer(producer, producerFusionOp,
+                                   consumerFusionOp)) {
     return false;
   }
 
