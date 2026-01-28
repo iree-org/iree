@@ -496,7 +496,7 @@ util.func public @sink_transpose_to_unary_transpose(%arg0 : tensor<2x3x4xf32>) -
 
 // -----
 
-util.func public @do_not_sink_multi_use(%arg0 : tensor<2x3x4xf32>) -> (tensor<3x4x2xf32>, tensor<3x4x2xf32>) {
+util.func public @sink_multi_use(%arg0 : tensor<2x3x4xf32>) -> (tensor<3x4x2xf32>, tensor<3x4x2xf32>) {
   %empty = tensor.empty(): tensor<3x4x2xf32>
   %transposed = linalg.transpose ins(%arg0 : tensor<2x3x4xf32>)
       outs(%empty : tensor<3x4x2xf32>) permutation = [1, 2, 0]
@@ -522,16 +522,19 @@ util.func public @do_not_sink_multi_use(%arg0 : tensor<2x3x4xf32>) -> (tensor<3x
                   } -> tensor<3x4x2xf32>
   util.return %0, %1 : tensor<3x4x2xf32>, tensor<3x4x2xf32>
 }
-// SINK-LABEL: util.func public @do_not_sink_multi_use
+// SINK-LABEL: util.func public @sink_multi_use
 //  SINK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<2x3x4xf32>
-//       SINK:   %[[T:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<2x3x4xf32>
+//       SINK:   %[[ELEM0:.+]] = linalg.generic {{.*}} ins(%[[ARG0]]
+//       SINK:     math.rsqrt
+//       SINK:   %[[T0:.+]] = linalg.transpose ins(%[[ELEM0]] : tensor<2x3x4xf32>
 //  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 0]
-//       SINK:   %[[ELEM0:.+]] = linalg.generic {{.*}} ins(%[[T]]
-//       SINK:     math.rsqrt
-//       SINK:   %[[ELEM1:.+]] = linalg.generic {{.*}} ins(%[[T]]
+//       SINK:   %[[ELEM1:.+]] = linalg.generic {{.*}} ins(%[[ARG0]]
 //       SINK:     math.exp
-//       SINK:   util.return %[[ELEM0]], %[[ELEM1]]
+//       SINK:   %[[T1:.+]] = linalg.transpose ins(%[[ELEM1]] : tensor<2x3x4xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  SINK-SAME:                    permutation = [1, 2, 0]
+//       SINK:   util.return %[[T0]], %[[T1]]
 
 // -----
 
@@ -553,12 +556,15 @@ util.func public @do_not_sink_unary_multi_use(%arg0 : tensor<2x3x4xf32>) -> (ten
 }
 // SINK-LABEL: util.func public @do_not_sink_unary_multi_use
 //  SINK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<2x3x4xf32>
-//       SINK:   %[[T:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<2x3x4xf32>
+//       SINK:   %[[T0:.+]] = linalg.transpose ins(%[[ARG0]] : tensor<2x3x4xf32>
 //  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 0]
-//       SINK:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[T]]
+//       SINK:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[ARG0]]
 //       SINK:     math.rsqrt
-//       SINK:   util.return %[[ELEM]], %[[T]]
+//       SINK:   %[[T1:.+]] = linalg.transpose ins(%[[ELEM]] : tensor<2x3x4xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  SINK-SAME:                    permutation = [1, 2, 0]
+//       SINK:   util.return %[[T1]], %[[T0]]
 
 // -----
 
