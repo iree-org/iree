@@ -1440,12 +1440,12 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  auto setMatmulConfig = [&entryPoint, &op,
-                          &target](int64_t tileX, int64_t tileY, int64_t tileK,
-                                   ArrayRef<int64_t> workgroupSize,
-                                   ArrayRef<int32_t> subgroupSizes,
-                                   unsigned softwarePipelineDepth,
-                                   CodeGenPipeline pipeline) {
+  auto setMatmulConfig = [&entryPoint, &op](int64_t tileX, int64_t tileY,
+                                            int64_t tileK,
+                                            ArrayRef<int64_t> workgroupSize,
+                                            ArrayRef<int32_t> subgroupSizes,
+                                            unsigned softwarePipelineDepth,
+                                            CodeGenPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
     unsigned numReductionLoops = op.getNumReductionLoops();
@@ -1503,8 +1503,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
       SmallVector<NamedAttribute, 1> pipelineAttrs;
       auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
           context, /*prefetch_num_stages=*/0,
-          /*no_reduce_shared_memory_bank_conflicts=*/
-          IREE::GPU::targetSupportsGlobalLoadDMA(target),
+          /*no_reduce_shared_memory_bank_conflicts=*/true,
           /*use_igemm_convolution=*/false,
           /*reorder_workgroups_strategy=*/std::nullopt);
       pipelineAttrs.emplace_back(
