@@ -622,30 +622,7 @@ static bool canFuseBroadcastingConsumer(
     return true;
   }
 
-  SmallVector<int64_t> rootIterationSpace = rootFusionOp.getStaticLoopRanges();
-  SmallVector<int64_t> consumerIterationSpace =
-      consumerFusionOp.getStaticLoopRanges();
-
-  // Only check when consumer might be broadcasting.
-  if (rootIterationSpace.size() > consumerIterationSpace.size()) {
-    return true;
-  }
-
-  auto computeIterationSpaceSize = [](ArrayRef<int64_t> shape) -> int64_t {
-    return ShapedType::isDynamicShape(shape)
-               ? ShapedType::kDynamic
-               : ShapedType::getNumElements(shape);
-  };
-  int64_t rootSize = computeIterationSpaceSize(rootIterationSpace);
-  int64_t consumerSize = computeIterationSpaceSize(consumerIterationSpace);
-
-  // Only block fusion if we can statically determine the iteration spaces
-  // don't match. For dynamic shapes, allow fusion.
-  if (ShapedType::isDynamic(rootSize) || ShapedType::isDynamic(consumerSize)) {
-    return true;
-  }
-
-  return consumerSize == rootSize;
+  return consumerFusionOp.getNumLoops() <= rootFusionOp.getNumLoops();
 }
 
 /// Returns true if this is a fusable use, while fusing a root with its
