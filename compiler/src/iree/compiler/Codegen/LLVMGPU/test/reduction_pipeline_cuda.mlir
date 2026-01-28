@@ -37,7 +37,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @warp_reduction_dispatch()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
-//     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x1x4xf32>
 //     CHECK-DAG:    %[[CST_ACC:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1xf32>
 //     CHECK-DAG:    gpu.thread_id  x
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c2560 step %c256 iter_args(%[[A0:.+]] = %[[CST_ACC]]) -> (vector<1x1x1xf32>) {
