@@ -7465,6 +7465,7 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
   std::optional&lt;int32_t&gt;,   # simds_per_wgp
   std::optional&lt;int32_t&gt;,   # vgpr_space_bits
   DenseI64ArrayAttr,   # dma_sizes
+  std::optional&lt;int32_t&gt;,   # workgroup_memory_bank_count
   DictionaryAttr   # extra
 &gt;
 </code></pre></div>
@@ -7556,6 +7557,11 @@ NVIDIA GPUs.</p>
 <tr>
 <td style="text-align: center;">dma_sizes</td>
 <td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">workgroup_memory_bank_count</td>
+<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
 <td></td>
 </tr>
 <tr>
