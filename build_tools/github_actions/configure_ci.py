@@ -193,8 +193,10 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     ),
     (
         "test_torch",
-        ["tests/external/iree-test-suites/torch*",
-         ".github/workflows/pkgci_test_torch.yml"],
+        [
+            "tests/external/iree-test-suites/torch*",
+            ".github/workflows/pkgci_test_torch.yml",
+        ],
     ),
 ]
 
