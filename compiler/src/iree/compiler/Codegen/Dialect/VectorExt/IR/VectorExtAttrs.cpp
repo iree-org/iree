@@ -100,26 +100,6 @@ VectorLayoutInterface NestedLayoutAttr::apply(AffineMap map) const {
                                subgroupStrides, threadStrides);
 }
 
-namespace {
-static SmallVector<int64_t> shuffle(unsigned rank, ArrayRef<int64_t> input,
-                                    bool simple) {
-  if (simple) {
-    SmallVector<int64_t> result(input);
-    std::reverse(result.begin(), result.end());
-    return result;
-  }
-  SmallVector<int64_t> result;
-  result.reserve(input.size());
-  for (unsigned r = 0; r < rank; ++r) {
-    for (unsigned i = r; i < input.size(); i += rank) {
-      result.push_back(input[i]);
-    }
-  }
-  std::reverse(result.begin(), result.end());
-  return result;
-}
-} // anonymous namespace
-
 VectorLayoutInterface
 NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
   SmallVector<int64_t> subgroupCount;
