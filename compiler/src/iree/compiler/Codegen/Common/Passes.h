@@ -179,6 +179,17 @@ void populateForOpInductionVarShapePatterns(RewritePatternSet &,
 #define GEN_PASS_DECL
 #include "iree/compiler/Codegen/Common/Passes.h.inc" // IWYU pragma: keep
 
+//----------------------------------------------------------------------------//
+// Tuning Spec Options
+//----------------------------------------------------------------------------//
+
+struct TuningSpecOptions;
+
+/// Sets the global tuning spec options pointer used by
+/// MaterializeTuningSpecsPass. This is set by the compiler driver before
+/// pipeline execution and cleared after.
+void setGlobalTuningSpecOptions(TuningSpecOptions *options);
+
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 
