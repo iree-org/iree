@@ -1545,3 +1545,103 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#contract = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [4, 4],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides = [4, 1]
+>
+
+#expand = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1, 1],
+  batch_tile = [4, 1, 4, 1],
+  outer_tile = [1, 1, 1, 1],
+  thread_tile = [4, 4, 4, 1],
+  element_tile = [1, 1, 1, 4],
+
+  subgroup_strides = [0, 0, 0, 0],
+  thread_strides = [16, 4, 1, 0]
+>
+
+// CHECK-LABEL: @distribute_shape_cast_expand_2D
+func.func @distribute_shape_cast_expand_2D(%arg0: vector<64x64xf16>) -> vector<16x4x16x4xf16> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#contract) : vector<64x64xf16>
+  //CHECK: vector.shape_cast %{{.+}} : vector<4x4x1x1x1x4xf16> to vector<4x1x4x1x1x1x1x1x1x1x1x4xf16>
+  %reshape = vector.shape_cast %source : vector<64x64xf16> to vector<16x4x16x4xf16>
+  %dst = iree_vector_ext.to_layout %reshape to layout(#expand) : vector<16x4x16x4xf16>
+  func.return %dst : vector<16x4x16x4xf16>
+}
+
+// CHECK-LABEL: @distribute_shape_cast_contract_2D
+func.func @distribute_shape_cast_contract_2D(%arg0: vector<16x4x16x4xf16>) -> vector<64x64xf16> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#expand) : vector<16x4x16x4xf16>
+  // CHECK: vector.shape_cast %{{.+}} : vector<4x1x4x1x1x1x1x1x1x1x1x4xf16> to vector<4x4x1x1x1x4xf16>
+  %reshape = vector.shape_cast %source : vector<16x4x16x4xf16> to vector<64x64xf16>
+  %dst = iree_vector_ext.to_layout %reshape to layout(#contract) : vector<64x64xf16>
+  func.return %dst : vector<64x64xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#contract = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2],
+  batch_tile = [4],
+  outer_tile = [1],
+  thread_tile = [4],
+  element_tile = [4],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+#expand = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 0],
+  thread_strides = [0, 1]
+>
+
+// CHECK-LABEL: @distribute_shape_cast_expand_1D
+func.func @distribute_shape_cast_expand_1D(%arg0: vector<128xf16>) -> vector<4x32xf16> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#contract) : vector<128xf16>
+  // CHECK: vector.shape_cast %{{.+}} : vector<4x1x4xf16> to vector<2x2x1x1x1x4xf16>
+  %reshape = vector.shape_cast %source : vector<128xf16> to vector<4x32xf16>
+  %dst = iree_vector_ext.to_layout %reshape to layout(#expand) : vector<4x32xf16>
+  func.return %dst : vector<4x32xf16>
+}
+
+// CHECK-LABEL: @distribute_shape_cast_contract_1D
+func.func @distribute_shape_cast_contract_1D(%arg0: vector<4x32xf16>) -> vector<128xf16> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#expand) : vector<4x32xf16>
+  // CHECK: vector.shape_cast %{{.+}} : vector<2x2x1x1x1x4xf16> to vector<4x1x4xf16>
+  %reshape = vector.shape_cast %source : vector<4x32xf16> to vector<128xf16>
+  %dst = iree_vector_ext.to_layout %reshape to layout(#contract) : vector<128xf16>
+  func.return %dst : vector<128xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}

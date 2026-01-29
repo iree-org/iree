@@ -2203,6 +2203,39 @@ struct DistributeConstantMask final
   int64_t subgroupSize;
 };
 
+struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::ShapeCastOp shapeCast,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue src = shapeCast.getSource();
+    VectorValue dst = shapeCast.getResult();
+    NestedLayoutAttr srcLayout =
+        dyn_cast_if_present<NestedLayoutAttr>(signature[src]);
+    NestedLayoutAttr dstLayout =
+        dyn_cast_if_present<NestedLayoutAttr>(signature[dst]);
+    if (!srcLayout || !dstLayout) {
+      return rewriter.notifyMatchFailure(shapeCast,
+                                         "expected nested layout attr");
+    }
+
+    // unpack -> reshape -> pack
+    VectorValue unpacked = getDeinterleavedUnpackedForm(
+        rewriter, getDistributed(rewriter, shapeCast.getSource(), srcLayout),
+        srcLayout);
+    VectorValue reshaped = vector::ShapeCastOp::create(
+        rewriter, shapeCast.getLoc(),
+        VectorType::get(dstLayout.getUndistributedShape(),
+                        unpacked.getType().getElementType()),
+        unpacked);
+    VectorValue packed =
+        getInterleavedPackedForm(rewriter, reshaped, dstLayout);
+    replaceOpWithDistributedValues(rewriter, shapeCast, packed);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
@@ -2213,7 +2246,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
                                      subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
-  patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
+  patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
+      patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());
