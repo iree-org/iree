@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
+#include "iree/compiler/Codegen/Common/Options.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -42,12 +43,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-llvm::cl::opt<std::string> clCodegenTuningSpecPath(
-    "iree-codegen-tuning-spec-path",
-    llvm::cl::desc("File path to a module containing a tuning spec (transform "
-                   "dialect library)."),
-    llvm::cl::init(""));
-
 llvm::cl::opt<bool> clCodegenEnableDefaultTuningSpecs(
     "iree-codegen-enable-default-tuning-specs",
     llvm::cl::desc("Whether to enable default tuning spec transform libraries "
@@ -62,6 +57,19 @@ llvm::cl::opt<std::string> clCodegenTuningSpecDumpDir(
     llvm::cl::init(""));
 
 using mlir::transform::NamedSequenceOp;
+
+// Global accessor for tuning spec options.
+// This is set by the compiler driver before pipeline execution and cleared
+// after completion.
+static TuningSpecOptions *globalTuningSpecOptions = nullptr;
+
+static const TuningSpecOptions &getTuningSpecOptions() {
+  if (globalTuningSpecOptions) {
+    return *globalTuningSpecOptions;
+  }
+  // Fallback to FromFlags for backward compatibility with standalone usage.
+  return TuningSpecOptions::FromFlags::get();
+}
 
 static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
   StringRef dir = clCodegenTuningSpecDumpDir;
@@ -97,16 +105,17 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
 
 static FailureOr<ModuleOp>
 getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
-  if (clCodegenTuningSpecPath.empty()) {
+  const std::string &tuningSpecPath = getTuningSpecOptions().tuningSpecPath;
+  if (tuningSpecPath.empty()) {
     return failure();
   }
 
   FailureOr<ModuleOp> maybeTransformLibrary =
-      dialect.getOrLoadTransformLibraryModule(clCodegenTuningSpecPath);
+      dialect.getOrLoadTransformLibraryModule(tuningSpecPath);
   if (failed(maybeTransformLibrary)) {
     return module->emitError()
            << "Failed to load tuning spec transform dialect library from "
-           << clCodegenTuningSpecPath;
+           << tuningSpecPath;
   }
 
   return *maybeTransformLibrary;
@@ -187,7 +196,7 @@ struct MaterializeTuningSpecsPass final
 
     FailureOr<ModuleOp> userTuningSpec = getUserTuningSpec(moduleOp, *dialect);
     const bool hasUserTuningSpec = succeeded(userTuningSpec);
-    if (!hasUserTuningSpec && !clCodegenTuningSpecPath.empty()) {
+    if (!hasUserTuningSpec && !getTuningSpecOptions().tuningSpecPath.empty()) {
       // When a user spec is requested but fails to load, this is a hard
       // failure.
       return signalPassFailure();
@@ -279,4 +288,9 @@ struct MaterializeTuningSpecsPass final
 };
 
 } // namespace
+
+void setGlobalTuningSpecOptions(TuningSpecOptions *options) {
+  globalTuningSpecOptions = options;
+}
+
 } // namespace mlir::iree_compiler

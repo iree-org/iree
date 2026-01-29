@@ -41,6 +41,8 @@
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
+#include "iree/compiler/Codegen/Common/Options.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -250,6 +252,7 @@ struct GlobalInit {
   ParameterOptions *clParameterOptions = nullptr;
   DispatchCreationOptions *clDispatchCreationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
+  TuningSpecOptions *clTuningSpecOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
   IREE::VM::TargetOptions *clVmTargetOptions = nullptr;
   IREE::VM::BytecodeTargetOptions *clBytecodeTargetOptions = nullptr;
@@ -297,6 +300,7 @@ void GlobalInit::registerCommandLineOptions() {
   clParameterOptions = &ParameterOptions::FromFlags::get();
   clDispatchCreationOptions = &DispatchCreationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
+  clTuningSpecOptions = &TuningSpecOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
   clBytecodeTargetOptions = &IREE::VM::BytecodeTargetOptions::FromFlags::get();
@@ -409,6 +413,7 @@ struct Session {
   GlobalOptimizationOptions highLevelOptimizationOptions;
   DispatchCreationOptions dispatchCreationOptions;
   SchedulingOptions schedulingOptions;
+  TuningSpecOptions tuningSpecOptions;
   IREE::HAL::TargetOptions halTargetOptions;
   IREE::VM::TargetOptions vmTargetOptions;
   IREE::VM::BytecodeTargetOptions bytecodeTargetOptions;
@@ -438,6 +443,7 @@ Session::Session(GlobalInit &globalInit)
     parameterOptions = *globalInit.clParameterOptions;
     dispatchCreationOptions = *globalInit.clDispatchCreationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
+    tuningSpecOptions = *globalInit.clTuningSpecOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
     vmTargetOptions = *globalInit.clVmTargetOptions;
     bytecodeTargetOptions = *globalInit.clBytecodeTargetOptions;
@@ -460,6 +466,7 @@ Session::Session(GlobalInit &globalInit)
   parameterOptions.bindOptions(binder);
   dispatchCreationOptions.bindOptions(binder);
   schedulingOptions.bindOptions(binder);
+  tuningSpecOptions.bindOptions(binder);
   halTargetOptions.bindOptions(binder);
   vmTargetOptions.bindOptions(binder);
   bytecodeTargetOptions.bindOptions(binder);
@@ -1000,6 +1007,18 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     }
   });
 
+  // Only pipelines that use MaterializeTuningSpecsPass need tuning spec
+  // options. STD and HAL_EXECUTABLE both run buildHALTransformPassPipeline
+  // which includes ConfigureExecutablesPass that adds
+  // MaterializeTuningSpecsPass.
+  bool needsTuningSpecs = (pipeline == IREE_COMPILER_PIPELINE_STD ||
+                           pipeline == IREE_COMPILER_PIPELINE_HAL_EXECUTABLE);
+  if (needsTuningSpecs) {
+    setGlobalTuningSpecOptions(&session.tuningSpecOptions);
+  }
+  auto resetTuningSpecOptions =
+      llvm::scope_exit([&]() { setGlobalTuningSpecOptions(nullptr); });
+
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
     IREEVMPipelinePhase compileFrom;
@@ -1089,10 +1108,13 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
                                      llvm::errs()))) {
     return false;
   }
-  if (failed(passManager->run(parsedModule))) {
-    return false;
-  }
-  return true;
+
+  // Inject tuning spec options before pipeline execution.
+  setGlobalTuningSpecOptions(&session.tuningSpecOptions);
+  auto resetTuningSpecOptions =
+      llvm::scope_exit([&]() { setGlobalTuningSpecOptions(nullptr); });
+
+  return succeeded(passManager->run(parsedModule));
 }
 
 Error *Invocation::outputIR(Output &output) {
