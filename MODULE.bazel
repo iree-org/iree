@@ -80,6 +80,7 @@ use_repo(
     "nccl",
     "spirv_cross",
     "stablehlo",
+    "torch-mlir",
     "tracy_client",
     "vulkan_headers",
     "webgpu_headers",
