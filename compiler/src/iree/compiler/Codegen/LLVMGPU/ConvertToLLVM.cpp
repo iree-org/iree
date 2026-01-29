@@ -349,13 +349,46 @@ public:
 
     // Set argument attributes.
     Attribute unit = rewriter.getUnitAttr();
+
+    // Build a map from HAL binding index to correlation group and noalias
+    // bindings. This allows us to determine which bindings are in the same
+    // correlation group (i.e., point to the same resource but with different
+    // offsets) and which bindings point to different resources (noalias).
+    DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
+    DenseMap<int64_t, SmallVector<int64_t>> bindingNoaliasMap;
+    for (IREE::HAL::InterfaceBindingSubspanOp subspan : subspans) {
+      int64_t binding = subspan.getBinding().getSExtValue();
+      // Try to read correlation information from the original function.
+      // Note: This assumes the correlation attribute was preserved through
+      // Stream → HAL conversion. If not, we'll need to preserve it explicitly.
+      if (auto correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+              binding, "stream.binding_correlation")) {
+        SmallVector<int64_t> correlatedBindings;
+        for (IntegerAttr intAttr : correlationAttr.getAsRange<IntegerAttr>()) {
+          correlatedBindings.push_back(intAttr.getInt());
+        }
+        if (!correlatedBindings.empty()) {
+          bindingCorrelationMap[binding] = std::move(correlatedBindings);
+        }
+      }
+      // Read noalias information (bindings pointing to different resources).
+      if (auto noaliasAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+              binding, "stream.binding_noalias")) {
+        SmallVector<int64_t> noaliasBindings;
+        for (IntegerAttr intAttr : noaliasAttr.getAsRange<IntegerAttr>()) {
+          noaliasBindings.push_back(intAttr.getInt());
+        }
+        if (!noaliasBindings.empty()) {
+          bindingNoaliasMap[binding] = std::move(noaliasBindings);
+        }
+      }
+    }
+
     for (auto [idx, info] : llvm::enumerate(bindingsInfo)) {
       // As a convention with HAL all the kernel argument pointers are 16Bytes
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
-      // It is safe to set the noalias attribute as it is guaranteed that the
-      // ranges within bindings won't alias.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNonNullAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
