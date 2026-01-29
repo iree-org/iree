@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -145,7 +146,8 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 /// We may ultimately break this out separately so creating a syntactic
 /// distinction to keep that as an option.
 void buildGlobalOptimizationPassPipeline(
-    OpPassManager &mainPassManager, const TransformOptions &transformOptions);
+    OpPassManager &mainPassManager, const TransformOptions &transformOptions,
+    const PreprocessingOptions &preprocessingOptions);
 
 //------------------------------------------------------------------------------
 // Wrappers that not use tablegen options.

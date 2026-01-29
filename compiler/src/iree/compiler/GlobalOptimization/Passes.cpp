@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -89,7 +90,8 @@ void buildGlobalOptExprHoistingPassPipeline(
 }
 
 void buildGlobalOptimizationPassPipeline(
-    OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
+    OpPassManager &mainPassManager, const TransformOptions &transformOptions,
+    const PreprocessingOptions &preprocessingOptions) {
   // Import parameters before any global optimization passes so that the inlined
   // parameters are available for folding.
   if (!transformOptions.parameterImportPaths.empty()) {
@@ -116,7 +118,18 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(transformOptions.stripAssertions,
                          IREE::Util::createStripDebugOpsPass)
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
-      .addPass(createLinalgQuantizedConvToConvPass)
+      .addPass(createLinalgQuantizedConvToConvPass);
+
+  // Add Conv2D to Img2Col conversion after QuantizedConvToConvPass
+  if (preprocessingOptions
+          .preprocessingEnableConv2dToImg2colAfterQuantizedConv) {
+    FunctionLikeNest(mainPassManager)
+        .addPass(Preprocessing::createConvertConv2DToImg2ColPass)
+        .addPass(createCanonicalizerPass)
+        .addPass(createCSEPass);
+  }
+
+  FunctionLikeNest(mainPassManager)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
@@ -298,7 +311,10 @@ void registerGlobalOptimizationPipeline() {
           "Runs the IREE global optimization transformation pipeline",
           [](OpPassManager &passManager,
              const TransformOptions &transformOptions) {
-            buildGlobalOptimizationPassPipeline(passManager, transformOptions);
+            // Use default preprocessing options for pipeline registration
+            PreprocessingOptions defaultPreprocessingOptions;
+            buildGlobalOptimizationPassPipeline(passManager, transformOptions,
+                                                defaultPreprocessingOptions);
           });
   PassPipelineRegistration<TransformOptions>
       globalOptimizationConstantHoistingPassPipeline(
