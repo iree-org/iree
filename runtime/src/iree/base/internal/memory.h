@@ -68,6 +68,24 @@ void iree_memory_jit_context_end(void);
 // executing code from any pages that have been written during load.
 void iree_memory_flush_icache(void* base_address, iree_host_size_t length);
 
+//===----------------------------------------------------------------------===//
+// C11 aligned_alloc shim
+//===----------------------------------------------------------------------===//
+
+// Allocates |size| bytes of uninitialized storage whose alignment is specified
+// by |alignment|. The |size| parameter must be an integral multiple of
+// |alignment|. The returned pointer must be freed using iree_aligned_free.
+//
+// This is a thin wrapper around C11's aligned_alloc when available:
+// https://en.cppreference.com/w/c/memory/aligned_alloc
+//
+// When not available (such as on MSVC) a fallback will be used:
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
+iree_status_t iree_aligned_alloc(iree_host_size_t alignment,
+                                 iree_host_size_t size, void** out_ptr);
+void iree_aligned_free(void* ptr);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
