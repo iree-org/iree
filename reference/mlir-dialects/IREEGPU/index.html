@@ -2183,6 +2183,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lanescopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneScopeAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#loweringconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       LoweringConfigAttr
@@ -2267,6 +2276,15 @@
   <a href="#subgroupopsattr" class="md-nav__link">
     <span class="md-ellipsis">
       SubgroupOpsAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SubgroupScopeAttr
     </span>
   </a>
   
@@ -5515,6 +5533,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#lanescopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      LaneScopeAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#loweringconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       LoweringConfigAttr
@@ -5599,6 +5626,15 @@
   <a href="#subgroupopsattr" class="md-nav__link">
     <span class="md-ellipsis">
       SubgroupOpsAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#subgroupscopeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SubgroupScopeAttr
     </span>
   </a>
   
@@ -5989,6 +6025,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#laneconstantattr">LaneConstantAttr</a></li>
 <li><a href="#laneidattr">LaneIdAttr</a></li>
 <li><a href="#laneincrementattr">LaneIncrementAttr</a></li>
+<li><a href="#lanescopeattr">LaneScopeAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaattr">MMAAttr</a></li>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
@@ -5999,6 +6036,7 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr</a></li>
 <li><a href="#storagebitwidthsattr">StorageBitwidthsAttr</a></li>
 <li><a href="#subgroupopsattr">SubgroupOpsAttr</a></li>
+<li><a href="#subgroupscopeattr">SubgroupScopeAttr</a></li>
 <li><a href="#swizzleoperandattr">SwizzleOperandAttr</a></li>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
@@ -6994,6 +7032,13 @@ where the column index must increment by 1 across consecutive lanes.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="lanescopeattr">LaneScopeAttr<a class="headerlink" href="#lanescopeattr" title="Permanent link">link</a></h3>
+<p><em>Attribute representing execution across lanes.</em></p>
+<p>Syntax: <code>#iree_gpu.lane_scope</code></p>
+<p>Scope for lane level parallelism. Currently allocating memory is
+unsupported due to required interface changes.</p>
+<p>Barriers don't need to do any synchronization and only fence memory at this
+scope (though is also currently unimplemented).</p>
 <h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation for gpu compilation.</em></p>
 <p>Syntax:</p>
@@ -7295,6 +7340,12 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="subgroupscopeattr">SubgroupScopeAttr<a class="headerlink" href="#subgroupscopeattr" title="Permanent link">link</a></h3>
+<p><em>Attribute representing execution across subgroups.</em></p>
+<p>Syntax: <code>#iree_gpu.subgroup_scope</code></p>
+<p>Scope for subgroup level parallelism. Memory allocated at this scope is
+all shared memory, and standard gpu barriers are used to synchronize all
+subgroups.</p>
 <h3 id="swizzleoperandattr">SwizzleOperandAttr<a class="headerlink" href="#swizzleoperandattr" title="Permanent link">link</a></h3>
 <p><em>Indicate promotion of an operand with setting an xor swizzle value.</em></p>
 <p>Syntax:</p>
