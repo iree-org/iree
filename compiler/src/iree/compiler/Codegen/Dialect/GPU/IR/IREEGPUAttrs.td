@@ -1110,4 +1110,34 @@ def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
   let hasCustomAssemblyFormat = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// GPU PCF Scope Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SubgroupScopeAttr : AttrDef<IREEGPU_Dialect, "SubgroupScope"> {
+  let mnemonic = "subgroup_scope";
+  let summary = [{Attribute representing execution across subgroups.}];
+  let description = [{
+    Scope for subgroup level parallelism. Memory allocated at this scope is
+    all shared memory, and standard gpu barriers are used to synchronize all
+    subgroups.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+def IREEGPU_LaneScopeAttr : AttrDef<IREEGPU_Dialect, "LaneScope"> {
+  let mnemonic = "lane_scope";
+  let summary = [{Attribute representing execution across lanes.}];
+  let description = [{
+    Scope for lane level parallelism. Currently allocating memory is
+    unsupported due to required interface changes.
+
+    Barriers don't need to do any synchronization and only fence memory at this
+    scope (though is also currently unimplemented).
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
