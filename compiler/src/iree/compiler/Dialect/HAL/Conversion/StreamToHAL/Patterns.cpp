@@ -841,6 +841,7 @@ struct CmdDispatchOpPattern
       // loading should have already failed.
       auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
       auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+      IREE::Util::SCFUnreachableOp::create(defaultBuilder, loc);
       scf::YieldOp::create(defaultBuilder, loc);
 
       rewriter.replaceOp(dispatchOp, switchOp);
