@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
@@ -118,6 +119,81 @@ cloneOffsetsSizesAndStrides(OpBuilder &builder,
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
+/// Returns true if the yield operand for the `argIdx`-th iter_arg of `forOp`
+/// preserves the dimension at `dimIndex`. This is needed to verify that
+/// computing an allocation bound from the init value is sound — if the yield
+/// could produce a larger dimension, the init-derived bound would be too small.
+/// Verify the dimension is preserved, via:
+///
+/// (1) The yield operand (after walking through cast/subview) is the iter_arg.
+/// (2) The yield operand traces to an alloca whose shape matches the iter_arg
+///     and whose dynamic size at `dimIndex` is `memref.dim` of the iter_arg.
+/// (3) The yield operand is a scf.for result whose init arg is the iter_arg
+///     and the inner loop also preserves the dimension (recursive).
+///
+/// Note: This may revisit inner loops when called at each nesting level during
+/// the source walk in computeAllocationBound. Caching would help if the nesting
+/// depth were large, but in practice it is bounded by the tensor rank.
+static bool isYieldDimPreserved(scf::ForOp forOp, unsigned argIdx,
+                                int64_t dimIndex) {
+  BlockArgument iterArg = forOp.getRegionIterArg(argIdx);
+  auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+  Value yieldVal = yieldOp.getOperand(argIdx);
+
+  // Walk through cast/subview to find the underlying source.
+  while (true) {
+    if (auto castOp = yieldVal.getDefiningOp<memref::CastOp>()) {
+      yieldVal = castOp.getSource();
+      continue;
+    }
+    if (auto subviewOp = yieldVal.getDefiningOp<memref::SubViewOp>()) {
+      yieldVal = subviewOp.getSource();
+      continue;
+    }
+    break;
+  }
+
+  // Case 1: Yield is the iter_arg itself — dimension trivially invariant.
+  if (yieldVal == iterArg) {
+    return true;
+  }
+
+  // Case 2: Yield traces to an alloca whose dynamic size at dimIndex comes
+  // from memref.dim of the same iter_arg (self-referential invariance).
+  if (auto allocaOp = yieldVal.getDefiningOp<memref::AllocaOp>()) {
+    MemRefType allocType = allocaOp.getType();
+    auto iterArgType = cast<MemRefType>(iterArg.getType());
+    // Shape comparison ensures same rank and same static/dynamic pattern,
+    // so we can directly index the dynamic sizes by counting dynamic dims
+    // before dimIndex.
+    if (allocType.getShape() != iterArgType.getShape()) {
+      return false;
+    }
+    unsigned dynIdx = llvm::count_if(allocType.getShape().take_front(dimIndex),
+                                     ShapedType::isDynamic);
+    auto dimOp =
+        allocaOp.getDynamicSizes()[dynIdx].getDefiningOp<memref::DimOp>();
+    if (!dimOp || dimOp.getSource() != iterArg) {
+      return false;
+    }
+    auto idx = dimOp.getConstantIndex();
+    return idx && *idx == dimIndex;
+  }
+
+  // Case 3: Yield is a scf.for result whose init arg at the same index is
+  // the iter_arg, and the inner loop also preserves the dimension.
+  if (auto result = dyn_cast<OpResult>(yieldVal)) {
+    if (auto innerFor = dyn_cast<scf::ForOp>(result.getOwner())) {
+      unsigned resultIdx = result.getResultNumber();
+      if (innerFor.getInitArgs()[resultIdx] == iterArg) {
+        return isYieldDimPreserved(innerFor, resultIdx, dimIndex);
+      }
+    }
+  }
+
+  return false;
+}
+
 template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
@@ -156,30 +232,81 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
           vector::ScalableValueBoundsConstraintSet::computeScalableBound(
               value, std::nullopt, vscaleRange->vscaleMin,
               vscaleRange->vscaleMax, presburger::BoundType::UB);
-      if (failed(ub)) {
-        return failure();
-      }
+      if (succeeded(ub)) {
+        if (ub->map.isSingleConstant()) {
+          auto constantBound = ub->map.getSingleConstantResult();
+          return OpFoldResult(builder.getIndexAttr(constantBound));
+        }
 
-      if (ub->map.isSingleConstant()) {
-        auto constantBound = ub->map.getSingleConstantResult();
-        return OpFoldResult(builder.getIndexAttr(constantBound));
+        if (!vscale) {
+          vscale = vector::VectorScaleOp::create(builder, loc);
+        }
+        return affine::materializeComputedBound(
+            builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
       }
-
-      if (!vscale) {
-        vscale = vector::VectorScaleOp::create(builder, loc);
+    } else {
+      // Non-scalable target: Assume everything is fixed-size.
+      auto ub = ValueBoundsConstraintSet::computeConstantBound(
+          presburger::BoundType::UB, {value, std::nullopt},
+          /*stopCondition=*/nullptr,
+          /*closedUB=*/true);
+      if (succeeded(ub)) {
+        return OpFoldResult(builder.getIndexAttr(*ub));
       }
-      return affine::materializeComputedBound(
-          builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
     }
-    // Non-scalable target: Assume everything is fixed-size.
+
+    // Special case for memref.dim. If the value is a memref.dim on a loop
+    // iter_arg, try computing the bound using the init value's dimension. This
+    // handles cases where bufferization creates loop-internal allocas with
+    // sizes derived from iter_arg dimensions (e.g., from issue #16956,
+    // allowReturnAllocsFromLoops, etc). The value bounds analysis cannot trace
+    // through scf.for iter_args, so we walk up to the outermost init value and
+    // compute the bound from there.
+    auto dimOp = value.getDefiningOp<memref::DimOp>();
+    if (!dimOp) {
+      return failure();
+    }
+    std::optional<int64_t> constIndex = dimOp.getConstantIndex();
+    if (!constIndex) {
+      return failure();
+    }
+
+    // Walk up through nested loop iter_args, casts, and subviews to find a
+    // value whose dimension bound can be computed.
+    Value source = dimOp.getSource();
+    while (true) {
+      if (auto blockArg = dyn_cast<BlockArgument>(source)) {
+        auto forOp = dyn_cast<scf::ForOp>(blockArg.getOwner()->getParentOp());
+        if (!forOp) {
+          break;
+        }
+        unsigned argIdx = blockArg.getArgNumber() - forOp.getNumInductionVars();
+        if (isYieldDimPreserved(forOp, argIdx, *constIndex)) {
+          source = forOp.getInitArgs()[argIdx];
+          continue;
+        }
+      }
+      if (auto castOp = source.getDefiningOp<memref::CastOp>()) {
+        source = castOp.getSource();
+        continue;
+      }
+      if (auto subviewOp = source.getDefiningOp<memref::SubViewOp>()) {
+        source = subviewOp.getSource();
+        continue;
+      }
+      break;
+    }
+    if (source == dimOp.getSource()) {
+      return failure();
+    }
+
     auto ub = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, {value, std::nullopt},
+        presburger::BoundType::UB, {source, *constIndex},
         /*stopCondition=*/nullptr,
         /*closedUB=*/true);
     if (failed(ub)) {
       return failure();
     }
-
     return OpFoldResult(builder.getIndexAttr(*ub));
   };
 
@@ -264,8 +391,8 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 /// non-trivial because of compatibility between types of different SSA values.
 static bool isUseReplaceableWithSubview(OpOperand &use) {
   Operation *user = use.getOwner();
-  return isa<linalg::LinalgOp, memref::DeallocOp, memref::StoreOp,
-             memref::SubViewOp>(user);
+  return isa<linalg::LinalgOp, memref::CastOp, memref::DeallocOp,
+             memref::LoadOp, memref::StoreOp, memref::SubViewOp>(user);
 }
 
 template <typename AllocLikeOpType>

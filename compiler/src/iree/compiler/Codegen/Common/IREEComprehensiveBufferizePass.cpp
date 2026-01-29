@@ -151,6 +151,13 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // as is and insert bufferization.to_buffer to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
 
+  // Allow returning allocs from loops. This is needed for patterns like online
+  // attention where scf.for yield operands cannot be buffer-equivalent to their
+  // corresponding iter bbArgs (e.g., the new max value is computed from both
+  // the old max and new data). This matches MLIR upstream's
+  // EmptyTensorElimination pass behavior.
+  options.allowReturnAllocsFromLoops = true;
+
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
   options.unknownTypeConverterFn = [](TensorType tensorType,
