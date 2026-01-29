@@ -763,12 +763,27 @@ static void insertStreamCopyBarriers(RewriterBase &rewriter,
                         state);
 }
 
+// Counts the number of gather_to_lds operations in the loop body.
+static unsigned countGatherToLDSOps(scf::ForOp forOp) {
+  unsigned count = 0;
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    if (isa<amdgpu::GatherToLDSOp>(op)) {
+      count++;
+    }
+  }
+  return count;
+}
+
 // Inserts barriers for AsyncCopy mode (gather_to_lds based pipelining).
 // In this mode:
 // - Prologue issues gather_to_lds DMAs to buffer 0
 // - Loop body: writes to buffer N+1 (gather_to_lds), reads from buffer N
 // - The first shared op in loop body is a WRITE (gather_to_lds), not a read
 // - We need needBarrierBeforeWrite=true to protect previous iteration's reads
+//
+// EXPERIMENTAL: Check IREE_ASYNC_NO_BARRIER env var to skip all barriers.
+// Check IREE_ASYNC_SINGLE_BARRIER env var to use only one barrier before writes.
+// Check IREE_ASYNC_VMCNT env var to use memory_counter_wait instead of barriers.
 static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                                     scf::ForOp newForOp) {
   Block *parentBlock = newForOp->getBlock();
@@ -776,6 +791,83 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
   SharedBarrierState state;
 
   bool isNested = isInsideLoop(newForOp);
+  
+  // Check for experimental modes
+  bool noBarrierMode = std::getenv("IREE_ASYNC_NO_BARRIER") != nullptr;
+  bool singleBarrierMode = std::getenv("IREE_ASYNC_SINGLE_BARRIER") != nullptr;
+  bool vmcntMode = std::getenv("IREE_ASYNC_VMCNT") != nullptr;
+
+  // EXPERIMENTAL: Skip all barrier insertion
+  if (noBarrierMode) {
+    return;
+  }
+  
+  // EXPERIMENTAL: Use memory_counter_wait with non-zero vmcnt to allow
+  // pipelining. This inserts vmcnt(N) where N is the number of gather_to_lds
+  // ops in the loop. This allows the current iteration's loads to be in-flight
+  // while waiting only for previous iteration's loads to complete.
+  if (vmcntMode) {
+    unsigned numGatherOps = countGatherToLDSOps(newForOp);
+    LDBG() << "Using vmcnt mode with " << numGatherOps << " gather_to_lds ops";
+    
+    Block *body = newForOp.getBody();
+    bool insertedWait = false;
+    bool insertedBarrier = false;
+    
+    for (auto it = body->begin(); it != std::prev(body->end()); ++it) {
+      Operation &op = *it;
+      
+      // Insert barrier before first gather_to_lds (to sync with previous
+      // iteration's reads)
+      if (!insertedBarrier && isa<amdgpu::GatherToLDSOp>(op)) {
+        rewriter.setInsertionPoint(&op);
+        gpu::BarrierOp::create(rewriter, loc);
+        amdgpu::SchedBarrierOp::create(
+            rewriter, loc,
+            amdgpu::sched_barrier_opt_enumAttr::get(
+                rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+        insertedBarrier = true;
+      }
+      
+      // Insert memory_counter_wait before first LDS read. This waits for
+      // vmcnt to drop to numGatherOps (i.e., only current iteration's loads
+      // remain outstanding, previous iteration's loads are complete).
+      if (!insertedWait && hasNestedSharedRead(&op)) {
+        rewriter.setInsertionPoint(&op);
+        // Use memory_counter_wait with load=numGatherOps to wait for previous
+        // iteration's loads while allowing current iteration's to be in-flight.
+        auto loadAttr = rewriter.getI32IntegerAttr(numGatherOps);
+        amdgpu::MemoryCounterWaitOp::create(rewriter, loc, loadAttr,
+                                            /*store=*/nullptr,
+                                            /*ds=*/nullptr,
+                                            /*exp=*/nullptr,
+                                            /*tensor=*/nullptr);
+        insertedWait = true;
+        LDBG() << "Inserted memory_counter_wait load(" << numGatherOps
+               << ") before: " << op;
+      }
+    }
+    
+    // Epilogue: insert final vmcnt(0) to ensure all loads complete before
+    // writing results
+    Block::iterator epilogueStart = std::next(newForOp->getIterator());
+    if (epilogueStart != parentBlock->end()) {
+      for (auto it = epilogueStart; it != parentBlock->end(); ++it) {
+        if (hasNestedSharedRead(&*it)) {
+          rewriter.setInsertionPoint(&*it);
+          auto zeroAttr = rewriter.getI32IntegerAttr(0);
+          amdgpu::MemoryCounterWaitOp::create(rewriter, loc, zeroAttr,
+                                              /*store=*/nullptr,
+                                              /*ds=*/nullptr,
+                                              /*exp=*/nullptr,
+                                              /*tensor=*/nullptr);
+          LDBG() << "Inserted epilogue memory_counter_wait load(0)";
+          break;
+        }
+      }
+    }
+    return;
+  }
 
   if (isNested) {
     // Nested loop: need barriers in prologue.
@@ -796,13 +888,41 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
 
   // Loop body (exclude terminator).
   Block *body = newForOp.getBody();
-  state = insertBarriersInRange(rewriter, loc, body->begin(),
-                                std::prev(body->end()), state);
+  
+  if (singleBarrierMode) {
+    // EXPERIMENTAL: Only insert barrier before writes, not before reads.
+    // In async copy mode, the gather_to_lds writes to different buffer than
+    // the transfer_read reads from (due to double buffering). The s_waitcnt
+    // vmcnt(0) before LDS access is handled by LLVM backend.
+    for (auto it = body->begin(); it != std::prev(body->end()); ++it) {
+      Operation &op = *it;
+      bool hasSharedWrite = hasNestedSharedWrite(&op);
+      
+      if (hasSharedWrite && state.needBarrierBeforeWrite) {
+        rewriter.setInsertionPoint(&op);
+        gpu::BarrierOp::create(rewriter, loc);
+        amdgpu::SchedBarrierOp::create(
+            rewriter, loc,
+            amdgpu::sched_barrier_opt_enumAttr::get(
+                rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+        state.needBarrierBeforeWrite = false;
+      }
+      
+      // After seeing a read, we need barrier before next write
+      if (hasNestedSharedRead(&op)) {
+        state.needBarrierBeforeWrite = true;
+      }
+    }
+    // Epilogue: no barriers needed in single-barrier mode
+  } else {
+    state = insertBarriersInRange(rewriter, loc, body->begin(),
+                                  std::prev(body->end()), state);
 
-  // Epilogue (operations after the loop).
-  Block::iterator epilogueStart = std::next(newForOp->getIterator());
-  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
-                        state);
+    // Epilogue (operations after the loop).
+    Block::iterator epilogueStart = std::next(newForOp->getIterator());
+    insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
+                          state);
+  }
 }
 
 // Dispatches to the appropriate barrier insertion strategy based on mode.

@@ -40,6 +40,12 @@ static llvm::cl::opt<bool> clGPUTestCpromotion(
                    "codegen cant yet support without it if also doing padding"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<int64_t> clGPUMNTileCountOverride(
+    "iree-codegen-gpu-mn-tile-count-override",
+    llvm::cl::desc("Override bestMNTileCountPerSubgroup for GPU tile size "
+                   "tuning experiments. A value of 0 disables the override."),
+    llvm::cl::init(0));
+
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
@@ -281,11 +287,15 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
            /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 /
                inBitWidth});
     }
+  {
+    int64_t mnTileCount =
+        clGPUMNTileCountOverride > 0 ? clGPUMNTileCountOverride.getValue() : 16;
     return GPUMMAHeuristicSeeds(
         {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/16,
+         /*bestMNTileCountPerSubgroup=*/mnTileCount,
          /*bestKTileCountPerSubgroup=*/2,
          /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
+  }
   default:
     assert(false && "Unhandled gemm size");
     return std::nullopt;

@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/LLVMIR/LLVMAttrs.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
 
@@ -71,6 +72,85 @@ struct ReplaceGPUBarrierWithLDSBarrier
 
 static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
+}
+
+/// Adds alias scope metadata to ROCDL::LoadToLDSOp operations to enable
+/// the LLVM backend to distinguish between different LDS buffers in
+/// double-buffered pipelining. Without this, the backend conservatively
+/// inserts s_waitcnt vmcnt(0) before any LDS access.
+static void addAliasScopesToLoadToLDS(ModuleOp m) {
+  // Check if feature is enabled via environment variable
+  if (!std::getenv("IREE_ASYNC_VMCNT"))
+    return;
+
+  MLIRContext *ctx = m.getContext();
+
+  // Create a single alias scope domain for LDS DMA operations
+  auto domainAttr = LLVM::AliasScopeDomainAttr::get(
+      ctx, StringAttr::get(ctx, "lds_dma_domain"));
+
+  // Map from base LDS pointer to its alias scope
+  DenseMap<Value, LLVM::AliasScopeAttr> ptrToScope;
+  SmallVector<LLVM::AliasScopeAttr> allScopes;
+
+  // First pass: create unique alias scopes for each distinct LDS base pointer
+  m.walk([&](ROCDL::LoadToLDSOp loadOp) {
+    Value ldsPtr = loadOp.getLdsPtr();
+
+    // Trace back to find the base allocation
+    Value basePtr = ldsPtr;
+    while (auto gepOp = basePtr.getDefiningOp<LLVM::GEPOp>()) {
+      basePtr = gepOp.getBase();
+    }
+
+    if (!ptrToScope.count(basePtr)) {
+      std::string scopeName =
+          "lds_buffer_" + std::to_string(ptrToScope.size());
+      auto scopeAttr = LLVM::AliasScopeAttr::get(
+          domainAttr, StringAttr::get(ctx, scopeName));
+      ptrToScope[basePtr] = scopeAttr;
+      allScopes.push_back(scopeAttr);
+    }
+  });
+
+  if (allScopes.empty())
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Adding alias scopes to " << allScopes.size()
+                          << " distinct LDS buffers\n");
+
+  // Second pass: attach alias scopes and noalias scopes to each LoadToLDSOp
+  m.walk([&](ROCDL::LoadToLDSOp loadOp) {
+    Value ldsPtr = loadOp.getLdsPtr();
+
+    // Trace back to find the base allocation
+    Value basePtr = ldsPtr;
+    while (auto gepOp = basePtr.getDefiningOp<LLVM::GEPOp>()) {
+      basePtr = gepOp.getBase();
+    }
+
+    auto scopeAttr = ptrToScope.lookup(basePtr);
+    if (!scopeAttr)
+      return;
+
+    // Set alias_scopes to this buffer's scope
+    SmallVector<Attribute> aliasScopes = {scopeAttr};
+    loadOp.setAliasScopesAttr(ArrayAttr::get(ctx, aliasScopes));
+
+    // Set noalias_scopes to all OTHER buffer scopes
+    SmallVector<Attribute> noaliasScopes;
+    for (auto otherScope : allScopes) {
+      if (otherScope != scopeAttr) {
+        noaliasScopes.push_back(otherScope);
+      }
+    }
+    if (!noaliasScopes.empty()) {
+      loadOp.setNoaliasScopesAttr(ArrayAttr::get(ctx, noaliasScopes));
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Added alias scope to LoadToLDSOp: " << loadOp
+                            << "\n");
+  });
 }
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
@@ -361,6 +441,13 @@ struct ConvertToROCDLPass final
     }
 
     LDBG() << "After converting to rocdl\n" << m;
+
+    // Add alias scope metadata to LoadToLDSOp for double-buffered pipelining.
+    // This allows the LLVM backend to distinguish between different LDS buffers
+    // and avoid inserting overly conservative s_waitcnt vmcnt(0).
+    addAliasScopesToLoadToLDS(m);
+
+    LDBG() << "After adding alias scopes to LoadToLDS\n" << m;
 
     // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
     // set it to 16 as all of our allocations almost always have much greater
