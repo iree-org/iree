@@ -39,9 +39,7 @@ static iree_status_t iree_wait_primitive_create_eventfd(
 
   return iree_ok_status();
 }
-#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
-
-#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
+#elif defined(IREE_HAVE_WAIT_TYPE_PIPE)
 static iree_status_t iree_wait_primitive_create_pipe(
     bool initial_state, iree_wait_handle_t* out_handle) {
   memset(out_handle, 0, sizeof(*out_handle));

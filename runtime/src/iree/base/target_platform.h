@@ -43,6 +43,7 @@
 // IREE_PLATFORM_ANDROID
 // IREE_PLATFORM_ANDROID_EMULATOR
 // IREE_PLATFORM_APPLE (IOS | MACOS)
+// IREE_PLATFORM_BSD (FreeBSD | NetBSD | OpenBSD | DragonFlyBSD)
 // IREE_PLATFORM_EMSCRIPTEN
 // IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
@@ -292,13 +293,24 @@ enum iree_arch_enum_e {
 #endif  // IREE_PLATFORM_WINDOWS
 
 //==============================================================================
+// IREE_PLATFORM_BSD
+// FreeBSD, NetBSD, OpenBSD, DragonFlyBSD.
+// These share the POSIX socket API with Apple-style sockaddr length fields.
+//==============================================================================
+
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+    defined(__DragonFly__)
+#define IREE_PLATFORM_BSD 1
+#endif  // BSD variants
+
+//==============================================================================
 // Fallthrough for unsupported platforms
 //==============================================================================
 
-#if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
-    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_IOS) &&        \
-    !defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_MACOS) &&        \
-    !defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_PLATFORM_ANDROID) && !defined(IREE_PLATFORM_BSD) &&        \
+    !defined(IREE_PLATFORM_EMSCRIPTEN) && !defined(IREE_PLATFORM_GENERIC) && \
+    !defined(IREE_PLATFORM_IOS) && !defined(IREE_PLATFORM_LINUX) &&          \
+    !defined(IREE_PLATFORM_MACOS) && !defined(IREE_PLATFORM_WINDOWS)
 #error Unknown platform.
 #endif  // all archs
 
