@@ -185,6 +185,24 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 }
 
 //===----------------------------------------------------------------------===//
+// LLVMPIPE
+//===----------------------------------------------------------------------===//
+const WgpDetails *getLLVMPIPEWgpDetails() {
+  ComputeBitwidths computeBitwdiths = allComputeBits;
+  // clang-format off
+  static const WgpDetails llvmpipeWgp = {
+      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0, /*scaledMmaOps=*/nullptr,
+      /*subgroupSizeChoices=*/{8, 8}, /*maxWorkgroupSizes=*/{1024, 1024, 1024},
+      /*maxThreadSize=*/1024,
+      /*maxWorkgroupMemoryBytes=*/32 * 1024, // Vulkan: maxComputeSharedMemorySize
+      /*maxWorkgroupCounts=*/{0xffff, 0xffff, 0xffff}};
+  // clang-format on
+  return &llvmpipeWgp;
+}
+
+//===----------------------------------------------------------------------===//
 // Known AMD target details
 //
 // Note: the max workgroup size is given as signed int32 max because MLIR's
@@ -1287,6 +1305,14 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
           getQualcommGPUTargetDetails(target)) {
     return createTargetAttr(*details, target,
                             /*features=*/"spirv:v1.6,cap:Shader", context);
+  }
+  if (target == "llvmpipe") {
+    return createTargetAttr(
+        {getLLVMPIPEWgpDetails(), nullptr}, target,
+        /*features=*/
+        "spirv:v1.6,cap:Shader,cap:PhysicalStorageBufferAddresses,cap:"
+        "PhysicalStorageBuffer64,cap:Int64,cap:Float64",
+        context);
   }
 
   // Go through common profiles if not hit in the above.
