@@ -2007,7 +2007,6 @@ util.func public @reduction_broadcast_no_fusion(%arg0: tensor<128x512xf32>, %arg
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<512xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<512xf32>) -> tensor<512xf32>
-  // Reduction: 2 loops (parallel, reduction)
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
                        affine_map<(d0, d1) -> (d0)>],
@@ -2017,7 +2016,6 @@ util.func public @reduction_broadcast_no_fusion(%arg0: tensor<128x512xf32>, %arg
       %4 = arith.addf %in, %out : f32
       linalg.yield %4 : f32
   } -> tensor<512xf32>
-  // Broadcast consumer: 3 loops (parallel, parallel, parallel)
   %3 = tensor.empty() : tensor<64x1024x512xf32>
   %result = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d2)>,
@@ -2048,9 +2046,6 @@ util.func public @reduction_broadcast_no_fusion(%arg0: tensor<128x512xf32>, %arg
 
 // -----
 
-// Test case: reduction -> 1-to-1 elementwise -> broadcast
-// The reduction and 1-to-1 elementwise should fuse together,
-// but the broadcast should be in a separate dispatch.
 util.func public @reduction_elementwise_broadcast_fusion(
     %arg0: tensor<128x512xf32>,
     %arg1: tensor<64x1024x512xf32>) -> tensor<64x1024x512xf32> {
@@ -2067,7 +2062,6 @@ util.func public @reduction_elementwise_broadcast_fusion(
       %5 = arith.addf %in, %out : f32
       linalg.yield %5 : f32
   } -> tensor<512xf32>
-  // 1-to-1 elementwise: 1 loop (same iteration space as reduction output)
   %3 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>,
                        affine_map<(d0) -> (d0)>],
@@ -2077,7 +2071,6 @@ util.func public @reduction_elementwise_broadcast_fusion(
       %5 = arith.mulf %in, %in : f32
       linalg.yield %5 : f32
   } -> tensor<512xf32>
-  // Broadcast: 3 loops (much larger iteration space)
   %4 = tensor.empty() : tensor<64x1024x512xf32>
   %result = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d2)>,

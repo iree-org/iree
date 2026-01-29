@@ -601,30 +601,6 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
-/// When fusing a broadcasting consumer with a producer that has reduction
-/// loops, ensure the iteration spaces match exactly to avoid losing
-/// parallelism. This prevents fusing cases where a small reduction result
-/// is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
-/// Returns true if fusion is allowed for broadcasting consumers.
-static bool canFuseBroadcastingConsumer(
-    Operation *producer, const FusionTracker &tracker,
-    IREE::LinalgExt::LinalgFusionOpInterface consumerFusionOp) {
-  // Get the root op of the producer's fusion group.
-  Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
-  auto rootFusionOp =
-      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
-  if (!rootFusionOp) {
-    return true;
-  }
-
-  // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
-  if (isa<IREE::LinalgExt::CustomOp>(rootOp)) {
-    return true;
-  }
-
-  return consumerFusionOp.getNumLoops() <= rootFusionOp.getNumLoops();
-}
-
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -742,7 +718,14 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
-  if (!canFuseBroadcastingConsumer(producer, tracker, consumerFusionOp)) {
+  // Block fusion if the consumer has more loops than the producer's fusion
+  // group root. This prevents fusing cases where a small reduction result
+  // is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+  Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
+  if (auto rootFusionOp =
+          dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+      rootFusionOp &&
+      consumerFusionOp.getNumLoops() > rootFusionOp.getNumLoops()) {
     return false;
   }
 
