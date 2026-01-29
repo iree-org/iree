@@ -371,13 +371,6 @@ struct CombineLayoutTransformationForMapGatherPass final
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
-
-    // Clean up any identity map_gather ops after combining.
-    funcOp->walk([&](MapGatherOp mapGatherOp) {
-      if (mapGatherOp.isIdentity()) {
-        rewriter.replaceOp(mapGatherOp, mapGatherOp.getSource());
-      }
-    });
   }
 };
 

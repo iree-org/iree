@@ -361,6 +361,11 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
     // from output to source index is identity.
     bool isIdentity();
 
+    // Return true if the map_gather op has vector semantics.
+    bool isVectorized() {
+      return isa<VectorType>(getSource().getType());
+    }
+
     // Creates a MapGatherOp with an identity mapping in the transformation
     // body. Expects the types of `source` and `output` to be the same.
     static MapGatherOp createIdentityMapGather(OpBuilder &builder,

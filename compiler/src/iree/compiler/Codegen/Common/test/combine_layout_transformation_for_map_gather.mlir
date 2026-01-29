@@ -81,7 +81,7 @@ func.func @fold_extract_slice(%buffer : memref<64xf32>) -> tensor<16xf32> {
 // -----
 
 // Test folding copy into map_gather - the copy is folded and the identity
-// map_gather is cleaned up, leaving just the load.
+// map_gather is converted to a copy op.
 func.func @fold_copy(%buffer : memref<4x16xf32>) -> tensor<4x16xf32> {
   %source = iree_codegen.load_from_buffer %buffer : memref<4x16xf32> -> tensor<4x16xf32>
   %init = tensor.empty() : tensor<4x16xf32>
@@ -91,9 +91,8 @@ func.func @fold_copy(%buffer : memref<4x16xf32>) -> tensor<4x16xf32> {
 // CHECK-LABEL: @fold_copy
 //  CHECK-SAME:   %[[BUFFER:[a-zA-Z0-9_]+]]
 //       CHECK:   %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUFFER]]
-//   CHECK-NOT:   linalg.copy
+//       CHECK:   linalg.copy
 //   CHECK-NOT:   iree_linalg_ext.map_gather
-//       CHECK:   return %[[SOURCE]]
 
 // -----
 
