@@ -105,7 +105,7 @@ static bool iree_wait_until_impl(iree_time_t deadline_ns) {
       .tv_sec = (time_t)(deadline_ns / 1000000000ull),
       .tv_nsec = (long)(deadline_ns % 1000000000ull),
   };
-  int ret = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &ts, NULL);
+  int ret = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL);
   return ret == 0;
 }
 

@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
 
@@ -69,11 +70,18 @@ void iree_wait_handle_close(iree_wait_handle_t* handle) {
 // Multi-wait emulation
 //===----------------------------------------------------------------------===//
 
+static iree_notification_t iree_wait_multi_notification_storage;
+
+static void iree_wait_multi_notification_initialize(void) {
+  iree_notification_initialize(&iree_wait_multi_notification_storage);
+}
+
 // Returns a notification that is shared with all waiters in the process.
 // Waiting on the notification will cause a wake whenever any event is set.
 static iree_notification_t* iree_wait_multi_notification(void) {
-  static iree_notification_t shared_notification = IREE_NOTIFICATION_INIT;
-  return &shared_notification;
+  static iree_once_flag init_flag = IREE_ONCE_FLAG_INIT;
+  iree_call_once(&init_flag, iree_wait_multi_notification_initialize);
+  return &iree_wait_multi_notification_storage;
 }
 
 //===----------------------------------------------------------------------===//
@@ -151,7 +159,7 @@ void iree_wait_set_free(iree_wait_set_t* set) {
 }
 
 bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
-  return set->handle_count != 0;
+  return set->handle_count == 0;
 }
 
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
@@ -197,16 +205,22 @@ void iree_wait_set_erase(iree_wait_set_t* set, iree_wait_handle_t handle) {
   // find the matching user handle or - if valid - we can use the native index
   // set after an iree_wait_any wake to do a quick lookup.
   iree_host_size_t index = handle.set_internal.index;
-  if (IREE_UNLIKELY(index >= set->handle_count) ||
-      IREE_UNLIKELY(!iree_wait_primitive_compare_identical(&set->handles[index],
-                                                           &handle))) {
+  bool found =
+      index < set->handle_count &&
+      iree_wait_primitive_compare_identical(&set->handles[index], &handle);
+  if (!found) {
     // Fallback to a linear scan of (hopefully) a small list.
     for (iree_host_size_t i = 0; i < set->handle_count; ++i) {
       if (iree_wait_primitive_compare_identical(&set->handles[i], &handle)) {
         index = i;
+        found = true;
         break;
       }
     }
+  }
+  if (!found) {
+    // Handle not in set - nothing to erase.
+    return;
   }
 
   // Decrement reference count.

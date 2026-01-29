@@ -159,3 +159,68 @@ void iree_memory_flush_icache(void* base_address, iree_host_size_t length) {
 }
 
 #endif  // IREE_PLATFORM_*
+
+//===----------------------------------------------------------------------===//
+// C11 aligned_alloc shim
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_aligned_alloc(iree_host_size_t alignment,
+                                 iree_host_size_t size, void** out_ptr) {
+  IREE_ASSERT_ARGUMENT(out_ptr);
+  *out_ptr = NULL;
+
+  void* ptr = NULL;
+#if defined(IREE_PLATFORM_WINDOWS)
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
+  ptr = _aligned_malloc(size, alignment);
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  // https://en.cppreference.com/w/c/memory/aligned_alloc
+  ptr = aligned_alloc(alignment, size);
+#elif _POSIX_C_SOURCE >= 200112L
+  // https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
+  if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
+#else
+  // Emulates alignment with normal malloc. We overallocate by at least the
+  // alignment + the size of a pointer, store the base pointer at ptr[-1], and
+  // return the aligned pointer.
+  iree_host_size_t alloc_size = 0;
+  if (iree_host_size_checked_add(size, alignment, &alloc_size) &&
+      iree_host_size_checked_add(alloc_size, sizeof(uintptr_t), &alloc_size)) {
+    void* base_ptr = malloc(alloc_size);
+    if (base_ptr) {
+      uintptr_t* aligned_ptr = (uintptr_t*)iree_host_align(
+          (uintptr_t)base_ptr + sizeof(uintptr_t), alignment);
+      aligned_ptr[-1] = (uintptr_t)base_ptr;
+      ptr = aligned_ptr;
+    }
+  }
+#endif  // IREE_PLATFORM_*
+
+  if (IREE_UNLIKELY(!ptr)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "failed to allocate %" PRIhsz
+                            " bytes aligned to %" PRIhsz,
+                            size, alignment);
+  }
+  IREE_TRACE_ALLOC(ptr, size);
+  *out_ptr = ptr;
+  return iree_ok_status();
+}
+
+void iree_aligned_free(void* ptr) {
+  if (ptr) {
+    IREE_TRACE_FREE(ptr);
+  }
+#if defined(IREE_PLATFORM_WINDOWS)
+  _aligned_free(ptr);
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  free(ptr);
+#elif _POSIX_C_SOURCE >= 200112L
+  free(ptr);
+#else
+  if (ptr) {
+    void* base_ptr = (void*)((uintptr_t*)ptr)[-1];
+    free(base_ptr);
+  }
+#endif  // IREE_PLATFORM_*
+}

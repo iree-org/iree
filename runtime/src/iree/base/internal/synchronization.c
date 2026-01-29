@@ -45,6 +45,30 @@
 
 #endif  // IREE_PLATFORM_*
 
+//==============================================================================
+// Pthreads notification clock configuration
+//==============================================================================
+// When using pthreads for notifications (macOS, BSD, Linux+TSan, etc.),
+// pthread_cond_timedwait() expects an absolute time in a specific clock domain.
+// Since iree_time_now() returns CLOCK_MONOTONIC time, we need to handle the
+// clock domain mismatch.
+
+#if !defined(IREE_RUNTIME_USE_FUTEX) && !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
+#if defined(IREE_PLATFORM_APPLE)
+// Apple has pthread_cond_timedwait_relative_np() but NOT
+// pthread_condattr_setclock.
+#define IREE_NOTIFICATION_USE_RELATIVE_TIMEDWAIT 1
+#elif defined(_POSIX_CLOCK_SELECTION) && (_POSIX_CLOCK_SELECTION >= 0)
+// Standard POSIX platforms with clock selection support.
+#define IREE_NOTIFICATION_USE_CONDATTR_CLOCK 1
+#else
+// Fallback: convert to relative timeout then to realtime absolute.
+#define IREE_NOTIFICATION_USE_RELATIVE_FALLBACK 1
+#endif
+
+#endif  // !IREE_RUNTIME_USE_FUTEX && !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+
 #if defined(NDEBUG)
 #define SYNC_ASSERT(x) (void)(x)
 #else
@@ -596,7 +620,18 @@ void iree_notification_cancel_wait(iree_notification_t* notification) {}
 void iree_notification_initialize(iree_notification_t* out_notification) {
   memset(out_notification, 0, sizeof(*out_notification));
   pthread_mutex_init(&out_notification->mutex, NULL);
+
+#if defined(IREE_NOTIFICATION_USE_CONDATTR_CLOCK)
+  // Configure condition variable to use CLOCK_MONOTONIC so that
+  // pthread_cond_timedwait() accepts monotonic absolute times directly.
+  pthread_condattr_t cond_attr;
+  pthread_condattr_init(&cond_attr);
+  pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+  pthread_cond_init(&out_notification->cond, &cond_attr);
+  pthread_condattr_destroy(&cond_attr);
+#else
   pthread_cond_init(&out_notification->cond, NULL);
+#endif  // IREE_NOTIFICATION_USE_CONDATTR_CLOCK
 }
 
 void iree_notification_deinitialize(iree_notification_t* notification) {
@@ -638,19 +673,67 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
                                    iree_duration_t spin_ns,
                                    iree_time_t deadline_ns) {
-  struct timespec abs_ts = {
-      .tv_sec = (time_t)(deadline_ns / 1000000000ull),
-      .tv_nsec = (long)(deadline_ns % 1000000000ull),
-  };
-
   pthread_mutex_lock(&notification->mutex);
 
-  // Spin until notified and the epoch increments from what we captured during
-  // iree_notification_prepare_wait.
   bool result = true;
   while (notification->epoch == wait_token) {
-    int ret = pthread_cond_timedwait(&notification->cond, &notification->mutex,
+    int ret;
+
+    if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
+      // No timeout - wait forever.
+      ret = pthread_cond_wait(&notification->cond, &notification->mutex);
+    } else if (deadline_ns == IREE_TIME_INFINITE_PAST) {
+      // Already past deadline - immediate timeout.
+      ret = ETIMEDOUT;
+    } else {
+#if defined(IREE_NOTIFICATION_USE_CONDATTR_CLOCK)
+      // Condition variable configured with CLOCK_MONOTONIC - use absolute time
+      // from iree_time_now() directly.
+      struct timespec abs_ts = {
+          .tv_sec = (time_t)(deadline_ns / 1000000000ull),
+          .tv_nsec = (long)(deadline_ns % 1000000000ull),
+      };
+      ret = pthread_cond_timedwait(&notification->cond, &notification->mutex,
+                                   &abs_ts);
+
+#elif defined(IREE_NOTIFICATION_USE_RELATIVE_TIMEDWAIT)
+      // Apple: use relative timeout API (pthread_cond_timedwait_relative_np).
+      iree_duration_t timeout_ns =
+          iree_absolute_deadline_to_timeout_ns(deadline_ns);
+      if (timeout_ns <= 0) {
+        ret = ETIMEDOUT;
+      } else {
+        struct timespec rel_ts = {
+            .tv_sec = (time_t)(timeout_ns / 1000000000ull),
+            .tv_nsec = (long)(timeout_ns % 1000000000ull),
+        };
+        ret = pthread_cond_timedwait_relative_np(&notification->cond,
+                                                 &notification->mutex, &rel_ts);
+      }
+
+#else   // IREE_NOTIFICATION_USE_RELATIVE_FALLBACK
+      // Convert monotonic deadline to realtime absolute.
+      // This has some clock drift but is acceptable for timeout precision.
+      iree_duration_t timeout_ns =
+          iree_absolute_deadline_to_timeout_ns(deadline_ns);
+      if (timeout_ns <= 0) {
+        ret = ETIMEDOUT;
+      } else {
+        struct timespec now_realtime;
+        clock_gettime(CLOCK_REALTIME, &now_realtime);
+        int64_t deadline_realtime_ns =
+            (int64_t)now_realtime.tv_sec * 1000000000ll + now_realtime.tv_nsec +
+            timeout_ns;
+        struct timespec abs_ts = {
+            .tv_sec = (time_t)(deadline_realtime_ns / 1000000000ll),
+            .tv_nsec = (long)(deadline_realtime_ns % 1000000000ll),
+        };
+        ret = pthread_cond_timedwait(&notification->cond, &notification->mutex,
                                      &abs_ts);
+      }
+#endif  // IREE_NOTIFICATION_USE_*
+    }
+
     if (ret != 0) {
       // Wait failed (timeout/etc); cancel the wait.
       // This may happen in spurious wakes but that's fine - the caller is

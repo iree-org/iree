@@ -13,7 +13,14 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Implementation for the public iree_time_now() function.
+// Returns monotonically increasing time in nanoseconds.
+// The epoch is arbitrary (typically system boot) and values are only meaningful
+// relative to other timestamps from the same process.
+//
+// Implementations:
+//   POSIX (Linux/Android/Apple/Emscripten): CLOCK_MONOTONIC
+//   Windows: QueryPerformanceCounter
+//
 // Also available to other libraries under base/ to avoid circular dependencies.
 int64_t iree_platform_time_now(void);
 
