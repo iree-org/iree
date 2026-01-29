@@ -619,6 +619,28 @@ def FuseTensorPadWithConsumerPass :
   let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
 }
 
+def FusePCFStoresPass
+    : Pass<"iree-codegen-fuse-pcf-stores", ""> {
+  let summary = "Fuse store operations into PCF parallel ops";
+  let description = [{
+    Fuses `iree_codegen.store_to_buffer` and `iree_tensor_ext.dispatch_tensor_store`
+    operations with their producer `pcf.loop` or `pcf.generic` ops. The pattern
+    converts `pcf.write_slice` operations inside the PCF region to direct buffer
+    writes or dispatch tensor stores.
+
+    This eliminates unnecessary tensor materializations by writing directly to
+    the final destination buffer inside the parallel loop body.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect",
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "iree_compiler::IREE::TensorExt::IREETensorExtDialect",
+    "memref::MemRefDialect",
+    "vector::VectorDialect",
+    "affine::AffineDialect"
+  ];
+}
+
 def GenericVectorizationPass :
     InterfacePass<"iree-codegen-generic-vectorization", "mlir::FunctionOpInterface"> {
   let summary = "Pass to perform vectorization on tensor/linalg ops.";
