@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -52,7 +53,9 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   // TODO: Make this hook work with multiple conv Ops
   assert(llvm::count_if(computeOps,
                         [](Operation *op) {
-                          return isa<linalg::ConvolutionOpInterface>(op);
+                          auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+                          return linalgOp &&
+                                 linalg::isaConvolutionOpInterface(linalgOp);
                         }) == 1 &&
          "Exactly 1 Linalg Conv Op is expected");
 
@@ -137,7 +140,8 @@ class DecomposeConvolutionToLowerDimOpsPass final
     // compute the "decomposed" version of its lowering config attribute.
     // TODO: Add support for cases with multiple convs per function
     int64_t numConvOps = llvm::count_if(computeOps, [](Operation *op) {
-      return isa<linalg::ConvolutionOpInterface>(op);
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+      return linalgOp && linalg::isaConvolutionOpInterface(linalgOp);
     });
 
     if (numConvOps == 0) {
