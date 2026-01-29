@@ -16,11 +16,13 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"
@@ -33,6 +35,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -387,6 +390,16 @@ LogicalResult materializeSliceFromOrdinals(
       for (auto result : op->getResults()) {
         map.map(result, constVal);
       }
+      continue;
+    }
+
+    // TODO(#21317, #21590): Currently, we cannot evaluate `vector.vscale` ops
+    // at host-side. Therefore, we map these values to the user-specified
+    // constants here at compile-time.
+    if (isa<vector::VectorScaleOp>(op)) {
+      Value constVal = arith::ConstantIndexOp::create(rewriter, op->getLoc(),
+                                                      getUserVscaleValue());
+      map.map(op->getResult(0), constVal);
       continue;
     }
     rewriter.clone(*op, map);

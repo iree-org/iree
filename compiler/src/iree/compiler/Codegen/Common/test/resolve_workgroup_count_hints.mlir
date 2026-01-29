@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-resolve-workgroup-count-hints, canonicalize, cse)))" \
-// RUN:   %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
+// RUN:   --iree-experimental-vscale-value=2 %s --verify-diagnostics --allow-unregistered-dialect | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
@@ -452,3 +452,39 @@ hal.executable private @hint_operand_not_ordinal_error {
     }
   }
 }
+
+// -----
+
+// Tests that hints that enclose vscale ops are resolved with their user-specified values.
+// This mechanism is a workaround until #21590 and #21317 are resolved.
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @resolve_vscale_in_hint {
+  hal.executable.variant public @variant target(#hal.executable.target<"", "", {}>) {
+    hal.executable.export public @entry_point layout(#pipeline_layout)
+        count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0)
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @entry_point() {
+        %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %o0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %vscale = vector.vscale
+        %c4 = arith.constant 4 : index
+        %tile = arith.muli %vscale, %c4 : index
+        %wg = arith.ceildivui %o0, %tile : index
+        iree_codegen.workgroup_count_hint(%wg, 1, 1)
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: hal.executable private @resolve_vscale_in_hint
+//       CHECK:   hal.executable.export public @entry_point
+//  CHECK-SAME:     layout({{.+}}) count(%{{.+}}: !hal.device, %[[ARG:.+]]: index) -> (index, index, index)
+//       CHECK:     %[[TILE:.+]] = arith.constant 8 : index
+//       CHECK:     %[[WG:.+]] = arith.ceildivui %[[ARG]], %[[TILE]] : index
+//       CHECK:     hal.return %[[WG]], %c1, %c1 : index, index, index
