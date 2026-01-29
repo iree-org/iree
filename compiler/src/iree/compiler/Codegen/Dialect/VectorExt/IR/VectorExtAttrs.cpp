@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -109,9 +110,23 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
   SmallVector<int64_t> elementCount;
   SmallVector<int64_t> subgroupStrides;
   SmallVector<int64_t> threadStrides;
-  // To reshape, we need to ensure that we always go up in the layout level.
-  // We can only go to a lower level if this is a new dimension, and we have
-  // to start from the lowest level (element).
+  // For each dimension of the layout, we have five levels that we need to
+  // process. We will start at the lowest level, i.e., the element level and
+  // then work our way upwards through thread, outer and batch level to
+  // eventually reach the subgroup level. While reshaping, we need to ensure
+  // that we always go upwards in the levels as long as we haven't fully
+  // exhausted that dimension of the layout. We can only reset to the element
+  // level after we have fully exhausted that dimension and move on to the next
+  // dimension of the layout.
+  //
+  // This implementation supports both cases of reshape, i.e.,
+  // expansion (e.g., 64x64 -> 16x4x16x4) as well as
+  // contraction (e.g., 16x4x16x4 -> 64x64).
+  //
+  // We process all shapes and layouts from the inside out, i.e., we start with
+  // the innermost dimension and work towards the outermost dimension. To that
+  // end, the input shapes & layouts are effectively reversed and we reverse
+  // back for the end result.
   //
   // When merging a thread/subgroup level, we need to also ensure that the
   // strides can be merged into a single stride.
@@ -119,34 +134,94 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
   SmallVector<int64_t> remainingStrides = {0, 0};
   SmallVector<bool> unitDims = {true, true, true, true, true};
   int64_t currDim = getRank();
+  // We initialize to 5 here to immediately trigger the initialization of
+  // data-structures inside the do-while-loop.
   int64_t currLevel = 5;
   int64_t minLevel = 0;
+  // We need to process all dimensions of the target shape.
   for (int64_t dim : llvm::reverse(newShape)) {
     // levels: element, thread, outer, batch, subgroup
     // strides: thread, subgroup
     SmallVector<int64_t> levels(5, 1);
     SmallVector<int64_t> strides(2, 0);
 
+    // The idea of this loop is to distribute the current dimension of the
+    // target shape onto one or multiple dimensions of the layout.
+    // In case of an expansion, distributing one dimension might not fully
+    // deplete one dimension of the layout and we will keep distributing that
+    // dimension of the layout when processing the next dimension of the target
+    // shape on the next iteration of the surrounding loop.
+    //
+    // To illustrate this case, assume an expansion from 64x64 to 16x4x6x4 and
+    // the following layout:
+    // subgroup_tile = [1, 1]
+    // batch_tile = [4, 4]
+    // outer_tile = [1, 1]
+    // thread_tile = [16, 4]
+    // element_tile = [1, 4]
+    // We start of with the 4 in the target shape (remember we process in
+    // reverse order). In the first iteration, we reset to the element dimension
+    // and initialize all data-structures, decrementing currDim from 2 to 1.
+    // Then, the 4 is entirely consumed by the element tile at position 1, which
+    // also consumes the element level. We then set the current and minimum
+    // level to the thread level and start processing the 16 of the target
+    // shape. That is partially consumed by the thread level, depleting the
+    // thread level, so we move on to the batch level with 16 / 4 = 4 remaining
+    // for the current dimension of the target shape. That remaining 4 is
+    // consumed by the batch level, depleting the batch level and the dimension
+    // of the layout. As a consequence, we move on to the next dimension of the
+    // target shape and the next dimension of the layout, where this process
+    // repeats.
+    //
+    // In case of a contraction on the other hand, we might consume more than
+    // one dimension of the layout for this dimension of the target shape. This
+    // case is handled by the do-while-loop and we will only move to the next
+    // dimension of the target shape when we have fully distributed it.
+    //
+    // To illustrate this case, assume an contraction from 16x4x6x4 to 64x64 and
+    // the following layout:
+    // subgroup_tile = [1, 1, 1, 1]
+    // batch_tile = [4, 1, 4, 1]
+    // outer_tile = [1, 1, 1, 1]
+    // thread_tile = [4, 4, 4, 1]
+    // element_tile = [1, 1, 1, 4]
+    // We start with 64 for the current dimension of the target
+    // shape. The element level of the innermost dimension of the layout
+    // consumes the 4, so we are left with 64/4 = 16. All remaining levels for
+    // the current dimension of the layout are unit, so we need to move on to
+    // the next dimension of the layout, resetting to the element level. The
+    // element level is unit, so we move on to the thread level, which consumes
+    // 4, leaving us with 16/4 = 4. We move on to the batch dimension, which
+    // consumes the remaining 4, completing this dimension of the target shape.
+    // For the next dimension of the target shape, a similar process repeats.
     int64_t dimRemaining = dim;
     do {
       if (dimRemaining == 1) {
-        // We have fully consumed this dimension.
+        // We have fully consumed this dimension of the target shape and can
+        // move on to the next dimension of the target shape.
         break;
       }
 
       if (currLevel == 5) {
-        // Move to the next dimension.
+        // We have reached the uppermost level (subgroup) of the layout and need
+        // to move on to the next level of the layout.
         if (currDim == 0) {
+          // There are no more dimensions of the layout to consume. In all
+          // well-formed cases, this should only be the case if we have also
+          // fully consumed the target shape. This is checked by the assert
+          // outside the loop.
           break;
         }
         --currDim;
         currLevel = 0;
+        // This is one of two cases where we reset the minLevel. If we start a
+        // new dimension, we start again with the element level, so it's fine to
+        // reset it here.
+        minLevel = 0;
         remainingLevels = llvm::to_vector(
             llvm::reverse(getPackedShapeForUndistributedDim(currDim)));
-        // printShape("New rem levels", remainingLevels);
         remainingStrides = {getThreadStrides()[currDim],
                             getSubgroupStrides()[currDim]};
-        // printShape("New rem strides", remainingStrides);
         unitDims = llvm::map_to_vector(remainingLevels,
                                        [](int64_t v) { return v == 1; });
       }
@@ -168,7 +243,11 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
       }
 
       if (currLevel < minLevel) {
-        // Cannot go below the minimum level, bail out.
+        // Check that invariant that we're always moving upwards in the levels
+        // of the layout (see above for definition). Bail out if the invariant
+        // doesn't hold.
+        LLVM_DEBUG(llvm::dbgs() << "invariant violated, trying to move below "
+                                   "minimum level, aborting layout reshaping");
         return VectorLayoutInterface();
       }
 
@@ -179,6 +258,8 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
         // thread level.
         if (strides[0] != 0 &&
             strides[0] * levels[currLevel] != remainingStrides[0]) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "cannot consume stride, aborting layout reshaping");
           // Cannot consume the stride, bail out.
           return VectorLayoutInterface();
         }
@@ -201,6 +282,9 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
       remainingLevels[currLevel] /= consume;
     } while (true);
 
+    // This assert ensure that if we break the above do-while-loop because we
+    // have completely depleted the layout that we have also fully distributed
+    // the target shape.
     assert(dimRemaining == 1 && "cannot reshape, remaining dim not consumed");
     elementCount.push_back(levels[0]);
     threadCount.push_back(levels[1]);
@@ -210,9 +294,13 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
     threadStrides.push_back(strides[0]);
     subgroupStrides.push_back(strides[1]);
 
-    // Check if we can reset the minimum level.
     if (llvm::all_of(remainingLevels, [](int64_t v) { return v == 1; })) {
-      // We have fully consumed the current dimension, reset the minLevel.
+      // This is the second case where we reset the minimum level: We have fully
+      // consumed the current dimension of the target shape and at the same time
+      // depleted the current dimension of the layout (all remaining levels are
+      // unit). We will move on to the next dimension of the target shape and at
+      // the same time also move on to the next dimension of the layout, which
+      // allows us to reset the minimum level back to element level.
       minLevel = 0;
       currLevel = 5;
     }
