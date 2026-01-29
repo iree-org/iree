@@ -366,11 +366,35 @@ private:
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
-          removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getSource()),
-              DFX::Resolution::OPTIONAL);
-          getState() ^= sourceUsage.getState();
+          // Check if the clone result has any tied uses (in-place mutations).
+          // This is a static IR property, safe to query during DFX iteration.
+          bool resultHasTiedUses =
+              llvm::any_of(op.getResult().getUses(), [](OpOperand &use) {
+                auto tiedOp =
+                    dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
+                return tiedOp && tiedOp.isOperandTied(use.getOperandNumber());
+              });
+          if (resultHasTiedUses) {
+            // Result is mutated: clone creates a fresh allocation whose
+            // lifetime is determined by how the clone result is used (backward
+            // propagation from uses), not by the source's lifetime. This
+            // allows clones of external resources to become transient when
+            // only used internally.
+            removeAssumedBits(NOT_TRANSFER_WRITE);
+          } else {
+            // Result is never mutated: this clone is purely a type-cast (no
+            // data isolation needed). Propagate source usage so that
+            // RefineUsage assigns the same lifetime to both sides. The second
+            // ElideAsyncCopies pass then elides the now-same-type clone.
+            auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op.getSource()),
+                DFX::Resolution::OPTIONAL);
+            getState() ^= sourceUsage.getState();
+          }
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getResult()),
+              DFX::Resolution::REQUIRED);
+          getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSliceOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);

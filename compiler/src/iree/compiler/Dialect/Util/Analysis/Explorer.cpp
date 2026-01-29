@@ -662,10 +662,13 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       regionOp.getSuccessorRegions(RegionBranchPoint::parent(),
                                    entrySuccessors);
       for (auto &entrySuccessor : entrySuccessors) {
+        // Skip parent-exit successors — they represent the region being
+        // skipped entirely, so no values flow into the entry block.
+        if (entrySuccessor.isParent()) {
+          continue;
+        }
         if (fn(regionOp->getBlock(),
-               regionOp.getEntrySuccessorOperands(
-                   entrySuccessor.getSuccessor()),
-               0)
+               regionOp.getEntrySuccessorOperands(entrySuccessor), 0)
                 .wasInterrupted()) {
           break;
         }
@@ -1007,46 +1010,85 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
     SmallVector<RegionSuccessor, 2> entrySuccessors;
     regionOp.getSuccessorRegions(RegionBranchPoint::parent(), entrySuccessors);
     for (auto &entrySuccessor : entrySuccessors) {
-      auto successorInputs = regionOp.getSuccessorInputs(entrySuccessor);
-      if (operandIdx >= successorInputs.size()) {
-        // Implicit capture; argument has the same SSA value on the inside of
-        // the region. Uses show up as normal so we ignore here.
-        LLVM_DEBUG(llvm::dbgs() << "  -- ignoring implicit region capture\n");
-      } else {
-        // Normal captured entry argument.
-        auto entryArg = successorInputs[operandIdx];
-        LLVM_DEBUG({
-          llvm::dbgs() << "   + queuing region argument ";
-          entryArg.printAsOperand(llvm::dbgs(), asmState);
-          llvm::dbgs() << "\n";
-        });
-        worklist.insert(entryArg);
+      // Skip parent-exit successors (e.g. scf.for with 0 iterations skips
+      // the body entirely). The parent-exit path maps operands to op results,
+      // but the body path already covers this connection statically
+      // (init_arg → block_arg → yield → result).
+      if (entrySuccessor.isParent()) {
+        continue;
       }
+      auto successorInputs = regionOp.getSuccessorInputs(entrySuccessor);
+      // Get the operand range that maps to this successor's inputs.
+      // This properly handles ops like scf.for where only a subset of operands
+      // (the iter_args) map to block arguments.
+      auto entryOperands = regionOp.getEntrySuccessorOperands(entrySuccessor);
+      unsigned entryBegin = entryOperands.getBeginOperandIndex();
+      unsigned entryEnd = entryBegin + entryOperands.size();
+      if (operandIdx < entryBegin || operandIdx >= entryEnd) {
+        // Operand not part of the entry operands for this successor.
+        // It might be an implicit capture or control operand.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  -- operand " << operandIdx << " not in entry range ["
+                   << entryBegin << ", " << entryEnd << ")\n");
+        continue;
+      }
+      // Compute relative index within the entry operands.
+      unsigned relativeIdx = operandIdx - entryBegin;
+      if (relativeIdx >= successorInputs.size()) {
+        // Safety check - shouldn't happen if the interface is implemented
+        // correctly.
+        LLVM_DEBUG(llvm::dbgs() << "  -- relative index " << relativeIdx
+                                << " out of range for successor inputs\n");
+        continue;
+      }
+      // Normal captured entry argument.
+      auto entryArg = successorInputs[relativeIdx];
+      LLVM_DEBUG({
+        llvm::dbgs() << "   + queuing region argument ";
+        entryArg.printAsOperand(llvm::dbgs(), asmState);
+        llvm::dbgs() << "\n";
+      });
+      worklist.insert(entryArg);
     }
     return TraversalResult::COMPLETE;
   };
 
-  // Move within/out-of a region.
+  // Move within/out-of a region. Handles inter-region transitions (e.g.
+  // scf.condition forwarding to scf.while's "after" body) as well as exits
+  // to the parent op (e.g. scf.yield exiting a loop).
   auto traverseRegionBranchOp = [&](RegionBranchTerminatorOpInterface branchOp,
                                     unsigned operandIdx) {
-    auto successorOperands =
-        branchOp.getSuccessorOperands(RegionSuccessor::parent());
-    unsigned beginIdx = successorOperands.getBeginOperandIndex();
-    if (operandIdx < beginIdx ||
-        operandIdx >= beginIdx + successorOperands.size()) {
-      // Used by the op itself (or something else); ignore.
-      LLVM_DEBUG(llvm::dbgs()
-                 << "  -- ignoring non-succesor region branch operand "
-                 << operandIdx << "\n");
+    Operation *parentOp = branchOp.getOperation()->getParentOp();
+    auto regionBranchOp = dyn_cast<RegionBranchOpInterface>(parentOp);
+    if (!regionBranchOp) {
       return TraversalResult::COMPLETE;
     }
-    auto result = successorOperands[operandIdx - beginIdx];
-    LLVM_DEBUG({
-      llvm::dbgs() << "   + queuing region result ";
-      result.printAsOperand(llvm::dbgs(), asmState);
-      llvm::dbgs() << "\n";
-    });
-    worklist.insert(result);
+
+    // Enumerate all possible successors from the terminator's region.
+    Region *currentRegion = branchOp.getOperation()->getParentRegion();
+    SmallVector<RegionSuccessor, 2> successors;
+    regionBranchOp.getSuccessorRegions(*currentRegion, successors);
+
+    for (auto &successor : successors) {
+      auto successorOperands = branchOp.getSuccessorOperands(successor);
+      unsigned beginIdx = successorOperands.getBeginOperandIndex();
+      if (operandIdx < beginIdx ||
+          operandIdx >= beginIdx + successorOperands.size()) {
+        continue;
+      }
+      unsigned relativeIdx = operandIdx - beginIdx;
+      auto successorInputs = regionBranchOp.getSuccessorInputs(successor);
+      if (relativeIdx >= successorInputs.size()) {
+        continue;
+      }
+      auto targetValue = successorInputs[relativeIdx];
+      LLVM_DEBUG({
+        llvm::dbgs() << "   + queuing region branch target ";
+        targetValue.printAsOperand(llvm::dbgs(), asmState);
+        llvm::dbgs() << "\n";
+      });
+      worklist.insert(targetValue);
+    }
     return TraversalResult::COMPLETE;
   };
 

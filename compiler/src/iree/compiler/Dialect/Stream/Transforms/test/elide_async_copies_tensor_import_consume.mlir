@@ -73,23 +73,49 @@ util.func public @caller_with_consume_import(%arg0: !util.buffer) {
 
 // -----
 
-// Tests stream.tensor.import consume with multiple uses (fork).
-// Clone must be preserved because original is used again.
+// Tests stream.tensor.import consume with multiple read-only uses.
+// Clone can be elided because neither the source nor clone is mutated.
+// Both dispatches only read, so sharing the buffer is safe.
 
-// CHECK-LABEL: @consume_import_with_fork
+// CHECK-LABEL: @consume_import_read_only_fork
 // CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
-util.func public @consume_import_with_fork(%arg0: !util.buffer) {
+util.func public @consume_import_read_only_fork(%arg0: !util.buffer) {
   %c0 = arith.constant 0 : index
   %c100 = arith.constant 100 : index
   // CHECK: %[[IMPORT:.+]] = stream.tensor.import consume %[[BUFFER]]
   %import = stream.tensor.import consume %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
-  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[IMPORT]]
+  // Clone can be elided - neither original nor clone is mutated.
+  // CHECK-NOT: stream.async.clone
   %clone = stream.async.clone %import : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
-  // Both original and clone are used - fork semantics.
+  // Both dispatches read from the same buffer (safe - no mutation).
   // CHECK: stream.async.dispatch @ex::@dispatch1(%[[IMPORT]][%c0 to %c100 for %c100])
   %dispatch1 = stream.async.dispatch @ex::@dispatch1(%import[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
-  // CHECK: stream.async.dispatch @ex::@dispatch2(%[[CLONE]][%c0 to %c100 for %c100])
+  // CHECK: stream.async.dispatch @ex::@dispatch2(%[[IMPORT]][%c0 to %c100 for %c100])
   %dispatch2 = stream.async.dispatch @ex::@dispatch2(%clone[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  util.return
+}
+
+// -----
+
+// Tests stream.tensor.import consume with fork where mutation occurs.
+// Clone must be preserved because the clone result is mutated via tied dispatch.
+
+// CHECK-LABEL: @consume_import_with_mutating_fork
+// CHECK-SAME: (%[[BUFFER:[^:]+]]: !util.buffer)
+util.func public @consume_import_with_mutating_fork(%arg0: !util.buffer) {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import consume %[[BUFFER]]
+  %import = stream.tensor.import consume %arg0 : !util.buffer -> tensor<f32> in !stream.resource<external>{%c100}
+  // Clone must be preserved - clone result is mutated by tied dispatch.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[IMPORT]]
+  %clone = stream.async.clone %import : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // First dispatch only reads from import.
+  // CHECK: stream.async.dispatch @ex::@dispatch1(%[[IMPORT]][%c0 to %c100 for %c100])
+  %dispatch1 = stream.async.dispatch @ex::@dispatch1(%import[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // Second dispatch mutates the clone in-place (tied operand).
+  // CHECK: stream.async.dispatch @ex::@dispatch2(%[[CLONE]][%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> %[[CLONE]]{%c100}
+  %dispatch2 = stream.async.dispatch @ex::@dispatch2(%clone[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> %clone{%c100}
   util.return
 }
 
