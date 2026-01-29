@@ -712,6 +712,21 @@ struct StoreToBufferOpSubsetInsertionInterface
 //===----------------------------------------------------------------------===//
 
 void registerBufferizationInterfaces(DialectRegistry &registry) {
+  // Prioritize IREE's PackOp/UnPackOp bufferization over the upstream's one.
+  // These create IREE::LinalgExt::Pack/UnPackOp instead of keeping linalg ops.
+  // This must be registered before the upstream linalg registration below,
+  // because MLIR's attachInterface uses first-one-wins semantics.
+  // The scalar code support (i.e., `generateScalarImplementation`) is not yet
+  // upstreamed, so the lowering path is not working.
+  // TODO(#20030): Remove once IREE's pack/unpack ops are fully upstreamed.
+  registry.insert<linalg::LinalgDialect>();
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
+        *ctx);
+    linalg::UnPackOp::attachInterface<PackUnPackOpInterface<linalg::UnPackOp>>(
+        *ctx);
+  });
+
   arith::registerBufferizableOpInterfaceExternalModels(registry);
   linalg::registerBufferizableOpInterfaceExternalModels(registry);
   scf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -754,13 +769,6 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
             >::registerOpInterface(ctx);
       });
-  registry.insert<linalg::LinalgDialect>();
-  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
-    linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
-        *ctx);
-    linalg::UnPackOp::attachInterface<PackUnPackOpInterface<linalg::UnPackOp>>(
-        *ctx);
-  });
 }
 
 } // namespace mlir::iree_compiler
