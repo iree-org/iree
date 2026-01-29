@@ -32,13 +32,20 @@ static bool isIterationCarriedArg(OpOperand &arg, linalg::GenericOp op) {
 static bool isPaddingNeeded(OpBuilder &b, TilingInterface op,
                             ArrayRef<OpFoldResult> padMultiples) {
   SmallVector<Range> iterationDomain = op.getIterationDomain(b);
-  for (auto [range, padMultiple] :
-       llvm::zip_equal(iterationDomain, padMultiples)) {
-    std::optional<int64_t> padSize = getConstantIntValue(padMultiple);
+
+  // Mismatched sizes.
+  if (iterationDomain.size() < padMultiples.size()) {
+    return true;
+  }
+
+  size_t numDims = std::min(iterationDomain.size(), padMultiples.size());
+  for (size_t i = 0; i < numDims; ++i) {
+    std::optional<int64_t> padSize = getConstantIntValue(padMultiples[i]);
     if (!padSize || *padSize == 0) {
       continue;
     }
-    std::optional<int64_t> dimSize = getConstantIntValue(range.size);
+    std::optional<int64_t> dimSize =
+        getConstantIntValue(iterationDomain[i].size);
     if (!dimSize) {
       // Dynamic dimension - assume padding is needed.
       return true;
