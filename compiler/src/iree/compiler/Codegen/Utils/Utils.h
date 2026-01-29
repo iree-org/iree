@@ -279,6 +279,15 @@ Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                   ValueRange convertedInputOperands,
                                   ValueRange convertedOutputOperands);
 
+/// Check if the uses of memref value `origValue` can be replaced with a value
+/// of `replacementType`. This validates that all transitive uses through
+/// reshape operations (CastOp, SubViewOp, ExpandShapeOp, CollapseShapeOp) can
+/// have their result types correctly computed. Returns failure if any reshape
+/// operation would fail to compute valid result types (e.g., ExpandShapeOp or
+/// CollapseShapeOp with incompatible layouts).
+LogicalResult canReplaceMemrefUsesAndPropagateType(Value origValue,
+                                                   Type replacementType);
+
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to
 /// the operation itself. Create new operations which can carry the change, and
