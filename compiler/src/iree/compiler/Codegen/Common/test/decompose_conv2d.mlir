@@ -35,3 +35,69 @@ module {
 // GENERIC:       linalg.depthwise_conv_1d_nwc_wc
 // GENERIC-SAME:    ins(%[[INPUT_SLICE]], %[[FILTER_SLICE]] : tensor<1x4x4xf32>, tensor<4x4xf32>)
 // GENERIC-SAME:    outs({{.+}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>
+
+// -----
+
+// Test case where output H > 1: should NOT decompose to 1D conv.
+module {
+  func.func @no_decompose_output_h_not_1(%input: tensor<1x4x4x4xf32>, %filter: tensor<1x4x4xf32>) -> tensor<1x4x1x4xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %empty = tensor.empty() : tensor<1x4x1x4xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x4x1x4xf32>) -> tensor<1x4x1x4xf32>
+    %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>,
+            strides = dense<1> : tensor<2xi64>} ins(%input, %filter : tensor<1x4x4x4xf32>, tensor<1x4x4xf32>) outs(%fill : tensor<1x4x1x4xf32>) -> tensor<1x4x1x4xf32>
+    return %conv : tensor<1x4x1x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @no_decompose_output_h_not_1
+// CHECK:       linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK-NOT:   linalg.depthwise_conv_1d_nwc_wc
+
+// GENERIC-LABEL: func.func @no_decompose_output_h_not_1
+// GENERIC:       linalg.generic
+// GENERIC-NOT:   linalg.depthwise_conv_1d_nwc_wc
+
+// -----
+
+// Test case where kernel H > 1: should NOT decompose to 1D conv.
+module {
+  func.func @no_decompose_kernel_h_not_1(%input: tensor<1x4x4x4xf32>, %filter: tensor<2x4x4xf32>) -> tensor<1x1x1x4xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %empty = tensor.empty() : tensor<1x1x1x4xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>,
+            strides = dense<1> : tensor<2xi64>} ins(%input, %filter : tensor<1x4x4x4xf32>, tensor<2x4x4xf32>) outs(%fill : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    return %conv : tensor<1x1x1x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @no_decompose_kernel_h_not_1
+// CHECK:       linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK-NOT:   linalg.depthwise_conv_1d_nwc_wc
+
+// GENERIC-LABEL: func.func @no_decompose_kernel_h_not_1
+// GENERIC:       linalg.generic
+// GENERIC-NOT:   linalg.depthwise_conv_1d_nwc_wc
+
+// -----
+
+// Test decomposition without lowering config.
+module {
+  func.func @decompose_without_config(%input: tensor<1x1x4x4xf32>, %filter: tensor<1x4x4xf32>) -> tensor<1x1x1x4xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %empty = tensor.empty() : tensor<1x1x1x4xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>,
+            strides = dense<1> : tensor<2xi64>} ins(%input, %filter : tensor<1x1x4x4xf32>, tensor<1x4x4xf32>) outs(%fill : tensor<1x1x1x4xf32>) -> tensor<1x1x1x4xf32>
+    return %conv : tensor<1x1x1x4xf32>
+  }
+}
+
+// Verify decomposition works even without lowering config.
+// CHECK-LABEL: func.func @decompose_without_config
+// CHECK:       linalg.depthwise_conv_1d_nwc_wc
+// CHECK-NOT:   lowering_config
+
+// GENERIC-LABEL: func.func @decompose_without_config
+// GENERIC:       linalg.depthwise_conv_1d_nwc_wc

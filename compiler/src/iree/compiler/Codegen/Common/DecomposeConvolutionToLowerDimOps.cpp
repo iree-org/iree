@@ -21,9 +21,9 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static bool foldHDim(linalg::DepthwiseConv2DNhwcHwcOp convOp) {
-  Value kernel = convOp.getInputs().back();
-  Value output = convOp.getOutputs().front();
+static bool foldHDim(linalg::LinalgOp convOp) {
+  Value kernel = convOp.getDpsInputs().back();
+  Value output = convOp.getDpsInits().front();
 
   auto kernelType = dyn_cast<RankedTensorType>(kernel.getType());
   auto outputType = dyn_cast<RankedTensorType>(output.getType());
@@ -62,9 +62,13 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   // 1. Get the conv Op to update
   // ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
-  linalg::DepthwiseConv2DNhwcHwcOp convOp;
+  linalg::LinalgOp convOp;
   for (Operation *op : computeOps) {
-    if ((convOp = dyn_cast<linalg::DepthwiseConv2DNhwcHwcOp>(op))) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (linalgOp &&
+        linalg::isaConvolutionOpOfType<linalg::DepthwiseConv2DNhwcHwcOp>(
+            linalgOp)) {
+      convOp = linalgOp;
       break;
     }
   }
@@ -166,7 +170,10 @@ class DecomposeConvolutionToLowerDimOpsPass final
     if (numConvOps == 1 && succeeded(newLoweringConfig)) {
       auto computeOps = getComputeOps(funcOp);
       for (auto computeOp : computeOps) {
-        if (isa<linalg::DepthwiseConv1DNwcWcOp>(computeOp)) {
+        auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp);
+        if (linalgOp &&
+            linalg::isaConvolutionOpOfType<linalg::DepthwiseConv1DNwcWcOp>(
+                linalgOp)) {
           setLoweringConfig(computeOp, newLoweringConfig.value());
         }
       }
