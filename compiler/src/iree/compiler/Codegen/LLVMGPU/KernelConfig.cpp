@@ -1022,8 +1022,6 @@ static LogicalResult setAttentionReductionConfig(
   }
 
   SmallVector<int64_t> bounds = maybeBounds.value();
-  // Save original bounds for checking if padding is needed later.
-  SmallVector<int64_t> originalBounds = bounds;
 
   auto opInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
@@ -1209,21 +1207,9 @@ static LogicalResult setAttentionReductionConfig(
   MLIRContext *context = op.getContext();
 
   SmallVector<NamedAttribute, 2> attrs = {
-      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
-
-  // Only set partial_reduction if padding would actually be needed.
-  // Padding is needed when a tile size doesn't divide evenly into the
-  // original dimension. OnlineAttention doesn't support padding without masks.
-  for (int64_t dim : opInfo.getK2Dims()) {
-    int64_t tileSize = reductionTileSizes[dim];
-    int64_t dimSize = originalBounds[dim];
-    if (tileSize > 0 && !ShapedType::isDynamic(dimSize) &&
-        dimSize % tileSize != 0) {
-      attrs.push_back(NamedAttribute("partial_reduction",
-                                     b.getI64ArrayAttr(reductionTileSizes)));
-      break;
-    }
-  }
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("partial_reduction",
+                     b.getI64ArrayAttr(reductionTileSizes))};
 
   // Create projected QK thread tile sizes by removing N dimensions.
   SmallVector<int64_t> qkThreadTileSizes;
@@ -1349,43 +1335,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t keyVectorSize = 128 / keyBitwidth;
   int64_t valueVectorSize = 128 / valueBitwidth;
 
-  // Get bounds to adjust seeds for small dimensions.
-  FailureOr<SmallVector<int64_t>> maybeBounds = op.getStaticLoopRanges();
-  if (failed(maybeBounds)) {
-    return failure();
-  }
-  ArrayRef<int64_t> bounds = maybeBounds.value();
-
-  auto opInfo =
-      IREE::LinalgExt::AttentionOpDetail::get(
-          op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
-          .value();
-
-  int64_t nDim = opInfo.getNDims().back();
-  int64_t k1Dim = opInfo.getK1Dims().back();
-  int64_t nSize = bounds[nDim];
-  int64_t k1Size = bounds[k1Dim];
-
-  // Adjust vector sizes to fit within actual dimensions to avoid padding.
-  // Padding attention ops without masks is not yet supported.
-  if (!ShapedType::isDynamic(k1Size)) {
-    keyVectorSize = std::min(keyVectorSize, k1Size);
-  }
-  if (!ShapedType::isDynamic(nSize)) {
-    valueVectorSize = std::min(valueVectorSize, nSize);
-  }
-
-  // Adjust numValueVectors to ensure the N tile size fits.
-  // N tile = numValueVectors * valueVectorSize, so cap numValueVectors.
-  int64_t numValueVectors = 2;
-  if (!ShapedType::isDynamic(nSize)) {
-    int64_t maxNumValueVectors = nSize / valueVectorSize;
-    numValueVectors =
-        std::max(int64_t(1), std::min(numValueVectors, maxNumValueVectors));
-  }
-
   AttentionReductionHeuristicSeeds seeds{/*numKeyVectors=*/8,
-                                         /*numValueVectors=*/numValueVectors,
+                                         /*numValueVectors=*/2,
                                          /*numSubgroups=*/8,
                                          /*keyVectorSize=*/keyVectorSize,
                                          /*valueVectorSize=*/valueVectorSize};
