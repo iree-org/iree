@@ -944,3 +944,20 @@ func.func @fuse_pad_dest(%arg0: tensor<128xf16>, %arg1: index) -> tensor<128xf16
 //       CHECK:     linalg.copy
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
+
+// -----
+
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+func.func @no_swap_same_block_expand_slice(%arg0: tensor<64xf16>) -> tensor<4x4xf16>
+    attributes {translation_info = #translation_info} {
+  %expanded = tensor.expand_shape %arg0 [[0, 1]] output_shape [8, 8]
+      : tensor<64xf16> into tensor<8x8xf16>
+  %extracted = tensor.extract_slice %expanded[0, 0] [4, 4] [1, 1]
+      : tensor<8x8xf16> to tensor<4x4xf16>
+  return %extracted : tensor<4x4xf16>
+}
+
+// CHECK-LABEL: func @no_swap_same_block_expand_slice
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[EXPAND]]
+//       CHECK:   return %[[SLICE]]
