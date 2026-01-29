@@ -13,7 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -246,8 +246,8 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
         // Check that invariant that we're always moving upwards in the levels
         // of the layout (see above for definition). Bail out if the invariant
         // doesn't hold.
-        LLVM_DEBUG(llvm::dbgs() << "invariant violated, trying to move below "
-                                   "minimum level, aborting layout reshaping");
+        LDBG() << "invariant violated, trying to move below "
+                  "minimum level, aborting layout reshaping";
         return VectorLayoutInterface();
       }
 
@@ -258,8 +258,7 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
         // thread level.
         if (strides[0] != 0 &&
             strides[0] * levels[currLevel] != remainingStrides[0]) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "cannot consume stride, aborting layout reshaping");
+          LDBG() << "cannot consume stride, aborting layout reshaping";
           // Cannot consume the stride, bail out.
           return VectorLayoutInterface();
         }
