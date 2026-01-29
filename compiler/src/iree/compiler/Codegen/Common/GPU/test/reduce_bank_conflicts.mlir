@@ -100,6 +100,36 @@ func.func @no_pad_alloc_collapse_shape_throughsubview(%a: memref<1024x1024xf32>)
 
 // -----
 
+// CHECK-LABEL: func.func @pad_alloc_collapse_outer_shape
+// CHECK-SAME:    %[[V:.*]]: vector<4xf32>
+// CHECK:         %[[A:.*]] = memref.alloc() : memref<2x16x8x10xf32, #gpu.address_space<workgroup>>
+// CHECK:         %[[S0:.*]] = memref.subview %[[A]][0, 0, 0, 0] [2, 16, 8, 8] [1, 1, 1, 1] :
+// CHECK-SAME:      memref<2x16x8x10xf32, #gpu.address_space<workgroup>> to
+// CHECK-SAME:      memref<2x16x8x8xf32, strided<[1280, 80, 10, 1]>, #gpu.address_space<workgroup>>
+// CHECK:         %[[S1:.*]] = memref.subview %[[S0]][0, 0, 0, 0] [2, 16, 8, 8] [1, 1, 1, 1] :
+// CHECK-SAME:      memref<2x16x8x8xf32, strided<[1280, 80, 10, 1]>, #gpu.address_space<workgroup>> to
+// CHECK-SAME:      memref<2x16x8x8xf32, strided<[1280, 80, 10, 1]>, #gpu.address_space<workgroup>>
+// CHECK:         %[[C:.*]] = memref.collapse_shape %[[S1]] {{\[}}[0, 1], [2], [3]]
+// CHECK-SAME:      memref<2x16x8x8xf32, strided<[1280, 80, 10, 1]>, #gpu.address_space<workgroup>> into
+// CHECK-SAME:      memref<32x8x8xf32, strided<[80, 10, 1]>, #gpu.address_space<workgroup>>
+// CHECK:         %[[C0:.*]] = arith.constant 0 : index
+// CHECK:         vector.transfer_write %[[V]], %[[C]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true]} :
+// CHECK-SAME:      vector<4xf32>, memref<32x8x8xf32, strided<[80, 10, 1]>, #gpu.address_space<workgroup>>
+
+func.func @pad_alloc_collapse_outer_shape(%v: vector<4xf32>) {
+  %0 = memref.alloc() : memref<2x16x8x8xf32, #gpu.address_space<workgroup>>
+  %subview = memref.subview %0[0, 0, 0, 0] [2, 16, 8, 8] [1, 1, 1, 1]
+   : memref<2x16x8x8xf32, #gpu.address_space<workgroup>> to memref<2x16x8x8xf32, #gpu.address_space<workgroup>>
+  %1 = memref.collapse_shape %subview [[0, 1], [2], [3]]
+    : memref<2x16x8x8xf32, #gpu.address_space<workgroup>> into memref<32x8x8xf32, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  vector.transfer_write %v, %1[%c0, %c0, %c0] {in_bounds = [true]} :
+    vector<4xf32>, memref<32x8x8xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
 // CHECK-LABEL: func.func @pad_alloc_negative
 // CHECK:         memref.alloc(%{{.*}}) : memref<?x32x64xf32, #gpu.address_space<workgroup>
 func.func @pad_alloc_negative(%a: memref<1024x1024xf32>, %i: index, %v: vector<4xf32>) {

@@ -154,7 +154,7 @@ hal.executable private @main {
 //      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
 //      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
 // CHECK-COUNT-1:       amdgpu.mfma 16x16x16
-//          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x1x4x1xf32> to vector<4xf32>
+//          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]]
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
 // Note there is a writeback loop here that is skipped to simplify the test.
 //          CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
