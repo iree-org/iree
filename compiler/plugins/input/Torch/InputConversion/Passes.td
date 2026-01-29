@@ -41,6 +41,13 @@ def FuncConversionPass :
     Conversion pass for finalizing functions and ABI. Replaces the generic
     torch-func-backend-type-conversion pass.
   }];
+  let options = [
+    Option<"externalizeTransients", "externalize-transients",
+           "bool",
+           /*default=*/"false",
+          "If enabled, this option will append an external hal buffer to "
+          "program inputs. This buffer will be used for storing transient "
+          "memory and must be provided by the user.">];
 }
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
