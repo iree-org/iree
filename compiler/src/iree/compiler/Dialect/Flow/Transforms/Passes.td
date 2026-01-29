@@ -46,53 +46,6 @@ def CleanupTensorShapesPass :
   let summary = "Cleans up any remaining tensor shape metadata after lowering.";
 }
 
-def ConvertShardToFlowPass :
-    Pass<"iree-convert-shard-to-flow", "mlir::ModuleOp"> {
-  let summary = "Convert Shard dialect operations to flow.";
-  let description = [{
-    Each grid corresponds to a default !flow.channel with the same group name.
-    ```
-    shard.grid @grid_1(shape = 2x3)
-    ```
-    ```
-    %channel = flow.channel.default "grid_1" : !flow.channel
-    ```
-    If there is only one grid in the program than the name is omitted and the
-    ```
-    %channel = flow.channel.default : !flow.channel
-    ```
-
-    Each (shard, grid_axes) pair partitions and orders the devices into disjoint
-    groups, each corresponding to a !flow.channel to perform a collective
-    operation.
-    For example
-    ```
-    shard.grid @grid(shape = 2x3x4x5)
-    ...
-    %1 = shard.all_reduce on @grid grid_axes = [2, 0] : tensor<10x20xf32>
-    ```
-    For more information see
-    [Shard dialect](https://mlir.llvm.org/docs/Dialects/Shard/#device-groups).
-
-    The shard partition and device ordering determines the values for the
-    `color` and `key` in the corresponding `flow.channel.split` operation used
-    to create the channel.
-    For more information on the meaning of `color` and `key` see
-    [MPI_Comm_split](https://www.mpi-forum.org/docs/mpi-4.1/mpi41-report/node188.htm#Node188)
-    in the MPI standard.
-
-    Each !flow.channel is wrapped in an IREE `util.global` and its construction
-    is done only once with `util.initializer`.
-  }];
-  let dependentDialects = [
-    "mlir::affine::AffineDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::shard::ShardDialect",
-    "mlir::tensor::TensorDialect",
-    "IREE::Flow::FlowDialect",
-  ];
-}
-
 def ConvertToFlowPass :
     Pass<"iree-flow-convert-to-flow", ""> {
   let summary = "Convert operations to flow. Currently just a test pass.";
