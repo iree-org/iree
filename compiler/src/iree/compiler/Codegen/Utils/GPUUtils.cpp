@@ -828,24 +828,38 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
   // The number of total tile elements we want to swizzle must be greater than
   // or equal to the number of elements in a row.
   if (totalTileElems < numRowElems) {
+    LDBG() << "The number of row elements exceed the total elements in the tile"
+           << "\n";
     return false;
   }
   // We need at least one column of access elements to swizzle within a row.
-  if (numAccessElems < numRowElems) {
+  if (numRowElems < numAccessElems) {
+    LDBG()
+        << "The number of access elements exceed the total elements in the row"
+        << "\n";
     return false;
   }
   // The size of a row must evenly divide the total number of tile elements.
   if (totalTileElems % numRowElems != 0) {
+    LDBG() << "The number of row elements does not evenly divide the total "
+              "elements in the tile"
+           << "\n";
     return false;
   }
   // The number of access elements must evenly divide the number of row
   // elements.
   if (numRowElems % numAccessElems != 0) {
+    LDBG() << "The number of access elements does not evenly divide the number "
+              "of row elements"
+           << "\n";
     return false;
   }
   // The number of columns in a row must evenly divide the total number of tile
   // elements. This is to avoid incomplete rows at the end of the tile.
-  if (((numRowElems / numAccessElems) % totalTileElems) != 0) {
+  if (totalTileElems % (numRowElems / numAccessElems) != 0) {
+    LDBG() << "The number of columns in a row does not evenly divide the total "
+              "elements in the tile"
+           << "\n";
     return false;
   }
   return true;
