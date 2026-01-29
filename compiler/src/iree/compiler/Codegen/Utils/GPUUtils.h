@@ -193,6 +193,16 @@ getXORShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
 /// Returns true if the XOR shuffle is valid for the given number of row
 /// elements, number of access elements, and total tile elements.
+/// Else returns false.
+/// An XOR Shuffle can be invalid for many reasons:
+/// - The number of row elements exceeds the total elements in the tile.
+/// - The number of access elements exceeds the total elements in the row.
+/// - The number of row elements does not evenly divide the total elements in
+/// the tile.
+/// - The number of access elements does not evenly divide the number of row
+/// elements.
+/// - The number of columns in a row does not evenly divide the total number of
+/// tile elements.
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                        int64_t totalTileElems);
 

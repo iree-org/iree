@@ -763,6 +763,10 @@ getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   return failure();
 }
 
+/// Returns the size of the total K dimension for the given intrinsic.
+/// For intrinsics with multiple K dimensions, returns the product of all K
+/// dimensions.
+/// Note this is for a single intrinsic.
 static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
@@ -774,6 +778,8 @@ getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   return failure();
 }
 
+/// Returns the number of elements each thread accesses for the given intrinsic
+/// and operand index.
 static FailureOr<int64_t>
 getNumAccessElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   int operandIndex) {
@@ -820,7 +826,7 @@ getXORShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return std::make_pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
+  return std::pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
@@ -828,38 +834,34 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
   // The number of total tile elements we want to swizzle must be greater than
   // or equal to the number of elements in a row.
   if (totalTileElems < numRowElems) {
-    LDBG() << "The number of row elements exceed the total elements in the tile"
-           << "\n";
+    LDBG()
+        << "The number of row elements exceed the total elements in the tile";
     return false;
   }
   // We need at least one column of access elements to swizzle within a row.
   if (numRowElems < numAccessElems) {
     LDBG()
-        << "The number of access elements exceed the total elements in the row"
-        << "\n";
+        << "The number of access elements exceed the total elements in the row";
     return false;
   }
   // The size of a row must evenly divide the total number of tile elements.
   if (totalTileElems % numRowElems != 0) {
     LDBG() << "The number of row elements does not evenly divide the total "
-              "elements in the tile"
-           << "\n";
+              "elements in the tile";
     return false;
   }
   // The number of access elements must evenly divide the number of row
   // elements.
   if (numRowElems % numAccessElems != 0) {
     LDBG() << "The number of access elements does not evenly divide the number "
-              "of row elements"
-           << "\n";
+              "of row elements";
     return false;
   }
   // The number of columns in a row must evenly divide the total number of tile
   // elements. This is to avoid incomplete rows at the end of the tile.
   if (totalTileElems % (numRowElems / numAccessElems) != 0) {
     LDBG() << "The number of columns in a row does not evenly divide the total "
-              "elements in the tile"
-           << "\n";
+              "elements in the tile";
     return false;
   }
   return true;
@@ -891,7 +893,7 @@ static FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForGfx950(
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
     switch (smma.getIntrinsic()) {
     case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return std::make_pair(/*row_width*/ 256l, /*access_width*/ 32l);
+      return std::pair(/*row_width*/ 256l, /*access_width*/ 32l);
     default:
       return failure();
     }
@@ -930,7 +932,6 @@ FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
   // width. For small K tiles, this may not reduce bank conflicts effectively.
   int64_t kTileSize =
       llvm::product_of(reductionTileSizes) * getKSize(intrinsic).value();
-  int64_t kTilePow2 = llvm::PowerOf2Ceil(kTileSize);
 
   // Figure out how many elements can fit across all banks of LDS.
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
@@ -938,26 +939,22 @@ FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
   if (failed(bitwidth)) {
     return failure();
   }
-  // Assumptions:
-  // - Each bank is 4 bytes wide (32 bits).
-  // - If not specified, assume 64 banks.
-  constexpr int64_t defaultBankWidthBits = 32;
-  constexpr int64_t defaultBankCount = 64;
-  int64_t ldsBankWidthBits =
-      (defaultBankCount * defaultBankWidthBits) / *bitwidth;
-  if (std::optional<int64_t> workgroupMemoryBankCount =
-          wgp.getWorkgroupMemoryBankCount()) {
-    ldsBankWidthBits =
-        (*workgroupMemoryBankCount * defaultBankWidthBits) / *bitwidth;
+  std::optional<int64_t> workgroupMemoryBankCount =
+      wgp.getWorkgroupMemoryBankCount();
+  if (!workgroupMemoryBankCount.has_value()) {
+    return failure();
   }
+  // Assuming each bank is 4 bytes wide (32 bits).
+  int64_t ldsBankWidthBits =
+      (workgroupMemoryBankCount.value() * 32l) / *bitwidth;
 
   // Row width must be less than or equal to the row size (in elements) of LDS
   // bank width to prevent bank conflicts.
-  int64_t effectiveRowWidth = std::min(ldsBankWidthBits, kTilePow2);
+  int64_t effectiveRowWidth = std::min(ldsBankWidthBits, kTileSize);
 
   // Ensure row width is at least access width (minimum 1 column).
   effectiveRowWidth = std::max(effectiveRowWidth, numAccessElems);
-  return validatedShuffle(std::make_pair(effectiveRowWidth, numAccessElems),
+  return validatedShuffle(std::pair(effectiveRowWidth, numAccessElems),
                           intrinsic, operandIndex);
 }
 
