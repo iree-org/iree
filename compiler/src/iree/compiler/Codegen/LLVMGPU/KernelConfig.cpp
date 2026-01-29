@@ -1207,9 +1207,17 @@ static LogicalResult setAttentionReductionConfig(
   MLIRContext *context = op.getContext();
 
   SmallVector<NamedAttribute, 2> attrs = {
-      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-      NamedAttribute("partial_reduction",
-                     b.getI64ArrayAttr(reductionTileSizes))};
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
+
+  // Only set partial_reduction if there are tile sizes > 1 that might require
+  // padding. Tile size of 1 never needs padding and OnlineAttention doesn't
+  // support padding without masks.
+  bool needsPartialReduction =
+      llvm::any_of(reductionTileSizes, [](int64_t size) { return size > 1; });
+  if (needsPartialReduction) {
+    attrs.push_back(NamedAttribute("partial_reduction",
+                                   b.getI64ArrayAttr(reductionTileSizes)));
+  }
 
   // Create projected QK thread tile sizes by removing N dimensions.
   SmallVector<int64_t> qkThreadTileSizes;
@@ -1335,8 +1343,43 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t keyVectorSize = 128 / keyBitwidth;
   int64_t valueVectorSize = 128 / valueBitwidth;
 
+  // Get bounds to adjust seeds for small dimensions.
+  FailureOr<SmallVector<int64_t>> maybeBounds = op.getStaticLoopRanges();
+  if (failed(maybeBounds)) {
+    return failure();
+  }
+  ArrayRef<int64_t> bounds = maybeBounds.value();
+
+  auto opInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
+          .value();
+
+  int64_t nDim = opInfo.getNDims().back();
+  int64_t k1Dim = opInfo.getK1Dims().back();
+  int64_t nSize = bounds[nDim];
+  int64_t k1Size = bounds[k1Dim];
+
+  // Adjust vector sizes to fit within actual dimensions to avoid padding.
+  // Padding attention ops without masks is not yet supported.
+  if (!ShapedType::isDynamic(k1Size)) {
+    keyVectorSize = std::min(keyVectorSize, k1Size);
+  }
+  if (!ShapedType::isDynamic(nSize)) {
+    valueVectorSize = std::min(valueVectorSize, nSize);
+  }
+
+  // Adjust numValueVectors to ensure the N tile size fits.
+  // N tile = numValueVectors * valueVectorSize, so cap numValueVectors.
+  int64_t numValueVectors = 2;
+  if (!ShapedType::isDynamic(nSize)) {
+    int64_t maxNumValueVectors = nSize / valueVectorSize;
+    numValueVectors =
+        std::max(int64_t(1), std::min(numValueVectors, maxNumValueVectors));
+  }
+
   AttentionReductionHeuristicSeeds seeds{/*numKeyVectors=*/8,
-                                         /*numValueVectors=*/2,
+                                         /*numValueVectors=*/numValueVectors,
                                          /*numSubgroups=*/8,
                                          /*keyVectorSize=*/keyVectorSize,
                                          /*valueVectorSize=*/valueVectorSize};
