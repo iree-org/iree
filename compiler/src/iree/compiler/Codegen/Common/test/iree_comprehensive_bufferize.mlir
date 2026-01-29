@@ -3220,3 +3220,45 @@ func.func @drop_fusion_barrier() -> memref<6xf32> {
 // CHECK-LABEL: func.func @drop_fusion_barrier
 // CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
 // CHECK:         return %[[ALLOC]]
+
+// -----
+
+// Regression test for https://github.com/iree-org/iree/issues/16956.
+// The yield operand %new is not buffer-equivalent to the iter bbArg %arg
+// because %arg is read after %new is computed. With allowReturnAllocsFromLoops,
+// bufferization allocates a new buffer inside the loop instead of failing.
+func.func @bufferize_non_equivalent_scf_yield() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+  %0 = scf.for %iv = %c0 to %c4 step %c1
+      iter_args(%arg = %fill) -> (tensor<4xf32>) {
+    %new = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        outs(%arg : tensor<4xf32>) {
+    ^bb0(%out: f32):
+      %v = arith.addf %out, %cst : f32
+      linalg.yield %v : f32
+    } -> tensor<4xf32>
+    // Reading %arg after %new forces non-equivalence.
+    %use = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%new : tensor<4xf32>) outs(%arg : tensor<4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %s = arith.subf %out, %in : f32
+      linalg.yield %s : f32
+    } -> tensor<4xf32>
+    scf.yield %new : tensor<4xf32>
+  }
+  return
+}
+// CHECK-LABEL: func.func @bufferize_non_equivalent_scf_yield
+// CHECK:         %[[INIT:.+]] = memref.alloc() : memref<4xf32>
+// CHECK:         scf.for {{.*}} iter_args(%[[ARG:.+]] = %[[INIT]])
+// CHECK:           %[[NEW:.+]] = memref.alloc() : memref<4xf32>
+// CHECK:           scf.yield %[[NEW]]
