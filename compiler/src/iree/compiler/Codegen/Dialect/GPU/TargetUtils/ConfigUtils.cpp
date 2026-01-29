@@ -44,6 +44,8 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+constexpr int64_t kMinMMADimSize = 16;
+constexpr int64_t kVerySkinnyThreshold = 4;
 
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
@@ -786,6 +788,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       }
       if (bounds[dim] > 32) {
         return maybePaddedBounds(bounds[dim], 32);
+      }
+      if (bounds[dim] > kVerySkinnyThreshold && bounds[dim] < kMinMMADimSize) {
+        return maybePaddedBounds(bounds[dim], kMinMMADimSize);
       }
 
       return bounds[dim];
