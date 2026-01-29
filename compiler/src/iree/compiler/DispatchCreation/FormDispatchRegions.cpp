@@ -704,17 +704,29 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
   if (!options.aggressiveFusion) {
-    FailureOr<SmallVector<int64_t>> producerIterationSpace =
+    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
+    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
+      return false;
+    }
+
+    SmallVector<int64_t> producerIterationSpace =
         producerFusionOp.getStaticLoopRanges();
-    FailureOr<SmallVector<int64_t>> consumerIterationSpace =
+    SmallVector<int64_t> consumerIterationSpace =
         consumerFusionOp.getStaticLoopRanges();
-    if (failed(producerIterationSpace) || failed(consumerIterationSpace)) {
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
       return false;
     }
-    if (producerIterationSpace.value().size() <
-        consumerIterationSpace.value().size()) {
-      return false;
-    }
+  }
+
+  // Block fusion if the consumer has more loops than the producer's fusion
+  // group root. This prevents fusing cases where a small reduction result
+  // is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+  Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
+  if (auto rootFusionOp =
+          dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
+      rootFusionOp &&
+      consumerFusionOp.getNumLoops() > rootFusionOp.getNumLoops()) {
+    return false;
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
