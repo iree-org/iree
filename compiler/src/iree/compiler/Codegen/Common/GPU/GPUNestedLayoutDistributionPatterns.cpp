@@ -456,6 +456,17 @@ struct DistributeTransferReadToSingleRead final
                                          "non-nested transfer_read layout");
     }
 
+    // Get mask and its layout if present.
+    VectorValue mask = readOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(readOp,
+                                           "non-nested mask vector layout");
+      }
+    }
+
     // Fall back to the simpler pattern for 0-d vectors, which will only create
     // a single transfer_read anyway.
     if (vectorLayout.getRank() == 0) {
@@ -480,10 +491,6 @@ struct DistributeTransferReadToSingleRead final
                                          "potential out-of-bounds access");
     }
 
-    if (readOp.getMask()) {
-      // TODO(sommerlukas): Can we support masks here?
-      return rewriter.notifyMatchFailure(readOp, "masks not supported");
-    }
     // Guard on memrefs for distribution. In isolation this pattern is agnostic
     // to tensors or memrefs.
     auto memrefTy = dyn_cast<MemRefType>(readOp.getBase().getType());
@@ -537,6 +544,12 @@ struct DistributeTransferReadToSingleRead final
                                             threadIndices))) {
       return rewriter.notifyMatchFailure(
           readOp, "warp or thread tiles have overlapping strides");
+    }
+
+    // Distribute the mask if present.
+    VectorValue distributedMask = nullptr;
+    if (mask) {
+      distributedMask = getDistributed(rewriter, mask, maskLayout);
     }
 
     int64_t distributedRank =
@@ -666,9 +679,10 @@ struct DistributeTransferReadToSingleRead final
     auto newVectorTy =
         VectorType::get(vectorLayout.getDistributedShape(), elementTy);
     SmallVector<bool> inBounds(3 * vectorRank, true);
+    ArrayAttr inBoundsAttr = builder.getBoolArrayAttr(inBounds);
     auto newRead = vector::TransferReadOp::create(
-        builder, newVectorTy, transposeMem, expandedReadIndices, std::nullopt,
-        newPermMap, inBounds);
+        builder, newVectorTy, transposeMem, expandedReadIndices, newPermMap,
+        readOp.getPadding(), distributedMask, inBoundsAttr);
 
     replaceOpWithDistributedValues(rewriter, readOp, newRead->getResults());
     return success();
