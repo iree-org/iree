@@ -188,6 +188,25 @@ def CombineLayoutTransformationPass :
   ];
 }
 
+def CombineLayoutTransformationForMapGatherPass :
+    InterfacePass<"iree-codegen-combine-layout-transformation-for-map-gather", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_gather operation.";
+  let description = [{
+    Starting from `iree_codegen.load_from_buffer` ops, iteratively combine
+    consumer layout/indexing transformation ops (linalg.transpose,
+    tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
+    tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def ConvolutionToIGEMMPass :
     InterfacePass<"iree-codegen-convolution-to-igemm", "mlir::FunctionOpInterface"> {
   let summary =
