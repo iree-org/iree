@@ -57,16 +57,15 @@ build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:t
 #
 # Combines several optimizations for faster local iteration:
 # - Skymeld (merged analysis/execution for faster multi-target builds)
-# - Ramdisk sandbox on Linux (reduces I/O bottleneck with many cores)
 #
-# Note: Disk cache is configured in user.bazelrc (created by iree-bazel-configure).
+# Note: Disk cache and platform-specific settings (e.g., Linux ramdisk sandbox)
+# are configured in user.bazelrc (created by iree-bazel-configure).
 ###############################################################################
 
-build:localdev --experimental_merged_skyframe_analysis_execution
+# Default (allows --config=localdev for consistency).
+query:localdev --output=label
 
-# Linux: use ramdisk for sandbox to reduce I/O with many cores.
-# This is a no-op on other platforms.
-build:localdev --sandbox_base=/dev/shm
+build:localdev --experimental_merged_skyframe_analysis_execution
 
 ###############################################################################
 # Options for "generic_gcc" builds

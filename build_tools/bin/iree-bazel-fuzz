@@ -59,6 +59,12 @@ EXAMPLES
     # Just update dictionary from existing corpus
     iree-bazel-fuzz -d //path/to:target
 
+    # Overnight fuzzing: all fuzz targets under a path (Ctrl+C to stop)
+    iree-bazel-fuzz //runtime/src/iree/tokenizer2/... -- -jobs=128
+
+    # Time-limited multi-target fuzzing
+    iree-bazel-fuzz //runtime/... -- -jobs=64 -max_total_time=3600
+
 CORPUS & DICTIONARY
     Corpus:    ~/.cache/iree-fuzz-cache/<relative-path>/<target>/corpus/
     Artifacts: ~/.cache/iree-fuzz-cache/<relative-path>/<target>/artifacts/
@@ -225,7 +231,8 @@ minimize_corpus() {
     if "${binary}" -set_cover_merge=1 "${temp_corpus}" "${corpus_dir}" 2>/dev/null; then
         local new_count
         new_count=$(ls -1 "${temp_corpus}" | wc -l)
-        rm -rf "${corpus_dir}"/*
+        # Use find -delete to avoid "argument list too long" with large corpora.
+        find "${corpus_dir}" -mindepth 1 -delete
         mv "${temp_corpus}"/* "${corpus_dir}"/ 2>/dev/null || true
         iree_info "Corpus minimized: ${corpus_count} -> ${new_count} files"
     else
@@ -300,6 +307,130 @@ fi
 
 # Set up worktree.
 iree_setup_worktree
+
+#===----------------------------------------------------------------------===#
+# Multi-target pattern support (e.g., //path/to/...)
+#===----------------------------------------------------------------------===#
+
+if [[ "${TARGET}" == *"..."* ]]; then
+    # Expand pattern to all fuzz targets.
+    BAZEL_BIN=$(iree_get_bazel_command)
+
+    iree_info "Discovering fuzz targets matching: ${TARGET}"
+
+    # Query for all targets ending in _fuzz under the pattern.
+    FUZZ_TARGETS=()
+    while IFS= read -r target; do
+        if [[ "${target}" == *"_fuzz" ]]; then
+            FUZZ_TARGETS+=("${target}")
+        fi
+    done < <("${BAZEL_BIN}" query "${TARGET}" 2>/dev/null | sort)
+
+    if [[ ${#FUZZ_TARGETS[@]} -eq 0 ]]; then
+        iree_error "No fuzz targets found matching: ${TARGET}"
+        exit 1
+    fi
+
+    iree_info "Found ${#FUZZ_TARGETS[@]} fuzz targets"
+
+    # Dry-run: just list targets.
+    if iree_is_dry_run; then
+        iree_info "Would run these fuzz targets:"
+        for target in "${FUZZ_TARGETS[@]}"; do
+            echo "  ${target}"
+        done
+        iree_info "Fuzzer args: ${FUZZER_ARGS[*]:-<none>}"
+        exit 0
+    fi
+
+    # Build all targets first.
+    iree_info "Building all fuzz targets..."
+    iree_bazel_build_default_configs
+    BUILD_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "--config=fuzzer" "${BAZEL_ARGS[@]}")
+
+    if ! iree_bazel_build_quiet "${TARGET}" "${BUILD_ARGS[@]}"; then
+        iree_error "Build failed"
+        exit 1
+    fi
+
+    # Track results using indexed arrays (bash 3 compatible).
+    declare -a FUZZ_PIDS=()
+    declare -a FUZZ_TARGETS_RUNNING=()
+    CRASHED_TARGETS=()
+    CLEAN_TARGETS=()
+
+    # Trap Ctrl+C to stop all fuzzers gracefully.
+    cleanup_multi() {
+        echo ""
+        iree_info "Stopping all fuzzers..."
+        for pid in "${FUZZ_PIDS[@]}"; do
+            kill -INT "${pid}" 2>/dev/null || true
+        done
+        wait 2>/dev/null || true
+
+        echo ""
+        iree_info "=== Fuzzing Summary ==="
+        iree_info "Total targets: ${#FUZZ_TARGETS[@]}"
+        if [[ ${#CRASHED_TARGETS[@]} -gt 0 ]]; then
+            iree_warn "Crashed (${#CRASHED_TARGETS[@]}):"
+            for t in "${CRASHED_TARGETS[@]}"; do
+                echo "  - ${t}"
+            done
+        fi
+        if [[ ${#CLEAN_TARGETS[@]} -gt 0 ]]; then
+            iree_info "Clean (${#CLEAN_TARGETS[@]}): ${#CLEAN_TARGETS[@]} targets"
+        fi
+
+        exit 0
+    }
+    trap cleanup_multi INT TERM
+
+    # Build forwarded options for child processes.
+    declare -a FORWARD_ARGS=()
+    [[ "${FUZZ_MINIMIZE}" == "1" ]] && FORWARD_ARGS+=("-m")
+    [[ "${FUZZ_DICT_ONLY}" == "1" ]] && FORWARD_ARGS+=("-d")
+    [[ "${IREE_BAZEL_VERBOSE}" == "1" ]] && FORWARD_ARGS+=("-v")
+    FORWARD_ARGS+=("${BAZEL_ARGS[@]}")
+
+    # Run all fuzzers. They each manage their own corpus/artifacts.
+    iree_info "Starting ${#FUZZ_TARGETS[@]} fuzzers..."
+    echo ""
+
+    for target in "${FUZZ_TARGETS[@]}"; do
+        # Spawn fuzzer in subshell that ignores SIGINT (parent handles cleanup).
+        (
+            trap '' INT
+            exec "${SCRIPT_DIR}/iree-bazel-fuzz" "${FORWARD_ARGS[@]}" "${target}" -- "${FUZZER_ARGS[@]}"
+        ) &
+        FUZZ_PIDS+=($!)
+        FUZZ_TARGETS_RUNNING+=("${target}")
+    done
+
+    # Wait for all fuzzers and collect results.
+    for i in "${!FUZZ_PIDS[@]}"; do
+        local pid="${FUZZ_PIDS[$i]}"
+        local target="${FUZZ_TARGETS_RUNNING[$i]}"
+        if wait "${pid}"; then
+            CLEAN_TARGETS+=("${target}")
+        else
+            CRASHED_TARGETS+=("${target}")
+        fi
+    done
+
+    # Final summary.
+    echo ""
+    iree_info "=== Fuzzing Complete ==="
+    iree_info "Total targets: ${#FUZZ_TARGETS[@]}"
+    if [[ ${#CRASHED_TARGETS[@]} -gt 0 ]]; then
+        iree_warn "Crashed (${#CRASHED_TARGETS[@]}):"
+        for t in "${CRASHED_TARGETS[@]}"; do
+            echo "  - ${t}"
+        done
+    fi
+    iree_info "Clean: ${#CLEAN_TARGETS[@]} targets"
+
+    exit 0
+fi
 
 # Extract target info for directory structure.
 TARGET_NAME=$(get_target_name "${TARGET}")

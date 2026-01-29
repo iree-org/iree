@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build IREE targets with Bazel.
 #
-# Usage: iree-bazel-build [options] [target] [bazel-args...]
+# Usage: iree-bazel-build [options] [targets...] [bazel-args...]
 #
 # Examples:
 #   iree-bazel-build                      # Build all tools
@@ -23,7 +23,7 @@ show_help() {
 iree-bazel-build - Build IREE with Bazel
 
 USAGE
-    iree-bazel-build [options] [target] [bazel-args...]
+    iree-bazel-build [options] [targets...] [bazel-args...]
 
 OPTIONS
     -n, --dry_run    Show the bazel command without executing
@@ -35,7 +35,7 @@ OPTIONS
     NOTE: Short flags can be combined: -nv is equivalent to -n -v
 
 ARGUMENTS
-    target       Bazel target (required)
+    targets      One or more Bazel targets (at least one required)
     bazel-args   Additional arguments passed to bazel build
 
 EXAMPLES
@@ -86,7 +86,7 @@ EOF
 # Parse arguments.
 KEEP_GOING=0
 WATCH_MODE=0
-TARGET=""
+TARGETS=()
 BAZEL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
@@ -120,11 +120,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            if [[ -z "${TARGET}" ]]; then
-                TARGET="${1}"
-            else
-                BAZEL_ARGS+=("${1}")
-            fi
+            TARGETS+=("${1}")
             shift
             ;;
     esac
@@ -133,8 +129,8 @@ done
 # Set up worktree (after arg parsing so --help works anywhere).
 iree_setup_worktree
 
-# Target is required.
-if [[ -z "${TARGET}" ]]; then
+# At least one target is required.
+if [[ ${#TARGETS[@]} -eq 0 ]]; then
     iree_error "Target is required for bazel build"
     echo ""
     echo "Examples:"
@@ -152,7 +148,7 @@ CMD=("${BAZEL_BIN}" build "${IREE_BAZEL_DEFAULT_CONFIGS[@]}")
 if [[ "${KEEP_GOING}" == "1" ]]; then
     CMD+=(--keep_going)
 fi
-CMD+=("${TARGET}" "${BAZEL_ARGS[@]}")
+CMD+=("${TARGETS[@]}" "${BAZEL_ARGS[@]}")
 
 # Execute or show.
 if iree_is_verbose || iree_is_dry_run; then
@@ -163,5 +159,5 @@ if iree_is_dry_run; then
     exit 0
 fi
 
-iree_info "Building ${TARGET}"
+iree_info "Building ${TARGETS[*]}"
 exec "${CMD[@]}"

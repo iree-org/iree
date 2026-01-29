@@ -65,6 +65,7 @@ iree-bazel-run //tools:iree-compile -- --help
 | `iree-bazel-test` | Run tests |
 | `iree-bazel-run` | Build and run executables from current directory |
 | `iree-bazel-query` | Query the build graph |
+| `iree-bazel-cquery` | Configuration-aware query (resolved select(), actual targets) |
 | `iree-bazel-try` | Compile and run C/C++ snippets without BUILD files |
 | `iree-bazel-fuzz` | Run libFuzzer targets with persistent corpus |
 | `iree-bazel-lib` | Shared library (sourced by other tools) |
