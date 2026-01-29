@@ -19,6 +19,77 @@ import os
 
 import bazel_to_cmake_targets
 
+# Maps Bazel platform labels (from both select() conditions and
+# target_compatible_with) to CMake CMAKE_SYSTEM_NAME values.
+_PLATFORM_CMAKE_SYSTEM_NAME = {
+    # select() condition labels (config_setting in build_tools/bazel/).
+    "//build_tools/bazel:iree_is_android": "Android",
+    "//build_tools/bazel:iree_is_linux": "Linux",
+    "//build_tools/bazel:iree_is_macos": "Darwin",
+    "//build_tools/bazel:iree_is_windows": "Windows",
+    # target_compatible_with constraint labels.
+    "@platforms//os:android": "Android",
+    "@platforms//os:linux": "Linux",
+    "@platforms//os:macos": "Darwin",
+    "@platforms//os:windows": "Windows",
+}
+
+
+class PlatformSelect:
+    """Represents a platform-conditional value from a Bazel select().
+
+    Carries the full condition→value mapping so that the rule handler can emit
+    CMake if/elseif/else blocks for platform-specific deps.
+    """
+
+    def __init__(self, conditions):
+        # conditions: dict mapping condition labels to value lists.
+        # Includes "//conditions:default" if present.
+        self.conditions = conditions
+
+    def __radd__(self, other):
+        """Support: unconditional_list + PlatformSelect(...)."""
+        if isinstance(other, list):
+            return MixedDeps(unconditional=list(other), selects=[self])
+        return NotImplemented
+
+    def __add__(self, other):
+        """Support: PlatformSelect(...) + unconditional_list."""
+        if isinstance(other, list):
+            return MixedDeps(unconditional=list(other), selects=[self])
+        return NotImplemented
+
+
+class MixedDeps:
+    """A deps value containing both unconditional entries and PlatformSelects.
+
+    Created by list + PlatformSelect concatenation in BUILD file exec context.
+    The rule handler splits this into a normal DEPS block (unconditional) plus
+    CMake variable(s) for the conditional portions.
+    """
+
+    def __init__(self, unconditional, selects):
+        self.unconditional = unconditional  # List of dep labels.
+        self.selects = selects  # List of PlatformSelect objects.
+
+    def __add__(self, other):
+        """Support: MixedDeps + list (e.g., cfg.py injecting extra deps)."""
+        if isinstance(other, list):
+            return MixedDeps(
+                unconditional=self.unconditional + other,
+                selects=list(self.selects),
+            )
+        return NotImplemented
+
+    def __radd__(self, other):
+        """Support: list + MixedDeps."""
+        if isinstance(other, list):
+            return MixedDeps(
+                unconditional=other + self.unconditional,
+                selects=list(self.selects),
+            )
+        return NotImplemented
+
 
 class BuildFileFunctions(object):
     """Object passed to `exec` that has handlers for BUILD file functions."""
@@ -69,6 +140,102 @@ class BuildFileFunctions(object):
         if tags and "skip-bazel_to_cmake" in tags:
             return True
         return False
+
+    def _convert_platform_condition(self, constraint_label):
+        """Returns a CMake condition string for a platform constraint label."""
+        cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
+        if cmake_name:
+            return f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
+        return None
+
+    def _emit_platform_guard_begin(self, target_compatible_with):
+        """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
+        if not target_compatible_with:
+            return
+        # target_compatible_with is a list of constraints (typically one).
+        conditions = []
+        for label in target_compatible_with:
+            cond = self._convert_platform_condition(label)
+            if cond:
+                conditions.append(cond)
+            else:
+                self._convert_unimplemented_function("target_compatible_with", label)
+                return
+        # Multiple constraints are AND-ed (all must be satisfied).
+        combined = " AND ".join(conditions)
+        self._converter.body += f"if({combined})\n"
+
+    def _emit_platform_guard_end(self, target_compatible_with):
+        """Emits endif() to close a target_compatible_with guard."""
+        if not target_compatible_with:
+            return
+        # Only emit if all labels are recognized (same check as begin).
+        if all(
+            label in _PLATFORM_CMAKE_SYSTEM_NAME for label in target_compatible_with
+        ):
+            # Strip trailing blank line from the target body so endif() is
+            # adjacent to the closing paren.
+            self._converter.body = self._converter.body.rstrip("\n") + "\n"
+            self._converter.body += f"endif()\n\n"
+
+    def _convert_platform_select_deps(self, name, deps):
+        """Handles deps that may contain PlatformSelect entries.
+
+        If deps is a plain list, returns (converted_deps_block, "").
+        If deps is a MixedDeps or PlatformSelect, emits a CMake variable
+        with if/elseif/else blocks before the target and returns
+        (converted_deps_block_with_variable, variable_block).
+        """
+        if deps is None:
+            return self._convert_target_list_block("DEPS", None), ""
+        if isinstance(deps, PlatformSelect):
+            deps = MixedDeps(unconditional=[], selects=[deps])
+        if not isinstance(deps, MixedDeps):
+            return self._convert_target_list_block("DEPS", deps), ""
+
+        # Emit a CMake variable for the conditional deps.
+        var_name = f"_{name}_platform_deps"
+        var_block = f'set({var_name} "")\n'
+
+        for ps in deps.selects:
+            first = True
+            for label, values in ps.conditions.items():
+                if label == "//conditions:default":
+                    continue
+                cond = self._convert_platform_condition(label)
+                if not cond:
+                    self._convert_unimplemented_function("select condition", label)
+                    continue
+                keyword = "if" if first else "elseif"
+                var_block += f"{keyword}({cond})\n"
+                cmake_targets = []
+                for t in values:
+                    cmake_targets.extend(self._convert_target(t))
+                for ct in sorted(cmake_targets):
+                    var_block += f"  list(APPEND {var_name} {ct})\n"
+                first = False
+            # Default branch.
+            default_values = ps.conditions.get("//conditions:default", [])
+            if default_values:
+                var_block += "else()\n"
+                cmake_targets = []
+                for t in default_values:
+                    cmake_targets.extend(self._convert_target(t))
+                for ct in sorted(cmake_targets):
+                    var_block += f"  list(APPEND {var_name} {ct})\n"
+            var_block += "endif()\n"
+
+        # Build the DEPS block: unconditional deps + the variable reference.
+        all_deps = list(deps.unconditional) + [f"${{{var_name}}}"]
+        deps_block = self._convert_target_list_block("DEPS", deps.unconditional)
+        # Append the variable reference to the deps block.
+        if deps_block:
+            # Insert the variable ref before the closing of the DEPS block.
+            deps_block = deps_block.rstrip("\n") + f"\n    ${{{var_name}}}\n"
+        else:
+            deps_block = f"  DEPS\n    ${{{var_name}}}\n"
+
+        return deps_block, var_block
 
     def _convert_timeout_arg_block(self, name, value):
         if value is None:
@@ -381,8 +548,17 @@ class BuildFileFunctions(object):
         return [f"//{path}/internal:{basename}_internal"]
 
     def select(self, d):
+        # Check if all condition keys (except //conditions:default) are known
+        # platform conditions. If so, return a PlatformSelect that the rule
+        # handler can convert to CMake if/elseif/else blocks.
+        non_default_keys = [k for k in d if k != "//conditions:default"]
+        if non_default_keys and all(
+            k in _PLATFORM_CMAKE_SYSTEM_NAME for k in non_default_keys
+        ):
+            return PlatformSelect(d)
+        # Unrecognized conditions: fall back to default-only with a warning.
         self._convert_unimplemented_function("select", str(d))
-        return d["//conditions:default"]
+        return d.get("//conditions:default", [])
 
     def defaulting_select(self, selector):
         """Defined in build_defs.oss.bzl as a scoped alternative to select."""
@@ -405,6 +581,7 @@ class BuildFileFunctions(object):
         linkopts=None,
         includes=None,
         system_includes=None,
+        target_compatible_with=None,
         **kwargs,
     ):
         if self._should_skip_target(**kwargs):
@@ -420,13 +597,16 @@ class BuildFileFunctions(object):
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
         data_block = self._convert_target_list_block("DATA", data)
-        deps_block = self._convert_target_list_block("DEPS", deps)
+        deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
         includes_block = self._convert_includes_block(includes)
         system_includes_block = self._convert_string_list_block(
             "SYSTEM_INCLUDES", system_includes
         )
 
+        self._emit_platform_guard_begin(target_compatible_with)
+        if platform_deps_block:
+            self._converter.body += platform_deps_block
         self._converter.body += (
             f"iree_cc_library(\n"
             f"{name_block}"
@@ -442,6 +622,7 @@ class BuildFileFunctions(object):
             f"{system_includes_block}"
             f"  PUBLIC\n)\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_compiler_register_plugin(self, plugin_id, target):
         plugin_id_block = self._convert_string_arg_block(
@@ -469,6 +650,7 @@ class BuildFileFunctions(object):
         tags=None,
         includes=None,
         group=None,
+        target_compatible_with=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -479,13 +661,16 @@ class BuildFileFunctions(object):
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
         data_block = self._convert_target_list_block("DATA", data)
-        deps_block = self._convert_target_list_block("DEPS", deps)
+        deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         includes_block = self._convert_includes_block(includes)
         group_block = self._convert_string_arg_block("GROUP", group)
 
+        self._emit_platform_guard_begin(target_compatible_with)
+        if platform_deps_block:
+            self._converter.body += platform_deps_block
         self._converter.body += (
             f"iree_cc_test(\n"
             f"{name_block}"
@@ -502,6 +687,7 @@ class BuildFileFunctions(object):
             f"{group_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def cc_binary(
         self,
@@ -514,6 +700,7 @@ class BuildFileFunctions(object):
         linkopts=None,
         testonly=None,
         includes=None,
+        target_compatible_with=None,
         **kwargs,
     ):
         if self._should_skip_target(**kwargs):
@@ -525,10 +712,13 @@ class BuildFileFunctions(object):
         defines_block = self._convert_string_list_block("DEFINES", defines)
         srcs_block = self._convert_srcs_block(srcs)
         data_block = self._convert_target_list_block("DATA", data)
-        deps_block = self._convert_target_list_block("DEPS", deps)
+        deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
         includes_block = self._convert_includes_block(includes)
 
+        self._emit_platform_guard_begin(target_compatible_with)
+        if platform_deps_block:
+            self._converter.body += platform_deps_block
         self._converter.body += (
             f"iree_cc_binary(\n"
             f"{name_block}"
@@ -541,6 +731,7 @@ class BuildFileFunctions(object):
             f"{includes_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_cc_fuzz(
         self,
@@ -552,6 +743,7 @@ class BuildFileFunctions(object):
         defines=None,
         linkopts=None,
         tags=None,
+        target_compatible_with=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -559,12 +751,15 @@ class BuildFileFunctions(object):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         srcs_block = self._convert_srcs_block(srcs)
         data_block = self._convert_target_list_block("DATA", data)
-        deps_block = self._convert_target_list_block("DEPS", deps)
+        deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
         linkopts_block = self._convert_string_list_block("LINKOPTS", linkopts)
         labels_block = self._convert_string_list_block("LABELS", tags)
 
+        self._emit_platform_guard_begin(target_compatible_with)
+        if platform_deps_block:
+            self._converter.body += platform_deps_block
         self._converter.body += (
             f"iree_cc_fuzz(\n"
             f"{name_block}"
@@ -577,6 +772,7 @@ class BuildFileFunctions(object):
             f"{labels_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_runtime_cc_fuzz(self, **kwargs):
         self.iree_cc_fuzz(**kwargs)
@@ -1058,6 +1254,7 @@ class BuildFileFunctions(object):
         linkopts=None,
         tags=None,
         testonly=True,
+        target_compatible_with=None,
         # unused
         size="small",
         timeout=None,
@@ -1070,10 +1267,11 @@ class BuildFileFunctions(object):
         deps_block = self._convert_target_list_block("DEPS", deps)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
-        defines_block = self._convert_string_list_block("LINKOPTS", linkopts)
+        linkopts_block = self._convert_string_list_block("LINKOPTS", linkopts)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
         labels_block = self._convert_string_list_block("LABELS", tags)
 
+        self._emit_platform_guard_begin(target_compatible_with)
         self._converter.body += (
             f"iree_cc_binary_benchmark(\n"
             f"{name_block}"
@@ -1082,11 +1280,12 @@ class BuildFileFunctions(object):
             f"{deps_block}"
             f"{copts_block}"
             f"{defines_block}"
-            f"{defines_block}"
+            f"{linkopts_block}"
             f"{testonly_block}"
             f"{labels_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_cmake_extra_content(self, content, inline=False):
         if inline:
