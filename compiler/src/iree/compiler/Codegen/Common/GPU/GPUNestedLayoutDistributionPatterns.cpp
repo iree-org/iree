@@ -300,21 +300,19 @@ static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
   return cast<VectorValue>(slice);
 }
 
-void appendFirstN(llvm::SmallVectorImpl<int64_t> &appendTo,
-                  llvm::ArrayRef<int64_t> takeFrom, size_t N) {
-  appendTo.append(takeFrom.begin(), std::next(takeFrom.begin(), N));
-}
-
-void appendFirstNOperands(llvm::SmallVector<Value> &appendTo,
-                          mlir::OperandRange takeFrom, size_t N) {
-  appendTo.append(takeFrom.begin(), std::next(takeFrom.begin(), N));
-}
-
+namespace {
 struct ExpandMemrefResult {
   Value readIndex;
   SmallVector<int64_t> expandedShape;
   SmallVector<int64_t> expandedStrides;
 };
+
+struct PermutationResult {
+  SmallVector<Value> readIndices;
+  SmallVector<unsigned> permutationTargets;
+};
+
+} // anonymous namespace
 
 /// Calculate the sizes and strides for expanding the \p memrefDim dimension of
 /// the \p memrefTy according to the \p vectorDim dimension of the \p
@@ -365,11 +363,6 @@ expandMemrefDimForLayout(ImplicitLocOpBuilder &builder,
 
   return {delinearizeOp->getResult(0), expandedShape, distributedStrides};
 }
-
-struct PermutationResult {
-  SmallVector<Value> readIndices;
-  SmallVector<unsigned> permutationTargets;
-};
 
 /// Based on the \p vectorRank this function calculcates the permutation and
 /// indices for a `vector.transfer_read` that reads the distributed vector.
@@ -563,10 +556,13 @@ struct DistributeTransferReadToSingleRead final
     expandedStrides.reserve(newNumDimensions);
 
     // Append information for the undistributed dimensions.
-    appendFirstN(expandedMemShape, memrefTy.getShape(), undistributedDims);
-    appendFirstNOperands(expandedReadIndices, readOp.getIndices().take_front(),
-                         undistributedDims);
-    appendFirstN(expandedStrides, memStrides, undistributedDims);
+    llvm::append_range(expandedMemShape,
+                       memrefTy.getShape().take_front(undistributedDims));
+    llvm::append_range(expandedReadIndices,
+                       readOp.getIndices().take_front(undistributedDims));
+    llvm::append_range(
+        expandedStrides,
+        ArrayRef<int64_t>(memStrides).take_front(undistributedDims));
 
     // Calculate the information for the dimensions of the memref that are going
     // to be distributed.
