@@ -75,6 +75,27 @@ struct GenericResourcePattern : public ConversionPattern {
       return failure();
     }
 
+    // We cannot support unknown operations with dynamically shaped tensors if
+    // they are not shape/size-aware. Importing a dynamically shaped
+    // tensor requires to determine the size and for operations that are not
+    // shape/size-aware, this would require inserting `tensor.dim` operations,
+    // which are illegal after this pass.
+    auto anyDynamicTensorTy = [](TypeRange types) {
+      return llvm::any_of(types, [](Type t) {
+        if (auto tensorTy = dyn_cast<TensorType>(t)) {
+          return !tensorTy.hasStaticShape();
+        }
+        return false;
+      });
+    };
+    if (!llvm::IsaPred<IREE::Util::ShapeAwareOpInterface,
+                       IREE::Util::SizeAwareOpInterface>(op) &&
+        anyDynamicTensorTy(op->getResultTypes())) {
+      return rewriter.notifyMatchFailure(
+          op, "dynamic tensor import for non-shape, "
+              "non-size aware operation not supported");
+    }
+
     auto executionAffinityAttr = affinityAnalysis->inferExecutionAffinity(op);
 
     // Export resources into tensor operands for the op to consume.
