@@ -1022,6 +1022,8 @@ static LogicalResult setAttentionReductionConfig(
   }
 
   SmallVector<int64_t> bounds = maybeBounds.value();
+  // Save original bounds for checking if padding is needed later.
+  SmallVector<int64_t> originalBounds = bounds;
 
   auto opInfo =
       IREE::LinalgExt::AttentionOpDetail::get(
@@ -1209,14 +1211,18 @@ static LogicalResult setAttentionReductionConfig(
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
 
-  // Only set partial_reduction if there are tile sizes > 1 that might require
-  // padding. Tile size of 1 never needs padding and OnlineAttention doesn't
-  // support padding without masks.
-  bool needsPartialReduction =
-      llvm::any_of(reductionTileSizes, [](int64_t size) { return size > 1; });
-  if (needsPartialReduction) {
-    attrs.push_back(NamedAttribute("partial_reduction",
-                                   b.getI64ArrayAttr(reductionTileSizes)));
+  // Only set partial_reduction if padding would actually be needed.
+  // Padding is needed when a tile size doesn't divide evenly into the
+  // original dimension. OnlineAttention doesn't support padding without masks.
+  for (int64_t dim : opInfo.getK2Dims()) {
+    int64_t tileSize = reductionTileSizes[dim];
+    int64_t dimSize = originalBounds[dim];
+    if (tileSize > 0 && !ShapedType::isDynamic(dimSize) &&
+        dimSize % tileSize != 0) {
+      attrs.push_back(NamedAttribute("partial_reduction",
+                                     b.getI64ArrayAttr(reductionTileSizes)));
+      break;
+    }
   }
 
   // Create projected QK thread tile sizes by removing N dimensions.
