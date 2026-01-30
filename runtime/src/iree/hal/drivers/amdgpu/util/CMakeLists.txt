@@ -97,8 +97,8 @@ iree_cc_library(
     ::libhsa
     ::topology
     iree::base
+    iree::base::bitmap
     iree::base::internal
-    iree::base::internal::bitmap
     iree::base::internal::synchronization
     iree::base::internal::threading
     iree::hal::drivers::amdgpu::device::binaries

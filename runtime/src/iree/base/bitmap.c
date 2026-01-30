@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/bitmap.h"
+#include "iree/base/bitmap.h"
 
 #include "iree/base/internal/math.h"
 
@@ -12,8 +12,6 @@
 // iree_bitmap_t
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): move to iree/base/internal/math.h?
-//
 // https://en.wikipedia.org/wiki/Find_first_set
 #define IREE_FFS_U64(v) ((v) == 0 ? -1 : iree_math_count_trailing_zeros_u64(v))
 
@@ -74,6 +72,21 @@ bool iree_bitmap_none_set(iree_bitmap_t bitmap) {
   return !iree_bitmap_any_set(bitmap);
 }
 
+iree_host_size_t iree_bitmap_count(iree_bitmap_t bitmap) {
+  iree_host_size_t count = 0;
+  iree_host_size_t full_words = bitmap.bit_count / IREE_BITMAP_BITS_PER_WORD;
+  for (iree_host_size_t i = 0; i < full_words; ++i) {
+    count += iree_math_count_ones_u64(bitmap.words[i]);
+  }
+  // Handle tail bits (mask off bits beyond bit_count).
+  iree_host_size_t tail_bits = bitmap.bit_count % IREE_BITMAP_BITS_PER_WORD;
+  if (tail_bits > 0) {
+    uint64_t tail_mask = (1ull << tail_bits) - 1;
+    count += iree_math_count_ones_u64(bitmap.words[full_words] & tail_mask);
+  }
+  return count;
+}
+
 bool iree_bitmap_test(iree_bitmap_t bitmap, iree_host_size_t bit_index) {
   return 1ull & (bitmap.words[_BIT_OFFSET_TO_WORD_INDEX(bit_index)] >>
                  (bit_index & (IREE_BITMAP_BITS_PER_WORD - 1)));
@@ -112,7 +125,9 @@ void iree_bitmap_set_span(iree_bitmap_t bitmap, iree_host_size_t bit_index,
 void iree_bitmap_set_all(iree_bitmap_t bitmap) {
   const iree_host_size_t word_count =
       iree_bitmap_calculate_words(bitmap.bit_count);
-  memset(bitmap.words, 0xFF, word_count * sizeof(uint64_t));
+  if (word_count > 0) {
+    memset(bitmap.words, 0xFF, word_count * sizeof(uint64_t));
+  }
 }
 
 void iree_bitmap_reset(iree_bitmap_t bitmap, iree_host_size_t bit_index) {
@@ -148,7 +163,9 @@ void iree_bitmap_reset_span(iree_bitmap_t bitmap, iree_host_size_t bit_index,
 void iree_bitmap_reset_all(iree_bitmap_t bitmap) {
   const iree_host_size_t word_count =
       iree_bitmap_calculate_words(bitmap.bit_count);
-  memset(bitmap.words, 0x00, word_count * sizeof(uint64_t));
+  if (word_count > 0) {
+    memset(bitmap.words, 0x00, word_count * sizeof(uint64_t));
+  }
 }
 
 static iree_host_size_t iree_bitmap_find_next_set_bit(

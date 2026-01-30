@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/bitmap.h"
 #include "iree/testing/benchmark.h"
 
 // WARNING: these benchmarks likely test the CPU cache more than they test the
@@ -281,6 +280,29 @@ IREE_BENCHMARK_FN(BM_BitmapNoneSet_1024) {
   return iree_ok_status();
 }
 IREE_BENCHMARK_REGISTER(BM_BitmapNoneSet_1024);
+
+IREE_BENCHMARK_FN(BM_BitmapCount_64) {
+  uint64_t words[1] = {0xAAAAAAAAAAAAAAAAull};  // 32 bits set.
+  iree_bitmap_t bitmap = {64, words};
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_host_size_t result = iree_bitmap_count(bitmap);
+    iree_optimization_barrier(result);
+  }
+  return iree_ok_status();
+}
+IREE_BENCHMARK_REGISTER(BM_BitmapCount_64);
+
+IREE_BENCHMARK_FN(BM_BitmapCount_1024) {
+  uint64_t words[16];
+  memset(words, 0xAA, sizeof(words));  // 50% bits set.
+  iree_bitmap_t bitmap = {1024, words};
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_host_size_t result = iree_bitmap_count(bitmap);
+    iree_optimization_barrier(result);
+  }
+  return iree_ok_status();
+}
+IREE_BENCHMARK_REGISTER(BM_BitmapCount_1024);
 
 //===----------------------------------------------------------------------===//
 // Find operations

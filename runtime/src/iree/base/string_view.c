@@ -28,6 +28,7 @@ static inline char iree_tolower(char c) {
 IREE_API_EXPORT bool iree_string_view_equal(iree_string_view_t lhs,
                                             iree_string_view_t rhs) {
   if (lhs.size != rhs.size) return false;
+  if (lhs.size == 0) return true;  // Both empty - equal without memcmp.
   return memcmp(lhs.data, rhs.data, lhs.size) == 0;
 }
 
@@ -43,6 +44,11 @@ IREE_API_EXPORT bool iree_string_view_equal_case(iree_string_view_t lhs,
 IREE_API_EXPORT int iree_string_view_compare(iree_string_view_t lhs,
                                              iree_string_view_t rhs) {
   iree_host_size_t min_size = iree_min_host_size(lhs.size, rhs.size);
+  if (min_size == 0) {
+    // Both empty, or one is a prefix of the other starting from empty.
+    if (lhs.size == rhs.size) return 0;
+    return lhs.size < rhs.size ? -1 : 1;
+  }
   int cmp = strncmp(lhs.data, rhs.data, min_size);
   if (cmp != 0) {
     return cmp;
@@ -341,7 +347,10 @@ IREE_API_EXPORT void iree_string_view_to_cstring(
   // Truncate and ensure there's space for the NUL terminator.
   iree_host_size_t length = iree_min(value.size, buffer_length - 1);
   // Copy string contents up to the truncated length.
-  memcpy(buffer, value.data, length);
+  // Guard against NULL data pointer (empty string view).
+  if (length > 0) {
+    memcpy(buffer, value.data, length);
+  }
   // Add NUL terminator.
   buffer[length] = 0;
 }

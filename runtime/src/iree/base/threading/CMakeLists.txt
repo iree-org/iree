@@ -55,6 +55,7 @@ iree_cc_test(
     "numa_test.cc"
   DEPS
     ::threading
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
 )

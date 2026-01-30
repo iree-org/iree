@@ -56,6 +56,7 @@ iree_runtime_cc_test(
     srcs = ["numa_test.cc"],
     deps = [
         ":threading",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
