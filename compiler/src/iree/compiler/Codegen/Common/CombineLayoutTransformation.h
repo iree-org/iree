@@ -56,7 +56,7 @@ getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
 
 /// Returns true if the `op` type has a folding pattern into
 /// iree_linalg_ext.map_scatter or iree_linalg_ext.map_gather.
-bool isSupportedRelayoutOp(Operation *op);
+bool isSupportedSingleInputRelayoutOp(Operation *op);
 
 /// Convert complex ops into simpler ops by decomposing or raising to a named
 /// op.

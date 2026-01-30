@@ -286,7 +286,7 @@ struct FoldConsumerRelayoutIntoMapGatherPattern
     // Find a consumer relayout op.
     Operation *consumerOp = nullptr;
     for (Operation *user : mapGatherOp->getUsers()) {
-      if (isSupportedRelayoutOp(user)) {
+      if (isSupportedSingleInputRelayoutOp(user)) {
         consumerOp = user;
         break;
       }
@@ -336,7 +336,7 @@ struct InsertMapGatherOpPattern
     // Check if the load has at least one relayout op user.
     bool hasRelayoutUser =
         llvm::any_of(loadOp->getUsers(), [](Operation *user) {
-          return isSupportedRelayoutOp(user);
+          return isSupportedSingleInputRelayoutOp(user);
         });
     if (!hasRelayoutUser) {
       return failure();

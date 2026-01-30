@@ -526,7 +526,7 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
   return mapScatterOp;
 }
 
-bool isSupportedRelayoutOp(Operation *op) {
+bool isSupportedSingleInputRelayoutOp(Operation *op) {
   return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
              tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
              linalg::TransposeOp>(op);
@@ -543,11 +543,11 @@ shouldDoReshapesByExpansion(IREE::Codegen::RelayoutCombinationScope scope) {
 
 /// Insert identity map_scatter ops after the given operation if it is a valid
 /// leaf op of a relayout op chain. A relayout op chain is a sequence of
-/// relayout ops (defined by `isSupportedRelayoutOp`) for which the only users
-/// of the ops in the chain are relayout ops, except for the leaves of the
-/// chain. The leaves are simply relayout ops that have non relayout op users.
-/// The `controlFn` is a callback on the leaf OpResult that provides control
-/// over whether or not to insert a map_scatter op.
+/// relayout ops (defined by `isSupportedSingleInputRelayoutOp`) for which the
+/// only users of the ops in the chain are relayout ops, except for the leaves
+/// of the chain. The leaves are simply relayout ops that have non relayout op
+/// users. The `controlFn` is a callback on the leaf OpResult that provides
+/// control over whether or not to insert a map_scatter op.
 struct InsertMapScatterOpPattern : public RewritePattern {
   InsertMapScatterOpPattern(MLIRContext *context,
                             CombineRelayoutOpsControlFnRef controlFn = nullptr,
@@ -557,12 +557,12 @@ struct InsertMapScatterOpPattern : public RewritePattern {
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    if (!isSupportedRelayoutOp(op)) {
+    if (!isSupportedSingleInputRelayoutOp(op)) {
       return failure();
     }
     // Relayout ops with only relayout op users are not leaves.
     auto isDimOrSupportedRelayoutOp = [](Operation *op) {
-      return isSupportedRelayoutOp(op) || isa<tensor::DimOp>(op);
+      return isSupportedSingleInputRelayoutOp(op) || isa<tensor::DimOp>(op);
     };
     if (llvm::all_of(op->getUsers(), isDimOrSupportedRelayoutOp)) {
       return failure();
@@ -747,7 +747,7 @@ getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
       // it, so don't introduce map_scatter.
       llvm::SetVector<Operation *> slice;
       BackwardSliceOptions options;
-      options.filter = isSupportedRelayoutOp;
+      options.filter = isSupportedSingleInputRelayoutOp;
       options.inclusive = true;
       LogicalResult result =
           getBackwardSlice(parallelInsertOp.getSource(), &slice, options);

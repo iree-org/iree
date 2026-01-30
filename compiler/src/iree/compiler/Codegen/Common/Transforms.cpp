@@ -128,7 +128,7 @@ struct FoldRelayoutOpIntoMapScatterPattern
       return failure();
     }
     // Folding tensor.pad is handled by a separate pattern.
-    if (!isSupportedRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+    if (!isSupportedSingleInputRelayoutOp(op) || isa<tensor::PadOp>(op)) {
       return failure();
     }
     if (failed(foldIntoMapScatter(rewriter, op, mapScatterOp))) {
@@ -164,33 +164,12 @@ private:
   PadDistributionConfigFn padDistributionConfigFn;
 };
 
-struct FoldRelayoutOpIntoMapGatherPattern
-    : public OpRewritePattern<IREE::LinalgExt::MapGatherOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapGatherOp mapGatherOp,
-                                PatternRewriter &rewriter) const override {
-    Operation *op = mapGatherOp.getSource().getDefiningOp();
-    if (!op) {
-      return failure();
-    }
-    if (!isSupportedRelayoutOp(op)) {
-      return failure();
-    }
-    if (failed(foldIntoMapGather(rewriter, op, mapGatherOp))) {
-      return failure();
-    }
-    return success();
-  }
-};
-
 } // namespace
 
 void populateCombineRelayoutOpPatterns(
     RewritePatternSet &patterns,
     PadDistributionConfigFn padDistributionConfigFn) {
   patterns.add<FoldRelayoutOpIntoMapScatterPattern>(patterns.getContext());
-  patterns.add<FoldRelayoutOpIntoMapGatherPattern>(patterns.getContext());
   if (padDistributionConfigFn) {
     patterns.add<FoldPadOpIntoMapScatterPattern>(patterns.getContext(),
                                                  padDistributionConfigFn);

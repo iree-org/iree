@@ -752,10 +752,12 @@ bool MapGatherOp::isIdentity() {
   if (getSourceType() != getOutputType()) {
     return false;
   }
+
   // Bail out on dynamic shapes.
   if (!getSourceType().hasStaticShape()) {
     return false;
   }
+
   // Check that the block arguments are directly yielded in the order that they
   // are defined in the block (excluding padding).
   Block &transformBody = getTransformationRegion().getBlocks().front();
@@ -795,6 +797,7 @@ MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
   Block *block =
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
   SmallVector<Value> yieldedValues(block->getArguments());
+
   // Add a zero padding value (the identity transformation shouldn't need it
   // since source and output have the same shape).
   Type elementType = outputType.getElementType();
