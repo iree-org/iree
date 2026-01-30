@@ -26,6 +26,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
@@ -40,6 +41,68 @@ struct StageClassification {
   SmallVector<Operation *> computeStage;
 };
 } // namespace
+
+//===----------------------------------------------------------------------===//
+// Async Copy Mode (gather_to_lds) Support
+//===----------------------------------------------------------------------===//
+
+/// Checks if a loop contains gather_to_lds operations.
+static bool hasGatherToLDS(scf::ForOp forOp) {
+  bool found = false;
+  forOp->walk([&](amdgpu::GatherToLDSOp) {
+    found = true;
+    return WalkResult::interrupt();
+  });
+  return found;
+}
+
+/// Multi-buffer LDS allocations used by gather_to_lds operations.
+/// This enables double-buffering for pipelined async copies.
+static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
+                                               unsigned numBuffers) {
+  // Find all LDS allocations used by gather_to_lds
+  llvm::SetVector<memref::AllocOp> ldsAllocs;
+  forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
+    Value dst = gatherOp.getDst();
+    // Trace back through subviews to find the alloc
+    while (dst) {
+      if (auto allocOp = dst.getDefiningOp<memref::AllocOp>()) {
+        auto memrefType = allocOp.getType();
+        if (hasSharedMemoryAddressSpace(memrefType)) {
+          ldsAllocs.insert(allocOp);
+        }
+        break;
+      }
+      if (auto subview = dst.getDefiningOp<memref::SubViewOp>()) {
+        dst = subview.getSource();
+        continue;
+      }
+      if (auto view = dst.getDefiningOp<memref::ViewOp>()) {
+        dst = view.getSource();
+        continue;
+      }
+      break;
+    }
+  });
+
+  if (ldsAllocs.empty()) {
+    LDBG() << "No LDS allocations found for multi-buffering";
+    return success();
+  }
+
+  LDBG() << "Multi-buffering " << ldsAllocs.size() << " LDS allocations";
+
+  for (memref::AllocOp alloc : ldsAllocs) {
+    LDBG() << "  Multi-buffering: " << alloc;
+    if (failed(memref::multiBuffer(alloc, numBuffers,
+                                   /*skipOverrideAnalysis=*/false))) {
+      LDBG() << "  Failed to multi-buffer: " << alloc;
+      return failure();
+    }
+  }
+
+  return success();
+}
 
 // Helper function to check if a transfer_read is from global memory.
 static bool isGlobalMemoryRead(vector::TransferReadOp read) {
@@ -690,8 +753,25 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
-  // For global->shared->register data flow, we have 3 operation groups (read,
-  // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+  // Check if this loop uses async copy mode (gather_to_lds).
+  // Async copy mode uses 2-stage pipelining with double buffering.
+  bool isAsyncCopyMode = hasGatherToLDS(forOp);
+
+  if (isAsyncCopyMode) {
+    LDBG() << "Async copy mode detected (gather_to_lds present)";
+
+    // Multi-buffer LDS allocations for double buffering
+    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/2))) {
+      return failure();
+    }
+
+    // TODO: Full async copy pipelining will be added in a follow-up commit.
+    // For now, just perform multi-buffering without pipelining.
+    return forOp;
+  }
+
+  // Stream copy mode: global->shared->register data flow with 3 operation
+  // groups (read, write, compute), so 3 stages is the maximum pipeline depth.
   if (numStages > 3) {
     LDBG() << "numStages=" << numStages
            << " requested but capping to 3 (maximum for read, write, compute)";
