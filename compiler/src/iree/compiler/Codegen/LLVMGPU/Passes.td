@@ -95,7 +95,10 @@ def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
       let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
           "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
-  let dependentDialects = ["amdgpu::AMDGPUDialect"];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "amdgpu::AMDGPUDialect"
+  ];
   let options = [
     Option<"numStages", "num-stages", "unsigned",
            /*default=*/"2",
