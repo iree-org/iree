@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
@@ -37,6 +38,7 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/LLVMIR/LLVMAttrs.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
 
@@ -361,6 +363,19 @@ struct ConvertToROCDLPass final
     }
 
     LDBG() << "After converting to rocdl\n" << m;
+
+    // Add alias scope metadata to LoadToLDSOp for double-buffered pipelining.
+    // This allows the LLVM backend to distinguish between different LDS buffers
+    // and avoid inserting overly conservative s_waitcnt vmcnt(0).
+    {
+      PassManager nestedPM(&getContext());
+      nestedPM.addPass(createROCDLAddLDSAliasScopesPass());
+      if (failed(runPipeline(nestedPM, m))) {
+        return signalPassFailure();
+      }
+    }
+
+    LDBG() << "After adding alias scopes to LoadToLDS\n" << m;
 
     // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
     // set it to 16 as all of our allocations almost always have much greater
