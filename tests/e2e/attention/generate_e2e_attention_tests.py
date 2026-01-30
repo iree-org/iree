@@ -49,6 +49,19 @@ class ShapesId(enum.Enum):
     SMALL = "small"
     MEDIUM = "medium"
     LARGE = "large"
+    DECODE_SMALL = "decode_small"
+    DECODE_LARGE = "decode_large"
+    PREFILL_SMALL = "prefill_small"
+    PREFILL_LARGE = "prefill_large"
+
+
+# Enumerates the types of masks that can be applied to attention.
+# The values are the accepted values for the --mask_type= flag.
+@enum.unique
+class MaskType(enum.Enum):
+    NONE = "none"  # No mask
+    ALL_ONES = "all_ones"  # All positions can attend (for decode)
+    CAUSAL = "causal"  # Lower triangular mask (for prefill)
 
 
 # batch: Batch dimension
@@ -80,6 +93,24 @@ def get_test_shapes(shapes_id: ShapesId):
     if shapes_id == ShapesId.LARGE:
         return [
             TestShapeAndScale(batch=2, m=1024, k1=128, k2=128, n=64, scale=1.0),
+        ]
+    # Decode: m = 1 (single token attending to cached KV)
+    if shapes_id == ShapesId.DECODE_SMALL:
+        return [
+            TestShapeAndScale(batch=2, m=1, k1=64, k2=128, n=64, scale=1.0),
+        ]
+    if shapes_id == ShapesId.DECODE_LARGE:
+        return [
+            TestShapeAndScale(batch=2, m=1, k1=64, k2=512, n=64, scale=1.0),
+        ]
+    # Prefill: m = k2 (self-attention on full sequence)
+    if shapes_id == ShapesId.PREFILL_SMALL:
+        return [
+            TestShapeAndScale(batch=2, m=128, k1=64, k2=128, n=64, scale=1.0),
+        ]
+    if shapes_id == ShapesId.PREFILL_LARGE:
+        return [
+            TestShapeAndScale(batch=2, m=512, k1=64, k2=512, n=64, scale=1.0),
         ]
 
     raise ValueError(shapes_id)
@@ -118,7 +149,7 @@ def generate_shapes_and_scale(shape: TestShapeAndScale):
     return shapes_scale
 
 
-# Helper to return input, kernel and output shapes based on the layout and the Attention Params.
+# Helper to return input, kernel, output, and mask shapes based on the layout and the Attention Params.
 def get_tensor_shapes(
     shapes_scale: TestShapeAndScale,
 ):
@@ -127,14 +158,20 @@ def get_tensor_shapes(
     k1 = shapes_scale.k1
     k2 = shapes_scale.k2
     n = shapes_scale.n
-    scale = shapes_scale.scale
 
     query_tensor_shape = [batch, m, k1]
     key_tensor_shape = [batch, k2, k1]
     value_tensor_shape = [batch, k2, n]
     result_tensor_shape = [batch, m, n]
+    mask_tensor_shape = [batch, m, k2]
 
-    return query_tensor_shape, key_tensor_shape, value_tensor_shape, result_tensor_shape
+    return (
+        query_tensor_shape,
+        key_tensor_shape,
+        value_tensor_shape,
+        result_tensor_shape,
+        mask_tensor_shape,
+    )
 
 
 # Helper for generate_function.
@@ -180,6 +217,7 @@ def generate_function(
     key_type: KeyElemTypeId,
     value_type: ValueElemTypeId,
     shape_scale: TestShapeAndScale,
+    mask_type: MaskType,
 ):
     shapes_scale = generate_shapes_and_scale(shape_scale)
     func_name = generate_function_name(
@@ -188,8 +226,13 @@ def generate_function(
         value_type,
         shapes_scale,
     )
+    use_mask = mask_type != MaskType.NONE
+    if use_mask:
+        func_name = func_name + "_masked"
 
-    query_shape, key_shape, value_shape, result_shape = get_tensor_shapes(shapes_scale)
+    query_shape, key_shape, value_shape, result_shape, mask_shape = get_tensor_shapes(
+        shapes_scale
+    )
     query_tensor_type = (
         f"tensor<{query_shape[0]}x{query_shape[1]}x{query_shape[2]}x{query_type.value}>"
     )
@@ -200,6 +243,7 @@ def generate_function(
         f"tensor<{value_shape[0]}x{value_shape[1]}x{value_shape[2]}x{value_type.value}>"
     )
     result_tensor_type = f"tensor<{result_shape[0]}x{result_shape[1]}x{result_shape[2]}x{value_type.value}>"
+    mask_tensor_type = f"tensor<{mask_shape[0]}x{mask_shape[1]}x{mask_shape[2]}xi1>"
     F32 = "f32"
     F16 = "f16"
     op_name = "iree_linalg_ext.attention"
@@ -207,26 +251,51 @@ def generate_function(
     # Compilation info is optional; prints empty string by default.
     func_definition = ""
 
-    signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
-    import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
-    func_definition = func_definition + (
-        f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
-        f"  %result0 = tensor.empty(): {result_tensor_type}\n"
-        f"  %scale_f16 = arith.truncf %scale : {F32} to {F16} \n"
-        f"  %result1 = {op_name} {{\n"
-        f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
-        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
-        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
-        f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
-        f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
-        f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
-        f"      outs(%result0: {result_tensor_type}) {{\n"
-        f"   ^bb0(%score: f32): \n"
-        f"   iree_linalg_ext.yield %score : f32\n"
-        f" }} -> {result_tensor_type}\n"
-        f" return %result1: {result_tensor_type}\n"
-        f"}}\n"
-    )
+    if use_mask:
+        # Function with mask parameter
+        signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {mask_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
+        import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %mask: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
+        func_definition = func_definition + (
+            f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %mask: {mask_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
+            f"  %result0 = tensor.empty(): {result_tensor_type}\n"
+            f"  %scale_f16 = arith.truncf %scale : {F32} to {F16} \n"
+            f"  %result1 = {op_name} {{\n"
+            f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, k2)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
+            f"      ins(%query, %key, %value, %scale_f16, %mask: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16}, {mask_tensor_type})\n"
+            f"      outs(%result0: {result_tensor_type}) {{\n"
+            f"   ^bb0(%score: f32): \n"
+            f"   iree_linalg_ext.yield %score : f32\n"
+            f" }} -> {result_tensor_type}\n"
+            f" return %result1: {result_tensor_type}\n"
+            f"}}\n"
+        )
+    else:
+        # Function without mask
+        signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
+        import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
+        func_definition = func_definition + (
+            f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
+            f"  %result0 = tensor.empty(): {result_tensor_type}\n"
+            f"  %scale_f16 = arith.truncf %scale : {F32} to {F16} \n"
+            f"  %result1 = {op_name} {{\n"
+            f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
+            f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
+            f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
+            f"      outs(%result0: {result_tensor_type}) {{\n"
+            f"   ^bb0(%score: f32): \n"
+            f"   iree_linalg_ext.yield %score : f32\n"
+            f" }} -> {result_tensor_type}\n"
+            f" return %result1: {result_tensor_type}\n"
+            f"}}\n"
+        )
     return MLIRFunction(
         name=func_name,
         signature=signature,
@@ -288,19 +357,42 @@ def generate_random_3d_tensor(
 call_id = 0
 
 
+# Generate causal mask as i8 tensor (0 or 1 values) for shape [batch, m, k2]
+# Causal pattern: mask[b, i, j] = 1 if j <= i, else 0
+def generate_causal_mask_values(batch: int, m: int, k2: int) -> list:
+    mask = []
+    for b in range(batch):
+        for i in range(m):
+            for j in range(k2):
+                mask.append(1 if j <= i else 0)
+    return mask
+
+
+# Generate all-ones mask as i8 tensor for shape [batch, m, k2]
+# All positions can attend to all positions
+def generate_all_ones_mask_values(batch: int, m: int, k2: int) -> list:
+    return [1] * (batch * m * k2)
+
+
 def generate_call(
     function: MLIRFunction,
     query_type: QueryElemTypeId,
     key_type: KeyElemTypeId,
     value_type: ValueElemTypeId,
     shapes_scale: TestShapeAndScale,
+    mask_type: MaskType,
 ):
     global call_id
     func_name = f"{function.name}_{shapes_scale.batch}_{shapes_scale.m}_{shapes_scale.k1}_{shapes_scale.k2}_{shapes_scale.n}_{shapes_scale.k1}_{shapes_scale.scale}"
     func_name = f"{func_name}_{call_id}"
     call_id = call_id + 1
 
+    use_mask = mask_type != MaskType.NONE
     description = f"Attention shape (BATCHxMxK1xK2xN): {shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.k1}x{shapes_scale.k2}x{shapes_scale.k1}x{shapes_scale.n}"
+    if mask_type == MaskType.ALL_ONES:
+        description = description + " (all-ones masked)"
+    elif mask_type == MaskType.CAUSAL:
+        description = description + " (causal masked)"
     op = (
         f"func.func @{func_name}() attributes {{\n"
         f'  iree.reflection = {{description = "{description}"}}\n'
@@ -309,7 +401,7 @@ def generate_call(
         "  %device = hal.devices.get %device_index : !hal.device\n"
     )
 
-    query_shape, key_shape, value_shape, result_shape = get_tensor_shapes(
+    query_shape, key_shape, value_shape, result_shape, mask_shape = get_tensor_shapes(
         shapes_scale,
     )
 
@@ -317,12 +409,38 @@ def generate_call(
     op = op + generate_random_3d_tensor("key", key_shape, key_type)
     op = op + generate_random_3d_tensor("value", value_shape, value_type)
 
+    if use_mask:
+        batch, m, k2 = mask_shape
+        mask_size = batch * m * k2
+        # Generate mask as i8, then convert to i1 for attention op
+        if mask_type == MaskType.ALL_ONES:
+            mask_values = generate_all_ones_mask_values(batch, m, k2)
+        elif mask_type == MaskType.CAUSAL:
+            mask_values = generate_causal_mask_values(batch, m, k2)
+        mask_values_str = ", ".join(str(v) for v in mask_values)
+        op = op + (
+            f"  %mask_i8 = arith.constant dense<[{mask_values_str}]> : tensor<{mask_size}xi8>\n"
+            f"  %mask_i8_reshaped = tensor.expand_shape %mask_i8 [[0, 1, 2]] output_shape [{batch}, {m}, {k2}] : tensor<{mask_size}xi8> into tensor<{batch}x{m}x{k2}xi8>\n"
+            f"  %c0_i8 = arith.constant 0 : i8\n"
+            f"  %zeros_i8 = tensor.empty() : tensor<{batch}x{m}x{k2}xi8>\n"
+            f"  %zeros_i8_filled = linalg.fill ins(%c0_i8 : i8) outs(%zeros_i8 : tensor<{batch}x{m}x{k2}xi8>) -> tensor<{batch}x{m}x{k2}xi8>\n"
+            f"  %mask_i1 = arith.cmpi ne, %mask_i8_reshaped, %zeros_i8_filled : tensor<{batch}x{m}x{k2}xi8>\n"
+            f"  %mask = hal.tensor.export %mask_i1 : tensor<{batch}x{m}x{k2}xi1> -> !hal.buffer_view\n"
+        )
+
     global pseudorandom_generator_seed
     pseudorandom_generator_seed = pseudorandom_generator_seed - 1
-    op = op + (
-        f"  %scale = arith.constant {shapes_scale.scale} : f32\n"
-        f"  %result = call @module.{function.name}(%query, %key, %value, %scale) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view, f32) -> !hal.buffer_view\n"
-    )
+
+    if use_mask:
+        op = op + (
+            f"  %scale = arith.constant {shapes_scale.scale} : f32\n"
+            f"  %result = call @module.{function.name}(%query, %key, %value, %mask, %scale) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, f32) -> !hal.buffer_view\n"
+        )
+    else:
+        op = op + (
+            f"  %scale = arith.constant {shapes_scale.scale} : f32\n"
+            f"  %result = call @module.{function.name}(%query, %key, %value, %scale) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view, f32) -> !hal.buffer_view\n"
+        )
 
     op = op + (
         f"  %batch = arith.constant {shapes_scale.batch} : i64 \n"
@@ -342,8 +460,18 @@ def generate_call(
         f"  %keyExtBufferView = hal.tensor.export %keyExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.k1}xf32> -> !hal.buffer_view \n"
         f"  %valueExtBufferView = hal.tensor.export %valueExt : tensor<{shapes_scale.batch}x{shapes_scale.k2}x{shapes_scale.n}xf32> -> !hal.buffer_view \n"
         f"  %resultExtBufferView = hal.tensor.export %resultExt : tensor<{shapes_scale.batch}x{shapes_scale.m}x{shapes_scale.n}xf32> -> !hal.buffer_view \n"
-        f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
+
+    if use_mask:
+        # Export mask as i8 for the reference implementation
+        op = op + (
+            f"  %mask_i8_export = hal.tensor.export %mask_i8_reshaped : tensor<{batch}x{m}x{k2}xi8> -> !hal.buffer_view\n"
+            f"  call @attention_test.check_attention_results_with_mask(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %mask_i8_export, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        )
+    else:
+        op = op + (
+            f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        )
 
     op = op + "  return\n"
     op = op + "}\n"
@@ -357,6 +485,7 @@ def generate(
     key_type: KeyElemTypeId,
     value_type: ValueElemTypeId,
     shapes_id: ShapesId,
+    mask_type: MaskType,
 ):
     functions = {}
     calls = []
@@ -367,6 +496,7 @@ def generate(
             key_type,
             value_type,
             shape,
+            mask_type,
         )
         if function.name not in functions:
             functions[function.name] = function
@@ -377,6 +507,7 @@ def generate(
                 key_type,
                 value_type,
                 shape,
+                mask_type,
             )
         )
 
@@ -419,7 +550,7 @@ def parse_arguments():
         required=True,
     )
     parser.add_argument(
-        "--shapes_scale",
+        "--shapes",
         type=str,
         choices=[s.value for s in ShapesId],
         help="Collection of tensor shapes to test",
@@ -430,6 +561,13 @@ def parse_arguments():
         type=str,
         help="Target requirements for this module. Comma-separated. As in -iree-llvmcpu-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
         required=False,
+    )
+    parser.add_argument(
+        "--mask_type",
+        type=str,
+        choices=[m.value for m in MaskType],
+        default="none",
+        help="Type of attention mask to generate: none, all_ones (for decode), or causal (for prefill)",
     )
     return parser.parse_args()
 
@@ -459,6 +597,7 @@ def write_calls_file(functions, calls, filename, requirements):
     module_definition = module_definition + (
         "func.func private @attention_test.generate_random_tensor(%device: !hal.device, %dim0: i64, %dim1: i64, %dim2: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
         "func.func private @attention_test.check_attention_results(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %result: !hal.buffer_view)\n"
+        "func.func private @attention_test.check_attention_results_with_mask(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %mask: !hal.buffer_view, %result: !hal.buffer_view)\n"
         "\n"
     )
 
@@ -481,13 +620,15 @@ def main(args):
     query_type = QueryElemTypeId(args.query_type)
     key_type = KeyElemTypeId(args.key_type)
     value_type = ValueElemTypeId(args.value_type)
-    shapes_id = ShapesId(args.shapes_scale)
+    shapes_id = ShapesId(args.shapes)
+    mask_type = MaskType(args.mask_type)
 
     (functions, calls) = generate(
         query_type,
         key_type,
         value_type,
         shapes_id,
+        mask_type,
     )
 
     write_code_file(functions, args.output_attention_mlir)
