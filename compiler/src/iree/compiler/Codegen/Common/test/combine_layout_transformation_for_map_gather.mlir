@@ -15,8 +15,8 @@ func.func @fold_transpose(%buffer : memref<2x4x16xf32>) -> tensor<4x16x2xf32> {
 //       CHECK:   %[[MAP_GATHER:.+]] = iree_linalg_ext.map_gather
 //  CHECK-SAME:     %[[SOURCE]] into %[[DEST]] {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
-// For perm=[1,2,0]: result[i0,i1,i2] = input[i1,i2,i0], so yield [idx1,idx2,idx0]
-//       CHECK:     iree_linalg_ext.yield %[[IDX1]], %[[IDX2]], %[[IDX0]],
+// For perm=[1,2,0], inverse_perm=[2,0,1]: output[i,j,k] = input[k,i,j], so yield [idx2,idx0,idx1]
+//       CHECK:     iree_linalg_ext.yield %[[IDX2]], %[[IDX0]], %[[IDX1]],
 //       CHECK:   } : tensor<2x4x16xf32> into tensor<4x16x2xf32> -> tensor<4x16x2xf32>
 
 // -----
