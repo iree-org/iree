@@ -801,6 +801,9 @@ getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
          llvm::product_of(layout.element);
 }
 
+// Disabling clang-tidy for the following function, as it will be externally
+// linked to the CAPI in a future PR. 
+// NOLINTBEGIN
 FailureOr<std::pair<int64_t, int64_t>>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
@@ -813,6 +816,7 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   }
   return std::pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
 }
+// NOLINTEND
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                        int64_t totalTileElems) {
