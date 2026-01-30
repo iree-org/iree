@@ -1553,7 +1553,8 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   FailureOr<linalg::ContractionDimensions> cDims =
       linalg::inferContractionDims(op);
   if (failed(cDims) || cDims->m.size() != 1 || cDims->n.size() != 1 ||
-      cDims->k.size() != 1) {
+      cDims->k.size() != 1 || cDims->m[0] != 0 || cDims->n[0] != 1 ||
+      cDims->k[0] != 2) {
     return;
   }
 
