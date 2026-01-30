@@ -3195,14 +3195,6 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                 IREE::LinalgExt::WinogradInputTransformOp,
                 IREE::LinalgExt::WinogradOutputTransformOp>(
               [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-              [&](auto op) {
-                return setConvInterfaceRootConfig(entryPointFn, op);
-              })
           .Default([&](Operation *op) { return failure(); });
   if (succeeded(result)) {
     return result;
