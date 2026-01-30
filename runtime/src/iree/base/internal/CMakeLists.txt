@@ -110,6 +110,7 @@ iree_cc_test(
     "atomic_freelist_test.cc"
   DEPS
     ::atomic_freelist
+    ::memory
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -121,6 +122,7 @@ iree_cc_binary_benchmark(
     "atomic_freelist_benchmark.cc"
   DEPS
     ::atomic_freelist
+    ::memory
     benchmark
     iree::testing::benchmark_main
   TESTONLY
