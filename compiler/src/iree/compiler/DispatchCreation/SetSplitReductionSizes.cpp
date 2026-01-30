@@ -113,15 +113,15 @@ getOuterReductionSizes(PartialReductionOpInterface op,
 }
 
 /// Determines split reduction sizes for weight backward convolutions.
-/// These convolutions have a special CHWN layout, where the filter sizes
-/// (corresponding to output image sizes in forward convolutions) are
+/// These convolutions have a special CHWN or CNHW layout, where the filter
+/// sizes (corresponding to output image sizes in forward convolutions) are
 /// typically large, while the output spatial dimensions are small. This makes
 /// the split reduction strategy particularly effective. Currently, splitting
 /// is only applied along the input channel dimension.
 static std::optional<SmallVector<int64_t>>
 getWeightBackwardReductionSizes(PartialReductionOpInterface op,
                                 int64_t splitReductionTargetSize) {
-  // First check if the input op is a convolution with CHWN layout.
+  // First check if the input op is a convolution with static shapes.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     LDBG() << "skipping op; not convolution";
@@ -194,13 +194,14 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
     return std::nullopt;
   }
 
-  if (batchPos.back() != outputShape.size() - 1) {
-    LDBG() << "skipping op; not batch last layout";
+  // Only apply to weight backward convolutions with CHWN or CNHW layout.
+  if (batchPos.front() == 0) {
+    LDBG() << "skipping op; not apply to batch first layout";
     return std::nullopt;
   }
 
   if (!inputChannelPos.empty() && inputChannelPos.front() > filterPos.back()) {
-    LDBG() << "skipping op; not channel first layout";
+    LDBG() << "skipping op; not apply to channel last layout";
     return std::nullopt;
   }
 
