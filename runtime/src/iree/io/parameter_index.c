@@ -7,7 +7,7 @@
 #include "iree/io/parameter_index.h"
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 struct iree_io_parameter_index_t {
   iree_atomic_ref_count_t ref_count;

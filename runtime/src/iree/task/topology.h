@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 #include "iree/task/tuning.h"
 
 #ifdef __cplusplus

@@ -6,7 +6,7 @@
 
 #include "iree/hal/utils/caching_allocator.h"
 
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 // Default capacity of a pool free list when not specified by the user.
 #define IREE_HAL_CACHING_ALLOCATOR_DEFAULT_FREE_LIST_CAPACITY 64

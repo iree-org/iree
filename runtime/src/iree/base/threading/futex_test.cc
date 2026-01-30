@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 #include "iree/testing/gtest.h"
 
 namespace {

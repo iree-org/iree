@@ -75,7 +75,6 @@ iree_runtime_cc_library(
     deps = [
         ":atomic_slist",
         ":internal",
-        ":synchronization",
         "//runtime/src/iree/base",
     ],
 )
@@ -86,8 +85,8 @@ iree_runtime_cc_library(
     hdrs = ["atomic_slist.h"],
     deps = [
         ":internal",
-        ":synchronization",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -133,7 +132,6 @@ cc_binary_benchmark(
     ],
 )
 
-
 iree_runtime_cc_library(
     name = "cpu",
     srcs = ["cpu.c"],
@@ -155,7 +153,6 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         ":path",
-        ":synchronization",
         "//build_tools:dl",
         "//build_tools:pthreads",
         "//runtime/src/iree/base",
@@ -306,33 +303,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "synchronization",
-    hdrs = ["synchronization.h"],
-    deps = ["//runtime/src/iree/base/threading"],
-)
-
-cc_binary_benchmark(
-    name = "synchronization_benchmark",
-    testonly = True,
-    srcs = ["synchronization_benchmark.cc"],
-    deps = [
-        ":synchronization",
-        "//runtime/src/iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "synchronization_test",
-    srcs = ["synchronization_test.cc"],
-    deps = [
-        ":synchronization",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "time",
     srcs = [
         "time.c",
@@ -392,7 +362,6 @@ iree_runtime_cc_library(
     ],
     hdrs = ["wait_handle.h"],
     deps = [
-        ":synchronization",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base/threading",
@@ -428,30 +397,9 @@ iree_runtime_cc_library(
     hdrs = ["event_pool.h"],
     deps = [
         ":internal",
-        ":synchronization",
         ":wait_handle",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "threading",
-    hdrs = [
-        "threading.h",
-        "threading_impl.h",
-    ],
-    deps = ["//runtime/src/iree/base/threading:thread"],
-)
-
-iree_runtime_cc_test(
-    name = "threading_test",
-    srcs = ["threading_test.cc"],
-    deps = [
-        ":internal",
-        ":synchronization",
-        ":threading",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/base/threading",
     ],
 )

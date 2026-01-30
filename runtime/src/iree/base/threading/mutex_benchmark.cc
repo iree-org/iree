@@ -8,16 +8,16 @@
 #include <mutex>
 
 #include "benchmark/benchmark.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 namespace {
 
 //==============================================================================
-// Inlined timing utils
+// Inlined timing utilities
 //==============================================================================
 
 void SpinDelay(int count, int* data) {
-  // This emulates work we may be doing while holding the lock (like swapping
+  // Emulates work we may be doing while holding the lock (like swapping
   // around some pointers).
   for (size_t i = 0; i < count * 10; ++i) {
     ++(*data);
@@ -26,7 +26,7 @@ void SpinDelay(int count, int* data) {
 }
 
 //==============================================================================
-// iree_mutex_t / iree_slim_mutex_t
+// iree_mutex_t / iree_slim_mutex_t benchmarks
 //==============================================================================
 
 void BM_Mutex(benchmark::State& state) {
@@ -127,7 +127,7 @@ void BM_Uncontended(benchmark::State& state) {
   for (auto _ : state) {
     // Here we model both local work outside of the critical section as well as
     // some work inside of the critical section. The idea is to capture some
-    // more or less realisitic contention levels.
+    // more or less realistic contention levels.
     // If contention is too low, the benchmark won't measure anything useful.
     // If contention is unrealistically high, the benchmark will favor
     // bad mutex implementations that block and otherwise distract threads
@@ -171,7 +171,7 @@ void BM_Contended(benchmark::State& state) {
   for (auto _ : state) {
     // Here we model both local work outside of the critical section as well as
     // some work inside of the critical section. The idea is to capture some
-    // more or less realisitic contention levels.
+    // more or less realistic contention levels.
     // If contention is too low, the benchmark won't measure anything useful.
     // If contention is unrealistically high, the benchmark will favor
     // bad mutex implementations that block and otherwise distract threads
@@ -244,13 +244,5 @@ BENCHMARK_TEMPLATE(BM_Contended, std::mutex)
     // 1 is low contention, 200 is high contention and few values in between.
     ->Arg(50)
     ->Arg(200);
-
-//==============================================================================
-// iree_notification_t
-//==============================================================================
-
-// TODO(benvanik): benchmark this; it should in the worst case be as bad as
-// mutex/futex (as that's what is used), but at the moment we don't really
-// care beyond that.
 
 }  // namespace

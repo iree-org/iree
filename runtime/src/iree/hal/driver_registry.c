@@ -10,8 +10,8 @@
 #include <string.h>
 
 #include "iree/base/internal/path.h"
-#include "iree/base/internal/synchronization.h"
 #include "iree/base/threading/call_once.h"
+#include "iree/base/threading/mutex.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_driver_registry_t

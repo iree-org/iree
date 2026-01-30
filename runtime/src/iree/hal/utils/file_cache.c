@@ -7,7 +7,7 @@
 #include "iree/hal/utils/file_cache.h"
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 typedef struct iree_hal_file_cache_entry_t {
   iree_io_file_handle_t* handle;

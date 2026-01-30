@@ -97,10 +97,9 @@ iree_cc_library(
     ::libhsa
     ::topology
     iree::base
-    iree::base::bitmap
     iree::base::internal
-    iree::base::internal::synchronization
-    iree::base::internal::threading
+    iree::base::threading
+    iree::base::threading::thread
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
   PUBLIC

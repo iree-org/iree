@@ -57,8 +57,8 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
-    iree::base::internal::synchronization
-    iree::base::internal::threading
+    iree::base::threading
+    iree::base::threading::thread
     iree::hal
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers

@@ -35,15 +35,68 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    thread
+  HDRS
+    "thread.h"
+    "thread_impl.h"
+  SRCS
+    "thread.c"
+    "thread_darwin.c"
+    "thread_pthreads.c"
+    "thread_win32.c"
+  DEPS
+    ${CMAKE_DL_LIBS}
+    ::threading
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    call_once_test
+  SRCS
+    "call_once_test.cc"
+  DEPS
+    ::threading
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_test(
   NAME
     futex_test
   SRCS
     "futex_test.cc"
   DEPS
+    ::thread
     ::threading
     iree::base
-    iree::base::internal::threading
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    mutex_test
+  SRCS
+    "mutex_test.cc"
+  DEPS
+    ::threading
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    notification_test
+  SRCS
+    "notification_test.cc"
+  DEPS
+    ::threading
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -60,24 +113,55 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
-iree_cc_library(
+iree_cc_test(
   NAME
-    thread
-  HDRS
-    "thread.h"
+    thread_test
   SRCS
-    "thread.c"
-    "thread_darwin.c"
-    "thread_impl.h"
-    "thread_pthreads.c"
-    "thread_win32.c"
+    "thread_test.cc"
   DEPS
-    ${CMAKE_DL_LIBS}
+    ::thread
     ::threading
-    iree::base
-    iree::base::core_headers
     iree::base::internal
-  PUBLIC
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    mutex_benchmark
+  SRCS
+    "mutex_benchmark.cc"
+  DEPS
+    ::threading
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    notification_benchmark
+  SRCS
+    "notification_benchmark.cc"
+  DEPS
+    ::thread
+    ::threading
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    thread_benchmark
+  SRCS
+    "thread_benchmark.cc"
+  DEPS
+    ::thread
+    ::threading
+    benchmark
+    iree::testing::benchmark_main
+  TESTONLY
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

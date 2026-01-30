@@ -5,12 +5,17 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
+
+#===------------------------------------------------------------------------===#
+# Libraries
+#===------------------------------------------------------------------------===#
 
 iree_runtime_cc_library(
     name = "threading",
@@ -39,13 +44,69 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "thread",
+    srcs = [
+        "thread.c",
+        "thread_darwin.c",
+        "thread_pthreads.c",
+        "thread_win32.c",
+    ],
+    hdrs = [
+        "thread.h",
+        "thread_impl.h",
+    ],
+    deps = [
+        ":threading",
+        "//build_tools:dl",
+        "//build_tools:pthreads",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Tests
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "call_once_test",
+    srcs = ["call_once_test.cc"],
+    deps = [
+        ":threading",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "futex_test",
     srcs = ["futex_test.cc"],
     deps = [
+        ":thread",
         ":threading",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:threading",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "mutex_test",
+    srcs = ["mutex_test.cc"],
+    deps = [
+        ":threading",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "notification_test",
+    srcs = ["notification_test.cc"],
+    deps = [
+        ":threading",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -62,24 +123,50 @@ iree_runtime_cc_test(
     ],
 )
 
-iree_runtime_cc_library(
-    name = "thread",
-    srcs = [
-        "thread.c",
-        "thread_darwin.c",
-        "thread_impl.h",
-        "thread_pthreads.c",
-        "thread_win32.c",
+iree_runtime_cc_test(
+    name = "thread_test",
+    srcs = ["thread_test.cc"],
+    deps = [
+        ":thread",
+        ":threading",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
-    hdrs = [
-        "thread.h",
-    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+cc_binary_benchmark(
+    name = "mutex_benchmark",
+    srcs = ["mutex_benchmark.cc"],
     deps = [
         ":threading",
-        "//build_tools:dl",
-        "//build_tools:pthreads",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "notification_benchmark",
+    srcs = ["notification_benchmark.cc"],
+    deps = [
+        ":thread",
+        ":threading",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "thread_benchmark",
+    srcs = ["thread_benchmark.cc"],
+    deps = [
+        ":thread",
+        ":threading",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
     ],
 )

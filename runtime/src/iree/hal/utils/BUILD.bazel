@@ -43,7 +43,7 @@ iree_runtime_cc_library(
     hdrs = ["caching_allocator.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
     ],
 )
@@ -98,7 +98,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
     ],
@@ -223,7 +223,7 @@ iree_runtime_cc_library(
     hdrs = ["semaphore_base.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
     ],
 )
@@ -235,6 +235,7 @@ iree_runtime_cc_test(
         ":semaphore_base",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:wait_handle",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -248,7 +249,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/threading",
         "//runtime/src/iree/hal",
     ],
 )
@@ -272,8 +273,8 @@ iree_runtime_cc_library(
         ":semaphore_base",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
-        "//runtime/src/iree/base/internal:synchronization",
-        "//runtime/src/iree/base/internal:threading",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal",
     ],
 )
@@ -285,8 +286,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:synchronization",
-        "//runtime/src/iree/base/internal:threading",
+        "//runtime/src/iree/base/threading:thread",
         "//runtime/src/iree/hal",
     ],
 )

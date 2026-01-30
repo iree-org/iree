@@ -10,8 +10,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading.h"
 #include "iree/task/executor_impl.h"
 #include "iree/task/queue.h"
 #include "iree/task/worker.h"

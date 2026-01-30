@@ -66,7 +66,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::synchronization
+    iree::base::threading
   PUBLIC
 )
 
