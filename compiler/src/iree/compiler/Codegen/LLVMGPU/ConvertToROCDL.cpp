@@ -153,6 +153,65 @@ static void addAliasScopesToLoadToLDS(ModuleOp m) {
   });
 }
 
+/// Simplifies redundant LLVM insertvalue/extractvalue chains.
+/// The multi-buffer pattern creates loop-carried memref descriptors where only
+/// the offset field changes. This pass:
+/// 1. Identifies extractvalue operations that extract constant fields
+/// 2. Replaces them with the constant value directly
+static void simplifyMemrefDescriptorsForSGPR(ModuleOp m) {
+  // Check if SGPR optimization is enabled
+  if (!std::getenv("IREE_REDUCE_SGPR"))
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Running SGPR reduction pass\n");
+
+  // Walk all functions and find extractvalue ops that can be simplified
+  m.walk([&](LLVM::LLVMFuncOp funcOp) {
+    SmallVector<std::pair<LLVM::ExtractValueOp, int64_t>> toReplace;
+    
+    funcOp.walk([&](LLVM::ExtractValueOp extractOp) {
+      // Check if extracting from insertvalue chain with constant value
+      Value container = extractOp.getContainer();
+      ArrayRef<int64_t> indices = extractOp.getPosition();
+      
+      // Walk up insertvalue chain to find if this index has a constant value
+      while (auto insertOp = container.getDefiningOp<LLVM::InsertValueOp>()) {
+        ArrayRef<int64_t> insertIndices = insertOp.getPosition();
+        
+        if (insertIndices == indices) {
+          // Found matching insert - check if value is constant
+          if (auto constOp = insertOp.getValue().getDefiningOp<LLVM::ConstantOp>()) {
+            if (auto intAttr = dyn_cast<IntegerAttr>(constOp.getValue())) {
+              toReplace.push_back({extractOp, intAttr.getInt()});
+              break;
+            }
+          }
+          break;
+        }
+        container = insertOp.getContainer();
+      }
+    });
+
+    // Replace extractvalue ops with constants
+    OpBuilder builder(funcOp.getContext());
+    for (auto &[extractOp, constVal] : toReplace) {
+      builder.setInsertionPoint(extractOp);
+      auto constOp = builder.create<LLVM::ConstantOp>(
+          extractOp.getLoc(), extractOp.getType(),
+          builder.getIntegerAttr(extractOp.getType(), constVal));
+      extractOp.replaceAllUsesWith(constOp.getResult());
+      LLVM_DEBUG(llvm::dbgs() << "  Replaced extractvalue with constant "
+                              << constVal << "\n");
+    }
+    
+    // Clean up dead extractvalue ops
+    for (auto &[extractOp, _] : toReplace) {
+      if (extractOp.use_empty())
+        extractOp.erase();
+    }
+  });
+}
+
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
 /// waves from interrupting the MFMA region of the high priority wave.
@@ -448,6 +507,11 @@ struct ConvertToROCDLPass final
     addAliasScopesToLoadToLDS(m);
 
     LDBG() << "After adding alias scopes to LoadToLDS\n" << m;
+
+    // Simplify memref descriptor patterns to reduce SGPR pressure
+    simplifyMemrefDescriptorsForSGPR(m);
+
+    LDBG() << "After simplifying memref descriptors\n" << m;
 
     // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
     // set it to 16 as all of our allocations almost always have much greater

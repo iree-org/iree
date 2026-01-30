@@ -806,9 +806,14 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
   // pipelining. This inserts vmcnt(N) where N is the number of gather_to_lds
   // ops in the loop. This allows the current iteration's loads to be in-flight
   // while waiting only for previous iteration's loads to complete.
+  //
+  // Additional env var: IREE_ASYNC_NO_BARRIER_IN_LOOP - skip barrier in loop
+  bool noBarrierInLoop = std::getenv("IREE_ASYNC_NO_BARRIER_IN_LOOP") != nullptr;
+  
   if (vmcntMode) {
     unsigned numGatherOps = countGatherToLDSOps(newForOp);
-    LDBG() << "Using vmcnt mode with " << numGatherOps << " gather_to_lds ops";
+    LDBG() << "Using vmcnt mode with " << numGatherOps << " gather_to_lds ops"
+           << (noBarrierInLoop ? " (no barrier in loop)" : "");
     
     Block *body = newForOp.getBody();
     bool insertedWait = false;
@@ -818,8 +823,8 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
       Operation &op = *it;
       
       // Insert barrier before first gather_to_lds (to sync with previous
-      // iteration's reads)
-      if (!insertedBarrier && isa<amdgpu::GatherToLDSOp>(op)) {
+      // iteration's reads) - UNLESS noBarrierInLoop is set
+      if (!noBarrierInLoop && !insertedBarrier && isa<amdgpu::GatherToLDSOp>(op)) {
         rewriter.setInsertionPoint(&op);
         gpu::BarrierOp::create(rewriter, loc);
         amdgpu::SchedBarrierOp::create(
@@ -1096,6 +1101,300 @@ static LogicalResult cloneViewOpsInsideLoop(memref::AllocOp alloc,
   return success();
 }
 
+/// Information about a memref iter_arg that can be simplified.
+struct SimplifiableMemrefArg {
+  unsigned argIdx;
+  Value source;             // The multi-buffered allocation
+  memref::SubViewOp initSubview;
+  memref::SubViewOp yieldSubview;
+};
+
+/// Simplify memref iter_args to reduce SGPR pressure.
+/// After pipelining with double buffering, the loop carries memref subviews
+/// as iter_args. These get lowered to struct types with multiple fields,
+/// increasing SGPR usage. This function rewrites the loop to carry just
+/// an integer index and reconstruct the subview inside the loop body.
+static void simplifyMemrefIterArgs(RewriterBase &rewriter, scf::ForOp forOp) {
+  LDBG() << "Attempting to simplify memref iter_args";
+
+  // Find memref iter_args that can be simplified
+  SmallVector<SimplifiableMemrefArg> simplifiableArgs;
+
+  for (unsigned i = 0; i < forOp.getNumRegionIterArgs(); ++i) {
+    Value iterArg = forOp.getRegionIterArg(i);
+    if (!isa<MemRefType>(iterArg.getType()))
+      continue;
+
+    Value initValue = forOp.getInitArgs()[i];
+
+    // The init value should be a subview
+    auto initSubview = initValue.getDefiningOp<memref::SubViewOp>();
+    if (!initSubview) {
+      LDBG() << "  Arg " << i << ": init value is not a subview";
+      continue;
+    }
+
+    // Find the yield value for this iter_arg
+    auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+    Value yieldValue = yieldOp.getOperand(i);
+
+    // The yield should also be a subview from the same source
+    auto yieldSubview = yieldValue.getDefiningOp<memref::SubViewOp>();
+    if (!yieldSubview) {
+      LDBG() << "  Arg " << i << ": yield value is not a subview";
+      continue;
+    }
+
+    // Check if they access the same multi-buffered allocation
+    Value initSource = initSubview.getSource();
+    Value yieldSource = yieldSubview.getSource();
+
+    if (initSource != yieldSource) {
+      LDBG() << "  Arg " << i
+             << ": init and yield subviews have different sources";
+      continue;
+    }
+
+    // Check if the source is a multi-buffered allocation (shape [2, ...])
+    auto sourceType = dyn_cast<MemRefType>(initSource.getType());
+    if (!sourceType || sourceType.getRank() < 2) {
+      LDBG() << "  Arg " << i << ": source is not a valid multi-buffer";
+      continue;
+    }
+
+    int64_t numBuffers = sourceType.getShape()[0];
+    if (numBuffers != 2) {
+      LDBG() << "  Arg " << i << ": source has " << numBuffers
+             << " buffers (expected 2)";
+      continue;
+    }
+
+    LDBG() << "  Arg " << i << ": found double-buffered memref iter_arg";
+    simplifiableArgs.push_back({i, initSource, initSubview, yieldSubview});
+  }
+
+  if (simplifiableArgs.empty()) {
+    LDBG() << "  No simplifiable memref iter_args found";
+    return;
+  }
+
+  LDBG() << "  Simplifying " << simplifiableArgs.size() << " memref iter_args";
+
+  // Get the loop body
+  Block *body = forOp.getBody();
+  Location loc = forOp.getLoc();
+
+  // Track which iter_args to remove (by index)
+  SmallVector<unsigned> argsToRemove;
+
+  for (const auto &arg : simplifiableArgs) {
+    Value regionArg = forOp.getRegionIterArg(arg.argIdx);
+
+    memref::SubViewOp initSV = arg.initSubview;
+    memref::SubViewOp yieldSV = arg.yieldSubview;
+    SmallVector<OpFoldResult> initOffsets = initSV.getMixedOffsets();
+    SmallVector<OpFoldResult> yieldOffsets = yieldSV.getMixedOffsets();
+
+    LDBG() << "    Init has " << initOffsets.size() << " offsets";
+    LDBG() << "    Yield has " << yieldOffsets.size() << " offsets";
+
+    // Check if all offsets except the first are identical (constants)
+    bool canSimplify = true;
+    for (size_t j = 1; j < initOffsets.size() && j < yieldOffsets.size(); ++j) {
+      if (initOffsets[j] != yieldOffsets[j]) {
+        LDBG() << "      Offset " << j << " differs between init and yield";
+        canSimplify = false;
+        break;
+      }
+    }
+
+    if (!canSimplify) {
+      LDBG() << "    Cannot simplify: non-buffer offsets differ";
+      continue;
+    }
+
+    LDBG() << "    Pattern confirmed: only buffer index (offset[0]) changes";
+
+    // The read index for iteration i is: (i / step) mod 2
+    // We compute this from the induction variable directly.
+
+    rewriter.setInsertionPointToStart(body);
+
+    Value iv = forOp.getInductionVar();
+    Value step = forOp.getStep();
+
+    // Compute: (iv / step) mod 2
+    Value divResult = rewriter.create<arith::DivUIOp>(loc, iv, step);
+    Value two = rewriter.create<arith::ConstantIndexOp>(loc, 2);
+    Value readIdx = rewriter.create<arith::RemUIOp>(loc, divResult, two);
+
+    // Build new offsets - same as yieldSubview but with readIdx for buffer
+    SmallVector<OpFoldResult> newOffsets;
+    newOffsets.push_back(readIdx);
+    for (size_t j = 1; j < yieldOffsets.size(); ++j) {
+      newOffsets.push_back(yieldOffsets[j]);
+    }
+
+    // Create the new subview
+    auto newSubview = rewriter.create<memref::SubViewOp>(
+        loc, cast<MemRefType>(regionArg.getType()), arg.source, newOffsets,
+        yieldSV.getMixedSizes(), yieldSV.getMixedStrides());
+
+    // Replace all uses of regionArg with the new subview
+    regionArg.replaceAllUsesWith(newSubview);
+    argsToRemove.push_back(arg.argIdx);
+
+    LDBG() << "    Created replacement subview: " << newSubview;
+  }
+
+  if (argsToRemove.empty()) {
+    LDBG() << "  No iter_args to remove";
+    return;
+  }
+
+  LDBG() << "  Rebuilding loop to remove " << argsToRemove.size()
+         << " memref iter_args";
+
+  // Sort args to remove in ascending order for this step
+  llvm::sort(argsToRemove);
+
+  // For loop results that ARE used outside (epilogue uses), we need to
+  // replace those uses with freshly computed subviews based on the final
+  // loop iteration index.
+  for (unsigned argIdx : argsToRemove) {
+    Value loopResult = forOp.getResult(argIdx);
+    if (loopResult.use_empty())
+      continue;
+
+    // Find the corresponding simplifiable arg info
+    const SimplifiableMemrefArg *argInfo = nullptr;
+    for (const auto &arg : simplifiableArgs) {
+      if (arg.argIdx == argIdx) {
+        argInfo = &arg;
+        break;
+      }
+    }
+    if (!argInfo)
+      continue;
+
+    // The epilogue reads from the buffer that was WRITTEN in the last iteration.
+    // Last iteration has iv = upper - step (since loop goes from lower to upper-1).
+    // In last iteration, we WRITE to buffer[((iv + step) / step) mod 2]
+    // = buffer[(upper / step) mod 2]
+    //
+    // So the epilogue index = (upper / step) mod 2
+    rewriter.setInsertionPointAfter(forOp);
+    Value upper = forOp.getUpperBound();
+    Value step = forOp.getStep();
+    Value divResult = rewriter.create<arith::DivUIOp>(loc, upper, step);
+    Value two = rewriter.create<arith::ConstantIndexOp>(loc, 2);
+    Value finalIdx = rewriter.create<arith::RemUIOp>(loc, divResult, two);
+
+    // Get the yield subview info to know sizes/strides
+    memref::SubViewOp yieldSV = argInfo->yieldSubview;
+    SmallVector<OpFoldResult> yieldOffsets = yieldSV.getMixedOffsets();
+
+    // Build new offsets with finalIdx
+    SmallVector<OpFoldResult> newOffsets;
+    newOffsets.push_back(finalIdx);
+    for (size_t j = 1; j < yieldOffsets.size(); ++j) {
+      newOffsets.push_back(yieldOffsets[j]);
+    }
+
+    // Create the epilogue subview
+    auto epilogueSubview = rewriter.create<memref::SubViewOp>(
+        loc, cast<MemRefType>(loopResult.getType()), argInfo->source,
+        newOffsets, yieldSV.getMixedSizes(), yieldSV.getMixedStrides());
+
+    loopResult.replaceAllUsesWith(epilogueSubview);
+    LDBG() << "    Replaced epilogue uses of result " << argIdx;
+  }
+
+  // Now all loop results should be unused
+  // Sort in descending order for removal
+  llvm::sort(argsToRemove, std::greater<unsigned>());
+
+  // Verify all results are now unused
+  for (unsigned argIdx : argsToRemove) {
+    Value loopResult = forOp.getResult(argIdx);
+    if (!loopResult.use_empty()) {
+      LDBG() << "  Still cannot remove iter_arg " << argIdx << ": result used";
+      return;
+    }
+  }
+
+  // Build new init args list, excluding the ones we want to remove
+  SmallVector<Value> newInitArgs;
+  DenseSet<unsigned> removeSet(argsToRemove.begin(), argsToRemove.end());
+  for (unsigned i = 0; i < forOp.getNumRegionIterArgs(); ++i) {
+    if (!removeSet.contains(i)) {
+      newInitArgs.push_back(forOp.getInitArgs()[i]);
+    }
+  }
+
+  // Create the new loop with fewer iter_args
+  rewriter.setInsertionPoint(forOp);
+  auto newLoop = rewriter.create<scf::ForOp>(
+      loc, forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep(),
+      newInitArgs);
+
+  // Map old block arguments to new ones
+  IRMapping mapping;
+  mapping.map(forOp.getInductionVar(), newLoop.getInductionVar());
+
+  unsigned newArgIdx = 0;
+  for (unsigned i = 0; i < forOp.getNumRegionIterArgs(); ++i) {
+    if (!removeSet.contains(i)) {
+      mapping.map(forOp.getRegionIterArg(i), newLoop.getRegionIterArg(newArgIdx));
+      ++newArgIdx;
+    }
+    // Note: removed args are already replaced with recomputed subviews
+  }
+
+  // Clone the loop body into the new loop
+  Block *oldBody = forOp.getBody();
+  Block *newBody = newLoop.getBody();
+
+  // Clone all ops from old body to new body (except terminator for now)
+  rewriter.setInsertionPointToEnd(newBody);
+  for (Operation &op : oldBody->without_terminator()) {
+    rewriter.clone(op, mapping);
+  }
+
+  // Build new yield operands, excluding removed ones
+  auto oldYield = cast<scf::YieldOp>(oldBody->getTerminator());
+  SmallVector<Value> newYieldOperands;
+  for (unsigned i = 0; i < oldYield.getNumOperands(); ++i) {
+    if (!removeSet.contains(i)) {
+      Value yieldVal = oldYield.getOperand(i);
+      if (auto mappedVal = mapping.lookupOrNull(yieldVal)) {
+        newYieldOperands.push_back(mappedVal);
+      } else {
+        newYieldOperands.push_back(yieldVal);
+      }
+    }
+  }
+  rewriter.create<scf::YieldOp>(loc, newYieldOperands);
+
+  // Replace uses of old loop results with new loop results
+  unsigned newResIdx = 0;
+  for (unsigned i = 0; i < forOp.getNumResults(); ++i) {
+    if (!removeSet.contains(i)) {
+      forOp.getResult(i).replaceAllUsesWith(newLoop.getResult(newResIdx));
+      ++newResIdx;
+    }
+  }
+
+  // Save old count before erasing
+  unsigned oldIterArgCount = forOp.getNumRegionIterArgs();
+
+  // Erase the old loop
+  rewriter.eraseOp(forOp);
+
+  LDBG() << "  Created new loop with " << newLoop.getNumRegionIterArgs()
+         << " iter_args (was " << oldIterArgCount << ")";
+}
+
 /// Multi-buffer LDS allocations used by gather_to_lds operations.
 /// Only used in async copy mode.
 static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
@@ -1222,6 +1521,14 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Insert barriers using the appropriate strategy for each mode.
   insertPipelineBarriers(rewriter, newForOp, mode);
+
+  // Simplify memref iter_args to reduce SGPR pressure.
+  // The pipelining creates iter_args that carry memref subviews,
+  // but only the offset (buffer index) changes between iterations.
+  // We can reconstruct the subview from the loop induction variable.
+  if (std::getenv("IREE_REDUCE_SGPR")) {
+    simplifyMemrefIterArgs(rewriter, newForOp);
+  }
 
   return newForOp;
 }
