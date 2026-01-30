@@ -29,17 +29,23 @@ static bool isIterationCarriedArg(OpOperand &arg, linalg::GenericOp op) {
   return op.isDpsInit(inputOperand);
 }
 
+/// Returns true if the operation needs to be padded to align its iteration
+/// domain to the given `padMultiples`. Padding is needed when:
+///   - A dimension size is dynamic (not statically known), or
+///   - A dimension size is not evenly divisible by its corresponding multiple.
+/// A pad multiple of 0 indicates that no padding is required for that
+/// dimension.
 static bool isPaddingNeeded(OpBuilder &b, TilingInterface op,
                             ArrayRef<OpFoldResult> padMultiples) {
   SmallVector<Range> iterationDomain = op.getIterationDomain(b);
 
-  // Mismatched sizes.
+  // Mismatched sizes. Return true (assume padding is needed) to allow later
+  // validation stages to emit proper diagnostics.
   if (iterationDomain.size() < padMultiples.size()) {
     return true;
   }
 
-  size_t numDims = std::min(iterationDomain.size(), padMultiples.size());
-  for (size_t i = 0; i < numDims; ++i) {
+  for (size_t i = 0; i < padMultiples.size(); ++i) {
     std::optional<int64_t> padSize = getConstantIntValue(padMultiples[i]);
     if (!padSize || *padSize == 0) {
       continue;
