@@ -749,75 +749,62 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
 static FailureOr<int64_t>
 getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                    int operandIndex) {
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    SmallVector<Type> elementTypes;
-    smma.getElementTypes(elementTypes);
-    return elementTypes[operandIndex].getIntOrFloatBitWidth();
+  SmallVector<Type> elementTypes;
+  intrinsic.getElementTypes(elementTypes);
+  if (operandIndex < 0 || operandIndex >= elementTypes.size()) {
+    return failure();
   }
-  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
-    auto [aType, bType, _] = mma.getABCElementTypes();
-    return operandIndex == IREE::GPU::kMMAOperandLhs
-               ? aType.getIntOrFloatBitWidth()
-               : bType.getIntOrFloatBitWidth();
-  }
-  return failure();
+  return elementTypes[operandIndex].getIntOrFloatBitWidth();
 }
 
-/// Returns the size of the total K dimension for the given intrinsic.
-/// For intrinsics with multiple K dimensions, returns the product of all K
-/// dimensions.
+/// Returns the size of the total K dimension (reduction dimension) for the
+/// given intrinsic. For intrinsics with multiple K dimensions, returns the
+/// product of all K dimensions. This is determined by looking at all reduction
+/// dimensions in the undistributed tile shape.
 /// Note this is for a single intrinsic.
 static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    return getKSize(smma.getIntrinsic()) * getKbSize(smma.getIntrinsic());
+  SmallVector<VectorType> undistributedTypes;
+  intrinsic.getUndistributedTileTypes(undistributedTypes);
+  if (undistributedTypes.empty()) {
+    return failure();
   }
-  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
-    return getKSize(mma.getIntrinsic());
+  // For matmul-like operations (C += A * B), the K dimension is the last
+  // dimension of the LHS operand (operand 0).
+  ArrayRef<int64_t> lhsShape = undistributedTypes[0].getShape();
+  if (lhsShape.size() < 2) {
+    return failure();
   }
-  return failure();
+  // Return the product of all reduction dimensions (everything after the M
+  // dim).
+  return llvm::product_of(lhsShape.drop_front(1));
 }
 
 /// Returns the number of elements each thread accesses for the given intrinsic
-/// and operand index.
+/// and operand index. This is determined by the `element` field of the
+/// subgroup layout.
 static FailureOr<int64_t>
 getNumAccessElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   int operandIndex) {
-  IREE::GPU::MMASingleSubgroupLayout layout;
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    layout =
-        IREE::GPU::getSingleSubgroupLayout(smma.getIntrinsic(), operandIndex);
-    return llvm::product_of(layout.element);
-  }
-  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
-    layout =
-        IREE::GPU::getSingleSubgroupLayout(mma.getIntrinsic(), operandIndex);
-    return llvm::product_of(layout.element);
-  }
-  return failure();
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  return llvm::product_of(layout.element);
 }
 
+/// Returns the total number of elements in the shape of the given intrinsic
+/// with the given operand index. This is the product of all dimensions in the
+/// distributed shape: outer × thread × element.
 static FailureOr<int64_t>
 getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   int operandIndex) {
-  IREE::GPU::MMASingleSubgroupLayout layout;
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    layout =
-        IREE::GPU::getSingleSubgroupLayout(smma.getIntrinsic(), operandIndex);
-    return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
-           llvm::product_of(layout.element);
-  }
-  if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
-    layout =
-        IREE::GPU::getSingleSubgroupLayout(mma.getIntrinsic(), operandIndex);
-    return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
-           llvm::product_of(layout.element);
-  }
-  return failure();
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
+         llvm::product_of(layout.element);
 }
 
 FailureOr<std::pair<int64_t, int64_t>>
-getXORShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
   FailureOr<int64_t> maybeMinimumAccessElems =
       getNumAccessElems(intrinsic, operandIndex);
@@ -887,7 +874,7 @@ validatedShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
 }
 
 // TODO(muzasyed): Add more intrinsics for gfx950.
-static FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForGfx950(
+static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
@@ -901,7 +888,7 @@ static FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForGfx950(
   return failure();
 }
 
-FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForTunedChipset(
+FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
   FailureOr<amdgpu::Chipset> maybeChipset =
@@ -911,13 +898,13 @@ FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForTunedChipset(
   }
   if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
     return validatedShuffle(
-        getXORShuffleParamsForGfx950(target, intrinsic, operandIndex),
+        getXorShuffleParamsForGfx950(target, intrinsic, operandIndex),
         intrinsic, operandIndex);
   }
   return failure();
 }
 
-FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
+FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
@@ -959,25 +946,25 @@ FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
 }
 
 FailureOr<std::pair<int64_t, int64_t>>
-getXORShuffleParams(IREE::GPU::TargetAttr target,
+getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
   FailureOr<std::pair<int64_t, int64_t>> xorShuffleAttr =
-      getXORShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
+      getXorShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
   if (failed(xorShuffleAttr)) {
-    xorShuffleAttr = getXORShuffleParamsForUntunedChipset(
+    xorShuffleAttr = getXorShuffleParamsForUntunedChipset(
         target, intrinsic, reductionTileSizes, operandIndex);
   }
   return xorShuffleAttr;
 }
 
 FailureOr<Attribute>
-getXORShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
+getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
   FailureOr<std::pair<int64_t, int64_t>> xorShuffleParams =
-      getXORShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
+      getXorShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
   if (failed(xorShuffleParams)) {
     return failure();
   }

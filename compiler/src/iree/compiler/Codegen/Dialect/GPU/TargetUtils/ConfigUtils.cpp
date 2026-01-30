@@ -941,10 +941,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
     // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
     FailureOr<Attribute> lhsSwizzleAttr =
-        getXORShuffleAttr(context, defaultConfigAttr, target, kind,
+        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
                           schedule->kTileSizes, kMMAOperandLhs);
     FailureOr<Attribute> rhsSwizzleAttr =
-        getXORShuffleAttr(context, defaultConfigAttr, target, kind,
+        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
                           schedule->kTileSizes, kMMAOperandRhs);
     if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
       promotionArray = {};

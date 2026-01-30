@@ -607,6 +607,11 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
         vmmaAttr.getIntrinsic(), operandIndex,
         operandIndex == kMMAOperandAcc && vmmaAttr.getColMajor());
   }
+  if (auto smmaAttr = dyn_cast<ScaledMMAAttr>(mmaKind)) {
+    return IREE::GPU::getSingleSubgroupLayout(
+        smmaAttr.getIntrinsic(), operandIndex,
+        operandIndex == kScaledMMAOperandAcc && smmaAttr.getColMajor());
+  }
   assert(false && "unhandled MMA Interface type.");
   return {};
 }

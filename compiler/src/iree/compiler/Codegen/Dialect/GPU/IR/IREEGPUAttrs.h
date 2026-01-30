@@ -284,6 +284,10 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
 MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
                                                 int64_t operandIndex);
 
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex,
+                                                bool isAccColMajor);
+
 /// Returns the name of the tilling `level`, as used in the `lowering_config`
 /// attribute.
 StringRef getTilingLevelName(GPU::TilingLevel level);

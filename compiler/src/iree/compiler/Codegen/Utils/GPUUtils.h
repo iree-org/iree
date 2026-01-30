@@ -188,7 +188,7 @@ combiningKindToAllReduce(vector::CombiningKind kind);
 /// - sweep row elements over all multiple of the access elements, respecting
 /// the upper bound.
 FailureOr<std::pair<int64_t, int64_t>>
-getXORShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex);
 
 /// Returns true if the XOR shuffle is valid for the given number of row
@@ -208,13 +208,13 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
 
 /// Returns XOR shuffle parameters known to be optimal for the given target and
 /// intrinsic based on profiling results.
-FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForTunedChipset(
+FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex);
 
 /// Note this generic heuristic for untuned cases is not guaranteed to be
 /// optimal for all targets and intrinsics.
-FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
+FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     ArrayRef<int64_t> reductionTileSizes, int operandIndex);
@@ -228,14 +228,14 @@ FailureOr<std::pair<int64_t, int64_t>> getXORShuffleParamsForUntunedChipset(
 /// generic heuristic for untuned cases is not guaranteed to be optimal for all
 /// targets and intrinsics.
 FailureOr<std::pair<int64_t, int64_t>>
-getXORShuffleParams(IREE::GPU::TargetAttr target,
+getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     ArrayRef<int64_t> reductionTileSizes, int operandIndex);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
 FailureOr<Attribute>
-getXORShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
+getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   ArrayRef<int64_t> reductionTileSizes, int operandIndex);
