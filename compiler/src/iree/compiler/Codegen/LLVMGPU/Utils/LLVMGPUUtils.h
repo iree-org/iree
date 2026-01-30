@@ -67,8 +67,9 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
 /// Insert barriers and wait operations if there are allocs of a different alias
 /// group before the given alloc.
-void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
-                ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies = true);
+void addSharedMemoryBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
+                            ArrayRef<Operation *> aliasGroup,
+                            bool hasAsyncCopies = true);
 
 } // namespace iree_compiler
 } // namespace mlir

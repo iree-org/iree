@@ -1931,7 +1931,7 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
   if (insertBarrier) {
-    gpu::BarrierOp::create(rewriter, loc);
+    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
   rewriter.eraseOp(forallOp);
 }
@@ -2075,7 +2075,12 @@ struct LowerValueBarrierPattern
     if (barrier.hasTensorSemantics()) {
       return failure();
     }
-    gpu::BarrierOp::create(rewriter, barrier.getLoc());
+    // TODO(kdrewnia): We give this barrier workgroup fence semantics to mach
+    // the behavior it had from before we could be more precise about barrier
+    // addres spaces. Investigate if this could be a sync-only (`memfence []`)
+    // barrier
+    gpu::BarrierOp::create(rewriter, barrier.getLoc(),
+                           gpu::AddressSpace::Workgroup);
     for (auto [result, input] :
          llvm::zip_equal(barrier.getResults(), barrier.getInputs())) {
       rewriter.replaceAllUsesWith(result, input);

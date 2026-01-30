@@ -813,14 +813,19 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
 static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
-  // Insert barriers for copies from and to shared memory.
+  // Insert barriers for copies from and to shared memory. We use
+  // workgroup-scope barriers here because we do not currenly produce code that
+  // destructively overwrites global memory or uses it as a communication
+  // mechanism, thus eliminating the need for us to force glomal reads/writes to
+  // conclude at the barrier. This produces performance improvements on backends
+  // that support such a feature.
   bool needsBarrier = false;
   if (hasSharedMemoryAddressSpace(cast<MemRefType>(from.getType())) !=
       hasSharedMemoryAddressSpace(cast<MemRefType>(to.getType()))) {
     needsBarrier = true;
   }
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
@@ -829,7 +834,7 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   return success();
 }

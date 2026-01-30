@@ -173,12 +173,16 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
     needsBarrier = true;
   }
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    // This barrier is only on workgroup memory since (at time of writing) no
+    // code writes to global memory in a way that would require global writes to
+    // be visible after a barrier for correctness (ex. if a global array was
+    // being used to communicate without atomics).
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   return success();
 }
@@ -695,7 +699,8 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
     needsBarrier = true;
   }
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    // See notes in `gpuCopyFn` abut the address space argument here.
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   VectorType vectorType =
       VectorType::get(fromType.getShape(), fromType.getElementType());
@@ -707,7 +712,7 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
                                      /*padding=*/std::nullopt, inBounds);
   vector::TransferWriteOp::create(builder, loc, read, to, indices, inBounds);
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   return success();
 }

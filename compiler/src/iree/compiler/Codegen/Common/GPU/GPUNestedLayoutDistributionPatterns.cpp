@@ -1172,7 +1172,7 @@ struct DistributeMultiReduction final
     // fully read the subgroup partial reductions.
     // TODO: We should be only creating a barrier if this buffer is going to be
     // reused.
-    gpu::BarrierOp::create(rewriter, val.getLoc());
+    gpu::BarrierOp::create(rewriter, val.getLoc(), alloc);
     return alloc;
   }
 
@@ -1388,7 +1388,7 @@ struct DistributeMultiReduction final
     writePartialResultToBuffer(rewriter, loc, valueToWrite, alloc, srcLayout,
                                reductionDims);
     // Wait for writes to buffer to finish.
-    gpu::BarrierOp::create(rewriter, loc);
+    gpu::BarrierOp::create(rewriter, loc, alloc);
     return doSubgroupReductionFromBuffer(rewriter, loc, alloc, srcLayout,
                                          resLayout, reductionDims, kind, acc);
   }

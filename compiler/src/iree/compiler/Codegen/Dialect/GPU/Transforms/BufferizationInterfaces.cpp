@@ -16,6 +16,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 
@@ -158,10 +159,49 @@ struct BarrierRegionOpBufferizationInterface
               .getResult());
     }
 
+    bool hasUnknownGpuAddressSpace = false;
+    SmallVector<Attribute> addressSpaces;
+    for (Value buffer : llvm::concat<Value>(*newOperands, *newResults)) {
+      auto memrefType = dyn_cast<BaseMemRefType>(buffer.getType());
+      if (!memrefType) {
+        hasUnknownGpuAddressSpace = true;
+        break;
+      }
+      Attribute memorySpace = memrefType.getMemorySpace();
+      if (!memorySpace) {
+        hasUnknownGpuAddressSpace = true;
+        break;
+      }
+      // HAL descriptors live in global memory, and AMDGPU buffers are produced
+      // from it.
+      Attribute globalSpace =
+          rewriter.getAttr<gpu::AddressSpaceAttr>(gpu::AddressSpace::Global);
+
+      llvm::TypeSwitch<Attribute>(memrefType.getMemorySpace())
+          .Case([&](gpu::AddressSpaceAttr a) {
+            if (a.getValue() == gpu::AddressSpace::Private) {
+              // No such thing as a fence on private memory.
+              return;
+            }
+            addressSpaces.push_back(a);
+          })
+          .Case([&](IREE::HAL::DescriptorTypeAttr) {
+            addressSpaces.push_back(globalSpace);
+          })
+          .Case([&](amdgpu::AddressSpaceAttr) {
+            addressSpaces.push_back(globalSpace);
+          })
+          .Default([&](Attribute) { hasUnknownGpuAddressSpace = true; });
+    }
+
+    ArrayAttr addressSpacesAttr = hasUnknownGpuAddressSpace
+                                      ? ArrayAttr()
+                                      : rewriter.getArrayAttr(addressSpaces);
     rewriter.setInsertionPoint(barrierOp);
-    gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpacesAttr);
     rewriter.setInsertionPointAfter(barrierOp);
-    auto afterBarrier = gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
+    auto afterBarrier =
+        gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpacesAttr);
 
     rewriter.inlineBlockBefore(barrierOp.getBody(), afterBarrier,
                                tensorizedOperands);

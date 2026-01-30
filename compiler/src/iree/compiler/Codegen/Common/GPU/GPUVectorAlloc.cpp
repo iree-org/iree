@@ -118,7 +118,8 @@ struct GPUVectorAllocPass final
       // reads in the previous iteration of a loop. We set this barrier
       // at the start of this block.
       builder.setInsertionPointToStart(op->getBlock());
-      gpu::BarrierOp::create(builder, op->getLoc());
+      gpu::BarrierOp::create(builder, op->getLoc(),
+                             gpu::AddressSpace::Workgroup);
 
       // Promote both of the input operands, excluding the accumulator.
       builder.setInsertionPoint(op);
