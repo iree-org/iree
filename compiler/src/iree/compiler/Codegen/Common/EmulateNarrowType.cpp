@@ -164,10 +164,11 @@ LogicalResult emulateNarrowType(
   memref::populateFlattenMemrefsPatterns(patterns);
 
   arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
-  memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
+  memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns,
+                                                    /*disableAtomicRMW=*/true);
   populateIREEResolveExtractStridedMetadataPatterns(patterns);
   vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns,
-                                                    /*disableAtomicRMW=*/false,
+                                                    /*disableAtomicRMW=*/true,
                                                     /*assumeAligned=*/true);
   populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
   if (populateCallback) {
