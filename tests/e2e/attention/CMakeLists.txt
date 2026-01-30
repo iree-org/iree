@@ -80,7 +80,6 @@ iree_generated_e2e_runner_test(
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=decode_small"
-    "--mask_type=all_ones"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
@@ -104,7 +103,6 @@ iree_generated_e2e_runner_test(
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=decode_large"
-    "--mask_type=all_ones"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
@@ -270,7 +268,6 @@ iree_generated_e2e_runner_test(
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=decode_small"
-    "--mask_type=all_ones"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
@@ -299,7 +296,6 @@ iree_generated_e2e_runner_test(
     "--key_type=f16"
     "--value_type=f16"
     "--shapes=decode_large"
-    "--mask_type=all_ones"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-attention-test
   TARGET_BACKENDS
