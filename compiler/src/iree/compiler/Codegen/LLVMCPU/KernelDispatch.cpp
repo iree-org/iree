@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -2903,19 +2904,23 @@ setGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
   return failure();
 }
 
-static bool is2DConvOp(Operation *op) {
-  return isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(op);
+static bool is2DConvOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::Conv2DNhwcHwcfOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::Conv2DNchwFchwOp>(op);
 }
 
-static bool is2DDepthConvOp(Operation *op) {
-  return isa<linalg::DepthwiseConv2DNhwcHwcOp>(op);
+static bool is2DDepthConvOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::DepthwiseConv2DNhwcHwcOp>(op);
 }
 
-static bool is2DPoolingOp(Operation *op) {
-  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-             linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-             linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-             linalg::PoolingNchwMaxOp>(op);
+static bool is2DPoolingOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::PoolingNhwcSumOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxUnsignedOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinUnsignedOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNchwSumOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNchwMaxOp>(op);
 }
 
 /// Helper enum to represent conv2d input traversal order.
@@ -2926,15 +2931,19 @@ enum class Conv2DDimOrder {
   Nhwc
 };
 
-static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
-  if (isa<linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp,
-          linalg::PoolingNchwMaxOp>(op)) {
+static Conv2DDimOrder getConv2DDimOrder(linalg::LinalgOp op) {
+  if (linalg::isaConvolutionOpOfType<linalg::Conv2DNchwFchwOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNchwSumOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNchwMaxOp>(op)) {
     return Conv2DDimOrder::Nchw;
   }
-  if (isa<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-          linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-          linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-          linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
+  if (linalg::isaConvolutionOpOfType<linalg::Conv2DNhwcHwcfOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcSumOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxUnsignedOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinUnsignedOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
     return Conv2DDimOrder::Nhwc;
   }
   llvm::llvm_unreachable_internal("unsupported conv op");
@@ -3012,7 +3021,7 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
 /// convolutions, where the shape is [N, OH, OW, OC, KH, KW, (IC)].
 static SmallVector<int64_t>
 getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
-                       linalg::ConvolutionOpInterface op, int64_t vectorSize) {
+                       linalg::LinalgOp op, int64_t vectorSize) {
   bool isSupported = is2DConvOp(op) || is2DDepthConvOp(op) || is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
@@ -3076,7 +3085,7 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult
 setConvInterfaceRootConfig(mlir::FunctionOpInterface entryPointFn,
-                           linalg::ConvolutionOpInterface convOp) {
+                           linalg::LinalgOp convOp) {
   int64_t vectorSize = getVectorSize(
       entryPointFn, cast<ShapedType>(convOp->getResultTypes()[0]));
   SmallVector<int64_t> targetTileSizes =
@@ -3186,20 +3195,19 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                 IREE::LinalgExt::WinogradInputTransformOp,
                 IREE::LinalgExt::WinogradOutputTransformOp>(
               [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-              [&](auto op) {
-                return setConvInterfaceRootConfig(entryPointFn, op);
-              })
           .Default([&](Operation *op) { return failure(); });
   if (succeeded(result)) {
     return result;
   }
 
+  // Check for linalg.generic ops that match convolution patterns using
+  // isaConvolutionOpOfType. This allows generalized conv ops to use the
+  // specialized CPUConvTileAndDecomposeExpert pipeline.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    if (is2DConvOp(linalgOp) || is2DDepthConvOp(linalgOp) ||
+        is2DPoolingOp(linalgOp)) {
+      return setConvInterfaceRootConfig(entryPointFn, linalgOp);
+    }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {
       return setContractionRootConfig(entryPointFn, linalgOp);
