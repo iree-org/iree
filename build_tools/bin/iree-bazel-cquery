@@ -1,29 +1,29 @@
 #!/bin/bash
-# Query IREE build graph with Bazel.
+# Configuration-aware query of IREE build graph with Bazel cquery.
 #
-# Usage: iree-bazel-query [options] <query> [bazel-args...]
+# Usage: iree-bazel-cquery [options] <query> [bazel-args...]
 #
 # Examples:
-#   iree-bazel-query 'deps(//tools:iree-compile)'
-#   iree-bazel-query 'rdeps(//..., //runtime/src/iree/base:base)'
-#   iree-bazel-query 'kind(cc_library, //runtime/...)'
+#   iree-bazel-cquery 'deps(//tools:iree-compile)'
+#   iree-bazel-cquery --output=files //tools:iree-compile
+#   iree-bazel-cquery 'kind(cc_library, //runtime/...)'
 
 set -e
 
 # Source shared library.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/iree-bazel-lib"
-iree_bazel_init "iree-bazel-query"
+iree_bazel_init "iree-bazel-cquery"
 
 # Expand combined short flags (e.g., -nv -> -n -v).
 eval "set -- $(iree_expand_combined_flags "$@")"
 
 show_help() {
     cat << 'EOF'
-iree-bazel-query - Query IREE build graph with Bazel
+iree-bazel-cquery - Configuration-aware query of IREE build graph
 
 USAGE
-    iree-bazel-query [options] <query> [bazel-args...]
+    iree-bazel-cquery [options] <query> [bazel-args...]
 
 OPTIONS
     -n, --dry_run    Show the bazel command without executing
@@ -34,26 +34,28 @@ OPTIONS
 
 ARGUMENTS
     query          Bazel query expression (required)
-    bazel-args     Additional arguments passed to bazel query
+    bazel-args     Additional arguments passed to bazel cquery
 
 DESCRIPTION
-    Queries the IREE build graph before configuration. Use this for:
+    Unlike iree-bazel-query, cquery evaluates the build graph after
+    configuration resolution. This means:
 
-    - Finding all targets matching a pattern
-    - Exploring the dependency structure
-    - Fast queries that don't need build configuration
-
-    For configuration-aware queries (resolved select(), actual build
-    targets), use iree-bazel-cquery instead.
+    - Results reflect actual build configuration (select() resolved)
+    - Only targets that would actually be built are shown
+    - Output paths include configuration-specific directory names
+    - Useful for understanding what will actually be compiled
 
 EXAMPLES
-    iree-bazel-query //tools:iree-compile           # Show target
-    iree-bazel-query '//tools/...'                  # List all tools
-    iree-bazel-query 'deps(//tools:iree-compile)'   # Show dependencies
-    iree-bazel-query 'rdeps(//..., //runtime/src/iree/base:base)'
-    iree-bazel-query 'kind(cc_library, //runtime/...)'
-    iree-bazel-query 'somepath(//tools:iree-compile, //runtime/src/iree/vm:vm)'
-    iree-bazel-query -n 'deps(//tools:iree-compile)'  # Show command only
+    iree-bazel-cquery //tools:iree-compile           # Show configured target
+    iree-bazel-cquery 'deps(//tools:iree-compile)'   # Configured dependencies
+    iree-bazel-cquery 'kind(cc_library, //runtime/...)'
+    iree-bazel-cquery -n 'deps(//tools:iree-compile)'  # Show command only
+
+    # Show output files for a target
+    iree-bazel-cquery --output=files //tools:iree-compile
+
+    # Analyze configuration transitions
+    iree-bazel-cquery 'deps(//tools:iree-compile)' --transitions=full
 
 COMMON QUERY FUNCTIONS
     deps(target)           All dependencies of target
@@ -61,18 +63,17 @@ COMMON QUERY FUNCTIONS
     kind(rule, pattern)    Targets of specific rule type
     somepath(from, to)     Path between two targets
     allpaths(from, to)     All paths between targets
-    attr(name, pattern, targets)  Targets with matching attribute
+    config(target, config) Target in specific configuration
 
 OUTPUT OPTIONS
     --output=label         Target labels only (default)
-    --output=package       Package names only
-    --output=build         BUILD file contents
-    --output=graph         Graphviz DOT format
-    --noimplicit_deps      Exclude implicit dependencies
+    --output=files         Output file paths
+    --output=starlark      Custom output via Starlark
+    --transitions=full     Show configuration transitions
 
 SEE ALSO
-    iree-bazel-cquery, iree-bazel-build, iree-bazel-test, iree-bazel-run
-    https://bazel.build/query/guide
+    iree-bazel-query, iree-bazel-build, iree-bazel-test, iree-bazel-run
+    https://bazel.build/query/cquery
 EOF
 }
 
@@ -127,7 +128,7 @@ iree_setup_worktree
 # Build the command with default configs (affects select() in build graph).
 iree_bazel_build_default_configs
 BAZEL_BIN=$(iree_get_bazel_command)
-CMD=("${BAZEL_BIN}" query "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${QUERY}" "${BAZEL_ARGS[@]}")
+CMD=("${BAZEL_BIN}" cquery "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${QUERY}" "${BAZEL_ARGS[@]}")
 
 # Execute or show.
 if iree_is_verbose || iree_is_dry_run; then

@@ -28,3 +28,20 @@ config_setting(
         "iree_is_android": "true",
     },
 )
+
+# OS platform constraints. Used in select() for platform-specific backend
+# selection. bazel_to_cmake maps these to CMAKE_SYSTEM_NAME checks.
+config_setting(
+    name = "iree_is_linux",
+    constraint_values = ["@platforms//os:linux"],
+)
+
+config_setting(
+    name = "iree_is_macos",
+    constraint_values = ["@platforms//os:macos"],
+)
+
+config_setting(
+    name = "iree_is_windows",
+    constraint_values = ["@platforms//os:windows"],
+)
