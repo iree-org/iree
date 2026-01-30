@@ -751,17 +751,15 @@ getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                    int operandIndex) {
   SmallVector<Type> elementTypes;
   intrinsic.getElementTypes(elementTypes);
-  if (operandIndex < 0 || operandIndex >= elementTypes.size()) {
-    return failure();
-  }
+  assert(elementTypes.size() > operandIndex && "Operand index out of bounds");
   return elementTypes[operandIndex].getIntOrFloatBitWidth();
 }
 
-/// Returns the size of the total K dimension (reduction dimension) for the
-/// given intrinsic. For intrinsics with multiple K dimensions, returns the
-/// product of all K dimensions. This is determined by looking at all reduction
-/// dimensions in the undistributed tile shape.
-/// Note this is for a single intrinsic.
+/// Returns the number of elements along the K dimensions (all reduction
+/// dimensions) of the given intrinsic. For intrinsics with multiple K
+/// dimensions, returns the product of all K dimensions. This is determined by
+/// looking at all reduction dimensions in the undistributed tile shape. Note
+/// this is for a single intrinsic.
 static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   SmallVector<VectorType> undistributedTypes;
@@ -854,13 +852,13 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
   return true;
 }
 
+/// Validate the XOR shuffle parameters for the given intrinsic and operand
+/// index. If the parameters produce an XOR Shuffle that is not valid, return
+/// failure. Else, return the swizzle parameters.
 static FailureOr<std::pair<int64_t, int64_t>>
-validatedShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
-                 IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                 int operandIndex) {
-  if (failed(swizzle)) {
-    return failure();
-  }
+validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
+                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex) {
   FailureOr<int64_t> maybeTotalTileElems =
       getTotalTileElems(intrinsic, operandIndex);
   if (failed(maybeTotalTileElems)) {
@@ -880,7 +878,8 @@ static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
     switch (smma.getIntrinsic()) {
     case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return std::pair(/*row_width*/ 256l, /*access_width*/ 32l);
+      return std::pair(/*row_width*/ int64_t(256),
+                       /*access_width*/ int64_t(32));
     default:
       return failure();
     }
@@ -897,7 +896,7 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
     return failure();
   }
   if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
-    return validatedShuffle(
+    return validateXorShuffle(
         getXorShuffleParamsForGfx950(target, intrinsic, operandIndex),
         intrinsic, operandIndex);
   }
@@ -933,7 +932,7 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
   }
   // Assuming each bank is 4 bytes wide (32 bits).
   int64_t ldsBankWidthBits =
-      (workgroupMemoryBankCount.value() * 32l) / *bitwidth;
+      (workgroupMemoryBankCount.value() * int64_t(32)) / *bitwidth;
 
   // Row width must be less than or equal to the row size (in elements) of LDS
   // bank width to prevent bank conflicts.
@@ -941,8 +940,8 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
 
   // Ensure row width is at least access width (minimum 1 column).
   effectiveRowWidth = std::max(effectiveRowWidth, numAccessElems);
-  return validatedShuffle(std::pair(effectiveRowWidth, numAccessElems),
-                          intrinsic, operandIndex);
+  return validateXorShuffle(std::pair(effectiveRowWidth, numAccessElems),
+                            intrinsic, operandIndex);
 }
 
 FailureOr<std::pair<int64_t, int64_t>>
