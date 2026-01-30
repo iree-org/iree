@@ -91,3 +91,16 @@ util.func public @barrierEndFoldDuplicate(%arg0: tensor<4x8xf32>) -> tensor<4x8x
   // CHECK-NEXT: util.return %[[BARRIER]]
   util.return %1 : tensor<4x8xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @foldConsecutiveBitCasts
+// CHECK-SAME:  %[[ARG0:[A-Za-z0-9]+]]: tensor<4x?x16384xf4E2M1FN>
+// CHECK-SAME:  %[[D0:[A-Za-z0-9]+]]: index
+util.func public @foldConsecutiveBitCasts(%arg0: tensor<4x?x16384xf4E2M1FN>, %d0: index) -> tensor<4x?x16384xf4E2M1FN> {
+  // CHECK-NOT: iree_tensor_ext.bitcast
+  // CHECK: util.return %[[ARG0]]
+  %0 = iree_tensor_ext.bitcast %arg0 : tensor<4x?x16384xf4E2M1FN>{%d0} -> tensor<4x?x8192xi8>{%d0}
+  %1 = iree_tensor_ext.bitcast %0 : tensor<4x?x8192xi8>{%d0} -> tensor<4x?x16384xf4E2M1FN>{%d0}
+  util.return %1 : tensor<4x?x16384xf4E2M1FN>
+}
