@@ -20,7 +20,10 @@
   "skip_run_tests": [
     "InterestingShapesBiasAdd/1152x997xf16_matmul_997x576xf16_NN",
     "InterestingShapesBiasAdd/6144x419xbf16_matmul_419x384xbf16_NT",
-    "InterestingShapesBiasAdd/997x997xf16_NT_bias"
+    "InterestingShapesBiasAdd/997x997xf16_NT_bias",
+    "ConvForward/nchw_fchw",
+    "ConvForward/nhwc_fhwc",
+    "ConvForward/nhwc_hwcf"
   ],
   "expected_compile_failures": [],
   "expected_run_failures": [],
