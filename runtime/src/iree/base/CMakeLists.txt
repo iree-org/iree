@@ -60,6 +60,8 @@ iree_cc_library(
     "assert.h"
     "bitfield.c"
     "bitfield.h"
+    "bitmap.c"
+    "bitmap.h"
     "loop.c"
     "loop.h"
     "loop_inline.c"
@@ -83,6 +85,7 @@ iree_cc_library(
     ${_IREE_ALLOCATOR_SYSTEM_DEFINES}
   DEPS
     ::core_headers
+    iree::base::internal
     iree::base::internal::time
     iree::base::tracing::provider
     ${IREE_LIBBACKTRACE_TARGET}
@@ -106,6 +109,30 @@ iree_cc_test(
     bitfield_test
   SRCS
     "bitfield_test.cc"
+  DEPS
+    ::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    bitmap_benchmark
+  SRCS
+    "bitmap_benchmark.cc"
+  DEPS
+    ::base
+    iree::base
+    iree::testing::benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    bitmap_test
+  SRCS
+    "bitmap_test.cc"
   DEPS
     ::base
     iree::testing::gtest

@@ -4,28 +4,64 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
 #include <chrono>
 #include <cstring>
 #include <thread>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading_impl.h"  // to test the override list
+#include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread_impl.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
 namespace {
 
-using iree::Status;
+//==============================================================================
+// iree_thread_affinity_t
+//==============================================================================
+
+TEST(ThreadAffinityTest, SetAny) {
+  iree_thread_affinity_t affinity;
+  memset(&affinity, 0xFF, sizeof(affinity));  // Dirty memory.
+  iree_thread_affinity_set_any(&affinity);
+  EXPECT_TRUE(iree_thread_affinity_is_unspecified(affinity));
+  EXPECT_FALSE(affinity.group_any);
+  EXPECT_FALSE(affinity.id_assigned);
+}
+
+TEST(ThreadAffinityTest, SetGroupAny) {
+  iree_thread_affinity_t affinity;
+  memset(&affinity, 0xFF, sizeof(affinity));  // Dirty memory.
+  iree_thread_affinity_set_group_any(5, &affinity);
+  EXPECT_FALSE(iree_thread_affinity_is_unspecified(affinity));
+  EXPECT_TRUE(affinity.group_any);
+  EXPECT_EQ(5u, affinity.group);
+  EXPECT_FALSE(affinity.id_assigned);
+}
+
+TEST(ThreadAffinityTest, IsUnspecifiedFalseWhenGroupAny) {
+  iree_thread_affinity_t affinity;
+  memset(&affinity, 0, sizeof(affinity));
+  affinity.group_any = 1;
+  EXPECT_FALSE(iree_thread_affinity_is_unspecified(affinity));
+}
+
+TEST(ThreadAffinityTest, IsUnspecifiedFalseWhenIdAssigned) {
+  iree_thread_affinity_t affinity;
+  memset(&affinity, 0, sizeof(affinity));
+  affinity.id_assigned = 1;
+  affinity.id = 3;
+  EXPECT_FALSE(iree_thread_affinity_is_unspecified(affinity));
+}
 
 //==============================================================================
 // iree_thread_t
 //==============================================================================
 
 TEST(ThreadTest, Lifetime) {
-  // Default parameters:
+  // Default parameters.
   iree_thread_create_params_t params;
   memset(&params, 0, sizeof(params));
 
@@ -47,7 +83,7 @@ TEST(ThreadTest, Lifetime) {
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
                                     iree_allocator_system(), &thread));
-  EXPECT_NE(0, iree_thread_id(thread));
+  EXPECT_NE(0u, iree_thread_id(thread));
 
   // Wait for the thread to finish.
   iree_notification_await(
@@ -73,50 +109,186 @@ TEST(ThreadTest, CreateSuspended) {
 
   struct entry_data_t {
     iree_atomic_int32_t value;
-    iree_notification_t barrier;
+    std::atomic<bool> gate_open;
+    iree_notification_t gate;
+    iree_notification_t done;
   } entry_data;
   iree_atomic_store(&entry_data.value, 123, iree_memory_order_relaxed);
-  iree_notification_initialize(&entry_data.barrier);
+  entry_data.gate_open.store(false, std::memory_order_relaxed);
+  iree_notification_initialize(&entry_data.gate);
+  iree_notification_initialize(&entry_data.done);
+
   iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
     auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
+    // Wait for gate to open before doing work.
+    iree_notification_await(
+        &entry_data->gate,
+        +[](void* arg) {
+          return static_cast<std::atomic<bool>*>(arg)->load(
+              std::memory_order_acquire);
+        },
+        &entry_data->gate_open, iree_infinite_timeout());
     iree_atomic_fetch_add(&entry_data->value, 1, iree_memory_order_acq_rel);
-    iree_notification_post(&entry_data->barrier, IREE_ALL_WAITERS);
+    iree_notification_post(&entry_data->done, IREE_ALL_WAITERS);
     return 0;
   };
 
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
                                     iree_allocator_system(), &thread));
-  EXPECT_NE(0, iree_thread_id(thread));
+  EXPECT_NE(0u, iree_thread_id(thread));
 
-  // NOTE: the thread will not be running and we should not expect a change in
-  // the value. I can't think of a good way to test this, though, so we'll just
-  // wait a moment here and assume that if the thread was able to run it would
-  // have during this wait.
+  // Value should be unchanged (thread created but suspended).
   ASSERT_EQ(123,
             iree_atomic_load(&entry_data.value, iree_memory_order_seq_cst));
-  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+
+  // Open the gate. If the thread were running (not suspended), it would now
+  // pass through the gate and modify the value. Since it's suspended, the
+  // value should remain unchanged.
+  entry_data.gate_open.store(true, std::memory_order_release);
+  iree_notification_post(&entry_data.gate, IREE_ALL_WAITERS);
+
+  // Value should still be unchanged (thread is suspended, can't run).
   ASSERT_EQ(123,
             iree_atomic_load(&entry_data.value, iree_memory_order_seq_cst));
 
   // Resume the thread and wait for it to finish its work.
   iree_thread_resume(thread);
   iree_notification_await(
-      &entry_data.barrier,
+      &entry_data.done,
       +[](void* entry_arg) -> bool {
         auto* entry_data = reinterpret_cast<struct entry_data_t*>(entry_arg);
         return iree_atomic_load(&entry_data->value,
                                 iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
+
   iree_thread_release(thread);
-  iree_notification_deinitialize(&entry_data.barrier);
+  iree_notification_deinitialize(&entry_data.done);
+  iree_notification_deinitialize(&entry_data.gate);
 }
 
-// NOTE: testing whether priority took effect is really hard given that on
-// certain platforms the priority may not be respected or may be clamped by
-// the system. This is here to test the mechanics of the priority override code
-// on our side and assumes that if we tell the OS something it respects it.
+TEST(ThreadTest, RetainRelease) {
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+
+  std::atomic<bool> completed{false};
+  iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
+    auto* completed = reinterpret_cast<std::atomic<bool>*>(entry_arg);
+    completed->store(true, std::memory_order_release);
+    return 0;
+  };
+
+  iree_thread_t* thread = nullptr;
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &completed, params,
+                                    iree_allocator_system(), &thread));
+
+  // Retain adds a reference.
+  iree_thread_retain(thread);
+
+  // Wait for thread to complete.
+  while (!completed.load(std::memory_order_acquire)) {
+    iree_thread_yield();
+  }
+
+  // First release does not destroy the thread.
+  iree_thread_release(thread);
+
+  // Verify we can still get the thread ID (object is alive).
+  EXPECT_NE(0u, iree_thread_id(thread));
+
+  // Second release destroys the thread.
+  iree_thread_release(thread);
+}
+
+TEST(ThreadTest, ReleaseWaitsForCompletion) {
+  // Tests that iree_thread_release properly waits for thread completion.
+  // Note: iree_thread_join + iree_thread_release cannot both be called as
+  // release internally joins when destroying the thread.
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+
+  std::atomic<int32_t> value{0};
+  iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
+    auto* value = reinterpret_cast<std::atomic<int32_t>*>(entry_arg);
+    // Do some work.
+    for (int i = 0; i < 100; ++i) {
+      value->fetch_add(1, std::memory_order_relaxed);
+      iree_thread_yield();
+    }
+    return 42;
+  };
+
+  iree_thread_t* thread = nullptr;
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &value, params,
+                                    iree_allocator_system(), &thread));
+
+  // Release internally joins/waits for the thread to complete.
+  iree_thread_release(thread);
+
+  // Thread has completed all work (release waited for it).
+  EXPECT_EQ(100, value.load(std::memory_order_acquire));
+}
+
+TEST(ThreadTest, NamedThread) {
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+  params.name = iree_make_cstring_view("TestThread");
+
+  std::atomic<bool> completed{false};
+  iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
+    auto* completed = reinterpret_cast<std::atomic<bool>*>(entry_arg);
+    completed->store(true, std::memory_order_release);
+    return 0;
+  };
+
+  iree_thread_t* thread = nullptr;
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &completed, params,
+                                    iree_allocator_system(), &thread));
+
+  // Wait for completion.
+  while (!completed.load(std::memory_order_acquire)) {
+    iree_thread_yield();
+  }
+
+  iree_thread_release(thread);
+}
+
+TEST(ThreadTest, RequestAffinity) {
+  iree_thread_create_params_t params;
+  memset(&params, 0, sizeof(params));
+
+  std::atomic<bool> completed{false};
+  iree_thread_entry_t entry_fn = +[](void* entry_arg) -> int {
+    auto* completed = reinterpret_cast<std::atomic<bool>*>(entry_arg);
+    // Spin for a bit to give time for affinity to take effect (maybe).
+    for (int i = 0; i < 1000; ++i) {
+      iree_thread_yield();
+    }
+    completed->store(true, std::memory_order_release);
+    return 0;
+  };
+
+  iree_thread_t* thread = nullptr;
+  IREE_ASSERT_OK(iree_thread_create(entry_fn, &completed, params,
+                                    iree_allocator_system(), &thread));
+
+  // Request affinity to group 0 (smoke test - may be ignored by OS).
+  iree_thread_affinity_t affinity;
+  iree_thread_affinity_set_group_any(0, &affinity);
+  iree_thread_request_affinity(thread, affinity);
+
+  // Wait for completion.
+  while (!completed.load(std::memory_order_acquire)) {
+    iree_thread_yield();
+  }
+
+  iree_thread_release(thread);
+}
+
+// Testing whether priority took effect is hard given that on certain platforms
+// the priority may not be respected or may be clamped by the system. This test
+// exercises the mechanics of the priority override code on our side.
 TEST(ThreadTest, PriorityOverride) {
   iree_thread_create_params_t params;
   memset(&params, 0, sizeof(params));
@@ -134,11 +306,11 @@ TEST(ThreadTest, PriorityOverride) {
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
                                     iree_allocator_system(), &thread));
-  EXPECT_NE(0, iree_thread_id(thread));
+  EXPECT_NE(0u, iree_thread_id(thread));
 
   // Push a few overrides.
-  // NOTE: some platforms (Apple) may ignore the request and return NULL. Code
-  // using overrides needs to be tolerant of this.
+  // Some platforms (Apple) may ignore the request and return NULL. Code using
+  // overrides needs to be tolerant of this.
   iree_thread_override_t* override0 = iree_thread_priority_class_override_begin(
       thread, IREE_THREAD_PRIORITY_CLASS_HIGH);
   iree_thread_override_t* override1 = iree_thread_priority_class_override_begin(
@@ -194,7 +366,7 @@ TEST(ThreadOverrideListTest, PriorityClass) {
   EXPECT_NE(nullptr, override2);
   ASSERT_EQ(IREE_THREAD_PRIORITY_CLASS_HIGHEST, current_priority_class);
 
-  // Out of order to ensure highest bit sticks:
+  // Out of order to ensure highest bit sticks.
   ASSERT_EQ(IREE_THREAD_PRIORITY_CLASS_HIGHEST, current_priority_class);
   iree_thread_override_remove_self(override1);
   ASSERT_EQ(IREE_THREAD_PRIORITY_CLASS_HIGHEST, current_priority_class);

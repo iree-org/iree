@@ -6,7 +6,7 @@
 
 #include "iree/task/queue.h"
 
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 #include "iree/testing/gtest.h"
 
 // Like iree_task_queue_try_steal but retries until success.

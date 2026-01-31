@@ -81,9 +81,9 @@ iree_cc_library(
     iree::base::internal::event_pool
     iree::base::internal::fpu_state
     iree::base::internal::prng
-    iree::base::internal::synchronization
-    iree::base::internal::threading
     iree::base::internal::wait_handle
+    iree::base::threading
+    iree::base::threading::thread
   PUBLIC
 )
 
@@ -146,7 +146,7 @@ iree_cc_test(
   DEPS
     ::task
     iree::base
-    iree::base::internal::threading
+    iree::base::threading::thread
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main

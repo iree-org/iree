@@ -14,6 +14,8 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

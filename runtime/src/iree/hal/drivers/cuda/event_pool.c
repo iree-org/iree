@@ -12,7 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"

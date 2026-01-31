@@ -9,9 +9,9 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/threading/call_once.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

@@ -21,7 +21,7 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::cpu
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::builtins::ukernel
     iree::schemas::cpu_data
   PUBLIC

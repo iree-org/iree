@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 struct iree_event_pool_t {
   // Allocator used to create the event pool.

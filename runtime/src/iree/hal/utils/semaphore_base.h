@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus

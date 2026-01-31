@@ -169,13 +169,21 @@ iree_status_t iree_aligned_alloc(iree_host_size_t alignment,
   IREE_ASSERT_ARGUMENT(out_ptr);
   *out_ptr = NULL;
 
+  // C11 aligned_alloc and POSIX posix_memalign require alignment to be at least
+  // sizeof(void*). Smaller alignments are valid for the caller to request but
+  // we must bump them up to satisfy the underlying allocator.
+  if (alignment < sizeof(void*)) {
+    alignment = sizeof(void*);
+  }
+
   void* ptr = NULL;
 #if defined(IREE_PLATFORM_WINDOWS)
   // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
   ptr = _aligned_malloc(size, alignment);
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
   // https://en.cppreference.com/w/c/memory/aligned_alloc
-  ptr = aligned_alloc(alignment, size);
+  // C11 requires size be a multiple of alignment; round up.
+  ptr = aligned_alloc(alignment, iree_host_align(size, alignment));
 #elif _POSIX_C_SOURCE >= 200112L
   // https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
   if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;

@@ -11,7 +11,8 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
 #include "iree/base/tracing.h"
 
 typedef struct iree_hal_hip_buffer_t {

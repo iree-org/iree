@@ -8,7 +8,7 @@
 #define IREE_HAL_DRIVERS_AMDGPU_UTIL_BLOCK_POOL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 
 #ifdef __cplusplus

@@ -237,7 +237,7 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = {"job1"}
         is_pr = True
         is_llvm_integrate_pr = False
-        modified_paths = ["runtime/src/iree/base/internal/threading_win32.c"]
+        modified_paths = ["runtime/src/iree/base/threading/thread_win32.c"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,

@@ -17,7 +17,7 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 #ifdef __cplusplus
 extern "C" {

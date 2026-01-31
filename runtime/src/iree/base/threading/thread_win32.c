@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // clang-format off: must be included before all other headers.
-#include "iree/base/internal/threading_impl.h"
+#include "iree/base/threading/thread_impl.h"
 // clang-format on
 
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
 // Great documentation:
 // https://www.microsoftpressstore.com/articles/article.aspx?p=2233328

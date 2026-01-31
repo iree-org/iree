@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // NOTE: must be first to ensure that we can define settings for all includes.
-#include "iree/base/internal/threading_impl.h"
+#include "iree/base/threading/thread_impl.h"
 
 #if defined(IREE_PLATFORM_APPLE)
 
@@ -17,7 +17,7 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
 // Useful to see how pthreads is implemented on (old) darwin:
 // https://opensource.apple.com/source/Libc/Libc-825.40.1/pthreads/pthread.c.auto.html

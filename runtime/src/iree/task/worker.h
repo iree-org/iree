@@ -12,8 +12,8 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/prng.h"
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"

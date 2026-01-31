@@ -9,7 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/amdgpu/util/error_callback.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
 

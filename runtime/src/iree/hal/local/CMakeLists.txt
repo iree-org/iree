@@ -137,7 +137,7 @@ iree_cc_library(
     ::executable_plugin
     iree::base
     iree::base::internal
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
   PUBLIC
 )

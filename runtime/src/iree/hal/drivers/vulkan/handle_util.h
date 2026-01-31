@@ -20,7 +20,7 @@
 #include "iree/hal/drivers/vulkan/vulkan_headers.h"  // IWYU pragma: export
 // clang-format on
 
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
