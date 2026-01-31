@@ -2013,8 +2013,7 @@ ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
       /*index_base=*/nullptr,
       /*dimension=*/reductionDim);
 
-  // Clone the comparator region from the original operRegion &targetRegion =
-  // mergeOp.getRegion();
+  // Clone the comparator region from the original operation.
   Region &targetRegion = mergeOp->getRegion(0);
   Region &sourceRegion = getRegion();
   IRMapping mapper;

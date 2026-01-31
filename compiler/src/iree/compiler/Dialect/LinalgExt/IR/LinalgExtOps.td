@@ -752,18 +752,20 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     returning both the selected value and its corresponding index. The selection
     logic is defined by a user-specified comparator region.
 
-    The operation supports two modes:
+    The operation supports three index modes for flexibility in tiling:
 
-    1. Implicit-index mode (single input): Computes (value, index) pairs from scratch.
-       Indices are implicitly computed from the reduction dimension's iteration index
-       (using linalg.index on the reduction dimension). The comparator
-       region receives two candidate values and returns a single `i1` result indicating
-       whether the first argument should be preferred.
+    1. Implicit-index without index_base (single input, no index_base):
+       Indices are computed from local position (linalg.index on reduction dimension).
+       Used for untiled operations or when global offset is not needed.
 
-    2. Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
-       Indices are explicitly provided as input. The comparator region receives
-       two candidate values and returns `i1` to select the preferred value.
-       This mode is used to combine results from split-reduction operations.
+    2. Implicit-index with index_base (single input, with index_base):
+       Indices are computed as: index_base + local position.
+       Used in OuterParallel tiling where each parallel chunk has a fixed offset.
+
+    3. Explicit-index (two inputs: values + indices, no index_base):
+       Indices are provided as input tensor alongside values.
+       Used in OuterReduction tiling and merge operations where indices are
+       accumulated across iterations.
 
     The comparator region defines the sorting rule, e.g., "greater than" for argmax or
     "less than" for argmin, allowing for generalization beyond simple argmax-style

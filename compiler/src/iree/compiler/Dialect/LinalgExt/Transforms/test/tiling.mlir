@@ -3203,6 +3203,46 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func @arg_compare_outer_reduction_argmin(%arg0: tensor<2x64x1024xf32>, %out_val: tensor<2x64xf32>, %out_idx: tensor<2x64xi32>) -> (tensor<2x64xf32>, tensor<2x64xi32>) {
+  %0:2 = iree_linalg_ext.arg_compare
+      dimension(2)
+      ins(%arg0 : tensor<2x64x1024xf32>) outs(%out_val, %out_idx : tensor<2x64xf32>, tensor<2x64xi32>) {
+    ^bb0(%in: f32, %init_val: f32):
+      %cmp = arith.cmpf olt, %in, %init_val : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2x64xf32>, tensor<2x64xi32>
+
+  return %0#0, %0#1 : tensor<2x64xf32>, tensor<2x64xi32>
+}
+
+// CHECK-LABEL: func.func @arg_compare_outer_reduction_argmin
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<2x64x1024xf32>, %[[OUT_VAL:.+]]: tensor<2x64xf32>, %[[OUT_IDX:.+]]: tensor<2x64xi32>)
+
+// CHECK: linalg.broadcast
+// CHECK: linalg.broadcast
+
+// CHECK: scf.for
+// CHECK:   linalg.generic
+// CHECK:       arith.cmpf olt
+// CHECK:       arith.select
+// CHECK:       arith.select
+// CHECK:       linalg.yield
+// CHECK:   scf.yield
+
+// CHECK: iree_linalg_ext.arg_compare
+// CHECK:     arith.cmpf olt
+// CHECK:     iree_linalg_ext.yield
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %for_op = transform.structured.tile_reduction_using_for %arg_compare_op by tile_sizes = [0, 0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
 func.func @arg_compare_outer_reduction_explicit_index(%arg0: tensor<8x4096xf32>, %arg1: tensor<8x4096xi32>, %out_val: tensor<8xf32>, %out_idx: tensor<8xi32>) -> (tensor<8xf32>, tensor<8xi32>) {
   %0:2 = iree_linalg_ext.arg_compare
       dimension(1)
