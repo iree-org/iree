@@ -4909,6 +4909,9 @@ model execution is in a single-thread synchronous fashion.</p>
 <span class="c"># Disable multi-thread library support</span>
 <span class="nb">set</span><span class="p">(</span><span class="s">IREE_ENABLE_THREADING</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
 
+<span class="c"># Disable synchronization primitives (safe only for single-threaded targets)</span>
+<span class="nb">set</span><span class="p">(</span><span class="s">IREE_SYNCHRONIZATION_DISABLE_UNSAFE</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
+
 <span class="c"># Only enable the local synchronous HAL driver</span>
 <span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_DEFAULTS</span><span class="w"> </span><span class="s">OFF</span><span class="p">)</span>
 <span class="nb">set</span><span class="p">(</span><span class="s">IREE_HAL_DRIVER_LOCAL_SYNC</span><span class="w"> </span><span class="s">ON</span><span class="p">)</span>
@@ -4952,10 +4955,6 @@ architecture, target abi, linker script, system library path, etc.</p>
 <tr>
 <td><code>IREE_PLATFORM_GENERIC</code></td>
 <td>Let IREE build the runtime library without targeting a specific platform.</td>
-</tr>
-<tr>
-<td><code>IREE_SYNCHRONIZATION_DISABLE_UNSAFE=1</code></td>
-<td>Disable thread synchronization support.<br>Must only be used if there's a single thread.</td>
 </tr>
 <tr>
 <td><code>IREE_FILE_IO_ENABLE=0</code></td>
