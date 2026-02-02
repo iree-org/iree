@@ -745,6 +745,25 @@ def InstrumentMemoryAccessesPass :
   let summary = "Instruments memory reads and writes for address tracking when dispatch instrumentation is enabled.";
 }
 
+def InsertBatchDimForBatchlessConvPass :
+    InterfacePass<"iree-codegen-insert-batch-dim-for-batchless-conv", "mlir::FunctionOpInterface"> {
+  let summary = "Inserts batch dimension for batch-less convolutions.";
+  let description = [{
+    Detects convolution operations that have been generalized and had their
+    batch dimension (N=1) stripped by upstream IREE transformations. It
+    restores the batch dimension by inserting tensor.expand_shape and
+    tensor.collapse_shape operations, enabling downstream convolution-specific
+    patterns (like DownscaleConv and vectorization) to match and apply.
+
+    The reshape operations are propagated to the boundary and folded into
+    dispatch tensor load/store operations, resulting in zero runtime cost.
+  }];
+  let dependentDialects = [
+    "linalg::LinalgDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def LinkTuningSpecsPass : Pass<"iree-codegen-link-tuning-specs", "ModuleOp"> {
   let summary =
       "Link nested transform dialect tuning specs named sequences into a single entry point";
