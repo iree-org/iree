@@ -913,8 +913,8 @@ static iree_status_t iree_tooling_create_buffer_view_with_vm_buffer(
   iree_vm_buffer_retain(vm_buffer);
   iree_hal_buffer_t* hal_buffer = NULL;
   iree_status_t status = iree_hal_heap_buffer_wrap(
-      iree_hal_buffer_placement_undefined(), IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
-      IREE_HAL_MEMORY_ACCESS_READ,
+      NULL, iree_hal_buffer_placement_undefined(),
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_HAL_MEMORY_ACCESS_READ,
       IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING,
       span.data_length, iree_cast_const_byte_span(span), release_callback,
       host_allocator, &hal_buffer);
@@ -934,7 +934,7 @@ static iree_status_t iree_tooling_create_buffer_view_empty(
     iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
   iree_hal_buffer_t* hal_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_wrap(
-      iree_hal_buffer_placement_undefined(), IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      NULL, iree_hal_buffer_placement_undefined(), IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
       IREE_HAL_MEMORY_ACCESS_READ,
       IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING, 0,
       iree_byte_span_empty(), iree_hal_buffer_release_callback_null(),

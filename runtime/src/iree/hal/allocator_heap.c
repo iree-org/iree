@@ -253,10 +253,13 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
                             : IREE_HAL_QUEUE_AFFINITY_ANY,
       .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
   };
+  iree_hal_heap_allocator_statistics_t* statistics = NULL;
+  IREE_STATISTICS(statistics = &allocator->statistics);
   return iree_hal_heap_buffer_wrap(
-      placement, compat_params.type, compat_params.access, compat_params.usage,
-      external_buffer->size, iree_make_byte_span(ptr, external_buffer->size),
-      release_callback, allocator->host_allocator, out_buffer);
+      statistics, placement, compat_params.type, compat_params.access,
+      compat_params.usage, external_buffer->size,
+      iree_make_byte_span(ptr, external_buffer->size), release_callback,
+      allocator->host_allocator, out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_export_buffer(

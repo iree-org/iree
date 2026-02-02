@@ -53,19 +53,39 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_format(
 
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder,
-      "  HOST_LOCAL: %12" PRIdsz "B peak / %12" PRIdsz
-      "B allocated / %12" PRIdsz "B freed / %12" PRIdsz "B live\n",
+      "  HOST_LOCAL     : %12" PRIdsz "B peak / %12" PRIdsz
+      "B allocated / %12" PRIdsz "B freed    / %12" PRIdsz "B live\n",
       statistics->host_bytes_peak, statistics->host_bytes_allocated,
       statistics->host_bytes_freed,
       (statistics->host_bytes_allocated - statistics->host_bytes_freed)));
 
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder,
-      "DEVICE_LOCAL: %12" PRIdsz "B peak / %12" PRIdsz
-      "B allocated / %12" PRIdsz "B freed / %12" PRIdsz "B live\n",
+      "  HOST_IMPORTED  : %12" PRIdsz "B peak / %12" PRIdsz
+      "B wrapped   / %12" PRIdsz "B released / %12" PRIdsz "B live\n",
+      statistics->host_import_bytes_peak,
+      statistics->host_import_bytes_imported,
+      statistics->host_import_bytes_released,
+      (statistics->host_import_bytes_imported -
+       statistics->host_import_bytes_released)));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder,
+      "  DEVICE_LOCAL   : %12" PRIdsz "B peak / %12" PRIdsz
+      "B allocated / %12" PRIdsz "B freed    / %12" PRIdsz "B live\n",
       statistics->device_bytes_peak, statistics->device_bytes_allocated,
       statistics->device_bytes_freed,
       (statistics->device_bytes_allocated - statistics->device_bytes_freed)));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder,
+      "  DEVICE_IMPORTED: %12" PRIdsz "B peak / %12" PRIdsz
+      "B wrapped   / %12" PRIdsz "B released / %12" PRIdsz "B live\n",
+      statistics->device_import_bytes_peak,
+      statistics->device_import_bytes_imported,
+      statistics->device_import_bytes_released,
+      (statistics->device_import_bytes_imported -
+       statistics->device_import_bytes_released)));
 
 #else
   // No-op when disabled.

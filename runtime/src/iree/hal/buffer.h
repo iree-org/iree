@@ -20,6 +20,8 @@ extern "C" {
 
 typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 typedef struct iree_hal_device_t iree_hal_device_t;
+typedef struct iree_hal_heap_allocator_statistics_t
+    iree_hal_heap_allocator_statistics_t;
 
 //===----------------------------------------------------------------------===//
 // Types and Enums
@@ -1102,6 +1104,7 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
 // |out_buffer| must be released by the caller. |data| must be kept live for the
 // lifetime of the wrapping buffer.
 iree_status_t iree_hal_heap_buffer_wrap(
+    iree_hal_heap_allocator_statistics_t* statistics,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,

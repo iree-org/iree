@@ -316,9 +316,15 @@ typedef struct iree_hal_allocator_statistics_t {
   iree_device_size_t host_bytes_peak;
   iree_device_size_t host_bytes_allocated;
   iree_device_size_t host_bytes_freed;
+  iree_device_size_t host_import_bytes_peak;
+  iree_device_size_t host_import_bytes_imported;
+  iree_device_size_t host_import_bytes_released;
   iree_device_size_t device_bytes_peak;
   iree_device_size_t device_bytes_allocated;
   iree_device_size_t device_bytes_freed;
+  iree_device_size_t device_import_bytes_peak;
+  iree_device_size_t device_import_bytes_imported;
+  iree_device_size_t device_import_bytes_released;
   // TODO(benvanik): mapping information (discarded, mapping ranges,
   //                 flushed/invalidated, etc).
 #else
@@ -780,6 +786,25 @@ static inline void iree_hal_allocator_statistics_record_alloc(
   }
 }
 
+// Records an imported buffer allocation to |statistics|.
+static inline void iree_hal_allocator_statistics_record_import(
+    iree_hal_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_device_size_t allocation_size) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    statistics->host_import_bytes_imported += allocation_size;
+    statistics->host_import_bytes_peak =
+        iree_max(statistics->host_import_bytes_peak,
+                 statistics->host_import_bytes_imported -
+                     statistics->host_import_bytes_released);
+  } else {
+    statistics->device_import_bytes_imported += allocation_size;
+    statistics->device_import_bytes_peak =
+        iree_max(statistics->device_import_bytes_peak,
+                 statistics->device_import_bytes_imported -
+                     statistics->device_import_bytes_released);
+  }
+}
+
 // Records a buffer deallocation to |statistics|.
 static inline void iree_hal_allocator_statistics_record_free(
     iree_hal_allocator_statistics_t* statistics,
@@ -788,6 +813,17 @@ static inline void iree_hal_allocator_statistics_record_free(
     statistics->host_bytes_freed += allocation_size;
   } else {
     statistics->device_bytes_freed += allocation_size;
+  }
+}
+
+// Records an imported buffer release to |statistics|.
+static inline void iree_hal_allocator_statistics_record_release(
+    iree_hal_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_device_size_t allocation_size) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    statistics->host_import_bytes_released += allocation_size;
+  } else {
+    statistics->device_import_bytes_released += allocation_size;
   }
 }
 

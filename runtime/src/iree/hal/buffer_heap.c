@@ -172,6 +172,7 @@ iree_status_t iree_hal_heap_buffer_create(
 }
 
 iree_status_t iree_hal_heap_buffer_wrap(
+    iree_hal_heap_allocator_statistics_t* statistics,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
@@ -205,6 +206,16 @@ iree_status_t iree_hal_heap_buffer_wrap(
     buffer->base.flags = IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL;
     buffer->release_callback = release_callback;
 
+    IREE_STATISTICS({
+      if (statistics != NULL) {
+        buffer->statistics = statistics;
+        iree_slim_mutex_lock(&statistics->mutex);
+        iree_hal_allocator_statistics_record_import(
+            &statistics->base, memory_type, allocation_size);
+        iree_slim_mutex_unlock(&statistics->mutex);
+      }
+    });
+
     *out_buffer = &buffer->base;
   }
 
@@ -220,9 +231,16 @@ static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_STATISTICS({
     if (buffer->statistics != NULL) {
       iree_slim_mutex_lock(&buffer->statistics->mutex);
-      iree_hal_allocator_statistics_record_free(&buffer->statistics->base,
-                                                base_buffer->memory_type,
-                                                base_buffer->allocation_size);
+      if (buffer->base.flags ==
+          IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL) {
+        iree_hal_allocator_statistics_record_release(
+            &buffer->statistics->base, base_buffer->memory_type,
+            base_buffer->allocation_size);
+      } else {
+        iree_hal_allocator_statistics_record_free(&buffer->statistics->base,
+                                                  base_buffer->memory_type,
+                                                  base_buffer->allocation_size);
+      }
       iree_slim_mutex_unlock(&buffer->statistics->mutex);
     }
   });

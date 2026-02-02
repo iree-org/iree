@@ -159,8 +159,8 @@ IREE_API_EXPORT iree_status_t iree_allocator_statistics_fprint(
     iree_slim_mutex_lock(stats->mutex);
     status = iree_string_builder_append_format(
         &builder,
-        "  HOST_ALLOC: %12" PRIdsz "B peak / %12" PRIdsz
-        "B allocated / %12" PRIdsz "B freed / %12" PRIdsz "B live\n",
+        "  HOST_ALLOC     : %12" PRIdsz "B peak / %12" PRIdsz
+        "B allocated / %12" PRIdsz "B freed    / %12" PRIdsz "B live\n",
         stats->bytes_peak, stats->bytes_allocated, stats->bytes_freed,
         (stats->bytes_allocated - stats->bytes_freed));
     iree_slim_mutex_unlock(stats->mutex);
