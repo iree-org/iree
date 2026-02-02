@@ -2755,30 +2755,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-stream-split-parameter-encoder" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-stream-split-parameter-encoder
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-iree-stream-split-parameter-encoder">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-stream-sync-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-sync-initializers
@@ -3833,8 +3809,6 @@
       
         
       
-        
-      
     
     
       
@@ -4045,29 +4019,6 @@
   
   <span class="md-ellipsis">
     Sanitizers (ASan/MSan/TSan)
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../developers/debugging/fuzzing/" class="md-nav__link">
-        
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 12h-4v-2h4m0 6h-4v-2h4m6-6h-2.81a6 6 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6 6 0 0 0-2.83 0L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20z"/></svg>
-  
-  <span class="md-ellipsis">
-    Fuzzing with libFuzzer
   </span>
   
 
@@ -5361,30 +5312,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-stream-split-parameter-encoder" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-stream-split-parameter-encoder
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-iree-stream-split-parameter-encoder">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-stream-sync-initializers" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-sync-initializers
@@ -5814,16 +5741,6 @@ updates bindings with resolved layouts.</p>
   so it can updates the types without accessing any other dialects.
 - All the encodings attached on the types have to implement
   SerializableAttr. Because the pass updates the encodings using interfaces.</p>
-<h3 id="-iree-stream-split-parameter-encoder"><code>-iree-stream-split-parameter-encoder</code><a class="headerlink" href="#-iree-stream-split-parameter-encoder" title="Permanent link">link</a></h3>
-<p><em>Splits out a parameter encoder module for compatible hoisted expressions.</em></p>
-<h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-mode                        : Controls how the encoder manages parameters.
--output-scope                : Parameter scope for the output parameters. Omit for global.
--output-file                 : .mlir/.mlirbc file path to write the split parameter encoder module to.
--hoist-parameter-expressions : Enable hoisting parameter transformation expressions.
--hoist-constant-expressions  : Enable hoisting pure constant expressions with transformations.
--max-encoding-growth-factor  : Maximum ratio of output size to input parameter size.
-</code></pre></div>
 <h3 id="-iree-stream-sync-initializers"><code>-iree-stream-sync-initializers</code><a class="headerlink" href="#-iree-stream-sync-initializers" title="Permanent link">link</a></h3>
 <p><em>Makes all initializer-produced timepoints synchronously wait before proceeding.</em></p>
 <p>Gathers all global timepoint stores within each initializer and converts
