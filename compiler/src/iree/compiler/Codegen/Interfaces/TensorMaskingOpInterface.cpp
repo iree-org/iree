@@ -38,20 +38,16 @@ static bool isIterationCarriedArg(OpOperand &arg, linalg::GenericOp op) {
 static bool isPaddingNeeded(OpBuilder &b, TilingInterface op,
                             ArrayRef<OpFoldResult> padMultiples) {
   SmallVector<Range> iterationDomain = op.getIterationDomain(b);
+  assert(iterationDomain.size() == padMultiples.size() &&
+         "expected padMultiples to match the number of iteration dimensions");
 
-  // Mismatched sizes. Return true (assume padding is needed) to allow later
-  // validation stages to emit proper diagnostics.
-  if (iterationDomain.size() < padMultiples.size()) {
-    return true;
-  }
-
-  for (size_t i = 0; i < padMultiples.size(); ++i) {
-    std::optional<int64_t> padSize = getConstantIntValue(padMultiples[i]);
+  for (auto [range, padMultiple] :
+       llvm::zip_equal(iterationDomain, padMultiples)) {
+    std::optional<int64_t> padSize = getConstantIntValue(padMultiple);
     if (!padSize || *padSize == 0) {
       continue;
     }
-    std::optional<int64_t> dimSize =
-        getConstantIntValue(iterationDomain[i].size);
+    std::optional<int64_t> dimSize = getConstantIntValue(range.size);
     if (!dimSize) {
       // Dynamic dimension - assume padding is needed.
       return true;
@@ -259,13 +255,15 @@ struct OnlineAttentionOpInterface final
     // Check if padding is actually needed. If all dimensions are already
     // aligned to the pad multiples, we can skip padding entirely.
     auto tilingOp = cast<TilingInterface>(op);
-    if (!isPaddingNeeded(builder, tilingOp, padMultiples)) {
+    bool needsPadding = isPaddingNeeded(builder, tilingOp, padMultiples);
+
+    if (needsPadding && !onlineAttentionOp.getMask()) {
+      op->emitError(
+          "Padding OnlineAttention without existing mask is not yet supported");
       return failure();
     }
 
-    if (!onlineAttentionOp.getMask()) {
-      op->emitError(
-          "Padding OnlineAttention without existing mask is not yet supported");
+    if (!needsPadding) {
       return failure();
     }
 

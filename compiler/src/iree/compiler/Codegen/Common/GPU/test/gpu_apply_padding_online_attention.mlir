@@ -8,8 +8,8 @@
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
 
-//                                                        batch, m, k1, k2
-#lowering_config = #iree_gpu.lowering_config<{reduction = [   0, 0,  0, 32]}>
+//                                                        batch, m, k1, k2, n
+#lowering_config = #iree_gpu.lowering_config<{reduction = [   0, 0,  0, 32, 0]}>
 
 func.func @online_attention_fail_to_pad_no_mask(%query: tensor<192x1024x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>) -> tensor<192x1024x64xf32> {
   %scale = arith.constant 1.0 : f32
@@ -50,8 +50,8 @@ func.func @online_attention_fail_to_pad_no_mask(%query: tensor<192x1024x64xf32>,
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-//                                                        batch, m, k1, k2
-#lowering_config = #iree_gpu.lowering_config<{reduction = [   0, 0,  0, 32]}>
+//                                                        batch, m, k1, k2, n
+#lowering_config = #iree_gpu.lowering_config<{reduction = [   0, 0,  0, 32, 0]}>
 
 // CHECK-LABEL: func.func @online_attention_tile_then_pad
 func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>, %mask: tensor<192x1024x?xf32>) -> tensor<192x1024x64xf32> {
@@ -97,8 +97,8 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-//                                                        batch, m, k1, k2
-#lowering_config = #iree_gpu.lowering_config<{reduction = [   4, 8,  0, 32]}>
+//                                                        batch, m, k1, k2, n
+#lowering_config = #iree_gpu.lowering_config<{reduction = [   4, 8,  0, 32, 0]}>
 
 // CHECK-LABEL: func.func @online_attention_tile_then_pad_7
 func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x1021x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>, %mask: tensor<?x1021xf32>) -> tensor<?x1021x64xf32> {
