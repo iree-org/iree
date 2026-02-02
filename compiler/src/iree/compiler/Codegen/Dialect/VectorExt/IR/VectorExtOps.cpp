@@ -651,7 +651,7 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
   }
 };
 
-struct FoldContigousTransferGatherToTransferRead final
+struct FoldContigousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
   using Base::Base;
 
@@ -672,8 +672,8 @@ struct FoldContigousTransferGatherToTransferRead final
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexVec,
-              FoldContigousTransferGatherToTransferRead>(ctx);
+  results.add<FoldSingleElementIndexVec, FoldContigousGatherToTransferRead>(
+      ctx);
 }
 
 // MaskableOpInterface methods.
@@ -1167,6 +1167,7 @@ static Value applyTransformMapToVector(PatternRewriter &rewriter, Location loc,
 }
 
 struct FoldContiguousGatherToTransferRead final : OpRewritePattern<GatherOp> {
+
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GatherOp xferOp,
