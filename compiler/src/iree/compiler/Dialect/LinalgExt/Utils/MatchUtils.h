@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_MATCHUTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_MATCHUTILS_H_
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -20,9 +19,6 @@ namespace detail {
 /// contraction.
 enum class MatchContractionResult;
 } // namespace detail
-
-Value defaultPromotionImpl(OpBuilder &builder, OpOperand &operand,
-                           Attribute attr);
 
 /// Positions of a Linalg op loops that correspond to different kinds of
 /// contraction dimension for scaled contractions.

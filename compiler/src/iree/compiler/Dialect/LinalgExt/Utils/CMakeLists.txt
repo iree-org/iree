@@ -37,7 +37,6 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformUtils
-    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
   PUBLIC
 )
 
