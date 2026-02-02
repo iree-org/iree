@@ -138,7 +138,6 @@ jobs:
       - setup
       - build_packages
       - unit_test
-      - test_amd_mi250
       - test_amd_mi325
       - test_amd_w7900
       - test_amd_r9700
