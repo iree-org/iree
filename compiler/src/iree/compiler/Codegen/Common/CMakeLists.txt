@@ -117,6 +117,7 @@ iree_cc_library(
     "IREEExpandStridedMetadata.cpp"
     "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
+    "InsertBatchDimForBatchlessConv.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecsPass.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
