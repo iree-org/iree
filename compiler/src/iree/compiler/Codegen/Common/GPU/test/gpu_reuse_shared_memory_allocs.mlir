@@ -28,7 +28,7 @@ func.func @shared_memory_disjoint() {
 //       CHECK:     memref.store {{.*}} %[[VIEW_A]]{{.*}} : memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:     memref.store {{.*}} %[[VIEW_B]]{{.*}} : memref<256xf32, #gpu.address_space<workgroup>>
 //       CHECK:   }
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store {{.*}} %[[VIEW_C]]{{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   return
 
@@ -66,7 +66,7 @@ func.func @shared_memory_disjoint_subview() {
 //       CHECK:     memref.store {{.*}} %[[SUBVIEW_A]]{{.*}} : memref<64xf32, #gpu.address_space<workgroup>>
 //       CHECK:     memref.store {{.*}} %[[SUBVIEW_B]]{{.*}} : memref<64xf32, #gpu.address_space<workgroup>>
 //       CHECK:   }
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store {{.*}} %[[SUBVIEW_C]]{{.*}} : memref<16xf32, #gpu.address_space<workgroup>>
 //       CHECK:   return
 
@@ -162,7 +162,7 @@ func.func @select_alloc(%val : index) {
 //       CHECK:   %[[CMP:.+]] = arith.cmpi eq, %{{.*}}, %[[C1]] : index
 //       CHECK:   %[[SELECT:.+]] = arith.select %[[CMP]], %[[VIEW_A]], %[[VIEW_B]] : memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   memref.store %{{.*}}, %[[SELECT]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   return
 
@@ -196,7 +196,7 @@ func.func @select_alloc_with_if(%val : index) {
 //       CHECK:   %[[CMP:.+]] = arith.cmpi eq, %{{.*}}, %[[C1]] : index
 //       CHECK:   %[[SELECT:.+]] = arith.select %[[CMP]], %[[VIEW_A]], %[[VIEW_B]] : memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   memref.store %{{.*}}, %[[SELECT]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   return
 
@@ -232,6 +232,6 @@ func.func @alloc_with_if(%val : index) {
 //       CHECK:   } else {
 //       CHECK:     memref.store %{{.*}}, %[[VIEW_B]][%[[C0]]] : memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   }
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.store %{{.*}}, %[[VIEW_C]][%[[C0]]] : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   return

@@ -24,11 +24,11 @@ module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @lower_value_barrier
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<4xf32>
-//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NEXT:   return %[[INPUT]]
 
 // CHECK-LABEL: func @lower_value_barrier_multiple_inputs
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<4xf32>
 //  CHECK-SAME:   %[[INPUT_T:[A-Za-z0-9]+]]: vector<4xf32>
-//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NEXT:   return %[[INPUT]], %[[INPUT_T]]

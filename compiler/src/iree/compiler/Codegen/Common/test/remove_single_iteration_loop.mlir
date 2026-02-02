@@ -9,11 +9,11 @@ func.func @thread_tile_loop() {
   %tidx = gpu.thread_id x upper_bound 64
   %tidy = gpu.thread_id y upper_bound 1
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %tidy to %c2 step %c2 {
     %0 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%tidx]
     scf.for %arg4 = %0 to %c256 step %c256 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
     }
   }
   scf.for %arg3 = %tidy to %c2 step %c2 {
@@ -23,9 +23,9 @@ func.func @thread_tile_loop() {
   // The inner loop doesn't always execute once so it needs an scf.if
   //      CHECK: %[[COND:.+]] = arith.cmpi slt, %[[LB]], %[[C250]] : index
   //      CHECK: scf.if %[[COND]] {
-  //      CHECK:   gpu.barrier
+  //      CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
     scf.for %arg4 = %0 to %c250 step %c250 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
     }
   }
   return
@@ -41,9 +41,9 @@ func.func @workgroup_tile_loop() {
   %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
   %countx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg0 = %idx to %c2048 step %countx {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   return
 }
@@ -58,9 +58,9 @@ func.func @workgroup_tile_loop_negative() {
   %idx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
   %countx = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
   //     CHECK: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg0 = %idx to %c2048 step %countx {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   return
 }
@@ -69,7 +69,7 @@ func.func @workgroup_tile_loop_negative() {
 
 // CHECK-LABEL: func.func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 func.func @both_workgroup_and_workitem() {
   %c8 = arith.constant 8 : index
   %c32 = arith.constant 32 : index
@@ -102,7 +102,7 @@ func.func @both_workgroup_and_workitem() {
           %24 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%22]
           %25 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%23]
           scf.for %arg4 = %24 to %c32 step %25 {
-            gpu.barrier
+            gpu.barrier memfence [#gpu.address_space<workgroup>]
           }
         }
 
@@ -166,27 +166,27 @@ func.func @delinearize_linearize() {
   %ids:2 = affine.delinearize_index %tidx into (4, 32) : index, index
   //     CHECK: %[[IDS:.+]]:2 = affine.delinearize_index
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %ids#0 to %c4 step %c4 {
     %0 = affine.linearize_index [%ids#1, %c0] by (32, 2) : index
     scf.for %arg4 = %0 to %c64 step %c64 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
     }
   }
   // The loop doesn't always execute once so it needs an scf.if
   //     CHECK: %[[COND:.+]] = arith.cmpi slt, %[[IDS]]#0, %[[C3]] : index
   //     CHECK: scf.if %[[COND]] {
-  //     CHECK:   gpu.barrier
+  //     CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %ids#0 to %c3 step %c4 {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   // ValueBoundsOpInterface will also work on an arith.muli
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %ids#0 to %c4 step %c4 {
     %0 = arith.muli %ids#1, %c2 : index
     scf.for %arg4 = %0 to %c64 step %c64 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
     }
   }
 
@@ -203,9 +203,9 @@ func.func @workgroup_id() {
   %c8 = arith.constant 8 : index
   %workgroup_id_x = hal.interface.workgroup.id[0] upper_bound 8 : index
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %workgroup_id_x to %c8 step %c8 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   return
 }
@@ -219,9 +219,9 @@ func.func @argument_with_assume(%arg_index : index) {
   %arg = util.assume.int %arg_index[<umin=0, umax=4>, <umin=4, umax=7>] : index
   %ordinal = iree_tensor_ext.dispatch.workload.ordinal %arg, 0 : index
   // CHECK-NOT: scf.for
-  //     CHECK: gpu.barrier
+  //     CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   scf.for %arg3 = %ordinal to %c8 step %c8 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   return
 }
@@ -279,7 +279,7 @@ func.func @dynamic_nonunittrip(%arg_index : index, %arg_value : memref<8xf16>) {
   %c3 = arith.constant 3 : index
   %0 = util.assume.int %arg_index<umin = 0, umax = 5> : index
   scf.for %arg1 = %c1 to %0 step %c3 {
-       gpu.barrier
+       gpu.barrier memfence [#gpu.address_space<workgroup>]
   }
   return
 }

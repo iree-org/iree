@@ -50,6 +50,53 @@ getBuffers(RewriterBase &rewriter, const MutableOperandRange &operands,
   return result;
 }
 
+/// Return the set of address spaces that need to be fenced by a GPU barrier
+/// that will synchronize those buffers. If an address space isn't recognized or
+/// there's a null address space, returns ArrayAttr() to fence everything.
+template <typename Iter>
+static ArrayAttr fencedGpuAddressSpaces(RewriterBase &rewriter, Iter buffers) {
+  llvm::SetVector<Attribute> addressSpaces;
+  for (Value buffer : buffers) {
+    auto memrefType = dyn_cast<BaseMemRefType>(buffer.getType());
+    if (!memrefType) {
+      return ArrayAttr();
+    }
+    Attribute memorySpace = memrefType.getMemorySpace();
+    if (!memorySpace) {
+      return ArrayAttr();
+    }
+    // HAL descriptors live in global memory, and AMDGPU buffers are produced
+    // from it.
+    Attribute globalSpace =
+        rewriter.getAttr<gpu::AddressSpaceAttr>(gpu::AddressSpace::Global);
+
+    bool isKnown =
+        llvm::TypeSwitch<Attribute, bool>(memrefType.getMemorySpace())
+            .Case([&](gpu::AddressSpaceAttr a) {
+              if (a.getValue() == gpu::AddressSpace::Private) {
+                // No such thing as a fence on private memory.
+                return true;
+              }
+              addressSpaces.insert(a);
+              return true;
+            })
+            .Case([&](IREE::HAL::DescriptorTypeAttr) {
+              addressSpaces.insert(globalSpace);
+              return true;
+            })
+            .Case([&](amdgpu::AddressSpaceAttr) {
+              addressSpaces.insert(globalSpace);
+              return true;
+            })
+            .Default([&](Attribute) { return false; });
+    if (!isKnown) {
+      return ArrayAttr();
+    }
+  }
+
+  return rewriter.getArrayAttr(addressSpaces.getArrayRef());
+}
+
 /// Bufferization of iree_gpu.barrier_region. Always just bufferizes in place
 /// and gets inlined with barriers.
 struct BarrierRegionOpBufferizationInterface
@@ -159,49 +206,13 @@ struct BarrierRegionOpBufferizationInterface
               .getResult());
     }
 
-    bool hasUnknownGpuAddressSpace = false;
-    SmallVector<Attribute> addressSpaces;
-    for (Value buffer : llvm::concat<Value>(*newOperands, *newResults)) {
-      auto memrefType = dyn_cast<BaseMemRefType>(buffer.getType());
-      if (!memrefType) {
-        hasUnknownGpuAddressSpace = true;
-        break;
-      }
-      Attribute memorySpace = memrefType.getMemorySpace();
-      if (!memorySpace) {
-        hasUnknownGpuAddressSpace = true;
-        break;
-      }
-      // HAL descriptors live in global memory, and AMDGPU buffers are produced
-      // from it.
-      Attribute globalSpace =
-          rewriter.getAttr<gpu::AddressSpaceAttr>(gpu::AddressSpace::Global);
-
-      llvm::TypeSwitch<Attribute>(memrefType.getMemorySpace())
-          .Case([&](gpu::AddressSpaceAttr a) {
-            if (a.getValue() == gpu::AddressSpace::Private) {
-              // No such thing as a fence on private memory.
-              return;
-            }
-            addressSpaces.push_back(a);
-          })
-          .Case([&](IREE::HAL::DescriptorTypeAttr) {
-            addressSpaces.push_back(globalSpace);
-          })
-          .Case([&](amdgpu::AddressSpaceAttr) {
-            addressSpaces.push_back(globalSpace);
-          })
-          .Default([&](Attribute) { hasUnknownGpuAddressSpace = true; });
-    }
-
-    ArrayAttr addressSpacesAttr = hasUnknownGpuAddressSpace
-                                      ? ArrayAttr()
-                                      : rewriter.getArrayAttr(addressSpaces);
+    ArrayAttr addressSpaces = fencedGpuAddressSpaces(
+        rewriter, llvm::concat<Value>(*newOperands, *newResults));
     rewriter.setInsertionPoint(barrierOp);
-    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpacesAttr);
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
     rewriter.setInsertionPointAfter(barrierOp);
     auto afterBarrier =
-        gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpacesAttr);
+        gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
 
     rewriter.inlineBlockBefore(barrierOp.getBody(), afterBarrier,
                                tensorizedOperands);
@@ -263,8 +274,6 @@ struct ValueBarrierOpBufferizationInterface
       return failure();
     }
 
-    gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
-
     SmallVector<Value> buffers;
     buffers.reserve(barrierOp.getNumOperands());
     for (auto input : barrierOp.getInputs()) {
@@ -274,6 +283,9 @@ struct ValueBarrierOpBufferizationInterface
       }
       buffers.push_back(buffer.value());
     }
+
+    ArrayAttr addressSpaces = fencedGpuAddressSpaces(rewriter, buffers);
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
 
     // This operation bufferizes in place
     bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);

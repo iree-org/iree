@@ -18,7 +18,7 @@ func.func @test(%vector: vector<16x16xf16>) -> vector<16x16xf16> {
 
 
 //    CHECK-LABEL: func.func @test
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x16xf16, #gpu.address_space<workgroup>>
 //         CHECK:    %[[WRITE:.+]] = vector.transfer_write %{{.*}}, %[[ALLOC]]
 //         CHECK:    %[[BAR:.+]]   = iree_gpu.value_barrier %[[WRITE]]

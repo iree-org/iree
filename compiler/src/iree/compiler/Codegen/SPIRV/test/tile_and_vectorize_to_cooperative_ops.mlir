@@ -37,7 +37,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   scf.for %arg0 = %c0 to %c1024 step %c32 {
     %subview_5 = memref.subview %subview_1[0, %arg0] [32, 32] [1, 1] : memref<32x1024xf16, strided<[1024, 1], offset: ?>> to memref<32x32xf16, strided<[1024, 1], offset: ?>>
     %subview_6 = memref.subview %subview_2[%arg0, 0] [32, 32] [1, 1] : memref<1024x32xf16, strided<[128, 1], offset: ?>> to memref<32x32xf16, strided<[128, 1], offset: ?>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %subview_7 = memref.subview %alloc[%c0, %c0] [32, 32] [1, 1] : memref<32x32xf16, 3> to memref<32x32xf16, strided<[32, 1], offset: ?>, 3>
     %10 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
     %11 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
@@ -56,7 +56,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
     %subview_12 = memref.subview %subview_10[%17, %18] [1, 8] [1, 1] : memref<32x32xf16, strided<[32, 1], offset: ?>, 3> to memref<1x8xf16, strided<[32, 1], offset: ?>, 3>
     %19 = vector.transfer_read %subview_11[%c0, %c0], %cst {in_bounds = [true, true]} : memref<1x8xf16, strided<[128, 1], offset: ?>>, vector<1x8xf16>
     vector.transfer_write %19, %subview_12[%c0, %c0] {in_bounds = [true, true]} : vector<1x8xf16>, memref<1x8xf16, strided<[32, 1], offset: ?>, 3>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     linalg.matmul {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config}
       ins(%alloc, %alloc_0 : memref<32x32xf16, 3>, memref<32x32xf16, 3>) outs(%subview : memref<32x32xf16, strided<[128, 1], offset: ?>>)
   }
@@ -101,12 +101,12 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:     scf.for %{{.+}} = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:       vector.transfer_write %[[ZERO]], {{.+}} : vector<16x16xf16>, memref<16x16xf16, strided<[128, 1], offset: ?>>
 //       CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C1024]] step %[[C32]]
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     vector.transfer_read {{.+}} vector<8xf16>
 //       CHECK:     vector.transfer_write
 //       CHECK:     vector.transfer_read {{.+}} vector<8xf16>
 //       CHECK:     vector.transfer_write
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
 //   CHECK-DAG:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]
@@ -172,7 +172,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
   scf.for %arg0 = %c0 to %c512 step %c32 {
     %subview_4 = memref.subview %subview_1[0, 0, %arg0] [1, 32, 32] [1, 1, 1] : memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
     %subview_5 = memref.subview %subview_2[0, %arg0, 0] [1, 32, 32] [1, 1, 1] : memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>> to memref<1x32x32xf16, strided<[131072, 256, 1], offset: ?>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %subview_6 = memref.subview %alloc[%c0, %c0, %c0] [1, 32, 32] [1, 1, 1] : memref<1x32x32xf16, 3> to memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3>
     %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
     %10 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
@@ -191,7 +191,7 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
     %subview_11 = memref.subview %subview_9[0, %16, %17] [1, 1, 8] [1, 1, 1] : memref<1x32x32xf16, strided<[1024, 32, 1], offset: ?>, 3> to memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
     %18 = vector.transfer_read %subview_10[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<1x1x8xf16, strided<[131072, 256, 1], offset: ?>>, vector<1x1x8xf16>
     vector.transfer_write %18, %subview_11[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x1x8xf16>, memref<1x1x8xf16, strided<[1024, 32, 1], offset: ?>, 3>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     linalg.batch_matmul {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config}
       ins(%alloc, %alloc_0 : memref<1x32x32xf16, 3>, memref<1x32x32xf16, 3>) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
   }
@@ -237,12 +237,12 @@ func.func @matmul_256x1024x128_div_add() attributes {translation_info = #transla
 //       CHECK:         vector.transfer_write %[[ZERO]], {{.+}} : vector<16x16xf16>, memref<1x16x16xf16, strided<[32768, 256, 1], offset: ?>>
 
 //       CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C512]] step %[[C32]]
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     vector.transfer_read {{.+}} vector<8xf16>
 //       CHECK:     vector.transfer_write
 //       CHECK:     vector.transfer_read {{.+}} vector<8xf16>
 //       CHECK:     vector.transfer_write
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     scf.for %[[IV_Z:.+]] = %[[ID_Z]] to %[[C1]] step %[[C1]]
 //       CHECK:       scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:         %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Z]], %[[IV_Y]], 0] [1, 16, 32]
@@ -300,7 +300,7 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
   scf.for %arg0 = %c0 to %c1024 step %c32 {
     %subview_5 = memref.subview %subview_1[0, %arg0] [32, 32] [1, 1] : memref<32x1024xi8, strided<[1024, 1], offset: ?>> to memref<32x32xi8, strided<[1024, 1], offset: ?>>
     %subview_6 = memref.subview %subview_2[%arg0, 0] [32, 32] [1, 1] : memref<1024x32xi8, strided<[128, 1], offset: ?>> to memref<32x32xi8, strided<[128, 1], offset: ?>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %subview_7 = memref.subview %alloc[%c0, %c0] [32, 32] [1, 1] : memref<32x32xi8, 3> to memref<32x32xi8, strided<[32, 1], offset: ?>, 3>
     %10 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%0, %1, %2]
     %11 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%0]
@@ -319,7 +319,7 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
     %subview_12 = memref.subview %subview_10[%17, %18] [1, 8] [1, 1] : memref<32x32xi8, strided<[32, 1], offset: ?>, 3> to memref<1x8xi8, strided<[32, 1], offset: ?>, 3>
     %19 = vector.transfer_read %subview_11[%c0, %c0], %cst_i8 {in_bounds = [true, true]} : memref<1x8xi8, strided<[128, 1], offset: ?>>, vector<1x8xi8>
     vector.transfer_write %19, %subview_12[%c0, %c0] {in_bounds = [true, true]} : vector<1x8xi8>, memref<1x8xi8, strided<[32, 1], offset: ?>, 3>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"]
@@ -361,12 +361,12 @@ func.func @matmul_256x1024x128_mixed_signedness_int8() {
 //       CHECK:     scf.for %{{.+}} = %[[OFFSET_X]] to %[[C32]] step %[[C32]]
 //       CHECK:       vector.transfer_write %[[ZERO]], {{.+}} : vector<16x16xi32>, memref<16x16xi32, strided<[128, 1], offset: ?>>
 //       CHECK:   scf.for %{{.+}} = %[[C0]] to %[[C1024]] step %[[C32]]
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     vector.transfer_read {{.+}} vector<8xi8>
 //       CHECK:     vector.transfer_write
 //       CHECK:     vector.transfer_read {{.+}} vector<8xi8>
 //       CHECK:     vector.transfer_write
-//       CHECK:     gpu.barrier
+//       CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[OFFSET_Y]] to %[[C32]] step %[[C32]]
 //       CHECK:       %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][%[[IV_Y]], 0]
 //   CHECK-DAG:       %[[READ0:.+]] = vector.transfer_read %[[LHS_VIEW]][%[[C0]], %[[C0]]]

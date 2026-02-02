@@ -23,5 +23,5 @@ func.func @shared_memory_disjoint() {
 //       CHECK:   memref.view %[[PACKED]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   nvgpu.device_async_create_group
 //       CHECK:   nvgpu.device_async_wait %0 {numGroups = 0 : i32}
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   memref.view %[[PACKED]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>

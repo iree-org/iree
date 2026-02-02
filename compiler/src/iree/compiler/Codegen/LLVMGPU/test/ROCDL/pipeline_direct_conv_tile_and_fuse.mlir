@@ -69,12 +69,12 @@ hal.executable private @main {
 //          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:       scf.for {{.+}} = %[[C0]] to %[[C3]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:         scf.for {{.+}} = %[[C0]] to %[[C36]] step %[[C4]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
-//          CHECK:           gpu.barrier
+//          CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK-DAG:           %[[LHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<4xf16>
 //      CHECK-DAG:           vector.transfer_write %[[LHS_RD]]
 //      CHECK-DAG:           %[[RHS_RD:.+]] = vector.transfer_read {{.+}} : {{.*}}vector<8xf16>
 //      CHECK-DAG:           vector.transfer_write %[[RHS_RD]]
-//          CHECK:           gpu.barrier
+//          CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
 //      CHECK-DAG:           vector.transfer_read {{.*}} vector<4x4xf16>
 //  CHECK-COUNT-4:           amdgpu.mfma 16x16x16

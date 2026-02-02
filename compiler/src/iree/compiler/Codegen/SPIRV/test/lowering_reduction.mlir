@@ -57,7 +57,7 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //         CHECK:    scf.if %[[LANE0]] {
 //         CHECK:      memref.store %[[R5]], %[[ALLOC]][%[[WID]]] : memref<4xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    %[[LANE_ID_IN_BOUNDS:.*]] = arith.minui %[[LANE_ID]]
 //         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID_IN_BOUNDS]]] : memref<4xf32, #gpu.address_space<workgroup>>
 //         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LOAD_VAL]], %[[C1]], %[[C32]] : f32
@@ -135,7 +135,7 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[SPAN1_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //     CHECK-DAG:    %[[SPAN1:.+]] = memref.assume_alignment %[[SPAN1_BINDING]], 64
 
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I2]], %[[I32]] : i32
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  idx %{{.+}}, %[[I0]], %[[I32]] : i32
@@ -192,7 +192,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
@@ -218,7 +218,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
 //         CHECK:    }
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
@@ -297,7 +297,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[PV]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
 // CHECK:           %[[MAX:.+]] = arith.maxnumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
-// CHECK:           gpu.barrier
+// CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
@@ -314,7 +314,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:           math.exp
 // CHECK:           arith.addf
 // CHECK:           vector.transfer_write %{{.*}}, %[[MASK2]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
-// CHECK:           gpu.barrier
+// CHECK:           gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // Finish the second reduction.
 // CHECK:         vector.transfer_read {{.*}} {in_bounds = [true]} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>

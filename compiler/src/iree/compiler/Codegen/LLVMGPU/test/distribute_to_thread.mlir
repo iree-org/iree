@@ -47,11 +47,11 @@ func.func @dot_dispatch_0() attributes {translation_info = #translation} {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, #gpu.address_space<workgroup>>
 //     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x256xf32, #gpu.address_space<workgroup>>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, #gpu.address_space<workgroup>>
-//     CHECK-NOT:    gpu.barrier
+//     CHECK-NOT:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, strided<[1024, 1], offset: ?>> to memref<4x256xf32, #gpu.address_space<workgroup>>
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
 //     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, #gpu.address_space<workgroup>> to memref<2x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>
@@ -60,9 +60,9 @@ func.func @dot_dispatch_0() attributes {translation_info = #translation} {
 //         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<4x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%[[C]] : memref<2x4xf32, strided<[256, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x256xf32, #gpu.address_space<workgroup>> to memref<2x256xf32,
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 
@@ -128,9 +128,9 @@ func.func @batch_matmul_func() attributes {translation_info = #translation} {
 //         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, strided<[256, 32, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<1x32x4xf32, strided<[1024, 32, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%{{.*}} : memref<1x1x4xf32, strided<[256, 32, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<1x8x32xf32, #gpu.address_space<workgroup>> to memref<1x8x32xf32
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 
@@ -183,11 +183,11 @@ func.func @dot_dispatch_0() attributes {translation_info = #translation} {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, #gpu.address_space<workgroup>>
 //     CHECK-DAG:  %[[BUFFER2:.+]] = memref.alloc() : memref<2x32xf32, #gpu.address_space<workgroup>>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, #gpu.address_space<workgroup>>
-//     CHECK-NOT:    gpu.barrier
+//     CHECK-NOT:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, strided<[1024, 1], offset: ?>> to memref<4x32xf32, #gpu.address_space<workgroup>>
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {
 //     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, #gpu.address_space<workgroup>> to memref<1x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>
@@ -196,9 +196,9 @@ func.func @dot_dispatch_0() attributes {translation_info = #translation} {
 //         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, strided<[4, 1], offset: ?>, #gpu.address_space<workgroup>>, memref<4x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>) outs(%[[C]] : memref<1x1xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>)
 //         CHECK:    }
 //         CHECK:  }
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:  memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x32xf32, #gpu.address_space<workgroup>> to memref<2x32xf32
-//         CHECK:  gpu.barrier
+//         CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 

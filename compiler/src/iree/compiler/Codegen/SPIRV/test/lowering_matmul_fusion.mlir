@@ -105,7 +105,7 @@ func.func @matmul_i4_quant_weight() {
 //     CHECK-COUNT:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
 
 //           CHECK:       vector.transfer_write %{{.+}}, %[[A_ALLOC]]
-//           CHECK:       gpu.barrier
+//           CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 //  CHECK-COUNT-32:       vector.transfer_read %[[A_ALLOC]]
 //  CHECK-COUNT-32:       vector.transfer_read %[[B_ALLOC]]

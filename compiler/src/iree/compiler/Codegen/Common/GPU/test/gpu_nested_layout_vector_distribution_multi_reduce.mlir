@@ -159,7 +159,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[THREAD_RED4:.+]] = vector.shape_cast %[[THREAD_RED3]] : vector<2xf32> to vector<2x1x1xf32>
 // Subgroup reduction
 // CHECK-DAG: %[[ALLOC:.+]] = memref.alloc() : memref<32x2xf32, #gpu.address_space<workgroup>>
-// CHECK: gpu.barrier
+// CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG: %[[SGID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
 // CHECK-DAG: %[[TIDX:.+]]:2 = affine.delinearize_index %thread_id_x into (16)
 // CHECK-DAG: %[[EXTRACT0:.+]] = vector.extract %[[THREAD_RED4]][0] : vector<1x1xf32> from vector<2x1x1xf32>
@@ -167,7 +167,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[TIDX1:.+]] = affine.linearize_index disjoint [%c1, %[[TIDX]]#1] by (2, 16) : index
 // CHECK-DAG: vector.transfer_write %[[EXTRACT0]], %[[ALLOC]][%[[TIDX]]#1, %[[SGID]]#1]
 // CHECK-DAG: vector.transfer_write %[[EXTRACT1]], %[[ALLOC]][%[[TIDX1]], %[[SGID]]#1]
-// CHECK: gpu.barrier
+// CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG: %[[BATCH0:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 16) : index, index, index
 // CHECK-DAG: %[[SG_READ0:.+]] = vector.transfer_read %alloc[%[[BATCH0]]#2, %[[BATCH0]]#1], %{{.*}} : memref<32x2xf32, #gpu.address_space<workgroup>>, vector<1x1xf32>
 // CHECK-DAG: %[[BATCH1:.+]] = affine.linearize_index disjoint [%c1, %[[BATCH0]]#2] by (2, 16) : index
@@ -210,7 +210,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @subgroup_reduction_masked_tail_thread
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: vector.transfer_write
-// CHECK: gpu.barrier
+// CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // The read will be masked, because we have 4 threads doing a subgroup reduce
 // on 3 elements.
 // CHECK: %[[MASK:.+]] = vector.create_mask %[[C1]], %{{.*}} : vector<1x1xi1>
@@ -247,7 +247,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @subgroup_reduction_serial_tail
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: vector.transfer_write
-// CHECK: gpu.barrier
+// CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // We should be doing a serialized reduction, because we don't know if we have
 // enough threads on the reduction dimension to do a subgroup reduce.
 // CHECK: vector.transfer_read %{{.*}}[%{{.*}}, %[[C0]]]

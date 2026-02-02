@@ -202,7 +202,7 @@ module {
     %alloc = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
     %2 = vector.transfer_read %0[%workgroup_id_x, %c0], %cst_0 {in_bounds = [true]} : memref<128x32xf32>, vector<32xf32>
     vector.transfer_write %2, %alloc[%c0] {in_bounds = [true]} : vector<32xf32>, memref<32xf32, #gpu.address_space<workgroup>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %3 = vector.transfer_read %alloc[%c0], %cst_0 {in_bounds = [true]} : memref<32xf32, #gpu.address_space<workgroup>>, vector<32xf32>
     vector.transfer_write %3, %1[%workgroup_id_x, %c0] {in_bounds = [true]} : vector<32xf32>, memref<128x32xf32>
     return
@@ -213,7 +213,7 @@ module {
 //       CHECK:   %[[ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   vector.transfer_read {{.*}} : memref<128x32xf32>, vector<1xf32>
 //       CHECK:   vector.transfer_write {{.*}} %[[ALLOC]]{{.*}} : vector<1xf32>, memref<32xf32, #gpu.address_space<workgroup>>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   vector.transfer_read %[[ALLOC]]{{.*}} : memref<32xf32, #gpu.address_space<workgroup>>, vector<1xf32>
 //       CHECK:   vector.transfer_write {{.*}} : vector<1xf32>, memref<128x32xf32>
 //       CHECK:   return

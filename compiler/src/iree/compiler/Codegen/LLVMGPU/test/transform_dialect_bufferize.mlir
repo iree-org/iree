@@ -19,9 +19,9 @@ func.func @pad_matmul_static_dispatch_0() {
 
   // CHECK: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
   // CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x500xf32, #gpu.address_space<workgroup>>
-  // CHECK: gpu.barrier
+  // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   // CHECK: linalg.generic
-  // CHECK: gpu.barrier
+  // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
   // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #gpu.address_space<workgroup>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
   %p = bufferization.alloc_tensor() copy(%3) : tensor<250x500xf32>
   %6 = linalg.matmul ins(%p, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>

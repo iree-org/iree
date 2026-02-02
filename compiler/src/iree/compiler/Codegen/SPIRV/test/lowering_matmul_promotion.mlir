@@ -58,28 +58,28 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:   memref.alloc() : memref<2x64x20xf32, #gpu.address_space<workgroup>>
 //           CHECK:   memref.alloc() : memref<2x16x68xf32, #gpu.address_space<workgroup>>
 //           CHECK:   scf.for
-//           CHECK:     gpu.barrier
+//           CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //           CHECK:     affine.apply #[[$MAP]]
 //   CHECK-COUNT-2:     vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x64x20xf32, #gpu.address_space<workgroup>>
 //   CHECK-COUNT-2:     vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x16x68xf32, #gpu.address_space<workgroup>>
-//           CHECK:     gpu.barrier
+//           CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-COUNT-32:     vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:     vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-128:     vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
 //   CHECK-COUNT-2:     vector.transfer_read %{{.+}}, %[[PV]] {__pipelining_first_stage__, in_bounds = [true]} : memref<128x512xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //   CHECK-COUNT-2:     vector.transfer_read %{{.+}}, %[[PV]] {__pipelining_first_stage__, in_bounds = [true]} : memref<512x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:     scf.yield
-//           CHECK:   gpu.barrier
+//           CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x64x20xf32, #gpu.address_space<workgroup>>
 //   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x16x68xf32, #gpu.address_space<workgroup>>
-//           CHECK:   gpu.barrier
+//           CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//           CHECK:   gpu.barrier
+//           CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x64x20xf32, #gpu.address_space<workgroup>>
 //   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<2x16x68xf32, #gpu.address_space<workgroup>>
-//           CHECK:   gpu.barrier
+//           CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<2x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 // CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
@@ -159,7 +159,7 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, #gpu.address_space<workgroup>>
 //           CHECK:   vector.transfer_read %{{.+}}, %[[PV]] {__pipelining_first_stage__, in_bounds = [true]} : memref<512x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:   vector.transfer_write %{{.+}}, %{{.+}} {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, #gpu.address_space<workgroup>>
-//           CHECK:   gpu.barrier {__pipelining_first_stage__}
+//           CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>] {__pipelining_first_stage__}
 //           CHECK:   scf.for
 //  CHECK-COUNT-32:     vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<3x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:     vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<3x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>
@@ -173,7 +173,7 @@ hal.executable @matmul_f32_128x256x64 {
 //           CHECK:     vector.transfer_write %{{.+}}, %{{.+}}[%[[APPLY]], {{.+}}] {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, #gpu.address_space<workgroup>>
 //           CHECK:     vector.transfer_read %{{.+}}, %[[PV]] {__pipelining_first_stage__, in_bounds = [true]} : memref<512x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:     vector.transfer_write %{{.+}}, %{{.+}}[%[[APPLY]], {{.+}}] {__pipelining_first_stage__, in_bounds = [true]} : vector<4xf32>, memref<3x16x68xf32, #gpu.address_space<workgroup>>
-//           CHECK:     gpu.barrier {__pipelining_first_stage__}
+//           CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>] {__pipelining_first_stage__}
 //           CHECK:     scf.yield
 //  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<3x64x20xf32, #gpu.address_space<workgroup>>, vector<4xf32>
 //  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[PV]] {in_bounds = [true]} : memref<3x16x68xf32, #gpu.address_space<workgroup>>, vector<4xf32>

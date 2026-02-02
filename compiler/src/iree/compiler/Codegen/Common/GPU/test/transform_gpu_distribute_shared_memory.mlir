@@ -9,7 +9,7 @@ module attributes {transform.with_named_sequence} {
   func.func @shared_mem_cpy(%m0 : memref<64x16xf32, #hal.descriptor_type<storage_buffer>>)
   attributes {hal.executable.target = #executable_target, translation_info = #translation_info} {
     %sm0 = memref.get_global @__shared_memory__ : memref<64x16xf32, #gpu.address_space<workgroup>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
 
     linalg.generic {indexing_maps = [#map1, #map1],
         iterator_types = ["parallel", "parallel"]}

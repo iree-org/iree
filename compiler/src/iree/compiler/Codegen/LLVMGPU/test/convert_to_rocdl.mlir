@@ -62,20 +62,20 @@ builtin.module {
 // CHECK:  llvm.intr.vector.reduce.fmax({{.*}})  : (vector<2xf32>) -> f32
 
 // -----
-// Test that gpu barriers be lowered to `s_waitcnt lgkmcnt(0)\0As_barrier` on rocm
+// Test that gpu barriers be lowered to mmra fences
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
 builtin.module {
   func.func @simple_barrier() {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     return
   }
 }
 // CHECK: #[[$MMRA:.+]] = #llvm.mmra_tag<"amdgpu-synchronize-as":"local">
 // CHECK-LABEL: llvm.func @simple_barrier
 // CHECK: llvm.fence syncscope("workgroup") release {llvm.mmra = #[[$MMRA]]}
-// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_barrier", ""  : () -> ()
+// CHECK: rocdl.s.barrier
 // CHECK: llvm.fence syncscope("workgroup") acquire {llvm.mmra = #[[$MMRA]]}
 
 // -----

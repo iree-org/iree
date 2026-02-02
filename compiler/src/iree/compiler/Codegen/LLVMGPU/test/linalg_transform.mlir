@@ -52,7 +52,7 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
   // FOREACH-TO-GPU:   linalg.fill
   // FOREACH-TO-GPU: }
-  // FOREACH-TO-GPU: gpu.barrier
+  // FOREACH-TO-GPU: gpu.barrier{{$}}
   //
   // Matmul is tiled by 7x9 with identity (omitted) thread_dim_mapping, predicate appropriately.
   // FOREACH-TO-GPU: %[[LT7:.*]]  = arith.cmpi ult, %[[TIDX]], %[[C7]] : index
@@ -69,7 +69,7 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU:   linalg.generic
   // FOREACH-TO-GPU-SAME: ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
   // FOREACH-TO-GPU: }
-  // FOREACH-TO-GPU: gpu.barrier
+  // FOREACH-TO-GPU: gpu.barrier{{$}}
 
   %7 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%6 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : tensor<250x1020xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<250x1020xf32>>
