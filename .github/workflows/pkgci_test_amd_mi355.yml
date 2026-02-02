@@ -34,7 +34,7 @@ jobs:
       IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx950"
     container:
-      image: rocm/dev-ubuntu-22.04:7.1.1-complete
+      image: rocm/dev-ubuntu-24.04:7.2
       options: --ipc host
         --group-add video
         --device /dev/kfd
@@ -92,6 +92,4 @@ jobs:
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
           IREE_NVIDIA_SM80_TESTS_DISABLE: 1
           IREE_MULTI_DEVICE_TESTS_DISABLE: 0
-          # TODO: Enable HIP CTS tests (iree/hal/drivers/hip/cts)
-          IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE: "^iree/hal/drivers/hip/cts"
         run: ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
