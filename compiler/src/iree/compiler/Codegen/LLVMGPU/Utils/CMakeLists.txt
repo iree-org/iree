@@ -36,12 +36,14 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRMathDialect
     MLIRMemRefDialect
+    MLIRMemRefTransforms
     MLIRNVGPUDialect
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRVectorDialect
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

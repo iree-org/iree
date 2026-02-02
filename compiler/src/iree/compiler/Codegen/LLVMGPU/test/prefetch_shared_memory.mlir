@@ -400,3 +400,176 @@ func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
   }
   return
 }
+
+// -----
+
+// CHECK-LABEL: @prefetch_gather_to_lds_two_operands
+// CHECK-SAME: (%[[A_GLOBAL:.*]]: memref<128x128xf32>, %[[B_GLOBAL:.*]]: memref<128x128xf32>, %[[C_GLOBAL:.*]]: memref<128xf32>)
+func.func @prefetch_gather_to_lds_two_operands(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  // CHECK: %[[A_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: %[[B_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // CHECK: %[[IDX:.*]] = affine.apply #map(%[[K:.*]])
+    // CHECK: %[[B_SUB:.*]] = memref.subview %[[B_ALLOC]][%[[IDX]], 0] [1, 1] [1, 1] : memref<2x1xf32, #gpu.address_space<workgroup>> to memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
+    // CHECK: %[[A_SUB:.*]] = memref.subview %[[A_ALLOC]][%[[IDX]], 0] [1, 1] [1, 1] : memref<2x1xf32, #gpu.address_space<workgroup>> to memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
+    // CHECK: amdgpu.gather_to_lds %[[A_GLOBAL]][%c0, %[[K]]], %[[A_SUB]][%c0]
+    amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    // CHECK: amdgpu.gather_to_lds %[[B_GLOBAL]][%[[K]], %c0], %[[B_SUB]][%c0]
+    amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+
+    // CHECK: vector.transfer_read %[[A_SUB]][%c0]
+    %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK: vector.transfer_read %[[B_SUB]][%c0]
+    %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK: arith.mulf
+    %prod = arith.mulf %a_val, %b_val : vector<1xf32>
+    // CHECK: arith.addf
+    %sum = arith.addf %prod, %acc : vector<1xf32>
+
+    // CHECK: scf.yield
+    scf.yield %sum : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @gather_to_lds_inside_if_not_multibuffered
+func.func @gather_to_lds_inside_if_not_multibuffered(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>,
+    %bound: index) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-NOT: memref<2x1xf32
+  %lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // CHECK: scf.if
+    %in_bounds = arith.cmpi slt, %k, %bound : index
+    // CHECK: amdgpu.gather_to_lds
+    scf.if %in_bounds {
+      amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    }
+    // CHECK: vector.transfer_read
+    %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK: arith.addf
+    %sum = arith.addf %val, %acc : vector<1xf32>
+    // CHECK: scf.yield
+    scf.yield %sum : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// CHECK-ALL-LABEL: @gather_to_lds_mixed_with_stream_copy
+// CHECK-ALL-SAME: (%[[GLOBAL:.*]]: memref<128x128xf32>, %[[OUTPUT:.*]]: memref<128xf32>)
+func.func @gather_to_lds_mixed_with_stream_copy(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>) {
+  // CHECK-ALL-NEXT: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  // CHECK-ALL-NEXT: %[[CST_0:.*]] = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  // CHECK-ALL-NEXT: %[[C128:.*]] = arith.constant 128 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-ALL-NEXT: %[[C1:.*]] = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-ALL-NEXT: %[[C0:.*]] = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
+
+  // CHECK-ALL-NEXT: %[[LDS_ASYNC:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %lds_async = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK-ALL-NEXT: %[[LDS_STREAM:.*]] = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %lds_stream = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // CHECK-ALL-NEXT: %[[RESULT:.*]] = scf.for %[[K:.*]] = %[[C0]] to %[[C128]] step %[[C1]] iter_args(%[[ACC:.*]] = %[[CST]]) -> (vector<1xf32>) {
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    // CHECK-ALL-NEXT:   amdgpu.gather_to_lds %[[GLOBAL]][%[[C0]], %[[K]]], %[[LDS_ASYNC]][%[[C0]]] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    amdgpu.gather_to_lds %global[%c0, %k], %lds_async[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+
+    // CHECK-ALL-NEXT:   %[[VAL_GLOBAL:.*]] = vector.transfer_read %[[GLOBAL]][%[[K]], %[[C0]]], %[[CST_0]]{{.*}} : memref<128x128xf32>, vector<1xf32>
+    %val_global = vector.transfer_read %global[%k, %c0], %cst_0 : memref<128x128xf32>, vector<1xf32>
+    // CHECK-ALL-NEXT:   vector.transfer_write %[[VAL_GLOBAL]], %[[LDS_STREAM]][%[[C0]]]{{.*}} : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    vector.transfer_write %val_global, %lds_stream[%c0] : vector<1xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+
+    // CHECK-ALL-NEXT:   %[[VAL1:.*]] = vector.transfer_read %[[LDS_ASYNC]][%[[C0]]], %[[CST_0]]{{.*}} : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %val1 = vector.transfer_read %lds_async[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK-ALL-NEXT:   %[[VAL2:.*]] = vector.transfer_read %[[LDS_STREAM]][%[[C0]]], %[[CST_0]]{{.*}} : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %val2 = vector.transfer_read %lds_stream[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK-ALL-NEXT:   %[[SUM1:.*]] = arith.addf %[[VAL1]], %[[ACC]] : vector<1xf32>
+    %sum1 = arith.addf %val1, %acc : vector<1xf32>
+    // CHECK-ALL-NEXT:   %[[SUM2:.*]] = arith.addf %[[VAL2]], %[[SUM1]] : vector<1xf32>
+    %sum2 = arith.addf %val2, %sum1 : vector<1xf32>
+
+    // CHECK-ALL-NEXT:   scf.yield %[[SUM2]] : vector<1xf32>
+    scf.yield %sum2 : vector<1xf32>
+  }
+
+  // CHECK-ALL-NEXT: }
+  // CHECK-ALL-NEXT: vector.transfer_write %[[RESULT]], %[[OUTPUT]][%[[C0]]]{{.*}} : vector<1xf32>, memref<128xf32>
+  vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  // CHECK-ALL-NEXT: return
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @gather_to_lds_subview_escape_no_multibuffer
+// CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT: memref<2x1xf32
+func.func @gather_to_lds_subview_escape_no_multibuffer(
+    %global: memref<128x128xf32>,
+    %output: memref<128xf32>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %sv = memref.subview %lds[%c0] [1] [1]
+        : memref<1xf32, #gpu.address_space<workgroup>>
+        to memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
+
+  // Use the subview outside the loop to force an escape.
+  %outside = vector.transfer_read %sv[%c0], %cst_0
+             : memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>, vector<1xf32>
+
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
+    amdgpu.gather_to_lds %global[%c0, %k], %sv[%c0]
+        : vector<1xf32>, memref<128x128xf32>,
+          memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
+    %val = vector.transfer_read %sv[%c0], %cst_0
+           : memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>, vector<1xf32>
+    %sum = arith.addf %val, %acc : vector<1xf32>
+    scf.yield %sum : vector<1xf32>
+  }
+
+  %combined = arith.addf %result, %outside : vector<1xf32>
+  vector.transfer_write %combined, %output[%c0] {in_bounds = [true]}
+      : vector<1xf32>, memref<128xf32>
+  return
+}
