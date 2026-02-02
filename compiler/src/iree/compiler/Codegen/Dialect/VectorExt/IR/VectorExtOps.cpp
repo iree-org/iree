@@ -1049,8 +1049,8 @@ struct FoldSingleElementIndexingMap final : OpRewritePattern<GatherOp> {
       // Extract the scalar and add it to the
       // corressponding base.
       OpOperand &base = xferOp.getOffsetsMutable()[index];
-      Value extracted = rewriter.create<vector::ExtractOp>(
-          xferOp.getLoc(), indexVec,
+      Value extracted = vector::ExtractOp::create(
+          rewriter, xferOp.getLoc(), indexVec,
           SmallVector<int64_t>(vectorTy.getRank(), 0));
       AffineExpr d0, d1;
       bindDims(xferOp.getContext(), d0, d1);
@@ -1090,7 +1090,83 @@ static AffineMap inverseMap(AffineMap map, ArrayRef<AffineExpr> initValues) {
   return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
 }
 
-struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
+/// Apply an affine map transformation to a vector using broadcast and
+/// transpose operations.
+///
+/// The map describes how target indices relate to source indices:
+///   output[d0, d1, ...] = source[map(d0, d1, ...)]
+static Value applyTransformMapToVector(PatternRewriter &rewriter, Location loc,
+                                       Value source, AffineMap map,
+                                       ArrayRef<int64_t> targetShape) {
+  auto sourceType = cast<VectorType>(source.getType());
+  int64_t targetRank = map.getNumDims();
+  int64_t sourceRank = sourceType.getRank();
+
+  assert(map.getNumResults() == sourceRank &&
+         "Map results must match source rank");
+
+  // If already the right shape, no transformation needed.
+  if (sourceRank == targetRank) {
+    bool isIdentity = true;
+    for (unsigned i = 0; i < sourceRank; ++i) {
+      auto dimExpr = dyn_cast<AffineDimExpr>(map.getResult(i));
+      if (!dimExpr || dimExpr.getPosition() != i) {
+        isIdentity = false;
+        break;
+      }
+    }
+    if (isIdentity) {
+      return source;
+    }
+  }
+
+  // Build direct mapping: for each target dim, which source dim provides it
+  SmallVector<int64_t> targetDimToSourceDim(targetRank, -1);
+  for (int64_t srcDim = 0; srcDim < sourceRank; ++srcDim) {
+    AffineExpr expr = map.getResult(srcDim);
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+      targetDimToSourceDim[dimExpr.getPosition()] = srcDim;
+    }
+  }
+
+  int64_t numBroadcastDims = llvm::count(targetDimToSourceDim, -1);
+
+  // Build broadcast shape: [broadcast dim sizes..., source shape...]
+  SmallVector<int64_t> broadcastShape;
+  for (int64_t i = 0; i < targetRank; ++i) {
+    if (targetDimToSourceDim[i] == -1) {
+      broadcastShape.push_back(targetShape[i]);
+    }
+  }
+  for (int64_t i = 0; i < sourceRank; ++i) {
+    broadcastShape.push_back(sourceType.getDimSize(i));
+  }
+
+  // Broadcast to add dimensions
+  VectorType broadcastType =
+      VectorType::get(broadcastShape, sourceType.getElementType());
+  Value result = source;
+  if (broadcastType != sourceType) {
+    result = vector::BroadcastOp::create(rewriter, loc, broadcastType, source);
+  }
+
+  // Compute transpose permutation
+  SmallVector<int64_t> transposePerm(targetRank);
+  int64_t bcastIdx = 0;
+  for (int64_t i = 0; i < targetRank; ++i) {
+    transposePerm[i] = targetDimToSourceDim[i] == -1
+                           ? bcastIdx++
+                           : numBroadcastDims + targetDimToSourceDim[i];
+  }
+
+  if (!llvm::equal(transposePerm, llvm::seq<int64_t>(0, targetRank))) {
+    result = vector::TransposeOp::create(rewriter, loc, result, transposePerm);
+  }
+
+  return result;
+}
+
+struct FoldContiguousGatherToTransferRead final : OpRewritePattern<GatherOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GatherOp xferOp,
@@ -1107,7 +1183,7 @@ struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
 
     Value mask = xferOp.getMask();
     if (mask) {
-      // vector_ext.gather has a nicer mask representation where the mask
+      // vector_ext.gather has a "better" mask representation where the mask
       // indexing is part of the op definition as an indexing map. transfer_read
       // on the other hand, models it as the vector shape read from the slice
       // before any permutation or broadcasting.
@@ -1115,14 +1191,15 @@ struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
       // We can create a mask compatible with transfer_read by create a map from
       // the mask domain to the source domain.
       AffineMap maskMap = xferOp.getIndexingMapsArray().back();
-      SmallVector<AffineExpr> shapeInit =
-          llvm::map_to_vector(xferOp.getType().getShape(), [&](int64_t x) {
-            return rewriter.getAffineConstantExpr(x);
-          });
-      AffineMap maskTransform = baseMap.compose(inverseMap(maskMap, shapeInit));
-      maskTransform.dump();
-      return failure();
-      // mask = applyTransformMapToVector(mask, maskTransform);
+      ArrayRef<int64_t> targetShape = xferOp.getType().getShape();
+
+      // Check if the mask map is an identity - if not, we need to transform.
+      // Even if types match (e.g., vector<64x64xi1>), a map like (d1, d0)
+      // requires a transpose.
+      if (!maskMap.isIdentity()) {
+        mask = applyTransformMapToVector(rewriter, xferOp.getLoc(), mask,
+                                         maskMap, targetShape);
+      }
     }
 
     // Canonicalize to vector.transfer_read.
@@ -1137,7 +1214,7 @@ struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
 
 void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexingMap, FoldContigousGatherToTransferRead>(
+  results.add<FoldSingleElementIndexingMap, FoldContiguousGatherToTransferRead>(
       ctx);
 }
 
