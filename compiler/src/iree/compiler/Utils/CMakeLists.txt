@@ -21,7 +21,6 @@ iree_cc_library(
     "FlatbufferUtils.h"
     "Indexing.h"
     "IntegerSet.h"
-    "LoopMappingUtils.h"
     "ModuleUtils.h"
     "OpVisitor.h"
     "OptionUtils.h"
@@ -40,7 +39,6 @@ iree_cc_library(
     "EquivalenceUtils.cpp"
     "FlatbufferUtils.cpp"
     "Indexing.cpp"
-    "LoopMappingUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
@@ -59,20 +57,15 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
-    MLIRLinalgDialect
-    MLIRLinalgUtils
     MLIRParser
     MLIRPass
     MLIRSupport
-    MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
     iree::base
     iree::base::internal::flatcc::building
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
-    iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

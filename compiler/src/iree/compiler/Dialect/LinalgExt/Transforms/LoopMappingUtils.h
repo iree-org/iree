@@ -12,15 +12,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef IREE_COMPILER_UTILS_LOOPMAPPINGUTILS_H_
-#define IREE_COMPILER_UTILS_LOOPMAPPINGUTILS_H_
+#ifndef IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_LOOPMAPPINGUTILS_H_
+#define IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_LOOPMAPPINGUTILS_H_
 
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Returns a bit vector of size number of loops of the operation with
 /// the bits corresponding to outer parallel loops set to `true`.
@@ -41,6 +41,6 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
     Operation *candidateOp,
     const llvm::MapVector<Operation *, AffineMap> &loopMaps);
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
-#endif // IREE_COMPILER_UTILS_LOOPMAPPINGUTILS_H_
+#endif // IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_LOOPMAPPINGUTILS_H_

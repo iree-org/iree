@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Utils/LoopMappingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/LoopMappingUtils.h"
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -14,32 +13,39 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
-  if (auto setEncodingOp = dyn_cast<IREE::Encoding::SetEncodingOp>(op)) {
-    return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
-  }
-  if (auto unsetEncodingOp = dyn_cast<IREE::Encoding::UnsetEncodingOp>(op)) {
-    return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
-                                true);
+  // Try TilingInterface first - this properly handles linalg ops with mixed
+  // parallel/reduction loops by iterating through iterator types.
+  if (auto interfaceOp = dyn_cast<TilingInterface>(op)) {
+    SmallVector<utils::IteratorType> loopIteratorTypes =
+        interfaceOp.getLoopIteratorTypes();
+    llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
+    for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
+      if (iteratorType.value() != utils::IteratorType::parallel) {
+        break;
+      }
+      parallelLoops.set(iteratorType.index());
+    }
+    return parallelLoops;
   }
 
-  auto interfaceOp = dyn_cast<TilingInterface>(op);
-  if (!interfaceOp) {
-    // For ops that dont implement the `TilingInterface` just return empty.
-    return llvm::SmallBitVector{};
-  }
-  SmallVector<utils::IteratorType> loopIteratorTypes =
-      interfaceOp.getLoopIteratorTypes();
-  llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
-  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != utils::IteratorType::parallel) {
-      break;
+  // For ops that implement LinalgFusionOpInterface but not TilingInterface
+  // (like SetEncodingOp/UnsetEncodingOp), use the interface to determine
+  // parallel loops. These ops have all dimensions as parallel.
+  if (auto fusionOp = dyn_cast<LinalgFusionOpInterface>(op)) {
+    unsigned numLoops = fusionOp.getNumLoops();
+    unsigned numParallelLoops = fusionOp.getNumParallelLoops();
+    llvm::SmallBitVector parallelLoops(numLoops);
+    for (unsigned i = 0; i < numParallelLoops; ++i) {
+      parallelLoops.set(i);
     }
-    parallelLoops.set(iteratorType.index());
+    return parallelLoops;
   }
-  return parallelLoops;
+
+  // For ops that don't implement either interface, return empty.
+  return llvm::SmallBitVector{};
 }
 
 static FailureOr<AffineMap>
@@ -74,8 +80,7 @@ computeIterationSpaceMapping(AffineMap producerResultMap,
 FailureOr<AffineMap> getRootParallelLoopToOpMap(
     Operation *candidateOp,
     const llvm::MapVector<Operation *, AffineMap> &loopMaps) {
-  auto fusionOp =
-      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(candidateOp);
+  auto fusionOp = dyn_cast<LinalgFusionOpInterface>(candidateOp);
   if (!fusionOp) {
     return failure();
   }
@@ -93,9 +98,7 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
   if (isConsumer) {
     // Compute mapping by examining producer operands.
     for (OpOperand &operand : candidateOp->getOpOperands()) {
-      auto producer =
-          operand.get()
-              .getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
+      auto producer = operand.get().getDefiningOp<LinalgFusionOpInterface>();
       if (!producer || !loopMaps.contains(producer)) {
         continue;
       }
@@ -119,8 +122,7 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
   } else {
     // Compute mapping by examining consumer uses.
     for (OpOperand &use : candidateOp->getUses()) {
-      auto consumer =
-          dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(use.getOwner());
+      auto consumer = dyn_cast<LinalgFusionOpInterface>(use.getOwner());
       if (!consumer || !loopMaps.contains(use.getOwner())) {
         continue;
       }
@@ -150,4 +152,4 @@ FailureOr<AffineMap> getRootParallelLoopToOpMap(
   return resultMap ? resultMap : FailureOr<AffineMap>();
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -23,6 +23,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "LoopMappingUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "Transforms.h"
@@ -36,6 +37,7 @@ iree_cc_library(
     "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
     "FoldUnitExtentDims.cpp"
+    "LoopMappingUtils.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"

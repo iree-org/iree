@@ -13,10 +13,10 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/LoopMappingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
-#include "iree/compiler/Utils/LoopMappingUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
@@ -50,6 +50,9 @@
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+using IREE::LinalgExt::getOuterParallelLoops;
+using IREE::LinalgExt::getRootParallelLoopToOpMap;
 
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
@@ -248,7 +251,7 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
 FailureOr<AffineMap>
 FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
   assert(!contains(op) && "op cannot already be in group");
-  return DispatchCreation::getRootParallelLoopToOpMap(op, loopMaps);
+  return IREE::LinalgExt::getRootParallelLoopToOpMap(op, loopMaps);
 }
 
 namespace {
