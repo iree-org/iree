@@ -36,6 +36,17 @@ kernels, drawing inspiration from the high-level approach described in Harris's
 * `subgroup_basis` (subgroup distribution within a workgroup)
 * `expand_dims` reassociation list
 
+#### Summary
+
+| Attribute           | Key Semantic                                                          |
+| ------------------- | --------------------------------------------------------------------- |
+| `workgroup`         | Workgroup tile size along each dimension                              |
+| `thread`            | Thread tile size along each dimension (e.g., load width per thread)   |
+| `partial_reduction` | Tile size of the reduction dimension(s) processed by the workgroup    |
+| `lane_basis`        | Distribution of threads within a subgroup onto the iteration space    |
+| `subgroup_basis`    | Distribution of subgroups within a workgroup onto the iteration space |
+| `expand_dims`       | Split reduction dimensions to enable finer-grain accumulation         |
+
 #### Tile sizes
 
 Tile sizes are expressed as arrays of integers, one per dimension of the
@@ -273,9 +284,7 @@ This keeps `d0` and `d1` unchanged and splits `d2` into `d2` and `d3`, where
 
 ---
 
-## Complete Worked Examples
-
-### Example 1:
+## Example
 
 **Iteration space:** `[d0=parallel(4), d1=parallel(6656), d2=reduction(16384)]`
 
@@ -340,14 +349,3 @@ within the workgroup via the partial reduction loop and thread distribution.
 **Subgroup basis `[[1, 1, 1, 1], [0, 1, 2, 3]]`:**
 
 With counts 1x1x1x1 = 1, there is a single 64-thread subgroup per workgroup.
-
-## Summary: Reduction Config Attributes Quick Reference
-
-| Attribute           | Key Semantic                                                          |
-| ------------------- | --------------------------------------------------------------------- |
-| `workgroup`         | Workgroup tile size along each dimension                              |
-| `thread`            | Thread tile size along each dimension (e.g., load width per thread)   |
-| `partial_reduction` | Tile size of the reduction dimension(s) processed by the workgroup    |
-| `lane_basis`        | Distribution of threads within a subgroup onto the iteration space    |
-| `subgroup_basis`    | Distribution of subgroups within a workgroup onto the iteration space |
-| `expand_dims`       | Split reduction dimensions to enable finer-grain accumulation         |
