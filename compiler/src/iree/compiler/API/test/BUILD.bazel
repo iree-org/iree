@@ -21,13 +21,3 @@ iree_compiler_cc_test(
         "@llvm-project//mlir:CAPIIRHeaders",
     ],
 )
-
-iree_compiler_cc_test(
-    name = "tuning-spec-flags-test",
-    testonly = True,
-    srcs = ["tuning_spec_flags_test.c"],
-    deps = [
-        "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:Impl",
-    ],
-)

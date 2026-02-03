@@ -5,9 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Test that verifies the tuning spec path flag can be set via C API.
-// The tuning spec path is now registered as part of ROCMOptions but uses
-// the codegen prefix for consistency. Other tuning spec flags
-// (enable-default-tuning-specs, dump-tuning-specs-to) remain CLI-only.
+// This test is in the ROCM plugin directory because the flag is registered
+// by ROCMOptions and only available when ROCM is enabled.
 
 #include <stdio.h>
 #include "iree/compiler/embedding_api.h"

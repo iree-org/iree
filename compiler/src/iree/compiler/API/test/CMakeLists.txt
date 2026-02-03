@@ -21,16 +21,6 @@ iree_cc_test(
     iree::compiler::bindings::c::headers
 )
 
-iree_cc_test(
-  NAME
-    tuning-spec-flags-test
-  SRCS
-    "tuning_spec_flags_test.c"
-  DEPS
-    iree::compiler::API::Impl
-    iree::compiler::bindings::c::headers
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Move to bin/ directory and systematically name more appropriately.

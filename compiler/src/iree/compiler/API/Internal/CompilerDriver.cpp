@@ -41,7 +41,6 @@
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -1090,8 +1089,10 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
                                      llvm::errs()))) {
     return false;
   }
-
-  return succeeded(passManager->run(parsedModule));
+  if (failed(passManager->run(parsedModule))) {
+    return false;
+  }
+  return true;
 }
 
 Error *Invocation::outputIR(Output &output) {

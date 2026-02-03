@@ -10,6 +10,16 @@
 
 iree_add_all_subdirs()
 
+iree_cc_test(
+  NAME
+    tuning-spec-c-api-test
+  SRCS
+    "tuning_spec_c_api_test.c"
+  DEPS
+    iree::compiler::API::Impl
+    iree::compiler::bindings::c::headers
+)
+
 iree_lit_test_suite(
   NAME
     lit
