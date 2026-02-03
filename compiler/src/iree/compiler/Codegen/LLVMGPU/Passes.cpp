@@ -465,8 +465,6 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
-  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
-
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
   funcPassManager.addPass(createDecomposePackUnPackOpsPass(
       DecomposePackUnPackOpsPassOptions{/*tileOuterToOne=*/false,
@@ -486,6 +484,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+
+  // Convert global load DMAs after pack decomposition but before thread tiling.
+  funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
 
   // Step 4. Tile and fuse tileable ops to subgroups/threads.
   {

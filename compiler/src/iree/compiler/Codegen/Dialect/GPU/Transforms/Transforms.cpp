@@ -320,7 +320,8 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     auto newGatherOp = IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, loc, coalescedGather.getInit().getType(),
         coalescedGather.getSource(), coalescedGather.getIndices(),
-        coalescedGather.getInit(), coalescedGather.getLane());
+        coalescedGather.getInit(), coalescedGather.getLane(),
+        coalescedGather.getInBoundsAttr());
     Value gatherResult = newGatherOp.getResult();
 
     // Use a tensor.insert_slice to insert the gather result back into the
@@ -458,7 +459,7 @@ static void composeCoalescedGatherDMA(
     auto dmaOp = IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, warpInsert.getLoc(), destSlice.getType(),
         laneInsert.getSource(), laneInsert.getIndices(), destSlice,
-        laneInsert.getLane());
+        laneInsert.getLane(), laneInsert.getInBoundsAttr());
 
     // Replace the warp parallel_insert_slice with one that inserts the DMA
     // result.

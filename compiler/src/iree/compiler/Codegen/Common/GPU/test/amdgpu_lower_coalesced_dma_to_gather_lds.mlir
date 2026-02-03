@@ -1025,3 +1025,142 @@ func.func @lower_coalesced_dma_lane_offset_regression(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
+
+// -----
+
+// Test: coalesced_gather_dma with in_bounds attribute (tensor.pad fusion case).
+// When in_bounds = [false, true], the source dim 0 can differ from dest dim 0.
+// This happens when tensor.pad is fused - source is the pre-padded tensor,
+// dest is the padded shape. Hardware OOB returns 0 for reads beyond source bounds.
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_32 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// CHECK-LABEL: func.func @lower_coalesced_dma_with_in_bounds
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x128xf32, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_dma_with_in_bounds(
+    %source: memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x128xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb,
+    translation_info = #translation_32} {
+  // Source is 2x128 (pre-padded), dest is 4x128 (padded).
+  // in_bounds = [false, true]: dim 0 may OOB (padding), dim 1 is in-bounds.
+  // Lowering uses dest shape (4x128) to compute transfer pattern.
+  // Reads beyond source row 2 will return 0 via hardware OOB.
+  //
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%arg6) in (32) {
+    // 4 rows * 128 cols = 512 elements total, 4 elements per lane = 4 transfers
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: row 0
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Transfer 2: row 1
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Transfer 3: row 2 (OOB in source, hardware returns 0)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Transfer 4: row 3 (OOB in source, hardware returns 0)
+    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
+      memref<2x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
+// Test: coalesced_gather_dma with in_bounds for unaligned matmul tensor.pad fusion.
+// This tests the exact pattern from unaligned matmul (65x64x121):
+//   - RHS slice shape: 4x64 (K-tile x N-dim)
+//   - 64 lanes (one subgroup)
+//   - in_bounds = [false, true]: K-dim may OOB (last tile 121 % 4 = 1), N-dim is aligned
+//
+// With 64 lanes and 4x64 dest shape:
+//   - Elements per lane = 64 / 64 = 1 (each lane reads 1 f32)
+//   - Delinearization basis = (4, 64)
+//   - 4 transfers per lane (one per row)
+//
+// This verifies correct row access pattern: all 4 rows (0-3) are accessed,
+// not just row 0 repeated 4 times (which was the bug before the fix).
+
+#executable_target_rocm_hsaco_fb_unaligned = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx942", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = shuffle, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+
+#translation_64_unaligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_coalesced_dma_4x64_tensor_pad_fusion
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<?x64xf32, strided<[64, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x64xf32, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_dma_4x64_tensor_pad_fusion(
+    %source: memref<?x64xf32, strided<[64, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x64xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_unaligned,
+    translation_info = #translation_64_unaligned} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%arg6) in (64) {
+    // Each lane reads 1 element (64 elements / 64 lanes = 1).
+    // CHECK: %[[C1:[a-zA-Z0-9_]+]] = arith.constant 1 : index
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C1]]
+    //
+    // 4 transfers with delinearization basis (4, 64):
+    // Transfer 1: linearOffset = 0, accesses row 0
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 64)
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 64)
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN0]]#0, %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<1xf32>
+    //
+    // Transfer 2: linearOffset = 64, accesses row 1
+    // CHECK: %[[C64:.+]] = arith.constant 64 : index
+    // CHECK: %[[SRC_LIN64:.+]] = arith.addi %[[C64]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN64:.+]]:2 = affine.delinearize_index %[[SRC_LIN64]] into (4, 64)
+    // CHECK: %[[DST_DELIN64:.+]]:2 = affine.delinearize_index %[[C64]] into (4, 64)
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN64]]#0, %[[SRC_DELIN64]]#1], %[[DST]][%[[DST_DELIN64]]#0, %[[DST_DELIN64]]#1] : vector<1xf32>
+    //
+    // Transfer 3: linearOffset = 128, accesses row 2
+    // CHECK: %[[C128:.+]] = arith.constant 128 : index
+    // CHECK: %[[SRC_LIN128:.+]] = arith.addi %[[C128]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN128:.+]]:2 = affine.delinearize_index %[[SRC_LIN128]] into (4, 64)
+    // CHECK: %[[DST_DELIN128:.+]]:2 = affine.delinearize_index %[[C128]] into (4, 64)
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN128]]#0, %[[SRC_DELIN128]]#1], %[[DST]][%[[DST_DELIN128]]#0, %[[DST_DELIN128]]#1] : vector<1xf32>
+    //
+    // Transfer 4: linearOffset = 192, accesses row 3
+    // CHECK: %[[C192:.+]] = arith.constant 192 : index
+    // CHECK: %[[SRC_LIN192:.+]] = arith.addi %[[C192]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN192:.+]]:2 = affine.delinearize_index %[[SRC_LIN192]] into (4, 64)
+    // CHECK: %[[DST_DELIN192:.+]]:2 = affine.delinearize_index %[[C192]] into (4, 64)
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN192]]#0, %[[SRC_DELIN192]]#1], %[[DST]][%[[DST_DELIN192]]#0, %[[DST_DELIN192]]#1] : vector<1xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
+      memref<?x64xf32, strided<[64, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x64xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}

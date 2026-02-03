@@ -205,6 +205,43 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
   return getOperation()->getParentOfType<scf::ForallOp>();
 }
 
+void CoalescedGatherDMAOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  // Get the OpOperand pointers for source and init
+  // Operand layout: source, indices (variadic), init, lane
+  unsigned numOperands = getOperation()->getNumOperands();
+  unsigned laneOperandIdx = numOperands - 1;
+  unsigned initOperandIdx = laneOperandIdx - 1;
+  unsigned sourceOperandIdx = 0;
+
+  Value source = getSource();
+  Value init = getInit();
+
+  // The operation reads from the source
+  if (isa<MemRefType>(source.getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(),
+                         &getOperation()->getOpOperand(sourceOperandIdx),
+                         SideEffects::DefaultResource::get());
+  }
+
+  // For memref form, the operation writes to init (side effect)
+  // For tensor form with result, the write is captured in the result value
+  // For tensor form without result (combiner case in forall.in_parallel),
+  // we must declare a write effect to prevent DCE from eliminating the op.
+  if (isa<MemRefType>(init.getType())) {
+    effects.emplace_back(MemoryEffects::Write::get(),
+                         &getOperation()->getOpOperand(initOperandIdx),
+                         SideEffects::DefaultResource::get());
+  } else if (isa<RankedTensorType>(init.getType()) &&
+             getOperation()->getNumResults() == 0) {
+    // Tensor combiner case: declare write effect to prevent DCE
+    effects.emplace_back(MemoryEffects::Write::get(),
+                         &getOperation()->getOpOperand(initOperandIdx),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
 LogicalResult CoalescedGatherDMAOp::verify() {
   TypedValue<ShapedType> init = getInit();
   auto initType = init.getType();
@@ -287,7 +324,8 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   // Verify the contiguous (non-indexed) dimensions match between source and
-  // dest.
+  // dest, unless in_bounds allows OOB reads for that dimension.
+  std::optional<ArrayAttr> inBoundsAttr = getInBounds();
   for (auto [dim, size] : llvm::enumerate(initShape)) {
     if (dim >= sourceShape.size()) {
       return emitOpError("expected source to have at least ")
@@ -300,6 +338,18 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       continue;
     }
 
+    // If in_bounds is present and this dimension allows OOB (in_bounds=false),
+    // skip the size matching check - hardware OOB returns 0 for padding.
+    if (inBoundsAttr) {
+      auto inBoundsArray = *inBoundsAttr;
+      if (dim < inBoundsArray.size()) {
+        bool dimInBounds = cast<BoolAttr>(inBoundsArray[dim]).getValue();
+        if (!dimInBounds) {
+          continue; // OOB allowed, skip size check
+        }
+      }
+    }
+
     // Check the suffix (hidden) gathering dimensions are the same in `source`
     // and `init`.
     int64_t sourceDim = sourceShape[dim];
@@ -307,6 +357,16 @@ LogicalResult CoalescedGatherDMAOp::verify() {
       return emitOpError("expected unindexed dimension ")
              << dim << " to have same length in source (" << sourceDim
              << ") and destination (" << size << ')';
+    }
+  }
+
+  // Validate in_bounds attribute if present.
+  if (std::optional<ArrayAttr> inBoundsAttr = getInBounds()) {
+    int64_t initRank = initShapedType.getRank();
+    if (static_cast<int64_t>(inBoundsAttr->size()) != initRank) {
+      return emitOpError("in_bounds array size (")
+             << inBoundsAttr->size() << ") must match init rank (" << initRank
+             << ")";
     }
   }
 
