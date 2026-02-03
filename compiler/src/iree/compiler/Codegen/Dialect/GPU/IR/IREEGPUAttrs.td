@@ -261,6 +261,8 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
     "buildUnderlyingOperations",
+    "getParallelDimSizes",
+    "getReductionDimSizes",
   ]>
 ]> {
   let mnemonic = "mma_layout";
@@ -320,6 +322,8 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
+        "getParallelDimSizes",
+        "getReductionDimSizes",
       ]>,
       DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
         "getTileSwizzle",
@@ -529,6 +533,8 @@ def IREEGPU_VirtualMMAAttr :
     "getDistributionWorkerCount",
     "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
+    "getParallelDimSizes",
+    "getReductionDimSizes",
   ]>
 ]> {
   let mnemonic = "virtual_mma_layout";
@@ -594,6 +600,8 @@ def IREEGPU_ScaledMMAAttr :
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
     "buildUnderlyingOperations",
+    "getParallelDimSizes",
+    "getReductionDimSizes",
   ]>
 ]> {
   let mnemonic = "scaled_mma_layout";

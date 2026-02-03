@@ -690,6 +690,43 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
+void MMAAttr::getParallelDimSizes(int64_t operandIndex,
+                                  SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+    result.push_back(m);
+    break;
+  case kMMAOperandRhs:
+    result.push_back(n);
+    break;
+  case kMMAOperandAcc:
+    result.push_back(m);
+    result.push_back(n);
+    break;
+  default:
+    break;
+  }
+}
+
+void MMAAttr::getReductionDimSizes(int64_t operandIndex,
+                                   SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+  case kMMAOperandRhs:
+    result.push_back(k);
+    break;
+  case kMMAOperandAcc:
+    // Accumulator has no reduction dimensions
+    break;
+  default:
+    break;
+  }
+}
+
 Attribute MMAAttr::getDistributionMappingKind() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
@@ -956,6 +993,52 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
+void DataTiledMMAAttr::getParallelDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
+  
+  // Scale by the number of intrinsics and subgroups
+  m *= getIntrinsicsM() * getSubgroupsM();
+  n *= getIntrinsicsN() * getSubgroupsN();
+  
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+    result.push_back(m);
+    break;
+  case kMMAOperandRhs:
+    result.push_back(n);
+    break;
+  case kMMAOperandAcc:
+    result.push_back(m);
+    result.push_back(n);
+    break;
+  default:
+    break;
+  }
+}
+
+void DataTiledMMAAttr::getReductionDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
+  
+  // Scale by the number of intrinsics and subgroups
+  k *= getIntrinsicsK() * getSubgroupsK();
+  
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+  case kMMAOperandRhs:
+    result.push_back(k);
+    break;
+  case kMMAOperandAcc:
+    // Accumulator has no reduction dimensions
+    break;
+  default:
+    break;
+  }
+}
+
 int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
   return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
          getSubgroupsK();
@@ -1216,6 +1299,43 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   }
   assert(false && "unhandled virtual mma layout type.");
   return 0;
+}
+
+void VirtualMMAAttr::getParallelDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShape();
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+    result.push_back(m);
+    break;
+  case kMMAOperandRhs:
+    result.push_back(n);
+    break;
+  case kMMAOperandAcc:
+    result.push_back(m);
+    result.push_back(n);
+    break;
+  default:
+    break;
+  }
+}
+
+void VirtualMMAAttr::getReductionDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  auto [m, n, k] = getMNKShape();
+  switch (operandIndex) {
+  case kMMAOperandLhs:
+  case kMMAOperandRhs:
+    result.push_back(k);
+    break;
+  case kMMAOperandAcc:
+    // Accumulator has no reduction dimensions
+    break;
+  default:
+    break;
+  }
 }
 
 Attribute VirtualMMAAttr::getDistributionMappingKind() const {
@@ -1481,6 +1601,63 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 
 int64_t ScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
+}
+
+void ScaledMMAAttr::getParallelDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  int64_t m = getMSize(getIntrinsic());
+  int64_t n = getNSize(getIntrinsic());
+  
+  switch (operandIndex) {
+  case kScaledMMAOperandLhs:
+    result.push_back(m);
+    break;
+  case kScaledMMAOperandRhs:
+    result.push_back(n);
+    break;
+  case kScaledMMAOperandLhsScale:
+    result.push_back(m);
+    break;
+  case kScaledMMAOperandRhsScale:
+    result.push_back(n);
+    break;
+  case kScaledMMAOperandAcc:
+    result.push_back(m);
+    result.push_back(n);
+    break;
+  default:
+    break;
+  }
+}
+
+void ScaledMMAAttr::getReductionDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  int64_t k = getKSize(getIntrinsic());
+  int64_t kb = getKbSize(getIntrinsic());
+  
+  switch (operandIndex) {
+  case kScaledMMAOperandLhs:
+    result.push_back(k);
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandRhs:
+    result.push_back(k);
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandLhsScale:
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandRhsScale:
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandAcc:
+    // Accumulator has no reduction dimensions
+    break;
+  default:
+    break;
+  }
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
@@ -1876,6 +2053,70 @@ int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
 
 int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
+}
+
+void DataTiledScaledMMAAttr::getParallelDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  int64_t m = getMSize(getIntrinsic());
+  int64_t n = getNSize(getIntrinsic());
+  
+  // Scale by the number of intrinsics and subgroups
+  m *= getIntrinsicsM() * getSubgroupsM();
+  n *= getIntrinsicsN() * getSubgroupsN();
+  
+  switch (operandIndex) {
+  case kScaledMMAOperandLhs:
+    result.push_back(m);
+    break;
+  case kScaledMMAOperandRhs:
+    result.push_back(n);
+    break;
+  case kScaledMMAOperandLhsScale:
+    result.push_back(m);
+    break;
+  case kScaledMMAOperandRhsScale:
+    result.push_back(n);
+    break;
+  case kScaledMMAOperandAcc:
+    result.push_back(m);
+    result.push_back(n);
+    break;
+  default:
+    break;
+  }
+}
+
+void DataTiledScaledMMAAttr::getReductionDimSizes(
+    int64_t operandIndex, SmallVectorImpl<int64_t> &result) const {
+  result.clear();
+  int64_t k = getKSize(getIntrinsic());
+  int64_t kb = getKbSize(getIntrinsic());
+  
+  // Scale by the number of intrinsics and subgroups
+  k *= getIntrinsicsK() * getSubgroupsK();
+  
+  switch (operandIndex) {
+  case kScaledMMAOperandLhs:
+    result.push_back(k);
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandRhs:
+    result.push_back(k);
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandLhsScale:
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandRhsScale:
+    result.push_back(kb);
+    break;
+  case kScaledMMAOperandAcc:
+    // Accumulator has no reduction dimensions
+    break;
+  default:
+    break;
+  }
 }
 
 int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {

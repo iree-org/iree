@@ -248,6 +248,46 @@ def IREECodegen_InnerTileDescAttrInterface :
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For the given operand index, return the sizes of the parallel dimensions
+        in the intrinsic. For a matrix multiplication C = A * B:
+        - LHS (operand 0): parallel dimension is M
+        - RHS (operand 1): parallel dimension is N
+        - ACC (operand 2): parallel dimensions are M and N
+        
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getParallelDimSizes",
+      /*args=*/(ins "int64_t":$operandIndex,
+                    "::llvm::SmallVectorImpl<int64_t>&":$result),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        result.clear();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For the given operand index, return the sizes of the reduction dimensions
+        in the intrinsic. For a matrix multiplication C = A * B:
+        - LHS (operand 0): reduction dimension is K
+        - RHS (operand 1): reduction dimension is K
+        - ACC (operand 2): no reduction dimensions
+        
+        The returned values are placed into the `result` vector, which will have
+        its existing contents overwritten if there is any.
+      }],
+      /*retType=*/"void",
+      /*methodName=*/"getReductionDimSizes",
+      /*args=*/(ins "int64_t":$operandIndex,
+                    "::llvm::SmallVectorImpl<int64_t>&":$result),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        result.clear();
+      }]
+    >,
   ];
 
   let extraSharedClassDeclaration = [{
