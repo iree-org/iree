@@ -40,13 +40,6 @@ jobs:
               - X64
 
           # AMD GPU
-          - name: amdgpu_rocm_mi250_gfx90a
-            rocm-chip: gfx90a
-            backend: rocm
-            iree_test_files: /groups/aig_sharks/iree-tests-cache
-            sku: mi250
-            target: target_hip
-            runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             rocm-chip: gfx942
             backend: rocm
