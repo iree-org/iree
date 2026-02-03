@@ -52,15 +52,12 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
-    MLIRControlFlowDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -71,8 +68,6 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
@@ -82,8 +77,6 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTensorUtils
     MLIRTilingInterface
-    MLIRTransformDialect
-    MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Common
@@ -100,12 +93,9 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
-    iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
-    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
-    iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
 )
