@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/reference/mlir-passes/CodegenVMVX/">
+        <link rel="canonical" href="https://iree.dev/developers/debugging/fuzzing/">
       
       
-        <link rel="prev" href="../CodegenSPIRV/">
+        <link rel="prev" href="../sanitizers/">
       
       
-        <link rel="next" href="../../../developers/">
+        <link rel="next" href="../../performance/benchmarking/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>VMVX - IREE</title>
+        <title>Fuzzing with libFuzzer - IREE</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#-iree-vmvx-assign-constant-ordinals" class="md-skip">
+        <a href="#fuzzing-with-libfuzzer" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              VMVX
+              Fuzzing with libFuzzer
             
           </span>
         </div>
@@ -269,13 +269,11 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../reference/" class="md-tabs__link">
           
   
     
@@ -291,11 +289,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../developers/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
     
@@ -1122,8 +1122,6 @@
       
   
   
-    
-  
   
   
     
@@ -1144,24 +1142,23 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../../reference/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -1172,13 +1169,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -1209,13 +1206,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1224,7 +1218,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1249,7 +1243,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../glossary/" class="md-nav__link">
+      <a href="../../../reference/glossary/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.74 3.74 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574M8.755 4.75l-.004 7.322a3.75 3.75 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25"/></svg>
@@ -1272,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../optimization-options/" class="md-nav__link">
+      <a href="../../../reference/optimization-options/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.75 8.75 0 0 1-2.564 6.186l-.458.459q-.472.471-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.75.75 0 0 1-1.11-.418l-.954-3.102a1 1 0 0 1-.145-.125L3.754 9.816a1 1 0 0 1-.124-.145L.528 8.717a.75.75 0 0 1-.418-1.11l1.71-2.774A1.75 1.75 0 0 1 3.31 4h3.204q.433-.508.904-.979l.459-.458A8.75 8.75 0 0 1 14.064 0M8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.25 7.25 0 0 0-5.125 2.123M3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.23.23 0 0 1-.201-.064.23.23 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12m6.94-3.935q-.132.09-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766q.087-.135.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg>
@@ -1295,7 +1289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tuning/" class="md-nav__link">
+      <a href="../../../reference/tuning/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 6.016 4.035.75.75 0 0 1 1.388-.57 8 8 0 1 1-4.37-4.37.75.75 0 1 1-.569 1.389A6.5 6.5 0 0 0 8 1.5m6.28.22a.75.75 0 0 1 0 1.06l-4.063 4.064a2.5 2.5 0 1 1-1.06-1.06L13.22 1.72a.75.75 0 0 1 1.06 0M7 8a1 1 0 1 0 2 0 1 1 0 0 0-2 0"/></svg>
@@ -1326,7 +1320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../extensions/" class="md-nav__link">
+      <a href="../../../reference/extensions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8 8 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224q.347.171.668.386c.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63q.406.578.704 1.218c.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294q.024.386 0 .772c-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a8 8 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a6 6 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8 8 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a6 6 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8 8 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6 6 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a8 8 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071q.321-.215.668-.386c.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03Q7.646 0 8 0m-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189q-.26.13-.5.29c-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045q-.33.47-.573.99c-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a5 5 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19q.243.52.573.989c.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27q.242.16.501.29c.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189q.26-.13.5-.29c.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045q.33-.47.573-.99c.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a5 5 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.5 6.5 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.4 4.4 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0M11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0M9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8"/></svg>
@@ -1372,13 +1366,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1389,7 +1380,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../bindings/" class="md-nav__link ">
+            <a href="../../../reference/bindings/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -1400,7 +1391,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1422,7 +1413,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../bindings/c-api/" class="md-nav__link">
+      <a href="../../../reference/bindings/c-api/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -1445,7 +1436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../bindings/python/" class="md-nav__link">
+      <a href="../../../reference/bindings/python/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
@@ -1495,13 +1486,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1512,7 +1500,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../mlir-dialects/" class="md-nav__link ">
+            <a href="../../../reference/mlir-dialects/" class="md-nav__link ">
               
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
@@ -1525,7 +1513,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1601,7 +1589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Flow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1622,7 +1610,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HAL/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1643,7 +1631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Stream/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1664,7 +1652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1685,7 +1673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VM/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1764,7 +1752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Encoding/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Encoding/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1785,7 +1773,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/LinalgExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/LinalgExt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1806,7 +1794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/TensorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/TensorExt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1887,7 +1875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREECodegen/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREECodegen/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1908,7 +1896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREEGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1929,7 +1917,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREEVectorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEVectorExt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1950,7 +1938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VMVX/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2029,7 +2017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Check/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2098,7 +2086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALInline/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2119,7 +2107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALLoader/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2194,7 +2182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IOParameters/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IOParameters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2236,8 +2224,6 @@
                 
   
   
-    
-  
   
   
     
@@ -2258,22 +2244,21 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../reference/mlir-passes/" class="md-nav__link ">
               
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
@@ -2286,13 +2271,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             MLIR passes
@@ -2362,7 +2347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Flow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2383,7 +2368,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/HAL/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2404,7 +2389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Stream/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2425,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Util/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2446,7 +2431,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/VM/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2529,7 +2514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ConstEval/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/ConstEval/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2550,7 +2535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../DispatchCreation/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/DispatchCreation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2571,7 +2556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../GlobalOptimization/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/GlobalOptimization/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2592,7 +2577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../InputConversion/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/InputConversion/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2613,7 +2598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Preprocessing/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Preprocessing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2639,8 +2624,6 @@
                 
   
   
-    
-  
   
   
     
@@ -2650,372 +2633,6 @@
       
         
       
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5_4" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_4_5_4" id="__nav_4_5_4_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Codegen
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_5_4">
-            <span class="md-nav__icon md-icon"></span>
-            Codegen
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenCommon/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Common
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenCommonCPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Common/CPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenCommonGPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Common/GPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenDialectGPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Dialect/GPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenDialectVectorExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Dialect/VectorExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenLLVMCPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    LLVMCPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenLLVMGPU/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    LLVMGPU
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenSPIRV/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    SPIRV
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    VMVX
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  <span class="md-ellipsis">
-    VMVX
-  </span>
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-assign-constant-ordinals" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-assign-constant-ordinals
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-link-executables" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-link-executables
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-lower-executable-target" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-lower-executable-target
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-lower-linalg-microkernels" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-lower-linalg-microkernels
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-iree-vmvx-lower-linalg-microkernels">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
-    <span class="md-ellipsis">
-      Options
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-select-lowering-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-select-lowering-strategy
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-      
-        
-          
         
       
         
@@ -3044,12 +2661,287 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5_4" id="__nav_4_5_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Codegen
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            Codegen
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenCommon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenCommonCPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common/CPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenCommonGPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common/GPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenDialectGPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Dialect/GPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Dialect/VectorExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LLVMCPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LLVMGPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenSPIRV/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    SPIRV
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenVMVX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VMVX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../developers/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -3060,13 +2952,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Developers
@@ -3103,10 +2995,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3115,7 +3010,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
         
           
-          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3140,7 +3035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/contributing/" class="md-nav__link">
+      <a href="../../general/contributing/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 13H8.061l-2.574 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25v-8.5C0 1.784.784 1 1.75 1M1.5 2.75v8.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.75.75 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25m5.28 1.72a.75.75 0 0 1 0 1.06L5.31 7l1.47 1.47a.75.75 0 0 1-.018 1.042.75.75 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.06 0m2.44 0a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.75.75 0 0 1-1.042-.018.75.75 0 0 1-.018-1.042L10.69 7 9.22 5.53a.75.75 0 0 1 0-1.06"/></svg>
@@ -3163,7 +3058,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-overview/" class="md-nav__link">
+      <a href="../../general/developer-overview/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.74 3.74 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574M8.755 4.75l-.004 7.322a3.75 3.75 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25"/></svg>
@@ -3186,7 +3081,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-tips/" class="md-nav__link">
+      <a href="../../general/developer-tips/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1zm6-10h3v2h-3zM1 11h3v2H1zM13 1v3h-2V1zM4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93zm12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12z"/></svg>
@@ -3209,7 +3104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/testing-guide/" class="md-nav__link">
+      <a href="../../general/testing-guide/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -3232,7 +3127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/github-actions/" class="md-nav__link">
+      <a href="../../general/github-actions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8m1.5 0a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0m10.28-1.72-4.5 4.5a.75.75 0 0 1-1.06 0l-2-2a.75.75 0 0 1 .018-1.042.75.75 0 0 1 1.042-.018l1.47 1.47 3.97-3.97a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042"/></svg>
@@ -3255,7 +3150,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/release-management/" class="md-nav__link">
+      <a href="../../general/release-management/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0M7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.25.25 0 0 0-.25 0M2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -3278,7 +3173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/versioning-scheme/" class="md-nav__link">
+      <a href="../../general/versioning-scheme/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M7.75 14A1.75 1.75 0 0 1 6 12.25v-8.5C6 2.784 6.784 2 7.75 2h6.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14Zm-.25-1.75c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25ZM4.9 3.508a.75.75 0 0 1-.274 1.025.25.25 0 0 0-.126.217v6.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.75 1.75 0 0 1 3 11.25v-6.5c0-.649.353-1.214.874-1.516a.75.75 0 0 1 1.025.274ZM1.625 5.533za.25.25 0 0 0-.126.217v4.5c0 .09.048.173.126.217a.75.75 0 0 1-.752 1.298A1.75 1.75 0 0 1 0 10.25v-4.5a1.75 1.75 0 0 1 .873-1.516.75.75 0 1 1 .752 1.299"/></svg>
@@ -3324,10 +3219,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3336,7 +3234,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
         
           
-          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3361,7 +3259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/bazel/" class="md-nav__link">
+      <a href="../../building/bazel/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75m-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5zM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8m-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75"/></svg>
@@ -3384,7 +3282,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/emscripten/" class="md-nav__link">
+      <a href="../../building/emscripten/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.745 0v.129a2.752 2.752 0 1 1-5.504 0V0H0v24h24V0zm-3.291 21.431-1.169-5.783h-.02l-1.264 5.783H7.39l-1.824-8.497h1.59l1.088 5.783h.02l1.311-5.783h1.487l1.177 5.854h.02l1.242-5.854h1.561l-2.027 8.497zm8.755 0-.542-1.891h-2.861l-.417 1.891h-1.59l2.056-8.497h2.509l2.5 8.497zm-2.397-6.403-.694 3.118h2.159l-.796-3.118z"/></svg>
@@ -3407,7 +3305,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-options/" class="md-nav__link">
+      <a href="../../building/cmake-options/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -3430,7 +3328,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-with-ccache/" class="md-nav__link">
+      <a href="../../building/cmake-with-ccache/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -3458,8 +3356,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -3485,20 +3385,21 @@
     
       
       
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
         
           
+          
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3509,7 +3410,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_4">
             <span class="md-nav__icon md-icon"></span>
             Debugging
@@ -3523,7 +3424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/android-with-lldb/" class="md-nav__link">
+      <a href="../android-with-lldb/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18.44 5.559q-1.015 1.748-2.028 3.498-.055-.023-.111-.043a12.098 12.098 0 0 0-8.68.033C7.537 8.897 5.868 6.026 5.6 5.56a1 1 0 0 0-.141-.19 1.104 1.104 0 0 0-1.768 1.298c1.947 3.37-.096-.216 1.948 3.36.017.03-.495.263-1.393 1.017C2.9 12.176.452 14.772 0 18.99h24a11.7 11.7 0 0 0-.746-3.068 12.1 12.1 0 0 0-2.74-4.184 12 12 0 0 0-2.131-1.687c.66-1.122 1.312-2.256 1.965-3.385a1.11 1.11 0 0 0-.008-1.12 1.1 1.1 0 0 0-.852-.532c-.522-.054-.939.313-1.049.545m-.04 8.46c.395.593.324 1.331-.156 1.65-.48.32-1.188.1-1.582-.493s-.324-1.33.156-1.65c.473-.316 1.182-.11 1.582.494m-11.193-.492c.48.32.55 1.058.156 1.65-.394.593-1.103.815-1.584.495-.48-.32-.55-1.058-.156-1.65.4-.603 1.109-.811 1.584-.495"/></svg>
@@ -3546,7 +3447,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/compile-time-regressions/" class="md-nav__link">
+      <a href="../compile-time-regressions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.5 3.5 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327q0 .15-.025.292c.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5q-.002.615-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A5 5 0 0 1 8 16a5 5 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5 5 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.7 1.7 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06m.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.17.17 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173"/></svg>
@@ -3569,7 +3470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/gpu/" class="md-nav__link">
+      <a href="../gpu/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.5 3.5 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327q0 .15-.025.292c.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5q-.002.615-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A5 5 0 0 1 8 16a5 5 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5 5 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.7 1.7 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06m.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.17.17 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173"/></svg>
@@ -3592,7 +3493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/llvm/" class="md-nav__link">
+      <a href="../llvm/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.5 3.5 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327q0 .15-.025.292c.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5q-.002.615-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A5 5 0 0 1 8 16a5 5 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5 5 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.7 1.7 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06m.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.17.17 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173"/></svg>
@@ -3615,7 +3516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/integration-tests/" class="md-nav__link">
+      <a href="../integration-tests/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.5 3.5 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327q0 .15-.025.292c.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5q-.002.615-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A5 5 0 0 1 8 16a5 5 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5 5 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.7 1.7 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06m.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.17.17 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173"/></svg>
@@ -3638,7 +3539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/model-development/" class="md-nav__link">
+      <a href="../model-development/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.5 3.5 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327q0 .15-.025.292c.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5q-.002.615-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A5 5 0 0 1 8 16a5 5 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5 5 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.7 1.7 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06m.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.17.17 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173"/></svg>
@@ -3661,7 +3562,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/releases/" class="md-nav__link">
+      <a href="../releases/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0M7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.25.25 0 0 0-.25 0M2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -3684,7 +3585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/sanitizers/" class="md-nav__link">
+      <a href="../sanitizers/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19.36 2.72 1.42 1.42-5.72 5.71c1.07 1.54 1.22 3.39.32 4.59L9.06 8.12c1.2-.9 3.05-.75 4.59.32zM5.93 17.57c-2.01-2.01-3.24-4.41-3.58-6.65l4.88-2.09 7.44 7.44-2.09 4.88c-2.24-.34-4.64-1.57-6.65-3.58"/></svg>
@@ -3704,10 +3605,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../developers/debugging/fuzzing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 12h-4v-2h4m0 6h-4v-2h4m6-6h-2.81a6 6 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6 6 0 0 0-2.83 0L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20z"/></svg>
+  
+  <span class="md-ellipsis">
+    Fuzzing with libFuzzer
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 12h-4v-2h4m0 6h-4v-2h4m6-6h-2.81a6 6 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6 6 0 0 0-2.83 0L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20z"/></svg>
@@ -3718,6 +3641,209 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-fuzzing" class="md-nav__link">
+    <span class="md-ellipsis">
+      When to use fuzzing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-fuzzing-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      Enabling fuzzing builds
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enabling fuzzing builds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bazel" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bazel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-fuzz-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Running fuzz targets
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running fuzz targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-fuzz-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Writing fuzz targets
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing fuzz targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-to-the-build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding to the build system
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#maintain-a-corpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Maintain a corpus
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-unit-tests-for-found-bugs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Add unit tests for found bugs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-dictionaries-for-structured-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use dictionaries for structured formats
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fuzzer-runs-slowly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fuzzer runs slowly
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of memory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-new-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      No new coverage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeout-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Timeout errors
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3755,10 +3881,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3767,7 +3896,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
         
           
-          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3792,7 +3921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/benchmarking/" class="md-nav__link">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.57 9.57 0 0 1 12 4.185a9.57 9.57 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -3815,7 +3944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling/" class="md-nav__link">
+      <a href="../../performance/profiling/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
@@ -3838,7 +3967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-cpu-events/" class="md-nav__link">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
@@ -3861,7 +3990,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
@@ -3884,7 +4013,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-with-tracy/" class="md-nav__link">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8z"/></svg>
@@ -3936,10 +4065,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -3948,7 +4080,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -3973,7 +4105,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3994,7 +4126,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/function-abi/" class="md-nav__link">
+      <a href="../../design-docs/function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4015,7 +4147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4036,7 +4168,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/cuda-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/cuda-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4057,7 +4189,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/hip-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/hip-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4078,7 +4210,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/metal-hal-driver/" class="md-nav__link">
+      <a href="../../design-docs/metal-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4099,7 +4231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/vm/" class="md-nav__link">
+      <a href="../../design-docs/vm/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4143,10 +4275,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -4155,7 +4290,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_7" >
         
           
-          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -4180,7 +4315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/usage-best-practices/" class="md-nav__link">
+      <a href="../../usage-best-practices/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1zm6-10h3v2h-3zM1 11h3v2H1zM13 1v3h-2V1zM4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93zm12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12z"/></svg>
@@ -4203,7 +4338,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/update-sdxl-golden-outputs/" class="md-nav__link">
+      <a href="../../update-sdxl-golden-outputs/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1zm6-10h3v2h-3zM1 11h3v2H1zM13 1v3h-2V1zM4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93zm12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12z"/></svg>
@@ -4226,7 +4361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/vulkan-environment-setup/" class="md-nav__link">
+      <a href="../../vulkan-environment-setup/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.74 1.74 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1M1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25m.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75M7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5M3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75M3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5"/></svg>
@@ -4249,7 +4384,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/lowering-config/" class="md-nav__link">
+      <a href="../../lowering-config/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 12.25 15h-7a.75.75 0 0 1 0-1.5h7a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5H3.75a.25.25 0 0 0-.25.25V4.5a.75.75 0 0 1-1.5 0Zm-.5 10.487v1.013a.75.75 0 0 1-1.5 0v-1.012a3.75 3.75 0 0 1 3.77-3.749L4 8.49V6.573a.25.25 0 0 1 .42-.183l2.883 2.678a.25.25 0 0 1 0 .366L4.42 12.111a.25.25 0 0 1-.42-.183V9.99l-.238-.003a2.25 2.25 0 0 0-2.262 2.25m8-10.675V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg>
@@ -4715,6 +4850,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -4723,46 +4860,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#-iree-vmvx-assign-constant-ordinals" class="md-nav__link">
+  <a href="#when-to-use-fuzzing" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-vmvx-assign-constant-ordinals
+      When to use fuzzing
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-vmvx-link-executables" class="md-nav__link">
+  <a href="#enabling-fuzzing-builds" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-vmvx-link-executables
+      Enabling fuzzing builds
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-lower-executable-target" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-lower-executable-target
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vmvx-lower-linalg-microkernels" class="md-nav__link">
-    <span class="md-ellipsis">
-      -iree-vmvx-lower-linalg-microkernels
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="-iree-vmvx-lower-linalg-microkernels">
+    <nav class="md-nav" aria-label="Enabling fuzzing builds">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options" class="md-nav__link">
+  <a href="#bazel" class="md-nav__link">
     <span class="md-ellipsis">
-      Options
+      Bazel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cmake" class="md-nav__link">
+    <span class="md-ellipsis">
+      CMake
     </span>
   </a>
   
@@ -4774,11 +4902,143 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-vmvx-select-lowering-strategy" class="md-nav__link">
+  <a href="#running-fuzz-targets" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-vmvx-select-lowering-strategy
+      Running fuzz targets
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Running fuzz targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#common-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Common options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-fuzz-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      Writing fuzz targets
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Writing fuzz targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adding-to-the-build-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding to the build system
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best practices
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Best practices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#maintain-a-corpus" class="md-nav__link">
+    <span class="md-ellipsis">
+      Maintain a corpus
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-unit-tests-for-found-bugs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Add unit tests for found bugs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#use-dictionaries-for-structured-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use dictionaries for structured formats
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Troubleshooting
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fuzzer-runs-slowly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fuzzer runs slowly
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#out-of-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Out of memory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-new-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      No new coverage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeout-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Timeout errors
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4797,7 +5057,7 @@
                   
 
   
-    <a href="https://github.com/iree-org/iree/tree/main/Codegen/VMVX" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/debugging/fuzzing.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
@@ -4805,23 +5065,167 @@
   
 
 
-  <h1>VMVX</h1>
-
-<!-- Autogenerated by mlir-tblgen; don't manually edit -->
-
-<h3 id="-iree-vmvx-assign-constant-ordinals"><code>-iree-vmvx-assign-constant-ordinals</code><a class="headerlink" href="#-iree-vmvx-assign-constant-ordinals" title="Permanent link">link</a></h3>
-<p><em>Assigns executable constant ordinals across all VMVX variants.</em></p>
-<h3 id="-iree-vmvx-link-executables"><code>-iree-vmvx-link-executables</code><a class="headerlink" href="#-iree-vmvx-link-executables" title="Permanent link">link</a></h3>
-<p><em>Links VMVX HAL executables within the top-level program module.</em></p>
-<h3 id="-iree-vmvx-lower-executable-target"><code>-iree-vmvx-lower-executable-target</code><a class="headerlink" href="#-iree-vmvx-lower-executable-target" title="Permanent link">link</a></h3>
-<p><em>Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline</em></p>
-<h3 id="-iree-vmvx-lower-linalg-microkernels"><code>-iree-vmvx-lower-linalg-microkernels</code><a class="headerlink" href="#-iree-vmvx-lower-linalg-microkernels" title="Permanent link">link</a></h3>
-<p><em>Lowers linalg ops to the VMVX microkernel library</em></p>
-<h4 id="options">Options<a class="headerlink" href="#options" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-warn-on-unconverted : Warns on any unconverted linalg ops which remain live
+<h1 id="fuzzing-with-libfuzzer">Fuzzing with libFuzzer<a class="headerlink" href="#fuzzing-with-libfuzzer" title="Permanent link">link</a></h1>
+<p><a href="https://llvm.org/docs/LibFuzzer.html">libFuzzer</a> is a coverage-guided fuzzing
+engine provided by LLVM. It generates random inputs and mutates them based on
+code coverage feedback to find crashes, hangs, and memory errors.</p>
+<p>IREE provides build infrastructure for creating libFuzzer-based fuzz targets
+that integrate with the existing build system.</p>
+<h2 id="when-to-use-fuzzing">When to use fuzzing<a class="headerlink" href="#when-to-use-fuzzing" title="Permanent link">link</a></h2>
+<p>Fuzzing is most effective for:</p>
+<ul>
+<li>Parsers and decoders (UTF-8, binary formats, etc.)</li>
+<li>Serialization/deserialization code</li>
+<li>Input validation logic</li>
+<li>Any code that processes untrusted or external data</li>
+</ul>
+<h2 id="enabling-fuzzing-builds">Enabling fuzzing builds<a class="headerlink" href="#enabling-fuzzing-builds" title="Permanent link">link</a></h2>
+<h3 id="bazel">Bazel<a class="headerlink" href="#bazel" title="Permanent link">link</a></h3>
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span>build<span class="w"> </span>--config<span class="o">=</span>fuzzer<span class="w"> </span>//runtime/src/iree/base/internal:unicode_fuzz
 </code></pre></div>
-<h3 id="-iree-vmvx-select-lowering-strategy"><code>-iree-vmvx-select-lowering-strategy</code><a class="headerlink" href="#-iree-vmvx-select-lowering-strategy" title="Permanent link">link</a></h3>
-<p><em>Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant</em></p>
+<p>The <code>--config=fuzzer</code> flag enables coverage instrumentation and ASan.</p>
+<h3 id="cmake">CMake<a class="headerlink" href="#cmake" title="Permanent link">link</a></h3>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DIREE_ENABLE_FUZZING<span class="o">=</span>ON<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo
+cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>unicode_fuzz
+</code></pre></div>
+<p>Fuzzing automatically enables ASan. Fuzz targets are excluded from the default
+<code>all</code> target and must be built explicitly.</p>
+<h2 id="running-fuzz-targets">Running fuzz targets<a class="headerlink" href="#running-fuzz-targets" title="Permanent link">link</a></h2>
+<p>Fuzz targets are standalone executables that accept libFuzzer arguments:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run indefinitely (Ctrl+C to stop)</span>
+./build/runtime/src/iree/base/internal/unicode_fuzz
+
+<span class="c1"># Run for 60 seconds</span>
+./build/runtime/src/iree/base/internal/unicode_fuzz<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+
+<span class="c1"># Use a corpus directory (recommended)</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>corpus/unicode
+./build/runtime/src/iree/base/internal/unicode_fuzz<span class="w"> </span>corpus/unicode/
+</code></pre></div>
+<h3 id="common-options">Common options<a class="headerlink" href="#common-options" title="Permanent link">link</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-max_total_time=N</code></td>
+<td>Stop after N seconds</td>
+</tr>
+<tr>
+<td><code>-max_len=N</code></td>
+<td>Maximum input size in bytes</td>
+</tr>
+<tr>
+<td><code>-timeout=N</code></td>
+<td>Per-input timeout in seconds (0 to disable)</td>
+</tr>
+<tr>
+<td><code>-jobs=N</code></td>
+<td>Run N parallel fuzzing jobs</td>
+</tr>
+<tr>
+<td><code>-workers=N</code></td>
+<td>Number of worker processes for parallel fuzzing</td>
+</tr>
+<tr>
+<td><code>-dict=file</code></td>
+<td>Use a dictionary file for structured inputs</td>
+</tr>
+<tr>
+<td><code>-seed=N</code></td>
+<td>Use specific random seed for reproducibility</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="https://llvm.org/docs/LibFuzzer.html">libFuzzer documentation</a> for all
+options.</p>
+<h2 id="writing-fuzz-targets">Writing fuzz targets<a class="headerlink" href="#writing-fuzz-targets" title="Permanent link">link</a></h2>
+<p>Fuzz targets implement the <code>LLVMFuzzerTestOneInput</code> function:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// my_fuzz.cc</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stddef.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdint.h&gt;</span>
+
+<span class="k">extern</span><span class="w"> </span><span class="s">&quot;C&quot;</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">LLVMFuzzerTestOneInput</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Process the fuzzer-generated input</span>
+<span class="w">  </span><span class="n">my_function_under_test</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Always return 0</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="adding-to-the-build-system">Adding to the build system<a class="headerlink" href="#adding-to-the-build-system" title="Permanent link">link</a></h3>
+<p>In <code>BUILD.bazel</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:build_defs.oss.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_runtime_cc_fuzz&quot;</span><span class="p">)</span>
+
+<span class="n">iree_runtime_cc_fuzz</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;my_fuzz&quot;</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;my_fuzz.cc&quot;</span><span class="p">],</span>
+    <span class="n">deps</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;:my_library&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Then run <code>python build_tools/bazel_to_cmake/bazel_to_cmake.py</code> to generate the
+CMake equivalent.</p>
+<h2 id="best-practices">Best practices<a class="headerlink" href="#best-practices" title="Permanent link">link</a></h2>
+<h3 id="maintain-a-corpus">Maintain a corpus<a class="headerlink" href="#maintain-a-corpus" title="Permanent link">link</a></h3>
+<p>Store interesting inputs in a corpus directory. The fuzzer uses existing corpus
+entries as seeds for mutation:</p>
+<div class="highlight"><pre><span></span><code>mkdir<span class="w"> </span>-p<span class="w"> </span>corpus/my_fuzz
+./my_fuzz<span class="w"> </span>corpus/my_fuzz/<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">3600</span>
+</code></pre></div>
+<p>After finding bugs, minimize the corpus to remove redundant entries:</p>
+<div class="highlight"><pre><span></span><code>mkdir<span class="w"> </span>corpus/my_fuzz_minimized
+./my_fuzz<span class="w"> </span>-merge<span class="o">=</span><span class="m">1</span><span class="w"> </span>corpus/my_fuzz_minimized/<span class="w"> </span>corpus/my_fuzz/
+</code></pre></div>
+<h3 id="add-unit-tests-for-found-bugs">Add unit tests for found bugs<a class="headerlink" href="#add-unit-tests-for-found-bugs" title="Permanent link">link</a></h3>
+<p>When fuzzing discovers a crash:</p>
+<ol>
+<li>Minimize the reproducer: <code>./my_fuzz -minimize_crash=1 crash-xxx</code></li>
+<li>Add the minimized input as a unit test case</li>
+<li>Fix the bug</li>
+<li>Verify the fix with the original crash input</li>
+</ol>
+<p>This prevents regressions and documents the bug.</p>
+<h3 id="use-dictionaries-for-structured-formats">Use dictionaries for structured formats<a class="headerlink" href="#use-dictionaries-for-structured-formats" title="Permanent link">link</a></h3>
+<p>For inputs with specific syntax (protocols, file formats), provide a dictionary:</p>
+<div class="highlight"><pre><span></span><code># my_dict.txt
+&quot;keyword1&quot;
+&quot;keyword2&quot;
+&quot;\x00\x01\x02&quot;
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>./my_fuzz<span class="w"> </span>-dict<span class="o">=</span>my_dict.txt<span class="w"> </span>corpus/
+</code></pre></div>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">link</a></h2>
+<h3 id="fuzzer-runs-slowly">Fuzzer runs slowly<a class="headerlink" href="#fuzzer-runs-slowly" title="Permanent link">link</a></h3>
+<ul>
+<li>Ensure <code>CMAKE_BUILD_TYPE=RelWithDebInfo</code> or <code>Release</code> (Debug is very slow)</li>
+<li>Check that the target doesn't do excessive I/O or allocations per iteration</li>
+<li>Use <code>-jobs=N</code> for parallel fuzzing on multi-core machines</li>
+</ul>
+<h3 id="out-of-memory">Out of memory<a class="headerlink" href="#out-of-memory" title="Permanent link">link</a></h3>
+<ul>
+<li>Limit input size with <code>-max_len=N</code></li>
+<li>Add early returns for oversized inputs in your fuzz target</li>
+<li>Use <code>-rss_limit_mb=N</code> to set memory limits</li>
+</ul>
+<h3 id="no-new-coverage">No new coverage<a class="headerlink" href="#no-new-coverage" title="Permanent link">link</a></h3>
+<ul>
+<li>Verify the target actually processes the input</li>
+<li>Check that coverage instrumentation is enabled (<code>-fsanitize=fuzzer-no-link</code>)</li>
+<li>Try seeding with representative inputs in the corpus</li>
+</ul>
+<h3 id="timeout-errors">Timeout errors<a class="headerlink" href="#timeout-errors" title="Permanent link">link</a></h3>
+<p>libFuzzer kills inputs that take too long (default 1200 seconds). If you see
+<code>ALARM: working on the last Unit for N seconds</code> followed by a timeout:</p>
+<ul>
+<li>Use <code>-timeout=N</code> to adjust the per-input timeout (in seconds)</li>
+<li>Use <code>-timeout=0</code> to disable timeouts entirely (useful for debugging)</li>
+<li>Check if certain inputs cause algorithmic complexity issues (e.g., pathological
+  regex patterns, deeply nested structures)</li>
+</ul>
 
 
 

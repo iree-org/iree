@@ -1947,6 +1947,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_linalg_extmap_gather-linalgextmapgatherop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_linalg_extmap_scatter-linalgextmapscatterop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)
@@ -3717,6 +3726,8 @@
       
         
       
+        
+      
     
     
       
@@ -3927,6 +3938,29 @@
   
   <span class="md-ellipsis">
     Sanitizers (ASan/MSan/TSan)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developers/debugging/fuzzing/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 12h-4v-2h4m0 6h-4v-2h4m6-6h-2.81a6 6 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17a6 6 0 0 0-2.83 0L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20z"/></svg>
+  
+  <span class="md-ellipsis">
+    Fuzzing with libFuzzer
   </span>
   
 
@@ -4349,6 +4383,8 @@
       
         
       
+        
+      
     
     
       
@@ -4444,6 +4480,29 @@
   
   <span class="md-ellipsis">
     Vulkan environment setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../developers/lowering-config/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 12.25 15h-7a.75.75 0 0 1 0-1.5h7a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5H3.75a.25.25 0 0 0-.25.25V4.5a.75.75 0 0 1-1.5 0Zm-.5 10.487v1.013a.75.75 0 0 1-1.5 0v-1.012a3.75 3.75 0 0 1 3.77-3.749L4 8.49V6.573a.25.25 0 0 1 .42-.183l2.883 2.678a.25.25 0 0 1 0 .366L4.42 12.111a.25.25 0 0 1-.42-.183V9.99l-.238-.003a2.25 2.25 0 0 0-2.262 2.25m8-10.675V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914z"/></svg>
+  
+  <span class="md-ellipsis">
+    IREE Lowering Configs
   </span>
   
 
@@ -5029,6 +5088,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_linalg_extmap_gather-linalgextmapgatherop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_linalg_extmap_scatter-linalgextmapscatterop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)
@@ -5252,6 +5320,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#iree_linalg_extfft-linalgextfftop">iree_linalg_ext.fft (LinalgExt::FftOp)</a></li>
 <li><a href="#iree_linalg_extgather-linalgextgatherop">iree_linalg_ext.gather (LinalgExt::GatherOp)</a></li>
 <li><a href="#iree_linalg_extim2col-linalgextim2colop">iree_linalg_ext.im2col (LinalgExt::Im2colOp)</a></li>
+<li><a href="#iree_linalg_extmap_gather-linalgextmapgatherop">iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)</a></li>
 <li><a href="#iree_linalg_extmap_scatter-linalgextmapscatterop">iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)</a></li>
 <li><a href="#iree_linalg_extonline_attention-linalgextonlineattentionop">iree_linalg_ext.online_attention (LinalgExt::OnlineAttentionOp)</a></li>
 <li><a href="#iree_linalg_extscan-linalgextscanop">iree_linalg_ext.scan (LinalgExt::ScanOp)</a></li>
@@ -5577,12 +5646,29 @@ also supports permuting the tiled loops.</p>
 <p>The <code>arg_compare</code> op performs a reduction over a given dimension of a tensor,
 returning both the selected value and its corresponding index. The selection
 logic is defined by a user-specified comparator region.</p>
-<p>The comparator region receives two candidate values and returns a single <code>i1</code>
-result indicating whether the first argument should be preferred over the second.</p>
-<p>This region defines the sorting rule, e.g., "greater than" for argmax or
-"less than" for argmin. It allows for generalization beyond simple argmax-style
+<p>The operation supports three index modes for flexibility in tiling:</p>
+<ol>
+<li>
+<p>Implicit-index without index_base (single input, no index_base):
+   Indices are computed from local position (linalg.index on reduction dimension).
+   Used for untiled operations or when global offset is not needed.</p>
+</li>
+<li>
+<p>Implicit-index with index_base (single input, with index_base):
+   Indices are computed as: index_base + local position.
+   Used in OuterParallel tiling where each parallel chunk has a fixed offset.</p>
+</li>
+<li>
+<p>Explicit-index (two inputs: values + indices, no index_base):
+   Indices are provided as input tensor alongside values.
+   Used in OuterReduction tiling and merge operations where indices are
+   accumulated across iterations.</p>
+</li>
+</ol>
+<p>The comparator region defines the sorting rule, e.g., "greater than" for argmax or
+"less than" for argmin, allowing for generalization beyond simple argmax-style
 behavior.</p>
-<p>Example (argmax over dim 1):
+<p>Example (implicit-index mode - argmax over dim 1):
 <div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
@@ -5595,7 +5681,7 @@ iree_linalg_ext.arg_compare
   iree_linalg_ext.yield %cmp : i1
 }
 </code></pre></div></p>
-<p>Example with index_base = 5 (i.e., indices start counting from 5):
+<p>Example (implicit-index mode with index_base = 5):
 <div class="highlight"><pre><span></span><code>%input = memref&lt;2x10xf32&gt;
 %out_val = memref&lt;2xf32&gt;
 %out_idx = memref&lt;2xi32&gt;
@@ -5605,6 +5691,20 @@ iree_linalg_ext.arg_compare
   ins(%input : memref&lt;2x10xf32&gt;)
   outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;)
   index_base(%base : index) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_linalg_ext.yield %cmp : i1
+}
+</code></pre></div></p>
+<p>Example (explicit-index mode - combining partial results):
+<div class="highlight"><pre><span></span><code>%partial_vals = memref&lt;2x4xf32&gt;
+%partial_idxs = memref&lt;2x4xi32&gt;
+%out_val = memref&lt;2xf32&gt;
+%out_idx = memref&lt;2xi32&gt;
+iree_linalg_ext.arg_compare
+  dimension(1)
+  ins(%partial_vals, %partial_idxs : memref&lt;2x4xf32&gt;, memref&lt;2x4xi32&gt;)
+  outs(%out_val, %out_idx : memref&lt;2xf32&gt;, memref&lt;2xi32&gt;) {
 ^bb0(%a: f32, %b: f32):
   %cmp = arith.cmpf ogt, %a, %b : f32
   iree_linalg_ext.yield %cmp : i1
@@ -6152,6 +6252,62 @@ applying the permutation to the <code>BxMxK</code> layout. For instance, an
 </tr>
 </tbody>
 </table>
+<h4 id="iree_linalg_extmap_gather-linalgextmapgatherop"><code>iree_linalg_ext.map_gather</code> (LinalgExt::MapGatherOp)<a class="headerlink" href="#iree_linalg_extmap_gather-linalgextmapgatherop" title="Permanent link">link</a></h4>
+<p><em>Gather with a mapping from result indices to source indices.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_gather` attr-dict $source `into` $output
+              $transformation_region
+              `:` type($source) `into` type($output) (`-&gt;` type($results)^)?
+</code></pre></div>
+<p>Takes two operands, <code>source</code> and <code>output</code>, and reads every element from
+the <code>source</code> based on a computed index mapping to store into the <code>output</code>.
+If the operands are tensors, the op will also return a Value for the result.
+For an element of the <code>output</code>, the index to read from the <code>source</code> is
+determined by index computation mapping the index in the <code>output</code> value to
+an index in the <code>source</code> value. This computation is contained in the
+<code>transformation_region</code>, which contains a single block, with one argument
+for each dimension in the <code>output</code> value. The block arguments represent the
+index of a given element along the corresponding dimension (i.e., block arg
+<code>i</code> represents the index along dimension <code>i</code> of the <code>output</code> value). The
+block is terminated by an iree_linalg_ext.yield op, which yields one index
+for each dimension in the <code>source</code>, and an additional padding value which
+represents the value to use if the computed source indices are out of bounds.</p>
+<p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>shaped of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>output</code></td>
+<td>ranked tensor or memref of any type</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h4 id="iree_linalg_extmap_scatter-linalgextmapscatterop"><code>iree_linalg_ext.map_scatter</code> (LinalgExt::MapScatterOp)<a class="headerlink" href="#iree_linalg_extmap_scatter-linalgextmapscatterop" title="Permanent link">link</a></h4>
 <p><em>Scatter with a mapping from source indices to result indices.</em></p>
 <p>Syntax:</p>
@@ -6175,7 +6331,7 @@ whether or not to write to the <code>output</code> at the yielded set of indices
 the mask value is true, the input value will be written.</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>TilingInterface</code></p>
-<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6194,7 +6350,7 @@ the mask value is true, the input value will be written.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
+<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6235,6 +6391,15 @@ its reduction dimension, making the online_attention operator:
 it over the entire softmax reduction dimension by:
   x, _, sum : results
   x = (1 / sum) * x</p>
+<p>Decomposition Configuration:
+The <code>decomposition_config</code> attribute is a DictionaryAttr that controls how
+this operation is decomposed into lower-level operations. It supports:
+  - "qk_attrs": DictionaryAttr - Attributes to attach to the Q@K matmul
+    operation after decomposition (e.g., lowering_config, attention markers)
+  - "pv_attrs": DictionaryAttr - Attributes to attach to the P@V matmul
+    operation after decomposition
+  - "use_exp2": BoolAttr - If true, uses exp2 with log2(e) scaling instead
+    of exp. (Gives better perf on some hardware, but trades off accuracy)</p>
 <p>Traits: <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>IndexingMapOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>PartialReductionOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
@@ -6244,7 +6409,7 @@ it over the entire softmax reduction dimension by:
 <tr><td><code>decomposition_config</code></td><td>::mlir::DictionaryAttr</td><td>dictionary of named attribute values</td></tr>
 </table>
 
-<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
+<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6287,7 +6452,7 @@ it over the entire softmax reduction dimension by:
 </tr>
 </tbody>
 </table>
-<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
+<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6322,7 +6487,7 @@ it over the entire softmax reduction dimension by:
 <tr><td><code>inclusive</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
 </table>
 
-<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
+<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6341,7 +6506,7 @@ it over the entire softmax reduction dimension by:
 </tr>
 </tbody>
 </table>
-<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6405,7 +6570,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <tr><td><code>unique_indices</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
 </table>
 
-<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
+<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6424,7 +6589,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6459,7 +6624,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 </table>
 
-<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
+<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6478,7 +6643,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 </tr>
 </tbody>
 </table>
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6524,7 +6689,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 </table>
 
-<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
+<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6543,7 +6708,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6590,7 +6755,7 @@ and then fed to a batch matmul op.</p>
 <tr><td><code>kernel_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
+<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6609,7 +6774,7 @@ and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6655,7 +6820,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6674,7 +6839,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6724,7 +6889,7 @@ only the non-padded part of the output.</p>
 <tr><td><code>image_dimensions</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 </table>
 
-<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
+<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6743,7 +6908,7 @@ only the non-padded part of the output.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
+<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
