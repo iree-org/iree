@@ -361,11 +361,10 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
       WMMA_F16_16x16x128_F8E4M3FN,
       WMMA_F16_16x16x128_F8E4M3FN_F8E5M2,
 
-      // NV intrinsics (CUDA mma.sync)
+      // NV intrinsics with layout
       NV_MMA_SYNC_F32_16x8x16_F16,
       NV_MMA_SYNC_F16_16x8x16_F16,
-
-      // NV intrinsics (Vulkan/SPIRV cooperative matrix)
+      // opaque NV intrinsics.
       NV_WMMA_F32_16x16x16_F16,
       NV_WMMA_F16_16x16x16_F16,
     ]>;
