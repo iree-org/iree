@@ -163,6 +163,10 @@ func.func @transfer_gather_fold_contiguous_load(%scalar: vector<64x1xindex>,
 
 // -----
 
+//===----------------------------------------------------------------------===//
+// GatherOp fold tests
+//===----------------------------------------------------------------------===//
+
 func.func @gather_fold_broadcast(%indices: vector<64xindex>,
   %source: memref<4096x64xf16>)
   -> vector<64x32xf16> {
@@ -297,9 +301,6 @@ func.func @gather_fold_single_element(%indices: vector<1xindex>,
 
 // -----
 
-// Test FoldContiguousGatherToTransferRead with identity mask map.
-// The mask map (d0, d1) -> (d0, d1) means the mask already matches the result.
-// No broadcast or transpose should be generated.
 func.func @gather_fold_contiguous_with_identity_mask(
   %source: memref<64x64xf16>,
   %mask: vector<64x64xi1>)
@@ -332,8 +333,6 @@ func.func @gather_fold_contiguous_with_identity_mask(
 
 // -----
 
-// Test FoldContiguousGatherToTransferRead with transpose-only mask map.
-// The mask map (d0, d1) -> (d1, d0) means the mask needs transpose but no broadcast.
 func.func @gather_fold_contiguous_with_transposed_mask(
   %source: memref<64x64xf16>,
   %mask: vector<64x64xi1>)
@@ -427,3 +426,85 @@ func.func @gather_fold_contiguous_mask_broadcast_minor_dim(
 // CHECK: %[[READ:.*]] = vector.transfer_read %[[SOURCE]][%[[C0]], %[[C0]]], %[[PAD]], %[[BCAST]]
 // CHECK-SAME: {in_bounds = [true, true]} : memref<64x4096xf16>, vector<64x64xf16>
 // CHECK: return %[[READ]]
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// ScatterOp fold tests
+//===----------------------------------------------------------------------===//
+
+func.func @scatter_fold_broadcast(%indices: vector<64xindex>,
+  %source: memref<4096x64xf16>, %value: vector<64x32xf16>) {
+
+  %c0 = arith.constant 0 : index
+
+  %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0]
+  [%broadcasted: vector<32x64xindex>]
+  {indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                    affine_map<(d0, d1)[s0] -> (d1, d0)>]}
+  : memref<4096x64xf16>, vector<64x32xf16>
+
+  return
+}
+
+// CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0, d1)[s0] -> (d0, s0)>
+// CHECK-DAG: #[[$MAP1:.*]] = affine_map<(d0, d1)[s0] -> (d0)>
+// CHECK-LABEL: @scatter_fold_broadcast
+// CHECK-NOT: vector.broadcast
+// CHECK: scatter
+// CHECK-SAME: indexing_maps = [#[[$MAP]], #[[$MAP1]]]
+
+// -----
+
+func.func @scatter_fold_transpose(%indices: vector<64x32xindex>,
+  %source: memref<4096x64xf16>, %value: vector<64x32xf16>) {
+
+  %c0 = arith.constant 0 : index
+
+  %transposed = vector.transpose %indices, [1, 0] : vector<64x32xindex> to vector<32x64xindex>
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0]
+  [%transposed: vector<32x64xindex>]
+  {indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                    affine_map<(d0, d1)[s0] -> (d1, d0)>]}
+  : memref<4096x64xf16>, vector<64x32xf16>
+
+  return
+}
+
+// CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0, d1)[s0] -> (d0, s0)>
+// CHECK-DAG: #[[$MAP1:.*]] = affine_map<(d0, d1)[s0] -> (d0, d1)>
+// CHECK-LABEL: @scatter_fold_transpose
+// CHECK-NOT: vector.transpose
+// CHECK: scatter
+// CHECK-SAME: indexing_maps = [#[[$MAP]], #[[$MAP1]]]
+
+// -----
+
+func.func @scatter_fold_step(%indices: vector<64x32xindex>,
+  %source: memref<4096x64xf16>, %value: vector<64x32xf16>) {
+
+  %c0 = arith.constant 0 : index
+
+  %step = vector.step : vector<64xindex>
+  %expanded = vector.broadcast %step : vector<64xindex> to vector<32x64xindex>
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0]
+  [%expanded, %indices : vector<32x64xindex>, vector<64x32xindex>]
+  {indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s1, s0)>,
+                    affine_map<(d0, d1)[s0, s1] -> (d1, d0)>,
+                    affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]}
+  : memref<4096x64xf16>, vector<64x32xf16>
+
+  return
+}
+
+// CHECK-DAG: #[[$MAP:.*]] = affine_map<(d0, d1)[s0] -> (s0, d0)>
+// CHECK-DAG: #[[$MAP1:.*]] = affine_map<(d0, d1)[s0] -> (d0, d1)>
+// CHECK-LABEL: @scatter_fold_step
+// CHECK-NOT: vector.step
+// CHECK-NOT: vector.broadcast
+// CHECK: scatter
+// CHECK-SAME: indexing_maps = [#[[$MAP]], #[[$MAP1]]]

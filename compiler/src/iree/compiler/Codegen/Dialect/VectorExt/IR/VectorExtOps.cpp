@@ -1027,8 +1027,188 @@ OpFoldResult GatherOp::fold(FoldAdaptor adaptor) {
   return OpFoldResult();
 }
 
+// Helper function to fold operations on scatter index vectors.
+// Mirrors foldGatherIndexVecs but for ScatterOp.
+static Value foldScatterIndexVecs(
+    ScatterOp scatterOp,
+    function_ref<IndexingMapFoldResult(int64_t, Value, AffineMap, AffineMap &)>
+        valueFolder) {
+  SmallVector<Value> indexedValues = scatterOp.getIndexVecs();
+  SmallVector<AffineMap> indexingMaps(ArrayRef(scatterOp.getIndexingMapsArray())
+                                          .slice(1, indexedValues.size()));
+
+  AffineMap baseMap = scatterOp.getIndexingMapsArray().front();
+
+  bool changed = false;
+  SmallVector<Value> newIndexedValues;
+  SmallVector<AffineMap> newIndexingMaps;
+  llvm::DenseSet<int64_t> deletedSyms;
+  for (auto [index, val, map] : llvm::enumerate(indexedValues, indexingMaps)) {
+    auto [newVal, newMap, valChanged] = valueFolder(index, val, map, baseMap);
+    changed |= valChanged;
+
+    if (newVal) {
+      newIndexedValues.push_back(newVal);
+      newIndexingMaps.push_back(newMap);
+    } else {
+      deletedSyms.insert(index);
+    }
+  }
+
+  Value mask;
+  AffineMap maskMap;
+  if (scatterOp.getMask()) {
+    auto [newMask, newMap, valChanged] =
+        valueFolder(indexedValues.size(), scatterOp.getMask(),
+                    scatterOp.getIndexingMapsArray().back(), baseMap);
+    changed |= valChanged;
+    if (newMask) {
+      mask = newMask;
+      maskMap = newMap;
+    }
+  }
+
+  if (!changed) {
+    return Value();
+  }
+
+  OpBuilder b(scatterOp);
+
+  // Collect all the indexing maps.
+  SmallVector<AffineMap> updatedIndexingMaps;
+  updatedIndexingMaps.push_back(baseMap);
+  updatedIndexingMaps.append(newIndexingMaps);
+  if (scatterOp.getMask()) {
+    updatedIndexingMaps.push_back(maskMap);
+  }
+
+  // Delete the deleted symbols from these maps.
+  if (!deletedSyms.empty()) {
+    SmallVector<AffineExpr> symReplacements;
+    int currSym = 0;
+    for (auto i : llvm::seq<int>(baseMap.getNumSymbols())) {
+      if (deletedSyms.contains(i)) {
+        symReplacements.push_back(b.getAffineConstantExpr(0));
+      } else {
+        symReplacements.push_back(b.getAffineSymbolExpr(currSym));
+        ++currSym;
+      }
+    }
+    for (AffineMap &map : updatedIndexingMaps) {
+      map = map.replaceDimsAndSymbols({}, symReplacements, map.getNumDims(),
+                                      currSym);
+    }
+  }
+
+  SmallVector<Value> operands;
+  SmallVector<int32_t> operandSegmentSizes;
+
+  // Base.
+  operands.push_back(scatterOp.getBase());
+  operandSegmentSizes.push_back(1);
+  // Offsets.
+  SmallVector<Value> offsets = scatterOp.getOffsets();
+  operands.append(offsets);
+  operandSegmentSizes.push_back(offsets.size());
+  // IndexVecs.
+  operands.append(newIndexedValues);
+  operandSegmentSizes.push_back(newIndexedValues.size());
+  // ValueToStore.
+  operands.push_back(scatterOp.getValueToStore());
+  operandSegmentSizes.push_back(1);
+  // Mask.
+  if (mask) {
+    operands.push_back(mask);
+    operandSegmentSizes.push_back(1);
+  } else {
+    operandSegmentSizes.push_back(0);
+  }
+  scatterOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(updatedIndexingMaps));
+  scatterOp->setOperands(operands);
+  scatterOp.getProperties().setOperandSegmentSizes(operandSegmentSizes);
+
+  // ScatterOp may return a tensor for tensor semantics, otherwise nothing.
+  if (scatterOp.getResult()) {
+    return scatterOp.getResult();
+  }
+  // For memref semantics, signal that the op was modified by returning truthy.
+  return scatterOp.getBase();
+}
+
+static Value foldScatterFromBroadcast(ScatterOp scatterOp) {
+  return foldScatterIndexVecs(
+      scatterOp,
+      [](int64_t, Value operand, AffineMap map,
+         AffineMap &) -> IndexingMapFoldResult {
+        auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
+        if (!broadcast) {
+          return {operand, map, false};
+        }
+
+        int64_t sourceRank = getVectorRank(broadcast.getSourceType());
+        int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
+        AffineMap newMap =
+            map.getSliceMap(operandRank - sourceRank, sourceRank);
+        return {broadcast.getSource(), newMap, true};
+      });
+}
+
+static Value foldScatterFromTranspose(ScatterOp scatterOp) {
+  return foldScatterIndexVecs(
+      scatterOp,
+      [](int64_t, Value operand, AffineMap map,
+         AffineMap &) -> IndexingMapFoldResult {
+        auto transpose = operand.getDefiningOp<vector::TransposeOp>();
+        if (!transpose) {
+          return {operand, map, false};
+        }
+
+        AffineMap newMap =
+            AffineMap::getPermutationMap(
+                invertPermutationVector(transpose.getPermutation()),
+                transpose.getContext())
+                .compose(map);
+        return {transpose.getVector(), newMap, true};
+      });
+}
+
+static Value foldScatterFromStep(ScatterOp scatterOp) {
+  return foldScatterIndexVecs(
+      scatterOp,
+      [](int64_t index, Value operand, AffineMap map,
+         AffineMap &baseMap) -> IndexingMapFoldResult {
+        auto step = operand.getDefiningOp<vector::StepOp>();
+        if (!step) {
+          return {operand, map, false};
+        }
+
+        assert(map.getNumResults() == 1);
+        SmallVector<AffineExpr> newResults;
+        for (AffineExpr expr : baseMap.getResults()) {
+          if (auto sym = dyn_cast<AffineSymbolExpr>(expr)) {
+            if (sym.getPosition() == index) {
+              expr = map.getResult(0);
+            }
+          }
+          newResults.push_back(expr);
+        }
+        baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumSymbols(),
+                                 newResults, baseMap.getContext());
+        return {Value(), AffineMap(), true};
+      });
+}
+
 LogicalResult ScatterOp::fold(FoldAdaptor adaptor,
                               SmallVectorImpl<OpFoldResult> &results) {
+  if (foldScatterFromBroadcast(*this)) {
+    return success();
+  }
+  if (foldScatterFromTranspose(*this)) {
+    return success();
+  }
+  if (foldScatterFromStep(*this)) {
+    return success();
+  }
   return failure();
 }
 
