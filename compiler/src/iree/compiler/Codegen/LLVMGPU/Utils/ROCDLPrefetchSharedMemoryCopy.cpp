@@ -44,21 +44,30 @@ struct StageClassification {
 } // namespace
 
 /// Checks if a loop contains gather_to_lds operations directly in the loop
-/// body. Returns false if any gather_to_lds is inside a nested region (e.g.,
-/// scf.if), as conditional async copies can't be reliably pipelined.
-static bool hasGatherToLDS(scf::ForOp forOp) {
-  bool found = false;
-  forOp.getBody()->walk([&](amdgpu::GatherToLDSOp gatherOp) {
-    if (gatherOp->getParentOp() == forOp.getOperation()) {
-      found = true;
-    } else {
-      // gather_to_lds is inside a nested region - can't use async copy mode
-      found = false;
-      return WalkResult::interrupt();
+/// body (immediate children of the for loop's body block).
+static bool hasDirectGatherToLDS(scf::ForOp forOp) {
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    if (isa<amdgpu::GatherToLDSOp>(&op)) {
+      return true;
     }
-    return WalkResult::advance();
-  });
-  return found;
+  }
+  return false;
+}
+
+/// Checks if a loop contains gather_to_lds operations nested inside regions
+/// (e.g., inside scf.if). Such conditional async copies can't be reliably
+/// pipelined.
+static bool hasNestedGatherToLDS(scf::ForOp forOp) {
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    if (op.getNumRegions() > 0) {
+      bool hasNested = false;
+      op.walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
+      if (hasNested) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /// Checks if a loop contains stream copy operations (global read + shared
@@ -201,8 +210,8 @@ static LogicalResult cloneViewOpsInsideLoop(memref::AllocOp alloc,
   }
 
   // Erase original ops (in reverse order to handle dependencies).
-  for (auto it = opsToErase.rbegin(); it != opsToErase.rend(); ++it) {
-    Operation *op = *it;
+  for (Operation *op : llvm::reverse(opsToErase)) {
+    assert(op->use_empty() && "expected all uses to be replaced");
     op->erase();
   }
 
@@ -903,9 +912,17 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
+  // Check for nested gather_to_lds (e.g., inside scf.if) - this is unsupported
+  // because conditional async copies can't be reliably pipelined.
+  if (hasNestedGatherToLDS(forOp)) {
+    LDBG() << "Loop has gather_to_lds inside nested region (e.g., scf.if) - "
+           << "cannot pipeline";
+    return failure();
+  }
+
   // Check for mixed mode: both gather_to_lds and stream copy ops.
   // This is unsupported - bail out entirely without any pipelining.
-  bool hasAsyncCopy = hasGatherToLDS(forOp);
+  bool hasAsyncCopy = hasDirectGatherToLDS(forOp);
   bool hasStreamCopy = hasStreamCopyOps(forOp);
   if (hasAsyncCopy && hasStreamCopy) {
     LDBG() << "Loop has both gather_to_lds and stream copy ops - "
@@ -916,8 +933,9 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   if (hasAsyncCopy) {
     LDBG() << "Async copy mode detected (gather_to_lds present)";
 
-    // Multi-buffer LDS allocations for double buffering
-    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/2))) {
+    // Multi-buffer LDS allocations for double buffering.
+    // Use numStages as the buffer count to match pipeline depth.
+    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
       return failure();
     }
 

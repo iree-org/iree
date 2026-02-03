@@ -405,6 +405,7 @@ func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
 
 // CHECK-LABEL: @prefetch_gather_to_lds_two_operands
 // CHECK-SAME: (%[[A_GLOBAL:.*]]: memref<128x128xf32>, %[[B_GLOBAL:.*]]: memref<128x128xf32>, %[[C_GLOBAL:.*]]: memref<128xf32>)
+// CHECK-3STAGE-LABEL: @prefetch_gather_to_lds_two_operands
 func.func @prefetch_gather_to_lds_two_operands(
     %A_global: memref<128x128xf32>,
     %B_global: memref<128x128xf32>,
@@ -415,9 +416,13 @@ func.func @prefetch_gather_to_lds_two_operands(
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
 
+  // 2-stage pipelining: 2 buffers for double-buffering
   // CHECK: %[[A_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  // 3-stage pipelining: 3 buffers for triple-buffering
+  // CHECK-3STAGE: memref.alloc() : memref<3x1xf32, #gpu.address_space<workgroup>>
   %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   // CHECK: %[[B_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  // CHECK-3STAGE: memref.alloc() : memref<3x1xf32, #gpu.address_space<workgroup>>
   %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
