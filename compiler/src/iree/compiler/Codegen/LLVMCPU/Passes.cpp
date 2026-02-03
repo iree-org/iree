@@ -622,16 +622,15 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass([&]() {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
-        options.includeF4E2M1 = true;
         options.includeF8E8M0 = true;
         return arith::createArithExpandOpsPass(options);
       })
+      .addPass(createConvertUnsupportedFloatArithPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPredicatedPass(clInstrumentMemoryAccesses,
-                         createInstrumentMemoryAccessesPass)
-      .addPass(createConvertUnsupportedFloatArithPass);
+                         createInstrumentMemoryAccessesPass);
 
   if (enableAArch64SME) {
     FunctionLikeNest(modulePassManager).addPass([&] {
