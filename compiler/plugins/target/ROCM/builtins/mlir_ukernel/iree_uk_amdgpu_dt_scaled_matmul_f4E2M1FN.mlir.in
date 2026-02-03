@@ -3,28 +3,28 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-// Template for scaled f4E2M1FN data-tiled matmul kernels
-// RUN: iree-opt %s
+
+//  RUN: iree-opt %s
+// AUTO-GENERATED - DO NOT EDIT
+// Generated from iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir.in
 
 // Input LHS and RHS layouts.
-// Tensor shape uses fold1() to omit dimensions that equal 1
-!lhs_ty = tensor<1x?x1x${fold1(SUBGROUPS_M)}${fold1(INTRINSICS_M)}${fold1(INTRINSICS_K)}4x16x32xf4E2M1FN>
-!rhs_ty = tensor<1x?x1x${fold1(SUBGROUPS_N)}${fold1(INTRINSICS_N)}${fold1(INTRINSICS_K)}4x16x32xf4E2M1FN>
+!lhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_M)}${FOLD1(INTRINSICS_M)}${FOLD1(INTRINSICS_K)}4x16x32xf4E2M1FN>
+!rhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_N)}${FOLD1(INTRINSICS_N)}${FOLD1(INTRINSICS_K)}4x16x32xf4E2M1FN>
 
 !lhs_byte_ty = tensor<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x16xi8>
 !rhs_byte_ty = tensor<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x16xi8>
 
 // Buffer types keep all dimensions (no folding) for simpler stride handling
-!lhs_buffer_ty = memref<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_M * INTRINSICS_M * INTRINSICS_K * 4 * 16 * 16}, ${SUBGROUPS_M * INTRINSICS_M * INTRINSICS_K * 4 * 16 * 16}, ${INTRINSICS_M * INTRINSICS_K * 4 * 16 * 16}, ${INTRINSICS_K * 4 * 16 * 16}, ${4 * 16 * 16}, ${16 * 16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_buffer_ty = memref<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_N * INTRINSICS_N * INTRINSICS_K * 4 * 16 * 16}, ${SUBGROUPS_N * INTRINSICS_N * INTRINSICS_K * 4 * 16 * 16}, ${INTRINSICS_N * INTRINSICS_K * 4 * 16 * 16}, ${INTRINSICS_K * 4 * 16 * 16}, ${4 * 16 * 16}, ${16 * 16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_buffer_ty = memref<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}, ${INTRINSICS_M*INTRINSICS_K*4*16*16}, ${INTRINSICS_K*4*16*16}, ${4*16*16}, ${16*16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_buffer_ty = memref<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}, ${INTRINSICS_N*INTRINSICS_K*4*16*16}, ${INTRINSICS_K*4*16*16}, ${4*16*16}, ${16*16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
-!lhs_buffer_collapse_ty = memref<?x${SUBGROUPS_M * INTRINSICS_M * INTRINSICS_K * 4 * 16 * 16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_buffer_collapse_ty = memref<?x${SUBGROUPS_N * INTRINSICS_N * INTRINSICS_K * 4 * 16 * 16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_buffer_collapse_ty = memref<?x${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_buffer_collapse_ty = memref<?x${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
 // Shared memory: rows = 2 (double buffer) * intrinsics * subgroups * intrinsics_k
-!lhs_shared_ty = memref<${2 * INTRINSICS_M * SUBGROUPS_M * INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
-!rhs_shared_ty = memref<${2 * INTRINSICS_N * SUBGROUPS_N * INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
+!lhs_shared_ty = memref<${2*INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
+!rhs_shared_ty = memref<${2*INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
 
 !lhs_copy_vec_ty = vector<16xi8>
 !rhs_copy_vec_ty = vector<16xi8>
@@ -43,19 +43,19 @@
 !rhs_scale_byte_ty = tensor<1x?x${SUBGROUPS_N}x4x16x${INTRINSICS_N}x${INTRINSICS_K}xi8>
 
 // Scale buffer types - keep all dimensions for simpler stride handling
-!lhs_scale_buffer_ty = memref<1x?x${SUBGROUPS_M}x4x16x${INTRINSICS_M}x${INTRINSICS_K}xi8, strided<[?, ${SUBGROUPS_M * 4 * 16 * INTRINSICS_M * INTRINSICS_K}, ${4 * 16 * INTRINSICS_M * INTRINSICS_K}, ${16 * INTRINSICS_M * INTRINSICS_K}, ${INTRINSICS_M * INTRINSICS_K}, ${INTRINSICS_K}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_scale_buffer_ty = memref<1x?x${SUBGROUPS_N}x4x16x${INTRINSICS_N}x${INTRINSICS_K}xi8, strided<[?, ${SUBGROUPS_N * 4 * 16 * INTRINSICS_N * INTRINSICS_K}, ${4 * 16 * INTRINSICS_N * INTRINSICS_K}, ${16 * INTRINSICS_N * INTRINSICS_K}, ${INTRINSICS_N * INTRINSICS_K}, ${INTRINSICS_K}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_scale_buffer_ty = memref<1x?x${SUBGROUPS_M}x4x16x${INTRINSICS_M}x${INTRINSICS_K}xi8, strided<[?, ${SUBGROUPS_M*4*16*INTRINSICS_M*INTRINSICS_K}, ${4*16*INTRINSICS_M*INTRINSICS_K}, ${16*INTRINSICS_M*INTRINSICS_K}, ${INTRINSICS_M*INTRINSICS_K}, ${INTRINSICS_K}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_scale_buffer_ty = memref<1x?x${SUBGROUPS_N}x4x16x${INTRINSICS_N}x${INTRINSICS_K}xi8, strided<[?, ${SUBGROUPS_N*4*16*INTRINSICS_N*INTRINSICS_K}, ${4*16*INTRINSICS_N*INTRINSICS_K}, ${16*INTRINSICS_N*INTRINSICS_K}, ${INTRINSICS_N*INTRINSICS_K}, ${INTRINSICS_K}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
-!lhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_M * 4 * 16 * INTRINSICS_M * INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_N * 4 * 16 * INTRINSICS_N * INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_M*4*16*INTRINSICS_M*INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_N*4*16*INTRINSICS_N*INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
 !lhs_scale_copy_vec_ty = vector<16xi8>
 !rhs_scale_copy_vec_ty = vector<16xi8>
 
 // Scale shared memory: rows = 2 (double buffer) * subgroups
-// Width = 4 * 16 * INTRINSICS_M/N * INTRINSICS_K (scale data per subgroup per K)
-!lhs_scale_shared_ty = memref<${2 * SUBGROUPS_M}x${4 * 16 * INTRINSICS_M * INTRINSICS_K}xi8, #gpu.address_space<workgroup>>
-!rhs_scale_shared_ty = memref<${2 * SUBGROUPS_N}x${4 * 16 * INTRINSICS_N * INTRINSICS_K}xi8, #gpu.address_space<workgroup>>
+// Width = 4*16*INTRINSICS_M/N*INTRINSICS_K (scale data per subgroup per K)
+!lhs_scale_shared_ty = memref<${2*SUBGROUPS_M}x${4*16*INTRINSICS_M*INTRINSICS_K}xi8, #gpu.address_space<workgroup>>
+!rhs_scale_shared_ty = memref<${2*SUBGROUPS_N}x${4*16*INTRINSICS_N*INTRINSICS_K}xi8, #gpu.address_space<workgroup>>
 
 !lhs_scale_byte_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x1xi8>
 !lhs_scale_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x1xf8E8M0FNU>
@@ -106,9 +106,9 @@ util.func @pingpong_dt_medium_f4E2M1FN(
     },
     benefit = 1,
     // Tile size calculation:
-    // M dimension: 16 (intrinsic) × ${INTRINSICS_M} (intrinsics_m) × ${SUBGROUPS_M} (subgroups_m) = ${16 * INTRINSICS_M * SUBGROUPS_M}.
-    // N dimension: 16 (intrinsic) × ${INTRINSICS_N} (intrinsics_n) × ${SUBGROUPS_N} (subgroups_n) = ${16 * INTRINSICS_N * SUBGROUPS_N}.
-    // KxKB dimension: 128 (intrinsic) × ${INTRINSICS_K} (intrinsics_k) = ${128 * INTRINSICS_K}.
+    // M dimension: 16 (intrinsic) × ${INTRINSICS_M} (intrinsics_m) × ${SUBGROUPS_M} (subgroups_m) = ${16*INTRINSICS_M*SUBGROUPS_M}.
+    // N dimension: 16 (intrinsic) × ${INTRINSICS_N} (intrinsics_n) × ${SUBGROUPS_N} (subgroups_n) = ${16*INTRINSICS_N*SUBGROUPS_N}.
+    // KxKB dimension: 128 (intrinsic) × ${INTRINSICS_K} (intrinsics_k) = ${128*INTRINSICS_K}.
     mma = #iree_gpu.data_tiled_scaled_mma_layout<
       intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN,
@@ -132,11 +132,11 @@ util.func @pingpong_dt_medium_f4E2M1FN(
 
   %cINT_M = arith.constant ${INTRINSICS_M} : index
   %cINT_N = arith.constant ${INTRINSICS_N} : index
-  %cSUB_MN = arith.constant ${SUBGROUPS_M * SUBGROUPS_N} : index
-  %cINT_MK = arith.constant ${INTRINSICS_M * INTRINSICS_K} : index
-  %cINT_NK = arith.constant ${INTRINSICS_N * INTRINSICS_K} : index
-  %cLHS_SHARED = arith.constant ${INTRINSICS_M * SUBGROUPS_M * INTRINSICS_K} : index
-  %cRHS_SHARED = arith.constant ${INTRINSICS_N * SUBGROUPS_N * INTRINSICS_K} : index
+  %cSUB_MN = arith.constant ${SUBGROUPS_M*SUBGROUPS_N} : index
+  %cINT_MK = arith.constant ${INTRINSICS_M*INTRINSICS_K} : index
+  %cINT_NK = arith.constant ${INTRINSICS_N*INTRINSICS_K} : index
+  %cLHS_SHARED = arith.constant ${INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K} : index
+  %cRHS_SHARED = arith.constant ${INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K} : index
 
   %cst_lhs = arith.constant 0 : i8
   %cst_rhs = arith.constant 0 : i8
@@ -167,13 +167,14 @@ util.func @pingpong_dt_medium_f4E2M1FN(
   %lhs_scale_collapse = memref.collapse_shape %lhs_scale [[0, 1], [2, 3, 4, 5, 6]] : !lhs_scale_buffer_ty into !lhs_scale_buffer_collapse_ty
   %rhs_scale_collapse = memref.collapse_shape %rhs_scale [[0, 1], [2, 3, 4, 5, 6]] : !rhs_scale_buffer_ty into !rhs_scale_buffer_collapse_ty
 
-  scf.forall (%base_id) in (512) {
+  $assert (SUBGROUPS_M*SUBGROUPS_N) == 4, "workgroup size must be 2x4x64=512"
+  scf.forall (%base_id) in (${2*SUBGROUPS_M*SUBGROUPS_N*64}) {
     // Make the upper 4 waves start copying data.
-    %cmp = arith.cmpi sge, %base_id, %c256 : index
+    %cmp = arith.cmpi sge, %base_id, %c${SUBGROUPS_M*SUBGROUPS_N*64} : index
     scf.if %cmp {
-      %id = arith.subi %base_id, %c256 : index
+      %id = arith.subi %base_id, %c${SUBGROUPS_M*SUBGROUPS_N*64} : index
 
-      %ids:2 = affine.delinearize_index %id into (${SUBGROUPS_M * SUBGROUPS_N}, 64) : index, index
+      %ids:2 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 64) : index, index
       %subgroups:2 = affine.delinearize_index %ids#0 into (${SUBGROUPS_M}, ${SUBGROUPS_N}) : index, index
       %threads:2 = affine.delinearize_index %ids#1 into (2, 32) : index, index
 
@@ -210,7 +211,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
           : !rhs_scale_copy_vec_ty, !rhs_scale_buffer_collapse_ty, !rhs_scale_shared_ty
 
         // There are (${INTRINSICS_N} + 1) gather_to_lds instructions above.
-        amdgpu.memory_counter_wait load(${INTRINSICS_N + 1})
+        amdgpu.memory_counter_wait load(${INTRINSICS_N+1})
         rocdl.s.barrier
 
         // Copy LHS from global memory to LDS.
@@ -240,7 +241,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
           : !lhs_scale_copy_vec_ty, !lhs_scale_buffer_collapse_ty, !lhs_scale_shared_ty
 
         // There are (${INTRINSICS_M} + 1) gather_to_lds instructions above.
-        amdgpu.memory_counter_wait load(${INTRINSICS_M + 1})
+        amdgpu.memory_counter_wait load(${INTRINSICS_M+1})
         rocdl.s.barrier
 
 
@@ -258,7 +259,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
   %0 = tensor.empty() : !return_ty
   %1 = scf.forall (%id) in (256) shared_outs(%out = %0) -> !return_ty {
     %init = arith.constant dense<0.0> : !acc_ty
-    %ids:2 = affine.delinearize_index %id into (${SUBGROUPS_M * SUBGROUPS_N}, 64) : index, index
+    %ids:2 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 64) : index, index
     %subgroups:2 = affine.delinearize_index %ids#0 into (${SUBGROUPS_M}, ${SUBGROUPS_N}) : index, index
     %threads:2 = affine.delinearize_index %ids#1 into (${INTRINSICS_M}, 16) : index, index
 
@@ -291,25 +292,25 @@ util.func @pingpong_dt_medium_f4E2M1FN(
 
       // Load inputs/scales from LDS.
       %lhs_byte_vec = vector.transfer_read %lhs_shared_base[%lhs_outer, %lhs_inner],
-        %cst_lhs {in_bounds = [true, true]} : !lhs_shared_ty, vector<${INTRINSICS_M * INTRINSICS_K}x16xi8>
-      %lhs_byte_vec_t = vector.shape_cast %lhs_byte_vec : vector<${INTRINSICS_M * INTRINSICS_K}x16xi8> to !lhs_byte_vec_ty
+        %cst_lhs {in_bounds = [true, true]} : !lhs_shared_ty, vector<${INTRINSICS_M*INTRINSICS_K}x16xi8>
+      %lhs_byte_vec_t = vector.shape_cast %lhs_byte_vec : vector<${INTRINSICS_M*INTRINSICS_K}x16xi8> to !lhs_byte_vec_ty
       %lhs_vec = vector.bitcast %lhs_byte_vec_t : !lhs_byte_vec_ty to !lhs_vec_ty
 
       %lhs_scale_byte_vec = vector.transfer_read %lhs_scale_shared[%lhs_scale_outer, %lhs_scale_inner],
-        %cst_scale {in_bounds = [true, true]} : !lhs_scale_shared_ty, vector<1x${INTRINSICS_M * INTRINSICS_K}xi8>
-      %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x${INTRINSICS_M * INTRINSICS_K}xi8> to !lhs_scale_byte_vec_ty
+        %cst_scale {in_bounds = [true, true]} : !lhs_scale_shared_ty, vector<1x${INTRINSICS_M*INTRINSICS_K}xi8>
+      %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x${INTRINSICS_M*INTRINSICS_K}xi8> to !lhs_scale_byte_vec_ty
       %lhs_scale_vec = vector.bitcast %lhs_scale_byte_vec_t : !lhs_scale_byte_vec_ty to !lhs_scale_vec_ty
 
       rocdl.sched.barrier 0
 
       %rhs_byte_vec = vector.transfer_read %rhs_shared_base[%rhs_outer, %rhs_inner],
-        %cst_rhs {in_bounds = [true, true]} : !rhs_shared_ty, vector<${INTRINSICS_N * INTRINSICS_K}x16xi8>
-      %rhs_byte_vec_t = vector.shape_cast %rhs_byte_vec : vector<${INTRINSICS_N * INTRINSICS_K}x16xi8> to !rhs_byte_vec_ty
+        %cst_rhs {in_bounds = [true, true]} : !rhs_shared_ty, vector<${INTRINSICS_N*INTRINSICS_K}x16xi8>
+      %rhs_byte_vec_t = vector.shape_cast %rhs_byte_vec : vector<${INTRINSICS_N*INTRINSICS_K}x16xi8> to !rhs_byte_vec_ty
       %rhs_vec = vector.bitcast %rhs_byte_vec_t : !rhs_byte_vec_ty to !rhs_vec_ty
 
       %rhs_scale_byte_vec = vector.transfer_read %rhs_scale_shared[%rhs_scale_outer, %rhs_scale_inner],
-        %cst_scale {in_bounds = [true, true]} : !rhs_scale_shared_ty, vector<1x${INTRINSICS_N * INTRINSICS_K}xi8>
-      %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x${INTRINSICS_N * INTRINSICS_K}xi8> to !rhs_scale_byte_vec_ty
+        %cst_scale {in_bounds = [true, true]} : !rhs_scale_shared_ty, vector<1x${INTRINSICS_N*INTRINSICS_K}xi8>
+      %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x${INTRINSICS_N*INTRINSICS_K}xi8> to !rhs_scale_byte_vec_ty
       %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
       amdgpu.lds_barrier
