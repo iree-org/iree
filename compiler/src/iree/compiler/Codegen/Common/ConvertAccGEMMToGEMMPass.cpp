@@ -136,8 +136,6 @@ namespace {
 
 struct ConvertAccGEMMToGEMMPass final
     : impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
-  using impl::ConvertAccGEMMToGEMMPassBase<
-      ConvertAccGEMMToGEMMPass>::ConvertAccGEMMToGEMMPassBase;
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     SmallVector<Operation *> candidates = llvm::filter_to_vector(

@@ -928,9 +928,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)},
       {"mma_kind", kind}};
 
-  // TODO(23370)
-  // At the moment we always have to convert accumulating gemms
-  // when using NV_MMA_SYNC intrinsics (NVIDIA mma.sync).
+  // TODO(#23370): At the moment we always have to convert
+  // accumulating gemms when using NV_MMA_SYNC intrinsics.
   if (auto mmaAttr = dyn_cast<GPU::MMAAttr>(kind)) {
     if (GPU::is_NV_MMA_SYNC(mmaAttr.getIntrinsic())) {
       GPU::appendConvertAccGemm(context, attrs);
