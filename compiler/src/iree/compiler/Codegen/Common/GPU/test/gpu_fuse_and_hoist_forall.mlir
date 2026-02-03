@@ -979,7 +979,7 @@ func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128
       tensor.parallel_insert_slice %copy into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  
+
   %empty2 = tensor.empty() : tensor<128x128xf16>
   %swizzle_2 = iree_codegen.swizzle_hint %empty2[#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
   %1 = scf.forall (%i, %j) in (32, 32) shared_outs(%out = %swizzle_2) -> (tensor<128x128xf16>) {
@@ -990,7 +990,7 @@ func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128
       tensor.parallel_insert_slice %copy into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  
+
   %empty3 = tensor.empty() : tensor<128x128xf16>
   %2 = scf.forall (%i, %j) in (32, 32) shared_outs(%out = %empty3) -> (tensor<128x128xf16>) {
     %slice0 = tensor.extract_slice %0[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
