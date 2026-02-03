@@ -256,17 +256,14 @@ struct OnlineAttentionOpInterface final
     // aligned to the pad multiples, we can skip padding entirely.
     auto tilingOp = cast<TilingInterface>(op);
     bool needsPadding = isPaddingNeeded(builder, tilingOp, padMultiples);
-
     if (needsPadding && !onlineAttentionOp.getMask()) {
       op->emitError(
           "Padding OnlineAttention without existing mask is not yet supported");
       return failure();
     }
-
     if (!needsPadding) {
       return failure();
     }
-
     FailureOr<linalg::PadTilingInterfaceResult> result =
         maskTilingInterfaceOp(builder, op, padMultiples);
     if (failed(result)) {
