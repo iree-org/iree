@@ -51,6 +51,46 @@ module @zext_i1_i64 {
 
 // -----
 
+// CHECK-LABEL: @zext_i4_i32
+module @zext_i4_i32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i4) -> i32 {
+    // CHECK: %[[MASK:.+]] = vm.const.i32 15
+    // CHECK: vm.and.i32 %[[ARG0]], %[[MASK]] : i32
+    %0 = arith.extui %arg0 : i4 to i32
+    return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @zext_i4_i64
+module @zext_i4_i64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i4) -> i64 {
+    // CHECK: %[[MASK:.+]] = vm.const.i32 15
+    // CHECK: %[[MASKED:.+]] = vm.and.i32 %[[ARG0]], %[[MASK]] : i32
+    // CHECK: vm.ext.i32.i64.u %[[MASKED]] : i32 -> i64
+    %0 = arith.extui %arg0 : i4 to i64
+    return %0 : i64
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @zext_i2_i32
+module @zext_i2_i32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i2) -> i32 {
+    // CHECK: %[[MASK:.+]] = vm.const.i32 3
+    // CHECK: vm.and.i32 %[[ARG0]], %[[MASK]] : i32
+    %0 = arith.extui %arg0 : i2 to i32
+    return %0 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @zext_i8_i64
 module @zext_i8_i64 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
@@ -95,6 +135,49 @@ module @sext_i1_i32 {
     // CHECK-DAG: %[[ONES:.+]] = vm.const.i32 -1
     // CHECK: vm.select.i32 %[[ARG0]], %[[ONES]], %[[ZEROS]] : i32
     %0 = arith.extsi %arg0 : i1 to i32
+    return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @sext_i4_i32
+module @sext_i4_i32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i4) -> i32 {
+    // CHECK: %[[SHIFT:.+]] = vm.const.i32 28
+    // CHECK: %[[SHL:.+]] = vm.shl.i32 %[[ARG0]], %[[SHIFT]] : i32
+    // CHECK: vm.shr.i32.s %[[SHL]], %[[SHIFT]] : i32
+    %0 = arith.extsi %arg0 : i4 to i32
+    return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @sext_i4_i64
+module @sext_i4_i64 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i4) -> i64 {
+    // CHECK: %[[SHIFT:.+]] = vm.const.i32 28
+    // CHECK: %[[SHL:.+]] = vm.shl.i32 %[[ARG0]], %[[SHIFT]] : i32
+    // CHECK: %[[SHR:.+]] = vm.shr.i32.s %[[SHL]], %[[SHIFT]] : i32
+    // CHECK: vm.ext.i32.i64.s %[[SHR]] : i32 -> i64
+    %0 = arith.extsi %arg0 : i4 to i64
+    return %0 : i64
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @sext_i2_i32
+module @sext_i2_i32 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i2) -> i32 {
+    // CHECK: %[[SHIFT:.+]] = vm.const.i32 30
+    // CHECK: %[[SHL:.+]] = vm.shl.i32 %[[ARG0]], %[[SHIFT]] : i32
+    // CHECK: vm.shr.i32.s %[[SHL]], %[[SHIFT]] : i32
+    %0 = arith.extsi %arg0 : i2 to i32
     return %0 : i32
   }
 }
@@ -188,6 +271,32 @@ module @trunc_i32_i1 {
 
 // -----
 
+// CHECK-LABEL: @trunc_i32_i4
+module @trunc_i32_i4 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i32) -> i4 {
+    // CHECK: %[[MASK:.+]] = vm.const.i32 15
+    // CHECK: vm.and.i32 %[[ARG0]], %[[MASK]] : i32
+    %0 = arith.trunci %arg0 : i32 to i4
+    return %0 : i4
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @trunc_i32_i2
+module @trunc_i32_i2 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i32) -> i2 {
+    // CHECK: %[[MASK:.+]] = vm.const.i32 3
+    // CHECK: vm.and.i32 %[[ARG0]], %[[MASK]] : i32
+    %0 = arith.trunci %arg0 : i32 to i2
+    return %0 : i2
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @trunc_i32_i8
 module @trunc_i32_i8 {
   // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
@@ -221,6 +330,34 @@ module @trunc_i64_i1 {
     // CHECK: vm.and.i32 %[[TRUNC]], %[[MASK]] : i32
     %0 = arith.trunci %arg0 : i64 to i1
     return %0 : i1
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @trunc_i64_i4
+module @trunc_i64_i4 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i64)
+  func.func @fn(%arg0: i64) -> i4 {
+    // CHECK-DAG: %[[TRUNC:.+]] = vm.trunc.i64.i32 %[[ARG0]] : i64 -> i32
+    // CHECK-DAG: %[[MASK:.+]] = vm.const.i32 15
+    // CHECK: vm.and.i32 %[[TRUNC]], %[[MASK]] : i32
+    %0 = arith.trunci %arg0 : i64 to i4
+    return %0 : i4
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @trunc_i64_i2
+module @trunc_i64_i2 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i64)
+  func.func @fn(%arg0: i64) -> i2 {
+    // CHECK-DAG: %[[TRUNC:.+]] = vm.trunc.i64.i32 %[[ARG0]] : i64 -> i32
+    // CHECK-DAG: %[[MASK:.+]] = vm.const.i32 3
+    // CHECK: vm.and.i32 %[[TRUNC]], %[[MASK]] : i32
+    %0 = arith.trunci %arg0 : i64 to i2
+    return %0 : i2
   }
 }
 
