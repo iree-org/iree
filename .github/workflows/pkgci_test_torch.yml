@@ -77,9 +77,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 30a9e6c7dc4b0760fd3275b39a97745fbd3a2d94
+          ref: c3b48ed923548e74b85329e201c12fe69cb1df2f
           path: iree-test-suites
-          lfs: true
+          lfs: false
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
@@ -145,7 +145,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 30a9e6c7dc4b0760fd3275b39a97745fbd3a2d94
+          ref: c3b48ed923548e74b85329e201c12fe69cb1df2f
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
