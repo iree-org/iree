@@ -10,8 +10,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::VectorExt;
+namespace mlir::iree_compiler::IREE::VectorExt {
 
 using VectorValue = TypedValue<VectorType>;
 
@@ -1221,6 +1220,8 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 void ScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *ctx) {}
+
+} // namespace mlir::iree_compiler::IREE::VectorExt
 
 // clang-format off
 #define GET_OP_CLASSES
