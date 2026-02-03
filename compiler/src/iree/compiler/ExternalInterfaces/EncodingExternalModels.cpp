@@ -9,10 +9,12 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 
 #define DEBUG_TYPE "iree-encoding-external-models"
@@ -258,6 +260,56 @@ struct EncodingCastableOpPropagationInterfaceHelper {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// LinalgFusionOpInterface for Encoding Ops
+//===----------------------------------------------------------------------===//
+
+/// External model for encoding ops implementing LinalgFusionOpInterface.
+/// All dimensions are parallel with identity indexing maps.
+template <typename ConcreteType>
+struct EncodingFusionOpInterfaceAdapter
+    : public IREE::LinalgExt::LinalgFusionOpInterface::ExternalModel<
+          EncodingFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
+  SmallVector<AffineMap> getIndexingMapsForOperands(Operation *op) const {
+    int64_t rank = cast<ConcreteType>(op).getResultType().getRank();
+    return {AffineMap::getMultiDimIdentityMap(rank, op->getContext())};
+  }
+
+  SmallVector<AffineMap> getIndexingMapsForResults(Operation *op) const {
+    int64_t rank = cast<ConcreteType>(op).getResultType().getRank();
+    return {AffineMap::getMultiDimIdentityMap(rank, op->getContext())};
+  }
+
+  SmallVector<AffineMap> getIndexingMapsArray(Operation *op) const {
+    auto operandMaps = getIndexingMapsForOperands(op);
+    llvm::append_range(operandMaps, getIndexingMapsForResults(op));
+    return operandMaps;
+  }
+
+  unsigned getNumParallelLoops(Operation *op) const {
+    return cast<ConcreteType>(op).getResultType().getRank();
+  }
+
+  unsigned getNumLoops(Operation *op) const {
+    return cast<ConcreteType>(op).getResultType().getRank();
+  }
+
+  SmallVector<int64_t> getStaticLoopRanges(Operation *op) const {
+    auto type = cast<ConcreteType>(op).getResultType();
+    return SmallVector<int64_t>(type.getShape());
+  }
+
+  AffineMap getIndexingMapMatchingResult(Operation *op, OpResult result) const {
+    assert(result.getOwner() == op);
+    return getIndexingMapsForResults(op)[result.getResultNumber()];
+  }
+
+  AffineMap getMatchingIndexingMap(Operation *op, OpOperand *opOperand) const {
+    assert(opOperand->getOwner() == op);
+    return getIndexingMapsArray(op)[opOperand->getOperandNumber()];
+  }
+};
+
 } // namespace
 
 void registerEncodingExternalModels(DialectRegistry &registry) {
@@ -266,6 +318,11 @@ void registerEncodingExternalModels(DialectRegistry &registry) {
     IREE::Encoding::EncodingAttr::attachInterface<
         EncodingAttrPropagationInterface>(*ctx);
     IREE::Encoding::LayoutAttr::attachInterface<LayoutAttrPropagationInterface>(
+        *ctx);
+    IREE::Encoding::SetEncodingOp::attachInterface<
+        EncodingFusionOpInterfaceAdapter<IREE::Encoding::SetEncodingOp>>(*ctx);
+    IREE::Encoding::UnsetEncodingOp::attachInterface<
+        EncodingFusionOpInterfaceAdapter<IREE::Encoding::UnsetEncodingOp>>(
         *ctx);
   });
   registry.addExtension(

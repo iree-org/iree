@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/LoopMappingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -50,36 +51,11 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
+using IREE::LinalgExt::getOuterParallelLoops;
+using IREE::LinalgExt::getRootParallelLoopToOpMap;
+
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
-
-/// Returns a bit vector of size number of loops of the `interfaceOp` with
-/// the bits corresponding to outer parallel loops set to `true`.
-static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
-  if (auto setEncodingOp = dyn_cast<IREE::Encoding::SetEncodingOp>(op)) {
-    return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
-  }
-  if (auto unsetEncodingOp = dyn_cast<IREE::Encoding::UnsetEncodingOp>(op)) {
-    return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
-                                true);
-  }
-
-  auto interfaceOp = dyn_cast<TilingInterface>(op);
-  if (!interfaceOp) {
-    // For ops that dont implement the `TilingInterface` just return empty.
-    return llvm::SmallBitVector{};
-  }
-  SmallVector<utils::IteratorType> loopIteratorTypes =
-      interfaceOp.getLoopIteratorTypes();
-  llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
-  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != utils::IteratorType::parallel) {
-      break;
-    }
-    parallelLoops.set(iteratorType.index());
-  }
-  return parallelLoops;
-}
 
 //===----------------------------------------------------------------------===//
 // Root and fusion group handling
@@ -275,117 +251,7 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
 FailureOr<AffineMap>
 FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
   assert(!contains(op) && "op cannot already be in group");
-  auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
-  if (!fusionOp) {
-    return failure();
-  }
-
-  bool isConsumer = llvm::any_of(op->getOperands(), [this](Value v) {
-    return contains(v.getDefiningOp());
-  });
-  assert(isConsumer !=
-             llvm::any_of(op->getUsers(),
-                          [this](Operation *op) { return contains(op); }) &&
-         "op must be not be a producer and consumer");
-
-  /// Computes the mapping from the root ops outer parallel loops to `op`'s
-  /// iteration space via a direct producer/consumer of `op` that is already in
-  /// the fusion group.
-  auto getMapFromOpInFusionGroup =
-      [&](AffineMap otherToOperand, AffineMap thisToOperand,
-          AffineMap otherMap) -> FailureOr<AffineMap> {
-    if (!otherToOperand || !thisToOperand ||
-        !otherToOperand.isProjectedPermutation() ||
-        !thisToOperand.isProjectedPermutation()) {
-      return failure();
-    }
-
-    // `thisToOperand` is a mapping from the iteration space of `op` to the
-    // operand's data space.
-    // `inverseMap` is the  mapping from the operand data space to `op`'s
-    // iteration space.
-    AffineMap inverseMap =
-        inverseAndBroadcastProjectedPermutation(thisToOperand);
-
-    // `otherToOperand` maps "other's" (an op in the fusion group) iteration
-    // space to the same operand's data space. Composing the two yields a
-    // mapping from other's iteration space to `op`'s iteration space.
-    AffineMap composedMap = inverseMap.compose(otherToOperand);
-
-    // `otherMap` is other's mapping from the root's outer parallel loops to
-    // other's iteration space. `composedMap.compose(otherMap)` computes the
-    // mapping from the root's outer parallel loops to `op`'s iteration space.
-    return composedMap.compose(otherMap);
-  };
-
-  AffineMap newMap;
-  if (isConsumer) {
-    for (OpOperand &operand : op->getOpOperands()) {
-      Operation *definingOp = operand.get().getDefiningOp();
-      if (!contains(definingOp)) {
-        continue;
-      }
-      auto fusionProducer =
-          operand.get()
-              .getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
-      if (!fusionProducer) {
-        return failure();
-      }
-      auto it = loopMaps.find(fusionProducer);
-      assert(it != loopMaps.end());
-
-      AffineMap producerResultMap = fusionProducer.getIndexingMapMatchingResult(
-          cast<OpResult>(operand.get()));
-      AffineMap consumerOperandMap = fusionOp.getMatchingIndexingMap(&operand);
-      FailureOr<AffineMap> composedMap = getMapFromOpInFusionGroup(
-          producerResultMap, consumerOperandMap, it->second);
-      // Mapping must be the same for all operands.
-      if (failed(composedMap) || (newMap && composedMap != newMap)) {
-        return failure();
-      }
-      if (composedMap.value().getNumResults() ==
-          composedMap.value().getNumOfZeroResults()) {
-        return failure();
-      }
-      newMap = composedMap.value();
-    }
-  } else {
-    for (OpOperand &operand : op->getUses()) {
-      if (!contains(operand.getOwner())) {
-        continue;
-      }
-      auto fusionConsumer = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
-          operand.getOwner());
-      if (!fusionConsumer) {
-        return failure();
-      }
-      auto it = loopMaps.find(operand.getOwner());
-      assert(it != loopMaps.end());
-
-      AffineMap consumerOperandMap =
-          fusionConsumer.getMatchingIndexingMap(&operand);
-      AffineMap producerResultMap =
-          fusionOp.getIndexingMapMatchingResult(cast<OpResult>(operand.get()));
-      FailureOr<AffineMap> composedMap = getMapFromOpInFusionGroup(
-          consumerOperandMap, producerResultMap, it->second);
-      // Mapping must be the same for all operands.
-      if (failed(composedMap) || (newMap && composedMap != newMap)) {
-        return failure();
-      }
-      newMap = composedMap.value();
-
-      // Producers cannot be more parallel than consumers.
-      if (compressUnusedDims(newMap).getNumDims() != it->second.getNumDims()) {
-        return failure();
-      }
-    }
-  }
-
-  // Fail if there is no mapping or if there are no parallel loops in common.
-  if (!newMap) {
-    return failure();
-  }
-  return newMap;
+  return IREE::LinalgExt::getRootParallelLoopToOpMap(op, loopMaps);
 }
 
 namespace {
