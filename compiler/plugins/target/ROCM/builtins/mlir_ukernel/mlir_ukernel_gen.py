@@ -8,7 +8,7 @@
 Template processor for MLIR microkernel code generation.
 
 This script processes .mlir.in template files and generates .mlir output files
-with expression evaluation.
+using Python-like syntax.
 
 Usage:
     python mlir_ukernel_gen.py template.mlir.in -o output.mlir \\
@@ -17,10 +17,13 @@ Usage:
 Template syntax:
     ${VAR}              - Variable substitution
     ${VAR * 2}          - Expression evaluation
-    ${VAR1 * VAR2 + 1}  - Complex expressions
+    $for i in range(4): - Loop unrolling
+    $if condition:      - Conditional generation
+    $else:              - Alternative branch
 """
 
 import argparse
+import io
 import re
 from typing import Dict, Any
 
@@ -70,19 +73,117 @@ def extract_internal_k(intrinsic_name: str) -> int:
 
 
 def process_template(text: str, params: Dict[str, Any]) -> str:
-    """Process ${...} substitutions in template text."""
-    eval_context = params.copy()
-    eval_context["fold1"] = fold1
+    """Process template with Python-like control flow.
 
-    def replacer(match):
-        expr = match.group(1).strip()
-        try:
-            result = eval(expr, {"__builtins__": {}}, eval_context)
-            return str(result)
-        except Exception as e:
-            raise ValueError(f"Failed to evaluate expression '${{{expr}}}': {e}")
+    Lines starting with $ (but not ${) are treated as Python statements.
+    Other lines are output directly with ${expr} evaluated and substituted.
 
-    return re.sub(r"\$\{([^}]+)\}", replacer, text)
+    Example (INTRINSICS_M=4):
+        $for i in range(INTRINSICS_M):
+          %val_${i} = arith.constant ${i} : index
+
+        Generates:
+          %val_0 = arith.constant 0 : index
+          %val_1 = arith.constant 1 : index
+          %val_2 = arith.constant 2 : index
+          %val_3 = arith.constant 3 : index
+    """
+
+    def extract_leading_whitespace(line):
+        """Get leading whitespace from a line."""
+        match = re.match(r"^\s*", line)
+        return match.group(0) if match else ""
+
+    def escape_line(line):
+        """Convert a line with ${expr} to Python print statement parts."""
+        output_parts = []
+        while "${" in line:
+            start_pos = line.index("${")
+            end_pos = line.index("}", start_pos + 2)
+            if start_pos != 0:
+                output_parts.append('"' + line[:start_pos].replace('"', '\\"') + '"')
+            output_parts.append("str(" + line[start_pos + 2 : end_pos] + ")")
+            line = line[end_pos + 1 :]
+        if line:
+            output_parts.append('"' + line.replace('"', '\\"') + '"')
+        return " + ".join(output_parts) if output_parts else '""'
+
+    # Convert template to Python code.
+    input_lines = text.splitlines()
+    python_lines = []
+    blank_lines = 0
+    last_indent = ""
+    indent_stack = [("", "")]
+    python_block_start = True
+
+    for input_line in input_lines:
+        if input_line == "":
+            blank_lines += 1
+            continue
+
+        input_indent = extract_leading_whitespace(input_line)
+
+        # Adjust indentation stack.
+        if python_block_start:
+            assert input_indent.startswith(
+                last_indent
+            ), f"Indentation error: expected indent to start with '{last_indent}', got '{input_indent}'"
+            extra_indent = input_indent[len(last_indent) :]
+            python_indent = indent_stack[-1][1] + extra_indent
+            indent_stack.append((input_indent, python_indent))
+        else:
+            while not input_indent.startswith(indent_stack[-1][0]):
+                indent_stack.pop()
+
+        python_block_start = False
+        python_indent = indent_stack[-1][1]
+        stripped_line = input_line.strip()
+
+        if stripped_line.startswith("$") and not stripped_line.startswith("${"):
+            if stripped_line.endswith(":"):
+                python_block_start = True
+
+            while blank_lines > 0:
+                python_lines.append(python_indent + "print(file=OUT_STREAM)")
+                blank_lines -= 1
+
+            python_lines.append(python_indent + stripped_line[1:])
+        else:
+            while blank_lines > 0:
+                python_lines.append(python_indent + "print(file=OUT_STREAM)")
+                blank_lines -= 1
+
+            line_after_indent = input_line[len(python_indent) :]
+            python_lines.append(
+                python_indent
+                + "print(%s, file=OUT_STREAM)" % escape_line(line_after_indent)
+            )
+
+        last_indent = input_indent
+
+    while blank_lines > 0:
+        python_lines.append(python_indent + "print(file=OUT_STREAM)")
+        blank_lines -= 1
+
+    # Set up execution context.
+    exec_globals = params.copy()
+    exec_globals["FOLD1"] = fold1
+    output_stream = io.StringIO()
+    exec_globals["OUT_STREAM"] = output_stream
+
+    # Compile and execute the generated Python code.
+    python_code = "\n".join(python_lines)
+    try:
+        python_bytecode = compile(python_code, "<template>", "exec")
+        exec(python_bytecode, exec_globals)
+    except Exception as e:
+        # Show the generated Python code for debugging.
+        print("Generated Python code:")
+        for i, line in enumerate(python_lines, 1):
+            print(f"{i:4d}: {line}")
+        raise ValueError(f"Failed to execute template: {e}")
+
+    return output_stream.getvalue()
 
 
 def parse_define(define_str: str) -> tuple:
@@ -172,11 +273,13 @@ Example:
     intrinsic = params["INTRINSIC"]
     params["INTERNAL_K"] = extract_internal_k(intrinsic)
 
+    # Note: Parameter validation now happens via ${ASSERT(...)} in templates.
+
     # Read template.
     with open(args.template, "r") as f:
         template = f.read()
 
-    # Process template.
+    # Process template with control flow and expressions.
     output = process_template(template, params)
 
     # Write output.

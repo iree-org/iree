@@ -22,7 +22,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_dt_matmul_large.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_dt_matmul_large.mlir.in \
   -D ELEM_TYPE=f8E4M3FNUZ INTRINSIC=MFMA_F32_16x16x32_F8E4M3FNUZ \
-     INTRINSICS_M=4 INTRINSICS_N=8 INTRINSICS_K=1 SUBGROUPS_M=2 SUBGROUPS_N=2 ARCH=gfx942 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx942 \
      SIZE_MIN_0=64 SIZE_MIN_1=2048 SIZE_MAX_1=8192 \
   -o iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ_large.mlir
 ```
@@ -40,7 +40,7 @@ python mlir_ukernel_gen.py iree_uk_amdgpu_dt_matmul_medium.mlir.in \
 ```bash
 python mlir_ukernel_gen.py iree_uk_amdgpu_dt_matmul_large.mlir.in \
   -D ELEM_TYPE=f8E4M3FN INTRINSIC=MFMA_F32_16x16x32_F8E4M3FN \
-     INTRINSICS_M=4 INTRINSICS_N=8 INTRINSICS_K=1 SUBGROUPS_M=2 SUBGROUPS_N=2 ARCH=gfx950 \
+     INTRINSICS_M=8 INTRINSICS_N=4 INTRINSICS_K=1 SUBGROUPS_M=2 SUBGROUPS_N=4 ARCH=gfx950 \
      SIZE_MIN_0=64 SIZE_MIN_1=2048 SIZE_MAX_1=8192 \
   -o iree_uk_amdgpu_dt_matmul_f8E4M3FN_large.mlir
 ```
