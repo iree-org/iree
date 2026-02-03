@@ -208,15 +208,28 @@ struct BufferFillOpConversion
         return rewriter.notifyMatchFailure(
             fillOp, "invalid integer buffer element type");
       }
-    } else if (oldType.isF32()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferFillF32Op>(
-          fillOp, adaptor.getTarget(), elementOffset, elementLength, pattern);
-    } else if (oldType.isF64()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferFillF64Op>(
-          fillOp, adaptor.getTarget(), elementOffset, elementLength, pattern);
+    } else if (auto floatType = dyn_cast<FloatType>(oldType)) {
+      unsigned bitWidth = floatType.getIntOrFloatBitWidth();
+      if (bitWidth == 8) {
+        // 8-bit floats (f8 variants): fill as i8.
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferFillI8Op>(
+            fillOp, adaptor.getTarget(), byteOffset, byteLength, pattern);
+      } else if (bitWidth == 16) {
+        // 16-bit floats (bf16, f16): fill as i16.
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferFillI16Op>(
+            fillOp, adaptor.getTarget(), elementOffset, elementLength, pattern);
+      } else if (floatType.isF32()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferFillF32Op>(
+            fillOp, adaptor.getTarget(), elementOffset, elementLength, pattern);
+      } else if (floatType.isF64()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferFillF64Op>(
+            fillOp, adaptor.getTarget(), elementOffset, elementLength, pattern);
+      } else {
+        return rewriter.notifyMatchFailure(fillOp,
+                                           "unsupported float buffer type");
+      }
     } else {
-      return rewriter.notifyMatchFailure(fillOp,
-                                         "invalid float buffer element type");
+      return rewriter.notifyMatchFailure(fillOp, "invalid buffer element type");
     }
     return success();
   }
@@ -264,15 +277,26 @@ struct BufferLoadOpConversion
         return rewriter.notifyMatchFailure(
             loadOp, "invalid integer buffer element type");
       }
-    } else if (oldType.isF32()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF32Op>(
-          loadOp, newType, adaptor.getSource(), elementOffset);
-    } else if (oldType.isF64()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF64Op>(
-          loadOp, newType, adaptor.getSource(), elementOffset);
+    } else if (auto floatType = dyn_cast<FloatType>(oldType)) {
+      unsigned bitWidth = floatType.getIntOrFloatBitWidth();
+      if (bitWidth == 8) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI8UOp>(
+            loadOp, newType, adaptor.getSource(), byteOffset);
+      } else if (bitWidth == 16) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16UOp>(
+            loadOp, newType, adaptor.getSource(), elementOffset);
+      } else if (floatType.isF32()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF32Op>(
+            loadOp, newType, adaptor.getSource(), elementOffset);
+      } else if (floatType.isF64()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF64Op>(
+            loadOp, newType, adaptor.getSource(), elementOffset);
+      } else {
+        return rewriter.notifyMatchFailure(loadOp,
+                                           "unsupported float buffer type");
+      }
     } else {
-      return rewriter.notifyMatchFailure(loadOp,
-                                         "invalid float buffer element type");
+      return rewriter.notifyMatchFailure(loadOp, "invalid buffer element type");
     }
     return success();
   }
@@ -305,12 +329,26 @@ struct BufferStoreOpConversion
     } else if (oldType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI64Op>(
           storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
-    } else if (oldType.isF32()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF32Op>(
-          storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
-    } else if (oldType.isF64()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF64Op>(
-          storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
+    } else if (auto floatType = dyn_cast<FloatType>(oldType)) {
+      unsigned bitWidth = floatType.getIntOrFloatBitWidth();
+      if (bitWidth == 8) {
+        // 8-bit floats (f8 variants): store as i8.
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI8Op>(
+            storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+      } else if (bitWidth == 16) {
+        // 16-bit floats (bf16, f16): store as i16.
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI16Op>(
+            storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
+      } else if (floatType.isF32()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF32Op>(
+            storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
+      } else if (floatType.isF64()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF64Op>(
+            storeOp, adaptor.getTarget(), elementOffset, adaptor.getSource());
+      } else {
+        return rewriter.notifyMatchFailure(storeOp,
+                                           "unsupported float buffer type");
+      }
     } else {
       return rewriter.notifyMatchFailure(storeOp,
                                          "invalid buffer element type");
