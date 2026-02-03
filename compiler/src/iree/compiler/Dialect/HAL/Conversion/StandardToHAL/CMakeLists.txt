@@ -21,8 +21,6 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithDialect
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
     MLIRShapeDialect

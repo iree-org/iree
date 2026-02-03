@@ -21,8 +21,6 @@ iree_cc_library(
     ::Utils
     LLVMSupport
     MLIRArithDialect
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
     MLIRSCFDialect
