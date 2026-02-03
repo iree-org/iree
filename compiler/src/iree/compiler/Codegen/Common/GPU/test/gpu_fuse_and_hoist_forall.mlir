@@ -964,17 +964,13 @@ func.func @no_swap_same_block_expand_slice(%arg0: tensor<64xf16>) -> tensor<4x4x
 
 // -----
 
-// Check that one tensor.empty can have multiple different swizzle hints.
-// CHECK-LABEL: func.func @multi_swizzle
-// CHECK: %[[EMPTY:.+]] = tensor.empty()
-// CHECK: %[[SWIZZLE1:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<64, 8>]
-// CHECK: %[[SWIZZLE2:.+]] = iree_codegen.swizzle_hint %[[EMPTY]][#iree_codegen.xor_shuffle<64, 16>]
-// CHECK: scf.forall {{.*}} shared_outs(%{{.+}} = %[[SWIZZLE1]])
-// CHECK: scf.forall {{.*}} shared_outs(%{{.+}} = %[[SWIZZLE2]])
-func.func @multi_swizzle(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>) -> (tensor<128x128xf16>, tensor<128x128xf16>) {
-  %empty = tensor.empty() : tensor<128x128xf16>
-  %swizzle_1 = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<64, 8>] : tensor<128x128xf16>
-  %swizzle_2 = iree_codegen.swizzle_hint %empty[#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
+// Check that when fusing two separate producer foralls (each with different swizzle hints)
+// into a consumer, each producer creates a bufferization.alloc_tensor with its correct swizzle.
+#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1024, 1, 1] subgroup_size = 64>
+func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>) -> tensor<128x128xf16>
+    attributes {translation_info = #translation_info} {
+  %empty1 = tensor.empty() : tensor<128x128xf16>
+  %swizzle_1 = iree_codegen.swizzle_hint %empty1[#iree_codegen.xor_shuffle<64, 8>] : tensor<128x128xf16>
   %0 = scf.forall (%i, %j) in (32, 32) shared_outs(%out = %swizzle_1) -> (tensor<128x128xf16>) {
     %slice = tensor.extract_slice %arg0[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
     %slice_out = tensor.extract_slice %out[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
@@ -983,6 +979,9 @@ func.func @multi_swizzle(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>)
       tensor.parallel_insert_slice %copy into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  
+  %empty2 = tensor.empty() : tensor<128x128xf16>
+  %swizzle_2 = iree_codegen.swizzle_hint %empty2[#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
   %1 = scf.forall (%i, %j) in (32, 32) shared_outs(%out = %swizzle_2) -> (tensor<128x128xf16>) {
     %slice = tensor.extract_slice %arg1[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
     %slice_out = tensor.extract_slice %out[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
@@ -991,5 +990,32 @@ func.func @multi_swizzle(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>)
       tensor.parallel_insert_slice %copy into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  return %0, %1 : tensor<128x128xf16>, tensor<128x128xf16>
+  
+  %empty3 = tensor.empty() : tensor<128x128xf16>
+  %2 = scf.forall (%i, %j) in (32, 32) shared_outs(%out = %empty3) -> (tensor<128x128xf16>) {
+    %slice0 = tensor.extract_slice %0[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
+    %slice1 = tensor.extract_slice %1[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
+    %slice_out = tensor.extract_slice %out[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
+    %add = linalg.add ins(%slice0, %slice1 : tensor<4x4xf16>, tensor<4x4xf16>) outs(%slice_out : tensor<4x4xf16>) -> tensor<4x4xf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %add into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
+    }
+  } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  return %2 : tensor<128x128xf16>
 }
+
+// CHECK-LABEL: func @swizzle_with_fusion(
+//       CHECK:   %[[ALLOC1:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf16>
+//       CHECK:   %[[SWIZZLE1:.+]] = iree_codegen.swizzle_hint %[[ALLOC1]][#iree_codegen.xor_shuffle<64, 8>] : tensor<128x128xf16>
+//       CHECK:   %[[ALLOC2:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf16>
+//       CHECK:   %[[SWIZZLE2:.+]] = iree_codegen.swizzle_hint %[[ALLOC2]][#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf16>
+//       CHECK:   scf.forall {{.*}} shared_outs(%[[OUT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf16>) {
+//       CHECK:     %[[BARRIER1:.+]] = iree_gpu.barrier_region ins(%[[SWIZZLE1]] : tensor<128x128xf16>) {
+//       CHECK:       scf.for
+//       CHECK:         linalg.copy
+//       CHECK:     %[[BARRIER2:.+]] = iree_gpu.barrier_region ins(%[[SWIZZLE2]] : tensor<128x128xf16>) {
+//       CHECK:       scf.for
+//       CHECK:         linalg.copy
+//       CHECK:     linalg.add
+//       CHECK:   return
