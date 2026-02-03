@@ -432,12 +432,22 @@ struct CoalescedGatherDMAOpBufferizationInterface
       }
     }
 
-    rewriter.setInsertionPoint(gatherOp);
+    // Insert the memref operation in the forall body, before the in_parallel
+    // terminator (not inside the in_parallel region which will be removed).
+    auto inParallelOp = gatherOp->getParentOfType<scf::InParallelOp>();
+    if (inParallelOp) {
+      // Insert before the in_parallel terminator (in the forall body)
+      rewriter.setInsertionPoint(inParallelOp);
+    } else {
+      // Not in in_parallel, just insert at current location
+      rewriter.setInsertionPoint(gatherOp);
+    }
 
     // Create the bufferized DMA operation with no results (memref form).
     IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-        bufferizedIndices, *initBuffer, gatherOp.getLane());
+        bufferizedIndices, *initBuffer, gatherOp.getLane(),
+        gatherOp.getInBoundsAttr());
 
     // Replace the tensor op. If it has a result, replace with the init buffer.
     // If it has no result (inside scf.forall.in_parallel), just erase it.
