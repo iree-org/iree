@@ -792,6 +792,11 @@ def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "
     This attribute is expected to be short-lived and removed by
     `iree-codegen-materialize-user-configs`.
   }];
+  let options = [
+    Option<"tuningSpecPath", "tuning-spec-path", "std::string",
+           /*default=*/"\"\"",
+           "File path to a module containing a tuning spec (transform dialect library).">,
+  ];
 }
 
 def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "ModuleOp"> {

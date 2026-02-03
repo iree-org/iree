@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include "iree/compiler/Codegen/Common/Options.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -58,19 +57,6 @@ llvm::cl::opt<std::string> clCodegenTuningSpecDumpDir(
 
 using mlir::transform::NamedSequenceOp;
 
-// Global accessor for tuning spec options.
-// This is set by the compiler driver before pipeline execution and cleared
-// after completion.
-static TuningSpecOptions *globalTuningSpecOptions = nullptr;
-
-static const TuningSpecOptions &getTuningSpecOptions() {
-  if (globalTuningSpecOptions) {
-    return *globalTuningSpecOptions;
-  }
-  // Fallback to FromFlags for backward compatibility with standalone usage.
-  return TuningSpecOptions::FromFlags::get();
-}
-
 static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
   StringRef dir = clCodegenTuningSpecDumpDir;
   if (dir.empty()) {
@@ -104,8 +90,8 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
 }
 
 static FailureOr<ModuleOp>
-getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
-  const std::string &tuningSpecPath = getTuningSpecOptions().tuningSpecPath;
+getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect,
+                  StringRef tuningSpecPath) {
   if (tuningSpecPath.empty()) {
     return failure();
   }
@@ -184,6 +170,9 @@ serializeTuningSpecToAttr(ModuleOp tuningSpec) {
 
 struct MaterializeTuningSpecsPass final
     : impl::MaterializeTuningSpecsPassBase<MaterializeTuningSpecsPass> {
+  using Base = impl::MaterializeTuningSpecsPassBase<MaterializeTuningSpecsPass>;
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -194,9 +183,10 @@ struct MaterializeTuningSpecsPass final
     auto dialect = ctx->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
     assert(dialect);
 
-    FailureOr<ModuleOp> userTuningSpec = getUserTuningSpec(moduleOp, *dialect);
+    FailureOr<ModuleOp> userTuningSpec =
+        getUserTuningSpec(moduleOp, *dialect, tuningSpecPath);
     const bool hasUserTuningSpec = succeeded(userTuningSpec);
-    if (!hasUserTuningSpec && !getTuningSpecOptions().tuningSpecPath.empty()) {
+    if (!hasUserTuningSpec && !tuningSpecPath.empty()) {
       // When a user spec is requested but fails to load, this is a hard
       // failure.
       return signalPassFailure();
@@ -288,9 +278,5 @@ struct MaterializeTuningSpecsPass final
 };
 
 } // namespace
-
-void setGlobalTuningSpecOptions(TuningSpecOptions *options) {
-  globalTuningSpecOptions = options;
-}
 
 } // namespace mlir::iree_compiler

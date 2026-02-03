@@ -31,7 +31,6 @@ iree_cc_library(
     MLIRRemarkStreamer
     MLIRSupport
     iree::compiler::Codegen::Common::PassHeaders
-    iree::compiler::Codegen::Common::TuningSpecOptions
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C

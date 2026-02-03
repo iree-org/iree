@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/Options.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -32,10 +31,6 @@ namespace {
 } // namespace
 
 void registerCodegenCommonPasses() {
-  // Force registration of TuningSpecOptions flags for standalone tools.
-  // This ensures --iree-codegen-tuning-spec-path is available on the CLI.
-  (void)TuningSpecOptions::FromFlags::get();
-
   // Generated.
   registerPasses();
 }

@@ -50,17 +50,6 @@ iree_compiler_cc_library(
     ],
 )
 
-iree_compiler_cc_library(
-    name = "TuningSpecOptions",
-    srcs = ["Options.cpp"],
-    hdrs = ["Options.h"],
-    deps = [
-        "//compiler/src/iree/compiler/Utils",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
-    ],
-)
-
 iree_gentbl_cc_library(
     name = "FoldTensorExtractOpIncGen",
     tbl_outs = [
@@ -205,7 +194,6 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        ":TuningSpecOptions",
         "//compiler/src/iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect/CPU/IR:IREECPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",

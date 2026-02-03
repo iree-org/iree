@@ -39,20 +39,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    TuningSpecOptions
-  HDRS
-    "Options.h"
-  SRCS
-    "Options.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    iree::compiler::Utils
-  PUBLIC
-)
-
 iree_tablegen_library(
   NAME
     FoldTensorExtractOpIncGen
@@ -185,7 +171,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    ::TuningSpecOptions
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAMDGPUDialect

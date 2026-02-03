@@ -5,10 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Test that verifies the tuning spec path flag can be set via C API.
-// Before the TuningSpecOptions refactoring, this flag would be rejected
-// because it was not registered in the Session's local OptionsBinder.
-// Other tuning spec flags (enable-default-tuning-specs, dump-tuning-specs-to)
-// remain CLI-only and are not tested here.
+// The tuning spec path is now registered as part of ROCMOptions but uses
+// the codegen prefix for consistency. Other tuning spec flags
+// (enable-default-tuning-specs, dump-tuning-specs-to) remain CLI-only.
 
 #include <stdio.h>
 #include "iree/compiler/embedding_api.h"

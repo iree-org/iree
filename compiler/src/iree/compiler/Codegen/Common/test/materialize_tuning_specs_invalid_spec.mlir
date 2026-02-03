@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs)' \
-// RUN:   --iree-codegen-tuning-spec-path=%s --no-implicit-module --verify-diagnostics %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%s})' \
+// RUN:   --no-implicit-module --verify-diagnostics %s
 
 // Check that we error out on mlir inputs that are not tuning specs (e.g., the input itself).
 
