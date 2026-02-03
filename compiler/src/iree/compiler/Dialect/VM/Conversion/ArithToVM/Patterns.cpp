@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -493,12 +494,16 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isInteger(1)) {
-      // NOTE: this may not be required - if we know that the i1 is never able
-      // to have more than bit 0 manipulated then this is wasted work.
+    unsigned srcBits = srcType.getIntOrFloatBitWidth();
+
+    // Handle sub-byte integers (i1, i2, i4) that are stored in i32.
+    // The adaptor value is already i32, but we need to mask to the correct
+    // number of bits for proper zero extension semantics.
+    if (llvm::isPowerOf2_32(srcBits) && srcBits < 8) {
+      unsigned mask = (1u << srcBits) - 1;
       auto maskedValue = rewriter.createOrFold<IREE::VM::AndI32Op>(
           srcOp.getLoc(), rewriter.getI32Type(), adaptor.getIn(),
-          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), mask));
       if (dstType.isInteger(32)) {
         rewriter.replaceOp(srcOp, maskedValue);
       } else if (dstType.isInteger(64)) {
@@ -506,7 +511,7 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
                                                             maskedValue);
       } else {
         return rewriter.notifyMatchFailure(srcOp,
-                                           "unsupported i1 zero extension");
+                                           "unsupported sub-byte extension");
       }
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
@@ -537,7 +542,12 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isInteger(1)) {
+    unsigned srcBits = srcType.getIntOrFloatBitWidth();
+
+    // Handle sub-byte integers (i1, i2, i4) with shift-based sign extension.
+    // For i1, we use select for efficiency; for others, shift left then
+    // arithmetic shift right to sign-extend.
+    if (srcBits == 1) {
       if (dstType.isInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
             srcOp, dstType, adaptor.getIn(),
@@ -553,6 +563,25 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
         return rewriter.notifyMatchFailure(srcOp,
                                            "unsupported i1 sign extension");
       }
+    } else if (llvm::isPowerOf2_32(srcBits) && srcBits < 8) {
+      if (!dstType.isInteger(32) && !dstType.isInteger(64)) {
+        return rewriter.notifyMatchFailure(srcOp,
+                                           "unsupported sub-byte sign ext");
+      }
+      // Sign extend by shifting left then arithmetic right.
+      // This puts the sign bit in the MSB, then propagates it.
+      unsigned shiftAmount = 32 - srcBits;
+      auto shiftConst = rewriter.createOrFold<IREE::VM::ConstI32Op>(
+          srcOp.getLoc(), shiftAmount);
+      auto shifted = rewriter.createOrFold<IREE::VM::ShlI32Op>(
+          srcOp.getLoc(), rewriter.getI32Type(), adaptor.getIn(), shiftConst);
+      Value result = IREE::VM::ShrI32SOp::create(
+          rewriter, srcOp.getLoc(), rewriter.getI32Type(), shifted, shiftConst);
+      if (dstType.isInteger(64)) {
+        result = IREE::VM::ExtI32I64SOp::create(rewriter, srcOp.getLoc(),
+                                                dstType, result);
+      }
+      rewriter.replaceOp(srcOp, result);
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
                                                          adaptor.getIn());
@@ -583,18 +612,20 @@ struct TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
     auto srcType = srcOp.getIn().getType();
     auto resultType = srcOp.getResult().getType();
     auto dstType = getTypeConverter()->convertType(resultType);
-    if (resultType.isInteger(1)) {
-      // i1 is represented as i32, so just mask off the bit and truncate as
-      // normal. Note that if we started as i64 we need to first get that into
-      // an i32 that we can work with.
+    unsigned resultBits = resultType.getIntOrFloatBitWidth();
+
+    // Handle sub-byte results (i1, i2, i4) by masking.
+    // These are all represented as i32 in VM.
+    if (llvm::isPowerOf2_32(resultBits) && resultBits < 8) {
       auto value = adaptor.getIn();
       if (srcType.isInteger(64)) {
         value = rewriter.createOrFold<IREE::VM::TruncI64I32Op>(srcOp.getLoc(),
                                                                dstType, value);
       }
+      unsigned mask = (1u << resultBits) - 1;
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
           srcOp, dstType, value,
-          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), mask));
     } else if (srcType.isInteger(16) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI16I8Op>(srcOp, dstType,
                                                           adaptor.getIn());
