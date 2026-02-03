@@ -255,13 +255,13 @@ def WMMA_F16_16x16x128_F8E5M2_F8E4M3FN : I32EnumAttrCase<"WMMA_F16_16x16x128_F8E
 def WMMA_F16_16x16x128_F8E4M3FN : I32EnumAttrCase<"WMMA_F16_16x16x128_F8E4M3FN", 0x1A3E>;
 def WMMA_F16_16x16x128_F8E4M3FN_F8E5M2 : I32EnumAttrCase<"WMMA_F16_16x16x128_F8E4M3FN_F8E5M2", 0x1A3F>;
 
-// NV intrinsics for CUDA (mma.sync)
+// NV intrinsics with explicit layout (mma.sync)
 def NV_MMA_SYNC_F32_16x8x16_F16 : I32EnumAttrCase<"NV_MMA_SYNC_F32_16x8x16_F16", 0x2020>;
-def NV_MMA_SYNC_F16_16x8x16_F16 : I32EnumAttrCase<"NV_MMA_SYNC_F16_16x8x16_F16", 0x2023>;
+def NV_MMA_SYNC_F16_16x8x16_F16 : I32EnumAttrCase<"NV_MMA_SYNC_F16_16x8x16_F16", 0x2021>;
 
-// NV intrinsics for Vulkan/SPIRV (cooperative matrix)
-def NV_WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F32_16x16x16_F16", 0x2021>;
-def NV_WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F16_16x16x16_F16", 0x2022>;
+// opaque NV intrinsics
+def NV_WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F32_16x16x16_F16", 0x2120>;
+def NV_WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F16_16x16x16_F16", 0x2121>;
 
 def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
     "Descriptor for different MMA intrinsics", [

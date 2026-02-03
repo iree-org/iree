@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -32,7 +34,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_CONVERTACCGEMMTOGEMMPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-static bool accGemmToGemmPrecondition(Operation *op, bool forceConversion) {
+static bool accGemmToGemmPrecondition(Operation *op) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
     return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
                IREE::GPU::DataTiledMMAInterfaceAttr>(innerTiledOp.getKind());
@@ -49,8 +51,12 @@ static bool accGemmToGemmPrecondition(Operation *op, bool forceConversion) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return false;
   }
-  if (!forceConversion &&
-      isValidInPlaceAccumulatingOp(
+
+  if (auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op)) {
+    return IREE::GPU::shouldConvertAccGemm(config);
+  }
+
+  if (isValidInPlaceAccumulatingOp(
           cast<DestinationStyleOpInterface>(linalgOp.getOperation()))) {
     return false;
   }
@@ -136,9 +142,7 @@ struct ConvertAccGEMMToGEMMPass final
     FunctionOpInterface funcOp = getOperation();
     SmallVector<Operation *> candidates = llvm::filter_to_vector(
         llvm::make_pointer_range(funcOp.getFunctionBody().getOps()),
-        [&](Operation *op) {
-          return accGemmToGemmPrecondition(op, forceConversion);
-        });
+        [&](Operation *op) { return accGemmToGemmPrecondition(op); });
     IRRewriter rewriter(&getContext());
     for (Operation *candidate : candidates) {
       convertAccGemmToGemm(rewriter,

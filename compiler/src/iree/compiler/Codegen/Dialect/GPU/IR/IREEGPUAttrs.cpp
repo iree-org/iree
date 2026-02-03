@@ -78,6 +78,14 @@ static bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
 }
 
+bool is_NV_MMA_SYNC(MMAIntrinsic intrinsic) {
+  return getArchID(intrinsic) == 0x2000;
+}
+
+static bool is_NV_WMMA(MMAIntrinsic intrinsic) {
+  return getArchID(intrinsic) == 0x2100;
+}
+
 int64_t getIntrinsicSubgroupSize(ScaledMMAIntrinsic intrinsic) {
   switch (intrinsic) {
   case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
@@ -675,8 +683,7 @@ static VectorType getThreadVectorType(MLIRContext *context,
                   : isIntrinsicRhs<MMAIntrinsicType>(operandIndex) ? o.bType
                                                                    : o.cType;
   if constexpr (std::is_same_v<MMAIntrinsicType, MMAIntrinsic>) {
-    if (intrinsic == MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16 ||
-        intrinsic == MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16) {
+    if (is_NV_MMA_SYNC(intrinsic)) {
       return VectorType::get(
           {s.outer[0] * s.outer[1], s.element[0] * s.element[1]}, elemType);
     }
@@ -779,8 +786,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
         .getResult();
   }
-  if (intrinsic == MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16 ||
-      intrinsic == MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16) {
+  if (is_NV_MMA_SYNC(intrinsic)) {
     // Transpose the two outer dimensions to model the column-major register
     // ordering expected by mma.sync. The input shape differs between pipelines:
     // VectorDistribute produces 2x2x1x2, TileAndFuse produces 2x1x2x2.

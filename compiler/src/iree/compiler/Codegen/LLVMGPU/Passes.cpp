@@ -418,12 +418,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   if (pipelineOptions.useIgemmConvolution) {
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
-  // TODO: this shouldn't be required
-  ConvertAccGEMMToGEMMPassOptions accGemmOptions;
-  accGemmOptions.forceConversion = !forROCDL;
   // TODO (nirvedhmeshram) : Can remove this pass after
   // https://github.com/iree-org/iree/issues/19546 is fixed.
-  funcPassManager.addPass(createConvertAccGEMMToGEMMPass(accGemmOptions));
+  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/std::nullopt);
 

@@ -82,10 +82,15 @@ class IREEGPUCompilationInfo(CompilationInfo):
             subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
 
         if compiler_pipeline == "LLVMGPUTileAndFuse":
+            # Add convert_acc_gemm for NVIDIA mma.sync intrinsics
+            convert_acc_gemm = ""
+            if self.mma_schedule.intrinsic.startswith("NV_MMA_SYNC"):
+                convert_acc_gemm = "convert_acc_gemm, "
             lowering_config = (
                 f"  lowering_config = #iree_gpu.lowering_config<{{"
                 f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
                 f"  subgroup = {self.mma_schedule.get_subgroup_tile()}, "
+                f"  {convert_acc_gemm}"
                 f"  promote_operands = [0, 1], "
                 f"  workgroup = {self.workgroup_tile}, "
                 f"  reduction = {self.reduction_tile} }}>,\n"

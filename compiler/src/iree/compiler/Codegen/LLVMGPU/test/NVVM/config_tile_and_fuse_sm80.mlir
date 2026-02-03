@@ -62,3 +62,32 @@ func.func @matmul_256x256x256_f16_f16() {
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>
+
+// -----
+
+// Test that matmul_accumulate sets convert_acc_gemm for NV_MMA_SYNC.
+
+#pipeline_layout_acc = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @matmul_accumulate_256x256x256_f16_f32() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_acc) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_acc) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_acc) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<256x256xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
+  %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<256x256xf32>> -> tensor<256x256xf32>
+  %6 = linalg.matmul ins(%3, %4 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+  iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<256x256xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_accumulate_256x256x256_f16_f32(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 32
+
+//       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     convert_acc_gemm
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>
