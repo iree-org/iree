@@ -798,7 +798,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     auto transposed = vector::TransposeOp::create(builder, loc, nonUnitVecType,
                                                   reshaped, permAttr);
     lhs = vector::ShapeCastOp::create(builder, loc, lhs.getType(), transposed);
-    SmallVector<Attribute> mmaShape{builder.getI64IntegerAttr(layout.mSize),
+    Attribute mmaShape[] = {builder.getI64IntegerAttr(layout.mSize),
                                     builder.getI64IntegerAttr(layout.nSize),
                                     builder.getI64IntegerAttr(layout.kSize)};
     ArrayAttr mmShapeAttr = builder.getArrayAttr(mmaShape);
