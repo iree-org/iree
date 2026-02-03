@@ -794,8 +794,16 @@ struct BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = srcOp.getResult().getType();
-    auto resultType =
-        getTypeConverter()->convertType(srcOp.getResult().getType());
+    auto convertedSrcType = getTypeConverter()->convertType(srcType);
+    auto resultType = getTypeConverter()->convertType(dstType);
+
+    // If both source and destination types convert to the same type,
+    // the bitcast is a no-op (e.g., f8 -> i8 both become i32).
+    if (convertedSrcType == resultType) {
+      rewriter.replaceOp(srcOp, adaptor.getOperands()[0]);
+      return success();
+    }
+
     if (srcType.isF32() && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BitcastF32I32Op>(
           srcOp, resultType, adaptor.getOperands()[0]);
