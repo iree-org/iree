@@ -6,13 +6,16 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingPatterns.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
@@ -64,6 +67,20 @@ LogicalResult SetEncodingOp::reifyResultShapes(
   return success();
 }
 
+FailureOr<Value> SetEncodingOp::reifyEncodingDim(OpBuilder &builder,
+                                                 unsigned resultIndex,
+                                                 unsigned dimIndex) {
+  // SetEncodingOp has a single result, so resultIndex must be 0.
+  assert(resultIndex == 0 && "SetEncodingOp has only one result");
+
+  ValueRange encodingDims = getEncodingDims();
+  if (dimIndex >= encodingDims.size()) {
+    return failure();
+  }
+
+  return encodingDims[dimIndex];
+}
+
 //===----------------------------------------------------------------------===//
 // encoding.unset_encoding
 //===----------------------------------------------------------------------===//
@@ -112,6 +129,54 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   reifiedReturnShapes[0] =
       getMixedValues(getResultType().getShape(), getResultDims(), builder);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// encoding.dim
+//===----------------------------------------------------------------------===//
+
+LogicalResult DimOp::verify() {
+  auto sourceType = cast<RankedTensorType>(getSource().getType());
+  Attribute encoding = sourceType.getEncoding();
+
+  if (!encoding) {
+    return emitOpError() << "source tensor " << getSource()
+                         << " must have an encoding";
+  }
+
+  auto serializableAttr = dyn_cast<SerializableAttr>(encoding);
+  if (!serializableAttr) {
+    return emitOpError() << "source tensor encoding " << encoding
+                         << " must implement SerializableAttr";
+  }
+
+  // Check that the index is valid if we can determine the number of dims.
+  std::optional<int64_t> numEncodingDims =
+      serializableAttr.getNumDynamicEncodingDims();
+  if (numEncodingDims) {
+    int64_t index = getConstantIndex();
+    if (index < 0 || index >= *numEncodingDims) {
+      return emitOpError() << "encoding dimension index " << index
+                           << " is out of bounds for encoding with "
+                           << *numEncodingDims << " dimensions";
+    }
+  }
+  return success();
+}
+
+void DimOp::build(OpBuilder &builder, OperationState &result, Value source,
+                  int64_t index) {
+  build(builder, result, builder.getIndexType(), source,
+        builder.getIndexAttr(index));
+}
+
+void DimOp::getAsmResultNames(function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "enc_dim");
+}
+
+void DimOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {
+  populateEncodingDimReificationPatterns(results);
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

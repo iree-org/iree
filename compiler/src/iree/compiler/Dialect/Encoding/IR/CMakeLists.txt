@@ -22,6 +22,7 @@ iree_cc_library(
     "EncodingOpInterfaces.h.inc"
     "EncodingOps.h"
     "EncodingOps.h.inc"
+    "EncodingPatterns.h"
     "EncodingTypeInterfaces.h.inc"
     "EncodingTypes.h"
     "EncodingTypes.h.inc"
@@ -35,6 +36,7 @@ iree_cc_library(
     "EncodingOpInterfaces.cpp.inc"
     "EncodingOps.cpp"
     "EncodingOps.cpp.inc"
+    "EncodingPatterns.cpp"
     "EncodingTypeInterfaces.cpp.inc"
     "EncodingTypes.cpp"
     "EncodingTypes.cpp.inc"
@@ -45,6 +47,7 @@ iree_cc_library(
     ::EncodingTypesGen
     LLVMSupport
     MLIRArithDialect
+    MLIRDestinationStyleOpInterface
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
