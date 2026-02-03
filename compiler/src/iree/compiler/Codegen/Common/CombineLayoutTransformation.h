@@ -40,7 +40,7 @@ using CombineRelayoutOpsControlFnRef = function_ref<bool(OpResult leaf)>;
 using CombineRelayoutOpsControlFn = std::function<bool(OpResult leaf)>;
 
 namespace IREE::Codegen {
-/// Enum defining the scope of the CombineLayoutTransformationPass.
+/// Enum defining the scope of the CombineResultLayoutTransformationPass.
 ///  - The `Dispatch` scope will combine layout transformation chains that are
 ///    consumed by an `iree_codegen.store_to_buffer` op.
 ///  - The `Workgroup` scope will combine layout transformation chains that are

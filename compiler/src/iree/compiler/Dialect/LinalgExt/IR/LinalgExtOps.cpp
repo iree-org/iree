@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -725,29 +726,6 @@ void MapGatherOp::inlineMapGatherBody(
                                  transformBodyIndices, bodyBuilder);
 }
 
-void MapGatherOp::insertTransformationAtEnd(
-    OpBuilder &builder,
-    function_ref<SmallVector<Value>(ValueRange)> transformationBuilder) {
-  Block &transformBody = getTransformationRegion().front();
-  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
-
-  // Get the currently yielded source indices (excluding padding).
-  SmallVector<Value> oldSourceIndices(yieldOp.getOperands().drop_back());
-  Value padding = yieldOp.getOperands().back();
-
-  OpBuilder::InsertionGuard g(builder);
-  builder.setInsertionPoint(yieldOp);
-
-  // Apply the transformation to get new source indices.
-  SmallVector<Value> newSourceIndices = transformationBuilder(oldSourceIndices);
-
-  // Update the yield op with the new source indices.
-  SmallVector<Value> newYieldOperands(newSourceIndices);
-  newYieldOperands.push_back(padding);
-  IREE::LinalgExt::YieldOp::create(builder, yieldOp.getLoc(), newYieldOperands);
-  yieldOp->erase();
-}
-
 bool MapGatherOp::isIdentity() {
   if (getSourceType() != getOutputType()) {
     return false;
@@ -798,11 +776,12 @@ MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
   SmallVector<Value> yieldedValues(block->getArguments());
 
-  // Add a zero padding value (the identity transformation shouldn't need it
-  // since source and output have the same shape).
+  // Add a poison padding value. The identity transformation shouldn't need it
+  // since source and output have the same shape. Using poison indicates that
+  // no real padding is needed, and allows foldPadIntoMapGather to detect
+  // whether it's safe to set a new padding value.
   Type elementType = outputType.getElementType();
-  TypedAttr zeroAttr = builder.getZeroAttr(elementType);
-  Value padding = arith::ConstantOp::create(builder, loc, zeroAttr);
+  Value padding = ub::PoisonOp::create(builder, loc, elementType);
   yieldedValues.push_back(padding);
   IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
   return mapGatherOp;

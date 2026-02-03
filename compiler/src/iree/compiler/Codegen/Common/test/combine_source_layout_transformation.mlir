@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-layout-transformation-for-map-gather,canonicalize,cse))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-source-layout-transformation,canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s
 
 func.func @fold_transpose(%buffer : memref<2x4x16xf32>) -> tensor<4x16x2xf32> {
@@ -144,3 +144,33 @@ func.func @fold_pad_with_non_zero_low_padding_offsets(%buffer : memref<8x16xf32>
 //       CHECK:     %[[NEW_IDX1:.+]] = arith.subi %[[IDX1]], %[[C2]] : index
 //       CHECK:     iree_linalg_ext.yield %[[NEW_IDX0]], %[[NEW_IDX1]], %[[CST]] :
 //       CHECK:   } : tensor<8x16xf32> into tensor<10x20xf32> -> tensor<10x20xf32>
+
+// -----
+
+// Test that nested pads with different padding values are NOT both folded.
+// The first pad gets folded, but the second pad remains because the map_gather
+// already has a non-poison padding value. Folding both would incorrectly
+// overwrite the first padding value.
+func.func @nested_pads_different_values(%buffer : memref<8x16xf32>) -> tensor<14x24xf32> {
+  %cst0 = arith.constant 0.000000e+00 : f32
+  %cst1 = arith.constant 1.000000e+00 : f32
+  %source = iree_codegen.load_from_buffer %buffer : memref<8x16xf32> -> tensor<8x16xf32>
+  %pad0 = tensor.pad %source low[1, 2] high[1, 2] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst0 : f32
+  } : tensor<8x16xf32> to tensor<10x20xf32>
+  %pad1 = tensor.pad %pad0 low[2, 2] high[2, 2] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst1 : f32
+  } : tensor<10x20xf32> to tensor<14x24xf32>
+  return %pad1 : tensor<14x24xf32>
+}
+// CHECK-LABEL: @nested_pads_different_values
+//       CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[CST1:.+]] = arith.constant 1.000000e+00 : f32
+//       CHECK:   iree_linalg_ext.map_gather
+// First pad is folded, so its padding value (0.0) is in the map_gather.
+//       CHECK:     iree_linalg_ext.yield {{.*}}, %[[CST0]] :
+// Second pad is NOT folded because the map_gather already has a padding value.
+//       CHECK:   tensor.pad
+//       CHECK:     tensor.yield %[[CST1]] : f32

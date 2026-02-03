@@ -347,14 +347,6 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       OpBuilder &b, Location loc, ValueRange transformBodyIndices,
       function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
-    // Helper to apply transformations to the yielded source indices at the
-    // end of the transformation body. The `transformationBuilder` function
-    // receives the current yielded source indices (excluding padding) and
-    // should return the new source indices to yield.
-    void insertTransformationAtEnd(
-        OpBuilder &builder,
-        function_ref<SmallVector<Value>(ValueRange)> transformationBuilder);
-
     // Return true if the mapGatherOp is an identity transformation, meaning
     // it is just doing a copy from source to output. This is true if the
     // padding is unused (source and output shapes match) and the mapping
