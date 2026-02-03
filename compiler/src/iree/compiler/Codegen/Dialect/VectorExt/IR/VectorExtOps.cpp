@@ -1392,6 +1392,104 @@ struct FoldContiguousGatherToTransferRead final : OpRewritePattern<GatherOp> {
   };
 };
 
+// Canonicalization pattern to fold single-element index vectors into base
+// offsets for ScatterOp. Mirrors FoldSingleElementIndexingMap for GatherOp.
+struct FoldSingleElementScatterIndexingMap final : OpRewritePattern<ScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto indexVecFolder = [&](int64_t index, Value indexVec, AffineMap map,
+                              AffineMap &baseMap) -> IndexingMapFoldResult {
+      auto vectorTy = cast<VectorType>(indexVec.getType());
+      if (vectorTy.getNumElements() != 1) {
+        return {indexVec, map, false};
+      }
+
+      // Extract the scalar and add it to the corresponding base offset.
+      OpOperand &base = scatterOp.getOffsetsMutable()[index];
+      Value extracted = vector::ExtractOp::create(
+          rewriter, scatterOp.getLoc(), indexVec,
+          SmallVector<int64_t>(vectorTy.getRank(), 0));
+      AffineExpr d0, d1;
+      bindDims(scatterOp.getContext(), d0, d1);
+      Value newIndex = affine::makeComposedAffineApply(
+                           rewriter, scatterOp.getLoc(), d0 + d1,
+                           ArrayRef<OpFoldResult>{base.get(), extracted})
+                           .getResult();
+      base.set(newIndex);
+
+      return {Value(), AffineMap(), true};
+    };
+
+    Value newVal = foldScatterIndexVecs(scatterOp, indexVecFolder);
+
+    if (!newVal) {
+      return failure();
+    }
+
+    return success();
+  }
+};
+
+// Canonicalization pattern to fold scatter ops with no index vectors into
+// vector.transfer_write. Mirrors FoldContiguousGatherToTransferRead.
+struct FoldContiguousScatterToTransferWrite final
+    : OpRewritePattern<ScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ScatterOp scatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (!scatterOp.getIndexVecs().empty()) {
+      return failure();
+    }
+
+    // Try to infer the permutation map from the base indexing map.
+    AffineMap baseMap = scatterOp.getIndexingMapsArray().front();
+    SmallVector<AffineExpr> zeroInit(baseMap.getNumInputs(),
+                                     rewriter.getAffineConstantExpr(0));
+    AffineMap permutationMap = inverseMap(baseMap, zeroInit);
+
+    Value mask = scatterOp.getMask();
+    if (mask) {
+      // Transform mask if needed, same logic as gather.
+      AffineMap maskMap = scatterOp.getIndexingMapsArray().back();
+      auto valueType = cast<VectorType>(scatterOp.getValueToStore().getType());
+      ArrayRef<int64_t> targetShape = valueType.getShape();
+
+      if (!maskMap.isIdentity()) {
+        mask = applyTransformMapToVector(rewriter, scatterOp.getLoc(), mask,
+                                         maskMap, targetShape);
+      }
+    }
+
+    // Canonicalize to vector.transfer_write.
+    SmallVector<bool> inBounds(baseMap.getNumDims(), true);
+
+    // For tensor semantics, we need result type. For memref semantics, empty.
+    Type tensorResultType;
+    if (scatterOp.getResult()) {
+      tensorResultType = scatterOp.getBase().getType();
+    }
+
+    auto writeOp = vector::TransferWriteOp::create(
+        rewriter, scatterOp.getLoc(),
+        tensorResultType ? TypeRange{tensorResultType} : TypeRange{},
+        scatterOp.getValueToStore(), scatterOp.getBase(),
+        scatterOp.getOffsets(), permutationMap, mask,
+        rewriter.getBoolArrayAttr(inBounds));
+
+    // Handle result for tensor semantics.
+    if (scatterOp.getResult()) {
+      rewriter.replaceOp(scatterOp, writeOp.getResult());
+    } else {
+      rewriter.eraseOp(scatterOp);
+    }
+    return success();
+  };
+};
+
 void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *ctx) {
   results.add<FoldSingleElementIndexingMap, FoldContiguousGatherToTransferRead>(
@@ -1399,7 +1497,10 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 void ScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                            MLIRContext *ctx) {}
+                                            MLIRContext *ctx) {
+  results.add<FoldSingleElementScatterIndexingMap,
+              FoldContiguousScatterToTransferWrite>(ctx);
+}
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
 

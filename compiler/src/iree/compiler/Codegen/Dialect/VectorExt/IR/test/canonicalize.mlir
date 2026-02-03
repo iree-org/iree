@@ -508,3 +508,81 @@ func.func @scatter_fold_step(%indices: vector<64x32xindex>,
 // CHECK-NOT: vector.broadcast
 // CHECK: scatter
 // CHECK-SAME: indexing_maps = [#[[$MAP]], #[[$MAP1]]]
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// ScatterOp -> transfer_write canonicalization tests
+//===----------------------------------------------------------------------===//
+
+func.func @scatter_fold_contiguous_to_write(
+  %source: memref<64x64xf16>,
+  %value: vector<64x64xf16>) {
+
+  %c0 = arith.constant 0 : index
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0]
+  {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>]}
+  : memref<64x64xf16>, vector<64x64xf16>
+
+  return
+}
+
+// CHECK-LABEL: @scatter_fold_contiguous_to_write
+// CHECK-SAME: %[[SOURCE:.*]]: memref<64x64xf16>, %[[VALUE:.*]]: vector<64x64xf16>
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-NOT: iree_vector_ext.scatter
+// CHECK: vector.transfer_write %[[VALUE]], %[[SOURCE]][%[[C0]], %[[C0]]]
+// CHECK-SAME: {in_bounds = [true, true]} : vector<64x64xf16>, memref<64x64xf16>
+// CHECK: return
+
+// -----
+
+func.func @scatter_fold_contiguous_with_mask(
+  %source: memref<64x64xf16>,
+  %value: vector<64x64xf16>,
+  %mask: vector<64x64xi1>) {
+
+  %c0 = arith.constant 0 : index
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0], %mask
+  {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                    affine_map<(d0, d1) -> (d0, d1)>]}
+  : memref<64x64xf16>, vector<64x64xf16>, vector<64x64xi1>
+
+  return
+}
+
+// CHECK-LABEL: @scatter_fold_contiguous_with_mask
+// CHECK-SAME: %[[SOURCE:.*]]: memref<64x64xf16>, %[[VALUE:.*]]: vector<64x64xf16>, %[[MASK:.*]]: vector<64x64xi1>
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK-NOT: iree_vector_ext.scatter
+// CHECK: vector.transfer_write %[[VALUE]], %[[SOURCE]][%[[C0]], %[[C0]]], %[[MASK]]
+// CHECK-SAME: {in_bounds = [true, true]} : vector<64x64xf16>, memref<64x64xf16>
+// CHECK: return
+
+// -----
+
+func.func @scatter_fold_contiguous_with_transposed_mask(
+  %source: memref<64x64xf16>,
+  %value: vector<64x64xf16>,
+  %mask: vector<64x64xi1>) {
+
+  %c0 = arith.constant 0 : index
+
+  iree_vector_ext.scatter %value, %source[%c0, %c0], %mask
+  {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                    affine_map<(d0, d1) -> (d1, d0)>]}
+  : memref<64x64xf16>, vector<64x64xf16>, vector<64x64xi1>
+
+  return
+}
+
+// CHECK-LABEL: @scatter_fold_contiguous_with_transposed_mask
+// CHECK-SAME: %[[SOURCE:.*]]: memref<64x64xf16>, %[[VALUE:.*]]: vector<64x64xf16>, %[[MASK:.*]]: vector<64x64xi1>
+// CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+// CHECK: %[[TRANSPOSE:.*]] = vector.transpose %[[MASK]], [1, 0]
+// CHECK-NOT: iree_vector_ext.scatter
+// CHECK: vector.transfer_write %[[VALUE]], %[[SOURCE]][%[[C0]], %[[C0]]], %[[TRANSPOSE]]
+// CHECK-SAME: {in_bounds = [true, true]} : vector<64x64xf16>, memref<64x64xf16>
+// CHECK: return
