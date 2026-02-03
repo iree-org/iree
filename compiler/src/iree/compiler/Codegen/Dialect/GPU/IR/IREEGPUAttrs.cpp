@@ -799,8 +799,8 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
                                                   reshaped, permAttr);
     lhs = vector::ShapeCastOp::create(builder, loc, lhs.getType(), transposed);
     Attribute mmaShape[] = {builder.getI64IntegerAttr(layout.mSize),
-                                    builder.getI64IntegerAttr(layout.nSize),
-                                    builder.getI64IntegerAttr(layout.kSize)};
+                            builder.getI64IntegerAttr(layout.nSize),
+                            builder.getI64IntegerAttr(layout.kSize)};
     ArrayAttr mmShapeAttr = builder.getArrayAttr(mmaShape);
 
     return nvgpu::MmaSyncOp::create(builder, loc, lhs, rhs, acc, mmShapeAttr)
