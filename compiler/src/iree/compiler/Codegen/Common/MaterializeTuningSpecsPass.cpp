@@ -170,7 +170,6 @@ serializeTuningSpecToAttr(ModuleOp tuningSpec) {
 
 struct MaterializeTuningSpecsPass final
     : impl::MaterializeTuningSpecsPassBase<MaterializeTuningSpecsPass> {
-  using Base = impl::MaterializeTuningSpecsPassBase<MaterializeTuningSpecsPass>;
   using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -278,5 +277,4 @@ struct MaterializeTuningSpecsPass final
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler

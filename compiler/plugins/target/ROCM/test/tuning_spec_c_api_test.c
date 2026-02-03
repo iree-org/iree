@@ -11,13 +11,12 @@
 #include <stdio.h>
 #include "iree/compiler/embedding_api.h"
 
-int main(int argc, char **argv) {
+int main() {
   ireeCompilerGlobalInitialize();
   iree_compiler_session_t *session = ireeCompilerSessionCreate();
 
-  const char *flags[] = {"--iree-codegen-tuning-spec-path=/tmp/spec.mlir"};
-
-  iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, flags);
+  const char *flag = "--iree-codegen-tuning-spec-path=/tmp/spec.mlir";
+  iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, &flag);
   if (err) {
     fprintf(stderr, "FAIL: Tuning spec path flag not accepted: %s\n",
             ireeCompilerErrorGetMessage(err));

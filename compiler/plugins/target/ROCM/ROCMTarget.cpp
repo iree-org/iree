@@ -85,6 +85,7 @@ struct ROCMOptions {
   std::string enableROCMUkernels = "none";
   std::string encodingLayoutResolver =
       GPU::kDataTilingEncodingLayoutResolverName;
+  std::string tuningSpecPath = "";
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
@@ -93,7 +94,6 @@ struct ROCMOptions {
       IREE::Codegen::DenormalFpMath::None;
   bool enableRegSpillWarning = false;
   bool debugSymbols = false;
-  std::string tuningSpecPath = "";
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -153,6 +153,11 @@ struct ROCMOptions {
                  "identity layout), `pad` (additional padding "
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
+    binder.opt<std::string>(
+        "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
+        cl::desc("Path to a module containing a tuning spec (transform "
+                 "dialect library). Accepts text (.mlir) and bytecode "
+                 "(.mlirbc) formats."));
 
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
@@ -184,10 +189,6 @@ struct ROCMOptions {
     binder.opt<bool>(
         "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
         cl::desc("Generate and embed debug information (DWARF) for HIP."));
-    binder.opt<std::string>(
-        "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
-        cl::desc("File path to a module containing a tuning spec (transform "
-                 "dialect library)."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
