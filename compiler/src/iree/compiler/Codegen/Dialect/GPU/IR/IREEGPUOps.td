@@ -228,6 +228,7 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -319,13 +320,15 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     AnyRankedTensorOrMemRef:$source,
     Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
-    Index:$lane
+    Index:$lane,
+    OptionalAttr<BoolArrayAttr>:$in_bounds
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
     $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+    (`in_bounds` $in_bounds^)?
     attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
 
