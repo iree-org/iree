@@ -79,7 +79,7 @@ jobs:
           repository: iree-org/iree-test-suites
           ref: abe747550a670ce4c1f11468cca082e2d697a98a
           path: iree-test-suites
-          lfs: true
+          lfs: false
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
