@@ -60,17 +60,9 @@ CMAKE_ARGS=(
   "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 )
 
-echo "::group::Configuring CMake"
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
-echo "::endgroup::"
-
-echo "::group::Building all"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
-echo "::endgroup::"
-
-echo "::group::Building test deps"
 "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
-echo "::endgroup::"
 
 # Disable actually running GPU tests. This tends to yield TSan reports that are
 # specific to one's particular GPU driver and therefore hard to reproduce across
