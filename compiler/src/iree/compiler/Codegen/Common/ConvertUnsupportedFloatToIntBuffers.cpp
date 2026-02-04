@@ -43,31 +43,6 @@ namespace {
 
 using Options = ConvertUnsupportedFloatToIntBuffersPassOptions;
 
-/// Returns the integer type to use for the given float type, or nullptr if the
-/// float type should not be converted.
-static IntegerType getIntTypeForFloat(FloatType ty, const Options &options) {
-  if (options.includeBf16 && ty.isBF16()) {
-    return IntegerType::get(ty.getContext(), 16);
-  }
-  IntegerType i8Type = IntegerType::get(ty.getContext(), 8);
-  if (options.includeF8E5M2 && isa<Float8E5M2Type>(ty)) {
-    return i8Type;
-  }
-  if (options.includeF8E4M3FN && isa<Float8E4M3FNType>(ty)) {
-    return i8Type;
-  }
-  if (options.includeF8E5M2FNUZ && isa<Float8E5M2FNUZType>(ty)) {
-    return i8Type;
-  }
-  if (options.includeF8E4M3FNUZ && isa<Float8E4M3FNUZType>(ty)) {
-    return i8Type;
-  }
-  if (options.includeF8E8M0FNU && isa<Float8E8M0FNUType>(ty)) {
-    return i8Type;
-  }
-  return nullptr;
-}
-
 class UnsupportedFloatEmulationConverter : public TypeConverter {
 public:
   explicit UnsupportedFloatEmulationConverter(const Options &options)
@@ -77,7 +52,7 @@ public:
 
     // Scalar float case.
     addConversion([this](FloatType ty) -> std::optional<Type> {
-      if (auto intTy = getIntTypeForFloat(ty, this->options)) {
+      if (auto intTy = getIntTypeForFloat(ty)) {
         return intTy;
       }
       return ty;
@@ -103,11 +78,35 @@ public:
   }
 
   bool shouldConvertFloat(FloatType ty) const {
-    return getIntTypeForFloat(ty, options) != nullptr;
+    return getIntTypeForFloat(ty) != nullptr;
   }
 
 private:
-  Options options;
+  /// Returns the integer type to use for the given float type, or nullptr if
+  /// the float type should not be converted.
+  IntegerType getIntTypeForFloat(FloatType ty) const {
+    if (options.includeBf16 && ty.isBF16()) {
+      return IntegerType::get(ty.getContext(), 16);
+    }
+    IntegerType i8Type = IntegerType::get(ty.getContext(), 8);
+    if (options.includeF8E5M2 && isa<Float8E5M2Type>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E4M3FN && isa<Float8E4M3FNType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E5M2FNUZ && isa<Float8E5M2FNUZType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E4M3FNUZ && isa<Float8E4M3FNUZType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E8M0FNU && isa<Float8E8M0FNUType>(ty)) {
+      return i8Type;
+    }
+    return nullptr;
+  }
+  ConvertUnsupportedFloatToIntBuffersPassOptions options;
 };
 
 //===----------------------------------------------------------------------===//
@@ -187,15 +186,15 @@ struct GenericTypeConversionPattern : public ConversionPattern {
           if (converter->shouldConvertFloat(floatTy)) {
             APInt apint = floatAttr.getValue().bitcastToAPInt();
             newAttr = rewriter.getIntegerAttr(
-                IntegerType::get(op->getContext(), apint.getBitWidth()), apint);
+                rewriter.getIntegerType(apint.getBitWidth()), apint);
           }
         } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
           auto floatTy = cast<FloatType>(denseAttr.getType().getElementType());
           if (converter->shouldConvertFloat(floatTy)) {
             unsigned bitWidth = floatTy.getWidth();
             newAttr = denseAttr.mapValues(
-                IntegerType::get(op->getContext(), bitWidth),
-                [&](APFloat src) { return src.bitcastToAPInt(); });
+                rewriter.getIntegerType(bitWidth),
+                [&](const APFloat &src) { return src.bitcastToAPInt(); });
           }
         }
 
@@ -336,16 +335,10 @@ struct ConvertUnsupportedFloatToIntBuffersPass final
   }
 
   void runOnOperation() override {
-    // Early exit if nothing to convert.
-    if (!includeBf16 && !includeF8E5M2 && !includeF8E4M3FN &&
-        !includeF8E5M2FNUZ && !includeF8E4M3FNUZ && !includeF8E8M0FNU) {
-      return;
-    }
-
     auto op = getOperation();
     MLIRContext *ctx = &getContext();
 
-    Options opts;
+    ConvertUnsupportedFloatToIntBuffersPassOptions opts;
     opts.includeBf16 = includeBf16;
     opts.includeF8E5M2 = includeF8E5M2;
     opts.includeF8E4M3FN = includeF8E4M3FN;

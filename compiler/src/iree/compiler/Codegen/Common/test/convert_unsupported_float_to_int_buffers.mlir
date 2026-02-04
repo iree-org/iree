@@ -186,3 +186,58 @@ func.func @to_elements_bf16_2d(%arg0 : vector<2x2xbf16>) -> (bf16, bf16, bf16, b
   // CHECK: return %[[E]]#0, %[[E]]#1, %[[E]]#2, %[[E]]#3 : i16, i16, i16, i16
   return %0, %1, %2, %3 : bf16, bf16, bf16, bf16
 }
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E5M2
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E5M2(%arg0 : f8E5M2, %arg1 : f8E5M2) -> vector<2xf8E5M2> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E5M2>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E5M2>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E4M3FN
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E4M3FN(%arg0 : f8E4M3FN, %arg1 : f8E4M3FN) -> vector<2xf8E4M3FN> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E4M3FN>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E4M3FN>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E5M2FNUZ
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E5M2FNUZ(%arg0 : f8E5M2FNUZ, %arg1 : f8E5M2FNUZ) -> vector<2xf8E5M2FNUZ> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E5M2FNUZ>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E5M2FNUZ>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E4M3FNUZ
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E4M3FNUZ(%arg0 : f8E4M3FNUZ, %arg1 : f8E4M3FNUZ) -> vector<2xf8E4M3FNUZ> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E4M3FNUZ>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E4M3FNUZ>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E8M0FNU
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E8M0FNU(%arg0 : f8E8M0FNU, %arg1 : f8E8M0FNU) -> vector<2xf8E8M0FNU> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E8M0FNU>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E8M0FNU>
+}
