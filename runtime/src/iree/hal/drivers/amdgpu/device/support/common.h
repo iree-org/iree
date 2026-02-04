@@ -53,7 +53,7 @@ typedef uint64_t uintptr_t;
 #include <stdint.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 #include "third_party/hsa-runtime-headers/include/hsa/hsa.h"  // IWYU pragma: export
 
 #endif  // IREE_AMDGPU_TARGET_DEVICE

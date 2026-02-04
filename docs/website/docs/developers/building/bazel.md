@@ -320,6 +320,7 @@ export PATH="$PATH:/path/to/iree/build_tools/bin"
 - `iree-bazel-run <target> [-- args]` - Build and execute from current directory
     (supports `-w` watch mode)
 - `iree-bazel-query <expr>` - Query the build graph
+- `iree-bazel-cquery <expr>` - Configuration-aware query (resolved select())
 - `iree-bazel-try <file>` - Compile/run C++ snippets without BUILD files
 - `iree-bazel-fuzz <target>` - Run fuzzer with corpus management
 

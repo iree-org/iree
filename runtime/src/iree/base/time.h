@@ -17,8 +17,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-// A point in time represented as nanoseconds since unix epoch.
-// TODO(benvanik): pick something easy to get into/out-of time_t/etc.
+// A point in time represented as monotonic nanoseconds.
+// The epoch is arbitrary (typically system boot) and values are only meaningful
+// relative to other timestamps from the same process.
 typedef int64_t iree_time_t;
 
 // A time in the infinite past used to indicate "already happened".
@@ -44,13 +45,29 @@ typedef int64_t iree_duration_t;
 // their wait condition is satisfied without returning early.
 #define IREE_DURATION_INFINITE INT64_MAX
 
-// Returns the current system time in unix nanoseconds.
+// Returns monotonically increasing time in nanoseconds.
+// The epoch is arbitrary (typically system boot) and values are only meaningful
+// relative to other timestamps from the same process. Guaranteed to never
+// decrease, making it suitable for measuring elapsed time, computing deadlines,
+// and all timing operations.
+//
 // Depending on the system architecture and power mode this time may have a
 // very coarse granularity (on the order of microseconds to milliseconds).
 //
-// The system timer may not be monotonic; users should ensure when comparing
-// times they check for negative values in case the time moves backwards.
+// Implementations:
+//   POSIX (Linux/Android/Apple/Emscripten): CLOCK_MONOTONIC
+//   Windows: QueryPerformanceCounter
+//
+// This clock is immune to manual clock changes and leap seconds. NTP rate
+// adjustments may affect CLOCK_MONOTONIC slightly (<0.05%) but this is
+// negligible for timeout precision. Wall-clock time (for human-readable
+// timestamps, external system coordination) is not provided by this API.
 IREE_API_EXPORT iree_time_t iree_time_now(void);
+
+// Defines a duration with the given time in milliseconds.
+static inline iree_duration_t iree_make_duration_ms(int64_t timeout_ms) {
+  return timeout_ms * 1000000ll;
+}
 
 // Converts a relative timeout duration to an absolute deadline time.
 // This handles the special cases of IREE_DURATION_ZERO and

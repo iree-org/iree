@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "./hal.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 namespace iree::python {
 

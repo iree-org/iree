@@ -4,16 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
+#include <atomic>
 #include <thread>
+#include <vector>
 
 #include "iree/testing/gtest.h"
 
 namespace {
 
 //==============================================================================
-// Test utils
+// Test utilities
 //==============================================================================
 
 template <typename T>
@@ -125,6 +127,101 @@ void TestMutexExclusiveAccessTryLock() {
   Mutex<T>::Deinitialize(&mu);
 }
 
+// Tests high contention with multiple threads.
+template <typename T>
+void TestMutexHighContention() {
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 1000;
+
+  std::atomic<int> counter{0};
+  T mu;
+  Mutex<T>::Initialize(&mu);
+
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([&]() {
+      for (int j = 0; j < kIncrementsPerThread; ++j) {
+        Mutex<T>::Lock(&mu);
+        counter.fetch_add(1, std::memory_order_relaxed);
+        Mutex<T>::Unlock(&mu);
+      }
+    });
+  }
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  EXPECT_EQ(kNumThreads * kIncrementsPerThread,
+            counter.load(std::memory_order_acquire));
+
+  Mutex<T>::Deinitialize(&mu);
+}
+
+// Tests try_lock under contention.
+template <typename T>
+void TestMutexTryLockContended() {
+  T mu;
+  Mutex<T>::Initialize(&mu);
+
+  // Hold lock in main thread.
+  Mutex<T>::Lock(&mu);
+
+  constexpr int kNumThreads = 4;
+  std::atomic<int> attempted_count{0};
+  std::atomic<int> failed_count{0};
+  std::atomic<int> succeeded_count{0};
+  std::atomic<bool> main_released{false};
+
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([&]() {
+      // First try should fail since main holds the lock.
+      if (!Mutex<T>::TryLock(&mu)) {
+        failed_count.fetch_add(1, std::memory_order_relaxed);
+      } else {
+        Mutex<T>::Unlock(&mu);
+      }
+      // Signal that we've attempted our first try_lock.
+      attempted_count.fetch_add(1, std::memory_order_release);
+
+      // Wait for main to release.
+      while (!main_released.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+      }
+
+      // Try again - one should succeed.
+      if (Mutex<T>::TryLock(&mu)) {
+        succeeded_count.fetch_add(1, std::memory_order_relaxed);
+        // Hold briefly to let others fail.
+        std::this_thread::yield();
+        Mutex<T>::Unlock(&mu);
+      }
+    });
+  }
+
+  // Wait for all threads to attempt their first try_lock.
+  while (attempted_count.load(std::memory_order_acquire) < kNumThreads) {
+    std::this_thread::yield();
+  }
+
+  // All threads should have failed their first try.
+  EXPECT_EQ(kNumThreads, failed_count.load(std::memory_order_acquire));
+
+  // Release and let threads race.
+  Mutex<T>::Unlock(&mu);
+  main_released.store(true, std::memory_order_release);
+
+  for (auto& t : threads) {
+    t.join();
+  }
+
+  // At least one thread should have succeeded.
+  EXPECT_GE(succeeded_count.load(std::memory_order_acquire), 1);
+
+  Mutex<T>::Deinitialize(&mu);
+}
+
 //==============================================================================
 // iree_mutex_t
 //==============================================================================
@@ -133,7 +230,7 @@ TEST(MutexTest, Lifetime) {
   iree_mutex_t mutex;
   iree_mutex_initialize(&mutex);
   while (!iree_mutex_try_lock(&mutex)) {
-    // NOTE: functions with try in their name may fail spuriously.
+    // Functions with try in their name may fail spuriously.
   }
   iree_mutex_unlock(&mutex);
   iree_mutex_lock(&mutex);
@@ -147,6 +244,10 @@ TEST(MutexTest, ExclusiveAccessTryLock) {
   TestMutexExclusiveAccessTryLock<iree_mutex_t>();
 }
 
+TEST(MutexTest, HighContention) { TestMutexHighContention<iree_mutex_t>(); }
+
+TEST(MutexTest, TryLockContended) { TestMutexTryLockContended<iree_mutex_t>(); }
+
 //==============================================================================
 // iree_slim_mutex_t
 //==============================================================================
@@ -155,7 +256,7 @@ TEST(SlimMutexTest, Lifetime) {
   iree_slim_mutex_t mutex;
   iree_slim_mutex_initialize(&mutex);
   while (!iree_slim_mutex_try_lock(&mutex)) {
-    // NOTE: functions with try in their name may fail spuriously.
+    // Functions with try in their name may fail spuriously.
   }
   iree_slim_mutex_unlock(&mutex);
   iree_slim_mutex_lock(&mutex);
@@ -171,50 +272,12 @@ TEST(SlimMutexTest, ExclusiveAccessTryLock) {
   TestMutexExclusiveAccessTryLock<iree_slim_mutex_t>();
 }
 
-//==============================================================================
-// iree_notification_t
-//==============================================================================
-
-// Tested implicitly in threading_test.cc.
-
-TEST(NotificationTest, TimeoutImmediate) {
-  iree_notification_t notification;
-  iree_notification_initialize(&notification);
-
-  iree_time_t start_ns = iree_time_now();
-
-  EXPECT_FALSE(iree_notification_await(
-      &notification,
-      +[](void* entry_arg) -> bool {
-        return false;  // condition is never true
-      },
-      NULL, iree_immediate_timeout()));
-
-  iree_duration_t delta_ns = iree_time_now() - start_ns;
-  iree_duration_t delta_ms = delta_ns / 1000000;
-  EXPECT_LT(delta_ms, 50);  // slop
-
-  iree_notification_deinitialize(&notification);
+TEST(SlimMutexTest, HighContention) {
+  TestMutexHighContention<iree_slim_mutex_t>();
 }
 
-TEST(NotificationTest, Timeout) {
-  iree_notification_t notification;
-  iree_notification_initialize(&notification);
-
-  iree_time_t start_ns = iree_time_now();
-
-  EXPECT_FALSE(iree_notification_await(
-      &notification,
-      +[](void* entry_arg) -> bool {
-        return false;  // condition is never true
-      },
-      NULL, iree_make_timeout_ms(100)));
-
-  iree_duration_t delta_ns = iree_time_now() - start_ns;
-  iree_duration_t delta_ms = delta_ns / 1000000;
-  EXPECT_GE(delta_ms, 50);  // slop
-
-  iree_notification_deinitialize(&notification);
+TEST(SlimMutexTest, TryLockContended) {
+  TestMutexTryLockContended<iree_slim_mutex_t>();
 }
 
 }  // namespace

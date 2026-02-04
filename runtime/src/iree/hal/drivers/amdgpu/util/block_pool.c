@@ -6,8 +6,6 @@
 
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 
-#include "iree/base/internal/bitmap.h"
-
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_block_pool_t
 //===----------------------------------------------------------------------===//

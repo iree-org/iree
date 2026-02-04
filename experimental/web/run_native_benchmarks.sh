@@ -38,7 +38,7 @@ echo "Benchmarking DeepLabV3..."
     --task_topology_group_count=1 \
     --function=main \
     --input=1x257x257x3xf32 \
-    --benchmark_min_time=3
+    --benchmark_min_time=3s
 
 echo ""
 echo "Benchmarking MobileSSD..."
@@ -48,7 +48,7 @@ echo "Benchmarking MobileSSD..."
     --task_topology_group_count=1 \
     --function=main \
     --input=1x320x320x3xf32 \
-    --benchmark_min_time=3
+    --benchmark_min_time=3s
 
 echo ""
 echo "Benchmarking PoseNet..."
@@ -58,7 +58,7 @@ echo "Benchmarking PoseNet..."
     --task_topology_group_count=1 \
     --function=main \
     --input=1x353x257x3xf32 \
-    --benchmark_min_time=3
+    --benchmark_min_time=3s
 
 echo ""
 echo "Benchmarking MobileBertSquad..."
@@ -70,7 +70,7 @@ echo "Benchmarking MobileBertSquad..."
     --input=1x384xi32 \
     --input=1x384xi32 \
     --input=1x384xi32 \
-    --benchmark_min_time=10
+    --benchmark_min_time=10s
 
 echo ""
 echo "Benchmarking MobileNetV2..."
@@ -80,7 +80,7 @@ echo "Benchmarking MobileNetV2..."
     --task_topology_group_count=1 \
     --function=main \
     --input=1x224x224x3xf32 \
-    --benchmark_min_time=3
+    --benchmark_min_time=3s
 
 echo ""
 echo "Benchmarking MobileNetV3Small..."
@@ -90,4 +90,4 @@ echo "Benchmarking MobileNetV3Small..."
     --task_topology_group_count=1 \
     --function=main \
     --input=1x224x224x3xf32 \
-    --benchmark_min_time=3
+    --benchmark_min_time=3s

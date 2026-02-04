@@ -4,8 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/bitmap.h"
-
+#include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -31,6 +30,65 @@ TEST(BitmapTest, NoneSet) {
   EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), 0);
   EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 0), 0);
   EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 0, 0), 0);
+}
+
+TEST(BitmapTest, CountEmpty) {
+  iree_bitmap_t bitmap = {0, NULL};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 0);
+}
+
+TEST(BitmapTest, CountZero) {
+  uint64_t words[] = {0ull, 0ull};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 0);
+}
+
+TEST(BitmapTest, CountAll) {
+  uint64_t words[] = {UINT64_MAX, UINT64_MAX};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 128);
+}
+
+TEST(BitmapTest, CountPartialWord) {
+  uint64_t words[] = {UINT64_MAX, UINT64_MAX};
+  // Only 74 bits (64 + 10), so count should be 74 not 128.
+  iree_bitmap_t bitmap = {74, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 74);
+}
+
+TEST(BitmapTest, CountSparse) {
+  uint64_t words[] = {
+      0b1010,  // 2 bits
+      0b1,     // 1 bit
+  };
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 3);
+}
+
+TEST(BitmapTest, CountSparseWithTailMask) {
+  uint64_t words[] = {
+      0b1010,                              // 2 bits set
+      0b11111111111111111111111111111111,  // many bits set, but only 10 valid
+  };
+  // 74 bits total = 64 full + 10 tail.
+  iree_bitmap_t bitmap = {74, words};
+  // First word: 2 bits, second word masked to 10 bits: 10 bits.
+  EXPECT_EQ(iree_bitmap_count(bitmap), 12);
+}
+
+TEST(BitmapTest, CountSingleBit) {
+  uint64_t words[] = {1ull << 31, 0ull};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 1);
+}
+
+TEST(BitmapTest, CountCrossingWordBoundary) {
+  uint64_t words[] = {
+      0x8000000000000000ull,  // bit 63 set
+      0x0000000000000001ull,  // bit 0 (64 total) set
+  };
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 2);
 }
 
 TEST(BitmapTest, Test) {

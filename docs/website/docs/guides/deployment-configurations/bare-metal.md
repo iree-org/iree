@@ -97,6 +97,9 @@ set(CMAKE_SYSTEM_NAME Generic)
 # Disable multi-thread library support
 set(IREE_ENABLE_THREADING OFF)
 
+# Disable synchronization primitives (safe only for single-threaded targets)
+set(IREE_SYNCHRONIZATION_DISABLE_UNSAFE ON)
+
 # Only enable the local synchronous HAL driver
 set(IREE_HAL_DRIVER_DEFAULTS OFF)
 set(IREE_HAL_DRIVER_LOCAL_SYNC ON)
@@ -137,7 +140,6 @@ set(CMAKE_CXX_FLAGS ${MY_FLAGS} ${CMAKE_CXX_FLAGS})
 | Macro | Description |
 | ----- | ----------- |
 | `IREE_PLATFORM_GENERIC` | Let IREE build the runtime library without targeting a specific platform. |
-| `IREE_SYNCHRONIZATION_DISABLE_UNSAFE=1` | Disable thread synchronization support.<br>Must only be used if there's a single thread. |
 | `IREE_FILE_IO_ENABLE=0` | Disable file I/O. |
 | `IREE_TIME_NOW_FN` | A function to return the system time. For the bare-metal systems, it can be set as `IREE_TIME_NOW_FN=\"\{ return 0;\}\"` as there's no asynchronous wait handling. |
 | `IREE_WAIT_UNTIL_FN` | A function to wait until the given time in nanoseconds. Must match the signature `bool(uint64_t nanos)` and return false if the wait failed. |

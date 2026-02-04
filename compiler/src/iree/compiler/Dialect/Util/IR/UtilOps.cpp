@@ -1846,6 +1846,9 @@ void IREE::Util::FuncOp::expandSignature(
     size_t newIndex = newArgumentTypes.size();
     expandArgument(oldIndex, argType, newArgumentTypes);
     size_t expandedCount = newArgumentTypes.size() - newIndex;
+    if (expandedCount == 0) {
+      continue;
+    }
     for (size_t i = 0; i < adjustedTiedOperands.size(); ++i) {
       if (adjustedTiedOperands[i] == oldIndex) {
         adjustedTiedOperands[i] = newIndex;
@@ -1863,6 +1866,9 @@ void IREE::Util::FuncOp::expandSignature(
     size_t newIndex = newResultTypes.size();
     expandResult(oldIndex, resultType, newResultTypes);
     size_t expandedCount = newResultTypes.size() - newIndex;
+    if (expandedCount == 0) {
+      continue;
+    }
     newTiedOperands.push_back(adjustedTiedOperands[oldIndex]);
     newTiedOperands.append(expandedCount - 1,
                            IREE::Util::TiedOpInterface::kUntiedIndex);

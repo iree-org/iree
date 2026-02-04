@@ -64,7 +64,7 @@ iree_cc_library(
     ::file_handle
     iree::base
     iree::base::internal
-    iree::base::internal::synchronization
+    iree::base::threading
   PUBLIC
 )
 

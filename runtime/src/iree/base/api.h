@@ -83,6 +83,7 @@
 #include "iree/base/assert.h"          // IWYU pragma: export
 #include "iree/base/attributes.h"      // IWYU pragma: export
 #include "iree/base/bitfield.h"        // IWYU pragma: export
+#include "iree/base/bitmap.h"          // IWYU pragma: export
 #include "iree/base/config.h"          // IWYU pragma: export
 #include "iree/base/loop.h"            // IWYU pragma: export
 #include "iree/base/loop_inline.h"     // IWYU pragma: export

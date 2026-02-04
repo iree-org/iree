@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_THREADING_IMPL_H_
-#define IREE_BASE_INTERNAL_THREADING_IMPL_H_
+#ifndef IREE_BASE_THREADING_THREAD_IMPL_H_
+#define IREE_BASE_THREADING_THREAD_IMPL_H_
 
 // Ensure that any posix header we include exposes GNU stuff. Ignored on
 // platforms where we either don't have the GNU stuff or don't have posix
@@ -25,8 +25,8 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/thread.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,4 +73,4 @@ void iree_thread_override_remove_self(iree_thread_override_t* override);
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_INTERNAL_THREADING_IMPL_H_
+#endif  // IREE_BASE_THREADING_THREAD_IMPL_H_

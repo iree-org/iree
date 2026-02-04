@@ -11,8 +11,8 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//

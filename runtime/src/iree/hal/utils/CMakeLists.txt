@@ -49,7 +49,7 @@ iree_cc_library(
     "caching_allocator.c"
   DEPS
     iree::base
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
   PUBLIC
 )
@@ -119,7 +119,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
     iree::io::file_handle
   PUBLIC
@@ -263,7 +263,7 @@ iree_cc_library(
     "semaphore_base.c"
   DEPS
     iree::base
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
   PUBLIC
 )
@@ -277,6 +277,7 @@ iree_cc_test(
     ::semaphore_base
     iree::base
     iree::base::internal::wait_handle
+    iree::base::threading
     iree::hal
     iree::testing::gtest
     iree::testing::gtest_main
@@ -292,7 +293,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::arena
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
   PUBLIC
 )
@@ -314,8 +315,8 @@ iree_cc_library(
     ::semaphore_base
     iree::base
     iree::base::internal::arena
-    iree::base::internal::synchronization
-    iree::base::internal::threading
+    iree::base::threading
+    iree::base::threading::thread
     iree::hal
   PUBLIC
 )
@@ -330,8 +331,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::synchronization
-    iree::base::internal::threading
+    iree::base::threading::thread
     iree::hal
   PUBLIC
 )

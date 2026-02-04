@@ -70,7 +70,7 @@ CONFIGURATIONS
     --config=tsan            Thread Sanitizer
 
 SEE ALSO
-    iree-bazel-build, iree-bazel-test, iree-bazel-query
+    iree-bazel-build, iree-bazel-test, iree-bazel-query, iree-bazel-cquery
 EOF
 }
 

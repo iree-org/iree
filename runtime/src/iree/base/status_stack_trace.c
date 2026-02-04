@@ -82,8 +82,8 @@ static iree_host_size_t IREE_PRINTF_ATTRIBUTE(4, 5)
 #if defined(IREE_USE_LIBBACKTRACE)
 
 // pthread_once is used for thread-safe one-time initialization.
-// We inline it here rather than using iree/base/internal/call_once.h because:
-// 1. The :synchronization target has a circular dependency with :base.
+// We inline it here rather than using iree/base/threading/call_once.h because:
+// 1. The :threading target has a circular dependency with :base.
 // 2. Bare metal builds may not have pthreads, but libbacktrace requires it.
 #include <pthread.h>
 

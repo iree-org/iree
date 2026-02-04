@@ -111,7 +111,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal::flags
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
     iree::hal::drivers
     iree::hal::utils::allocators

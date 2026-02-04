@@ -36,6 +36,16 @@ ARGUMENTS
     query          Bazel query expression (required)
     bazel-args     Additional arguments passed to bazel query
 
+DESCRIPTION
+    Queries the IREE build graph before configuration. Use this for:
+
+    - Finding all targets matching a pattern
+    - Exploring the dependency structure
+    - Fast queries that don't need build configuration
+
+    For configuration-aware queries (resolved select(), actual build
+    targets), use iree-bazel-cquery instead.
+
 EXAMPLES
     iree-bazel-query //tools:iree-compile           # Show target
     iree-bazel-query '//tools/...'                  # List all tools
@@ -61,7 +71,7 @@ OUTPUT OPTIONS
     --noimplicit_deps      Exclude implicit dependencies
 
 SEE ALSO
-    iree-bazel-build, iree-bazel-test, iree-bazel-run
+    iree-bazel-cquery, iree-bazel-build, iree-bazel-test, iree-bazel-run
     https://bazel.build/query/guide
 EOF
 }

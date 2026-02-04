@@ -38,6 +38,24 @@ util.func public @conv_2d_chwn_chwf_large(%arg0: tensor<16x227x227x16xf32>, %arg
 
 // -----
 
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d3, d1 + d5, d2 + d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d0, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @conv_2d_cnhw_cfhw_large(%arg0: tensor<16x16x227x227xf32>, %arg1: tensor<16x64x225x225xf32>, %arg2: tensor<64x3x3x16xf32>) -> tensor<64x3x3x16xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x16x227x227xf32>, tensor<16x64x225x225xf32>) outs(%arg2 : tensor<64x3x3x16xf32>) {
+  ^bb0(%in: f32, %in_3: f32, %out: f32):
+    %12 = arith.mulf %in, %in_3 : f32
+    %13 = arith.addf %out, %12 : f32
+    linalg.yield %13 : f32
+  } -> tensor<64x3x3x16xf32>
+  util.return %0 : tensor<64x3x3x16xf32>
+}
+
+// CHECK-LABEL: @conv_2d_cnhw_cfhw_large
+//       CHECK: iree_linalg_ext.split_reduction = [1 : index, 45 : index, 225 : index]
+
+// -----
+
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>

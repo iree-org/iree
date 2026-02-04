@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_THREADING_H_
-#define IREE_BASE_INTERNAL_THREADING_H_
+#ifndef IREE_BASE_THREADING_THREAD_H_
+#define IREE_BASE_THREADING_THREAD_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -112,7 +112,8 @@ typedef struct iree_thread_affinity_t {
 } iree_thread_affinity_t;
 
 // Sets |out_thread_affinity| to match with any processor in the system.
-void iree_thread_affinity_set_any(iree_thread_affinity_t* out_thread_affinity);
+IREE_API_EXPORT void iree_thread_affinity_set_any(
+    iree_thread_affinity_t* out_thread_affinity);
 
 // Returns true if |thread_affinity| does not specify any particular processor.
 static inline bool iree_thread_affinity_is_unspecified(
@@ -123,7 +124,7 @@ static inline bool iree_thread_affinity_is_unspecified(
 // Sets |out_thread_affinity| to match all processors associated with the given
 // processor group (aka NUMA node ID). Any processor within the group may be
 // selected by the platform.
-void iree_thread_affinity_set_group_any(
+IREE_API_EXPORT void iree_thread_affinity_set_group_any(
     uint32_t group, iree_thread_affinity_t* out_thread_affinity);
 
 // Thread creation parameters.
@@ -168,19 +169,19 @@ typedef int (*iree_thread_entry_t)(void* entry_arg);
 //
 // |entry_arg| lifetime is not managed and unless the caller is waiting for the
 // thread to start must not be stack-allocated.
-iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
-                                 iree_thread_create_params_t params,
-                                 iree_allocator_t allocator,
-                                 iree_thread_t** out_thread);
+IREE_API_EXPORT iree_status_t
+iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
+                   iree_thread_create_params_t params,
+                   iree_allocator_t allocator, iree_thread_t** out_thread);
 
 // Retains the given |thread| for the caller.
-void iree_thread_retain(iree_thread_t* thread);
+IREE_API_EXPORT void iree_thread_retain(iree_thread_t* thread);
 
 // Releases the given |thread| from the caller.
-void iree_thread_release(iree_thread_t* thread);
+IREE_API_EXPORT void iree_thread_release(iree_thread_t* thread);
 
 // Returns a platform-defined thread ID for the given |thread|.
-uintptr_t iree_thread_id(iree_thread_t* thread);
+IREE_API_EXPORT uintptr_t iree_thread_id(iree_thread_t* thread);
 
 typedef struct iree_thread_override_t iree_thread_override_t;
 
@@ -193,12 +194,14 @@ typedef struct iree_thread_override_t iree_thread_override_t;
 // non-deterministically return NULL and callers must gracefully handle that.
 // It's safe to pass NULL to iree_thread_override_end and in most cases as
 // callers aren't checking the returned value they won't notice.
-iree_thread_override_t* iree_thread_priority_class_override_begin(
+IREE_API_EXPORT iree_thread_override_t*
+iree_thread_priority_class_override_begin(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class);
 
 // Ends a priority class override that was began for a thread with
 // iree_thread_priority_class_override_begin.
-void iree_thread_override_end(iree_thread_override_t* override_token);
+IREE_API_EXPORT void iree_thread_override_end(
+    iree_thread_override_t* override_token);
 
 // Updates the thread affinity of the given |thread|.
 // Affinities are not sticky and may need to be refreshed over time as CPUs are
@@ -217,20 +220,20 @@ void iree_thread_override_end(iree_thread_override_t* override_token);
 // that trying to get clever with several thread sets with overlapping
 // affinities will likely not work as expected. Try to stick with threads that
 // run only on a single processor.
-void iree_thread_request_affinity(iree_thread_t* thread,
-                                  iree_thread_affinity_t affinity);
+IREE_API_EXPORT void iree_thread_request_affinity(
+    iree_thread_t* thread, iree_thread_affinity_t affinity);
 
 // Resumes |thread| if it was created suspended.
 // This has no effect if the thread is not suspended.
-void iree_thread_resume(iree_thread_t* thread);
+IREE_API_EXPORT void iree_thread_resume(iree_thread_t* thread);
 
 // Blocks the current thread until |thread| has finished its execution.
-void iree_thread_join(iree_thread_t* thread);
+IREE_API_EXPORT void iree_thread_join(iree_thread_t* thread);
 
-void iree_thread_yield(void);
+IREE_API_EXPORT void iree_thread_yield(void);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_INTERNAL_THREADING_H_
+#endif  // IREE_BASE_THREADING_THREAD_H_

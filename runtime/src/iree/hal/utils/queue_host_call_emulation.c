@@ -8,7 +8,7 @@
 
 #if IREE_THREADING_ENABLE
 
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
 //===----------------------------------------------------------------------===//
 // Emulated Host Call

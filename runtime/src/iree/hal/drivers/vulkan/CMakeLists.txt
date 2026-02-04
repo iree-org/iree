@@ -67,7 +67,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
-    iree::base::internal::synchronization
+    iree::base::threading
     iree::hal
     iree::hal::drivers::vulkan::builtin
     iree::hal::drivers::vulkan::util::arena

@@ -10,7 +10,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/thread.h"
 
 void iree_task_scope_initialize(iree_string_view_t name,
                                 iree_task_scope_flags_t flags,

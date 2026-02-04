@@ -29,6 +29,36 @@ static bool isIterationCarriedArg(OpOperand &arg, linalg::GenericOp op) {
   return op.isDpsInit(inputOperand);
 }
 
+/// Returns true if the operation needs to be padded to align its iteration
+/// domain to the given `padMultiples`. Padding is needed when:
+///   - A dimension size is dynamic (not statically known), or
+///   - A dimension size is not evenly divisible by its corresponding multiple.
+/// A pad multiple of 0 indicates that no padding is required for that
+/// dimension.
+static bool isPaddingNeeded(OpBuilder &b, TilingInterface op,
+                            ArrayRef<OpFoldResult> padMultiples) {
+  SmallVector<Range> iterationDomain = op.getIterationDomain(b);
+  assert(iterationDomain.size() == padMultiples.size() &&
+         "expected padMultiples to match the number of iteration dimensions");
+
+  for (auto [range, padMultiple] :
+       llvm::zip_equal(iterationDomain, padMultiples)) {
+    std::optional<int64_t> padSize = getConstantIntValue(padMultiple);
+    if (!padSize || *padSize == 0) {
+      continue;
+    }
+    std::optional<int64_t> dimSize = getConstantIntValue(range.size);
+    if (!dimSize) {
+      // Dynamic dimension - assume padding is needed.
+      return true;
+    }
+    if (*dimSize % *padSize != 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static FailureOr<linalg::PadTilingInterfaceResult>
 maskTilingInterfaceOp(OpBuilder &b, Operation *op,
                       ArrayRef<OpFoldResult> padMultiples) {
@@ -221,12 +251,19 @@ struct OnlineAttentionOpInterface final
   getMaskedImplementation(Operation *op, OpBuilder &builder,
                           ArrayRef<OpFoldResult> padMultiples) const {
     auto onlineAttentionOp = cast<IREE::LinalgExt::OnlineAttentionOp>(op);
-    if (!onlineAttentionOp.getMask()) {
+
+    // Check if padding is actually needed. If all dimensions are already
+    // aligned to the pad multiples, we can skip padding entirely.
+    auto tilingOp = cast<TilingInterface>(op);
+    bool needsPadding = isPaddingNeeded(builder, tilingOp, padMultiples);
+    if (needsPadding && !onlineAttentionOp.getMask()) {
       op->emitError(
           "Padding OnlineAttention without existing mask is not yet supported");
       return failure();
     }
-
+    if (!needsPadding) {
+      return failure();
+    }
     FailureOr<linalg::PadTilingInterfaceResult> result =
         maskTilingInterfaceOp(builder, op, padMultiples);
     if (failed(result)) {

@@ -8,7 +8,7 @@
 #define IREE_HAL_DRIVERS_AMDGPU_SEMAPHORE_POOL_H_
 
 #include "iree/base/api.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/amdgpu/semaphore.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"

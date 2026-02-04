@@ -98,28 +98,9 @@ static iree_status_t iree_string_view_join(iree_host_size_t part_count,
   return iree_ok_status();
 }
 
-static iree_host_size_t iree_file_path_canonicalize_unix(
-    char* path, iree_host_size_t path_length) {
-  char* p = path;
-  iree_host_size_t new_length = path_length;
-
-  // Replace `//` with `/`.
-  if (new_length > 1) {
-    for (iree_host_size_t i = 0; i < new_length - 1; ++i) {
-      if (p[i] == '/' && p[i + 1] == '/') {
-        memmove(&p[i + 1], &p[i + 2], new_length - i - 2);
-        --new_length;
-        --i;
-      }
-    }
-  }
-
-  path[new_length] = 0;  // NUL
-  return new_length;
-}
-
-static iree_host_size_t iree_file_path_canonicalize_win32(
-    char* path, iree_host_size_t path_length) {
+#if defined(IREE_PLATFORM_WINDOWS)
+iree_host_size_t iree_file_path_canonicalize(char* path,
+                                             iree_host_size_t path_length) {
   char* p = path;
   iree_host_size_t new_length = path_length;
 
@@ -142,15 +123,27 @@ static iree_host_size_t iree_file_path_canonicalize_win32(
   path[new_length] = 0;  // NUL
   return new_length;
 }
-
+#else
 iree_host_size_t iree_file_path_canonicalize(char* path,
                                              iree_host_size_t path_length) {
-#if defined(IREE_PLATFORM_WINDOWS)
-  return iree_file_path_canonicalize_win32(path, path_length);
-#else
-  return iree_file_path_canonicalize_unix(path, path_length);
-#endif  // IREE_PLATFORM_WINDOWS
+  char* p = path;
+  iree_host_size_t new_length = path_length;
+
+  // Replace `//` with `/`.
+  if (new_length > 1) {
+    for (iree_host_size_t i = 0; i < new_length - 1; ++i) {
+      if (p[i] == '/' && p[i + 1] == '/') {
+        memmove(&p[i + 1], &p[i + 2], new_length - i - 2);
+        --new_length;
+        --i;
+      }
+    }
+  }
+
+  path[new_length] = 0;  // NUL
+  return new_length;
 }
+#endif  // IREE_PLATFORM_WINDOWS
 
 iree_status_t iree_file_path_join(iree_string_view_t lhs,
                                   iree_string_view_t rhs,

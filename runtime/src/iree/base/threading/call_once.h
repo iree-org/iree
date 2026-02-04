@@ -4,8 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_CALL_ONCE_H_
-#define IREE_BASE_INTERNAL_CALL_ONCE_H_
+// One-time initialization primitive.
+//
+// Emulates the C11 call_once feature since few compilers/platforms have it.
+// https://en.cppreference.com/w/c/thread/call_once
+//
+// Usage:
+//   static iree_once_flag init_flag = IREE_ONCE_FLAG_INIT;
+//   static void initialize_subsystem(void) { ... }
+//   void use_subsystem(void) {
+//     iree_call_once(&init_flag, initialize_subsystem);
+//     // Subsystem is now guaranteed to be initialized.
+//   }
+
+#ifndef IREE_BASE_THREADING_CALL_ONCE_H_
+#define IREE_BASE_THREADING_CALL_ONCE_H_
 
 #include <stddef.h>
 
@@ -18,8 +31,6 @@ extern "C" {
 //==============================================================================
 // iree_call_once
 //==============================================================================
-// Emulates the C11 call_once feature as few seem to have it.
-// https://en.cppreference.com/w/c/thread/call_once
 
 #if defined(__has_include)
 #if __has_include(<thread.h>)
@@ -105,4 +116,4 @@ static inline void iree_call_once(iree_once_flag* flag, void (*func)(void)) {
 }  // extern "C"
 #endif
 
-#endif  // IREE_BASE_INTERNAL_CALL_ONCE_H_
+#endif  // IREE_BASE_THREADING_CALL_ONCE_H_

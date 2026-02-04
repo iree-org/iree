@@ -17,7 +17,7 @@
 
 #include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -222,8 +222,8 @@ bool iree_atomic_slist_flush(iree_atomic_slist_t* list,
   static inline void name##_slist_push(name##_slist_t* list, type* entry) {    \
     iree_atomic_slist_push(&list->impl, name##_slist_entry_from_ptr(entry));   \
   }                                                                            \
-  static inline void name##_slist_push_unsafe(name##_slist_t* list,            \
-                                              type* entry) {                   \
+  IREE_ATTRIBUTE_UNUSED static inline void name##_slist_push_unsafe(           \
+      name##_slist_t* list, type* entry) {                                     \
     iree_atomic_slist_push_unsafe(&list->impl,                                 \
                                   name##_slist_entry_from_ptr(entry));         \
   }                                                                            \
