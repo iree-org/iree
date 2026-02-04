@@ -242,4 +242,141 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasVerifier = 1;
 }
 
+def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
+  Pure,
+  AttrSizedOperandSegments
+]> {
+  let summary = "Vectorized arg-reduction using a user-defined comparator.";
+  let description = [{
+    The `iree_vector_ext.arg_compare` op is the vectorized form of
+    `iree_linalg_ext.arg_compare`. It performs a reduction over a given
+    dimension of a vector, returning both the selected value and its
+    corresponding index.
+
+    This operation is created by vectorizing `iree_linalg_ext.arg_compare`
+    through the GenericVectorizationPass. It wraps the operation with
+    vector.transfer_read/write but keeps the core reduction semantics intact.
+
+    The comparator region defines the selection rule (e.g., "greater than"
+    for argmax or "less than" for argmin).
+
+    Example (implicit-index mode - argmax over dim 1):
+    ```mlir
+    %input_vec = vector<4x128xf32>
+    %out_val_vec = vector<4xf32>
+    %out_idx_vec = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input_vec : vector<4x128xf32>)
+      outs(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    Example (explicit-index mode):
+    ```mlir
+    %partial_vals = vector<4x32xf32>
+    %partial_idxs = vector<4x32xi32>
+    %out_val = vector<4xf32>
+    %out_idx = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : vector<4x32xf32>, vector<4x32xi32>)
+      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    The `index_base` is optional and is preserved from the tensor version
+    when applicable.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyVectorOfAnyRank>:$inputs,
+    Variadic<AnyVectorOfAnyRank>:$outputs,
+    Optional<Index>:$index_base,
+    I64Attr:$dimension
+  );
+
+  let results = (outs
+    Variadic<AnyVectorOfAnyRank>:$results
+  );
+
+  let regions = (region SizedRegion<1>:$region);
+
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    Value getInputValue() {
+      return getInputs()[0];
+    }
+
+    bool hasExplicitIndexInput() {
+      return getInputs().size() == 2;
+    }
+
+    Value getInputIndex() {
+      if (!hasExplicitIndexInput()) {
+        return nullptr;
+      }
+      return getInputs()[1];
+    }
+
+    Value getOutputValue() {
+      return getOutputs()[0];
+    }
+
+    Value getOutputIndex() {
+      return getOutputs()[1];
+    }
+
+    VectorType getInputType() {
+      return cast<VectorType>(getInputValue().getType());
+    }
+
+    VectorType getOutputValueType() {
+      return cast<VectorType>(getOutputValue().getType());
+    }
+
+    VectorType getOutputIndexType() {
+      return cast<VectorType>(getOutputIndex().getType());
+    }
+
+    VectorType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<VectorType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    Type getInputIndexElementType() {
+      if (VectorType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getOutputIndexElementType() {
+      return getOutputIndexType().getElementType();
+    }
+
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+  }];
+
+  let hasVerifier = 1;
+}
+
 #endif  // IREE_DIALECT_VECTOREXT_OPS

@@ -682,6 +682,173 @@ Type TransferGatherOp::getExpectedMaskType() {
   return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
 
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgCompareOp::verify() {
+  Operation *op = getOperation();
+
+  unsigned numInputs = llvm::size(getInputs());
+  if (numInputs != 1 && numInputs != 2) {
+    return op->emitOpError("expected 1 or 2 input operands, but got ")
+           << numInputs;
+  }
+
+  unsigned numOutputs = llvm::size(getOutputs());
+  if (numOutputs != 2) {
+    return op->emitOpError("expected 2 output operands, but got ")
+           << numOutputs;
+  }
+
+  unsigned numResults = llvm::size(getResults());
+  if (numResults != 2) {
+    return op->emitOpError("expected 2 results, but got ") << numResults;
+  }
+
+  VectorType inputType = getInputType();
+  VectorType outputValueType = getOutputValueType();
+  VectorType outputIndexType = getOutputIndexType();
+
+  int64_t inputRank = inputType.getRank();
+  int64_t outputValueRank = outputValueType.getRank();
+  int64_t outputIndexRank = outputIndexType.getRank();
+  int64_t dimension = getDimension();
+
+  if (dimension < 0 || dimension >= inputRank) {
+    return op->emitOpError("dimension ")
+           << dimension << " is out of range [0, " << inputRank << ")";
+  }
+
+  if (outputValueRank != inputRank - 1) {
+    return op->emitOpError("output value rank (")
+           << outputValueRank << ") should be input rank - 1 (" << inputRank
+           << " - 1)";
+  }
+
+  if (outputIndexRank != inputRank - 1) {
+    return op->emitOpError("output index rank (")
+           << outputIndexRank << ") should be input rank - 1 (" << inputRank
+           << " - 1)";
+  }
+
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i != dimension) {
+      expectedShape.push_back(inputType.getDimSize(i));
+    }
+  }
+
+  ArrayRef<int64_t> outputValueShape = outputValueType.getShape();
+  if (!llvm::equal(expectedShape, outputValueShape)) {
+    return op->emitOpError(
+               "output value shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(outputValueShape);
+  }
+
+  ArrayRef<int64_t> outputIndexShape = outputIndexType.getShape();
+  if (!llvm::equal(expectedShape, outputIndexShape)) {
+    return op->emitOpError(
+               "output index shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(outputIndexShape);
+  }
+
+  Type inputElementType = inputType.getElementType();
+  Type outputValueElementType = outputValueType.getElementType();
+
+  if (inputElementType != outputValueElementType) {
+    return op->emitOpError("input and output value element types must match. ")
+           << "Input type: " << inputElementType
+           << ", output value type: " << outputValueElementType;
+  }
+
+  Type outputIndexElementType = getOutputIndexElementType();
+  if (!isa<IntegerType, IndexType>(outputIndexElementType)) {
+    return op->emitOpError(
+               "output index must have integer or index element type, but got ")
+           << outputIndexElementType;
+  }
+
+  if (hasExplicitIndexInput()) {
+    VectorType inputIndexType = getInputIndexType();
+    ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
+    if (inputIndexShape != inputShape) {
+      return op->emitOpError(
+                 "explicit-index mode: value and index inputs must have the "
+                 "same shape. ")
+             << "Value shape: " << llvm::interleaved_array(inputShape)
+             << ", index shape: " << llvm::interleaved_array(inputIndexShape);
+    }
+
+    Type inputIndexElementType = getInputIndexElementType();
+    if (!isa<IntegerType, IndexType>(inputIndexElementType)) {
+      return op->emitOpError("explicit-index mode: index input must have "
+                             "integer or index element type, but got ")
+             << inputIndexElementType;
+    }
+
+    if (inputIndexElementType != outputIndexElementType) {
+      return op->emitOpError(
+                 "explicit-index mode: input and output index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexElementType
+             << ", output index type: " << outputIndexElementType;
+    }
+
+    if (getIndexBase()) {
+      return op->emitOpError(
+          "index_base must not be used with explicit indices");
+    }
+  }
+
+  Region &comparator = getRegion();
+  if (comparator.getNumArguments() != 2) {
+    return op->emitOpError("comparator region must have exactly 2 arguments");
+  }
+
+  Type arg0Type = comparator.getArgument(0).getType();
+  Type arg1Type = comparator.getArgument(1).getType();
+
+  if (arg0Type != inputElementType || arg1Type != inputElementType) {
+    return op->emitOpError(
+               "comparator arguments must match input value element type. ")
+           << "Expected: " << inputElementType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  Block &block = comparator.front();
+  Operation *terminator = block.getTerminator();
+
+  unsigned numYieldOperands = terminator->getNumOperands();
+  if (numYieldOperands != 1) {
+    return op->emitOpError(
+               "expected comparator region to yield 1 operand, but got ")
+           << numYieldOperands;
+  }
+
+  Type yieldType = terminator->getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return op->emitOpError("comparator region must yield i1, but got ")
+           << yieldType;
+  }
+
+  TypeRange resultTypes = getResultTypes();
+  if (resultTypes[0] != outputValueType) {
+    return op->emitOpError("result type 0 doesn't match output value type");
+  }
+
+  if (resultTypes[1] != outputIndexType) {
+    return op->emitOpError("result type 1 doesn't match output index type");
+  }
+
+  return success();
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep

@@ -189,3 +189,92 @@ func.func @transfer_gather(%indices: vector<128xindex>,
 // CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, None], %[[PAD]] {indexed_maps = [#[[$MAP1]]]} : tensor<4096x64xf16>, vector<128x64xf16>
 // CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, %[[INDICES1]]: vector<64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP1]], #[[$MAP0]]]} : tensor<4096x64xf16>, vector<128x64xf16>
 // CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][None, %[[INDICES2]]: vector<128x64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP2]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_implicit_index
+func.func @arg_compare_implicit_index(%input: vector<4x128xf32>,
+                                      %out_val: vector<4xf32>,
+                                      %out_idx: vector<4xi32>)
+    -> (vector<4xf32>, vector<4xi32>) {
+  // CHECK: iree_vector_ext.arg_compare
+  // CHECK-SAME: dimension(1)
+  // CHECK-SAME: ins(%{{.*}} : vector<4x128xf32>)
+  // CHECK-SAME: outs(%{{.*}}, %{{.*}} : vector<4xf32>, vector<4xi32>)
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_explicit_index
+func.func @arg_compare_explicit_index(%input_val: vector<4x32xf32>,
+                                      %input_idx: vector<4x32xi32>,
+                                      %out_val: vector<4xf32>,
+                                      %out_idx: vector<4xi32>)
+    -> (vector<4xf32>, vector<4xi32>) {
+  // CHECK: iree_vector_ext.arg_compare
+  // CHECK-SAME: dimension(1)
+  // CHECK-SAME: ins(%{{.*}}, %{{.*}} : vector<4x32xf32>, vector<4x32xi32>)
+  // CHECK-SAME: outs(%{{.*}}, %{{.*}} : vector<4xf32>, vector<4xi32>)
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input_val, %input_idx : vector<4x32xf32>, vector<4x32xi32>)
+      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_with_index_base
+func.func @arg_compare_with_index_base(%input: vector<4x128xf32>,
+                                       %out_val: vector<4xf32>,
+                                       %out_idx: vector<4xi32>,
+                                       %base: index)
+    -> (vector<4xf32>, vector<4xi32>) {
+  // CHECK: iree_vector_ext.arg_compare
+  // CHECK-SAME: index_base(%{{.*}} : index)
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>)
+      index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func @arg_compare_1d_to_0d
+func.func @arg_compare_1d_to_0d(%input: vector<128xf32>,
+                                %out_val: vector<f32>,
+                                %out_idx: vector<i32>)
+    -> (vector<f32>, vector<i32>) {
+  // CHECK: iree_vector_ext.arg_compare
+  // CHECK-SAME: dimension(0)
+  // CHECK-SAME: ins(%{{.*}} : vector<128xf32>)
+  // CHECK-SAME: outs(%{{.*}}, %{{.*}} : vector<f32>, vector<i32>)
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(0)
+      ins(%input : vector<128xf32>)
+      outs(%out_val, %out_idx : vector<f32>, vector<i32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> vector<f32>, vector<i32>
+  return %result#0, %result#1 : vector<f32>, vector<i32>
+}
