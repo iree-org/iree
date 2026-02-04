@@ -568,11 +568,39 @@ module @bitcast_f32_i32 {
 
 // -----
 
-// expected-error@+1 {{conversion to vm.module failed}}
+// Both f16 and bf16 convert to i32 in VM, so bitcast is a no-op.
+// CHECK-LABEL: @bitcast_f16_bf16
 module @bitcast_f16_bf16 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
   func.func @fn(%arg0: f16) -> bf16 {
-    // expected-error@+1 {{failed to legalize}}
+    // CHECK: vm.return %[[ARG0]] : i32
     %0 = arith.bitcast %arg0 : f16 to bf16
     return %0 : bf16
+  }
+}
+
+// -----
+
+// Both f8E5M2FNUZ and i8 convert to i32 in VM, so bitcast is a no-op.
+// CHECK-LABEL: @bitcast_f8_i8
+module @bitcast_f8_i8 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: f8E5M2FNUZ) -> i8 {
+    // CHECK: vm.return %[[ARG0]] : i32
+    %0 = arith.bitcast %arg0 : f8E5M2FNUZ to i8
+    return %0 : i8
+  }
+}
+
+// -----
+
+// Both i8 and f8E5M2FNUZ convert to i32 in VM, so bitcast is a no-op.
+// CHECK-LABEL: @bitcast_i8_f8
+module @bitcast_i8_f8 {
+  // CHECK: vm.func private @fn(%[[ARG0:.+]]: i32)
+  func.func @fn(%arg0: i8) -> f8E5M2FNUZ {
+    // CHECK: vm.return %[[ARG0]] : i32
+    %0 = arith.bitcast %arg0 : i8 to f8E5M2FNUZ
+    return %0 : f8E5M2FNUZ
   }
 }
