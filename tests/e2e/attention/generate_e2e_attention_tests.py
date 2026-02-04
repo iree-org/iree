@@ -252,7 +252,7 @@ def generate_function(
     func_definition = ""
 
     if use_mask:
-        # Function with mask parameter
+        # Function with mask parameter.
         signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {mask_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
         import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %mask: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
         func_definition = func_definition + (
@@ -275,7 +275,7 @@ def generate_function(
             f"}}\n"
         )
     else:
-        # Function without mask
+        # Function without mask.
         signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
         import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
         func_definition = func_definition + (
@@ -369,7 +369,7 @@ def generate_causal_mask_values(batch: int, m: int, k2: int) -> list:
 
 
 # Generate all-ones mask as i8 tensor for shape [batch, m, k2]
-# All positions can attend to all positions
+# All positions can attend to all positions.
 def generate_all_ones_mask_values(batch: int, m: int, k2: int) -> list:
     return [1] * (batch * m * k2)
 
@@ -412,7 +412,7 @@ def generate_call(
     if use_mask:
         batch, m, k2 = mask_shape
         mask_size = batch * m * k2
-        # Generate mask as i8, then convert to i1 for attention op
+        # Generate mask as i8, then convert to i1 for attention op.
         if mask_type == MaskType.ALL_ONES:
             mask_values = generate_all_ones_mask_values(batch, m, k2)
         elif mask_type == MaskType.CAUSAL:
@@ -463,7 +463,7 @@ def generate_call(
     )
 
     if use_mask:
-        # Export mask as i8 for the reference implementation
+        # Export mask as i8 for the reference implementation.
         op = op + (
             f"  %mask_i8_export = hal.tensor.export %mask_i8_reshaped : tensor<{batch}x{m}x{k2}xi8> -> !hal.buffer_view\n"
             f"  call @attention_test.check_attention_results_with_mask(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %mask_i8_export, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
