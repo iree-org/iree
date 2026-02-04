@@ -34,7 +34,6 @@ iree_cc_library(
     LLVMSupport
     MLIRBytecodeWriter
     MLIRIR
-    MLIRPDLDialect
     MLIRParser
     MLIRSupport
     MLIRTransformDialect

@@ -52,23 +52,18 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransforms
-    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
-    MLIRBufferizationDialect
     MLIRComplexDialect
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
-    MLIRLinalgStructuredOpsIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
@@ -77,7 +72,6 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTensorUtils
     MLIRTilingInterface
-    MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface

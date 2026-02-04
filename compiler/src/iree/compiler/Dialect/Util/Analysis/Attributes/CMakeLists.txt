@@ -21,12 +21,10 @@ iree_cc_library(
     "Range.cpp"
   DEPS
     LLVMSupport
-    MLIRAnalysis
     MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect
-    MLIRPass
     MLIRSupport
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
