@@ -730,7 +730,8 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
     %config_name = pdl.attribute = "compilation_info"
     %config = pdl.attribute = #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{
-        workgroup = [1, 1, 0]
+        workgroup = [1, 1, 0],
+        workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
@@ -786,7 +787,8 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
     %config_name = pdl.attribute = "compilation_info"
     %config = pdl.attribute = #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{
-        workgroup = [1, 1, 0]
+        workgroup = [1, 1, 0],
+        workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
@@ -842,7 +844,8 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
     %config_name = pdl.attribute = "compilation_info"
     %config = pdl.attribute = #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{
-        workgroup = [1, 1, 0]
+        workgroup = [1, 1, 0],
+        workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
