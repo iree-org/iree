@@ -311,3 +311,94 @@ func.func @conv_with_batch_not_transformed(%input: tensor<1x16x16x4xf32>, %filte
 // CHECK:       %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
 // CHECK:       return %[[RESULT]]
+
+// -----
+
+// Test reshape propagation.
+
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0 + d3, d1 + d4, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+func.func @reshape_propagation_fill_conv_elem(%input: tensor<16x16x4xf32>, %filter: tensor<3x3x4x16xf32>) -> tensor<14x14x16xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<14x14x16xf32>
+
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<14x14x16xf32>) -> tensor<14x14x16xf32>
+
+  %conv = linalg.generic {
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
+  } ins(%input, %filter : tensor<16x16x4xf32>, tensor<3x3x4x16xf32>)
+    outs(%fill : tensor<14x14x16xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<14x14x16xf32>
+
+  %elem = linalg.generic {
+    indexing_maps = [#map3, #map3],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%conv : tensor<14x14x16xf32>)
+    outs(%empty : tensor<14x14x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %zero = arith.constant 0.000000e+00 : f32
+    %relu = arith.maximumf %in, %zero : f32
+    linalg.yield %relu : f32
+  } -> tensor<14x14x16xf32>
+
+  return %elem : tensor<14x14x16xf32>
+}
+
+// CHECK-LABEL: func.func @reshape_propagation_fill_conv_elem
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<16x16x4xf32>
+// CHECK-SAME:    %[[FILTER:[a-zA-Z0-9]+]]: tensor<3x3x4x16xf32>
+// CHECK:       %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:    outs({{.*}} : tensor<1x14x14x16xf32>)
+// CHECK:       %[[EXPANDED_INPUT:.+]] = tensor.expand_shape %[[INPUT]] {{\[}}[0, 1], [2], [3]{{\]}}
+// CHECK-SAME:    : tensor<16x16x4xf32> into tensor<1x16x16x4xf32>
+// CHECK:       %[[CONV:.+]] = linalg.generic
+// CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
+// CHECK-SAME:    ins(%[[EXPANDED_INPUT]], %[[FILTER]] : tensor<1x16x16x4xf32>, tensor<3x3x4x16xf32>)
+// CHECK-SAME:    outs(%[[FILL]] : tensor<1x14x14x16xf32>)
+// CHECK:       %[[ELEM:.+]] = linalg.generic
+// CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:    ins(%[[CONV]] : tensor<1x14x14x16xf32>)
+// CHECK:       %[[RESULT:.+]] = tensor.collapse_shape %[[ELEM]] {{\[}}[0, 1], [2], [3]{{\]}}
+// CHECK-SAME:    : tensor<1x14x14x16xf32> into tensor<14x14x16xf32>
+// CHECK:       return %[[RESULT]] : tensor<14x14x16xf32>
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0 + d4, d1 + d5, d2 + d6, d7)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d4, d5, d6, d7, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>
+
+func.func @batchless_conv_3d_ndhwc_dhwcf(%input: tensor<10x10x10x4xf32>, %filter: tensor<3x3x3x4x8xf32>, %output: tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
+  } ins(%input, %filter : tensor<10x10x10x4xf32>, tensor<3x3x3x4x8xf32>)
+    outs(%output : tensor<8x8x8x8xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<8x8x8x8xf32>
+  return %0 : tensor<8x8x8x8xf32>
+}
+
+// CHECK-LABEL: func.func @batchless_conv_3d_ndhwc_dhwcf
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<10x10x10x4xf32>
+// CHECK-SAME:    %[[FILTER:[a-zA-Z0-9]+]]: tensor<3x3x3x4x8xf32>
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]: tensor<8x8x8x8xf32>
+// CHECK:       %[[EXPANDED_INPUT:.+]] = tensor.expand_shape %[[INPUT]] {{\[}}[0, 1], [2], [3], [4]{{\]}} output_shape [1, 10, 10, 10, 4] : tensor<10x10x10x4xf32> into tensor<1x10x10x10x4xf32>
+// CHECK:       %[[EXPANDED_OUTPUT:.+]] = tensor.expand_shape %[[OUTPUT]] {{\[}}[0, 1], [2], [3], [4]{{\]}} output_shape [1, 8, 8, 8, 8] : tensor<8x8x8x8xf32> into tensor<1x8x8x8x8xf32>
+// CHECK:       %[[CONV:.+]] = linalg.generic
+// CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
+// CHECK-SAME:    ins(%[[EXPANDED_INPUT]], %[[FILTER]] : tensor<1x10x10x10x4xf32>, tensor<3x3x3x4x8xf32>)
+// CHECK-SAME:    outs(%[[EXPANDED_OUTPUT]] : tensor<1x8x8x8x8xf32>)
+// CHECK:       %[[RESULT:.+]] = tensor.collapse_shape %[[CONV]] {{\[}}[0, 1], [2], [3], [4]{{\]}} : tensor<1x8x8x8x8xf32> into tensor<8x8x8x8xf32>
+// CHECK:       return %[[RESULT]] : tensor<8x8x8x8xf32>
