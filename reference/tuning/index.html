@@ -5128,10 +5128,18 @@ flags:</p>
 <ul>
 <li><code>--iree-codegen-enable-default-tuning-specs</code> -- enables or disables the
   default tuning specs shipped with the compiler.</li>
-<li><code>--iree-codegen-tuning-spec-path</code> -- loads a user-specified tuning spec.</li>
+<li><code>--iree-codegen-tuning-spec-path</code> -- loads a user-specified tuning spec.
+  Accepts both MLIR text (<code>.mlir</code>) and bytecode (<code>.mlirbc</code>) formats.</li>
 <li><code>--iree-codegen-dump-tuning-specs-to</code> -- dumps final tuning specs to a
   directory or standard output.</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code>--iree-codegen-tuning-spec-path</code> flag is a part of <code>ROCMOptions</code> and
+only available for the ROCM/HIP backends. It can be set programmatically via
+the C API using <code>ireeCompilerSessionSetFlags()</code>. The other two flags are
+global options available for all backends.</p>
+</div>
 <p>Note that both default and user-provided specs can be enabled at the same time.
 The compiler will link them together and invoke the user-provided spec before
 attempting the default one.</p>
