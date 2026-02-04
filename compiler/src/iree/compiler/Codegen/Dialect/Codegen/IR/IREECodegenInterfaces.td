@@ -250,36 +250,16 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the sizes of the parallel dimensions for each operand.
+        Return the iterator types of the parallel dimensions for each operand.
         For example in a matmul C = A * B:
-        - LHS (operand 0): parallel dimension is M
-        - RHS (operand 1): parallel dimension is N
-        - ACC (operand 2): parallel dimensions are M and N
+        - LHS (operand 0): {"parallel", "reduction"}
+        - RHS (operand 1): {"parallel", "reduction"}
+        - ACC (operand 2): {"parallel", "parallel"}
 
-        Returns a vector where each element is a vector of parallel dimension
-        sizes for that operand.
+        Returns a vector where each element is a vector of iterator types for that operand.
       }],
-      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<int64_t>>",
-      /*methodName=*/"getParallelDimSizes",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return {};
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return the sizes of the reduction dimensions for each operand.
-        For example in a matmul C = A * B:
-        - LHS (operand 0): reduction dimension is K
-        - RHS (operand 1): reduction dimension is K
-        - ACC (operand 2): no reduction dimensions
-
-        Returns a vector where each element is a vector of reduction dimension
-        sizes for that operand.
-      }],
-      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<int64_t>>",
-      /*methodName=*/"getReductionDimSizes",
+      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>>",
+      /*methodName=*/"getOperandIteratorTypes",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

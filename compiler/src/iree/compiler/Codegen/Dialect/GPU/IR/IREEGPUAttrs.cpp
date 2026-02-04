@@ -690,16 +690,6 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-SmallVector<SmallVector<int64_t>> MMAAttr::getParallelDimSizes() const {
-  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
-  return {{m}, {n}, {m, n}};
-}
-
-SmallVector<SmallVector<int64_t>> MMAAttr::getReductionDimSizes() const {
-  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
-  return {{k}, {k}, {}};
-}
-
 Attribute MMAAttr::getDistributionMappingKind() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
@@ -966,23 +956,6 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-SmallVector<SmallVector<int64_t>>
-DataTiledMMAAttr::getParallelDimSizes() const {
-  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
-  // Scale by the number of intrinsics and subgroups
-  m *= getIntrinsicsM() * getSubgroupsM();
-  n *= getIntrinsicsN() * getSubgroupsN();
-  return {{m}, {n}, {m, n}};
-}
-
-SmallVector<SmallVector<int64_t>>
-DataTiledMMAAttr::getReductionDimSizes() const {
-  auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
-  // Scale by the number of intrinsics and subgroups
-  k *= getIntrinsicsK() * getSubgroupsK();
-  return {{k}, {k}, {}};
-}
-
 int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
   return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
          getSubgroupsK();
@@ -1243,16 +1216,6 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   }
   assert(false && "unhandled virtual mma layout type.");
   return 0;
-}
-
-SmallVector<SmallVector<int64_t>> VirtualMMAAttr::getParallelDimSizes() const {
-  auto [m, n, k] = getMNKShape();
-  return {{m}, {n}, {m, n}};
-}
-
-SmallVector<SmallVector<int64_t>> VirtualMMAAttr::getReductionDimSizes() const {
-  auto [m, n, k] = getMNKShape();
-  return {{k}, {k}, {}};
 }
 
 Attribute VirtualMMAAttr::getDistributionMappingKind() const {
@@ -1518,18 +1481,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 
 int64_t ScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
-}
-
-SmallVector<SmallVector<int64_t>> ScaledMMAAttr::getParallelDimSizes() const {
-  int64_t m = getMSize(getIntrinsic());
-  int64_t n = getNSize(getIntrinsic());
-  return {{m}, {n}, {m}, {n}, {m, n}};
-}
-
-SmallVector<SmallVector<int64_t>> ScaledMMAAttr::getReductionDimSizes() const {
-  int64_t k = getKSize(getIntrinsic());
-  int64_t kb = getKbSize(getIntrinsic());
-  return {{k, kb}, {k, kb}, {k}, {k}, {}};
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
@@ -1925,25 +1876,6 @@ int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
 
 int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
-}
-
-SmallVector<SmallVector<int64_t>>
-DataTiledScaledMMAAttr::getParallelDimSizes() const {
-  int64_t m = getMSize(getIntrinsic());
-  int64_t n = getNSize(getIntrinsic());
-  // Scale by the number of intrinsics and subgroups
-  m *= getIntrinsicsM() * getSubgroupsM();
-  n *= getIntrinsicsN() * getSubgroupsN();
-  return {{m}, {n}, {m}, {n}, {m, n}};
-}
-
-SmallVector<SmallVector<int64_t>>
-DataTiledScaledMMAAttr::getReductionDimSizes() const {
-  int64_t k = getKSize(getIntrinsic());
-  int64_t kb = getKbSize(getIntrinsic());
-  // Scale by the number of intrinsics and subgroups
-  k *= getIntrinsicsK() * getSubgroupsK();
-  return {{k, kb}, {k, kb}, {k}, {k}, {}};
 }
 
 int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
