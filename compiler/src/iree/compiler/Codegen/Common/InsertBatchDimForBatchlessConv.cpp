@@ -8,14 +8,11 @@
 // InsertBatchDimForBatchlessConv Pass
 //===----------------------------------------------------------------------===//
 //
-// This pass detects 2D convolution operations that have been generalized and
+// This pass detects convolution operations that have been generalized and
 // had their batch dimension (N=1) stripped by IREE codegen transformations.
 // It restores the batch dimension by inserting tensor.expand_shape and
 // tensor.collapse_shape operations, enabling upstream convolution-specific
 // patterns (like DownscaleConv and vectorization) to match and apply.
-//
-// Note: This pass currently only handles 2D convolutions (conv_2d, pooling_2d,
-// depthwise_conv_2d).
 //
 // The reshape operations are expected to be folded into dispatch tensor
 // load/store operations by the PropagateReshapesByExpansion pass, resulting
@@ -44,92 +41,80 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// Detects if the given linalg op is a batch-less 2D convolution (a convolution
+/// Detects if the given linalg op is a batch-less convolution (a convolution
 /// where the batch dimension N=1 was stripped by IREE's unit dim folding).
 ///
-/// Returns success if this is a batch-less 2D convolution that should be
-/// transformed, failure otherwise.
-static LogicalResult isBatchlessConv(linalg::LinalgOp op) {
+/// Returns true if this is a batch-less convolution that should be
+/// transformed, false otherwise.
+static bool isBatchlessConv(linalg::LinalgOp op) {
   // Must be a convolution operation (uses upstream MLIR's convolution
-  // detection)
+  // detection).
   if (!linalg::isaConvolutionOpInterface(op)) {
-    return failure();
+    return false;
   }
 
-  auto dimsOr = linalg::inferConvolutionDims(op);
-  if (failed(dimsOr)) {
-    return failure();
-  }
-  linalg::ConvolutionDimensions dims = *dimsOr;
-
-  // Must be 2D spatial convolution
-  if (dims.outputImage.size() != 2 || dims.filterLoop.size() != 2) {
-    return failure();
+  FailureOr<linalg::ConvolutionDimensions> maybeConvDims =
+      linalg::inferConvolutionDims(op);
+  if (failed(maybeConvDims)) {
+    return false;
   }
 
-  // Detect operation kind based on channel dimensions
-  bool isRegularConv =
-      !dims.inputChannel.empty() && !dims.outputChannel.empty();
-  bool isDepthwise = !dims.depth.empty();
-  bool isPooling = dims.inputChannel.empty() && dims.outputChannel.empty() &&
-                   dims.depth.empty();
+  // Detect operation kind based on channel dimensions.
+  bool isRegularConv = !maybeConvDims->inputChannel.empty() &&
+                       !maybeConvDims->outputChannel.empty();
+  bool isDepthwise = !maybeConvDims->depth.empty();
+  bool isPooling = maybeConvDims->inputChannel.empty() &&
+                   maybeConvDims->outputChannel.empty() &&
+                   maybeConvDims->depth.empty();
 
-  // Check if batch dimension is missing
+  // Check if batch dimension is missing.
   bool isBatchless = false;
 
   if (isRegularConv || isDepthwise) {
-    // For conv/depthwise: batch should be non-empty when present
-    isBatchless = dims.batch.empty();
+    // For conv/depthwise: batch should be non-empty when present.
+    isBatchless = maybeConvDims->batch.empty();
   } else if (isPooling) {
-    // For pooling: batch contains [N, C], without N it's just [C]
-    // So batch.size() == 1 means only channel, no real batch
-    isBatchless = (dims.batch.size() == 1);
+    // For pooling: batch contains [N, C], without N it's just [C].
+    // So batch.size() == 1 means only channel, no real batch.
+    isBatchless = (maybeConvDims->batch.size() == 1);
   }
 
-  if (!isBatchless) {
-    return failure();
-  }
-
-  return success();
+  return isBatchless;
 }
 
-//===----------------------------------------------------------------------===//
-// Helper functions for batch dimension insertion
-//===----------------------------------------------------------------------===//
-
-/// Builds reassociation indices to prepend a unit batch dimension at position
-/// 0. For a tensor of rank R, produces: [[0, 1], [2], [3], ..., [R]]
-static SmallVector<ReassociationIndices> buildBatchReassociation(int64_t rank) {
+/// Builds reassociation indices for prepending a dimension at position 0.
+/// For a tensor of rank R, produces: [[0, 1], [2], [3], ..., [R]]
+static SmallVector<ReassociationIndices>
+buildPrependDimReassociation(int64_t rank) {
   SmallVector<ReassociationIndices> reassoc;
-  reassoc.push_back({0, 1}); // New batch dim groups with first existing dim
+  reassoc.push_back({0, 1}); // New dim groups with first existing dim.
   for (int64_t i = 1; i < rank; ++i) {
     reassoc.push_back({i + 1});
   }
   return reassoc;
 }
 
-/// Expands a tensor by prepending a unit batch dimension at position 0.
+/// Expands a tensor by prepending a unit dimension at position 0.
 /// tensor<AxBxC> -> tensor<1xAxBxC>
-static Value expandWithBatchDim(PatternRewriter &rewriter, Location loc,
-                                Value tensor) {
+static Value prependUnitDimToTensor(RewriterBase &rewriter, Location loc,
+                                    Value tensor) {
   auto tensorType = cast<RankedTensorType>(tensor.getType());
   SmallVector<int64_t> newShape = {1};
   llvm::append_range(newShape, tensorType.getShape());
   auto newType = RankedTensorType::get(newShape, tensorType.getElementType());
-  auto reassoc = buildBatchReassociation(tensorType.getRank());
+  auto reassoc = buildPrependDimReassociation(tensorType.getRank());
   return tensor::ExpandShapeOp::create(rewriter, loc, newType, tensor, reassoc);
 }
 
-/// Transforms an indexing map to account for a new batch dimension.
-/// Shifts all existing dimensions by 1 and prepends d0 (batch).
+/// Shifts all existing dimensions in an affine map by 1 and prepends d0.
 /// (d0, d1, ...) -> (...) becomes (d0, d1, d2, ...) -> (d0, ...)
-static AffineMap prependBatchDimToMap(AffineMap oldMap, unsigned newNumLoops,
-                                      MLIRContext *ctx) {
+static AffineMap shiftAndPrependDimToMap(AffineMap oldMap, unsigned newNumDims,
+                                         MLIRContext *ctx) {
   AffineMap shifted = oldMap.shiftDims(1);
   SmallVector<AffineExpr> newResults;
-  newResults.push_back(getAffineDimExpr(0, ctx)); // batch dim
+  newResults.push_back(getAffineDimExpr(0, ctx)); // New leading dim.
   llvm::append_range(newResults, shifted.getResults());
-  return AffineMap::get(newNumLoops, 0, newResults, ctx);
+  return AffineMap::get(newNumDims, 0, newResults, ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,9 +123,8 @@ static AffineMap prependBatchDimToMap(AffineMap oldMap, unsigned newNumLoops,
 
 /// Pattern to insert batch dimension for batch-less convolutions.
 ///
-/// This transforms a 6D linalg.generic (3 parallel + 3 reduction) representing
-/// a batch-less conv into a 7D linalg.generic (4 parallel + 3 reduction) with
-/// the batch dimension restored:
+/// This transforms a linalg.generic representing a batch-less convolution
+/// into one with an additional batch dimension restored:
 ///
 ///   expand_shape(image_input) -> linalg.generic (with batch) ->
 ///   collapse_shape(output)
@@ -154,7 +138,7 @@ struct InsertBatchDimForConvPattern
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(isBatchlessConv(op))) {
+    if (!isBatchlessConv(op)) {
       return failure();
     }
 
@@ -162,50 +146,55 @@ struct InsertBatchDimForConvPattern
     MLIRContext *ctx = rewriter.getContext();
     unsigned newNumLoops = op.getNumLoops() + 1;
 
-    // --- Image input (operand 0): expand and add batch dim to map ---
-    OpOperand *imageOperand = op.getDpsInputOperand(0);
-    Value image = imageOperand->get();
-    if (!isa<RankedTensorType>(image.getType())) {
-      return rewriter.notifyMatchFailure(op,
-                                         "image input is not a ranked tensor");
+    // Process all input operands.
+    // - Operand 0 (image): expand tensor and prepend dim to map.
+    // - Other operands (filter, zero points, etc.): keep as-is, shift map.
+    SmallVector<Value> newInputs;
+    SmallVector<AffineMap> newMaps;
+
+    for (OpOperand *inputOperand : op.getDpsInputOperands()) {
+      Value input = inputOperand->get();
+      AffineMap oldMap = op.getMatchingIndexingMap(inputOperand);
+
+      if (inputOperand->getOperandNumber() == 0) {
+        // Image input: expand and prepend dim to map.
+        if (!isa<RankedTensorType>(input.getType())) {
+          return rewriter.notifyMatchFailure(
+              op, "image input is not a ranked tensor");
+        }
+        newInputs.push_back(prependUnitDimToTensor(rewriter, loc, input));
+        newMaps.push_back(shiftAndPrependDimToMap(oldMap, newNumLoops, ctx));
+      } else {
+        // Other inputs (filter, zero points): keep as-is, just shift map.
+        newInputs.push_back(input);
+        newMaps.push_back(oldMap.shiftDims(1));
+      }
     }
-    Value expandedImage = expandWithBatchDim(rewriter, loc, image);
-    AffineMap newImageMap = prependBatchDimToMap(
-        op.getMatchingIndexingMap(imageOperand), newNumLoops, ctx);
 
-    // --- Filter (operand 1): keep tensor as-is, only shift map indices ---
-    OpOperand *filterOperand = op.getDpsInputOperand(1);
-    Value filter = filterOperand->get();
-    AffineMap newFilterMap =
-        op.getMatchingIndexingMap(filterOperand).shiftDims(1);
-
-    // --- Output: expand and add batch dim to map ---
+    // Output: expand and add batch dim to map.
     OpOperand *outputOperand = op.getDpsInitOperand(0);
     Value output = outputOperand->get();
     auto outputType = dyn_cast<RankedTensorType>(output.getType());
     if (!outputType) {
       return rewriter.notifyMatchFailure(op, "output is not a ranked tensor");
     }
-    Value expandedOutput = expandWithBatchDim(rewriter, loc, output);
-    AffineMap newOutputMap = prependBatchDimToMap(
+    Value expandedOutput = prependUnitDimToTensor(rewriter, loc, output);
+    AffineMap newOutputMap = shiftAndPrependDimToMap(
         op.getMatchingIndexingMap(outputOperand), newNumLoops, ctx);
+    newMaps.push_back(newOutputMap);
 
-    // Collect inputs and maps
-    SmallVector<Value> newInputs = {expandedImage, filter};
-    SmallVector<AffineMap> newMaps = {newImageMap, newFilterMap, newOutputMap};
-
-    // New iterator types: prepend parallel (batch) to existing types
+    // New iterator types: prepend parallel (batch) to existing types.
     SmallVector<utils::IteratorType> newIterTypes;
     newIterTypes.push_back(utils::IteratorType::parallel);
     llvm::append_range(newIterTypes, op.getIteratorTypesArray());
 
-    // Create new generic with batch dimension
+    // Create new generic with batch dimension.
     auto newOutputType = cast<RankedTensorType>(expandedOutput.getType());
     auto newOp = linalg::GenericOp::create(
         rewriter, loc, TypeRange{newOutputType}, newInputs,
         ValueRange{expandedOutput}, newMaps, newIterTypes,
         [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-          // Clone the body
+          // Clone the body.
           IRMapping mapping;
           for (auto [oldArg, newArg] :
                llvm::zip(op.getBody()->getArguments(), args)) {
@@ -219,8 +208,8 @@ struct InsertBatchDimForConvPattern
                                   mapping.lookup(yield.getOperand(0)));
         });
 
-    // Collapse result to remove the batch dimension we added
-    auto reassoc = buildBatchReassociation(outputType.getRank());
+    // Collapse result to remove the batch dimension we added.
+    auto reassoc = buildPrependDimReassociation(outputType.getRank());
     auto collapsed = tensor::CollapseShapeOp::create(
         rewriter, loc, outputType, newOp.getResult(0), reassoc);
 
@@ -236,10 +225,6 @@ struct InsertBatchDimForConvPattern
 struct InsertBatchDimForBatchlessConvPass final
     : impl::InsertBatchDimForBatchlessConvPassBase<
           InsertBatchDimForBatchlessConvPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
-  }
-
   void runOnOperation() override {
     MLIRContext *context = &getContext();
 
@@ -250,17 +235,19 @@ struct InsertBatchDimForBatchlessConvPass final
       return signalPassFailure();
     }
 
-    // Run reshape propagation to push the expand/collapse shapes to boundaries
+    // Run reshape propagation to push the expand/collapse shapes to boundaries.
     {
       RewritePatternSet reshapePatterns(context);
       populateReshapeToInterfaceTensorPatterns(reshapePatterns);
-      linalg::ControlFusionFn bubbleUpExpansionControlFn =
-          [](OpOperand *fusedOperand) {
-            // Allow fusion through all ops
-            return true;
-          };
-      linalg::populateFoldReshapeOpsByExpansionPatterns(
-          reshapePatterns, bubbleUpExpansionControlFn);
+      linalg::ControlFusionFn reshapeControlFn = [](OpOperand *fusedOperand) {
+        // Allow fusion through all ops.
+        return true;
+      };
+      linalg::populateFoldReshapeOpsByExpansionPatterns(reshapePatterns,
+                                                        reshapeControlFn);
+      tensor::populateFoldTensorEmptyPatterns(reshapePatterns);
+      tensor::populateBubbleUpExpandShapePatterns(reshapePatterns);
+      linalg::FillOp::getCanonicalizationPatterns(reshapePatterns, context);
       tensor::CollapseShapeOp::getCanonicalizationPatterns(reshapePatterns,
                                                            context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(reshapePatterns,
