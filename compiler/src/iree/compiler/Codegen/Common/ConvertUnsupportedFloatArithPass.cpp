@@ -41,7 +41,8 @@ using hasContextGet = decltype(T::get(std::declval<MLIRContext *>()));
 
 /// Helpers to append types to a vector if they are small float types (fp4/fp8).
 template <typename T>
-static void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
+static void maybeAppendSmallFloatType(MLIRContext *ctx,
+                                      SmallVectorImpl<Type> &types) {
   if constexpr (llvm::is_detected<hasContextGet, T>::value) {
     Type t = T::get(ctx);
     if (isa<FloatType>(t)) {
@@ -52,9 +53,11 @@ static void maybeAppendType(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
     }
   }
 }
+
 template <typename... Ts>
-static void appendTypesIf(MLIRContext *ctx, SmallVectorImpl<Type> &types) {
-  (maybeAppendType<Ts>(ctx, types), ...);
+static void appendSmallFloatTypes(MLIRContext *ctx,
+                                  SmallVectorImpl<Type> &types) {
+  (maybeAppendSmallFloatType<Ts>(ctx, types), ...);
 }
 
 //===----------------------------------------------------------------------===//
@@ -126,8 +129,12 @@ public:
     // Check for FNUZ types where NaN is encoded as sign bit only
     // (e.g., 0x80 for fp8, 0x8 for fp4). These types have no negative zero
     // and no infinity.
-    llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
-    smallHasNegZero = negZero.isZero() && negZero.isNegative();
+    if (llvm::APFloat::semanticsHasZero(sem)) {
+      llvm::APFloat negZero = llvm::APFloat::getZero(sem, /*Negative=*/true);
+      smallHasNegZero = negZero.isZero() && negZero.isNegative();
+    } else {
+      smallHasNegZero = false;
+    }
     smallNanIsNegZero = !smallHasNegZero && !smallHasInf && smallHasNan;
   }
 
@@ -361,7 +368,9 @@ private:
 ///    - Max exponent values are valid finite numbers (except NaN encoding).
 ///    - f4E2M1FN has no NaN and no negative zero.
 struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
-  using Base::Base;
+  TruncFToSmallFloat(MLIRContext *ctx, ArrayRef<Type> sourceTypes)
+      : OpRewritePattern(ctx),
+        sourceTypes(sourceTypes.begin(), sourceTypes.end()) {}
 
   LogicalResult matchAndRewrite(arith::TruncFOp op,
                                 PatternRewriter &rewriter) const override {
@@ -372,6 +381,11 @@ struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
     unsigned resultBitWidth = resultElemType.getIntOrFloatBitWidth();
     if (!isa<Float32Type>(inputElemType) ||
         (resultBitWidth != 4 && resultBitWidth != 8)) {
+      return failure();
+    }
+
+    // Only match types that are in our source types list.
+    if (!llvm::is_contained(sourceTypes, resultElemType)) {
       return failure();
     }
 
@@ -567,6 +581,9 @@ struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
     rewriter.replaceOp(op, result);
     return success();
   }
+
+private:
+  SmallVector<Type> sourceTypes;
 };
 
 //===----------------------------------------------------------------------===//
@@ -585,7 +602,9 @@ struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
 /// We implement this using uitofp + mulf with a precomputed scale factor,
 /// which is simpler and more general than enumerating all possible values.
 struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
-  using Base::Base;
+  ExtFFromSmallFloat(MLIRContext *ctx, ArrayRef<Type> sourceTypes)
+      : OpRewritePattern(ctx),
+        sourceTypes(sourceTypes.begin(), sourceTypes.end()) {}
 
   LogicalResult matchAndRewrite(arith::ExtFOp op,
                                 PatternRewriter &rewriter) const override {
@@ -597,6 +616,11 @@ struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
     unsigned inputBitWidth = inputElemType.getIntOrFloatBitWidth();
     if ((inputBitWidth != 4 && inputBitWidth != 8) ||
         !isa<Float32Type>(resultElemType)) {
+      return failure();
+    }
+
+    // Only match types that are in our source types list.
+    if (!llvm::is_contained(sourceTypes, inputElemType)) {
       return failure();
     }
 
@@ -728,6 +752,9 @@ struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
 
     return success();
   }
+
+private:
+  SmallVector<Type> sourceTypes;
 };
 
 struct ConvertUnsupportedFloatArithPass final
@@ -737,109 +764,99 @@ struct ConvertUnsupportedFloatArithPass final
   using Base::Base;
 };
 
-} // namespace
-
-static void populateCPUSourceAndTargetType(MLIRContext *ctx, Operation *op,
-                                           SmallVectorImpl<Type> &sourceTypes,
-                                           Type &targetType) {
-  // For CPU backend, we emulate all small float types (fp4, fp8) to fp32. This
-  // supports any future new small float types automatically.
-  appendTypesIf<
+/// Returns the types that need extf/truncf emulation (bit manipulation) for
+/// the given GPU target. Types with hardware conversion instructions are
+/// excluded since ArithToAMDGPU patterns in ConvertToROCDL handle those.
+///
+/// Note: ALL small float types need arithmetic emulation (wrapping addf/mulf
+/// with extf/truncf) because no GPU has native fp4/fp8 arithmetic instructions.
+/// This function only determines which types need SOFTWARE conversion.
+static SmallVector<Type>
+getTypesNeedingConversionEmulationForGPU(MLIRContext *context,
+                                         IREE::GPU::TargetAttr gpuAttr) {
+  SmallVector<Type> types;
+  appendSmallFloatTypes<
 #define GET_TYPEDEF_LIST
 #include "mlir/IR/BuiltinTypes.cpp.inc"
-      >(ctx, sourceTypes);
-  targetType = Float32Type::get(ctx);
-}
+      >(context, types);
 
-// Populates source and target conversion types based on the target
-// architecture.
-// TODO(pashu123): Refine the patterns based on the target arch.
-static void populateGPUSourceAndTargetType(MLIRContext *ctx, Operation *op,
-                                           SmallVectorImpl<Type> &sourceTypes,
-                                           Type &targetType) {
-  auto gpuAttr = getGPUTargetAttr(op);
-  if (!gpuAttr) {
-    return;
-  }
+  // Remove types that have hardware conversion support on this chip.
   StringRef chipset = gpuAttr.getArch();
   FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
   if (failed(maybeChipset)) {
     LDBG() << "Invalid chip name";
-    return;
+    return types;
   }
   constexpr amdgpu::Chipset kGfx942{9, 4, 2};
   constexpr amdgpu::Chipset kGfx950{9, 5, 0};
-  constexpr amdgpu::Chipset kGfx10{10, 0, 0};
-  constexpr amdgpu::Chipset kGfx12{12, 0, 0};
-  // Add source and target conversion types for gfx94{*} series.
-  if (*maybeChipset >= kGfx942 && *maybeChipset <= kGfx950) {
-    sourceTypes.insert(sourceTypes.end(), {Float8E4M3FNUZType::get(ctx),
-                                           Float8E5M2FNUZType::get(ctx)});
-    targetType = Float32Type::get(ctx);
+  if (*maybeChipset >= kGfx942 && *maybeChipset < kGfx950) {
+    // gfx942 has hardware conversion for FNUZ types.
+    llvm::erase(types, Float8E4M3FNUZType::get(context));
+    llvm::erase(types, Float8E5M2FNUZType::get(context));
   }
-  // gfx950 and gfx12+ support OCP FP8 conversions
-  if (*maybeChipset >= kGfx12 ||
-      (*maybeChipset <= kGfx10 && *maybeChipset >= kGfx950)) {
-    // TODO(kdrewnia): On gfx950, add fp4 or fp6 here maybe.
-    // TODO(kdrewnia): After checking for instruction avaiability, turn
-    // the target type down to f16.
-    sourceTypes.push_back(Float8E4M3FNType::get(ctx));
-    sourceTypes.push_back(Float8E5M2Type::get(ctx));
-    targetType = Float32Type::get(ctx);
+  if (amdgpu::hasOcpFp8(*maybeChipset)) {
+    // gfx950+ and gfx12+ have hardware conversion for OCP types.
+    llvm::erase(types, Float8E4M3FNType::get(context));
+    llvm::erase(types, Float8E5M2Type::get(context));
+    llvm::erase(types, Float4E2M1FNType::get(context));
   }
-  return;
+  return types;
 }
+
+} // namespace
 
 void ConvertUnsupportedFloatArithPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FunctionOpInterface funcOp = getOperation();
-  SmallVector<Type> sourceTypes;
-  Type targetType = nullptr;
+  Type targetType = Float32Type::get(context);
 
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool isCPU = isLLVMCPUBackend(targetAttr);
-  if (isCPU) {
-    populateCPUSourceAndTargetType(context, funcOp, sourceTypes, targetType);
-  } else if (isROCMBackend(targetAttr)) {
-    populateGPUSourceAndTargetType(context, funcOp, sourceTypes, targetType);
-  } else {
-    LDBG() << "backend does not require float emulation";
-    return;
-  }
-
-  if (sourceTypes.empty() || !targetType) {
-    LDBG() << "no source or target type specified, float emulation will do "
-              "nothing";
-    return;
-  }
-
-  if (llvm::is_contained(sourceTypes, targetType)) {
-    funcOp->emitError() << " target type cannot be an unsupported source type";
-    return signalPassFailure();
-  }
+  // All small float types (fp4, fp8) need arithmetic emulation unless the
+  // hardware has native arithmetic instructions for these types. Operations
+  // like addf/mulf usually have to be wrapped with extf/truncf to compute in
+  // f32.
+  SmallVector<Type> allSmallFloatTypes;
+  appendSmallFloatTypes<
+#define GET_TYPEDEF_LIST
+#include "mlir/IR/BuiltinTypes.cpp.inc"
+      >(context, allSmallFloatTypes);
 
   // Apply the standard float emulation patterns. This inserts extf/truncf pairs
   // around unsupported float operations.
   {
     TypeConverter converter;
-    arith::populateEmulateUnsupportedFloatsConversions(converter, sourceTypes,
-                                                       targetType);
+    arith::populateEmulateUnsupportedFloatsConversions(
+        converter, allSmallFloatTypes, targetType);
     RewritePatternSet patterns(context);
     arith::populateEmulateUnsupportedFloatsPatterns(patterns, converter);
     ConversionTarget target(*context);
     arith::populateEmulateUnsupportedFloatsLegality(target, converter);
+
+    // Mark scaling ops as legal - they have their own expansion patterns in
+    // arith::populateExpandScalingExtTruncPatterns that run in later passes.
+    // We don't want to insert extf/truncf pairs around them.
+    target.addLegalOp<arith::ScalingExtFOp, arith::ScalingTruncFOp>();
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 
-  // For CPU, emulate extf/truncf to/from small float types using integer ops.
-  // This is needed because LLVM doesn't support fpext/fptrunc for fp4/fp8
-  // types; these types eventually get lowered to small integers in LLVM IR.
-  if (isCPU) {
+  // Determine which types need software conversion emulation. By default, all
+  // the small float types need the emulation. For GPU targets, some types may
+  // have hardware conversion support and can be skipped.
+  SmallVector<Type> typesNeedingConversionEmulation = allSmallFloatTypes;
+  if (auto gpuAttr = getGPUTargetAttr(funcOp)) {
+    typesNeedingConversionEmulation =
+        getTypesNeedingConversionEmulationForGPU(context, gpuAttr);
+  }
+
+  // Emulate extf/truncf to/from small float types using integer bit
+  // manipulation. Only for types without hardware conversion support.
+  // This is gated by the enableExtTruncEmulation flag.
+  if (enableExtTruncEmulation && !typesNeedingConversionEmulation.empty()) {
     RewritePatternSet emulationPatterns(context);
-    emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(context);
+    emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(
+        context, typesNeedingConversionEmulation);
     walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
   }
 }
