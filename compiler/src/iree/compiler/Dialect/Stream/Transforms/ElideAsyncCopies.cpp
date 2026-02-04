@@ -24,6 +24,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -57,6 +58,151 @@ static IREE::Stream::AffinityAttr tryLookupDefaultAffinity(Operation *fromOp) {
     fromOp = fromOp->getParentOp();
   }
   return nullptr;
+}
+
+// Returns true if |value| is known to be constant zero.
+static bool isConstantZero(Value value) {
+  if (!value)
+    return true; // No offset means 0.
+  return matchPattern(value, m_Zero());
+}
+
+// Returns true if |result| is produced by an operation that fully overwrites
+// the tied resource with new data. In this case, the result's data is "owned"
+// (not borrowed) even if the underlying buffer came from an external source.
+//
+// This is a tactical check using constant matching. A proper fix would use
+// DFX-based range analysis and integer range analysis.
+static bool doesOpFullyOverwriteTiedResult(OpResult result) {
+  Operation *op = result.getOwner();
+
+  // Must be a tied operation.
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  if (!tiedOp)
+    return false;
+
+  auto resultIdx = result.getResultNumber();
+  if (!tiedOp.getTiedResultOperandIndex(resultIdx).has_value()) {
+    return false;
+  }
+
+  // Must implement AsyncAccessOpInterface to query access ranges.
+  auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(op);
+  if (!accessOp)
+    return false;
+
+  // Must implement SizeAwareOpInterface to get result size.
+  auto sizeAwareOp = dyn_cast<IREE::Util::SizeAwareOpInterface>(op);
+  if (!sizeAwareOp)
+    return false;
+
+  Value resultSize = sizeAwareOp.getResultSizeFromValue(result);
+  if (!resultSize)
+    return false;
+
+  // Check access ranges for a full overwrite of the result.
+  SmallVector<AsyncAccessRange> accessRanges;
+  accessOp.getAsyncAccessRanges(accessRanges);
+  for (auto &range : accessRanges) {
+    // Look for write-ONLY access to this result. Read+Write means the op
+    // depends on the existing data (e.g., in/out dispatch operand), so we
+    // can't treat it as a full overwrite of borrowed data.
+    if (range.resource == result &&
+        range.access == ResourceAccessBitfield::Write) {
+      // Check if write covers full resource: offset=0, length=size.
+      if (isConstantZero(range.start) && range.length == resultSize) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Returns true if we can safely propagate |newLifetime| through all users of
+// |value|. This is used for eliding lifetime-changing clones (e.g., external
+// -> *) by propagating the source lifetime through the use chain.
+//
+// Collects operations that need type updates in |opsToUpdate|. Each entry is
+// (op, operandIdx) where operandIdx identifies which operand receives |value|.
+//
+// We can propagate through:
+// - TiedOpInterface ops: result is tied to operand, so result type must match
+// - Ops whose result is already the target lifetime (will become same-type)
+static bool canPropagateLifetimeToUsers(
+    Value value, IREE::Stream::Lifetime newLifetime,
+    SmallVectorImpl<std::pair<Operation *, unsigned>> &opsToUpdate,
+    SmallPtrSetImpl<Value> &visited) {
+  if (!visited.insert(value).second)
+    return true; // Already visited, avoid cycles.
+
+  for (OpOperand &use : value.getUses()) {
+    Operation *user = use.getOwner();
+    unsigned operandIdx = use.getOperandNumber();
+
+    // Check if this op ties the operand to a result via TiedOpInterface.
+    if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user)) {
+      // Find any results tied to this operand.
+      auto tiedResults = tiedOp.getOperandTiedResults(operandIdx);
+      if (!tiedResults.empty()) {
+        // This op passes the resource through - we need to update result types.
+        opsToUpdate.push_back({user, operandIdx});
+
+        // Recursively check all tied results.
+        for (auto result : tiedResults) {
+          if (isa<IREE::Stream::ResourceType>(result.getType())) {
+            if (!canPropagateLifetimeToUsers(result, newLifetime, opsToUpdate,
+                                             visited))
+              return false;
+          }
+        }
+        continue;
+      }
+    }
+
+    // Non-tied use: check if result converts BACK to our target lifetime.
+    // (e.g., clone/transfer from * -> external when we're propagating external)
+    // These will become same-type ops after we update the operand.
+    if (user->getNumResults() == 1) {
+      if (auto resultType = dyn_cast<IREE::Stream::ResourceType>(
+              user->getResult(0).getType())) {
+        if (resultType.getLifetime() == newLifetime) {
+          // This op's result is already the target lifetime - it will become
+          // a same-type operation and can be elided in a subsequent pass.
+          opsToUpdate.push_back({user, operandIdx});
+          continue;
+        }
+      }
+    }
+
+    // Unknown pattern - conservatively fail.
+    return false;
+  }
+  return true;
+}
+
+// Updates the types of operations collected during canPropagateLifetimeToUsers.
+// For tied ops, we update the tied result types to match the new lifetime.
+static void updateTypesForLifetimePropagation(
+    ArrayRef<std::pair<Operation *, unsigned>> opsToUpdate,
+    IREE::Stream::Lifetime newLifetime) {
+  for (auto [op, operandIdx] : opsToUpdate) {
+    // For tied ops: update the tied result types to match new operand lifetime.
+    if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+      auto tiedResults = tiedOp.getOperandTiedResults(operandIdx);
+      for (auto result : tiedResults) {
+        if (auto oldType =
+                dyn_cast<IREE::Stream::ResourceType>(result.getType())) {
+          auto newType = IREE::Stream::ResourceType::get(oldType.getContext(),
+                                                         newLifetime);
+          result.setType(newType);
+        }
+      }
+    }
+    // For non-tied ops with single result converting back to target lifetime:
+    // No type update needed - they already have the correct result type.
+    // After RAUW, they will have same source/target type and become elidable.
+  }
 }
 
 // TODO(benvanik): change this to just be an AbstractState - there's no real
@@ -393,39 +539,28 @@ public:
 private:
   explicit ResourceMutationSemantics(const Position &pos) : BaseType(pos) {}
 
-  // Analyzes whether a value is mutated by walking all transitive uses.
-  // Checks both TiedOpInterface (for in-place mutations) and
-  // AsyncAccessOpInterface (for explicit write access).
-  void analyzeMutation(Value value, DFX::Solver &solver) {
+  // Analyzes LOCAL mutations of a value by checking AsyncAccessOpInterface.
+  // This does NOT follow tied operations - that's done in updateValue to
+  // participate in fixed-point iteration.
+  void analyzeLocalMutation(Value value, DFX::Solver &solver) {
     SmallVector<AsyncAccessRange> accessRanges;
 
     // Walk ALL transitive uses (crosses function boundaries).
     auto traversalResult = solver.getExplorer().walkTransitiveUses(
         value, [&](OpOperand &operand) -> WalkResult {
-          // Check if tied (in-place mutation).
-          if (auto tiedOp =
-                  dyn_cast<IREE::Util::TiedOpInterface>(operand.getOwner())) {
-            if (tiedOp.isOperandTied(operand.getOperandNumber())) {
-              LLVM_DEBUG({
-                llvm::dbgs() << "    found tied mutation at op: ";
-                operand.getOwner()->print(llvm::dbgs(), solver.getAsmState());
-                llvm::dbgs() << "\n";
-              });
-              removeAssumedBits(NOT_MUTATED);
-              return WalkResult::interrupt();
-            }
-          }
+          Operation *op = operand.getOwner();
 
           // Check AsyncAccessOpInterface for write access.
-          if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(
-                  operand.getOwner())) {
+          // This is the primary way to detect mutations.
+          if (auto accessOp =
+                  dyn_cast<IREE::Stream::AsyncAccessOpInterface>(op)) {
             accessRanges.clear();
             accessOp.getAsyncAccessRanges(accessRanges);
             for (auto &range : accessRanges) {
               if (range.resource == value && !range.isReadOnly()) {
                 LLVM_DEBUG({
                   llvm::dbgs() << "    found write access at op: ";
-                  operand.getOwner()->print(llvm::dbgs(), solver.getAsmState());
+                  op->print(llvm::dbgs(), solver.getAsmState());
                   llvm::dbgs() << "\n";
                 });
                 removeAssumedBits(NOT_MUTATED);
@@ -437,23 +572,85 @@ private:
           return WalkResult::advance();
         });
 
-    if (traversalResult == TraversalResult::INCOMPLETE) {
-      // For constants, even if analysis is incomplete (e.g., returned from
-      // public functions), they maintain immutability guarantees.
-      auto resourceType =
-          llvm::cast<IREE::Stream::ResourceType>(value.getType());
-      if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
-        LLVM_DEBUG(
-            llvm::dbgs()
-            << "    incomplete analysis for constant; assuming immutable\n");
-      } else {
-        // Conservative: assume mutated if analysis fails for non-constants.
-        LLVM_DEBUG(
-            llvm::dbgs()
-            << "    incomplete analysis; conservatively assuming mutated\n");
-        removeAssumedBits(NOT_MUTATED);
-      }
+    handleIncompleteTraversal(value, traversalResult);
+  }
+
+  // Handle incomplete traversal results (value escapes).
+  void handleIncompleteTraversal(Value value, TraversalResult traversalResult) {
+    if (traversalResult != TraversalResult::INCOMPLETE)
+      return;
+
+    // Analysis is incomplete when a value escapes (e.g., returned from
+    // public functions). Whether we assume mutation depends on the lifetime:
+    auto resourceType = llvm::cast<IREE::Stream::ResourceType>(value.getType());
+    auto lifetime = resourceType.getLifetime();
+    if (lifetime == IREE::Stream::Lifetime::Constant) {
+      // Constants maintain immutability guarantees.
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "    incomplete analysis for constant; assuming immutable\n");
+    } else if (lifetime == IREE::Stream::Lifetime::External) {
+      // External resources are expected to cross function boundaries (they
+      // are imported/exported). Escaping via return/export doesn't mean
+      // mutation - it just means the resource is being returned to the
+      // caller who owns it. The caller may mutate it later, but that's
+      // THEIR concern after we return.
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "    incomplete analysis for external; assuming immutable\n");
+    } else {
+      // Conservative: assume mutated if analysis fails for other lifetimes.
+      LLVM_DEBUG(
+          llvm::dbgs()
+          << "    incomplete analysis; conservatively assuming mutated\n");
+      removeAssumedBits(NOT_MUTATED);
     }
+  }
+
+  // Analyzes tied operations to check if any tied result is mutated.
+  // This is called during updateValue to participate in fixed-point iteration.
+  // If a value is used by a tied op and the tied result is mutated, the
+  // original value is also considered mutated (they share storage).
+  void analyzeTiedMutation(Value value, DFX::Solver &solver) {
+    // Walk uses to find tied operations.
+    solver.getExplorer().walkTransitiveUses(
+        value, [&](OpOperand &operand) -> WalkResult {
+          Operation *op = operand.getOwner();
+
+          // For tied ops (barrier, await), check if the tied result is mutated.
+          // Since they share storage, mutation of the result means mutation of
+          // the operand.
+          if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+            // Find which result is tied to our operand.
+            unsigned operandIdx = operand.getOperandNumber();
+            for (auto result : op->getResults()) {
+              if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+                continue;
+              auto tiedOperandIdx =
+                  tiedOp.getTiedResultOperandIndex(result.getResultNumber());
+              if (tiedOperandIdx.has_value() &&
+                  tiedOperandIdx.value() == operandIdx) {
+                // This result is tied to our value - check if IT is mutated.
+                // Use the solver to get the mutation status, which will trigger
+                // analysis if needed and participate in fixed-point iteration.
+                auto &resultMutation =
+                    solver.getOrCreateElementFor<ResourceMutationSemantics>(
+                        Position::forValue(result));
+                if (!resultMutation.isAssumed(NOT_MUTATED)) {
+                  LLVM_DEBUG({
+                    llvm::dbgs() << "    tied result is mutated: ";
+                    result.printAsOperand(llvm::dbgs(), solver.getAsmState());
+                    llvm::dbgs() << "\n";
+                  });
+                  removeAssumedBits(NOT_MUTATED);
+                  return WalkResult::interrupt();
+                }
+              }
+            }
+          }
+
+          return WalkResult::advance();
+        });
   }
 
   void initializeValue(Value value, DFX::Solver &solver) override {
@@ -466,7 +663,9 @@ private:
       llvm::dbgs() << "\n";
     });
 
-    analyzeMutation(value, solver);
+    // Only do local analysis during initialization (direct write access).
+    // Tied-chain analysis is deferred to updateValue for fixed-point iteration.
+    analyzeLocalMutation(value, solver);
 
     LLVM_DEBUG({
       if ((this->getAssumed() & NOT_MUTATED) == NOT_MUTATED) {
@@ -480,12 +679,21 @@ private:
   }
 
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override {
-    // Perform the same analysis as initialization to allow iterative
-    // refinement. This enables the solver to detect mutations that appear
-    // through control flow joins and tied operation chains.
+    // Check if already known to be mutated - no need to re-analyze.
+    if (!isAssumed(NOT_MUTATED)) {
+      return ChangeStatus::UNCHANGED;
+    }
+
     auto assumedBits = getAssumed();
 
-    analyzeMutation(value, solver);
+    // Re-run local analysis (may find mutations through control flow joins).
+    analyzeLocalMutation(value, solver);
+
+    // Check tied operations to propagate mutation through the alias chain.
+    // This is the key for fixed-point iteration: if a value flows through
+    // barrier/await and the tied result is mutated, this value is also
+    // mutated since they share the same underlying storage.
+    analyzeTiedMutation(value, solver);
 
     return assumedBits == getAssumed() ? ChangeStatus::UNCHANGED
                                        : ChangeStatus::CHANGED;
@@ -597,6 +805,65 @@ public:
         solver.getOrCreateElementFor<ResourceMutationSemantics>(
             Position::forValue(value));
     return mutationSemantics.isAssumedNotMutated();
+  }
+
+  // Returns true if |value| is "borrowed" from an external source, meaning
+  // the caller retains ownership and we cannot safely mutate it in-place.
+  // This is true when:
+  // - The value is a block argument that was passed by-reference (not moved)
+  // - The value traces back to a stream.tensor.import WITHOUT consume
+  //
+  // If borrowed, cloning the value creates a copy that we can mutate safely.
+  bool isBorrowedValue(Value value) {
+    // For block arguments, use ArgumentSemantics which already handles
+    // cross-function analysis of whether the arg was passed by-value or
+    // by-reference.
+    if (auto arg = dyn_cast<BlockArgument>(value)) {
+      return !isArgMoved(arg);
+    }
+
+    // For operation results, walk up the def chain (through tied ops only)
+    // to find the ultimate source. If it's a non-consuming import the value
+    // is borrowed.
+    bool foundBorrowed = false;
+    explorer.walkDefiningOps(
+        value,
+        [&](OpResult result) {
+          Operation *op = result.getOwner();
+
+          // Check for stream.tensor.import - if present without consume,
+          // this is the borrowing point.
+          if (auto importOp = dyn_cast<IREE::Stream::TensorImportOp>(op)) {
+            if (!importOp.getConsume()) {
+              foundBorrowed = true;
+              return WalkResult::interrupt();
+            }
+            // Import with consume = owned, stop searching this path
+            return WalkResult::interrupt();
+          }
+
+          // For tied operations, the result may inherit ownership from the
+          // tied operand - unless the operation fully overwrites with new data.
+          if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+            auto resultIdx = result.getResultNumber();
+            if (tiedOp.getTiedResultOperandIndex(resultIdx).has_value()) {
+              // If this operation fully overwrites the result with new data,
+              // the data is owned (not borrowed) - stop walking.
+              if (doesOpFullyOverwriteTiedResult(result)) {
+                return WalkResult::interrupt();
+              }
+              // Partial/no overwrite - continue walking to find ultimate
+              // source.
+              return WalkResult::advance();
+            }
+          }
+
+          // Non-tied result = owned, stop searching this path.
+          return WalkResult::interrupt();
+        },
+        TraversalBehavior::DEFAULT);
+
+    return foundBorrowed;
   }
 
   // Attempts to infer the affinity of |value| by walking up its defining ops
@@ -747,6 +1014,26 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                << "  ? clone source is a by-value arg; may elide\n");
   }
 
+  // If the source is "borrowed" (comes from a non-consuming import or is a
+  // by-reference block argument), the caller retains ownership. If the clone
+  // result is ever mutated (including transitively through tied ops), we need
+  // to preserve the clone to protect the caller's buffer from in-place
+  // mutation. This handles cases like:
+  // - An imported buffer used as an in-place accumulator (GEMM accumulate)
+  // - A value passed by-reference through function calls
+  // - A value flowing through tied ops from a borrowed source
+  if (analysis.isBorrowedValue(cloneOp.getSource())) {
+    // Check if the clone result is ever mutated anywhere (whole program).
+    if (!analysis.isNeverMutated(cloneOp.getResult())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - source is borrowed and result is mutated; "
+                    "cannot elide\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "  ? source is borrowed but result is never "
+                               "mutated; may elide\n");
+  }
+
   // If there's only one user of the source we know it's this clone and can
   // bypass all the more expensive liveness analysis.
   if (cloneOp.getSource().hasOneUse()) {
@@ -771,6 +1058,78 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 static void elideCloneOp(IREE::Stream::AsyncCloneOp cloneOp) {
   cloneOp.replaceAllUsesWith(cloneOp.getSource());
   cloneOp.erase();
+}
+
+// Attempts to elide a lifetime-changing clone (e.g., external -> *) by
+// propagating the source lifetime through all downstream users.
+//
+// Returns true if the clone was elided, false if elision is not possible.
+//
+// This handles the case where an external buffer flows through internal ops
+// (barriers, awaits) and eventually returns to external. By propagating the
+// external lifetime through the chain, we avoid allocating an intermediate
+// buffer.
+static bool tryElideLifetimeChangingClone(IREE::Stream::AsyncCloneOp cloneOp,
+                                          ElisionAnalysis &analysis) {
+  auto sourceType =
+      cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
+  auto targetType =
+      cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
+
+  // Only handle lifetime changes.
+  if (sourceType.getLifetime() == targetType.getLifetime())
+    return false;
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "tryElideLifetimeChangingClone:\n";
+    llvm::dbgs() << "  ";
+    cloneOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  // Only handle external -> * for now (most common case for output buffers).
+  if (sourceType.getLifetime() != IREE::Stream::Lifetime::External ||
+      targetType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - unsupported lifetime change (not external -> *)\n");
+    return false;
+  }
+
+  // Check if source is borrowed - if so, we need to be careful about mutation.
+  if (analysis.isBorrowedValue(cloneOp.getSource())) {
+    // Source is borrowed from caller. We can only elide if the result is
+    // never mutated (otherwise we'd mutate the caller's buffer).
+    if (!analysis.isNeverMutated(cloneOp.getResult())) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - borrowed source and result is mutated; keeping\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "  ? borrowed source but result never mutated; may elide\n");
+  }
+
+  // Check if we can propagate the external lifetime through all users.
+  SmallVector<std::pair<Operation *, unsigned>> opsToUpdate;
+  SmallPtrSet<Value, 8> visited;
+  if (!canPropagateLifetimeToUsers(cloneOp.getResult(),
+                                   sourceType.getLifetime(), opsToUpdate,
+                                   visited)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - cannot propagate lifetime to all users; keeping\n");
+    return false;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "  + can propagate lifetime through "
+                          << opsToUpdate.size() << " ops; eliding\n");
+
+  // Update types of all downstream operations.
+  updateTypesForLifetimePropagation(opsToUpdate, sourceType.getLifetime());
+
+  // Replace uses and erase the clone.
+  cloneOp.replaceAllUsesWith(cloneOp.getSource());
+  cloneOp.erase();
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1409,6 +1768,13 @@ static ElisionResults tryElideAsyncCopiesInRegion(
     block.walk([&](Operation *op) {
       return TypeSwitch<Operation *, WalkResult>(op)
           .Case<IREE::Stream::AsyncCloneOp>([&](auto cloneOp) {
+            // First, try to elide lifetime-changing clones by propagating
+            // the source lifetime through downstream ops.
+            if (tryElideLifetimeChangingClone(cloneOp, analysis)) {
+              ++results.clonesElided;
+              return WalkResult::advance();
+            }
+            // Fall back to same-lifetime clone elision.
             if (isSafeToElideCloneOp(cloneOp, analysis)) {
               elideCloneOp(cloneOp);
               ++results.clonesElided;
