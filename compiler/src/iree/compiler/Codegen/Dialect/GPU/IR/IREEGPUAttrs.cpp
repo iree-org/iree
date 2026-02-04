@@ -1920,18 +1920,12 @@ DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
 
 SmallVector<SmallVector<utils::IteratorType>>
 DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
-  // Scaled MMA has 4 inputs: lhs, rhs, lhs_scales, rhs_scales
-  // lhs: M×K (parallel, reduction)
-  // rhs: K×N (reduction, parallel)
-  // lhs_scales: M×K (parallel, reduction) - follows lhs
-  // rhs_scales: K×N (reduction, parallel) - follows rhs
-  // acc: M×N (parallel, parallel)
   return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction, utils::IteratorType::reduction},  // lhs
-    {utils::IteratorType::reduction, utils::IteratorType::reduction, utils::IteratorType::parallel},  // rhs
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},  // lhs_scales
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},  // rhs_scales
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}    // acc
+    {utils::IteratorType::parallel, utils::IteratorType::reduction, utils::IteratorType::reduction},
+    {utils::IteratorType::reduction, utils::IteratorType::reduction, utils::IteratorType::parallel},
+    {utils::IteratorType::parallel, utils::IteratorType::reduction},
+    {utils::IteratorType::reduction, utils::IteratorType::parallel},
+    {utils::IteratorType::parallel, utils::IteratorType::parallel}
   };
 }
 
