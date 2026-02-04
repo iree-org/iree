@@ -68,7 +68,7 @@ static void reference_attention_f32_f32_f32_f32(
     }
   }
 
-  // Apply mask before softmax if provided
+  // Apply mask before softmax if provided.
   // mask_data is a boolean mask where 1 = attend, 0 = mask out (-inf)
   if (mask_data != nullptr) {
     for (int m = 0; m < M; ++m) {
@@ -161,7 +161,7 @@ static iree_status_t reference_attention(
 
   iree_host_size_t count = 0;
   float* Attention = allocate_tensor(1, M, K2);
-  // mask_data is nullptr if no mask is provided
+  // mask_data is nullptr if no mask is provided.
   const uint8_t* mask_data = mask_contents.data_length > 0
                                  ? (const uint8_t*)mask_contents.data
                                  : nullptr;
@@ -200,7 +200,7 @@ typedef struct {
   iree_byte_span_t value_contents;
   iree_byte_span_t actual_contents;
   iree_byte_span_t expected_contents;
-  iree_byte_span_t mask_contents;  // Optional: empty if no mask
+  iree_byte_span_t mask_contents;  // Optional: empty if no mask.
 } attention_results_t;
 
 static void attention_results_deinitialize(attention_results_t* results);
@@ -210,7 +210,7 @@ static iree_status_t attention_results_initialize(
     iree_hal_dim_t k1_size, iree_hal_dim_t k2_size, iree_hal_dim_t n_size,
     iree_hal_buffer_view_t* query, iree_hal_buffer_view_t* key,
     iree_hal_buffer_view_t* value, iree_hal_buffer_view_t* result,
-    iree_hal_buffer_view_t* mask,  // Optional: can be nullptr
+    iree_hal_buffer_view_t* mask,  // Optional: can be nullptr.
     iree_allocator_t host_allocator, attention_results_t* out_results) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -297,7 +297,7 @@ static iree_status_t attention_results_initialize(
         host_allocator, out_results->expected_contents.data_length,
         (void**)&out_results->expected_contents.data);
   }
-  // Transfer mask data if mask is provided
+  // Transfer mask data if mask is provided.
   if (iree_status_is_ok(status) && mask_buffer != nullptr) {
     out_results->mask_contents.data_length =
         iree_hal_buffer_byte_length(mask_buffer);

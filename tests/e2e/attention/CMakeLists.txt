@@ -73,7 +73,7 @@ iree_generated_e2e_runner_test(
     "local"
 )
 
-# Decode tests: m=1 (single token attending to cached KV) with all-ones mask
+# Decode tests: m=1 (single token attending to cached KV) with all-ones mask.
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_cpu_f16_f16_f16_decode_small
@@ -120,7 +120,7 @@ iree_generated_e2e_runner_test(
     "local"
 )
 
-# Prefill tests: m=k2 (self-attention) with causal mask
+# Prefill tests: m=k2 (self-attention) with causal mask.
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_cpu_f16_f16_f16_prefill_small
@@ -261,7 +261,7 @@ iree_generated_e2e_runner_test(
     "requires-gpu-cdna3"
 )
 
-# GPU Decode tests: m=1 (single token attending to cached KV) with all-ones mask
+# GPU Decode tests: m=1 (single token attending to cached KV) with all-ones mask.
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_gpu_cdna3_f16_f16_f16_decode_small
@@ -318,7 +318,7 @@ iree_generated_e2e_runner_test(
     "requires-gpu-cdna3"
 )
 
-# GPU Prefill tests: m=k2 (self-attention) with causal mask
+# GPU Prefill tests: m=k2 (self-attention) with causal mask.
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_gpu_cdna3_f16_f16_f16_prefill_small
