@@ -144,8 +144,9 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
 
 class LLVMCPUTargetBackend final : public TargetBackend {
 public:
-  LLVMCPUTargetBackend(LLVMTargetOptions options, CPUCodegenOptions codegenOpts)
-      : defaultOptions_(std::move(options)),
+  LLVMCPUTargetBackend(LLVMTargetOptions targetOptions,
+                       CPUCodegenOptions codegenOpts)
+      : defaultTargetOptions_(std::move(targetOptions)),
         codegenOptions_(std::move(codegenOpts)) {}
 
   std::string getLegacyDefaultDeviceID() const override { return "local"; }
@@ -155,7 +156,7 @@ public:
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
     executableTargetAttrs.push_back(
-        getExecutableTarget(context, defaultOptions_.target));
+        getExecutableTarget(context, defaultTargetOptions_.target));
   }
 
   void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
@@ -265,7 +266,7 @@ public:
   getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
     auto configAttr = variantOp.getTarget().getConfiguration();
     return LLVMTarget::loadFromConfigAttr(variantOp.getLoc(), configAttr,
-                                          defaultOptions_.target);
+                                          defaultTargetOptions_.target);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
@@ -491,9 +492,9 @@ public:
     std::unique_ptr<LinkerTool> linkerTool;
     if (!target.linkStatic) {
       // Grab a linker tool based on the options (and target environment).
-      // This uses the defaultOptions_ in order to get paths and such, which
-      // are environmental, but replace the target with the actual one.
-      LLVMTargetOptions options = defaultOptions_;
+      // This uses the defaultTargetOptions_ in order to get paths and such,
+      // which are environmental, but replace the target with the actual one.
+      LLVMTargetOptions options = defaultTargetOptions_;
       options.target = target;
       linkerTool = LinkerTool::getForTarget(targetTriple, options);
       if (!linkerTool) {
@@ -760,7 +761,7 @@ public:
                 "above for more specific error messages)";
     }
     auto &linkArtifacts = linkArtifactsOr.value();
-    if (defaultOptions_.keepLinkerArtifacts) {
+    if (defaultTargetOptions_.keepLinkerArtifacts) {
       mlir::emitRemark(variantOp.getLoc())
           << "linker artifacts for " << variantOp.getName() << " preserved:\n"
           << "    " << linkArtifacts.libraryFile.path;
@@ -859,7 +860,7 @@ private:
   // relied on outside of getDefaultDeviceTarget() since it represents
   // a static "cross compiling" config and would override more specific
   // settings.
-  const LLVMTargetOptions defaultOptions_;
+  const LLVMTargetOptions defaultTargetOptions_;
 
   // Session-scoped codegen options controlling optimization behavior.
   const CPUCodegenOptions codegenOptions_;
