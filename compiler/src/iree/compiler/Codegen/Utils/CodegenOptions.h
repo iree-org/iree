@@ -21,7 +21,7 @@ struct CPUCodegenOptions {
   bool failOnOutOfBoundsStackAllocation = true;
 
   // Enables reassociation for FP reductions.
-  bool reassociateFpReductions = true;
+  bool reassociateFpReductions = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
