@@ -796,7 +796,7 @@ def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "
     Option<"tuningSpecPath", "tuning-spec-path", "std::string",
            /*default=*/"\"\"",
            "Path to a module containing a tuning spec (transform dialect library). "
-           "Accepts both text (.mlir) and bytecode (.mlirbc) formats.">,
+           "Accepts both MLIR text (.mlir) and bytecode (.mlirbc) formats.">,
   ];
 }
 

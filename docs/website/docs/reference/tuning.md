@@ -258,8 +258,8 @@ flags:
   directory or standard output.
 
 !!! note
-    The `--iree-codegen-tuning-spec-path` flag is part of `ROCMOptions` and
-    only available for ROCM/HIP backends. It can be set programmatically via
+    The `--iree-codegen-tuning-spec-path` flag is a part of `ROCMOptions` and
+    only available for the ROCM/HIP backends. It can be set programmatically via
     the C API using `ireeCompilerSessionSetFlags()`. The other two flags are
     global options available for all backends.
 

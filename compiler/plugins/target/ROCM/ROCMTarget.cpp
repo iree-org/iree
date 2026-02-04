@@ -156,7 +156,7 @@ struct ROCMOptions {
     binder.opt<std::string>(
         "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
         cl::desc("Path to a module containing a tuning spec (transform "
-                 "dialect library). Accepts text (.mlir) and bytecode "
+                 "dialect library). Accepts MLIR text (.mlir) and bytecode "
                  "(.mlirbc) formats."));
 
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
