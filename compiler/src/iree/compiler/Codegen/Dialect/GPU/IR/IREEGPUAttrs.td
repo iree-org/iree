@@ -305,8 +305,8 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
 
     ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
       return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction}, 
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel}, 
+        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
+        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
         {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
     }
   }];
@@ -464,8 +464,8 @@ def IREEGPU_DataTiledMMAAttr :
   let extraClassDeclaration = [{
     ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
       return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction}, 
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel}, 
+        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
+        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
         {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
     }
   }];
@@ -587,8 +587,8 @@ def IREEGPU_VirtualMMAAttr :
 
     ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
       return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction}, 
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel}, 
+        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
+        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
         {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
     }
   }];
@@ -679,8 +679,8 @@ def IREEGPU_ScaledMMAAttr :
     }
     ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
       return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction}, 
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel}, 
+        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction},
+        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
         {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
     }
   }];
