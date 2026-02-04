@@ -252,6 +252,7 @@ iree_check_single_backend_test_suite(
     # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
     timeout = "moderate",
     srcs = ROCM_SRCS,
+    compiler_flags = ["--iree-llvmgpu-enable-small-float-emulation"],
     driver = "hip",
     target_backend = "rocm",
 )

@@ -852,7 +852,8 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
 
   // Emulate extf/truncf to/from small float types using integer bit
   // manipulation. Only for types without hardware conversion support.
-  if (!typesNeedingConversionEmulation.empty()) {
+  // This is gated by the enableExtTruncEmulation flag.
+  if (enableExtTruncEmulation && !typesNeedingConversionEmulation.empty()) {
     RewritePatternSet emulationPatterns(context);
     emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(
         context, typesNeedingConversionEmulation);

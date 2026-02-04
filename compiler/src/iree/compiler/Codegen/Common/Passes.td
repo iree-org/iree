@@ -117,6 +117,13 @@ def ConvertUnsupportedFloatArithPass
     Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
     preserved and handled by separate expansion patterns in later passes.
   }];
+  let options = [
+    Option<"enableExtTruncEmulation", "enable-ext-trunc-emulation",
+           "bool", /*default=*/"true",
+           "Enable software emulation for extf/truncf of fp4/fp8 types "
+           "without hardware support. When disabled, types requiring emulation "
+           "will be left unconverted and may cause errors in later passes.">
+  ];
 }
 
 def ConvertToDestinationPassingStylePass :

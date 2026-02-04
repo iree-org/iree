@@ -176,6 +176,8 @@ iree_check_single_backend_test_suite(
     "rocm"
   DRIVER
     "hip"
+  COMPILER_FLAGS
+    "--iree-llvmgpu-enable-small-float-emulation"
   TIMEOUT
     300
 )

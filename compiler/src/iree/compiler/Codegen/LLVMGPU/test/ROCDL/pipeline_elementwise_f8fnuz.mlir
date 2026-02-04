@@ -1,8 +1,12 @@
-// gfx942 (CDNA3) has hardware support for FNUZ types, other chips use software emulation.
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=CDNA3
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1201 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
+// RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
+// RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
+// RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx1201 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
+
+// With --iree-llvmgpu-enable-small-float-emulation, unsupported chips use software emulation.
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-llvmgpu-enable-small-float-emulation --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-llvmgpu-enable-small-float-emulation --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1201 --iree-llvmgpu-enable-small-float-emulation --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
 
 #map = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -42,7 +46,8 @@ hal.executable @ext_fp8_dispatch {
   }
 }
 
-// CDNA3 (gfx942) uses hardware fp8 conversion instructions.
+// ERRORS: F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 (MI-300) chipsets; try F8E5M2 or F8E4M3FN instead, or use --iree-llvmgpu-enable-small-float-emulation
+
 //   CDNA3-LABEL: hal.executable public @ext_fp8_dispatch {
 //         CDNA3:   hal.executable.variant public @rocm
 // CDNA3-COUNT-8:     rocdl.cvt.pk.f32.fp8 %{{.*}} : vector<2xf32>
@@ -50,7 +55,6 @@ hal.executable @ext_fp8_dispatch {
 //         CDNA3:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
 //         CDNA3:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
 
-// Other chips use software emulation via integer bit manipulation.
 // EMULATED-LABEL: hal.executable public @ext_fp8_dispatch {
 //       EMULATED:   hal.executable.variant public @rocm
 //       EMULATED:     llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>

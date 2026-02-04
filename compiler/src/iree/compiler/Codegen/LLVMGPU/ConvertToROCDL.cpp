@@ -27,6 +27,7 @@
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -137,6 +138,54 @@ static void populateSwapSetPrioWithMFMAPatterns(RewritePatternSet &patterns) {
 
 } // namespace
 
+template <typename... Floats>
+static bool containsAPred(Type type) {
+  type = getElementTypeOrSelf(type);
+  return isa<Floats...>(type);
+}
+
+// Validates that arith.extf/truncf operations use fp8 types supported by the
+// chipset. Storage in fp8 memrefs is always allowed; only conversion operations
+// require hardware support or software emulation.
+//
+// Note: different chips take different FP8 formats but re-use the same
+// instruction and intrinsic names, so we must filter out the "wrong" FP8 here.
+static LogicalResult validateDataTypes(Operation *op,
+                                       const amdgpu::Chipset &chipset) {
+  // Only validate arith.extf and arith.truncf - these are the operations that
+  // need hardware or software conversion support. Other ops (memrefs, etc.)
+  // just store fp8 data and don't need special handling.
+  if (!isa<arith::ExtFOp, arith::TruncFOp>(op)) {
+    return success();
+  }
+
+  constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
+  if (!amdgpu::hasOcpFp8(chipset)) {
+    auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError(
+          "F8E5M2 and F8E4M3FN types are not supported on "
+          "gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ "
+          "instead, or use --iree-llvmgpu-enable-small-float-emulation "
+          "to enable software emulation.");
+    }
+  }
+
+  if (chipset != kGfx942) {
+    auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
+    if (llvm::any_of(op->getOperandTypes(), pred) ||
+        llvm::any_of(op->getResultTypes(), pred)) {
+      return op->emitOpError(
+          "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
+          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead, or use "
+          "--iree-llvmgpu-enable-small-float-emulation "
+          "to enable software emulation.");
+    }
+  }
+  return success();
+}
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -199,6 +248,17 @@ struct ConvertToROCDLPass final
       auto options =
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct);
+      // These patterns only convert a subset of arith that target specific
+      // rocdl intrinsics (e.g. fp8 conversions).
+      WalkResult allTypesValid = m.walk([&](Operation *op) {
+        if (failed(validateDataTypes(op, *maybeChipset))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+      if (allTypesValid.wasInterrupted()) {
+        return signalPassFailure();
+      }
       bool supportsScaledExtTrunc =
           !getGPUTargetAttr(m).getWgp().getScaledMma().empty();
       arith::populateArithToAMDGPUConversionPatterns(

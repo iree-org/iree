@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-convert-unsupported-float-arith))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-convert-unsupported-float-arith{enable-ext-trunc-emulation=false}))" %s | FileCheck %s --check-prefix=NOEMU
 
 // CHECK-LABEL: func.func @expand_f8_ocp(
 // CHECK-SAME:    %[[ARG0:.*]]: f8E5M2
@@ -351,6 +352,15 @@ func.func @gpu_fnuz_gfx942_hw_conversion(%arg0 : f8E4M3FNUZ) -> f8E4M3FNUZ attri
 // CHECK:         arith.negf %{{.*}} : f32
 // CHECK:         arith.trunci %{{.*}} : i32 to i8
 // CHECK:         arith.bitcast %{{.*}} : i8 to f8E4M3FN
+//
+// With emulation disabled, extf/truncf remain unconverted (no bitcast).
+// NOEMU-LABEL: func.func @gpu_ocp_gfx942_emulated
+// NOEMU-SAME:    (%[[ARG0:.*]]: f8E4M3FN)
+// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FN to f32
+// NOEMU:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
+// NOEMU:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FN
+// NOEMU-NOT:     arith.bitcast
+// NOEMU:         return %[[TRUNC]]
 #executable_target_gfx942_ocp = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, ukernels = "none"}>
 func.func @gpu_ocp_gfx942_emulated(%arg0 : f8E4M3FN) -> f8E4M3FN attributes {
   hal.executable.target = #executable_target_gfx942_ocp
@@ -396,6 +406,15 @@ func.func @gpu_ocp_gfx950_hw_conversion(%arg0 : f8E4M3FN) -> f8E4M3FN attributes
 // CHECK:         arith.negf %{{.*}} : f32
 // CHECK:         arith.trunci %{{.*}} : i32 to i8
 // CHECK:         arith.bitcast %{{.*}} : i8 to f8E4M3FNUZ
+//
+// With emulation disabled, extf/truncf remain unconverted (no bitcast).
+// NOEMU-LABEL: func.func @gpu_fnuz_gfx950_emulated
+// NOEMU-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ)
+// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FNUZ to f32
+// NOEMU:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
+// NOEMU:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FNUZ
+// NOEMU-NOT:     arith.bitcast
+// NOEMU:         return %[[TRUNC]]
 #executable_target_gfx950_fnuz = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree_codegen.target_info = #iree_gpu.target<arch = "gfx950", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, ukernels = "none"}>
 func.func @gpu_fnuz_gfx950_emulated(%arg0 : f8E4M3FNUZ) -> f8E4M3FNUZ attributes {
   hal.executable.target = #executable_target_gfx950_fnuz
