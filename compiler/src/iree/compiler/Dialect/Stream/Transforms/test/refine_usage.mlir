@@ -554,3 +554,70 @@ util.func public @transients_external_result(%size: index, %storage_size: index)
   // CHECK: util.return {{.+}} !stream.resource<external>
   util.return %awaited : !stream.resource<*>
 }
+
+// -----
+
+// Tests that a clone of an external resource whose result is never mutated
+// (no tied uses) inherits the source's lifetime. ResourceUsageAnalysis
+// propagates source usage through immutable clones, causing both sides to
+// resolve to the same lifetime. The second ElideAsyncCopies pass then elides
+// the now-same-type clone.
+
+// CHECK-LABEL: @clone_external_immutable_inherits_source
+util.func private @clone_external_immutable_inherits_source(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // Clone result inherits External from source (no tied uses → source
+  // propagation). Both sides become external.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads from clone (not tied), produces a new transient allocation.
+  // CHECK: stream.async.dispatch {{.*}}(%[[CLONE]]{{.*}}) : (!stream.resource<external>{{.*}}) -> !stream.resource<transient>
+  %result = stream.async.dispatch on(#hal.device.affinity<@device>)
+      @ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return {{.*}} : !stream.resource<transient>
+  util.return %result : !stream.resource<*>
+}
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// -----
+
+// Tests that a clone of an external resource whose result IS mutated (tied
+// use from dispatch) gets its own lifetime determined by the result's uses,
+// not the source's lifetime. This is the data-isolation case where the clone
+// genuinely allocates a fresh buffer.
+
+// CHECK-LABEL: @clone_external_mutated_becomes_transient
+util.func private @clone_external_mutated_becomes_transient(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // Clone result has a tied use (dispatch mutates in-place), so it gets its
+  // own lifetime from backward propagation: transient (internal use only).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<transient>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // Dispatch mutates clone in-place (tied result), producing transient.
+  // CHECK: stream.async.dispatch {{.*}}(%[[CLONE]]{{.*}}) : (!stream.resource<transient>{{.*}}) -> %[[CLONE]]{%{{.*}}}
+  %result = stream.async.dispatch on(#hal.device.affinity<@device>)
+      @ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return {{.*}} : !stream.resource<transient>
+  util.return %result : !stream.resource<*>
+}
+
+stream.executable private @ex2 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%binding: !stream.binding) {
+      return
+    }
+  }
+}
