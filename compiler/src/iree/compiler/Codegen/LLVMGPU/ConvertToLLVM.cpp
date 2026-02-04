@@ -355,10 +355,9 @@ public:
       // Stream → HAL conversion. If not, we'll need to preserve it explicitly.
       if (auto correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_correlation")) {
-        SmallVector<int64_t> correlatedBindings;
-        for (IntegerAttr intAttr : correlationAttr.getAsRange<IntegerAttr>()) {
-          correlatedBindings.push_back(intAttr.getInt());
-        }
+        auto correlatedBindings =
+            llvm::map_to_vector(correlationAttr.getAsRange<IntegerAttr>(),
+                                [](IntegerAttr attr) { return attr.getInt(); });
         if (!correlatedBindings.empty()) {
           bindingCorrelationMap[binding] = std::move(correlatedBindings);
         }
@@ -366,10 +365,9 @@ public:
       // Read noalias information (bindings pointing to different resources).
       if (auto noaliasAttr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_noalias")) {
-        SmallVector<int64_t> noaliasBindings;
-        for (IntegerAttr intAttr : noaliasAttr.getAsRange<IntegerAttr>()) {
-          noaliasBindings.push_back(intAttr.getInt());
-        }
+        auto noaliasBindings =
+            llvm::map_to_vector(noaliasAttr.getAsRange<IntegerAttr>(),
+                                [](IntegerAttr attr) { return attr.getInt(); });
         if (!noaliasBindings.empty()) {
           bindingNoaliasMap[binding] = std::move(noaliasBindings);
         }
