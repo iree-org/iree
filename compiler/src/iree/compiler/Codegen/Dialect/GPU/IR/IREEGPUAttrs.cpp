@@ -690,11 +690,11 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-SmallVector<SmallVector<utils::IteratorType>> MMAAttr::getOperandIteratorTypes() const {
-  return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+SmallVector<SmallVector<utils::IteratorType>>
+MMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 Attribute MMAAttr::getDistributionMappingKind() const {
@@ -968,11 +968,11 @@ int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
          getSubgroupsK();
 }
 
-SmallVector<SmallVector<utils::IteratorType>> DataTiledMMAAttr::getOperandIteratorTypes() const {
-  return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+SmallVector<SmallVector<utils::IteratorType>>
+DataTiledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -1351,11 +1351,11 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   return 0;
 }
 
-SmallVector<SmallVector<utils::IteratorType>> VirtualMMAAttr::getOperandIteratorTypes() const {
-  return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+SmallVector<SmallVector<utils::IteratorType>>
+VirtualMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
@@ -1702,13 +1702,15 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   return success();
 }
 
-SmallVector<SmallVector<utils::IteratorType>> ScaledMMAAttr::getOperandIteratorTypes() const {
-  return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+SmallVector<SmallVector<utils::IteratorType>>
+ScaledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1920,13 +1922,13 @@ DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
 
 SmallVector<SmallVector<utils::IteratorType>>
 DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
-  return {
-    {utils::IteratorType::parallel, utils::IteratorType::reduction, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::reduction},
-    {utils::IteratorType::reduction, utils::IteratorType::parallel},
-    {utils::IteratorType::parallel, utils::IteratorType::parallel}
-  };
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 //===----------------------------------------------------------------------===//

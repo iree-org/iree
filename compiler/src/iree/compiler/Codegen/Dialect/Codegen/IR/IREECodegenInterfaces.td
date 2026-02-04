@@ -257,8 +257,8 @@ def IREECodegen_InnerTileDescAttrInterface :
         - RHS (operand 1): {"reduction", "parallel"}
         - ACC (operand 2): {"parallel", "parallel"}
         Returns: {
-          {"parallel", "reduction"}, 
-          {"reduction", "parallel"}, 
+          {"parallel", "reduction"},
+          {"reduction", "parallel"},
           {"parallel", "parallel"}
         }
       }],
