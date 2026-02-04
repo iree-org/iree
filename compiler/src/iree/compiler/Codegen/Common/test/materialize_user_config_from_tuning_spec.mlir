@@ -1,10 +1,8 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(builtin.module(iree-codegen-materialize-tuning-specs,iree-codegen-materialize-user-configs))' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec.mlir},iree-codegen-materialize-user-configs))' \
 // RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --no-implicit-module --verify-diagnostics %s | FileCheck %s
 
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs,builtin.module(iree-codegen-materialize-user-configs))' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec.mlir},builtin.module(iree-codegen-materialize-user-configs))' \
 // RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --no-implicit-module --verify-diagnostics %s | FileCheck %s --check-prefix=PARENT
 

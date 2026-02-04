@@ -1,10 +1,8 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs)' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec.mlir})' \
 // RUN:   --iree-codegen-dump-tuning-specs-to=- \
 // RUN:   --mlir-disable-threading --no-implicit-module %s | FileCheck %s
 
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs)' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_default.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec_default.mlir})' \
 // RUN:   --iree-codegen-dump-tuning-specs-to=- \
 // RUN:   --mlir-disable-threading --no-implicit-module %s | FileCheck %s --check-prefix=SKIPLINK
 
