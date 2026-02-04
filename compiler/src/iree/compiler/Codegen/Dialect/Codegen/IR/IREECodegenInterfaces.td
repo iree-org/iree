@@ -250,7 +250,7 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the iterator types of the parallel dimensions for each operand.
+        Return the iterator types of the dimensions for each operand.
         For example in a matmul C = A * B:
         - LHS (operand 0): {"parallel", "reduction"}
         - RHS (operand 1): {"parallel", "reduction"}

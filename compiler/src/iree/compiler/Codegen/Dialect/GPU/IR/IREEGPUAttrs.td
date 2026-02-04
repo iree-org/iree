@@ -260,6 +260,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -302,13 +303,6 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     int64_t getBlockSize() const;
 
     SmallVector<VirtualMMAIntrinsic> getVirtualIntrinsics() const;
-
-    ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
-      return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
-    }
   }];
 }
 
@@ -327,6 +321,7 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
+        "getOperandIteratorTypes",
       ]>,
       DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
         "getTileSwizzle",
@@ -396,6 +391,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -460,15 +456,6 @@ def IREEGPU_DataTiledMMAAttr :
               "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
           OptionalParameter<
               "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
-
-  let extraClassDeclaration = [{
-    ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
-      return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
-    }
-  }];
 }
 
 def IREEGPU_DataTiledScaledMMAAttr :
@@ -543,6 +530,7 @@ def IREEGPU_VirtualMMAAttr :
     "getDistributedTileTypes",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
@@ -584,13 +572,6 @@ def IREEGPU_VirtualMMAAttr :
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
     // in this example, intrinsicsK = 32/16 = 2.
     int64_t getIntrinsicsK() const;
-
-    ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
-      return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction},
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
-    }
   }];
 }
 
@@ -616,6 +597,7 @@ def IREEGPU_ScaledMMAAttr :
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -676,12 +658,6 @@ def IREEGPU_ScaledMMAAttr :
       ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
       return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
-    }
-    ::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>> getOperandIteratorTypes() const {
-      return {
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction},
-        {::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::reduction, ::mlir::utils::IteratorType::parallel},
-        {::mlir::utils::IteratorType::parallel, ::mlir::utils::IteratorType::parallel}};
     }
   }];
 }
