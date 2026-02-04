@@ -3970,6 +3970,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-convert-unsupported-float-arith">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4001,7 +4016,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_22" class="md-nav__link">
+  <a href="#options_23" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -7156,6 +7171,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-convert-unsupported-float-arith">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -7187,7 +7217,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_22" class="md-nav__link">
+  <a href="#options_23" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -7709,13 +7739,18 @@ target backend. The pass:</p>
    arithmetic in a supported type (e.g., f32).</p>
 </li>
 <li>
-<p>For CPU targets, emulates extf/truncf operations themselves using integer
-   bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.</p>
+<p>Emulates extf/truncf operations using integer bit manipulation, if the
+   backend doesn't natively support fpext/fptrunc for fp4/fp8 types.</p>
 </li>
 </ol>
 <p>The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
 IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
 NaN, Inf, and special encodings (FNUZ types).</p>
+<p>Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
+preserved and handled by separate expansion patterns in later passes.</p>
+<h4 id="options_22">Options<a class="headerlink" href="#options_22" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-enable-ext-trunc-emulation : Enable software emulation for extf/truncf of fp4/fp8 types without hardware support. When disabled, types requiring emulation will be left unconverted and may cause errors in later passes.
+</code></pre></div>
 <h3 id="-iree-eliminate-empty-tensors"><code>-iree-eliminate-empty-tensors</code><a class="headerlink" href="#-iree-eliminate-empty-tensors" title="Permanent link">link</a></h3>
 <p><em>Eliminate tensor.empty ops to avoid buffer allocations</em></p>
 <h3 id="-iree-loop-invariant-code-motion"><code>-iree-loop-invariant-code-motion</code><a class="headerlink" href="#-iree-loop-invariant-code-motion" title="Permanent link">link</a></h3>
@@ -7731,7 +7766,7 @@ and is explicitly disabled.</p>
 <p>This pass runs the transform dialect interpreter and applies the named
 sequence transformation specified by the provided name (defaults to
 <code>TransformDialect::kTransformEntryPointSymbolName</code> (i.e. <code>__transform_main</code>)).</p>
-<h4 id="options_22">Options<a class="headerlink" href="#options_22" title="Permanent link">link</a></h4>
+<h4 id="options_23">Options<a class="headerlink" href="#options_23" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-entry-point       : Entry point of the pass pipeline.
 -library-file-name : File path to load a library of transform dialect strategies from.
 </code></pre></div>
