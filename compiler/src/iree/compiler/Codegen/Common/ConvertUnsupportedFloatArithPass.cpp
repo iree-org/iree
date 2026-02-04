@@ -369,8 +369,7 @@ private:
 ///    - f4E2M1FN has no NaN and no negative zero.
 struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
   TruncFToSmallFloat(MLIRContext *ctx, ArrayRef<Type> sourceTypes)
-      : OpRewritePattern(ctx),
-        sourceTypes(sourceTypes.begin(), sourceTypes.end()) {}
+      : OpRewritePattern(ctx), sourceTypes(sourceTypes) {}
 
   LogicalResult matchAndRewrite(arith::TruncFOp op,
                                 PatternRewriter &rewriter) const override {
@@ -603,8 +602,7 @@ private:
 /// which is simpler and more general than enumerating all possible values.
 struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
   ExtFFromSmallFloat(MLIRContext *ctx, ArrayRef<Type> sourceTypes)
-      : OpRewritePattern(ctx),
-        sourceTypes(sourceTypes.begin(), sourceTypes.end()) {}
+      : OpRewritePattern(ctx), sourceTypes(sourceTypes) {}
 
   LogicalResult matchAndRewrite(arith::ExtFOp op,
                                 PatternRewriter &rewriter) const override {
@@ -845,7 +843,7 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   // the small float types need the emulation. For GPU targets, some types may
   // have hardware conversion support and can be skipped.
   SmallVector<Type> typesNeedingConversionEmulation = allSmallFloatTypes;
-  if (auto gpuAttr = getGPUTargetAttr(funcOp)) {
+  if (IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(funcOp)) {
     typesNeedingConversionEmulation =
         getTypesNeedingConversionEmulationForGPU(context, gpuAttr);
   }
