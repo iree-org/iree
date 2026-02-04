@@ -107,13 +107,23 @@ def ConvertUnsupportedFloatArithPass
     1. Wraps unsupported float operations with extf/truncf pairs to perform
        arithmetic in a supported type (e.g., f32).
 
-    2. For CPU targets, emulates extf/truncf operations themselves using integer
-       bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.
+    2. Emulates extf/truncf operations using integer bit manipulation, if the
+       backend doesn't natively support fpext/fptrunc for fp4/fp8 types.
 
     The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
     IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
     NaN, Inf, and special encodings (FNUZ types).
+
+    Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
+    preserved and handled by separate expansion patterns in later passes.
   }];
+  let options = [
+    Option<"enableExtTruncEmulation", "enable-ext-trunc-emulation",
+           "bool", /*default=*/"true",
+           "Enable software emulation for extf/truncf of fp4/fp8 types "
+           "without hardware support. When disabled, types requiring emulation "
+           "will be left unconverted and may cause errors in later passes.">
+  ];
 }
 
 def ConvertToDestinationPassingStylePass :

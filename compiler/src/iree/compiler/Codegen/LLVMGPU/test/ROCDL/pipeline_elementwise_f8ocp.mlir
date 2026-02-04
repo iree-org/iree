@@ -4,6 +4,10 @@
 // RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
 // RUN: not iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" -o /dev/null 2>&1 %s | FileCheck %s --check-prefix=ERRORS
 
+// With --iree-llvmgpu-enable-small-float-emulation, unsupported chips use software emulation.
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-llvmgpu-enable-small-float-emulation --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-llvmgpu-enable-small-float-emulation --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=EMULATED
+
 #map = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -42,7 +46,7 @@ hal.executable @ext_fp8_dispatch {
   }
 }
 
-// ERRORS: F8E5M2 and F8E4M3FN types are not supported on gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ instead.
+// ERRORS: F8E5M2 and F8E4M3FN types are not supported on gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ instead, or use --iree-llvmgpu-enable-small-float-emulation
 
 //   OCP-LABEL: hal.executable public @ext_fp8_dispatch {
 //         OCP:   hal.executable.variant public @rocm
@@ -50,3 +54,8 @@ hal.executable @ext_fp8_dispatch {
 // OCP-COUNT-8:     rocdl.cvt.pk.f32.bf8 %{{.*}} : vector<2xf32>
 //         OCP:     %[[ADD:.+]] = llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
 //         OCP:     llvm.store %[[ADD]], %{{.*}} : vector<16xf32>, !llvm.ptr<7>
+
+// EMULATED-LABEL: hal.executable public @ext_fp8_dispatch {
+//       EMULATED:   hal.executable.variant public @rocm
+//       EMULATED:     llvm.fadd %{{.*}}, %{{.*}} : vector<16xf32>
+//       EMULATED:     llvm.store %{{.*}}, %{{.*}} : vector<16xf32>, !llvm.ptr<7>

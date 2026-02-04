@@ -113,6 +113,14 @@ static llvm::cl::opt<bool> clPatchFuncOps(
         "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
+static llvm::cl::opt<bool> clLLVMGPUEnableSmallFloatEmulation(
+    "iree-llvmgpu-enable-small-float-emulation",
+    llvm::cl::desc(
+        "Enable software emulation for fp4/fp8 types without hardware support. "
+        "When disabled (default), unsupported types will cause a compile "
+        "error."),
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -1059,7 +1067,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
-    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
+    // Software emulation for small float types (fp4/fp8) is controlled by
+    // --iree-llvmgpu-enable-small-float-emulation. When disabled (default),
+    // ConvertToROCDL will error on unsupported types.
+    funcPassManager.addPass([] {
+      return createConvertUnsupportedFloatArithPass(
+          ConvertUnsupportedFloatArithPassOptions{
+              clLLVMGPUEnableSmallFloatEmulation});
+    });
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());
