@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Patterns.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRFunctionInterfaces
     MLIRIR
