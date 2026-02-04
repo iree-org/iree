@@ -94,9 +94,11 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "conv2d.mlir"
+    "fp_to_subbyte.mlir"
     "gather_like_ops.mlir"
     "index.mlir"
     "narrow_n_matmuls.mlir"
+    "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
   TARGET_BACKEND
