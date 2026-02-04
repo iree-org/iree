@@ -61,6 +61,10 @@ OUTPUT
 DEBUG
     --keep              Keep temp directory for inspection
 
+CACHE MANAGEMENT
+    --clean             Remove all cached data and exit
+    --cache_status      Show cache usage statistics and exit
+
 EXIT CODES
     0                   Success (build/run completed)
     1                   Build failed (compiler errors, missing deps)
@@ -268,25 +272,91 @@ _portable_hash() {
 
 # Portable file locking using mkdir (atomic on all POSIX systems).
 # flock is Linux-specific; mkdir-based locking works everywhere.
+#
+# Stale lock detection: if the process that created the lock is dead,
+# we reclaim the lock immediately rather than waiting forever.
 _acquire_lock() {
     local lock_dir="${1}.d"
     local timeout="${2:-60}"
     local waited=0
-    while ! mkdir "${lock_dir}" 2>/dev/null; do
+
+    while true; do
+        # Try to atomically create lock directory.
+        if mkdir "${lock_dir}" 2>/dev/null; then
+            # Successfully acquired lock - write our PID.
+            echo $$ > "${lock_dir}/pid"
+            return 0
+        fi
+
+        # Lock exists - check if holder is still alive.
+        if [[ -f "${lock_dir}/pid" ]]; then
+            local holder_pid
+            holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+            if [[ -n "${holder_pid}" ]]; then
+                # kill -0 checks if process exists without sending signal.
+                if ! kill -0 "${holder_pid}" 2>/dev/null; then
+                    # Holder process is dead - reclaim the stale lock.
+                    iree_debug "Reclaiming stale lock from dead process ${holder_pid}"
+                    rm -rf "${lock_dir}"
+                    continue  # Retry acquisition immediately.
+                fi
+            fi
+        elif [[ -d "${lock_dir}" ]]; then
+            # Lock directory exists but no PID file - likely a very old stale lock
+            # or mid-creation crash. Give it a moment, then reclaim.
+            if [[ "${waited}" -gt 2 ]]; then
+                iree_debug "Reclaiming orphaned lock directory (no PID file)"
+                rm -rf "${lock_dir}"
+                continue
+            fi
+        fi
+
+        # Lock is held by a live process (or we're giving it a grace period).
         sleep 1
         waited=$((waited + 1))
         if [[ "${waited}" -ge "${timeout}" ]]; then
+            # Provide actionable error message.
+            local msg="Timeout waiting for lock on cache slot"
+            if [[ -f "${lock_dir}/pid" ]]; then
+                local holder_pid
+                holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+                msg="${msg} (held by PID ${holder_pid})"
+            fi
+            iree_warn "${msg}"
             return 1
         fi
     done
-    # Store PID for debugging.
-    echo $$ > "${lock_dir}/pid"
-    return 0
 }
 
 _release_lock() {
     local lock_dir="${1}.d"
     rm -rf "${lock_dir}"
+}
+
+# Clean up any stale lock directories in the cache.
+# Called during cache maintenance to prevent lock accumulation.
+_cleanup_stale_locks() {
+    local cache_dir="${1}"
+    if [[ ! -d "${cache_dir}" ]]; then
+        return
+    fi
+
+    # Find all .lock.d directories.
+    while IFS= read -r lock_dir; do
+        [[ -z "${lock_dir}" ]] && continue
+        if [[ -f "${lock_dir}/pid" ]]; then
+            local holder_pid
+            holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+            if [[ -n "${holder_pid}" ]] && ! kill -0 "${holder_pid}" 2>/dev/null; then
+                iree_debug "Cleaning stale lock from dead process ${holder_pid}"
+                rm -rf "${lock_dir}"
+            fi
+        elif [[ -d "${lock_dir}" ]]; then
+            # No PID file - orphaned lock.
+            iree_debug "Cleaning orphaned lock directory: ${lock_dir}"
+            rm -rf "${lock_dir}"
+        fi
+    done < <(find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null)
 }
 
 # Compute a hash for cache slot naming based on deps-affecting inputs.
@@ -338,24 +408,177 @@ compute_cache_hash() {
 
 # Ensure cache doesn't exceed MAX_CACHE_SLOTS by evicting oldest slots.
 # Uses mtime for LRU ordering (we touch slots on use).
+# Also cleans up any stale locks from crashed processes.
 enforce_cache_limit() {
     local cache_dir="${1}"
     if [[ ! -d "${cache_dir}" ]]; then
         return
     fi
+
+    # First, clean up any stale lock directories.
+    _cleanup_stale_locks "${cache_dir}"
+
+    # Count only actual cache slot directories (not .lock.d directories).
     local slot_count
-    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" 2>/dev/null | wc -l)
     if [[ "${slot_count}" -gt "${MAX_CACHE_SLOTS}" ]]; then
         local excess=$((slot_count - MAX_CACHE_SLOTS))
         iree_debug "Cache has ${slot_count} slots, evicting ${excess} oldest"
-        # Find oldest directories by mtime and remove them.
-        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | \
+        # Find oldest directories by mtime and remove them (exclude lock dirs).
+        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" -printf '%T@ %p\n' 2>/dev/null | \
             sort -n | head -n "${excess}" | cut -d' ' -f2- | \
             while read -r old_slot; do
                 rm -rf "${old_slot}"
                 iree_debug "Evicted cache slot: ${old_slot}"
             done
     fi
+}
+
+# Show cache usage statistics.
+show_cache_status() {
+    local base_dir="${1}"
+    local cache_dir="${base_dir}/cache"
+    local output_base="${base_dir}/output_base"
+
+    echo "iree-bazel-try cache status"
+    echo "==========================="
+    echo ""
+    echo "Base directory: ${base_dir}"
+    echo ""
+
+    # Cache slots.
+    if [[ -d "${cache_dir}" ]]; then
+        local slot_count
+        slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" 2>/dev/null | wc -l)
+        local slot_size
+        slot_size=$(du -sh "${cache_dir}" 2>/dev/null | cut -f1)
+        echo "Cache slots: ${slot_count}/${MAX_CACHE_SLOTS} (${slot_size})"
+
+        # List slots with age.
+        if [[ "${slot_count}" -gt 0 ]]; then
+            echo ""
+            echo "Slots (newest first):"
+            local now
+            now=$(date +%s)
+            find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" -printf '%T@ %f\n' 2>/dev/null | \
+                sort -rn | \
+                while read -r mtime slot; do
+                    local age_seconds=$((now - ${mtime%.*}))
+                    local age_str
+                    if [[ "${age_seconds}" -lt 60 ]]; then
+                        age_str="${age_seconds}s ago"
+                    elif [[ "${age_seconds}" -lt 3600 ]]; then
+                        age_str="$((age_seconds / 60))m ago"
+                    elif [[ "${age_seconds}" -lt 86400 ]]; then
+                        age_str="$((age_seconds / 3600))h ago"
+                    else
+                        age_str="$((age_seconds / 86400))d ago"
+                    fi
+                    local slot_size
+                    slot_size=$(du -sh "${cache_dir}/${slot}" 2>/dev/null | cut -f1)
+                    echo "  ${slot} (${slot_size}, ${age_str})"
+                done
+        fi
+
+        # Stale locks.
+        local lock_count
+        lock_count=$(find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null | wc -l)
+        if [[ "${lock_count}" -gt 0 ]]; then
+            echo ""
+            echo "Lock directories: ${lock_count}"
+            find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null | \
+                while read -r lock_dir; do
+                    local status="active"
+                    if [[ -f "${lock_dir}/pid" ]]; then
+                        local holder_pid
+                        holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+                        if [[ -n "${holder_pid}" ]] && ! kill -0 "${holder_pid}" 2>/dev/null; then
+                            status="STALE (PID ${holder_pid} dead)"
+                        else
+                            status="held by PID ${holder_pid}"
+                        fi
+                    else
+                        status="ORPHANED (no PID)"
+                    fi
+                    echo "  $(basename "${lock_dir}"): ${status}"
+                done
+        fi
+    else
+        echo "Cache slots: 0/${MAX_CACHE_SLOTS} (not created yet)"
+    fi
+
+    echo ""
+
+    # Bazel output_base (can be large).
+    if [[ -d "${output_base}" ]]; then
+        local output_size
+        output_size=$(du -sh "${output_base}" 2>/dev/null | cut -f1)
+        echo "Bazel output_base: ${output_size}"
+        echo "  (This is used when --copt/--features are specified)"
+    else
+        echo "Bazel output_base: not created"
+    fi
+
+    echo ""
+
+    # Total size.
+    if [[ -d "${base_dir}" ]]; then
+        local total_size
+        total_size=$(du -sh "${base_dir}" 2>/dev/null | cut -f1)
+        echo "Total: ${total_size}"
+    fi
+}
+
+# Clean all cached data.
+clean_cache() {
+    local base_dir="${1}"
+
+    if [[ ! -d "${base_dir}" ]]; then
+        echo "No cache directory to clean."
+        return 0
+    fi
+
+    echo "Cleaning iree-bazel-try cache..."
+
+    # Show what we're about to clean.
+    local total_size
+    total_size=$(du -sh "${base_dir}" 2>/dev/null | cut -f1)
+    echo "  Directory: ${base_dir}"
+    echo "  Size: ${total_size}"
+
+    # Clean staging directories (from any crashed processes).
+    local staging_count
+    staging_count=$(find "${base_dir}" -maxdepth 1 -name "staging_*" -type d 2>/dev/null | wc -l)
+    if [[ "${staging_count}" -gt 0 ]]; then
+        echo "  Removing ${staging_count} staging directories..."
+        find "${base_dir}" -maxdepth 1 -name "staging_*" -type d -exec rm -rf {} \; 2>/dev/null
+    fi
+
+    # Clean cache slots (includes stale locks).
+    if [[ -d "${base_dir}/cache" ]]; then
+        local slot_count
+        slot_count=$(find "${base_dir}/cache" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+        echo "  Removing ${slot_count} cache entries..."
+        rm -rf "${base_dir}/cache"
+    fi
+
+    # Clean Bazel output_base.
+    if [[ -d "${base_dir}/output_base" ]]; then
+        local output_size
+        output_size=$(du -sh "${base_dir}/output_base" 2>/dev/null | cut -f1)
+        echo "  Removing Bazel output_base (${output_size})..."
+        rm -rf "${base_dir}/output_base"
+    fi
+
+    # Clean bazel-* symlinks.
+    for symlink in "${base_dir}"/bazel-*; do
+        if [[ -L "${symlink}" ]]; then
+            echo "  Removing symlink: $(basename "${symlink}")"
+            rm -f "${symlink}"
+        fi
+    done
+
+    echo "Done."
 }
 
 # Infer Bazel deps from #include directives in source files.
@@ -556,6 +779,18 @@ while [[ $# -gt 0 ]]; do
         --keep)
             KEEP_TEMP=1
             shift
+            ;;
+        --clean)
+            # Find worktree root first.
+            iree_require_worktree
+            clean_cache "${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+            exit 0
+            ;;
+        --cache-status|--cache_status)
+            # Find worktree root first.
+            iree_require_worktree
+            show_cache_status "${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+            exit 0
             ;;
         --no_infer|--no_infer)
             INFER_DEPS=0
