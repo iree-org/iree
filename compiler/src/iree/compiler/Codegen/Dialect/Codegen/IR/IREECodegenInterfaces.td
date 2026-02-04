@@ -250,15 +250,18 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For the given operand index, return the sizes of the parallel dimensions
-        in the intrinsic. For example in a matmul C = A * B:
+        Return the sizes of the parallel dimensions for each operand.
+        For example in a matmul C = A * B:
         - LHS (operand 0): parallel dimension is M
         - RHS (operand 1): parallel dimension is N
         - ACC (operand 2): parallel dimensions are M and N
+        
+        Returns a vector where each element is a vector of parallel dimension
+        sizes for that operand.
       }],
-      /*retType=*/"::llvm::SmallVector<int64_t>",
+      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<int64_t>>",
       /*methodName=*/"getParallelDimSizes",
-      /*args=*/(ins "int64_t":$operandIndex),
+      /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return {};
@@ -266,15 +269,18 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        For the given operand index, return the sizes of the reduction dimensions
-        in the intrinsic. For example in a matmul C = A * B:
+        Return the sizes of the reduction dimensions for each operand.
+        For example in a matmul C = A * B:
         - LHS (operand 0): reduction dimension is K
         - RHS (operand 1): reduction dimension is K
         - ACC (operand 2): no reduction dimensions
+        
+        Returns a vector where each element is a vector of reduction dimension
+        sizes for that operand.
       }],
-      /*retType=*/"::llvm::SmallVector<int64_t>",
+      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<int64_t>>",
       /*methodName=*/"getReductionDimSizes",
-      /*args=*/(ins "int64_t":$operandIndex),
+      /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return {};
