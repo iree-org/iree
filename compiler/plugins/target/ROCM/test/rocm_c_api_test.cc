@@ -16,15 +16,11 @@ namespace {
 
 class ROCMCAPITest : public ::testing::Test {
 protected:
-  void SetUp() override {
-    ireeCompilerGlobalInitialize();
-    session = ireeCompilerSessionCreate();
-  }
+  static void SetUpTestSuite() { ireeCompilerGlobalInitialize(); }
+  static void TearDownTestSuite() { ireeCompilerGlobalShutdown(); }
 
-  void TearDown() override {
-    ireeCompilerSessionDestroy(session);
-    ireeCompilerGlobalShutdown();
-  }
+  void SetUp() override { session = ireeCompilerSessionCreate(); }
+  void TearDown() override { ireeCompilerSessionDestroy(session); }
 
   iree_compiler_session_t *session = nullptr;
 };
@@ -34,6 +30,13 @@ TEST_F(ROCMCAPITest, TuningSpecPathFlagAccepted) {
   iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, &flag);
   ASSERT_EQ(err, nullptr)
       << "Tuning spec path flag should be accepted via C API";
+}
+
+TEST_F(ROCMCAPITest, DefaultTuningSpecsFlagNotRegistered) {
+  const char *flag = "--iree-codegen-enable-default-tuning-specs";
+  iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, &flag);
+  ASSERT_NE(err, nullptr) << "CLI-only flag should not be accessible via C API";
+  ireeCompilerErrorDestroy(err);
 }
 
 } // namespace
