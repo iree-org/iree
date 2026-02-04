@@ -88,6 +88,11 @@ static llvm::cl::opt<bool> clCombineLayoutTransformation(
     llvm::cl::desc("Combine relayout ops during dispatch configuration"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
+static llvm::cl::opt<bool> clROCDLLoadToTransposeLoad(
+    "iree-llvmgpu-test-load-to-transpose-load",
+    llvm::cl::desc("Enable amdgpu.transpose_load targeting for ROCDL"),
+    llvm::cl::init(true), llvm::cl::Hidden);
+
 static llvm::cl::opt<IREE::Codegen::WorkgroupId>
     clSetWorkgroupDistributionAlong(
         "iree-llvmgpu-set-workgroup-distribution-along",
@@ -588,6 +593,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  if (forROCDL && clROCDLLoadToTransposeLoad) {
+    funcPassManager.addPass(createROCDLLoadToTransposeLoadPass());
+  }
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
