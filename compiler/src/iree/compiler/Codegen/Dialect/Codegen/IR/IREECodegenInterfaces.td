@@ -250,13 +250,17 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the iterator types of the dimensions for each operand.
+        Returns a vector where each element is a vector of iterator types for
+        each dimension of each operand.
         For example in a matmul C = A * B:
         - LHS (operand 0): {"parallel", "reduction"}
-        - RHS (operand 1): {"parallel", "reduction"}
+        - RHS (operand 1): {"reduction", "parallel"}
         - ACC (operand 2): {"parallel", "parallel"}
-
-        Returns a vector where each element is a vector of iterator types for that operand.
+        Returns: {
+          {"parallel", "reduction"}, 
+          {"reduction", "parallel"}, 
+          {"parallel", "parallel"}
+        }
       }],
       /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>>",
       /*methodName=*/"getOperandIteratorTypes",
