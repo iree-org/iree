@@ -966,7 +966,8 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-SmallVector<SmallVector<int64_t>> DataTiledMMAAttr::getParallelDimSizes() const {
+SmallVector<SmallVector<int64_t>>
+DataTiledMMAAttr::getParallelDimSizes() const {
   auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
   // Scale by the number of intrinsics and subgroups
   m *= getIntrinsicsM() * getSubgroupsM();
@@ -974,7 +975,8 @@ SmallVector<SmallVector<int64_t>> DataTiledMMAAttr::getParallelDimSizes() const 
   return {{m}, {n}, {m, n}};
 }
 
-SmallVector<SmallVector<int64_t>> DataTiledMMAAttr::getReductionDimSizes() const {
+SmallVector<SmallVector<int64_t>>
+DataTiledMMAAttr::getReductionDimSizes() const {
   auto [m, n, k] = getMNKShapeFromIntrinsic(getIntrinsic());
   // Scale by the number of intrinsics and subgroups
   k *= getIntrinsicsK() * getSubgroupsK();

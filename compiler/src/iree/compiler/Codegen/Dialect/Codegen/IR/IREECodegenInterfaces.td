@@ -255,7 +255,7 @@ def IREECodegen_InnerTileDescAttrInterface :
         - LHS (operand 0): parallel dimension is M
         - RHS (operand 1): parallel dimension is N
         - ACC (operand 2): parallel dimensions are M and N
-        
+
         Returns a vector where each element is a vector of parallel dimension
         sizes for that operand.
       }],
@@ -274,7 +274,7 @@ def IREECodegen_InnerTileDescAttrInterface :
         - LHS (operand 0): reduction dimension is K
         - RHS (operand 1): reduction dimension is K
         - ACC (operand 2): no reduction dimensions
-        
+
         Returns a vector where each element is a vector of reduction dimension
         sizes for that operand.
       }],
