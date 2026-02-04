@@ -409,6 +409,27 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_library(
+  NAME
+    cpu_set
+  HDRS
+    "cpu_set.h"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    cpu_set_test
+  SRCS
+    "cpu_set_test.cc"
+  DEPS
+    ::cpu_set
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
