@@ -52,9 +52,12 @@ static void populateEscapingProducers(Operation *parentOp,
 // types.
 static bool isLegalConstExprType(Type t) {
   // If implementing the hoistable interface just return what the interface
-  // says.
+  // says. Use a default DataLayout (which uses 64-bit index by default) since
+  // this is called during analysis when we don't have module context.
+  // The actual index bitwidth only matters for storage encoding, not for
+  // determining if a type is legal for const-expr analysis.
   if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(t)) {
-    return hoistableType.isHoistableType();
+    return hoistableType.isHoistableType(DataLayout());
   } else if (t.isIntOrIndexOrFloat()) {
     return true;
   } else if (auto tensorType = dyn_cast<TensorType>(t)) {
@@ -161,10 +164,13 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
   }
 
   // If implementing the HoistableTypeInterface, at this point we can just
-  // return what the interface says.
+  // return what the interface says. Use a default DataLayout (which uses 64-bit
+  // index by default) since this is called during analysis when we don't have
+  // module context. The actual index bitwidth only matters for storage
+  // encoding, not for determining if a type is a hoistable leaf.
   if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
           info->constValue.getType())) {
-    return hoistableType.isHoistableLeafType();
+    return hoistableType.isHoistableLeafType(DataLayout());
   }
 
   // Never hoist sub-byte aligned values: in legal programs, these will be

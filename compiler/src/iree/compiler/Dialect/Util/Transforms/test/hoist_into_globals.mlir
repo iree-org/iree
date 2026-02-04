@@ -487,3 +487,37 @@ module @hoist_multiple_globals_ordered {
     util.return %extracted, %extracted : f32, f32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_tensor_from_elements_const_index_transient
+module @do_not_hoist_tensor_from_elements_const_index_transient {
+  // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
+  // CHECK:     util.func public @main() -> tensor<2xi64>
+  util.func public @main() -> tensor<2xi64> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %cast0 = arith.index_cast %c0 : index to i64
+    %cast1 = arith.index_cast %c1 : index to i64
+    // CHECK: tensor.from_elements %{{.*}}, %{{.*}} : tensor<2xi64>
+    %0 = tensor.from_elements %cast0, %cast1 : tensor<2xi64>
+    util.return %0 : tensor<2xi64>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @do_not_hoist_tensor_from_elements_const_index_leaf
+module @do_not_hoist_tensor_from_elements_const_index_leaf {
+  // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
+  // CHECK:     util.func public @main() -> tensor<2xindex>
+  util.func public @main() -> tensor<2xindex> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    // CHECK: tensor.from_elements %{{.*}}, %{{.*}} : tensor<2xindex>
+    %0 = tensor.from_elements %c0, %c1 : tensor<2xindex>
+    util.return %0 : tensor<2xindex>
+  }
+}

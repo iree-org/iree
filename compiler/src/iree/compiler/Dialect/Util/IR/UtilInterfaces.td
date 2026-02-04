@@ -1318,7 +1318,7 @@ def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isHoistableType",
-      /*args=*/(ins),
+      /*args=*/(ins "const DataLayout &":$dataLayout),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return true;
@@ -1331,7 +1331,7 @@ def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isHoistableLeafType",
-      /*args=*/(ins),
+      /*args=*/(ins "const DataLayout &":$dataLayout),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return true;
@@ -1344,7 +1344,7 @@ def Util_HoistableType : Util_TypeInterface<"HoistableTypeInterface"> {
       }],
       /*retTy=*/"mlir::Type",
       /*methodName=*/"getPreferredStorageType",
-      /*args=*/(ins),
+      /*args=*/(ins "const DataLayout &":$dataLayout),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return $_type;
