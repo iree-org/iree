@@ -3,6 +3,9 @@
 // generalizing the named ops. This ensures convolution pipeline selection works
 // on both named and generic convs.
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(linalg-generalize-named-ops),iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s --check-prefix=GENERIC
+// Test that batchless convolutions (convolutions without batch dimension) also
+// select the conv pipeline after batch dimension insertion.
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-insert-batch-dim-for-batchless-conv),iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s --check-prefix=BATCHLESS
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -1551,3 +1554,33 @@ func.func @batch_mmt4d_generic_form(%lhs: tensor<128x10x32x8x1xf32>, %rhs: tenso
 // CHECK-LABEL: func.func @batch_mmt4d_generic_form(
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG]]}
+
+// -----
+
+// Test that batchless conv (conv without batch dimension) selects the
+// CPUConvTileAndDecomposeExpert pipeline after batch dimension insertion.
+
+#map0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0 + d4, d1 + d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+
+#executable_target_embedded_elf_x86_64_batchless = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+func.func @batchless_conv_nchw_fchw(%input: tensor<128x30x30xf32>, %filter: tensor<3x3x128x64xf32>, %output: tensor<28x28x64xf32>) -> tensor<28x28x64xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_batchless} {
+  %0 = linalg.generic {
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
+  } ins(%input, %filter : tensor<128x30x30xf32>, tensor<3x3x128x64xf32>)
+    outs(%output : tensor<28x28x64xf32>) {
+  ^bb0(%in: f32, %f: f32, %out: f32):
+    %mul = arith.mulf %in, %f : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<28x28x64xf32>
+  return %0 : tensor<28x28x64xf32>
+}
+// After batch dim insertion, the conv should select CPUConvTileAndDecomposeExpert.
+// BATCHLESS-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+// BATCHLESS:     func.func @batchless_conv_nchw_fchw(
+// BATCHLESS-SAME:    translation_info = #[[TRANSLATION]]
+// BATCHLESS:     linalg.generic
+// BATCHLESS-SAME:    lowering_config = #
