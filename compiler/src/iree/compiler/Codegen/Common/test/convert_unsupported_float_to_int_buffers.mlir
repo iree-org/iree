@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-convert-bf16-to-uint16-buffers %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-convert-unsupported-float-to-int-buffers %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
