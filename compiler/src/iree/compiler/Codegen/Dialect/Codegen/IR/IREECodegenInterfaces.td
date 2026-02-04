@@ -252,6 +252,8 @@ def IREECodegen_InnerTileDescAttrInterface :
       /*desc=*/[{
         Returns a vector where each element is a vector of iterator types for
         each dimension of each operand.
+        These dimensions are taken from the unexpanded, undistributed tile
+        shapes of each operand.
         For example in a matmul C = A * B:
         - LHS (operand 0): {"parallel", "reduction"}
         - RHS (operand 1): {"reduction", "parallel"}
