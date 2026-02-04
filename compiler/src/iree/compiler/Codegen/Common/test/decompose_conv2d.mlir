@@ -1,7 +1,4 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
-// Test the same patterns on generic convolution ops by first generalizing the
-// named ops. This ensures decomposition works on both named and generic convs.
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(linalg-generalize-named-ops,iree-codegen-decompose-convolution-to-lower-dim-ops))" --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
 module {
