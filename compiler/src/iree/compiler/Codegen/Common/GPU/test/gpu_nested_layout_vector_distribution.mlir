@@ -122,14 +122,11 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (0, 0)>
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13) -> (0, 0, 0, 0, 0, 0)>
 
 // CHECK-LABEL: @distribute_transfer_read_col_major_with_broadcast
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
-
-// CHECK: %[[BROADCAST_READ:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[I1]]], %{{.*}} permutation_map = #[[$MAP]]
-// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0]
-// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} {offsets = [0, 1, 0, 0, 0, 0]
+// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$MAP]]{{.*}} vector<1x2x1x1x4x1xf16>
 
 // -----
 
@@ -144,7 +141,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [1, 1]
 >
 
-// CHECK-DAG: #[[$PERM:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK-DAG: #[[$PERM:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13) -> (d7, d6, d9, d8, d13, d12)>
 
 func.func @distribute_transfer_read_row_major_transpose(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
@@ -166,17 +163,7 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @distribute_transfer_read_row_major_transpose
-// CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
-
-// CHECK: %[[IDX:.+]] = gpu.thread_id  x
-// CHECK: %[[X:.+]]:2 = affine.delinearize_index %[[IDX]] into (8) : index, index
-// CHECK: %[[LIN_ID0:.+]] = affine.linearize_index [%[[X]]#1, %[[I1]]] by (8, 1)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID0]]], {{.*}} permutation_map = #[[$PERM]]
-// CHECK: %[[I0_PLUS_8:.+]] = affine.linearize_index [%c1, %[[I0]]] by (2, 8)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0_PLUS_8]], %[[LIN_ID0]]], {{.*}} permutation_map = #[[$PERM]]
-// CHECK: %[[LIN_ID1:.+]] = affine.linearize_index [%c1, %[[X]]#1, %[[I1]]] by (2, 8, 1)
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID1]]], {{.*}} permutation_map = #[[$PERM]]
-// CHECK: vector.transfer_read %{{.*}}[%c0, %c0, %[[I0_PLUS_8]], %[[LIN_ID1]]], %cst_0 {in_bounds = [true, true], permutation_map = #[[$PERM]]} : memref<32x32x32x32xf16>, vector<1x8xf16>
+// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$PERM]]{{.*}} vector<2x2x1x1x1x8xf16>
 
 // -----
 
@@ -191,7 +178,7 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [8, 1]
 >
 
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13) -> (d7, d6, d9, d8, d13, d12)>
 
 // CHECK-LABEL: @distribute_transfer_read_col_major_transpose
 func.func @distribute_transfer_read_col_major_transpose(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
@@ -213,8 +200,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$MAP2]]
-// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$MAP2]]
+// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$MAP2]]{{.*}} vector<1x2x1x1x4x1xf16>
 
 // -----
 
@@ -247,12 +233,10 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-LABEL: @distribute_transfer_read_row_major_with_permutations
+// CHECK: #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17, d18, d19, d20, d21, d22, d23) -> (d8, d11, 0, d9, d12, d15, 0, d13, d20, d23, 0, d21)>
 
-// Verify that there are (batch0: 3) * (batch1: 5) * (outer3: 4) = 60 total
-// unique transfer read ops. The broadcasted dimension (2) CSEs the duplicate
-// reads.
-// CHECK-COUNT-60: vector.transfer_read
+// CHECK-LABEL: @distribute_transfer_read_row_major_with_permutations
+// CHECK: vector.transfer_read {{.*}} permutation_map = #[[$MAP3]]{{.*}} vector<3x5x2x1x1x1x2x4x1x1x1x2xf16>
 
 // -----
 

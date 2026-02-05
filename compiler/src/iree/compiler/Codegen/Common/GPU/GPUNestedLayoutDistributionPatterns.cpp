@@ -309,7 +309,7 @@ struct ExpandMemrefResult {
 
 struct PermutationResult {
   SmallVector<Value> readIndices;
-  SmallVector<unsigned> permutationTargets;
+  SmallVector<AffineExpr> permutationTargets;
 };
 
 } // anonymous namespace
@@ -367,13 +367,14 @@ expandMemrefDimForLayout(ImplicitLocOpBuilder &builder,
 /// Based on the \p vectorRank this function calculcates the permutation and
 /// indices for a `vector.transfer_read` that reads the distributed vector.
 static PermutationResult getExpandedPermutation(ImplicitLocOpBuilder &builder,
+                                                AffineMap permutationMap,
                                                 ArrayRef<Value> warpIndices,
                                                 ArrayRef<Value> threadIndices,
                                                 int64_t memRank,
                                                 int64_t vectorRank) {
 
   auto zeroIndex = arith::ConstantIndexOp::create(builder, 0);
-  SmallVector<unsigned> permutationTargets;
+  SmallVector<AffineExpr> permutationTargets;
   permutationTargets.reserve(vectorRank * 3);
   SmallVector<Value> readIndices;
   readIndices.reserve(vectorRank * 3);
@@ -381,9 +382,9 @@ static PermutationResult getExpandedPermutation(ImplicitLocOpBuilder &builder,
   auto addDimension = [&](ValueRange indices, bool isPermutationTarget) {
     readIndices.append(indices.begin(), indices.end());
     if (isPermutationTarget) {
-      llvm::append_range(
-          permutationTargets,
-          llvm::seq<unsigned>(targetIndex, targetIndex + vectorRank));
+      // Shift the original map to the new dimensions and append the results.
+      llvm::append_range(permutationTargets,
+                         permutationMap.shiftDims(targetIndex).getResults());
     }
     targetIndex += vectorRank;
   };
@@ -523,12 +524,16 @@ struct DistributeTransferReadToSingleRead final
           readOp, "memref type has dynamic shape, stride or offset");
     }
 
-    // We require the permutation map to be a minor identity map.
-    if (!readOp.getPermutationMap().isMinorIdentity()) {
-      // TODO(sommerlukas): Can we support permutation maps that are not minor
-      // identity maps?
+    // We require the permutation map to have `vectorRank` results and not use
+    // any of the undistributed dimensions.
+    AffineMap origPermutation = readOp.getPermutationMap();
+    bool usesUndistributedDims = llvm::any_of(
+        llvm::seq<unsigned>(0, undistributedDims),
+        [&](unsigned d) { return origPermutation.isFunctionOfDim(d); });
+    if (origPermutation.getNumResults() != vectorRank ||
+        usesUndistributedDims) {
       return rewriter.notifyMatchFailure(
-          readOp, "permutation map is not minor identity map");
+          readOp, "permutation map uses undistributed dimension");
     }
 
     SmallVector<Value> warpIndices, threadIndices;
@@ -660,14 +665,22 @@ struct DistributeTransferReadToSingleRead final
     auto transposeMem = memref::TransposeOp::create(
         builder, expandedMem, AffineMapAttr::get(transposeMap));
 
+    // Drop the undistributed dimensions from the original permutation map, so
+    // we can reuse it to replicate the permutation and broadcasting behavior.
+    llvm::SmallBitVector projectedDims(origPermutation.getNumDims(), false);
+    projectedDims.set(0, undistributedDims);
+    AffineMap compressedPermutation =
+        projectDims(origPermutation, projectedDims, true);
+
     // Construct the remaining indices and the permutation map for the new
     // transfer_read.
-    PermutationResult permutation = getExpandedPermutation(
-        builder, warpIndices, threadIndices, memRank, vectorRank);
+    PermutationResult permutation =
+        getExpandedPermutation(builder, compressedPermutation, warpIndices,
+                               threadIndices, memRank, vectorRank);
     expandedReadIndices.append(permutation.readIndices);
-    AffineMap newPermMap = AffineMap::getMultiDimMapWithTargets(
-        expandedMemTy.getRank(), permutation.permutationTargets,
-        rewriter.getContext());
+    AffineMap newPermMap =
+        AffineMap::get(newNumDimensions, /*symbolCount=*/0,
+                       permutation.permutationTargets, builder.getContext());
 
     // Create the new vector.transfer_read operation that is going to read the
     // entire distributed shape in a single read.
