@@ -223,7 +223,7 @@ int64_t getKSize(MMAIntrinsic intrinsic);
 int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic);
 
 /// Returns true if the given MMA intrinsic is an NV_MMA_SYNC intrinsic.
-bool is_NV_MMA_SYNC(MMAIntrinsic intrinsic);
+bool isNvMmaSync(MMAIntrinsic intrinsic);
 
 constexpr int kMMAOperandLhs = 0;
 constexpr int kMMAOperandRhs = 1;
