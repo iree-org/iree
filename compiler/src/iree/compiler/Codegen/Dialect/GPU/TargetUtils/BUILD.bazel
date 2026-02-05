@@ -33,6 +33,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AMDGPUUtils",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FunctionInterfaces",
