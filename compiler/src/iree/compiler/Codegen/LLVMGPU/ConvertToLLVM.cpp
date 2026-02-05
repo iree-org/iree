@@ -379,7 +379,12 @@ public:
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
-      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
+      // Only set noalias if this binding has explicit noalias relationships
+      // with other bindings (i.e., it's in bindingNoaliasMap).
+      if (bindingNoaliasMap.count(idx) && !bindingNoaliasMap[idx].empty()) {
+        newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(),
+                             unit);
+      }
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNonNullAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
       if (info.unused) {
