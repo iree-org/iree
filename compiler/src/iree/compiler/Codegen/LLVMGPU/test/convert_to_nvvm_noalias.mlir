@@ -7,7 +7,7 @@
 //
 // This test verifies that:
 // Stream dialect: After FuseDispatchBindings pass, stream.binding_noalias
-// attributes are generated on func.func arguments for distinct bindings
+// attributes are generated on util.func arguments for distinct bindings
 // (different resources)
 
 // Test case: Two distinct bindings that use different resources.
@@ -78,3 +78,85 @@ util.func public @test() {
 // STREAM-LABEL: util.func public @dispatch
 // STREAM-SAME: (%[[ARG0:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]},
 // STREAM-SAME:  %[[ARG1:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]}
+
+// -----
+
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-nvvm))))" --iree-gpu-test-target=sm_60 --split-input-file %s | FileCheck %s --check-prefix=LLVM
+
+// Test that stream.binding_noalias attributes are correctly propagated from HAL
+// func op attributes to LLVM noalias attributes.
+//
+// This test verifies that:
+// 1. stream.binding_noalias attributes on func.func op (as function-level attributes
+//    with binding index suffix, e.g., stream.binding_noalias_0) in HAL dialect
+//    are correctly read by ConvertToLLVM
+// 2. These attributes are converted to llvm.noalias attributes in LLVM IR
+// 3. Only bindings with explicit noalias relationships get llvm.noalias
+//
+// Note: In HAL dialect, func.func has no arguments, so stream.binding_noalias
+// attributes are stored as function-level attributes with binding index suffix.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @test_noalias_propagation {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @test_noalias_propagation layout(#pipeline_layout)
+    builtin.module {
+      func.func @test_noalias_propagation() attributes {
+        stream.binding_noalias_0 = [1 : i32],
+        stream.binding_noalias_1 = [0 : i32]
+      } {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
+        %2 = memref.load %0[%c0] : memref<16xi32>
+        %3 = arith.sitofp %2 : i32 to f32
+        memref.store %3, %1[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @test_noalias_propagation
+// Both bindings have stream.binding_noalias attributes, so both should get llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: llvm.noalias
+
+// -----
+
+// Test case: Partial noalias relationships - binding 0 and 1 have noalias with
+// each other, but binding 2 has no noalias attribute
+#pipeline_layout_partial = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @test_partial_noalias {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @test_partial_noalias layout(#pipeline_layout_partial)
+    builtin.module {
+      func.func @test_partial_noalias() attributes {
+        stream.binding_noalias_0 = [1 : i32],
+        stream.binding_noalias_1 = [0 : i32]
+      } {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(0) : memref<16xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(1) : memref<16xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(2) : memref<16xf32>
+        %3 = memref.load %0[%c0] : memref<16xi32>
+        %4 = arith.sitofp %3 : i32 to f32
+        memref.store %4, %1[%c0] : memref<16xf32>
+        memref.store %4, %2[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @test_partial_noalias
+// Only binding 0 and 1 have noalias relationship, so only they get llvm.noalias
+// Binding 2 has no noalias attribute, so it should NOT have llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef}
