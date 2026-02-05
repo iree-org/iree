@@ -117,106 +117,83 @@ static AffineMap shiftAndPrependDimToMap(AffineMap oldMap, unsigned newNumDims,
   return AffineMap::get(newNumDims, 0, newResults, ctx);
 }
 
-//===----------------------------------------------------------------------===//
-// InsertBatchDimForConvPattern
-//===----------------------------------------------------------------------===//
-
-/// Pattern to insert batch dimension for batch-less convolutions.
+/// Inserts a unit batch dimension into a batchless convolution operation.
 ///
-/// This transforms a linalg.generic representing a batch-less convolution
-/// into one with an additional batch dimension restored:
+/// Transforms:
+///   linalg.generic (batchless conv, e.g., HWC -> HWF)
+/// Into:
+///   expand_shape(input) -> linalg.generic (with batch, NHWC -> NHWF) ->
+///   collapse_shape
 ///
-///   expand_shape(image_input) -> linalg.generic (with batch) ->
-///   collapse_shape(output)
-///
-/// Note: The filter tensor does NOT get a batch dimension - it's the same
-/// filter applied across the batch. Only the input and output tensors get
-/// expanded.
-struct InsertBatchDimForConvPattern
-    : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+/// Returns the newly created conv op with batch dimension.
+static linalg::GenericOp insertUnitBatchDimension(RewriterBase &rewriter,
+                                                  linalg::GenericOp op) {
+  Location loc = op.getLoc();
+  MLIRContext *ctx = rewriter.getContext();
+  unsigned newNumLoops = op.getNumLoops() + 1;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!isBatchlessConv(op)) {
-      return failure();
+  // Process all input operands.
+  // - Operand 0 (image): expand tensor and prepend dim to map.
+  // - Other operands (filter, zero points, etc.): keep as-is, shift map.
+  SmallVector<Value> newInputs;
+  SmallVector<AffineMap> newMaps;
+
+  for (OpOperand *inputOperand : op.getDpsInputOperands()) {
+    Value input = inputOperand->get();
+    AffineMap oldMap = op.getMatchingIndexingMap(inputOperand);
+
+    if (inputOperand->getOperandNumber() == 0) {
+      // Image input: expand and prepend dim to map.
+      newInputs.push_back(prependUnitDimToTensor(rewriter, loc, input));
+      newMaps.push_back(shiftAndPrependDimToMap(oldMap, newNumLoops, ctx));
+    } else {
+      // Other inputs (filter, zero points): keep as-is, just shift map.
+      newInputs.push_back(input);
+      newMaps.push_back(oldMap.shiftDims(1));
     }
-
-    Location loc = op.getLoc();
-    MLIRContext *ctx = rewriter.getContext();
-    unsigned newNumLoops = op.getNumLoops() + 1;
-
-    // Process all input operands.
-    // - Operand 0 (image): expand tensor and prepend dim to map.
-    // - Other operands (filter, zero points, etc.): keep as-is, shift map.
-    SmallVector<Value> newInputs;
-    SmallVector<AffineMap> newMaps;
-
-    for (OpOperand *inputOperand : op.getDpsInputOperands()) {
-      Value input = inputOperand->get();
-      AffineMap oldMap = op.getMatchingIndexingMap(inputOperand);
-
-      if (inputOperand->getOperandNumber() == 0) {
-        // Image input: expand and prepend dim to map.
-        if (!isa<RankedTensorType>(input.getType())) {
-          return rewriter.notifyMatchFailure(
-              op, "image input is not a ranked tensor");
-        }
-        newInputs.push_back(prependUnitDimToTensor(rewriter, loc, input));
-        newMaps.push_back(shiftAndPrependDimToMap(oldMap, newNumLoops, ctx));
-      } else {
-        // Other inputs (filter, zero points): keep as-is, just shift map.
-        newInputs.push_back(input);
-        newMaps.push_back(oldMap.shiftDims(1));
-      }
-    }
-
-    // Output: expand and add batch dim to map.
-    OpOperand *outputOperand = op.getDpsInitOperand(0);
-    Value output = outputOperand->get();
-    auto outputType = dyn_cast<RankedTensorType>(output.getType());
-    if (!outputType) {
-      return rewriter.notifyMatchFailure(op, "output is not a ranked tensor");
-    }
-    Value expandedOutput = prependUnitDimToTensor(rewriter, loc, output);
-    AffineMap newOutputMap = shiftAndPrependDimToMap(
-        op.getMatchingIndexingMap(outputOperand), newNumLoops, ctx);
-    newMaps.push_back(newOutputMap);
-
-    // New iterator types: prepend parallel (batch) to existing types.
-    SmallVector<utils::IteratorType> newIterTypes;
-    newIterTypes.push_back(utils::IteratorType::parallel);
-    llvm::append_range(newIterTypes, op.getIteratorTypesArray());
-
-    // Create new generic with batch dimension.
-    auto newOutputType = cast<RankedTensorType>(expandedOutput.getType());
-    auto newOp = linalg::GenericOp::create(
-        rewriter, loc, TypeRange{newOutputType}, newInputs,
-        ValueRange{expandedOutput}, newMaps, newIterTypes,
-        [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-          // Clone the body.
-          IRMapping mapping;
-          for (auto [oldArg, newArg] :
-               llvm::zip(op.getBody()->getArguments(), args)) {
-            mapping.map(oldArg, newArg);
-          }
-          for (Operation &bodyOp : op.getBody()->without_terminator()) {
-            b.clone(bodyOp, mapping);
-          }
-          auto yield = cast<linalg::YieldOp>(op.getBody()->getTerminator());
-          linalg::YieldOp::create(b, nestedLoc,
-                                  mapping.lookup(yield.getOperand(0)));
-        });
-
-    // Collapse result to remove the batch dimension we added.
-    auto reassoc = buildPrependDimReassociation(outputType.getRank());
-    auto collapsed = tensor::CollapseShapeOp::create(
-        rewriter, loc, outputType, newOp.getResult(0), reassoc);
-
-    rewriter.replaceOp(op, collapsed);
-    return success();
   }
-};
+
+  // Output: expand and add batch dim to map.
+  OpOperand *outputOperand = op.getDpsInitOperand(0);
+  Value output = outputOperand->get();
+  auto outputType = cast<RankedTensorType>(output.getType());
+  Value expandedOutput = prependUnitDimToTensor(rewriter, loc, output);
+  AffineMap newOutputMap = shiftAndPrependDimToMap(
+      op.getMatchingIndexingMap(outputOperand), newNumLoops, ctx);
+  newMaps.push_back(newOutputMap);
+
+  // New iterator types: prepend parallel (batch) to existing types.
+  SmallVector<utils::IteratorType> newIterTypes;
+  newIterTypes.push_back(utils::IteratorType::parallel);
+  llvm::append_range(newIterTypes, op.getIteratorTypesArray());
+
+  // Create new generic with batch dimension.
+  auto newOutputType = cast<RankedTensorType>(expandedOutput.getType());
+  auto newConvOp = linalg::GenericOp::create(
+      rewriter, loc, TypeRange{newOutputType}, newInputs,
+      ValueRange{expandedOutput}, newMaps, newIterTypes,
+      [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+        IRMapping mapping;
+        for (auto [oldArg, newArg] :
+             llvm::zip(op.getBody()->getArguments(), args)) {
+          mapping.map(oldArg, newArg);
+        }
+        for (Operation &bodyOp : op.getBody()->without_terminator()) {
+          b.clone(bodyOp, mapping);
+        }
+        auto yield = cast<linalg::YieldOp>(op.getBody()->getTerminator());
+        linalg::YieldOp::create(b, nestedLoc,
+                                mapping.lookup(yield.getOperand(0)));
+      });
+
+  // Collapse result to remove the batch dimension we added.
+  auto reassoc = buildPrependDimReassociation(outputType.getRank());
+  auto collapsed = tensor::CollapseShapeOp::create(
+      rewriter, loc, outputType, newConvOp.getResult(0), reassoc);
+
+  rewriter.replaceOp(op, collapsed);
+  return newConvOp;
+}
 
 //===----------------------------------------------------------------------===//
 // Pass definition
@@ -228,23 +205,58 @@ struct InsertBatchDimForBatchlessConvPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
 
-    RewritePatternSet patterns(context);
-    patterns.add<InsertBatchDimForConvPattern>(context);
+    // Find the batchless conv op. We assume there is only one convolution-like
+    // op per function (typical for dispatches).
+    linalg::GenericOp batchlessConv = nullptr;
+    getOperation()->walk([&](linalg::GenericOp op) {
+      if (isBatchlessConv(op)) {
+        if (batchlessConv) {
+          // Multiple batchless convs found - bail out.
+          batchlessConv = nullptr;
+          return WalkResult::interrupt();
+        }
+        batchlessConv = op;
+      }
+      return WalkResult::advance();
+    });
 
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
+    if (!batchlessConv) {
+      return;
     }
 
-    // Run reshape propagation to push the expand/collapse shapes to boundaries.
+    // Insert unit batch dimension into the convolution.
+    IRRewriter rewriter(context);
+    rewriter.setInsertionPoint(batchlessConv);
+    linalg::GenericOp newConvOp =
+        insertUnitBatchDimension(rewriter, batchlessConv);
+
+    // Run reshape propagation to push expand/collapse shapes to boundaries.
     {
       RewritePatternSet reshapePatterns(context);
       populateReshapeToInterfaceTensorPatterns(reshapePatterns);
-      linalg::ControlFusionFn reshapeControlFn = [](OpOperand *fusedOperand) {
-        // Allow fusion through all ops.
-        return true;
+
+      // Bubble expand_shape upward: only for ops BEFORE the conv.
+      linalg::ControlFusionFn expandControlFn = [&](OpOperand *fusedOperand) {
+        Operation *op = fusedOperand->getOwner();
+        if (op->getBlock() != newConvOp->getBlock()) {
+          return false;
+        }
+        return op != newConvOp.getOperation();
       };
+
+      // Sink collapse_shape downward: only for ops AFTER the conv.
+      linalg::ControlFusionFn collapseControlFn = [&](OpOperand *fusedOperand) {
+        Operation *op = fusedOperand->getOwner();
+        if (op->getBlock() != newConvOp->getBlock()) {
+          return false;
+        }
+        return op->isBeforeInBlock(newConvOp);
+      };
+
       linalg::populateFoldReshapeOpsByExpansionPatterns(reshapePatterns,
-                                                        reshapeControlFn);
+                                                        expandControlFn);
+      linalg::populateFoldReshapeOpsByCollapsingPatterns(reshapePatterns,
+                                                         collapseControlFn);
       tensor::populateFoldTensorEmptyPatterns(reshapePatterns);
       tensor::populateBubbleUpExpandShapePatterns(reshapePatterns);
       linalg::FillOp::getCanonicalizationPatterns(reshapePatterns, context);
