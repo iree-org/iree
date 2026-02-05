@@ -19,7 +19,8 @@ util.func private @external(%arg0: !stream.resource<*>, %arg0_size: index) -> (!
 // -----
 
 // Tests zero allocations with transients annotation.
-// The pass should handle this as a no-op (no pack needed).
+// The pass should remove the transients op (no pack needed) and forward
+// both the resource and timepoint.
 
 // CHECK-LABEL: @zero_allocations
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index, %[[STORAGE:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE:.+]]: index)
@@ -27,19 +28,24 @@ util.func public @zero_allocations(
   %arg0: !stream.resource<*>, %arg0_size: index,
   %storage: !stream.resource<transient>, %storage_size: index
 ) -> (!stream.resource<*>, index) {
-  // CHECK-NEXT: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-NEXT: arith.constant 0 : index
   %c0 = arith.constant 0 : index
-  // CHECK-NEXT: %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
+  // CHECK-NEXT: %[[IMMEDIATE:.+]] = stream.timepoint.immediate
   %immediate = stream.timepoint.immediate => !stream.timepoint
 
   // Annotate result with transients storage (immediate timepoint - no allocations).
-  // CHECK-NEXT: %[[RESULT:.+]], %[[RESULT_TP:.+]] = stream.resource.transients await(%[[IMMEDIATE]]) => %[[ARG0]] : !stream.resource<*>{%[[ARG0_SIZE]]} from %[[STORAGE]] : !stream.resource<transient>{%[[STORAGE_SIZE]]} => !stream.timepoint
+  // The transients op should be removed since there are no allocas.
+  // CHECK-NOT: stream.resource.transients
   %result, %result_tp = stream.resource.transients await(%immediate) => %arg0 : !stream.resource<*>{%arg0_size}
       from %storage : !stream.resource<transient>{%storage_size}
       => !stream.timepoint
 
-  // CHECK-NEXT: util.return %[[RESULT]], %[[ARG0_SIZE]] : !stream.resource<*>, index
-  util.return %result, %arg0_size : !stream.resource<*>, index
+  // Await should use the forwarded timepoint (was the transients op's await timepoint).
+  // CHECK-NEXT: %[[AWAITED:.+]] = stream.timepoint.await %[[IMMEDIATE]] => %[[ARG0]] : !stream.resource<*>{%[[ARG0_SIZE]]}
+  %awaited = stream.timepoint.await %result_tp => %result : !stream.resource<*>{%arg0_size}
+
+  // CHECK-NEXT: util.return %[[AWAITED]], %[[ARG0_SIZE]] : !stream.resource<*>, index
+  util.return %awaited, %arg0_size : !stream.resource<*>, index
 }
 
 // -----
