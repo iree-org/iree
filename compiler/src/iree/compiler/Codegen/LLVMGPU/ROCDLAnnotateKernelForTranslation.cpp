@@ -47,9 +47,9 @@ toLLVMDenormalModeKind(IREE::Codegen::DenormalFpMath mode) {
 static void setDenormalFpenvForF32(LLVM::LLVMFuncOp funcOp,
                                    LLVM::DenormalModeKind floatMode) {
   MLIRContext *ctx = funcOp.getContext();
-  auto attr = LLVM::DenormalFPEnvAttr::get(
-      ctx, LLVM::DenormalModeKind::IEEE, LLVM::DenormalModeKind::IEEE,
-      floatMode, floatMode);
+  auto attr = LLVM::DenormalFPEnvAttr::get(ctx, LLVM::DenormalModeKind::IEEE,
+                                           LLVM::DenormalModeKind::IEEE,
+                                           floatMode, floatMode);
   funcOp.setDenormalFpenvAttr(attr);
 }
 
