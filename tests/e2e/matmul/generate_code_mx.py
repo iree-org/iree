@@ -244,14 +244,7 @@ def generate_call_mx(
 
     for arg_name, arg_shape, arg_elemtype in matmul_args:
         op = op + generate_random_matrix(arg_name, arg_shape, arg_elemtype)
-        # TODO(#16168): there's a bug with in-place input->output aliasing and
-        # we work around it here by passing in a unique copy.
-        if arg_name == "acc":
-            # TODO(#16168): there's a bug with in-place input->output aliasing and
-            # we work around it here by passing in a unique copy.
-            op = op + generate_random_matrix(
-                "acc_copy", arg_shape, arg_elemtype, increment_seed=False
-            )
+
     gen_names_and_types = lambda args_list: (
         ", ".join(["%" + name for name, shape, ty in args_list]),
         ", ".join(["!hal.buffer_view" for a in args_list]),
@@ -331,7 +324,7 @@ def generate_call_mx(
         f"  %scaled_rhs_tensor = tensor.collapse_shape %scaled_rhs_expanded_tensor [[0], [1, 2]] : {scaled_rhs_expanded_tensor_type} into {scaled_rhs_tensor_type}\n"
         f"  %scaled_lhs = hal.tensor.export %scaled_lhs_tensor : {scaled_lhs_tensor_type} -> !hal.buffer_view\n"
         f"  %scaled_rhs = hal.tensor.export %scaled_rhs_tensor : {scaled_rhs_tensor_type} -> !hal.buffer_view\n"
-        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %scaled_lhs, %scaled_rhs, {'%acc_copy' if shape.accumulate else '%acc'}, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %scaled_lhs, %scaled_rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
         f"  util.return\n"
         f"}}\n"
     )
