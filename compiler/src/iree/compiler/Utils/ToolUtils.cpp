@@ -187,6 +187,19 @@ std::string findToolFromDylibDir(SmallVector<std::string> toolNames) {
     return toolPath;
   }
 
+  // Then search in an nested llvm/bin/ directory. This is the ROCm/TheRock
+  // standard location:
+  //   lib/
+  //     libIREECompiler.so
+  //     llvm/bin/
+  //       lld
+  toolPath = findToolAtPath(normalizedToolNames, dylibDir + "/llvm/bin/");
+  if (!toolPath.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "Found tool in ROCm llvm/bin directory at path "
+                            << toolPath << "\n");
+    return toolPath;
+  }
+
   // Then search in an adjacent tools/ directory. Build trees are
   // organized this way for reasons:
   //   lib/
@@ -212,18 +225,6 @@ std::string findToolFromDylibDir(SmallVector<std::string> toolNames) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found tool relative to dylib in build tree at path "
                << toolPath << "\n");
-    return toolPath;
-  }
-
-  // ROCm/TheRock standard location:
-  //   lib/
-  //     libIREECompiler.so
-  //     llvm/bin/
-  //       lld
-  toolPath = findToolAtPath(normalizedToolNames, dylibDir + "/llvm/bin/");
-  if (!toolPath.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "Found tool in ROCm llvm/bin directory at path "
-                            << toolPath << "\n");
     return toolPath;
   }
 
@@ -284,25 +285,28 @@ std::string findPlatformLibDirectory(StringRef platformName) {
     return {};
   }
 
-  SmallString<256> path(dylibPath);
-  llvm::sys::path::remove_filename(path);
+  SmallString<256> libPath(dylibPath);
+  // Trim patth to lib dir: some/path/lib/libIREECompiler.so -> some/path/lib
+  llvm::sys::path::remove_filename(libPath);
 
-  // Try IREE's convention first: lib/iree_platform_libs/<platform>/
-  SmallString<256> ireePath(path);
-  llvm::sys::path::append(ireePath, "iree_platform_libs", platformName);
-  if (llvm::sys::fs::is_directory(ireePath)) {
-    (void)llvm::sys::fs::make_absolute(ireePath);
-    (void)llvm::sys::path::remove_dots(ireePath, /*remove_dot_dot=*/true);
-    return std::string(ireePath);
+  // Try IREE's convention: lib/iree_platform_libs/<platform>/
+  SmallString<256> ireeLibPath(libPath);
+  llvm::sys::path::append(ireeLibPath, "iree_platform_libs", platformName);
+  if (llvm::sys::fs::is_directory(ireeLibPath)) {
+    (void)llvm::sys::fs::make_absolute(ireeLibPath);
+    (void)llvm::sys::path::remove_dots(ireeLibPath, /*remove_dot_dot=*/true);
+    return std::string(ireeLibPath);
   }
 
-  // Fallback: ROCm/TheRock standard location lib/llvm/amdgcn/bitcode/
-  SmallString<256> rocmPath(path);
-  llvm::sys::path::append(rocmPath, "llvm", "amdgcn", "bitcode");
-  if (llvm::sys::fs::is_directory(rocmPath)) {
-    (void)llvm::sys::fs::make_absolute(rocmPath);
-    (void)llvm::sys::path::remove_dots(rocmPath, /*remove_dot_dot=*/true);
-    return std::string(rocmPath);
+  if (platformName == "rocm") {
+    // Fallback: ROCm/TheRock standard location lib/llvm/amdgcn/bitcode/
+    SmallString<256> rocmLibPath(libPath);
+    llvm::sys::path::append(rocmLibPath, "llvm", "amdgcn", "bitcode");
+    if (llvm::sys::fs::is_directory(rocmLibPath)) {
+      (void)llvm::sys::fs::make_absolute(rocmLibPath);
+      (void)llvm::sys::path::remove_dots(rocmLibPath, /*remove_dot_dot=*/true);
+      return std::string(rocmLibPath);
+    }
   }
 
   return {};
