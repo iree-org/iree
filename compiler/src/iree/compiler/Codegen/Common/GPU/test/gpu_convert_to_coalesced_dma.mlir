@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file | FileCheck %s
 
-#gpu_target_copy = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_copy = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [32],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -49,7 +49,7 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
 
 // -----
 
-#gpu_target_gather = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_gather = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -103,7 +103,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 // Negative test: Skip coalesced DMA when innermost dimension < subgroup size. This is to ensure we do not go down
 // the slow path (which is not implemented yet).
 
-#gpu_target_small_inner = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_small_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -176,7 +176,7 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 // - Instead, we should tile rows to 16 (64/4) and keep columns whole (128)
 // This ensures subviews are contiguous in memory.
 
-#gpu_target_contiguous = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_contiguous = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -236,7 +236,7 @@ func.func @copy_prefer_contiguous_subview(%source: tensor<64x128xf32>, %init: te
 // When output comes from tensor.empty(), we can use total elements instead of
 // innermost dimension for the size check, enabling coalesced DMA.
 
-#gpu_target_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -296,7 +296,7 @@ func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tenso
 // Test: 1D tensor copy distributes warps across the single dimension.
 // This tests the 1D tile size computation logic for flattened copies.
 
-#gpu_target_1d = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_1d = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -358,7 +358,7 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
 // 1. Innermost dim (16) < minElementsPerTransfer (64)
 // 2. Output is a function argument, not tensor.empty, so we can't linearize
 
-#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -395,7 +395,7 @@ func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest:
 // The copy should be converted to coalesced DMA when the input comes from an
 // extract_slice with contiguous innermost dimensions.
 
-#gpu_target_extract_input = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_extract_input = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -451,7 +451,7 @@ func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> 
 // When linalg.copy reads from tensor.pad, trace through to the original source
 // and set in_bounds attribute based on padding.
 
-#gpu_target_pad = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_pad = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -467,24 +467,24 @@ func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> 
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x64xf32>
 func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tensor<4x64xf32>, %off: index, %sz: index, %high: index) -> tensor<4x64xf32>
   attributes {hal.executable.target = #exec_target_pad, translation_info = #translation_pad} {
-  // Extract a dynamic slice
+  // Extract a dynamic slice.
   %extracted = tensor.extract_slice %source[%off, 0] [%sz, 64] [1, 1]
       : tensor<121x64xf32> to tensor<?x64xf32>
 
-  // Pad to static size (only M dimension has padding)
+  // Pad to static size (only M dimension has padding).
   %cst = arith.constant 0.0 : f32
   %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
   ^bb0(%arg0: index, %arg1: index):
     tensor.yield %cst : f32
   } : tensor<?x64xf32> to tensor<4x64xf32>
 
-  // Copy from padded tensor
+  // Copy from padded tensor.
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: tensor.pad is fused - source is the extract_slice result, not the padded tensor
-  // in_bounds = [false, true] because M dim has dynamic padding, K dim has no padding
+  // Key check: tensor.pad is fused - source is the extract_slice result, not the padded tensor.
+  // in_bounds = [false, true] because M dim has dynamic padding, K dim has no padding.
   // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
   // CHECK: scf.forall {{.*}} shared_outs(%[[OUTER_INIT:.+]] = %[[INIT]])
   // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[OUTER_INIT]])
@@ -504,7 +504,7 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 // operates on the full padded buffer shape, not on smaller subviews.
 // This is critical for correct delinearization in the lowering pass.
 
-#gpu_target_pad_multi_warp = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_pad_multi_warp = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -520,18 +520,18 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x64xf32>
 func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %init: tensor<4x64xf32>, %off: index, %sz: index, %high: index) -> tensor<4x64xf32>
   attributes {hal.executable.target = #exec_target_pad_multi_warp, translation_info = #translation_pad_multi_warp} {
-  // Extract a dynamic slice
+  // Extract a dynamic slice.
   %extracted = tensor.extract_slice %source[%off, 0] [%sz, 64] [1, 1]
       : tensor<121x64xf32> to tensor<?x64xf32>
 
-  // Pad to static size (only M dimension has padding)
+  // Pad to static size (only M dimension has padding).
   %cst = arith.constant 0.0 : f32
   %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
   ^bb0(%arg0: index, %arg1: index):
     tensor.yield %cst : f32
   } : tensor<?x64xf32> to tensor<4x64xf32>
 
-  // Copy from padded tensor with 4 warps (256/64=4)
+  // Copy from padded tensor with 4 warps (256/64=4).
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
@@ -570,7 +570,7 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
 // If a DWORD is partially out-of-bounds, the entire DWORD returns zero,
 // causing incorrect results. We bail out to avoid the slow path.
 
-#gpu_target_pad_unaligned = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_pad_unaligned = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,

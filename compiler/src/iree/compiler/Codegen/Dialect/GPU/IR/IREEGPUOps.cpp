@@ -218,7 +218,7 @@ void CoalescedGatherDMAOp::getEffects(
   Value source = getSource();
   Value init = getInit();
 
-  // The operation reads from the source
+  // The operation reads from the source.
   if (isa<MemRefType>(source.getType())) {
     effects.emplace_back(MemoryEffects::Read::get(),
                          &getOperation()->getOpOperand(sourceOperandIdx),
@@ -235,7 +235,7 @@ void CoalescedGatherDMAOp::getEffects(
                          SideEffects::DefaultResource::get());
   } else if (isa<RankedTensorType>(init.getType()) &&
              getOperation()->getNumResults() == 0) {
-    // Tensor combiner case: declare write effect to prevent DCE
+    // Tensor combiner case: declare write effect to prevent DCE.
     effects.emplace_back(MemoryEffects::Write::get(),
                          &getOperation()->getOpOperand(initOperandIdx),
                          SideEffects::DefaultResource::get());
@@ -339,9 +339,8 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     }
 
     // If in_bounds is present and this dimension allows OOB (in_bounds=false),
-    // skip the size matching check. For non-outermost dimensions, the lowering
-    // adds explicit bounds checks since raw buffer OOB only provides 1D
-    // (linear) clamping, not per-dimension clamping.
+    // skip the size matching check. The source may be smaller than init along
+    // this dimension, and reads beyond the source extent return zero.
     if (inBoundsAttr) {
       auto inBoundsArray = *inBoundsAttr;
       if (dim < inBoundsArray.size()) {
