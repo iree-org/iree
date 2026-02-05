@@ -304,7 +304,8 @@ struct LowerCoalescedGatherDMAPattern final
     }
 
     emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
-                  elementType, indices, segments, segmentLaneOffsets);
+                  elementType, indices, segments, segmentLaneOffsets,
+                  dmaOp.getInBounds());
 
     rewriter.eraseOp(dmaOp);
     return success();
@@ -337,7 +338,8 @@ private:
                      Value dest, ArrayRef<int64_t> destShape,
                      int64_t numLinearDims, Type elementType,
                      OperandRange indices, ArrayRef<TransferSegment> segments,
-                     ArrayRef<Value> segmentLaneOffsets) const {
+                     ArrayRef<Value> segmentLaneOffsets,
+                     std::optional<ArrayAttr> inBoundsAttr) const {
     int64_t destRank = destShape.size();
     int64_t numOuterDims = destRank - numLinearDims;
     LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
@@ -399,6 +401,61 @@ private:
 
           auto [srcIndices, dstIndices] = generateGatherIndices(
               rewriter, loc, srcDimOffsets, dstDimOffsets, indices);
+
+          // Raw buffer OOB clamping is 1D (linear): it returns 0 only when the
+          // byte offset >= total buffer size. For non-outermost dimensions,
+          // an OOB index wraps into the next row instead of returning 0.
+          // Fix: when any non-outermost source index exceeds its dimension,
+          // replace the outermost index with sourceShape[0] to force the
+          // linearized offset past the buffer end → hardware returns 0.
+          if (inBoundsAttr) {
+            auto sourceType = cast<MemRefType>(source.getType());
+            ArrayRef<int64_t> sourceShape = sourceType.getShape();
+            Value anyNonOutermostOOB;
+
+            for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
+              if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
+                break;
+              }
+              bool dimInBounds =
+                  cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
+              if (dimInBounds) {
+                continue;
+              }
+
+              Value dimSize;
+              if (ShapedType::isDynamic(sourceShape[dim])) {
+                dimSize = memref::DimOp::create(rewriter, loc, source, dim);
+              } else {
+                dimSize = arith::ConstantIndexOp::create(rewriter, loc,
+                                                         sourceShape[dim]);
+              }
+
+              Value isOOB = arith::CmpIOp::create(rewriter, loc,
+                                                  arith::CmpIPredicate::uge,
+                                                  srcIndices[dim], dimSize);
+
+              if (anyNonOutermostOOB) {
+                anyNonOutermostOOB = arith::OrIOp::create(
+                    rewriter, loc, anyNonOutermostOOB, isOOB);
+              } else {
+                anyNonOutermostOOB = isOOB;
+              }
+            }
+
+            if (anyNonOutermostOOB) {
+              Value oobOuterIdx;
+              if (ShapedType::isDynamic(sourceShape[0])) {
+                oobOuterIdx = memref::DimOp::create(rewriter, loc, source, 0);
+              } else {
+                oobOuterIdx = arith::ConstantIndexOp::create(rewriter, loc,
+                                                             sourceShape[0]);
+              }
+              srcIndices[0] =
+                  arith::SelectOp::create(rewriter, loc, anyNonOutermostOOB,
+                                          oobOuterIdx, srcIndices[0]);
+            }
+          }
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
                                         dstIndices,
