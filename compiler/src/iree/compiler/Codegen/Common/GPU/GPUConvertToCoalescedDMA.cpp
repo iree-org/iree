@@ -370,8 +370,8 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       }
     }
 
-    // Fallback: original behavior without tensor.pad fusion.
-    // Only trace through ONE level of extract_slice (the immediate input).
+    // Fallback: no tensor.pad fusion. The input is an extract_slice from
+    // tiling; trace through it to get the actual source.
     if (!source) {
       if (auto extractSlice = input.getDefiningOp<tensor::ExtractSliceOp>()) {
         source = extractSlice.getSource();
@@ -506,19 +506,19 @@ struct ConvertPadFusionCopyToCoalescedDMA
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    // Only match copies with use_global_load_dma config
+    // Only match copies with use_global_load_dma config.
     auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
     if (!config) {
       return failure();
     }
 
-    // Check if this is a tensor.pad fusion case
+    // Check if this is a tensor.pad fusion case.
     auto pad = traceToTensorPad(copyOp.getInputs()[0]);
     if (!pad) {
       return failure(); // Not a pad fusion case
     }
 
-    // Check if padding exists (non-zero low/high pad)
+    // Check if padding exists (non-zero low/high pad).
     bool hasPadding = false;
     for (auto [low, high] :
          llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
@@ -894,7 +894,7 @@ private:
     bool isPadFusion = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       if (auto pad = traceToTensorPad(copyOp.getInputs()[0])) {
-        // Check if padding exists (non-zero low/high pad)
+        // Check if padding exists (non-zero low/high pad).
         for (auto [low, high] :
              llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
           if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
