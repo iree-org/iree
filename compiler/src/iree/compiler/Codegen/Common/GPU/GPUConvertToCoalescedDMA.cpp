@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -98,9 +99,8 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
-/// Check if the source of an operation comes directly from global memory.
-/// Returns false if the source goes through tensor.pad or other local
-/// computation that would prevent using global load DMA.
+/// Check if the source of an operation comes directly from fat_raw_buffer
+/// address space.
 static bool sourceIsFromGlobalMemory(Operation *op) {
   Value source;
   if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
@@ -116,13 +116,13 @@ static bool sourceIsFromGlobalMemory(Operation *op) {
     source = extractOp.getSource();
   }
 
-  // If the source comes from tensor.pad, it's not directly from global memory.
-  if (source.getDefiningOp<tensor::PadOp>()) {
+  // Check if the source comes from load_from_buffer with fat_raw_buffer
+  // address space.
+  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
     return false;
   }
-
-  // Otherwise, assume it's from global memory (e.g., dispatch tensor load).
-  return true;
+  return hasAMDGPUFatRawBufferAddressSpace(loadOp.getBuffer().getType());
 }
 
 /// Helper to compute thread number of threads based on translation_info.
