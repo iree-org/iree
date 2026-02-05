@@ -1278,9 +1278,38 @@ processTransientResource(FunctionOpInterface funcOp,
                          TransientResource &transientResource,
                          Explorer &explorer) {
   if (transientResource.allocaOps.empty()) {
-    // No allocations - just remove the transients ops without creating a pack.
+    // No allocations - create a trivial pack op with zero slices so that the
+    // MaterializeTransientSizeQueriesPass can still generate a size query
+    // function (which will return 0). This ensures consistent ABI behavior.
     LLVM_DEBUG(LDBG() << "no allocations found, "
-                         "removing transients ops\n");
+                         "creating trivial zero-size pack\n");
+
+    // Find the first transients op to use as insertion point.
+    auto firstTransientsOp = transientResource.transientsOps.front();
+    OpBuilder builder(firstTransientsOp);
+
+    // Create a pack op with zero slices - it will fold to total_length = 0.
+    auto indexType = builder.getIndexType();
+    SmallVector<int64_t> lifetimeIntervals; // Empty for zero slices.
+    SmallVector<Value> sliceSizes;          // Empty for zero slices.
+    SmallVector<Type> packedOffsetTypes;    // Empty for zero slices.
+    auto packOp = IREE::Stream::ResourcePackOp::create(
+        builder, firstTransientsOp.getLoc(), indexType, packedOffsetTypes,
+        /*offset=*/nullptr, builder.getIndexArrayAttr(lifetimeIntervals),
+        sliceSizes, transientResource.affinity);
+
+    // Add the stream.experimental.transients attribute so
+    // MaterializeTransientSizeQueriesPass can find this pack op and generate
+    // a size query function.
+    packOp->setAttr("stream.experimental.transients", builder.getUnitAttr());
+
+    LLVM_DEBUG({
+      LDBG() << "created trivial pack op: ";
+      packOp->print(llvm::dbgs(), explorer.getAsmState());
+      llvm::dbgs() << "\n";
+    });
+
+    // Remove the transients ops by forwarding their values.
     for (auto transientsOp : transientResource.transientsOps) {
       // Forward the result timepoint to the await timepoint.
       transientsOp.getResultTimepoint().replaceAllUsesWith(
