@@ -142,7 +142,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         // CHECK-LABEL: llvm.func @test_rocdl_attrs
-        // CHECK: denormal_fp_math_f32 = "preserve-sign"
+        // CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
         llvm.func @test_rocdl_attrs(%arg0: i32) {
           llvm.return
         }
@@ -178,7 +178,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         // CHECK-LABEL: llvm.func @test_rocdl_attrs
-        // CHECK: denormal_fp_math_f32 = "positive-zero"
+        // CHECK: denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = positivezero, float_input_mode = positivezero>
         llvm.func @test_rocdl_attrs(%arg0: i32) {
           llvm.return
         }
@@ -225,7 +225,7 @@ builtin.module {
 }
 
 // CHECK-LABEL: llvm.func @test_kern_arg
-// CHECK:       denormal_fp_math_f32 = "preserve-sign"
+// CHECK:       denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
 // CHECK-NOT:   iree_codegen.denormal_fp_math_f32
 // CHECK:       llvm_func_attrs = {check_attr
 
