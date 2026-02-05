@@ -339,7 +339,9 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     }
 
     // If in_bounds is present and this dimension allows OOB (in_bounds=false),
-    // skip the size matching check - hardware OOB returns 0 for padding.
+    // skip the size matching check. For non-outermost dimensions, the lowering
+    // adds explicit bounds checks since raw buffer OOB only provides 1D
+    // (linear) clamping, not per-dimension clamping.
     if (inBoundsAttr) {
       auto inBoundsArray = *inBoundsAttr;
       if (dim < inBoundsArray.size()) {
