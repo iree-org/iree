@@ -14,6 +14,7 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
+#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
@@ -75,6 +76,9 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   tracing::DebugCounter::registerCLOptions();
   auto &pluginManagerOptions =
       mlir::iree_compiler::PluginManagerOptions::FromFlags::get();
+  // Register the top-level optimization level flag (--iree-opt-level) and
+  // pipeline options so that optimization-level cascading works in iree-opt.
+  mlir::iree_compiler::GlobalPipelineOptions::FromFlags::get();
 
   // Build the list of dialects as a header for the --help message.
   std::string helpHeader = (toolName + "\nAvailable Dialects: ").str();
@@ -86,6 +90,13 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv, helpHeader);
+
+  // Apply optimization-level-dependent defaults to global options.
+  {
+    auto globalBinder = mlir::iree_compiler::OptionsBinder::global();
+    globalBinder.applyOptimizationDefaults();
+  }
+
   MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
   // The local binder is meant for overriding session-level options, but for
