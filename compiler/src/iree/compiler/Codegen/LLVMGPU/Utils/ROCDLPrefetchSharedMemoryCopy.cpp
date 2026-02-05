@@ -16,6 +16,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -36,11 +37,50 @@
 namespace mlir::iree_compiler {
 
 namespace {
+
+// Pipeline mode determines the pipelining strategy based on loop contents.
+enum class PipelineMode {
+  /// Async copy mode using gather_to_lds.
+  /// - pipelining with multi buffering
+  /// - Less gpu.barrier needed (vmcnt handles synchronization)
+  AsyncCopy,
+
+  /// Stream copy mode using transfer_read + transfer_write.
+  /// - 2 or 3-stage pipelining without buffering transformation
+  /// - Uses gpu.barrier for synchronization
+  StreamCopy
+};
+
 // Structure to hold the stage classification result.
+// Which fields are populated depends on the mode:
+// - AsyncCopy mode: loadStage + computeStage
+// - StreamCopy mode: readStage + writeStage + computeStage
 struct StageClassification {
+  PipelineMode mode;
+  unsigned numStages;
+
+  // AsyncCopy mode stages
+  SmallVector<Operation *> loadStage;
+
+  // StreamCopy mode stages
   SmallVector<Operation *> readStage;
   SmallVector<Operation *> writeStage;
+
+  // Common to both modes
   SmallVector<Operation *> computeStage;
+
+  /// Returns all operations in stage order for scheduling.
+  SmallVector<Operation *> getAllOpsInOrder() const {
+    SmallVector<Operation *> ops;
+    if (mode == PipelineMode::AsyncCopy) {
+      ops.append(loadStage.begin(), loadStage.end());
+    } else {
+      ops.append(readStage.begin(), readStage.end());
+      ops.append(writeStage.begin(), writeStage.end());
+    }
+    ops.append(computeStage.begin(), computeStage.end());
+    return ops;
+  }
 };
 } // namespace
 
@@ -344,48 +384,65 @@ static LogicalResult checkLoopIterations(scf::ForOp forOp) {
 // slice computation works naturally without special handling.
 // Returns failure if any scf.if has conflicting operations (both global reads
 // and shared writes).
-static LogicalResult
-identifyRootOperations(scf::ForOp forOp, SmallVector<Operation *> &readRoots,
-                       SmallVector<Operation *> &writeRoots,
-                       SmallVector<Operation *> &computeRoots) {
+static LogicalResult identifyRootOperations(
+    scf::ForOp forOp, PipelineMode mode, SmallVector<Operation *> &loadRoots,
+    SmallVector<Operation *> &readRoots, SmallVector<Operation *> &writeRoots,
+    SmallVector<Operation *> &computeRoots) {
 
   LDBG() << "\n=== Step 1: Identifying Root Operations ===";
 
   for (Operation &op : forOp.getBody()->getOperations()) {
-    // Read stage roots: vector.transfer_read from global memory
-    if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
-      if (isGlobalMemoryRead(read)) {
-        readRoots.push_back(&op);
-        LDBG() << "  Read root: " << op;
+    if (mode == PipelineMode::AsyncCopy) {
+      // Async copy mode: gather_to_lds and scf.yield
+      if (isa<amdgpu::GatherToLDSOp>(op)) {
+        loadRoots.push_back(&op);
+        LDBG() << "  Load root: " << op;
+      } else if (isa<scf::YieldOp>(op)) {
+        computeRoots.push_back(&op);
+        LDBG() << "  Compute root: " << op;
       }
-    }
-    // Write stage roots: all vector.transfer_write operations
-    else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
-      writeRoots.push_back(&op);
-      LDBG() << "  Write root: " << op;
-    }
-    // Compute stage roots: scf.yield (carries loop-carried dependencies)
-    else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
-      computeRoots.push_back(&op);
-      LDBG() << "  Compute root: " << op;
-    }
-    // Look inside scf.if blocks to find nested transfer operations
-    // Treat the scf.if as a single unit - add it to only one stage
-    else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-      // Analyze the scf.if contents and add roots in a single pass
-      // The scf.if itself will be added to slices via parent walking
-      if (failed(analyzeIfOp(ifOp, readRoots, writeRoots))) {
-        return failure();
+    } else {
+      // Stream copy mode: transfer_read, transfer_write, scf.yield
+      // Read stage roots: vector.transfer_read from global memory
+      if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
+        if (isGlobalMemoryRead(read)) {
+          readRoots.push_back(&op);
+          LDBG() << "  Read root: " << op;
+        }
+      }
+      // Write stage roots: all vector.transfer_write operations
+      else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
+        writeRoots.push_back(&op);
+        LDBG() << "  Write root: " << op;
+      }
+      // Compute stage roots: scf.yield (carries loop-carried dependencies)
+      else if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
+        computeRoots.push_back(&op);
+        LDBG() << "  Compute root: " << op;
+      }
+      // Look inside scf.if blocks to find nested transfer operations
+      // Treat the scf.if as a single unit - add it to only one stage
+      else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        // Analyze the scf.if contents and add roots in a single pass
+        // The scf.if itself will be added to slices via parent walking
+        if (failed(analyzeIfOp(ifOp, readRoots, writeRoots))) {
+          return failure();
+        }
       }
     }
   }
 
-  LDBG() << "Found " << readRoots.size() << " read roots, " << writeRoots.size()
-         << " write roots, " << computeRoots.size() << " compute roots";
+  LDBG() << "Found " << loadRoots.size() << " load roots, " << readRoots.size()
+         << " read roots, " << writeRoots.size() << " write roots, "
+         << computeRoots.size() << " compute roots";
 
-  // Validate that we have at least one read root - pipelining requires
-  // global memory reads to prefetch
-  if (readRoots.empty()) {
+  // Validate that we have the required roots - pipelining requires memory
+  // operations to prefetch.
+  if (mode == PipelineMode::AsyncCopy && loadRoots.empty()) {
+    LDBG() << "No gather_to_lds operations found";
+    return failure();
+  }
+  if (mode == PipelineMode::StreamCopy && readRoots.empty()) {
     LDBG() << "No global memory reads found - cannot pipeline";
     return failure();
   }
@@ -448,47 +505,25 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
   return success();
 }
 
-// Step 3: Classify all operations into stages and restore original order.
+// Step 3: Classify operations into stages by checking slice membership.
+// Assigns operations to stages based on slices, maintaining original order.
 static LogicalResult classifyOperationsIntoStages(
-    scf::ForOp forOp, const SetVector<Operation *> &readSlice,
-    const SetVector<Operation *> &writeSlice,
-    const SetVector<Operation *> &computeSlice, StageClassification &result) {
+    scf::ForOp forOp,
+    ArrayRef<std::pair<SetVector<Operation *> *, SmallVector<Operation *> *>>
+        sliceToStage) {
 
   LDBG() << "\n=== Step 3: Classifying Operations into Stages ===";
-  LDBG() << "  Read slice size: " << readSlice.size();
-  LDBG() << "  Write slice size: " << writeSlice.size();
-  LDBG() << "  Compute slice size: " << computeSlice.size();
-
-  // If compute slice only has the yield, there's no real compute
-  if (computeSlice.size() == 1) {
-    LDBG() << "Loop has no meaningful compute operations";
-    return failure();
-  }
 
   // Restore original order while assigning to stages
   for (Operation &op : forOp.getBody()->getOperations()) {
     bool assigned = false;
 
-    if (readSlice.contains(&op)) {
-      result.readStage.push_back(&op);
-      assigned = true;
-      LDBG() << "  READ: " << op;
-    }
-
-    // Don't duplicate ops that are in read stage
-    if (writeSlice.contains(&op) && !assigned) {
-      result.writeStage.push_back(&op);
-      assigned = true;
-      LDBG() << "  WRITE: " << op;
-    }
-
-    // Don't duplicate ops already assigned to read or write stages. The compute
-    // slice (from scf.yield) naturally includes all operations, but we want to
-    // classify them based on their primary purpose
-    if (computeSlice.contains(&op) && !assigned) {
-      result.computeStage.push_back(&op);
-      assigned = true;
-      LDBG() << "  COMPUTE: " << op;
+    // Don't duplicate ops - assign to first matching slice
+    for (auto [slice, stage] : sliceToStage) {
+      if (slice->contains(&op) && !assigned) {
+        stage->push_back(&op);
+        assigned = true;
+      }
     }
 
     // Check for unassigned operations with side effects
@@ -497,27 +532,13 @@ static LogicalResult classifyOperationsIntoStages(
       return failure();
     }
   }
-
-  LDBG() << "\n=== Final Stage Classification ===";
-  LDBG() << "--- Read Stage (" << result.readStage.size() << " ops) ---";
-  for (Operation *op : result.readStage) {
-    LDBG() << *op;
-  }
-  LDBG() << "--- Write Stage (" << result.writeStage.size() << " ops) ---";
-  for (Operation *op : result.writeStage) {
-    LDBG() << *op;
-  }
-  LDBG() << "--- Compute Stage (" << result.computeStage.size() << " ops) ---";
-  for (Operation *op : result.computeStage) {
-    LDBG() << *op;
-  }
-
   return success();
 }
 
 // Main function to compute stage classification for a loop.
 static FailureOr<StageClassification>
-computeStageClassification(scf::ForOp forOp) {
+computeStageClassification(scf::ForOp forOp, PipelineMode mode,
+                           unsigned numStages) {
   LDBG() << "\n=== Computing Stage Classification for Loop ===";
 
   // Check for nested loops
@@ -531,40 +552,93 @@ computeStageClassification(scf::ForOp forOp) {
     return failure();
   }
 
-  // Step 1: Identify root operations (with inline validation)
-  SmallVector<Operation *> readRoots, writeRoots, computeRoots;
-  if (failed(
-          identifyRootOperations(forOp, readRoots, writeRoots, computeRoots))) {
+  // Identify root operations
+  SmallVector<Operation *> loadRoots, readRoots, writeRoots, computeRoots;
+  if (failed(identifyRootOperations(forOp, mode, loadRoots, readRoots,
+                                    writeRoots, computeRoots))) {
     return failure();
   }
 
-  // Step 2: Compute backward slices
-  LDBG() << "\n=== Step 2: Computing Backward Slices ===";
-  SetVector<Operation *> readSlice, writeSlice, computeSlice;
+  StageClassification stages;
+  stages.mode = mode;
+  stages.numStages = numStages;
 
-  if (failed(computeBackwardSlice(readRoots, forOp, readSlice))) {
-    return failure();
+  if (mode == PipelineMode::AsyncCopy) {
+    // Async copy mode: compute slices for load and compute stages
+    LDBG() << "\n=== Computing Backward Slices (Async Copy Mode) ===";
+    SetVector<Operation *> loadSlice, computeSlice;
+
+    if (failed(computeBackwardSlice(loadRoots, forOp, loadSlice))) {
+      return failure();
+    }
+    LDBG() << "  Load slice: " << loadSlice.size() << " operations";
+
+    if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
+      return failure();
+    }
+    LDBG() << "  Compute slice: " << computeSlice.size() << " operations";
+
+    if (failed(classifyOperationsIntoStages(
+            forOp, {{&loadSlice, &stages.loadStage},
+                    {&computeSlice, &stages.computeStage}}))) {
+      return failure();
+    }
+  } else {
+    // Stream copy mode: compute slices for read, write, and compute stages
+    LDBG() << "\n=== Computing Backward Slices (Stream Copy Mode) ===";
+    SetVector<Operation *> readSlice, writeSlice, computeSlice;
+
+    if (failed(computeBackwardSlice(readRoots, forOp, readSlice))) {
+      return failure();
+    }
+    LDBG() << "  Read slice: " << readSlice.size() << " operations";
+
+    if (failed(computeBackwardSlice(writeRoots, forOp, writeSlice))) {
+      return failure();
+    }
+    LDBG() << "  Write slice: " << writeSlice.size() << " operations";
+
+    if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
+      return failure();
+    }
+    LDBG() << "  Compute slice: " << computeSlice.size() << " operations";
+
+    // If compute slice only has the yield, there's no real compute
+    if (computeSlice.size() == 1) {
+      LDBG() << "Loop has no meaningful compute operations";
+      return failure();
+    }
+
+    if (failed(classifyOperationsIntoStages(
+            forOp, {{&readSlice, &stages.readStage},
+                    {&writeSlice, &stages.writeStage},
+                    {&computeSlice, &stages.computeStage}}))) {
+      return failure();
+    }
   }
-  LDBG() << "  Read slice: " << readSlice.size() << " operations";
 
-  if (failed(computeBackwardSlice(writeRoots, forOp, writeSlice))) {
-    return failure();
+  LDBG() << "\n=== Final Stage Classification ===";
+  if (stages.mode == PipelineMode::AsyncCopy) {
+    LDBG() << "--- Load Stage (" << stages.loadStage.size() << " ops) ---";
+    for (Operation *op : stages.loadStage) {
+      LDBG() << *op;
+    }
+  } else {
+    LDBG() << "--- Read Stage (" << stages.readStage.size() << " ops) ---";
+    for (Operation *op : stages.readStage) {
+      LDBG() << *op;
+    }
+    LDBG() << "--- Write Stage (" << stages.writeStage.size() << " ops) ---";
+    for (Operation *op : stages.writeStage) {
+      LDBG() << *op;
+    }
   }
-  LDBG() << "  Write slice: " << writeSlice.size() << " operations";
-
-  if (failed(computeBackwardSlice(computeRoots, forOp, computeSlice))) {
-    return failure();
-  }
-  LDBG() << "  Compute slice: " << computeSlice.size() << " operations";
-
-  // Step 3: Classify operations into stages
-  StageClassification result;
-  if (failed(classifyOperationsIntoStages(forOp, readSlice, writeSlice,
-                                          computeSlice, result))) {
-    return failure();
+  LDBG() << "--- Compute Stage (" << stages.computeStage.size() << " ops) ---";
+  for (Operation *op : stages.computeStage) {
+    LDBG() << *op;
   }
 
-  return result;
+  return stages;
 }
 
 // Removes all barrier operations from the loop body.
@@ -597,7 +671,18 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
     opToStage[op] = stage;
   };
 
-  if (numStages == 2) {
+  if (stages.mode == PipelineMode::AsyncCopy) {
+    // Async copy mode: load in stage 0, compute in last stage.
+    // For N-stage pipelining, this creates N-1 empty intermediate stages,
+    // resulting in N-1 prologue iterations (like Triton's async copy approach).
+    // Example for 3-stage: load→stage 0, compute→stage 2, stage 1 is empty.
+    for (Operation *op : stages.loadStage) {
+      assignOp(op, /*stage=*/0);
+    }
+    for (Operation *op : stages.computeStage) {
+      assignOp(op, /*stage=*/numStages - 1);
+    }
+  } else if (numStages == 2) {
     // Two-stage pipelining: read+write in stage 0, compute in stage 1.
     for (Operation *op : stages.readStage) {
       assignOp(op, /*stage=*/0);
@@ -625,16 +710,28 @@ populateOpToStageMap(const StageClassification &stages, scf::ForOp forOp,
 
 // Populates cluster IDs for each operation based on stage groupings.
 // Cluster ordering determines execution order within each iteration:
-// - 2-stage pipeline: read -> compute -> write
-//   (read i+1, compute i, write i+1)
-// - 3-stage pipeline: compute -> write -> read
-//   (compute i, write i+1, read i+2)
+// - Async copy: load -> compute (same order for all stage counts)
+// - 2-stage stream: read -> compute -> write
+// - 3-stage stream: compute -> write -> read
 static void
 populateOpToClusterMap(const StageClassification &stages, unsigned numStages,
                        llvm::DenseMap<Operation *, unsigned> &opToCluster) {
   unsigned clusterID = 0;
 
-  if (numStages == 2) {
+  if (stages.mode == PipelineMode::AsyncCopy) {
+    // Async copy mode: always load first, then compute.
+    // The execution order within each iteration is the same regardless of
+    // numStages. Only the prologue depth changes (N-1 iterations for N stages).
+    for (Operation *op : stages.loadStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+
+    for (Operation *op : stages.computeStage) {
+      opToCluster[op] = clusterID;
+    }
+    ++clusterID;
+  } else if (numStages == 2) {
     // 2-stage pipeline: read first, then compute, then write
     // This allows reading for next iteration while computing current
     for (Operation *op : stages.readStage) {
@@ -684,10 +781,7 @@ static void buildFinalSchedule(
     std::vector<std::pair<Operation *, unsigned>> &finalSchedule) {
 
   // Collect all operations from all stages with their cluster IDs
-  SmallVector<Operation *> allOps;
-  allOps.append(stages.readStage.begin(), stages.readStage.end());
-  allOps.append(stages.computeStage.begin(), stages.computeStage.end());
-  allOps.append(stages.writeStage.begin(), stages.writeStage.end());
+  SmallVector<Operation *> allOps = stages.getAllOpsInOrder();
 
   // Sort by cluster ID, maintaining original order within each cluster
   llvm::stable_sort(allOps, [&](Operation *a, Operation *b) {
@@ -699,8 +793,7 @@ static void buildFinalSchedule(
   // Build the final schedule from the sorted operations
   for (Operation *op : allOps) {
     if (opToStage.count(op)) {
-      unsigned stage = opToStage.lookup(op);
-      finalSchedule.push_back({op, stage});
+      finalSchedule.push_back({op, opToStage.lookup(op)});
     }
   }
 
@@ -781,6 +874,8 @@ static bool hasNestedSharedRead(Operation *op) {
 }
 
 // Helper to check if operation or its nested ops have shared memory writes.
+// This includes both vector.transfer_write to shared memory and
+// amdgpu.gather_to_lds which writes directly to LDS.
 static bool hasNestedSharedWrite(Operation *op) {
   bool found = false;
   op->walk([&](vector::TransferWriteOp writeOp) {
@@ -789,6 +884,15 @@ static bool hasNestedSharedWrite(Operation *op) {
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
+  });
+  if (found) {
+    return true;
+  }
+
+  // Also check for gather_to_lds which writes to shared memory (LDS).
+  op->walk([&](amdgpu::GatherToLDSOp) {
+    found = true;
+    return WalkResult::interrupt();
   });
   return found;
 }
@@ -857,18 +961,17 @@ static bool isInsideLoop(Operation *op) {
   return false;
 }
 
-// Inserts synchronization barriers in the pipelined loop.
-static void insertPipelineBarriers(RewriterBase &rewriter,
-                                   scf::ForOp newForOp) {
+// Inserts barriers for StreamCopy mode (transfer_read/write based pipelining).
+// In this mode:
+// - Prologue writes to shared memory via transfer_write
+// - Loop body reads from shared (transfer_read) then writes (transfer_write)
+// - State machine flip works correctly because first shared op is a read
+static void insertStreamCopyBarriers(RewriterBase &rewriter,
+                                     scf::ForOp newForOp) {
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
   SharedBarrierState state;
 
-  // Check if the pipelined loop is nested inside another loop.
-  // If nested, we need prologue barriers because:
-  //   - The epilogue of outer iteration N writes to shared memory
-  //   - The prologue of outer iteration N+1 reads from shared memory
-  //   - Without a barrier, there's a data race between iterations
   bool isNested = isInsideLoop(newForOp);
 
   if (isNested) {
@@ -899,6 +1002,74 @@ static void insertPipelineBarriers(RewriterBase &rewriter,
                         state);
 }
 
+// Inserts barriers for AsyncCopy mode (gather_to_lds based pipelining).
+// In async copy mode with double buffering, we only insert barriers before
+// shared memory writes (gather_to_lds).
+static void insertAsyncCopyBarriers(RewriterBase &rewriter,
+                                    scf::ForOp newForOp) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+
+  bool isNested = isInsideLoop(newForOp);
+
+  if (isNested) {
+    // Nested loop: insert barriers in prologue before writes.
+    // The epilogue of the previous outer iteration may have read from shared
+    // memory, so we need barriers before any writes in the prologue.
+    bool needBarrierBeforeWrite = true;
+    for (auto it = parentBlock->begin(); it != newForOp->getIterator(); ++it) {
+      if (hasNestedSharedWrite(&*it) && needBarrierBeforeWrite) {
+        rewriter.setInsertionPoint(&*it);
+        gpu::BarrierOp::create(rewriter, loc);
+        needBarrierBeforeWrite = false;
+      }
+      if (hasNestedSharedRead(&*it)) {
+        needBarrierBeforeWrite = true;
+      }
+    }
+  }
+
+  // Loop body: only insert barriers before writes.
+  //
+  // Why barrier before write:
+  //   The write buffer (gather_to_lds target) was read by the previous
+  //   iteration. A barrier ensures all wavefronts complete their reads
+  //   before any wavefront starts writing, preventing write-after-read races.
+  //
+  // Why no barrier before read:
+  //   The LLVM backend inserts s_waitcnt vmcnt(N) before ds_read instructions
+  //   via alias scope metadata. vmcnt is per-wavefront and ensures that
+  //   wavefront's gather_to_lds DMAs complete before its ds_reads execute.
+  //   Cross-wavefront synchronization is already handled by the barrier
+  //   before write in the previous iteration.
+  Block *body = newForOp.getBody();
+  bool needBarrierBeforeWrite = true;
+
+  for (auto it = body->begin(); it != std::prev(body->end()); ++it) {
+    Operation &op = *it;
+
+    if (hasNestedSharedWrite(&op) && needBarrierBeforeWrite) {
+      rewriter.setInsertionPoint(&op);
+      gpu::BarrierOp::create(rewriter, loc);
+      needBarrierBeforeWrite = false;
+    }
+
+    if (hasNestedSharedRead(&op)) {
+      needBarrierBeforeWrite = true;
+    }
+  }
+}
+
+// Dispatches to the appropriate barrier insertion strategy based on mode.
+static void insertPipelineBarriers(RewriterBase &rewriter, scf::ForOp newForOp,
+                                   PipelineMode mode) {
+  if (mode == PipelineMode::AsyncCopy) {
+    insertAsyncCopyBarriers(rewriter, newForOp);
+  } else {
+    insertStreamCopyBarriers(rewriter, newForOp);
+  }
+}
+
 // Dumps the planned schedule before pipelining for debugging purposes.
 static void
 dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
@@ -918,13 +1089,23 @@ dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
   LDBG() << "=== End Planned Schedule ===\n";
 }
 
+/// Checks if a loop contains any gather_to_lds operations (anywhere in the
+/// loop, including nested regions). Used for determining pipeline mode.
+static bool hasGatherToLDS(scf::ForOp forOp) {
+  bool found = false;
+  forOp->walk([&](amdgpu::GatherToLDSOp) {
+    found = true;
+    return WalkResult::interrupt();
+  });
+  return found;
+}
+
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
-  // No prefetching needed for single-stage pipelining.
-  if (numStages <= 1) {
-    return forOp;
-  }
+  // Determine pipeline mode based on loop contents
+  PipelineMode mode = hasGatherToLDS(forOp) ? PipelineMode::AsyncCopy
+                                            : PipelineMode::StreamCopy;
 
   // Check for nested gather_to_lds (e.g., inside scf.if) - this is unsupported
   // because conditional async copies can't be reliably pipelined.
@@ -936,38 +1117,46 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Check for mixed mode: both gather_to_lds and stream copy ops.
   // This is unsupported - bail out entirely without any pipelining.
-  bool hasAsyncCopy = hasDirectGatherToLDS(forOp);
-  bool hasStreamCopy = hasStreamCopyOps(forOp);
-  if (hasAsyncCopy && hasStreamCopy) {
+  if (hasDirectGatherToLDS(forOp) && hasStreamCopyOps(forOp)) {
     LDBG() << "Loop has both gather_to_lds and stream copy ops - "
            << "skipping pipelining entirely";
     return forOp;
   }
 
-  if (hasAsyncCopy) {
-    LDBG() << "Async copy mode detected (gather_to_lds present)";
-
-    // Multi-buffer LDS allocations for double buffering.
-    // Use numStages as the buffer count to match pipeline depth.
+  // Early validation and setup for each mode
+  if (mode == PipelineMode::AsyncCopy) {
+    // No prefetching needed for single-stage pipelining.
+    if (numStages <= 1) {
+      return forOp;
+    }
+    // Async copy mode supports 2 or 3 stage pipelining with matching buffer
+    // count.
+    if (numStages > 3) {
+      LDBG() << "Async copy mode supports at most 3 stages, got " << numStages;
+      return failure();
+    }
+    // Apply multi-buffering: numStages buffers for N-stage pipelining
     if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
       return failure();
     }
-
-    // TODO: Full async copy pipelining will be added in a follow-up commit.
-    // For now, just perform multi-buffering without pipelining.
-    return forOp;
+  } else {
+    // Stream copy: no buffering, just validate numStages
+    // No prefetching needed for single-stage pipelining.
+    if (numStages <= 1) {
+      return forOp;
+    }
+    // For global->shared->register data flow, we have 3 operation groups (read,
+    // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+    if (numStages > 3) {
+      LDBG()
+          << "numStages=" << numStages
+          << " requested but capping to 3 (maximum for read, write, compute)";
+      numStages = 3;
+    }
   }
 
-  // Stream copy mode: global->shared->register data flow with 3 operation
-  // groups (read, write, compute), so 3 stages is the maximum pipeline depth.
-  if (numStages > 3) {
-    LDBG() << "numStages=" << numStages
-           << " requested but capping to 3 (maximum for read, write, compute)";
-    numStages = 3;
-  }
-
-  // Compute stage classification using the new refactored approach
-  auto stagesOr = computeStageClassification(forOp);
+  // Compute stage classification using the refactored approach
+  auto stagesOr = computeStageClassification(forOp, mode, numStages);
   if (failed(stagesOr)) {
     return failure();
   }
@@ -1005,8 +1194,8 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   scf::ForOp newForOp = *newForOpOr;
 
-  // Insert barriers in the pipelined loop
-  insertPipelineBarriers(rewriter, newForOp);
+  // Insert barriers using the appropriate strategy for each mode.
+  insertPipelineBarriers(rewriter, newForOp, mode);
 
   return newForOp;
 }
