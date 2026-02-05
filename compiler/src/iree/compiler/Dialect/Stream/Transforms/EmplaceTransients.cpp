@@ -1278,10 +1278,17 @@ processTransientResource(FunctionOpInterface funcOp,
                          TransientResource &transientResource,
                          Explorer &explorer) {
   if (transientResource.allocaOps.empty()) {
-    // No allocations - valid case (e.g., zero allocations with transients
-    // annotation).
+    // No allocations - just remove the transients ops without creating a pack.
     LLVM_DEBUG(LDBG() << "no allocations found, "
-                         "nothing to pack\n");
+                         "removing transients ops\n");
+    for (auto transientsOp : transientResource.transientsOps) {
+      // Forward the result timepoint to the await timepoint.
+      transientsOp.getResultTimepoint().replaceAllUsesWith(
+          transientsOp.getAwaitTimepoint());
+      // Forward the result resource to the input resource operand.
+      transientsOp.getResult().replaceAllUsesWith(transientsOp.getResource());
+      transientsOp.erase();
+    }
     return success();
   }
 
