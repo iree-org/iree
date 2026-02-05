@@ -360,7 +360,11 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %c1, %[[SELTREE0]] : index
 // CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
 // CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
-// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<2x8xi1>
+// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<8x8xi1>
+// CHECK: %[[DIST_MASK:.+]] = vector.shape_cast %[[MASK]] : vector<8x8xi1> to vector<2x1x2x1x2x8xi1>
+// CHECK: memref.reinterpret_cast %arg0
+// CHECK: memref.transpose
+// CHECK: vector.transfer_read {{.*}}, %[[DIST_MASK]] {{.*}} : {{.*}}, vector<2x1x2x1x2x8xf16>
 
 // -----
 
