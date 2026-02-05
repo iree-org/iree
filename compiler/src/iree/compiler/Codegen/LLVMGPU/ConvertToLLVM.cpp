@@ -352,7 +352,7 @@ public:
       int64_t binding = subspan.getBinding().getSExtValue();
       // Try to read correlation information from the original function.
       // Note: This assumes the correlation attribute was preserved through
-      // Stream → HAL conversion. If not, we'll need to preserve it explicitly.
+      // Stream -> HAL conversion. If not, we'll need to preserve it explicitly.
       // In HAL dialect, func.func has no arguments, so we try to read from
       // arg_attrs first (for Stream dialect compatibility), and if that fails,
       // we try to read from function-level attributes with a binding index
