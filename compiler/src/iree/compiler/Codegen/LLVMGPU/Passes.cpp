@@ -1043,9 +1043,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
-      // Hoist allocations back into the entry block, as lowering to CF may have
-      // split the block at a point before the allocation.
-      .addPass(createHoistStaticallyBoundAllocationsPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
       // Math dialect ops rewrites, approximations, casts.
@@ -1054,6 +1051,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
+      // Hoist allocations back into the entry block, as lowering to CF may have
+      // split the block at a point before the allocation.
+      .addPass(createHoistStaticallyBoundAllocationsPass)
       .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
