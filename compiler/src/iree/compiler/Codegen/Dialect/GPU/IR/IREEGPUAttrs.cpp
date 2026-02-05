@@ -690,6 +690,13 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
+SmallVector<SmallVector<utils::IteratorType>>
+MMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
 Attribute MMAAttr::getDistributionMappingKind() const {
   // Explicit distribution currently unsupported for NV intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
@@ -959,6 +966,13 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
   return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
          getSubgroupsK();
+}
+
+SmallVector<SmallVector<utils::IteratorType>>
+DataTiledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -1337,6 +1351,13 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   return 0;
 }
 
+SmallVector<SmallVector<utils::IteratorType>>
+VirtualMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 int operandIndex) {
   switch (intrinsic) {
@@ -1681,6 +1702,17 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   return success();
 }
 
+SmallVector<SmallVector<utils::IteratorType>>
+ScaledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
 //===----------------------------------------------------------------------===//
 // DataTiledScaledMMA Attributes
 //===----------------------------------------------------------------------===//
@@ -1886,6 +1918,17 @@ int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
 LogicalResult
 DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return IREE::LinalgExt::inferScaledContractionDims(maps);
+}
+
+SmallVector<SmallVector<utils::IteratorType>>
+DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 //===----------------------------------------------------------------------===//
