@@ -88,7 +88,7 @@ static ArrayAttr fencedGpuAddressSpaces(RewriterBase &rewriter, Iter buffers) {
               addressSpaces.insert(globalSpace);
               return true;
             })
-            .Default([&](Attribute) { return false; });
+            .Default(false);
     if (!isKnown) {
       return ArrayAttr();
     }

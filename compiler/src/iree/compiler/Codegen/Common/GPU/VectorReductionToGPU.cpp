@@ -194,8 +194,8 @@ struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
     }
 
     rewriter.setInsertionPointAfter(warpOp);
-    (void)gpu::BarrierOp::create(rewriter, barrierOp.getLoc(),
-                                 barrierOp.getAddressSpacesAttr());
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(),
+                           barrierOp.getAddressSpacesAttr());
     rewriter.eraseOp(barrierOp);
     return success();
   }
