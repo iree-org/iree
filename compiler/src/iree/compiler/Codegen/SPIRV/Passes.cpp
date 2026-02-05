@@ -196,6 +196,7 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // possible. In SPIR-V we don't use memref descriptor so it's not possible
       // to handle subview ops.
       .addPass(memref::createFoldMemRefAliasOpsPass)
+      .addPass(createConvertUnsupportedFloatArithPass)
       .addPass(createEmulateNarrowTypePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
@@ -250,16 +251,17 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createSPIRVEmulateI64Pass)
       .addPass(createConvertBf16ArithToF32Pass)
       .addPass([]() {
-        // Convert bf16 buffers to i16. Other float types are not yet
-        // supported in the SPIR-V pipeline.
+        // Convert unsupported float buffer types to integer types.
+        // SPIR-V doesn't natively support bf16 or fp8 types, so we convert
+        // them to integer types of the same bit width for storage.
         return createConvertUnsupportedFloatToIntBuffersPass(
             ConvertUnsupportedFloatToIntBuffersPassOptions{
                 /*includeBf16=*/true,
-                /*includeF8E5M2=*/false,
-                /*includeF8E4M3FN=*/false,
-                /*includeF8E5M2FNUZ=*/false,
-                /*includeF8E4M3FNUZ=*/false,
-                /*includeF8E8M0FNU=*/false,
+                /*includeF8E5M2=*/true,
+                /*includeF8E4M3FN=*/true,
+                /*includeF8E5M2FNUZ=*/true,
+                /*includeF8E4M3FNUZ=*/true,
+                /*includeF8E8M0FNU=*/true,
             });
       })
       .addPass(createCanonicalizerPass)

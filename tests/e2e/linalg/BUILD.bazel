@@ -128,21 +128,23 @@ VULKAN_SRCS = enforce_glob(
     [
         "argmax.mlir",
         "conv2d.mlir",
+        "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
         "index.mlir",
         "narrow_n_matmuls.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "fp_to_subbyte.mlir",
+        # TODO(#23387): Enable the test once scaling_extf/truncf lowering is
+        # supported.
         "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
-        "small_float_arith.mlir",
         "unpack.mlir",
     ],
 )
