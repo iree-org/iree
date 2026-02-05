@@ -3,14 +3,12 @@
 // RUN:   %s | FileCheck %s --check-prefix=STREAM
 
 // Test that stream.binding_noalias attributes are correctly generated in Stream
-// dialect and propagated to llvm.noalias attributes in LLVM dialect.
+// dialect by the FuseDispatchBindings pass.
 //
-// This test verifies the complete pipeline as described in the PR:
-// 1. Stream dialect: After FuseDispatchBindings pass, stream.binding_noalias
-//    attributes are generated on func.func arguments for distinct bindings
-//    (different resources)
-// 2. LLVM dialect: After ConvertToNVVMPass, llvm.noalias attributes are
-//    applied to function arguments
+// This test verifies that:
+// Stream dialect: After FuseDispatchBindings pass, stream.binding_noalias
+// attributes are generated on func.func arguments for distinct bindings
+// (different resources)
 
 // Test case: Two distinct bindings that use different resources.
 // With alias_mutable_bindings = false, each mutable binding gets its own
@@ -80,8 +78,3 @@ util.func public @test() {
 // STREAM-LABEL: util.func public @dispatch
 // STREAM-SAME: (%[[ARG0:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]},
 // STREAM-SAME:  %[[ARG1:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]}
-
-// After ConvertToNVVMPass: llvm.noalias attributes should be applied.
-// LLVM-LABEL: llvm.func @dispatch
-// LLVM-SAME: (%[[LLVM_ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
-// LLVM-SAME:  %[[LLVM_ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef}
