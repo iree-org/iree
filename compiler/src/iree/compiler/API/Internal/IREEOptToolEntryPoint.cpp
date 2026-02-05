@@ -10,11 +10,11 @@
 
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
+#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
-#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
