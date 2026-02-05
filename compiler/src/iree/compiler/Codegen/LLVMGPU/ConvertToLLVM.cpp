@@ -353,8 +353,20 @@ public:
       // Try to read correlation information from the original function.
       // Note: This assumes the correlation attribute was preserved through
       // Stream → HAL conversion. If not, we'll need to preserve it explicitly.
-      if (auto correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+      // In HAL dialect, func.func has no arguments, so we try to read from
+      // arg_attrs first (for Stream dialect compatibility), and if that fails,
+      // we try to read from function-level attributes with a binding index
+      // suffix.
+      ArrayAttr correlationAttr;
+      if (auto attr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_correlation")) {
+        correlationAttr = attr;
+      } else if (auto attr = funcOp->getAttrOfType<ArrayAttr>(
+                     (Twine("stream.binding_correlation_") + Twine(binding))
+                         .str())) {
+        correlationAttr = attr;
+      }
+      if (correlationAttr) {
         auto correlatedBindings =
             llvm::map_to_vector(correlationAttr.getAsRange<IntegerAttr>(),
                                 [](IntegerAttr attr) { return attr.getInt(); });
@@ -363,8 +375,16 @@ public:
         }
       }
       // Read noalias information (bindings pointing to different resources).
-      if (auto noaliasAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+      ArrayAttr noaliasAttr;
+      if (auto attr = funcOp.getArgAttrOfType<ArrayAttr>(
               binding, "stream.binding_noalias")) {
+        noaliasAttr = attr;
+      } else if (auto attr = funcOp->getAttrOfType<ArrayAttr>(
+                     (Twine("stream.binding_noalias_") + Twine(binding))
+                         .str())) {
+        noaliasAttr = attr;
+      }
+      if (noaliasAttr) {
         auto noaliasBindings =
             llvm::map_to_vector(noaliasAttr.getAsRange<IntegerAttr>(),
                                 [](IntegerAttr attr) { return attr.getInt(); });
