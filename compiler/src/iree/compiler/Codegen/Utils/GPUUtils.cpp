@@ -764,18 +764,17 @@ static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   SmallVector<VectorType> undistributedTypes;
   intrinsic.getUndistributedTileTypes(undistributedTypes);
-  if (undistributedTypes.empty()) {
-    return failure();
-  }
-  // For matmul-like operations (C += A * B), the K dimension is the last
-  // dimension of the LHS operand (operand 0).
-  ArrayRef<int64_t> lhsShape = undistributedTypes[0].getShape();
-  if (lhsShape.size() < 2) {
-    return failure();
-  }
-  // Return the product of all reduction dimensions (everything after the M
-  // dim).
-  return llvm::product_of(lhsShape.drop_front(1));
+  auto newIndices =
+          llvm::to_vector(llvm::map_range(
+              zip_equal(intrinsic.getOperandIteratorTypes(), undistributedTypes),
+              [&](auto pair) { 
+                utils::IteratorType iteratorType = std::get<0>(pair)
+                if (iteratorType == utils::IteratorType::reduction) {
+                  return std::get<1>(pair).getShape().size();
+                }
+                return 1;
+              }));
+  return llvm::product_of(newIndices[0]);
 }
 
 /// Returns the number of elements each thread accesses for the given intrinsic
