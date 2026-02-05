@@ -31,17 +31,17 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 /// specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
-LogicalResult setIGEMMConvolutionLoweringConfig(
-    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, bool useDirectLoad = false, bool padConv = false);
+LogicalResult
+setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op, bool padConv = false);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op,
-                                      bool useDirectLoad = false);
+                                      Operation *op);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.
@@ -57,6 +57,10 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op);
+
+/// Returns true if the target supports global load DMA operations.
+/// Currently this is only supported on gfx950+ (CDNA4+) architectures.
+bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
 
 /// Helper for setting up a memory bound reduction configuration, focusing
 /// on getting peak global memory bandwidth.

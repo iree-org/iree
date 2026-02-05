@@ -111,11 +111,6 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
     llvm::cl::desc("enable pre-padding for convolutions in igemm path"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool>
-    clUseDirectLoad("iree-llvmgpu-use-direct-load",
-                    llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
     llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
@@ -2261,8 +2256,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     return success();
   }
   if (clGPUUseTileAndFuseMatmul) {
-    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad))) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     computeOp))) {
       LDBG() << "Tile and fuse matmul config";
       return success();
     }
@@ -2276,8 +2271,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad,
-            clGPUPadConvolution))) {
+            target, entryPointFn, computeOp, clGPUPadConvolution))) {
       LDBG() << "Tile and fuse IGEMM config";
       return success();
     }
