@@ -584,15 +584,24 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     }
   }
 
-  // Block fusion if the consumer has more loops than the producer's fusion
-  // group root. This prevents fusing cases where a small reduction result
-  // is broadcast to a much larger consumer (e.g., batchnorm-like patterns).
+  // Block fusion if the consumer has more non-unit loops than the producer's
+  // fusion group root. This prevents fusing cases where a small reduction
+  // result is broadcast to a much larger consumer (e.g., batchn.
+  // patterns). Unit dimensions are ignored..
   Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
   if (auto rootFusionOp =
           dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
-      rootFusionOp &&
-      consumerFusionOp.getNumLoops() > rootFusionOp.getNumLoops()) {
-    return false;
+      rootFusionOp && !isa<IREE::LinalgExt::CustomOp>(rootOp)) {
+    SmallVector<int64_t> rootLoopRanges = rootFusionOp.getStaticLoopRanges();
+    SmallVector<int64_t> consumerLoopRanges =
+        consumerFusionOp.getStaticLoopRanges();
+    auto countNonUnitDims = [](ArrayRef<int64_t> ranges) {
+      return llvm::count_if(ranges, [](int64_t size) { return size != 1; });
+    };
+    if (countNonUnitDims(consumerLoopRanges) >
+        countNonUnitDims(rootLoopRanges)) {
+      return false;
+    }
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
