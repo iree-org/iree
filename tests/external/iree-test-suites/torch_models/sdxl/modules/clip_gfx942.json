@@ -2,7 +2,7 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/model.mlir",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
-        "--iree-hip-target=gfx942",
+        "--iree-rocm-target=gfx942",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-llvmgpu-enable-prefetch",

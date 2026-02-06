@@ -47,9 +47,17 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 static llvm::cl::opt<int>
-    clROCMIndexingBits("iree-hip-index-bits",
+    clROCMIndexingBits("iree-rocm-index-bits",
                        llvm::cl::desc("Set the bit width of indices in ROCm."),
                        llvm::cl::init(64));
+static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
+    "iree-hip-index-bits",
+    llvm::cl::desc("Deprecated; use --iree-rocm-index-bits instead."),
+    llvm::cl::init(64), llvm::cl::cb<void, int>([](int value) {
+      llvm::errs() << "warning: --iree-hip-index-bits is deprecated; "
+                   << "use --iree-rocm-index-bits instead\n";
+      clROCMIndexingBits = value;
+    }));
 
 namespace {
 

@@ -2,7 +2,7 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree_ci/sdxl/punet/punet_int8mm_f16attn.mlir",
     "compiler_flags" : [
         "--iree-hal-target-device=hip",
-        "--iree-hip-target=gfx942",
+        "--iree-rocm-target=gfx942",
         "--iree-opt-level=O3",
         "--iree-execution-model=async-external",
         "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-global-opt-raise-special-ops, iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"

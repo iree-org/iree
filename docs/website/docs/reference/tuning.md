@@ -117,7 +117,7 @@ While compiling this graph with IREE, the flag
 the created dispatches.
 
 ```mlir
-// RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
+// RUN: iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
             --iree-hal-dump-executable-files-to=<some directory> -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {

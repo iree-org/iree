@@ -163,7 +163,7 @@ IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '1 p')  # e.g. gfx1100
 
 iree-compile \
     --iree-hal-target-device=hip \
-    --iree-hip-target=${IREE_HIP_TARGET} \
+    --iree-rocm-target=${IREE_HIP_TARGET} \
     mobilenetv2.mlir -o mobilenet_hip.vmfb
 ```
 
@@ -173,14 +173,14 @@ iree-compile \
 
     That IREE comes with bundled bitcode files, which are used for linking
     certain intrinsics on AMD GPUs. These will be used automatically or if the
-    `--iree-hip-bc-dir` is empty. As additional support may be needed for
+    `--iree-rocm-bc-dir` is empty. As additional support may be needed for
     different chips, users can use this flag to point to an explicit directory.
     For example, in ROCm installations on Linux, this is often found under
     `/opt/rocm/amdgcn/bitcode`.
 
 #### Choosing HIP targets
 
-A HIP target (`iree-hip-target`) matching the LLVM AMDGPU backend is needed
+A HIP target (`iree-rocm-target`) matching the LLVM AMDGPU backend is needed
 to compile towards each GPU chip. Here is a table of commonly used
 architectures:
 
@@ -214,17 +214,17 @@ architectures:
 For a more comprehensive list of prior GPU generations, you can refer to the
 [LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).
 
-The `iree-hip-target` option support three schemes:
+The `iree-rocm-target` option support three schemes:
 
-1. The exact GPU product name (SKU), e.g., `--iree-hip-target=mi300x`. This
+1. The exact GPU product name (SKU), e.g., `--iree-rocm-target=mi300x`. This
     allows the compiler to know about both the target architecture and about
     additional hardware details like the number of compute units. This extra
     information guides some compiler heuristics and allows for SKU-specific
     [tuning specs](../../reference/tuning.md).
 2. The GPU architecture, as defined by LLVM, e.g.,
-    `--iree-hip-target=gfx942`. This scheme allows for architecture-specific
+    `--iree-rocm-target=gfx942`. This scheme allows for architecture-specific
     [tuning specs](../../reference/tuning.md) only.
-3. The architecture code name, e.g., `--iree-hip-target=cdna3`. This scheme
+3. The architecture code name, e.g., `--iree-rocm-target=cdna3`. This scheme
     gets translated to closes matching GPU architecture under the hood.
 
 We support for common code/SKU names without aiming to be exhaustive. If the

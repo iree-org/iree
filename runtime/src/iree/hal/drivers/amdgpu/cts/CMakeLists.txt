@@ -4,13 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
+if(NOT IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
   return()
 endif()
 
 unset(IREE_AMDGPU_TEST_COMPILER_FLAGS)
 list(APPEND IREE_AMDGPU_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
 iree_hal_cts_test_suite(
@@ -27,7 +27,7 @@ iree_hal_cts_test_suite(
   COMPILER_TARGET_DEVICE
     "amdgpu"
   EXECUTABLE_FORMAT
-    "\"amdgcn-amd-amdhsa--${IREE_HIP_TEST_TARGET_CHIP}\""
+    "\"amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}\""
   COMPILER_FLAGS
     ${IREE_AMDGPU_TEST_COMPILER_FLAGS}
   # ARGS

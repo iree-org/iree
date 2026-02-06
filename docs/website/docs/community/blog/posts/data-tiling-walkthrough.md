@@ -52,7 +52,7 @@ Compilation command, that targets gfx942 AMDGPU:
 ```bash
 iree-compile matmul.mlir -o /tmp/matmul.mlir \
   --iree-hal-target-device=hip \
-  --iree-hip-target=gfx942 \
+  --iree-rocm-target=gfx942 \
   --iree-dispatch-creation-data-tiling
 ```
 

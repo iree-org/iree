@@ -29,7 +29,7 @@ jobs:
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_ENABLE: 0
       IREE_HIP_ENABLE: 1
-      IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
+      IREE_ROCM_TEST_TARGET_CHIP: "gfx1100"
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
