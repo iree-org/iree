@@ -83,25 +83,21 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
   $assert (SUBGROUPS_M*SUBGROUPS_N) == 8, "workgroup size must be 8x64=512"
   %1 = scf.forall (%id) in (${SUBGROUPS_M*SUBGROUPS_N*64}) shared_outs(%out = %0) -> tensor<1x${SUBGROUPS_M*INTRINSICS_M}x16x${SUBGROUPS_N*INTRINSICS_N}x16xf32> {
     %ids:4 = affine.delinearize_index %id into (${SUBGROUPS_M}, ${SUBGROUPS_N}, 4, 16) : index, index, index, index
+    %m_outer_id = arith.muli %ids#0, %c${INTERNAL_M} overflow<nsw, nuw> : index
+    %n_outer_id = arith.muli %ids#1, %c${INTERNAL_N} overflow<nsw, nuw> : index
     %inner_id = arith.muli %ids#2, %c${INTERNAL_K} overflow<nsw, nuw> : index
     %inner_id_acc = arith.muli %ids#2, %c4 overflow<nsw, nuw> : index
-    %m_outer_id = arith.muli %ids#0, %c4 overflow<nsw, nuw> : index
-    %n_outer_id = arith.muli %ids#1, %c4 overflow<nsw, nuw> : index
-    %wt:3 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 8, 8) : index, index, index
 
-    // Inner 64 loads 8 threads x VEC_SIZE elements.
-    %gko = arith.muli %wt#2, %c${INTRINSICS_K*INTERNAL_K} overflow<nsw, nuw> : index
-    // RHS indexing. Each subgroup loads 32 contiguous rows out of 256.
-    %bpo = arith.muli %wt#0, %c32 overflow<nsw, nuw> : index
-    // Base index is remaining outer 8 lanes + subgroup base.
-    %glb0 = arith.addi %wt#1, %bpo overflow<nsw, nuw> : index
-    %glb1 = arith.addi %glb0, %c8 overflow<nsw, nuw> : index
-    %glb2 = arith.addi %glb1, %c8 overflow<nsw, nuw> : index
-    %glb3 = arith.addi %glb2, %c8 overflow<nsw, nuw> : index
-    // LHS indexing.
-    %bpo_lhs = arith.muli %wt#0, %c16 overflow<nsw, nuw> : index
+    %wt:3 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 8, 8) : index, index, index
+    %bpo_lhs = arith.muli %wt#0, %c{SUBGROUPS_M*INTRINSICS_M*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
+    %bpo_rhs = arith.muli %wt#0, %c{SUBGROUPS_N*INTRINSICS_N*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
     %glb0_lhs = arith.addi %wt#1, %bpo_lhs overflow<nsw, nuw> : index
-    %glb1_lhs = arith.addi %glb0_lhs, %c8 overflow<nsw, nuw> : index
+    %glb0_rhs = arith.addi %wt#1, %bpo_rhs overflow<nsw, nuw> : index
+    $for j in range(1, SUBGROUPS_M*INTRINSICS_M*2//SUBGROUPS_M//SUBGROUPS_N):
+      %glb${j}_lhs = arith.addi %glb${j-1}_lhs, %c8 overflow<nsw, nuw> : index
+    $for j in range(1, SUBGROUPS_N*INTRINSICS_N*2//SUBGROUPS_M//SUBGROUPS_N):
+      %glb${j}_rhs = arith.addi %glb${j-1}_rhs, %c8 overflow<nsw, nuw> : index
+    %gko = arith.muli %wt#2, %c${INTRINSICS_K*INTERNAL_K} overflow<nsw, nuw> : index
 
     %2 = arith.constant dense<0.0> : vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
@@ -121,14 +117,9 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
 
       // Global loads of rhs.
       %rhs_block = tensor.extract_slice %rhs [0, %i] [${SUBGROUPS_N*INTRINSICS_N*16}, ${8*INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_in_ty to !rhs_block_in
-      %rhs_thread_0 = tensor.extract_slice %rhs_block [%glb0, %gko] [1, ${INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_block_in to tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_vec_local_0 = vector.transfer_read %rhs_thread_0 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_thread_1 = tensor.extract_slice %rhs_block [%glb1, %gko] [1, ${INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_block_in to tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_vec_local_1 = vector.transfer_read %rhs_thread_1 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_thread_2 = tensor.extract_slice %rhs_block [%glb2, %gko] [1, ${INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_block_in to tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_vec_local_2 = vector.transfer_read %rhs_thread_2 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_thread_3 = tensor.extract_slice %rhs_block [%glb3, %gko] [1, ${INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_block_in to tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %rhs_vec_local_3 = vector.transfer_read %rhs_thread_3 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
+      $for j in range(SUBGROUPS_N*INTRINSICS_N*2//SUBGROUPS_M//SUBGROUPS_N):
+        %rhs_thread_${j} = tensor.extract_slice %rhs_block [%glb${j}_rhs, %gko] [1, ${INTRINSICS_K*INTERNAL_K}] [1, 1] : !rhs_block_in to tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
+        %rhs_vec_local_${j} = vector.transfer_read %rhs_thread_${j} [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
 
       rocdl.sched.barrier 0
 
@@ -141,10 +132,9 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
 
       // Global loads of lhs.
       %lhs_block = tensor.extract_slice %lhs [0, 0, %i] [1, ${SUBGROUPS_M*INTRINSICS_M*16}, ${8*INTRINSICS_K*INTERNAL_K}] [1, 1, 1] : !lhs_in_ty to !lhs_block_in
-      %lhs_thread_0 = tensor.extract_slice %lhs_block [0, %glb0_lhs, %gko] [1, 1, ${INTRINSICS_K*INTERNAL_K}] [1, 1, 1] : !lhs_block_in to tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %lhs_vec_local_0 = vector.transfer_read %lhs_thread_0 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %lhs_thread_1 = tensor.extract_slice %lhs_block [0, %glb1_lhs, %gko] [1, 1, ${INTRINSICS_K*INTERNAL_K}] [1, 1, 1] : !lhs_block_in to tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-      %lhs_vec_local_1 = vector.transfer_read %lhs_thread_1 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
+      $for j in range(1, SUBGROUPS_M*INTRINSICS_M*2//SUBGROUPS_M//SUBGROUPS_N):
+        %lhs_thread_${j} = tensor.extract_slice %lhs_block [0, %glb${j}_lhs, %gko] [1, 1, ${INTRINSICS_K*INTERNAL_K}] [1, 1, 1] : !lhs_block_in to tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
+        %lhs_vec_local_${j} = vector.transfer_read %lhs_thread_${j} [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
 
       gpu.barrier
       rocdl.sched.barrier 0
@@ -161,13 +151,11 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
       gpu.barrier
       rocdl.sched.barrier 0
 
-      vector.transfer_write %rhs_vec_local_0, %rhs_shared [%glb0, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared
-      vector.transfer_write %rhs_vec_local_1, %rhs_shared [%glb1, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared
-      vector.transfer_write %rhs_vec_local_2, %rhs_shared [%glb2, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared
-      vector.transfer_write %rhs_vec_local_3, %rhs_shared [%glb3, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared
+      $for j in range(SUBGROUPS_N*INTRINSICS_N*2//SUBGROUPS_M//SUBGROUPS_N):
+        vector.transfer_write %rhs_vec_local_${j}, %rhs_shared [%glb${j}_rhs, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared
 
-      vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0_lhs, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared
-      vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared
+      $for j in range(1, SUBGROUPS_M*INTRINSICS_M*2//SUBGROUPS_M//SUBGROUPS_N):
+        vector.transfer_write %lhs_vec_local_${j}, %lhs_shared [%glb${j}_lhs, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared
 
       gpu.barrier
       rocdl.sched.barrier 0
