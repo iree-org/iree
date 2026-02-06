@@ -898,9 +898,8 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
     return failure();
   }
   if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
-    return validateXorShuffle(
-        getXorShuffleParamsForGfx950(target, intrinsic, operandIndex),
-        intrinsic, operandIndex);
+    return validateXorShuffle(getXorShuffleParamsForGfx950(target, intrinsic),
+                              intrinsic, operandIndex);
   }
   return failure();
 }
