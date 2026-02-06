@@ -942,6 +942,9 @@ private:
 
     // Collect copy/gather ops that are eligible for coalesced DMA.
     // Skip ops that are already inside a warp-mapped forall.
+    // For CopyOps, only collect those tagged with UseGlobalLoadDMAAttr (set
+    // by GPUPromoteMatmulOperands). Other copies (e.g. transpose result
+    // copies) are not global-to-LDS loads and must not be DMA-converted.
     funcOp->walk([&](Operation *op) {
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
         auto parentForall = copyOp->getParentOfType<scf::ForallOp>();

@@ -960,7 +960,15 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Build promotion list - global load DMA eligibility is determined
   // dynamically in the GPUConvertToCoalescedDMA pass based on whether
   // the source comes directly from global memory.
+  // Build promotion list. Use global load DMA attribute for operand loads
+  // when the target supports it (e.g. gfx950+).
+  bool useGlobalLoadDMA = targetSupportsGlobalLoadDMA(target);
+  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+  SmallVector<Attribute> promotionArray;
   SmallVector<int64_t> promotionList = {0, 1};
+  if (useGlobalLoadDMA && !scaled) {
+    promotionArray = {useGlobalDma, useGlobalDma};
+  }
   if (scaled) {
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
@@ -984,7 +992,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     promotionList.push_back(promotionList.size());
   }
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
-                                  /*promotionTypes=*/{});
+                                  promotionArray);
   if (!mustBeAligned || couldNeedPadding) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
