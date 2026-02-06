@@ -414,6 +414,9 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     if (tensor::PadOp pad = traceToTensorPad(input)) {
       // Verify pad constraints: low padding must be all zeros, pad value must
       // be 0.
+      // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting
+      // a select on the loaded values from LDS to replace OOB zeros with the
+      // desired padding element.
       bool validPad = true;
       for (OpFoldResult low : pad.getMixedLowPad()) {
         if (!isConstantIntValue(low, 0)) {
@@ -1050,10 +1053,12 @@ private:
     int64_t numTiledDims = 0;
 
     if (isPadFusion) {
-      // For tensor.pad fusion, create a single-iteration wrapper forall
-      // by setting tile sizes to the full shape. This allows the DMA to
-      // operate on the full buffer while satisfying the warp-mapped parent
-      // requirement.
+      // TODO(#23365): Tile to subgroups for pad fusion by propagating source
+      // offsets through tiling. Currently, after subgroup tiling each warp's
+      // DMA gets the full pre-pad source but a sub-tiled init, and the DMA
+      // lowering has no way to offset into the source. This requires adding
+      // source offset support to CoalescedGatherDMAOp. For now, create a
+      // single-iteration wrapper forall so the DMA sees the full buffer.
       // Bail out if any dimension is dynamic since we need static tile sizes.
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         return failure();
