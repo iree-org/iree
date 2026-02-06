@@ -38,7 +38,7 @@ func.func @simple_large_reduction_tiling_static() {
       %0 = arith.addf %b0, %b1 : f32
       linalg.yield %0 : f32
   } -> tensor<128xf32>
-  check.expect_almost_eq (%normal_reduce, %split_reduction, atol 0.1) : tensor<128xf32>
+  check.expect_almost_eq (%normal_reduce, %split_reduction, atol 0.0, rtol 0.0001) : tensor<128xf32>
   return
 }
 
@@ -84,6 +84,6 @@ func.func @simple_large_reduction_2d_tiling_static() {
       %0 = arith.addf %b0, %b1 : f32
       linalg.yield %0 : f32
   } -> tensor<128xf32>
-  check.expect_almost_eq (%normal_reduce, %split_reduction, atol 0.1) : tensor<128xf32>
+  check.expect_almost_eq (%normal_reduce, %split_reduction, atol 0.0, rtol 0.0001) : tensor<128xf32>
   return
 }

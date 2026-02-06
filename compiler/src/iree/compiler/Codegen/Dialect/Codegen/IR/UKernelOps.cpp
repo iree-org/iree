@@ -84,7 +84,7 @@ static LogicalResult getCallOpType(MLIRContext *context,
         callOperandTypes.push_back(scalarType);
         return success();
       })
-      .Case<MemRefType>([&](MemRefType memrefType) {
+      .Case([&](MemRefType memrefType) {
         // Base ptr.
         callOperandTypes.push_back(MemRefType::get(
             ArrayRef<int64_t>{}, memrefType.getElementType(),
@@ -97,12 +97,12 @@ static LogicalResult getCallOpType(MLIRContext *context,
                                 indexType);
         return success();
       })
-      .Case<NullPointerType>([&](NullPointerType nullPointerType) {
+      .Case([&](NullPointerType nullPointerType) {
         callOperandTypes.push_back(nullPointerType);
         callOperandTypes.push_back(IndexType::get(context));
         return success();
       })
-      .Default([&](Type t) { return failure(); });
+      .Default(failure());
 }
 
 /// Map `operand` of a `ukernel.generic` operation to the operand(s) of
@@ -116,7 +116,7 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
         callOperands.push_back(operand);
         return success();
       })
-      .Case<MemRefType>([&](MemRefType memrefType) {
+      .Case([&](MemRefType memrefType) {
         auto extractStridedMetadataOp =
             memref::ExtractStridedMetadataOp::create(rewriter, loc, operand);
         // Base ptr.
@@ -130,13 +130,13 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
         }
         return success();
       })
-      .Case<NullPointerType>([&](NullPointerType /*unused*/) {
+      .Case([&](NullPointerType /*unused*/) {
         callOperands.push_back(operand);
         callOperands.push_back(
             arith::ConstantIndexOp::create(rewriter, loc, 0));
         return success();
       })
-      .Default([](Type) { return failure(); });
+      .Default(failure());
 }
 
 static FailureOr<func::CallOp>

@@ -1,5 +1,5 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-codegen-materialize-tuning-specs, iree-codegen-materialize-user-configs, func.func(iree-codegen-lowering-config-interpreter))" \
-// RUN:   --iree-codegen-tuning-spec-path=%p/external_strategy_spec.mlir --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/external_strategy_spec.mlir}, iree-codegen-materialize-user-configs, func.func(iree-codegen-lowering-config-interpreter))" \
+// RUN:   --split-input-file | FileCheck %s
 
 #config = #iree_gpu.lowering_config<{lowering_strategy = "print_me"}>
 module attributes { transform.with_named_sequence } {

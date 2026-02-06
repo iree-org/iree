@@ -10,6 +10,19 @@
 
 iree_add_all_subdirs()
 
+iree_cc_test(
+  NAME
+    rocm-c-api-test
+  SRCS
+    "rocm_c_api_test.cc"
+  DEPS
+    gmock
+    gtest
+    iree::compiler::API::Impl
+    iree::compiler::bindings::c::headers
+    iree::testing::gtest_main
+)
+
 iree_lit_test_suite(
   NAME
     lit

@@ -89,11 +89,12 @@ static LogicalResult
 setVMVXRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op) {
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<IREE::LinalgExt::FftOp>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<TilingInterface>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Default([&](Operation *op) { return success(); });
+        .Case([&](IREE::LinalgExt::FftOp op) {
+          return setRootConfig(entryPointFn, op);
+        })
+        .Case(
+            [&](TilingInterface op) { return setRootConfig(entryPointFn, op); })
+        .Default(success());
   };
   return setRootConfigFn(op);
 }

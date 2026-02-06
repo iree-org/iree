@@ -395,7 +395,7 @@ static std::string summarizeDispatchRegion(Region &region) {
     TypeSwitch<Operation *>(op)
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
             [&](auto op) { updateIfBetter(kMaxCost, op); })
-        .Case<linalg::LinalgOp>([&](auto op) {
+        .Case([&](linalg::LinalgOp op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
           updateIfBetter(estimatedCost, op);
         })
@@ -441,13 +441,12 @@ static std::string summarizeDispatchRegion(Region &region) {
             bestSummary =
                 opName + "_" + loopRangesToString(op.getStaticLoopRanges());
           })
-      .Case<linalg::LinalgOp>(
-          [&](auto op) { bestSummary = summarizeLinalgOp(op); })
+      .Case([&](linalg::LinalgOp op) { bestSummary = summarizeLinalgOp(op); })
       .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         bestSummary = opName + "_" + operandTypeToString(op.getSource());
       })
-      .Case<IREE::Encoding::SetEncodingOp>([&](auto op) {
+      .Case([&](IREE::Encoding::SetEncodingOp op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = cast<IREE::Encoding::EncodingAttr>(
             op.getResultType().getEncoding());
@@ -457,7 +456,7 @@ static std::string summarizeDispatchRegion(Region &region) {
         bestSummary = opName + "_" + index + "_" + loopRangesToString(shape);
         ;
       })
-      .Case<IREE::Encoding::UnsetEncodingOp>([&](auto op) {
+      .Case([&](IREE::Encoding::UnsetEncodingOp op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = cast<IREE::Encoding::EncodingAttr>(
             op.getSourceType().getEncoding());

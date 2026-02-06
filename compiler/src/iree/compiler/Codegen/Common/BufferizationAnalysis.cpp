@@ -72,14 +72,14 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   if (!definingOp) {
     auto arg = cast<BlockArgument>(v);
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
-        .Case<scf::ForOp>([&](scf::ForOp forOp) {
+        .Case([&](scf::ForOp forOp) {
           Value initOperand = forOp.getTiedLoopInit(arg)->get();
           if (plan.isEquivalent(arg, initOperand)) {
             return isFromReadOnlyTensor(initOperand, plan);
           }
           return false;
         })
-        .Default([&](Operation *op) { return false; });
+        .Default(false);
   }
   return isReadOnly(v);
 }
@@ -532,87 +532,74 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
                                              BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
+        .Case([&](arith::ConstantOp constantOp) {
           return analyseConstantOp(constantOp, plan);
         })
-        .Case<IREE::TensorExt::DispatchTensorLoadOp>(
-            [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-              return analyseInterfaceLoadTensorOp(loadOp, plan);
-            })
-        .Case<IREE::TensorExt::DispatchTensorStoreOp>(
-            [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
-              return analyseInterfaceStoreTensorOp(storeOp, plan);
-            })
-        .Case<IREE::Codegen::LoadFromBufferOp>(
-            [&](IREE::Codegen::LoadFromBufferOp loadOp) {
-              return analyseLoadFromBufferOp(loadOp, plan);
-            })
-        .Case<IREE::Codegen::StoreToBufferOp>(
-            [&](IREE::Codegen::StoreToBufferOp storeOp) {
-              return analyseStoreToBufferOp(storeOp, plan);
-            })
-        .Case<IREE::HAL::InterfaceBindingSubspanOp>(
-            [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-              return analyseInterfaceBindingSubspanOp(subspanOp, plan);
-            })
-        .Case<tensor::PadOp>([&](tensor::PadOp padTensorOp) {
+        .Case([&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+          return analyseInterfaceLoadTensorOp(loadOp, plan);
+        })
+        .Case([&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
+          return analyseInterfaceStoreTensorOp(storeOp, plan);
+        })
+        .Case([&](IREE::Codegen::LoadFromBufferOp loadOp) {
+          return analyseLoadFromBufferOp(loadOp, plan);
+        })
+        .Case([&](IREE::Codegen::StoreToBufferOp storeOp) {
+          return analyseStoreToBufferOp(storeOp, plan);
+        })
+        .Case([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+          return analyseInterfaceBindingSubspanOp(subspanOp, plan);
+        })
+        .Case([&](tensor::PadOp padTensorOp) {
           return analysePadTensorOp(padTensorOp, plan);
         })
-        .Case<DestinationStyleOpInterface>(
-            [&](DestinationStyleOpInterface dpsOp) {
-              return analyseDPSOps(dpsOp, plan);
-            })
+        .Case([&](DestinationStyleOpInterface dpsOp) {
+          return analyseDPSOps(dpsOp, plan);
+        })
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
               return analyseSingleOperandResultOp(reshapeOp.getSrc(),
                                                   reshapeOp.getResult(), plan);
             })
-        .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
+        .Case([&](tensor::ExtractSliceOp sliceOp) {
           return analyseSubTensorOp(sliceOp, plan);
         })
-        .Case<tensor::InsertSliceOp>(
-            [&](tensor::InsertSliceOp subTensorInsertOp) {
-              return analyseDestructiveUpdateOp(
-                  subTensorInsertOp, subTensorInsertOp.getSource(),
-                  subTensorInsertOp.getDest(), subTensorInsertOp.getResult(),
-                  plan);
-            })
-        .Case<tensor::ParallelInsertSliceOp>(
-            [&](tensor::ParallelInsertSliceOp subTensorInsertOp) {
-              return analyseDestructiveUpdateOp(
-                  subTensorInsertOp, subTensorInsertOp.getSource(),
-                  subTensorInsertOp.getDest(),
-                  subTensorInsertOp.getTiedOpResult(), plan);
-            })
-        .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
+        .Case([&](tensor::InsertSliceOp subTensorInsertOp) {
+          return analyseDestructiveUpdateOp(
+              subTensorInsertOp, subTensorInsertOp.getSource(),
+              subTensorInsertOp.getDest(), subTensorInsertOp.getResult(), plan);
+        })
+        .Case([&](tensor::ParallelInsertSliceOp subTensorInsertOp) {
+          return analyseDestructiveUpdateOp(
+              subTensorInsertOp, subTensorInsertOp.getSource(),
+              subTensorInsertOp.getDest(), subTensorInsertOp.getTiedOpResult(),
+              plan);
+        })
+        .Case([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.getSource(),
                                               castOp.getDest(), plan);
         })
-        .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
+        .Case([&](tensor::InsertOp insertOp) {
           return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
                                             insertOp.getDest(),
                                             insertOp.getResult(), plan);
         })
-        .Case<vector::TransferReadOp>(
-            [&](vector::TransferReadOp transferReadOp) {
-              if (isa<RankedTensorType>(transferReadOp.getBase().getType())) {
-                plan.insert(transferReadOp.getBase());
-              }
-              return success();
-            })
-        .Case<vector::TransferWriteOp>(
-            [&](vector::TransferWriteOp transferWriteOp) {
-              if (!isa<RankedTensorType>(transferWriteOp.getBase().getType())) {
-                return success();
-              }
-              return analyseDestructiveUpdateOp(
-                  transferWriteOp, nullptr, transferWriteOp.getBase(),
-                  transferWriteOp.getResult(), plan);
-            })
-        .Case<scf::IfOp>(
-            [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
-        .Case<scf::ForOp>(
-            [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
+        .Case([&](vector::TransferReadOp transferReadOp) {
+          if (isa<RankedTensorType>(transferReadOp.getBase().getType())) {
+            plan.insert(transferReadOp.getBase());
+          }
+          return success();
+        })
+        .Case([&](vector::TransferWriteOp transferWriteOp) {
+          if (!isa<RankedTensorType>(transferWriteOp.getBase().getType())) {
+            return success();
+          }
+          return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
+                                            transferWriteOp.getBase(),
+                                            transferWriteOp.getResult(), plan);
+        })
+        .Case([&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
+        .Case([&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
               tensor::GenerateOp, tensor::PadOp, bufferization::ToBufferOp,
               bufferization::AllocTensorOp>(

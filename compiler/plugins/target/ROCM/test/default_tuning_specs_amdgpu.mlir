@@ -3,14 +3,12 @@
 // RUN:   --iree-codegen-dump-tuning-specs-to=- \
 // RUN:   --no-implicit-module %s | FileCheck %s --check-prefix=DEFAULT
 
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs)' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse.mlir})' \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
 // RUN:   --iree-codegen-dump-tuning-specs-to=- \
 // RUN:   --no-implicit-module %s | FileCheck %s --check-prefix=BOTH
 
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs)' \
-// RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse_default.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-tuning-specs{tuning-spec-path=%p/tuning_spec_mmt_tile_and_fuse_default.mlir})' \
 // RUN:   --iree-codegen-enable-default-tuning-specs \
 // RUN:   --iree-codegen-dump-tuning-specs-to=- \
 // RUN:   --no-implicit-module %s | FileCheck %s --check-prefix=MERGE

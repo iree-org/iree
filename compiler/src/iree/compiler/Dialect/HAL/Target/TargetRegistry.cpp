@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+#include "llvm/ADT/SmallVectorExtras.h"
+
 namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
@@ -116,8 +118,8 @@ TargetRegistry::getTargetDevices(ArrayRef<std::string> targetNames) const {
   // To ensure deterministic builds we sort matches by name.
   std::sort(matches.begin(), matches.end(),
             [](const auto &a, const auto &b) { return a.first < b.first; });
-  return llvm::to_vector(llvm::map_range(
-      matches, [](auto match) { return std::move(match.second); }));
+  return llvm::map_to_vector(
+      matches, [](auto match) { return std::move(match.second); });
 }
 
 SmallVector<std::shared_ptr<TargetBackend>>
@@ -132,8 +134,8 @@ TargetRegistry::getTargetBackends(ArrayRef<std::string> targetNames) const {
   // To ensure deterministic builds we sort matches by name.
   std::sort(matches.begin(), matches.end(),
             [](const auto &a, const auto &b) { return a.first < b.first; });
-  return llvm::to_vector(llvm::map_range(
-      matches, [](auto match) { return std::move(match.second); }));
+  return llvm::map_to_vector(
+      matches, [](auto match) { return std::move(match.second); });
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

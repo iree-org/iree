@@ -85,6 +85,7 @@ struct ROCMOptions {
   std::string enableROCMUkernels = "none";
   std::string encodingLayoutResolver =
       GPU::kDataTilingEncodingLayoutResolverName;
+  std::string tuningSpecPath = "";
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
@@ -152,6 +153,11 @@ struct ROCMOptions {
                  "identity layout), `pad` (additional padding "
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
+    binder.opt<std::string>(
+        "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
+        cl::desc("Path to a module containing a tuning spec (transform "
+                 "dialect library). Accepts MLIR text (.mlir) and bytecode "
+                 "(.mlirbc) formats."));
 
     binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
@@ -449,7 +455,11 @@ public:
       modulePassManager.addPass(
           IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
     }
-    modulePassManager.addPass(createMaterializeTuningSpecsPass());
+    {
+      MaterializeTuningSpecsPassOptions passOptions;
+      passOptions.tuningSpecPath = options.tuningSpecPath;
+      modulePassManager.addPass(createMaterializeTuningSpecsPass(passOptions));
+    }
     modulePassManager.addPass(createMaterializeUserConfigsPass());
     modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   }

@@ -792,7 +792,7 @@ struct LLVMGPUConfigureTensorLayoutsPass final
                 return setGPULoweringConfigLayout(config, candidate,
                                                   workgroupSize, rewriter);
               })
-              .Default([](Attribute) -> LogicalResult { return failure(); });
+              .Default(failure());
 
       if (failed(result)) {
         return failure();

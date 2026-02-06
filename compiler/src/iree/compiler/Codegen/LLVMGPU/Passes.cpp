@@ -88,6 +88,11 @@ static llvm::cl::opt<bool> clCombineLayoutTransformation(
     llvm::cl::desc("Combine relayout ops during dispatch configuration"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
+static llvm::cl::opt<bool> clROCDLLoadToTransposeLoad(
+    "iree-llvmgpu-test-load-to-transpose-load",
+    llvm::cl::desc("Enable amdgpu.transpose_load targeting for ROCDL"),
+    llvm::cl::init(true), llvm::cl::Hidden);
+
 static llvm::cl::opt<IREE::Codegen::WorkgroupId>
     clSetWorkgroupDistributionAlong(
         "iree-llvmgpu-set-workgroup-distribution-along",
@@ -112,6 +117,14 @@ static llvm::cl::opt<bool> clPatchFuncOps(
         "Perform the patches on func ops for debugging purpose. It should be "
         "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
     llvm::cl::init(false), llvm::cl::Hidden);
+
+static llvm::cl::opt<bool> clLLVMGPUEnableSmallFloatEmulation(
+    "iree-llvmgpu-enable-small-float-emulation",
+    llvm::cl::desc(
+        "Enable software emulation for fp4/fp8 types without hardware support. "
+        "When disabled (default), unsupported types will cause a compile "
+        "error."),
+    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
@@ -584,6 +597,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  if (forROCDL && clROCDLLoadToTransposeLoad) {
+    funcPassManager.addPass(createROCDLLoadToTransposeLoadPass());
+  }
 
   // Step 9. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
@@ -1032,9 +1048,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
-      // Hoist allocations back into the entry block, as lowering to CF may have
-      // split the block at a point before the allocation.
-      .addPass(createHoistStaticallyBoundAllocationsPass)
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
       // Math dialect ops rewrites, approximations, casts.
@@ -1043,6 +1056,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createSCFToControlFlowPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
+      // Hoist allocations back into the entry block, as lowering to CF may have
+      // split the block at a point before the allocation.
+      .addPass(createHoistStaticallyBoundAllocationsPass)
       .addPass(createIREECodegenFoldMemRefAliasOpsPass)
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
@@ -1064,7 +1080,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     // convert to ROCDL.
-    funcPassManager.addPass(createConvertUnsupportedFloatArithPass);
+    // Software emulation for small float types (fp4/fp8) is controlled by
+    // --iree-llvmgpu-enable-small-float-emulation. When disabled (default),
+    // ConvertToROCDL will error on unsupported types.
+    funcPassManager.addPass([] {
+      return createConvertUnsupportedFloatArithPass(
+          ConvertUnsupportedFloatArithPassOptions{
+              clLLVMGPUEnableSmallFloatEmulation});
+    });
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());

@@ -63,14 +63,11 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
 
   // Convert floating-point types.
   addConversion([this](FloatType floatType) -> std::optional<Type> {
-    if (floatType.getIntOrFloatBitWidth() < 32) {
-      if (targetOptions_.f32Extension) {
-        // Promote f16 -> f32.
-        return Float32Type::get(floatType.getContext());
-      } else {
-        // f32 is not supported; can't compile.
-        return std::nullopt;
-      }
+    unsigned bitWidth = floatType.getIntOrFloatBitWidth();
+    if (bitWidth < 32) {
+      // Sub-32-bit floats are stored as i32 in VM (storage only, no
+      // arithmetic).
+      return IntegerType::get(floatType.getContext(), 32);
     } else if (floatType.isF32()) {
       if (targetOptions_.f32Extension) {
         return floatType;

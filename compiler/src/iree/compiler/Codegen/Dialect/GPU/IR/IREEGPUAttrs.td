@@ -260,6 +260,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -320,6 +321,7 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
+        "getOperandIteratorTypes",
       ]>,
       DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
         "getTileSwizzle",
@@ -389,6 +391,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -527,6 +530,7 @@ def IREEGPU_VirtualMMAAttr :
     "getDistributedTileTypes",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
@@ -593,6 +597,7 @@ def IREEGPU_ScaledMMAAttr :
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {

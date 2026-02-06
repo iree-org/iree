@@ -42,12 +42,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-llvm::cl::opt<std::string> clCodegenTuningSpecPath(
-    "iree-codegen-tuning-spec-path",
-    llvm::cl::desc("File path to a module containing a tuning spec (transform "
-                   "dialect library)."),
-    llvm::cl::init(""));
-
 llvm::cl::opt<bool> clCodegenEnableDefaultTuningSpecs(
     "iree-codegen-enable-default-tuning-specs",
     llvm::cl::desc("Whether to enable default tuning spec transform libraries "
@@ -96,17 +90,18 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
 }
 
 static FailureOr<ModuleOp>
-getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect) {
-  if (clCodegenTuningSpecPath.empty()) {
+getUserTuningSpec(ModuleOp module, IREE::Codegen::IREECodegenDialect &dialect,
+                  StringRef tuningSpecPath) {
+  if (tuningSpecPath.empty()) {
     return failure();
   }
 
   FailureOr<ModuleOp> maybeTransformLibrary =
-      dialect.getOrLoadTransformLibraryModule(clCodegenTuningSpecPath);
+      dialect.getOrLoadTransformLibraryModule(tuningSpecPath);
   if (failed(maybeTransformLibrary)) {
     return module->emitError()
            << "Failed to load tuning spec transform dialect library from "
-           << clCodegenTuningSpecPath;
+           << tuningSpecPath;
   }
 
   return *maybeTransformLibrary;
@@ -175,6 +170,8 @@ serializeTuningSpecToAttr(ModuleOp tuningSpec) {
 
 struct MaterializeTuningSpecsPass final
     : impl::MaterializeTuningSpecsPassBase<MaterializeTuningSpecsPass> {
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registerTransformDialectTranslationDependentDialects(registry);
   }
@@ -185,9 +182,10 @@ struct MaterializeTuningSpecsPass final
     auto dialect = ctx->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
     assert(dialect);
 
-    FailureOr<ModuleOp> userTuningSpec = getUserTuningSpec(moduleOp, *dialect);
+    FailureOr<ModuleOp> userTuningSpec =
+        getUserTuningSpec(moduleOp, *dialect, tuningSpecPath);
     const bool hasUserTuningSpec = succeeded(userTuningSpec);
-    if (!hasUserTuningSpec && !clCodegenTuningSpecPath.empty()) {
+    if (!hasUserTuningSpec && !tuningSpecPath.empty()) {
       // When a user spec is requested but fails to load, this is a hard
       // failure.
       return signalPassFailure();

@@ -69,11 +69,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
                    "thread distribution is enabled"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution",
-    llvm::cl::desc("disable thread distribution in codegen"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<int>
     clDefaultDistTileSize("iree-llvmcpu-distribution-size",
                           llvm::cl::desc("default distribution tile size"),
@@ -542,12 +537,6 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
          "expected all vectors to be of equal size");
 
   size_t numDims = lbs.size();
-  // Set all the distribution tile sizes to zero if thread distribution is
-  // disabled.
-  if (clDisableDistribution) {
-    return SmallVector<int64_t>(numDims, 0);
-  }
-
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
   for (auto i : llvm::seq<size_t>(0, numDims)) {
@@ -1167,7 +1156,7 @@ private:
       // - For all other (unknown) operations, assume an identity mapping for
       // any value whose rank matches the operation’s loop count.
       TypeSwitch<Operation *>(op)
-          .Case<IndexingMapOpInterface>([&](auto op) {
+          .Case([&](IndexingMapOpInterface op) {
             propagateOnIndexingMapOp(op, indicesEquivalence,
                                      valueToGlobalDimMaps);
           })
@@ -3183,7 +3172,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
   // These operations have their own logic of lowering config.
   auto result =
       TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          .Case([&](IREE::LinalgExt::CustomOp op) {
             return setDefaultCustomOpLoweringConfig(entryPointFn, op,
                                                     initCPULaunchConfig);
           })
@@ -3195,7 +3184,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                 IREE::LinalgExt::WinogradInputTransformOp,
                 IREE::LinalgExt::WinogradOutputTransformOp>(
               [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-          .Default([&](Operation *op) { return failure(); });
+          .Default(failure());
   if (succeeded(result)) {
     return result;
   }
@@ -4130,8 +4119,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    auto prunedComputeOps = llvm::to_vector(
-        llvm::make_filter_range(computeOps, shouldSetLoweringConfig));
+    auto prunedComputeOps =
+        llvm::filter_to_vector(computeOps, shouldSetLoweringConfig);
     if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();

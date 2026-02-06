@@ -19,16 +19,13 @@ iree_cc_library(
     "Patterns.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineDialect
     MLIRArithUtils
     MLIRIR
     MLIRLinalgDialect
-    MLIRLinalgUtils
     MLIRShardDialect
     MLIRShardTransforms
     MLIRSupport
     MLIRTensorDialect
-    MLIRTransformUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils

@@ -248,6 +248,30 @@ def IREECodegen_InnerTileDescAttrInterface :
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a vector where each element is a vector of iterator types for
+        each dimension of each operand.
+        These dimensions are taken from the unexpanded, undistributed tile
+        shapes of each operand.
+        For example in a matmul C = A * B:
+        - LHS (operand 0): {"parallel", "reduction"}
+        - RHS (operand 1): {"reduction", "parallel"}
+        - ACC (operand 2): {"parallel", "parallel"}
+        Returns: {
+          {"parallel", "reduction"},
+          {"reduction", "parallel"},
+          {"parallel", "parallel"}
+        }
+      }],
+      /*retType=*/"::llvm::SmallVector<::llvm::SmallVector<::mlir::utils::IteratorType>>",
+      /*methodName=*/"getOperandIteratorTypes",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
   ];
 
   let extraSharedClassDeclaration = [{

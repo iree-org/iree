@@ -1250,7 +1250,7 @@ static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
                      }
                    })
                // Dispatch/collective/etc fail the search.
-               .Default([&](auto otherOp) { return false; })) {
+               .Default(false)) {
         return nullptr;
       }
     }

@@ -19,12 +19,9 @@ iree_cc_library(
     "Passes.cpp"
   DEPS
     LLVMSupport
-    MLIRAnalysis
-    MLIRArithDialect
     MLIRIR
     MLIRLinalgTransforms
     MLIRPass
-    MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR

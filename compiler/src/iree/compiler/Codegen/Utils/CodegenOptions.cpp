@@ -1,0 +1,40 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
+
+namespace mlir::iree_compiler {
+
+void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category("IREE CPU Codegen Options");
+
+  auto initAtOpt = binder.optimizationLevel(
+      "iree-llvmcpu-mlir-opt-level", optLevel,
+      llvm::cl::desc("Optimization level for MLIR codegen passes."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>("iree-llvmcpu-disable-distribution", disableDistribution,
+                   llvm::cl::desc("Disable thread distribution in codegen."),
+                   llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-llvmcpu-fail-on-out-of-bounds-stack-allocation",
+      failOnOutOfBoundsStackAllocation,
+      llvm::cl::desc("Fail if the upper bound of dynamic stack allocation "
+                     "cannot be solved."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
+                   reassociateFpReductions,
+                   {initAtOpt(llvm::OptimizationLevel::O0, false),
+                    initAtOpt(llvm::OptimizationLevel::O2, true)},
+                   llvm::cl::desc("Enables reassociation for FP reductions."),
+                   llvm::cl::cat(category));
+}
+
+} // namespace mlir::iree_compiler

@@ -141,7 +141,7 @@ struct OutlineDispatchExternsPass
       SmallVector<Operation *> deadOps;
       auto outlineOps = [&](Operation *op) {
         return TypeSwitch<Operation *, WalkResult>(op)
-            .Case<IREE::HAL::DispatchExternOp>([&](auto dispatchExternOp) {
+            .Case([&](IREE::HAL::DispatchExternOp dispatchExternOp) {
               if (failed(outlineDispatchExternOp("extern_dispatch",
                                                  dispatchExternOp,
                                                  moduleSymbolTable))) {

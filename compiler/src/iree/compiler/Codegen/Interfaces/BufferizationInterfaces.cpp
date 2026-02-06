@@ -525,13 +525,13 @@ struct PackUnPackOpInterface
                           const BufferizationOptions &options,
                           bufferization::BufferizationState &state) const {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .template Case<linalg::PackOp>([&](auto pack) {
+        .Case([&](linalg::PackOp pack) {
           return bufferizePackOp(rewriter, pack, options, state);
         })
-        .template Case<linalg::UnPackOp>([&](auto unpack) {
+        .Case([&](linalg::UnPackOp unpack) {
           return bufferizeUnPackOp(rewriter, unpack, options, state);
         })
-        .Default([](auto) { return failure(); });
+        .Default(failure());
   }
 };
 

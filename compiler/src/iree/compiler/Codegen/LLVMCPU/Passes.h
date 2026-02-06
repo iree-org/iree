@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -74,7 +75,9 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 
 struct LLVMCPUPipelineOptions {
-  bool disableDistribution = false;
+  // CPU codegen options from command-line flags.
+  CPUCodegenOptions cpuOpts;
+
   bool decomposePackUnPackOps = true;
   bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
@@ -129,6 +132,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 /// to LLVM dialect via the structured ops path. The  `variantPassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+                                     const CPUCodegenOptions &codegenOptions,
                                      bool enableAArch64SME = false);
 
 //----------------------------------------------------------------------------//

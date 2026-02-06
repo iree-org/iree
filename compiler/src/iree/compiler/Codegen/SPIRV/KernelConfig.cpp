@@ -1751,7 +1751,7 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
         return op->emitOpError(
             "named matmul not supported, expected to be generalized first");
       })
-      .Case<linalg::ConvolutionOpInterface>([target](auto op) {
+      .Case([target](linalg::ConvolutionOpInterface op) {
         // Use the result type in case of larger bitwidth for accumulators.
         auto type = cast<ShapedType>(op->getResult(0).getType());
         const int bitwidth = type.getElementTypeBitWidth();
@@ -1768,7 +1768,7 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
         // If unsuccessful, try to tile and distribute/vectorize.
         return setDefaultOpConfig(target, op);
       })
-      .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
+      .Case([&](linalg::GenericOp op) {
         LLVM_DEBUG(llvm::dbgs() << "configuring for generic op\n");
         if (succeeded(detail::setTilingAndMatmulOpConfig(op, target))) {
           return success();
@@ -1792,13 +1792,13 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
         LLVM_DEBUG(llvm::dbgs() << "failed to set config of generic");
         return failure();
       })
-      .Case<IREE::LinalgExt::FftOp>([target](IREE::LinalgExt::FftOp op) {
+      .Case([target](IREE::LinalgExt::FftOp op) {
         return setFftOpConfig(target, op);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp>(
           [&](auto op) { return setWinogradOpConfig(target, op); })
-      .Default([](Operation *) { return failure(); });
+      .Default(failure());
 };
 
 //===----------------------------------------------------------------------===//

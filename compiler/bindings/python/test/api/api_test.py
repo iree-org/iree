@@ -52,6 +52,19 @@ else:
             with self.assertRaises(ValueError):
                 session.set_flags("--does-not-exist=1")
 
+        def testCPUCodegenFlagsAreScopedToSession(self):
+            """Tests that CPU codegen options are session-scoped."""
+            session1 = Session()
+            session2 = Session()
+            session1.set_flags("--iree-llvmcpu-disable-distribution=true")
+            session2.set_flags("--iree-llvmcpu-disable-distribution=false")
+            self.assertIn(
+                "--iree-llvmcpu-disable-distribution=true", session1.get_flags()
+            )
+            self.assertIn(
+                "--iree-llvmcpu-disable-distribution=false", session2.get_flags()
+            )
+
         def testOptFlags(self):
             session = Session()
             flags = session.get_flags()

@@ -92,7 +92,7 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
     return;
   }
   TypeSwitch<Operation *, void>(op)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+      .Case([&](linalg::LinalgOp linalgOp) {
         SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
         operandSet.insert(inputOperands.begin(), inputOperands.end());
       })
@@ -711,7 +711,7 @@ transform_dialect::IREEApplyLoopIndependentCodeMotionOp::applyToOne(
           .Case<affine::AffineForOp, scf::ForOp>([&](auto loop) {
             return loop.promoteIfSingleIteration(rewriter);
           })
-          .Default([](Operation *) { return success(); });
+          .Default(success());
     });
   });
 
