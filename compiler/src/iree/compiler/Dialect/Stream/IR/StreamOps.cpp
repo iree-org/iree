@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -4855,8 +4856,8 @@ Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
 
 // static
 Value TimepointJoinOp::join(ValueRange timepoints, OpBuilder &builder) {
-  return join(builder.getFusedLoc(llvm::to_vector(llvm::map_range(
-                  timepoints, [](Value value) { return value.getLoc(); }))),
+  return join(builder.getFusedLoc(llvm::map_to_vector(
+                  timepoints, [](Value value) { return value.getLoc(); })),
               timepoints, builder);
 }
 

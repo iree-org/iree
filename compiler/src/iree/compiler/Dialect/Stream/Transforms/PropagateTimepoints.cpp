@@ -15,6 +15,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -563,18 +564,18 @@ static void expandSwitchOp(mlir::cf::SwitchOp op,
     return;
   }
   OpBuilder builder(op);
-  auto caseOperands = llvm::to_vector(
-      llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
+  auto caseOperands =
+      llvm::map_to_vector(op.getCaseOperands(), [&](ValueRange operands) {
         return expandOperands(op.getLoc(), operands, resourceTimepointMap,
                               builder);
-      }));
+      });
   auto asValueRange = [](ArrayRef<Value> ref) -> ValueRange { return ref; };
   mlir::cf::SwitchOp::create(
       builder, op.getLoc(), op.getFlag(), op.getDefaultDestination(),
       expandOperands(op.getLoc(), op.getDefaultOperands(), resourceTimepointMap,
                      builder),
       op.getCaseValuesAttr(), op.getCaseDestinations(),
-      llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+      llvm::map_to_vector(caseOperands, asValueRange));
   op.erase();
 }
 
