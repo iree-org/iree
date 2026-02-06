@@ -47,7 +47,8 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
     auto forallOp = dyn_cast<scf::ForallOp>(user);
     if (!forallOp ||
         !forallOpHasMappingType<gpu::GPUThreadMappingAttr,
-                                gpu::GPUWarpMappingAttr>(forallOp)) {
+                                gpu::GPUWarpMappingAttr, IREE::GPU::LaneIdAttr>(
+            forallOp)) {
       return false;
     }
   }
