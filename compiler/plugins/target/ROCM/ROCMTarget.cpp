@@ -210,8 +210,7 @@ struct ROCMOptions {
     binder.opt<bool>(
         "iree-hip-specialize-dispatches", specializeDispatches,
         cl::cat(category),
-        cl::desc(
-            "Deprecated; use --iree-rocm-specialize-dispatches instead."),
+        cl::desc("Deprecated; use --iree-rocm-specialize-dispatches instead."),
         Deprecated("use --iree-rocm-specialize-dispatches instead"));
 
     binder.opt<bool>("iree-rocm-enable-tensor-ukernels", enableTensorUKernels,
@@ -220,8 +219,7 @@ struct ROCMOptions {
     binder.opt<bool>(
         "iree-hip-enable-tensor-ukernels", enableTensorUKernels,
         cl::cat(category),
-        cl::desc(
-            "Deprecated; use --iree-rocm-enable-tensor-ukernels instead."),
+        cl::desc("Deprecated; use --iree-rocm-enable-tensor-ukernels instead."),
         Deprecated("use --iree-rocm-enable-tensor-ukernels instead"));
 
     binder.opt<IREE::Codegen::DenormalFpMath>(
@@ -235,16 +233,14 @@ struct ROCMOptions {
                        "positive-zero", "Convert denormals to positive zero")));
     binder.opt<IREE::Codegen::DenormalFpMath>(
         "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
-        cl::desc(
-            "Deprecated; use --iree-rocm-denormal-fp-math-f32 instead."),
+        cl::desc("Deprecated; use --iree-rocm-denormal-fp-math-f32 instead."),
         Deprecated("use --iree-rocm-denormal-fp-math-f32 instead"),
         cl::values(
             clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
                        "preserve-sign",
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
-                       "positive-zero",
-                       "Convert denormals to positive zero")));
+                       "positive-zero", "Convert denormals to positive zero")));
 
     binder.opt<bool>("iree-rocm-enable-register-spill-warning",
                      enableRegSpillWarning, cl::cat(category),
@@ -256,9 +252,9 @@ struct ROCMOptions {
                  "instead."),
         Deprecated("use --iree-rocm-enable-register-spill-warning instead"));
 
-    binder.opt<bool>(
-        "iree-rocm-emit-debug-info", debugSymbols, cl::cat(category),
-        cl::desc("Generate and embed debug information (DWARF)."));
+    binder.opt<bool>("iree-rocm-emit-debug-info", debugSymbols,
+                     cl::cat(category),
+                     cl::desc("Generate and embed debug information (DWARF)."));
     binder.opt<bool>(
         "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
         cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),

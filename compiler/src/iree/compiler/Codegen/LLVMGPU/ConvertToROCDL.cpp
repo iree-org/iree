@@ -53,8 +53,7 @@ static llvm::cl::opt<int>
 static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
     "iree-hip-index-bits",
     llvm::cl::desc("Deprecated; use --iree-rocm-index-bits instead."),
-    llvm::cl::init(64),
-    llvm::cl::cb<void, int>([](int value) {
+    llvm::cl::init(64), llvm::cl::cb<void, int>([](int value) {
       llvm::errs() << "warning: --iree-hip-index-bits is deprecated; "
                    << "use --iree-rocm-index-bits instead\n";
       clROCMIndexingBits = value;
