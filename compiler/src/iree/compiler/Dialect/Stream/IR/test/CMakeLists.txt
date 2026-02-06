@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "context_ops.mlir"
     "executable_ops.mlir"
     "file_ops.mlir"
+    "invalid.mlir"
     "resource_folding.mlir"
     "resource_ops.mlir"
     "tensor_folding.mlir"

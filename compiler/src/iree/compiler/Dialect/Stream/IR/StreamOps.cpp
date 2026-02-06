@@ -2282,6 +2282,18 @@ LogicalResult TensorEncodeOp::verify() {
       failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
+  // Verify encoding_dims count matches what the encoding expects.
+  // Check both source (for decode) and result (for encode) encodings.
+  for (Type type : {op.getSourceEncoding(), op.getResultEncoding()}) {
+    std::optional<int64_t> expectedDims =
+        IREE::Encoding::getNumDynamicEncodingDims(type);
+    if (expectedDims.has_value() &&
+        static_cast<int64_t>(op.getEncodingDims().size()) != *expectedDims) {
+      return op.emitOpError()
+             << "encoding expects " << *expectedDims << " encoding dim(s), but "
+             << op.getEncodingDims().size() << " provided";
+    }
+  }
   return success();
 }
 

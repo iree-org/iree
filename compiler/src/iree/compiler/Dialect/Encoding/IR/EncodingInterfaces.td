@@ -83,6 +83,12 @@ def IREEEncoding_LayoutResolverAttr :
         one of the input encodings - for example, a resolver might return an
         identity encoding for simplicity, or synthesize a new encoding that
         introduces less overheads in relayout.
+
+        When used for global encoding unification (in initializers), the
+        returned encoding must have getNumDynamicEncodingDims() == 0, since
+        dynamic encoding dimensions cannot be tracked across function
+        boundaries. The caller will fall back to identity encoding if this
+        requirement is not met.
       }],
       /*retTy=*/"::mlir::Attribute",
       /*methodName=*/"getUnifiedEncoding",

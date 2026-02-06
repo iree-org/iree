@@ -62,6 +62,12 @@ struct MatmulNarrowDim {
 MatmulNarrowDim getMatmulNarrowDim(linalg::LinalgOp linalgOp,
                                    int narrowThreshold);
 
+/// Returns the number of dynamic encoding dimensions for a tensor type.
+/// If the type has a SerializableAttr encoding, returns the result of
+/// getNumDynamicEncodingDims(). Returns std::nullopt if the type has no
+/// encoding or the encoding is not a SerializableAttr.
+std::optional<int64_t> getNumDynamicEncodingDims(Type type);
+
 // The structs defined here because they are used by encoding_interfaces.td.
 
 /// Bundles an encoding attribute with its associated dynamic information.

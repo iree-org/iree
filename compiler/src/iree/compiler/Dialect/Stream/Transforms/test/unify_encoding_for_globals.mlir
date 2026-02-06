@@ -590,8 +590,8 @@ util.func public @dispatch_with_tied_operand(%N: index, %M: index) -> !stream.re
   // CHECK-SAME:   -> tensor<?x?xf32, #iree_encoding.specialized<123>>{%[[N]], %[[M]]}
   // Re-encode sizeof and encode ops are inserted after dispatch.
   // CHECK:      stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
-  // CHECK:      stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[DISPATCH]] :
-  // CHECK-SAME:   tensor<?x?xf32, #iree_encoding.specialized<123>>
+  // CHECK:      stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[DISPATCH]] encoding_dims{%[[N]], %[[M]]}
+  // CHECK-SAME:   : tensor<?x?xf32, #iree_encoding.specialized<123>>
   // CHECK-SAME:   -> tensor<?x?xf32, #[[$ENC]]>{%[[N]], %[[M]]}
   %result = stream.tensor.dispatch on(#hal.device.affinity<@device_a>) @executable_tied::@dispatch_inplace(%cloned)
     : (tensor<?x?xf32, #encoding1>{%N, %M} in !stream.resource<*>{%encoded_size})
@@ -817,13 +817,15 @@ util.initializer {
 #map = affine_map<(m, n, k) -> (m, k)>
 #map1 = affine_map<(m, n, k) -> (k, n)>
 #map2 = affine_map<(m, n, k) -> (m, n)>
+// #encoding1 has dynamic iteration_sizes, #encoding2 is static
 #encoding1 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 4096, 4096]>
 #encoding2 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 4096, 4096]>
 
-// The GPU resolver's getUnifiedEncoding returns the first encoding, so both
-// should be unified to #encoding1 (with iteration_sizes = [?, 4096, 4096]).
+// The GPU resolver's getUnifiedEncoding prefers static encodings (those with
+// getNumDynamicEncodingDims() == 0). Here #encoding2 has static iteration_sizes
+// [4, 4096, 4096], so it's selected as the unified encoding.
 
-// CHECK: #[[$UNIFIED_ENC:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [{{.+}}], iteration_sizes = [?, 4096, 4096]>
+// CHECK: #[[$UNIFIED_GPU:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [{{.+}}], iteration_sizes = [4, 4096, 4096]>
 // CHECK: util.global private @[[$DEVICE_A:.+]] =
 util.global private @device_a = #device_target_local
 util.global private @weight : !stream.resource<constant>
@@ -843,21 +845,93 @@ util.initializer {
   %source = util.global.load @weight : !stream.resource<constant>
   %source_size = util.global.load @weight_size : index
 
-  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
-  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  // #encoding1 has dynamic iteration_sizes, so it requires encoding_dims.
+  // After unification to static #encoding2, encoding_dims should be removed.
+  %m = arith.constant 1024 : index
+
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_GPU]]>
+  // Verify encoding_dims is removed when unifying to static encoding.
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_GPU]]> in !stream.resource
+  // CHECK-NOT: encoding_dims
+  // CHECK: util.global.store
   %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf8E4M3FNUZ, #encoding1> : index
-  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding1> in !stream.resource<constant>{%size1}
+  %enc1 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source encoding_dims{%m} : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding1> in !stream.resource<constant>{%size1}
   util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
   util.global.store %size1, @encoded_v1_size : index
 
-  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
-  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_ENC]]>
+  // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@[[$DEVICE_A]]>) tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_GPU]]>
+  // CHECK: stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE_A]]>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #[[$UNIFIED_GPU]]>
   %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<4096x4096xf8E4M3FNUZ, #encoding2> : index
   %enc2 = stream.tensor.encode on(#hal.device.affinity<@device_a>) %source : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding2> in !stream.resource<constant>{%size2}
   util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
   util.global.store %size2, @encoded_v2_size : index
 
   util.return
+}
+
+// -----
+
+// Test: GPU resolver with two dynamic encodings having different encoding_dims.
+// Both encodings have dynamic iteration_sizes (with ?), meaning the resolver
+// returns an encoding that requires dynamic dims. Since the encoding_dims values
+// differ (128 vs 256), we cannot unify and must fall back to identity.
+
+#executable_target_rocm_dynamic = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {
+    abi = "hip",
+    iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
+  }>
+#device_target_dynamic = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_dynamic]> : !hal.device
+#map_dyn = affine_map<(m, n, k) -> (m, k)>
+#map1_dyn = affine_map<(m, n, k) -> (k, n)>
+#map2_dyn = affine_map<(m, n, k) -> (m, n)>
+// Both encodings have dynamic iteration_sizes (? in first position) but are structurally different
+#encoding_dyn1 = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map_dyn, #map1_dyn, #map2_dyn], iteration_sizes = [?, 4096, 4096]>
+#encoding_dyn2 = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [#map_dyn, #map1_dyn, #map2_dyn], iteration_sizes = [?, 4096, 2048]>
+
+// CHECK-LABEL: module @gpu_dynamic_encodings_different_dims_identity
+module @gpu_dynamic_encodings_different_dims_identity {
+  util.global private @device = #device_target_dynamic
+  util.global private @weight : !stream.resource<constant>
+  util.global private @weight_size : index
+  util.global private @encoded_v1 : !stream.resource<constant>
+  util.global private @encoded_v1_size : index
+  util.global private @encoded_v2 : !stream.resource<constant>
+  util.global private @encoded_v2_size : index
+
+  // CHECK: util.initializer
+  util.initializer {
+    %cst = stream.tensor.constant on(#hal.device.affinity<@device>) : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant> = #stream.parameter.named<"model"::"weight"> : tensor<4096x4096xf8E4M3FNUZ>
+    %size = stream.resource.size %cst : !stream.resource<constant>
+    util.global.store %cst, @weight : !stream.resource<constant>
+    util.global.store %size, @weight_size : index
+
+    // CHECK: %[[SOURCE:.+]] = util.global.load @weight
+    %source = util.global.load @weight : !stream.resource<constant>
+    %source_size = util.global.load @weight_size : index
+
+    // Different encoding_dims values (128 vs 256) with dynamic encodings.
+    // Since resolver returns an encoding requiring dynamic dims but the dims
+    // don't match, we fall back to identity encoding.
+    %c128 = arith.constant 128 : index
+    %c256 = arith.constant 256 : index
+
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@device>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.identity>
+    %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<4096x4096xf8E4M3FNUZ, #encoding_dyn1> : index
+    %enc1 = stream.tensor.encode on(#hal.device.affinity<@device>) %source encoding_dims{%c128} : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding_dyn1> in !stream.resource<constant>{%size1}
+    util.global.store %enc1, @encoded_v1 : !stream.resource<constant>
+    util.global.store %size1, @encoded_v1_size : index
+
+    // CHECK: stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.identity>
+    // CHECK: stream.tensor.encode on(#hal.device.affinity<@device>) %[[SOURCE]] : {{.*}} -> tensor<4096x4096xf8E4M3FNUZ, #iree_encoding.identity>
+    %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device>) tensor<4096x4096xf8E4M3FNUZ, #encoding_dyn2> : index
+    %enc2 = stream.tensor.encode on(#hal.device.affinity<@device>) %source encoding_dims{%c256} : tensor<4096x4096xf8E4M3FNUZ> in !stream.resource<constant>{%source_size} -> tensor<4096x4096xf8E4M3FNUZ, #encoding_dyn2> in !stream.resource<constant>{%size2}
+    util.global.store %enc2, @encoded_v2 : !stream.resource<constant>
+    util.global.store %size2, @encoded_v2_size : index
+
+    util.return
+  }
 }
 
 // -----

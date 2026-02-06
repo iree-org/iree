@@ -677,6 +677,9 @@ struct GPULayoutResolverAttr final
     return GPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 
+  // Selects a unified encoding from multiple candidates. Prefers static
+  // encodings (no dynamic encoding dims) over dynamic ones, since dynamic
+  // encoding dims cannot be tracked across function boundaries in initializers.
   // TODO: Improve the heuristic. This is a placeholder that demonstrates the
   // encoding unification is working in practice.
   Attribute getUnifiedEncoding(Attribute attr,
@@ -684,6 +687,21 @@ struct GPULayoutResolverAttr final
     if (encodings.empty()) {
       return nullptr;
     }
+
+    // Prefer static encodings (getNumDynamicEncodingDims() == 0).
+    for (Attribute encoding : encodings) {
+      if (auto serializableAttr =
+              dyn_cast<IREE::Encoding::SerializableAttr>(encoding)) {
+        std::optional<int64_t> numDynamicDims =
+            serializableAttr.getNumDynamicEncodingDims();
+        if (numDynamicDims && *numDynamicDims == 0) {
+          return encoding;
+        }
+      }
+    }
+
+    // No static encoding found, return the first one.
+    // The caller will verify and fall back to identity if needed.
     return encodings[0];
   }
 };

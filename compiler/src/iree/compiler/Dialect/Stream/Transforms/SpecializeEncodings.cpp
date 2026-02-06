@@ -461,6 +461,12 @@ updateTensorEncodeOp(RewriterBase &rewriter, IREE::Stream::TensorEncodeOp op,
       failed(updateSourceEncoding(rewriter, op, layoutResolvers))) {
     return failure();
   }
+  // Clear encoding_dims after serialization. The serialized encoding (e.g.,
+  // LayoutAttr) no longer needs encoding_dims because the layout information
+  // is fully resolved. Keeping them would unnecessarily block hoisting of
+  // encoding dispatches into __init. Note that this might need to change in the
+  // future for dynamically specialized encodings.
+  rewriter.modifyOpInPlace(op, [&] { op.getEncodingDimsMutable().clear(); });
   return success();
 }
 

@@ -19,8 +19,10 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
 
@@ -270,12 +272,48 @@ LogicalResult GlobalEncodingAnalyzer::computeUnifiedEncodings() {
 
     LDBG() << "Use encoding resolver " << layoutResolver
            << " to unify encodings for source global: " << sourceName;
-    unifiedEncodings[sourceName] =
+    Attribute unifiedEncoding =
         layoutResolver.getUnifiedEncoding(encodingAttrVersions);
-    // Fallback to identity encoding on failure.
-    if (!unifiedEncodings[sourceName]) {
+
+    if (!unifiedEncoding) {
       unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+      continue;
     }
+
+    // If the unified encoding requires dynamic dims, verify we can provide
+    // them.
+    if (auto serializableAttr =
+            dyn_cast<IREE::Encoding::SerializableAttr>(unifiedEncoding)) {
+      std::optional<int64_t> numDynamicDims =
+          serializableAttr.getNumDynamicEncodingDims();
+      if (numDynamicDims && *numDynamicDims > 0) {
+        // Find encoding_dims from encode ops - they must all match.
+        // Collect non-empty encoding_dims and verify they're all equal.
+        SmallVector<ValueRange> dynamicDims;
+        for (EncodedGlobalInfo &info : sourceInfo.encodedVersions) {
+          if (ValueRange dims = info.encodeOp.getEncodingDims();
+              !dims.empty()) {
+            dynamicDims.push_back(dims);
+          }
+        }
+
+        bool hasCompatibleDims =
+            !dynamicDims.empty() &&
+            llvm::all_of(dynamicDims, [&](ValueRange dims) {
+              return llvm::equal(dims, dynamicDims.front());
+            });
+
+        if (!hasCompatibleDims) {
+          LDBG() << "Unified encoding requires " << *numDynamicDims
+                 << " dynamic dims but encode ops have incompatible or no dims"
+                 << ", falling back to identity";
+          unifiedEncodings[sourceName] = IREE::Encoding::IdentityAttr::get(ctx);
+          continue;
+        }
+      }
+    }
+
+    unifiedEncodings[sourceName] = unifiedEncoding;
   }
 
   return success();
@@ -526,13 +564,13 @@ static void updateTensorDispatchOp(TensorDispatchOp dispatchOp,
     Value oldSize = TensorSizeOfOp::create(
         rewriter, dispatchOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(oldType), encodingDims, dispatchOp.getAffinityAttr());
-    auto reencodeOp =
-        TensorEncodeOp::create(rewriter, dispatchOp.getLoc(), result.getType(),
-                               result, TypeAttr::get(newType),
-                               /*source_encoding_dims=*/encodingDims,
-                               resultSize, TypeAttr::get(oldType),
-                               /*result_encoding_dims=*/encodingDims, oldSize,
-                               dispatchOp.getAffinityAttr());
+    auto reencodeOp = TensorEncodeOp::create(
+        rewriter, dispatchOp.getLoc(), result.getType(), result,
+        TypeAttr::get(newType),
+        /*source_encoding_dims=*/encodingDims, resultSize,
+        TypeAttr::get(oldType),
+        /*result_encoding_dims=*/encodingDims, oldSize,
+        /*encoding_dims=*/encodingDims, dispatchOp.getAffinityAttr());
     rewriter.replaceAllUsesExcept(result, reencodeOp.getResult(), reencodeOp);
     LDBG() << "  Inserted re-encode op for result " << resultIdx << ": "
            << reencodeOp;
@@ -574,7 +612,8 @@ static Value maybeInsertReencode(IRRewriter &rewriter, Operation *op,
       TypeAttr::get(unifiedType),
       /*source_encoding_dims=*/sourceEncodingDims, unifiedSize,
       TypeAttr::get(expectedType),
-      /*result_encoding_dims=*/sourceEncodingDims, sourceSize, affinityAttr);
+      /*result_encoding_dims=*/sourceEncodingDims, sourceSize,
+      /*encoding_dims=*/sourceEncodingDims, affinityAttr);
 
   LDBG() << "    Created: " << reencodeOp;
   return reencodeOp.getResult();
@@ -768,9 +807,23 @@ struct UnifyEncodingForGlobalsPass
       Attribute unifiedEncoding = analyzer.getUnifiedEncoding(sourceName);
       LDBG() << "Unifying encodings for source global: " << sourceName << " to "
              << unifiedEncoding;
+
+      // Find encoding_dims from the encode op that already has the unified
+      // encoding. These will be used for all encode ops after unification.
+      SmallVector<Value> unifiedEncodingDims;
       for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
-        auto encodeOp = encodedInfo.encodeOp;
-        auto oldResultType =
+        TensorEncodeOp encodeOp = encodedInfo.encodeOp;
+        RankedTensorType resultType =
+            cast<RankedTensorType>(encodeOp.getResultEncoding());
+        if (resultType.getEncoding() == unifiedEncoding) {
+          unifiedEncodingDims = llvm::to_vector(encodeOp.getEncodingDims());
+          break;
+        }
+      }
+
+      for (EncodedGlobalInfo &encodedInfo : sourceInfo.encodedVersions) {
+        TensorEncodeOp encodeOp = encodedInfo.encodeOp;
+        RankedTensorType oldResultType =
             cast<RankedTensorType>(encodeOp.getResultEncoding());
         RankedTensorType newResultType =
             oldResultType.cloneWithEncoding(unifiedEncoding);
@@ -778,6 +831,22 @@ struct UnifyEncodingForGlobalsPass
         LDBG() << "  Updated encode op: " << encodeOp;
         encodedInfo.sizeofOp.setEncodingAttr(TypeAttr::get(newResultType));
         LDBG() << "  Updated sizeof op: " << encodedInfo.sizeofOp;
+
+        // Update encoding_dims to use the unified values (or clear them if the
+        // unified encoding doesn't need them).
+        if (!unifiedEncodingDims.empty()) {
+          IRRewriter rewriter(moduleOp.getContext());
+          // Move definitions of encoding_dims values before the encode op if
+          // they don't dominate it.
+          if (failed(moveValueDefinitions(rewriter, unifiedEncodingDims,
+                                          encodeOp))) {
+            encodeOp.emitError()
+                << "failed to move encoding_dims definitions for unification";
+            return signalPassFailure();
+          }
+        }
+        encodeOp.getEncodingDimsMutable().assign(unifiedEncodingDims);
+
         collectUpdatesForStreamTensorOps(explorer, encodedInfo, unifiedEncoding,
                                          tensorEncodingUpdates);
       }

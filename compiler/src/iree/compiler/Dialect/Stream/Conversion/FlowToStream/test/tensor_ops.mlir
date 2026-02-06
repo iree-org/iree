@@ -204,6 +204,29 @@ util.func public @tensorEncodeChangeEncoding(%arg0 : tensor<?x4xf32, #encoding>,
   // CHECK:      util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
   util.return %0 : tensor<?x4xf32, #encoding1>
 }
+
+// -----
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @tensorEncodeWithEncodingDims
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[D1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[M:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[N:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[K:[a-zA-Z0-9]+]]
+#encoding = #iree_encoding.testing<>
+util.func public @tensorEncodeWithEncodingDims(%input: tensor<?x?xf32>, %d0: index, %d1: index, %m: index, %n: index, %k: index) -> tensor<?x?xf32, #encoding> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32, #[[$ENCODING]]>{%[[D0]], %[[D1]]} : index
+  // CHECK: %[[RESULT:.+]] = stream.tensor.encode %[[ARG0]] encoding_dims{%[[M]], %[[N]], %[[K]]}
+  // CHECK-SAME:   : tensor<?x?xf32>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[ARG1]]}
+  // CHECK-SAME:   -> tensor<?x?xf32, #[[$ENCODING]]>{%[[D0]], %[[D1]]} in !stream.resource<*>{%[[SIZE]]}
+  %0 = flow.tensor.encode %input encoding_dims{%m, %n, %k} : tensor<?x?xf32>{%d0, %d1} -> tensor<?x?xf32, #encoding>{%d0, %d1}
+  // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<?x?xf32, #encoding>
+}
+
 // -----
 
 // CHECK-LABEL: @tensorAlloca

@@ -239,3 +239,88 @@ util.func public @multi_identical_encode_ops(%resource: !stream.resource<*>, %to
     -> tensor<4x5xf32, #encoding> in !stream.resource<*>{%total_size}
   util.return %0, %1 : !stream.resource<*>, !stream.resource<*>
 }
+
+// -----
+
+// Tests that encoding_dims are passed through as workload arguments and
+// forwarded to set_encoding inside the dispatch.
+
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
+// CHECK:      stream.executable private @[[$EX:.+]] {
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(
+// CHECK-SAME:      %[[WL_SRC_D0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_SRC_D1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_DEST_D0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_DEST_D1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_M:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_N:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_K:[a-zA-Z0-9]+]]: index
+// CHECK:         func.func @[[$ENTRY]](
+// CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
+// CHECK:           %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 4 : index
+// CHECK:           %[[N:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 5 : index
+// CHECK:           %[[K:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 6 : index
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}}
+// CHECK:           %[[ENCODED_VAL:.+]] = iree_encoding.set_encoding %[[VAL]] encoding_dims{%[[M]], %[[N]], %[[K]]}
+// CHECK-SAME:        : tensor<?x?xf32> -> tensor<?x?xf32, #[[ENCODING]]>
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[ENCODED_VAL]]
+// CHECK-LABEL:   util.func public @encode_with_encoding_dims(
+// CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[M:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[N:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[K:[a-zA-Z0-9]+]]
+util.func public @encode_with_encoding_dims(%resource: !stream.resource<*>, %total_size: index, %d0: index, %d1: index, %m: index, %n: index, %k: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]], %[[M]], %[[N]], %[[K]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]], %[[M]], %[[N]], %[[K]])
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource encoding_dims{%m, %n, %k}
+    : tensor<?x?xf32>{%d0, %d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x?xf32, #encoding>{%d0, %d1} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// Tests that encoding_dims are passed through for decode (unset_encoding) operations.
+
+// CHECK-DAG:  #[[ENCODING:.+]] = #iree_encoding.testing<>
+#encoding = #iree_encoding.testing<>
+// CHECK:      stream.executable private @[[$EX:.+]] {
+// CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(
+// CHECK-SAME:      %[[WL_SRC_D0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_SRC_D1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_DEST_D0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_DEST_D1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_M:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_N:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[WL_K:[a-zA-Z0-9]+]]: index
+// CHECK:         func.func @[[$ENTRY]](
+// CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
+// CHECK:           %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 4 : index
+// CHECK:           %[[N:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 5 : index
+// CHECK:           %[[K:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 6 : index
+// CHECK:           %[[VAL:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}}
+// CHECK:           %[[DECODED_VAL:.+]] = iree_encoding.unset_encoding %[[VAL]] encoding_dims{%[[M]], %[[N]], %[[K]]}
+// CHECK-SAME:        : tensor<?x?xf32, #[[ENCODING]]> -> tensor<?x?xf32>
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[DECODED_VAL]]
+// CHECK-LABEL:   util.func public @decode_with_encoding_dims(
+// CHECK-SAME:      %[[RESOURCE:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[TOTAL_SIZE:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[D0:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[D1:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[M:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[N:[a-zA-Z0-9]+]]
+// CHECK-SAME:      %[[K:[a-zA-Z0-9]+]]
+util.func public @decode_with_encoding_dims(%resource: !stream.resource<*>, %total_size: index, %d0: index, %d1: index, %m: index, %n: index, %k: index) -> !stream.resource<*> {
+  // CHECK:      stream.async.dispatch on(#{{.+}}) @[[$EX]]::@[[$ENTRY]][%[[D0]], %[[D1]], %[[D0]], %[[D1]], %[[M]], %[[N]], %[[K]]]
+  // CHECK-SAME:   (%[[RESOURCE]][{{.+}}], %[[D0]], %[[D1]], %[[D0]], %[[D1]], %[[M]], %[[N]], %[[K]])
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %resource encoding_dims{%m, %n, %k}
+    : tensor<?x?xf32, #encoding>{%d0, %d1} in !stream.resource<*>{%total_size}
+    -> tensor<?x?xf32>{%d0, %d1} in !stream.resource<*>{%total_size}
+  util.return %0 : !stream.resource<*>
+}

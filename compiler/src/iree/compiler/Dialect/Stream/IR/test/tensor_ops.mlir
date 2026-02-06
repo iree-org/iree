@@ -89,6 +89,42 @@ util.func private @tensorEncode(%arg0: !stream.resource<*>, %arg1: index, %arg2:
 
 // -----
 
+// Test encoding with encoding_dims for dynamic iteration sizes.
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_with_dims = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2], iteration_sizes = [?, 128, 64]>
+// CHECK-DAG:   #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK-DAG:   #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]], iteration_sizes = [?, 128, 64]>
+// CHECK-LABEL: @tensorEncodeWithEncodingDims
+util.func private @tensorEncodeWithEncodingDims(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %m: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.encode %arg0 encoding_dims{%arg4} : tensor<?x64xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x64xf32, #[[$ENC]]>{%arg1} in !stream.resource<*>{%arg3}
+  %0 = stream.tensor.encode %arg0 encoding_dims{%m} : tensor<?x64xf32>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x64xf32, #encoding_with_dims>{%arg1} in !stream.resource<*>{%arg3}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// Test decoding with encoding_dims - source has encoding, result doesn't.
+#map0_dec = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1_dec = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2_dec = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_dec = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0_dec, #map1_dec, #map2_dec], iteration_sizes = [?, 128, 64]>
+// CHECK-DAG:   #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK-DAG:   #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENC:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]], iteration_sizes = [?, 128, 64]>
+// CHECK-LABEL: @tensorDecodeWithEncodingDims
+util.func private @tensorDecodeWithEncodingDims(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %m: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.encode %arg0 encoding_dims{%arg4} : tensor<?x64xf32, #[[$ENC]]>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x64xf32>{%arg1} in !stream.resource<*>{%arg3}
+  %0 = stream.tensor.encode %arg0 encoding_dims{%m} : tensor<?x64xf32, #encoding_dec>{%arg1} in !stream.resource<*>{%arg2} -> tensor<?x64xf32>{%arg1} in !stream.resource<*>{%arg3}
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 util.func private @tensorSlice(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index

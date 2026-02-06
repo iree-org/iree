@@ -246,6 +246,38 @@ util.func public @tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index, %ar
 
 // -----
 
+// Test that encoding_dims are cleared after serialization. The serialized
+// encoding no longer needs encoding_dims because the layout information is
+// fully resolved.
+
+#map0 = affine_map<(m, n, k) -> (m, k)>
+#map1 = affine_map<(m, n, k) -> (k, n)>
+#map2 = affine_map<(m, n, k) -> (m, n)>
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
+// Encoding with dynamic M dimension (iteration_sizes = [?, 4096, 4096])
+#encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map0, #map1, #map2], iteration_sizes = [?, 4096, 4096]>
+util.global private @device_a = #device_target_local_0_
+util.func public @tensor_encode_op_clears_encoding_dims(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) {
+  %m = arith.constant 1024 : index
+  // The encode op has encoding_dims{%m} for the dynamic M dimension.
+  %0 = stream.tensor.encode on(#hal.device.affinity<@device_a>)
+    %arg0 encoding_dims{%m}
+    : tensor<?x?xf32>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+    -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
+  util.return
+}
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.layout<[#iree_encoding.specialized<123, tensor<?x?xf32>>]
+// CHECK:       #[[TARGET:.+]] = #hal.device.target
+// CHECK:       util.global private @[[$DEVICE:.+]] = #[[TARGET]]
+// CHECK-LABEL: util.func public @tensor_encode_op_clears_encoding_dims
+// After serialization, encoding_dims should be cleared.
+// CHECK:         stream.tensor.encode on(#hal.device.affinity<@[[$DEVICE]]>)
+// CHECK-SAME:      -> tensor<?x?xf32, #[[$ENCODING]]>
+// CHECK-NOT:     encoding_dims
+
+// -----
+
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_vmvx_bytecode_fb]> : !hal.device
 #encoding0 = #iree_encoding.testing<>

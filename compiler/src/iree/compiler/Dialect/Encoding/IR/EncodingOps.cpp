@@ -44,7 +44,8 @@ LogicalResult SetEncodingOp::verify() {
     return emitOpError("expected to preserve the logical shape of the tensor");
   }
   // Verify encoding_dims count matches what the encoding expects.
-  std::optional<int64_t> expectedDims = encoding.getNumDynamicEncodingDims();
+  std::optional<int64_t> expectedDims =
+      getNumDynamicEncodingDims(getResultType());
   if (expectedDims.has_value() &&
       static_cast<int64_t>(getEncodingDims().size()) != expectedDims.value()) {
     return emitOpError() << "encoding expects " << expectedDims.value()
@@ -94,7 +95,8 @@ LogicalResult UnsetEncodingOp::verify() {
                          << " dimension values are attached";
   }
   // Verify encoding_dims count matches what the encoding expects.
-  std::optional<int64_t> expectedDims = encoding.getNumDynamicEncodingDims();
+  std::optional<int64_t> expectedDims =
+      getNumDynamicEncodingDims(getSourceType());
   if (expectedDims.has_value() &&
       static_cast<int64_t>(getEncodingDims().size()) != expectedDims.value()) {
     return emitOpError() << "encoding expects " << expectedDims.value()
