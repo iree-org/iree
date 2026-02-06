@@ -37,6 +37,61 @@ namespace mlir::iree_compiler::IREE::Stream {
 // as transients instead of straight-line escaping results.
 static constexpr bool kFavorTransients = false;
 
+// Returns true if |value| has any tied uses that mutate the resource. A tied
+// operand-result pair may be either a genuine in-place mutation (dispatch,
+// fill, copy) or a scheduling passthrough (barriers, timepoint ops). This
+// function distinguishes the two using interface and trait queries rather than
+// hardcoded op names.
+//
+// The detection strategy (in order):
+//  - TiedResourcePassthrough trait: the op ties resources for scheduling
+//    without accessing the data (timepoint.barrier, timepoint.await).
+//  - StreamableOpInterface::isMetadata(): the op is a scheduling passthrough
+//    within the async phase (async.barrier).
+//  - AsyncAccessOpInterface: if the op reports access ranges, check whether
+//    any range for this resource includes a write.
+//  - Conservative fallback: unknown tied ops are assumed to mutate.
+static bool hasMutatingTiedUses(Value value) {
+  for (OpOperand &use : value.getUses()) {
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
+    if (!tiedOp || !tiedOp.isOperandTied(use.getOperandNumber())) {
+      continue;
+    }
+    Operation *owner = use.getOwner();
+
+    // Ops that tie resources purely for scheduling/synchronization.
+    if (owner->hasTrait<OpTrait::IREE::Stream::TiedResourcePassthrough>()) {
+      continue;
+    }
+
+    // Streamable metadata ops pass resources through unchanged.
+    if (auto streamableOp =
+            dyn_cast<IREE::Stream::StreamableOpInterface>(owner)) {
+      if (streamableOp.isMetadata()) {
+        continue;
+      }
+    }
+
+    // If the op reports explicit access ranges, check for writes on this
+    // resource. No write → not a mutation.
+    if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(owner)) {
+      SmallVector<AsyncAccessRange> ranges;
+      accessOp.getAsyncAccessRanges(ranges);
+      bool hasWrite = llvm::any_of(ranges, [&](const AsyncAccessRange &range) {
+        return range.resource == use.get() && !range.isReadOnly();
+      });
+      if (hasWrite) {
+        return true;
+      }
+      continue;
+    }
+
+    // Unknown tied op: conservatively assume mutation.
+    return true;
+  }
+  return false;
+}
+
 // Starts by assuming that the resource is never used and then removes assumed
 // bits based on the usage in the program.
 //
@@ -366,15 +421,10 @@ private:
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
-          // Check if the clone result has any tied uses (in-place mutations).
-          // This is a static IR property, safe to query during DFX iteration.
-          bool resultHasTiedUses =
-              llvm::any_of(op.getResult().getUses(), [](OpOperand &use) {
-                auto tiedOp =
-                    dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
-                return tiedOp && tiedOp.isOperandTied(use.getOperandNumber());
-              });
-          if (resultHasTiedUses) {
+          // Check if the clone result has any tied uses that actually mutate
+          // the resource. This is a static IR property, safe to query during
+          // DFX iteration.
+          if (hasMutatingTiedUses(op.getResult())) {
             // Result is mutated: clone creates a fresh allocation whose
             // lifetime is determined by how the clone result is used (backward
             // propagation from uses), not by the source's lifetime. This

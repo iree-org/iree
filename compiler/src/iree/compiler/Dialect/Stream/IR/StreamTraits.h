@@ -29,6 +29,14 @@ public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
+// Marks ops where tied operand->result pairs are identity passthroughs: the op
+// manages scheduling or synchronization but does not access or modify the
+// resource data. This distinguishes passthrough ties (timepoint.barrier,
+// timepoint.await) from mutating ties (dispatch, fill, copy).
+template <typename ConcreteType>
+class TiedResourcePassthrough
+    : public OpTrait::TraitBase<ConcreteType, TiedResourcePassthrough> {};
+
 } // namespace mlir::OpTrait::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTRAITS_H_

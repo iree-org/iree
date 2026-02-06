@@ -744,6 +744,7 @@ def Stream_ResourceTransientsOp : Stream_PureOp<"resource.transients", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "pinsValueAffinity",
   ]>,
+  Stream_TiedResourcePassthrough,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -2320,6 +2321,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  Stream_TiedResourcePassthrough,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
@@ -4522,6 +4524,7 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
 def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
   AllTypesMatch<["resource", "result"]>,
   Stream_AffinityOp,
+  Stream_TiedResourcePassthrough,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -4579,6 +4582,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
+  Stream_TiedResourcePassthrough,
   DeclareOpInterfaceMethods<Stream_TimelineOp, [
     "getAwaitTimepoints",
     "setAwaitTimepoint",

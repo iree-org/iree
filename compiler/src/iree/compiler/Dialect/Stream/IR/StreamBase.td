@@ -96,5 +96,7 @@ def Stream_GlobalPtr : Util_AnyPtrOf<[Stream_Tensor, Stream_PrimitiveType]>;
 def Stream_TensorPhaseOp : NativeOpTrait<"IREE::Stream::TensorPhaseOp">;
 def Stream_AsyncPhaseOp : NativeOpTrait<"IREE::Stream::AsyncPhaseOp">;
 def Stream_CmdPhaseOp : NativeOpTrait<"IREE::Stream::CmdPhaseOp">;
+def Stream_TiedResourcePassthrough
+    : NativeOpTrait<"IREE::Stream::TiedResourcePassthrough">;
 
 #endif  // IREE_DIALECT_STREAM_BASE
