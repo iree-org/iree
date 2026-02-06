@@ -455,6 +455,13 @@ def EmulateNarrowTypePass :
     A pass to emulate memref load operations that use narrow integer types
     with equivalent operations on supported wide integer types.
   }];
+  let options = [
+    Option<"disableAtomicRMW", "disable-atomic-rmw",
+           "bool", /*default=*/"false",
+           "Indicates that atomic ops are not allowed in the emulation. It can "
+           "be enabled if the target can guarantee no concurrent accesses to "
+           "the same memory location.">
+  ];
 }
 
 def EraseDeadAllocAndStoresPass :

@@ -89,7 +89,10 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
         return arith::createArithExpandOpsPass(options);
       })
       .addPass(createConvertUnsupportedFloatArithPass)
-      .addPass(createEmulateNarrowTypePass);
+      .addPass([]() {
+        return createEmulateNarrowTypePass(
+            EmulateNarrowTypePassOptions{/*disableAtomicRMW=*/true});
+      });
 
   // Handle tensor-type constants.
   modulePassManager.addPass(createIREEBufferizeConstantsPass());

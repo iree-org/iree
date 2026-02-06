@@ -102,6 +102,8 @@ static void populateIreeNarrowTypeEmulationPatterns(
 
 struct EmulateNarrowTypePass final
     : impl::EmulateNarrowTypePassBase<EmulateNarrowTypePass> {
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<arith::ArithDialect, func::FuncDialect, memref::MemRefDialect,
@@ -110,7 +112,7 @@ struct EmulateNarrowTypePass final
   }
 
   void runOnOperation() override {
-    if (failed(emulateNarrowType(getOperation()))) {
+    if (failed(emulateNarrowType(getOperation(), disableAtomicRMW))) {
       return signalPassFailure();
     }
   }
@@ -118,7 +120,7 @@ struct EmulateNarrowTypePass final
 } // namespace
 
 LogicalResult emulateNarrowType(
-    Operation *root,
+    Operation *root, bool disableAtomicRMW,
     std::optional<NarrowTypeConversionPopulationFn> populateCallback) {
   // The number of bits used in a load/store op.
   constexpr unsigned kLoadStoreEmulateBitwidth = 8;
@@ -164,10 +166,11 @@ LogicalResult emulateNarrowType(
   memref::populateFlattenMemrefsPatterns(patterns);
 
   arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
-  memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
+  memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns,
+                                                    disableAtomicRMW);
   populateIREEResolveExtractStridedMetadataPatterns(patterns);
   vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns,
-                                                    /*disableAtomicRMW=*/false,
+                                                    disableAtomicRMW,
                                                     /*assumeAligned=*/true);
   populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
   if (populateCallback) {

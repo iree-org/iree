@@ -1060,8 +1060,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         options.allowSubviewExpansion = true;
         return createIREEExpandStridedMetadataPass(options);
       })
-      .addPass(forROCDL ? createAMDGPUEmulateNarrowTypePass
-                        : createEmulateNarrowTypePass)
+      .addPass([&forROCDL]() {
+        return forROCDL ? createAMDGPUEmulateNarrowTypePass()
+                        : createEmulateNarrowTypePass();
+      })
       .addPass(createIREECodegenAffineExpandIndexOpsPass)
       .addPass(createIREECodegenLowerAffinePass);
 
