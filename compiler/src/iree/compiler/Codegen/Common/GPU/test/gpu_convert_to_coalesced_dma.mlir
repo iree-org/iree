@@ -107,7 +107,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 
 // -----
 
-// Test: Skip coalesced DMA when innermost dimension < subgroup size. This is to ensure we do not go down
+// Negative test: Skip coalesced DMA when innermost dimension < subgroup size. This is to ensure we do not go down
 // the slow path (which is not implemented yet).
 
 #gpu_target_small_inner = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
@@ -136,6 +136,42 @@ func.func @copy_small_innermost_dim(%source: tensor<64x32xf32>, %init: tensor<64
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
 
   return %result : tensor<64x32xf32>
+}
+
+// -----
+
+// Negative test: Skip coalesced DMA when elements are not aligned to transfer size.
+// With bf16 type, dma_sizes = [32, 128], and subgroup_size = 64:
+// - 32-bit DMA: elementsPerLane = 2, elementsPerTransfer = 64 * 2 = 128
+// - 128-bit DMA: elementsPerLane = 8, elementsPerTransfer = 64 * 8 = 512
+// - minElementsPerTransfer = 128
+// - 320 bf16 elements: 320 % 128 = 64 != 0, so alignment check fails.
+
+#gpu_target_not_aligned = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_not_aligned = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_not_aligned}>
+#translation_not_aligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_not_aligned_to_dma
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<320xbf16>
+func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<320xbf16>) -> tensor<320xbf16>
+  attributes {hal.executable.target = #exec_target_not_aligned, translation_info = #translation_not_aligned} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<320xbf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<320xbf16>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<320xbf16>)
+    outs(%init : tensor<320xbf16>) -> tensor<320xbf16>
+
+  // CHECK: linalg.copy
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<320xbf16>
 }
 
 // -----

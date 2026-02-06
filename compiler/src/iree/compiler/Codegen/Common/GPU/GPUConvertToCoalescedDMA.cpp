@@ -168,9 +168,9 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     }
   }
 
-  // If no valid DMA size found or available elements are too small, skip.
+  // If no valid DMA size found or elements not aligned to transfer size, skip.
   if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      availableElements < minElementsPerTransfer) {
+      availableElements % minElementsPerTransfer != 0) {
     return {};
   }
 
@@ -486,7 +486,7 @@ struct ConvertGatherToCoalescedDMA
     }
 
     if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim < minElementsPerTransfer) {
+        innermostDim % minElementsPerTransfer != 0) {
       return failure();
     }
 
@@ -751,9 +751,10 @@ private:
       }
     }
 
-    // If no valid DMA size found or available elements are too small, skip.
+    // If no valid DMA size found or available elements are not aligned to
+    // transfer size, skip.
     if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements < minElementsPerTransfer) {
+        availableElements % minElementsPerTransfer != 0) {
       return failure();
     }
 
