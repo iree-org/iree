@@ -285,12 +285,12 @@ func.func @copy_prefer_contiguous_subview(%source_buffer: memref<64x128xf32, #am
 // When output comes from tensor.empty(), we can use total elements instead of
 // innermost dimension for the size check, enabling coalesced DMA.
 
-#gpu_target_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_linearize}>
@@ -347,12 +347,12 @@ func.func @copy_small_innermost_linearized(%source_buffer: memref<128x16xf32, #a
 // Test: 1D tensor copy distributes warps across the single dimension.
 // This tests the 1D tile size computation logic for flattened copies.
 
-#gpu_target_1d = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_1d = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_1d = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_1d}>
@@ -411,12 +411,12 @@ func.func @copy_1d_tensor(%source_buffer: memref<2048xf32, #amdgpu.address_space
 // 1. Innermost dim (16) < minElementsPerTransfer (64)
 // 2. Output is a function argument, not tensor.empty, so we can't linearize
 
-#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_no_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_linearize}>
@@ -450,12 +450,12 @@ func.func @copy_small_innermost_no_linearize(%source_buffer: memref<128x16xf32, 
 // The copy should be converted to coalesced DMA when the input comes from an
 // extract_slice with contiguous innermost dimensions.
 
-#gpu_target_extract_input = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_extract_input = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_extract_input = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_extract_input}>
