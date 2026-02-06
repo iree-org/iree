@@ -199,15 +199,27 @@ static inline int iree_math_count_trailing_zeros_u64(uint64_t n) {
 
 // Returns the number of 1 bits in a 32 bit value.
 static inline int iree_math_count_ones_u32(uint32_t n) {
+#if defined(IREE_COMPILER_MSVC_COMPAT)
+  return __popcnt(n);
+#elif defined(IREE_COMPILER_GCC_COMPAT)
+  return __builtin_popcount(n);
+#else
   n -= ((n >> 1) & 0x55555555u);
   n = ((n >> 2) & 0x33333333u) + (n & 0x33333333u);
   return (int)((((n + (n >> 4)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24);
+#endif
 }
 
 // Returns the number of 1 bits in a 64 bit value.
 static inline int iree_math_count_ones_u64(uint64_t n) {
+#if defined(IREE_COMPILER_MSVC_COMPAT) && defined(IREE_PTR_SIZE_64)
+  return __popcnt64(n);
+#elif defined(IREE_COMPILER_GCC_COMPAT)
+  return __builtin_popcountll(n);
+#else
   return iree_math_count_ones_u32(n >> 32) +
          iree_math_count_ones_u32(n & 0xFFFFFFFFu);
+#endif
 }
 
 //==============================================================================
@@ -309,10 +321,10 @@ static inline float iree_math_make_f32_from_bits(uint32_t src, int exp_bits,
       // NaN or Inf case.
       if (have_nan && src_mantissa) {
         return NAN;
-      } else {
-        return float_sign * INFINITY;
       }
-    } else if (have_nan) {
+      return float_sign * INFINITY;
+    }
+    if (have_nan) {
       // No infinities => more large finite values, unless this is a NaN.
       if (src_mantissa == src_mantissa_mask && !nan_as_neg_zero) {
         return NAN;
@@ -362,15 +374,15 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
   uint32_t dst_mantissa = 0;
   // Flags that we set when we determine that we need to generate a NaN / an Inf
   // deferring to handlers are the end of this function.
-  bool convert_nan = false;
-  bool convert_inf = false;
+  bool generate_nan = false;
+  bool generate_inf = false;
   if (f32_exp >= f32_exp_mask) {
     // NaN or Inf case.
     dst_exp = dst_exp_mask;
     if (f32_mantissa) {
-      convert_nan = true;
+      generate_nan = true;
     } else {
-      convert_inf = true;
+      generate_inf = true;
     }
   } else if (f32_exp == 0) {
     // Zero or subnormal.
@@ -392,7 +404,7 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     // max exponent value for additional finite values.
     if (arithmetic_exp > (1 << (dst_exp_bits - 1)) - have_infinity) {
       // Overflow.
-      convert_inf = true;
+      generate_inf = true;
     } else if (arithmetic_exp + dst_exp_bias <= 0) {
       // Underflow. Generate a subnormal or zero.
       dst_exp = 0;
@@ -445,18 +457,19 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       dst_mantissa =
           biased_f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
       if (!have_infinity && dst_exp > dst_exp_mask) {
-        convert_nan = true;
+        generate_nan = true;
       }
     }
   }
 
   // Handler for converting Inf values. Needs to be before handler for Nan as it
   // may fall through to either when the destination type does not have Inf.
-  if (convert_inf) {
+  if (generate_inf) {
     if (have_infinity) {
       return dst_sign | dst_exp_mask;
-    } else if (have_nan) {
-      convert_nan = true;
+    }
+    if (have_nan) {
+      generate_nan = true;
     } else {
       // Generate the max finite value.
       // As we are here in the case where there is no NaN, the max finite value
@@ -466,16 +479,16 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
   }
 
   // Handler for converting NaN values.
-  if (convert_nan) {
+  if (generate_nan) {
     if (!have_nan) {
       // When the destination type has no NaN encoding, conversion of NaN is
       // implementation-defined. We choose to convert NaN to +0.0.
       return 0;
-    } else if (nan_as_neg_zero) {
-      return dst_sign_mask;
-    } else {
-      return dst_sign | dst_exp_mask | dst_mantissa_mask;
     }
+    if (nan_as_neg_zero) {
+      return dst_sign_mask;
+    }
+    return dst_sign | dst_exp_mask | dst_mantissa_mask;
   }
 
   // Normal case.
@@ -483,9 +496,8 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
     // Negative zero needs to be rounded to positive zero to avoid
     // accidentally producing NaN when negative-zero is the NaN encoding.
     return 0;
-  } else {
-    return dst_sign | dst_exp | dst_mantissa;
   }
+  return dst_sign | dst_exp | dst_mantissa;
 }
 
 #define IREE_MATH_MAKE_FLOAT_TYPE_HELPERS(                                   \
