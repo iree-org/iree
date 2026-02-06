@@ -69,11 +69,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
                    "thread distribution is enabled"),
     llvm::cl::init(8));
 
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution",
-    llvm::cl::desc("disable thread distribution in codegen"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<int>
     clDefaultDistTileSize("iree-llvmcpu-distribution-size",
                           llvm::cl::desc("default distribution tile size"),
@@ -542,12 +537,6 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
          "expected all vectors to be of equal size");
 
   size_t numDims = lbs.size();
-  // Set all the distribution tile sizes to zero if thread distribution is
-  // disabled.
-  if (clDisableDistribution) {
-    return SmallVector<int64_t>(numDims, 0);
-  }
-
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
   for (auto i : llvm::seq<size_t>(0, numDims)) {

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -42,12 +43,6 @@ namespace mlir::iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
-static llvm::cl::opt<bool> clFailOnOutOfBoundsStackAllocation(
-    "iree-llvmcpu-fail-on-out-of-bounds-stack-allocation",
-    llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
-                   "be solved"),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clFailOnLargeVector(
     "iree-llvmcpu-fail-on-large-vector",
     llvm::cl::desc("fail if there are operations with large vectors"),
@@ -64,11 +59,6 @@ static llvm::cl::opt<bool> clUseFastMinMaxOps(
     llvm::cl::desc(
         "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
     llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableReassociateFpReductions(
-    "iree-llvmcpu-reassociate-fp-reductions",
-    llvm::cl::desc("Enables reassociation for FP reductions"),
-    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clSkipIntermediateRoundings(
     "iree-llvmcpu-skip-intermediate-roundings",
@@ -126,7 +116,7 @@ static llvm::cl::opt<bool> clPatchFuncOps(
 static void
 addTileAndDistributePasses(OpPassManager &funcPassManager,
                            const LLVMCPUPipelineOptions &pipelineOpt) {
-  if (pipelineOpt.disableDistribution) {
+  if (pipelineOpt.cpuOpts.disableDistribution) {
     return;
   }
   if (clTileDispatchUsingForall) {
@@ -245,8 +235,8 @@ void addMultiTilingExpertPassPipeline(
     case IREE::CPU::TilingLevel::VectorReductionTiles:
       // Run SplitReductionPass before the final reduction Fuse pass, because
       // SplitReductionPass takes care of banked-tiling.
-      funcPassManager.addPass(
-          createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
+      funcPassManager.addPass(createLLVMCPUSplitReductionPass(
+          pipelineOpt.cpuOpts.reassociateFpReductions));
       funcPassManager.addPass(
           createLLVMCPUTileRootAndFuseInputOperandsPass(level));
       // Tile all the reduction ops for target vector sizes, which ensures
@@ -521,7 +511,8 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
 }
 
 static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
-                                 bool enableAArch64SME) {
+                                 bool enableAArch64SME,
+                                 const CPUCodegenOptions &cpuOpts) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
   FunctionLikeNest(modulePassManager)
@@ -610,7 +601,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(
             LLVMCPUCheckIRBeforeLLVMConversionPassOptions{
-                clFailOnOutOfBoundsStackAllocation});
+                cpuOpts.failOnOutOfBoundsStackAllocation});
       })
       // SCF -> CF
       .addPass(createSCFToControlFlowPass)
@@ -638,7 +629,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
     });
   }
   modulePassManager.addPass(
-      createConvertToLLVMPass(clEnableReassociateFpReductions));
+      createConvertToLLVMPass(cpuOpts.reassociateFpReductions));
   modulePassManager.addPass(createReconcileUnrealizedCastsPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need
@@ -687,13 +678,16 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+                                     const CPUCodegenOptions &cpuOpts,
                                      bool enableAArch64SME) {
-
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(createLLVMCPULowerExecutableTargetPass)
+        .addPass([&]() {
+          return createLLVMCPULowerExecutableTargetPass(
+              LLVMCPULowerExecutableTargetPassOptions{cpuOpts});
+        })
         .addPass(createVerifyWorkgroupDistributionPass);
     if (clPatchFuncOps) {
       modulePassManager.addPass(createPatchFuncOpsPass());
@@ -708,7 +702,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   // Run conversion to LLVM at `ModuleOp` granularity.
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
+    addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
   }
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
@@ -786,7 +780,10 @@ void registerCodegenLLVMCPUPasses() {
           "Runs the progressive lowering pipeline from Linalg to LLVM",
           [](OpPassManager &variantPassManager,
              LinalgToLLVMPipelineOptions const &options) {
-            buildLLVMCPUCodegenPassPipeline(variantPassManager,
+            // Use global codegen options for pipeline registration.
+            const CPUCodegenOptions &cpuOpts =
+                CPUCodegenOptions::FromFlags::get();
+            buildLLVMCPUCodegenPassPipeline(variantPassManager, cpuOpts,
                                             options.enableArmSME);
           });
 
