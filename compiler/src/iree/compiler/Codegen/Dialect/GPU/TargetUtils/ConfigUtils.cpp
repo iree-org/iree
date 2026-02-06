@@ -129,40 +129,38 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
 
 static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
   return llvm::TypeSwitch<Type, std::optional<ComputeBitwidths>>(type)
-      .Case<FloatType>(
-          [](FloatType floatType) -> std::optional<ComputeBitwidths> {
-            switch (floatType.getIntOrFloatBitWidth()) {
-            case 64:
-              return ComputeBitwidths::FP64;
-            case 32:
-              return ComputeBitwidths::FP32;
-            case 16:
-              return ComputeBitwidths::FP16;
-            case 8:
-              return ComputeBitwidths::FP8;
-            case 6:
-              return ComputeBitwidths::FP6;
-            case 4:
-              return ComputeBitwidths::FP4;
-            default:
-              return std::nullopt;
-            }
-          })
-      .Case<IntegerType>(
-          [](IntegerType intType) -> std::optional<ComputeBitwidths> {
-            switch (intType.getWidth()) {
-            case 64:
-              return ComputeBitwidths::Int64;
-            case 32:
-              return ComputeBitwidths::Int32;
-            case 16:
-              return ComputeBitwidths::Int16;
-            case 8:
-              return ComputeBitwidths::Int8;
-            default:
-              return std::nullopt;
-            }
-          })
+      .Case([](FloatType floatType) -> std::optional<ComputeBitwidths> {
+        switch (floatType.getIntOrFloatBitWidth()) {
+        case 64:
+          return ComputeBitwidths::FP64;
+        case 32:
+          return ComputeBitwidths::FP32;
+        case 16:
+          return ComputeBitwidths::FP16;
+        case 8:
+          return ComputeBitwidths::FP8;
+        case 6:
+          return ComputeBitwidths::FP6;
+        case 4:
+          return ComputeBitwidths::FP4;
+        default:
+          return std::nullopt;
+        }
+      })
+      .Case([](IntegerType intType) -> std::optional<ComputeBitwidths> {
+        switch (intType.getWidth()) {
+        case 64:
+          return ComputeBitwidths::Int64;
+        case 32:
+          return ComputeBitwidths::Int32;
+        case 16:
+          return ComputeBitwidths::Int16;
+        case 8:
+          return ComputeBitwidths::Int8;
+        default:
+          return std::nullopt;
+        }
+      })
       .Default(std::optional<ComputeBitwidths>());
 }
 

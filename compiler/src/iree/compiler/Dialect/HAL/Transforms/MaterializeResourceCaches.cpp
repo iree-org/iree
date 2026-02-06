@@ -339,14 +339,14 @@ getDeviceFallbackGlobals(IREE::Util::GlobalOpInterface deviceGlobal,
       return true; // ignore uninitialized devices
     }
     return TypeSwitch<Attribute, bool>(attr)
-        .Case<IREE::HAL::DeviceOrdinalAttr>([](auto attr) { return true; })
-        .Case<IREE::HAL::DeviceTargetAttr>([](auto attr) { return true; })
-        .Case<IREE::HAL::DeviceFallbackAttr>([&](auto fallbackAttr) {
+        .Case([](IREE::HAL::DeviceOrdinalAttr attr) { return true; })
+        .Case([](IREE::HAL::DeviceTargetAttr attr) { return true; })
+        .Case([&](IREE::HAL::DeviceFallbackAttr fallbackAttr) {
           resultSet.insert(symbolTable.lookup<IREE::Util::GlobalOpInterface>(
               fallbackAttr.getName().getValue()));
           return true;
         })
-        .Default([](auto attr) { return false; });
+        .Default(false);
   };
   auto initialValue = deviceGlobal.getGlobalInitialValue();
   if (auto selectAttr =

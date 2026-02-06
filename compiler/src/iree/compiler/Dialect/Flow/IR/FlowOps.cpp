@@ -974,10 +974,12 @@ refineTensorAccess(Value value, IREE::TensorExt::DispatchTensorType type) {
     bool hasWrites = false;
     for (OpOperand &uses : value.getUses()) {
       TypeSwitch<Operation *>(uses.getOwner())
-          .Case<IREE::TensorExt::DispatchTensorLoadOp>(
-              [&](auto loadOp) { hasReads = true; })
-          .Case<IREE::TensorExt::DispatchTensorStoreOp>(
-              [&](auto storeOp) { hasWrites = true; })
+          .Case([&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+            hasReads = true;
+          })
+          .Case([&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
+            hasWrites = true;
+          })
           .Default([&](auto op) {
             // Treat unknown ops conservatively as read/write.
             hasReads = true;

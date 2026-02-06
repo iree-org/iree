@@ -94,17 +94,17 @@ struct SplitReductionPass final
     IRRewriter rewriter(context);
     funcOp->walk([&](Operation *op) {
       TypeSwitch<Operation *>(op)
-          .Case<linalg::MatmulOp>([&](auto matmulOp) {
+          .Case([&](linalg::MatmulOp matmulOp) {
             if (splitMatmulReductionRatio > 1) {
               matmulCandidates.push_back(matmulOp);
             }
           })
-          .Case<IREE::LinalgExt::TopkOp>([&](auto topkOp) {
+          .Case([&](IREE::LinalgExt::TopkOp topkOp) {
             if (!topkSplitReductionRatio.empty()) {
               topkCandidates.push_back(topkOp);
             }
           })
-          .Case<linalg::GenericOp>([&](auto genericOp) {
+          .Case([&](linalg::GenericOp genericOp) {
             if (splitArgmaxTileSize > 1 &&
                 IREE::LinalgExt::isArgmaxOp(genericOp)) {
               // Due to isArgmaxOp, we support exactly one reduction dimension.

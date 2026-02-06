@@ -180,18 +180,16 @@ struct OutlineDispatchRegionsPass
       SmallVector<Operation *> deadOps;
       auto outlineOps = [&](Operation *op) {
         return TypeSwitch<Operation *, WalkResult>(op)
-            .Case<IREE::Flow::DispatchWorkgroupsOp>(
-                [&](auto dispatchWorkgroupsOp) {
-                  if (failed(outlineDispatchWorkgroupsOp(
-                          (namePrefix + "_dispatch_" +
-                           llvm::Twine(deadOps.size()))
-                              .str(),
-                          dispatchWorkgroupsOp))) {
-                    return WalkResult::interrupt();
-                  }
-                  deadOps.push_back(op);
-                  return WalkResult::advance();
-                })
+            .Case([&](IREE::Flow::DispatchWorkgroupsOp dispatchWorkgroupsOp) {
+              if (failed(outlineDispatchWorkgroupsOp(
+                      (namePrefix + "_dispatch_" + llvm::Twine(deadOps.size()))
+                          .str(),
+                      dispatchWorkgroupsOp))) {
+                return WalkResult::interrupt();
+              }
+              deadOps.push_back(op);
+              return WalkResult::advance();
+            })
             .Default(WalkResult::advance());
       };
       if (funcOp.walk(outlineOps).wasInterrupted()) {

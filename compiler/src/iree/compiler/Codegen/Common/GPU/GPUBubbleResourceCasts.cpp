@@ -119,7 +119,7 @@ struct BubbleResourceCastPattern
     Location loc = castOp.getLoc();
     bool swapped =
         TypeSwitch<Operation *, bool>(producer)
-            .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extract) {
+            .Case([&](tensor::ExtractSliceOp extract) {
               if (!extract->hasOneUse()) {
                 return false;
               }
@@ -131,7 +131,7 @@ struct BubbleResourceCastPattern
               extract.getSourceMutable().assign(newCast);
               return true;
             })
-            .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expand) {
+            .Case([&](tensor::ExpandShapeOp expand) {
               if (!expand->hasOneUse()) {
                 return false;
               }
@@ -142,19 +142,18 @@ struct BubbleResourceCastPattern
               expand.getSrcMutable().assign(newCast);
               return true;
             })
-            .Case<tensor::CollapseShapeOp>(
-                [&](tensor::CollapseShapeOp collapse) {
-                  if (!collapse->hasOneUse()) {
-                    return false;
-                  }
+            .Case([&](tensor::CollapseShapeOp collapse) {
+              if (!collapse->hasOneUse()) {
+                return false;
+              }
 
-                  rewriter.setInsertionPoint(collapse);
-                  auto newCast = IREE::GPU::BufferResourceCastOp::create(
-                      rewriter, loc, collapse.getSrcType(), collapse.getSrc());
-                  collapse.getSrcMutable().assign(newCast);
-                  return true;
-                })
-            .Case<tensor::PadOp>([&](tensor::PadOp pad) {
+              rewriter.setInsertionPoint(collapse);
+              auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                  rewriter, loc, collapse.getSrcType(), collapse.getSrc());
+              collapse.getSrcMutable().assign(newCast);
+              return true;
+            })
+            .Case([&](tensor::PadOp pad) {
               if (!pad->hasOneUse()) {
                 return false;
               }
@@ -165,7 +164,7 @@ struct BubbleResourceCastPattern
               pad.getSourceMutable().assign(newCast);
               return true;
             })
-            .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+            .Case([&](linalg::LinalgOp linalgOp) {
               // Skip gather-like linalg ops.
               if (linalgOp.hasIndexSemantics() || !linalgOp->hasOneUse()) {
                 return false;
@@ -180,7 +179,7 @@ struct BubbleResourceCastPattern
               }
               return true;
             })
-            .Case<tensor::EmptyOp>([&](tensor::EmptyOp empty) {
+            .Case([&](tensor::EmptyOp empty) {
               // Drop all casts of empties.
               return true;
             })

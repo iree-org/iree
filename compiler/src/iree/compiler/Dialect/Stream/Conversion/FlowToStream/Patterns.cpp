@@ -1176,17 +1176,17 @@ struct ConvertExecutableOp
       // and rely only the patterns.
       moduleOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
-            .Case<IREE::Flow::DispatchWorkgroupIDOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupIDOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupIDOp,
                   IREE::Stream::DispatchWorkgroupIDOp>(op, rewriter);
             })
-            .Case<IREE::Flow::DispatchWorkgroupCountOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupCountOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupCountOp,
                   IREE::Stream::DispatchWorkgroupCountOp>(op, rewriter);
             })
-            .Case<IREE::Flow::DispatchWorkgroupSizeOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupSizeOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupSizeOp,
                   IREE::Stream::DispatchWorkgroupSizeOp>(op, rewriter);

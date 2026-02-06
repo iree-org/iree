@@ -487,24 +487,24 @@ FailureOr<MapScatterOp> foldIntoMapScatter(RewriterBase &rewriter,
                                            Operation *op,
                                            MapScatterOp mapScatterOp) {
   return llvm::TypeSwitch<Operation *, FailureOr<MapScatterOp>>(op)
-      .Case<linalg::CopyOp>([&](linalg::CopyOp copyOp) {
+      .Case([&](linalg::CopyOp copyOp) {
         return foldIdentityLikeOpIntoMapScatter(rewriter, copyOp, mapScatterOp);
       })
-      .Case<linalg::TransposeOp>([&](linalg::TransposeOp transposeOp) {
+      .Case([&](linalg::TransposeOp transposeOp) {
         return foldTransposeIntoMapScatter(rewriter, transposeOp, mapScatterOp);
       })
-      .Case<tensor::ExpandShapeOp>([&](tensor::ExpandShapeOp expandOp) {
+      .Case([&](tensor::ExpandShapeOp expandOp) {
         return foldExpandShapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
       })
-      .Case<tensor::CollapseShapeOp>([&](tensor::CollapseShapeOp collapseOp) {
+      .Case([&](tensor::CollapseShapeOp collapseOp) {
         return foldCollapseShapeIntoMapScatter(rewriter, collapseOp,
                                                mapScatterOp);
       })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp extractSliceOp) {
+      .Case([&](tensor::ExtractSliceOp extractSliceOp) {
         return foldExtractSliceIntoMapScatter(rewriter, extractSliceOp,
                                               mapScatterOp);
       })
-      .Default([](Operation *) { return failure(); });
+      .Default(failure());
 }
 
 // Insert identity map_scatter op after the root and replace all uses.

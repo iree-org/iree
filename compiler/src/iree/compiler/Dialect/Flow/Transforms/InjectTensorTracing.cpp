@@ -25,9 +25,8 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 static std::string inferTraceKey(Operation *op) {
   return TypeSwitch<Operation *, std::string>(op)
-      .Case<IREE::Flow::DispatchOp>(
-          [&](auto op) { return op.getEntryPointName(); })
-      .Case<IREE::Util::CallOp>([&](auto op) { return op.getCallee().str(); })
+      .Case([&](IREE::Flow::DispatchOp op) { return op.getEntryPointName(); })
+      .Case([&](IREE::Util::CallOp op) { return op.getCallee().str(); })
       .Default([](auto *op) { return op->getName().getStringRef().str(); });
 }
 

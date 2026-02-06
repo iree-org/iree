@@ -286,7 +286,7 @@ static bool emplaceAllocationsInRegion(Region &region) {
       if (op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
         didChange = TypeSwitch<Operation *, bool>(&op)
                         // TODO(#11249): support in-place collective ops.
-                        .Case<IREE::Stream::AsyncDispatchOp>([&](auto op) {
+                        .Case([&](IREE::Stream::AsyncDispatchOp op) {
                           return tryEmplaceDispatchOp(op, indexSet);
                         })
                         .Default(false) ||

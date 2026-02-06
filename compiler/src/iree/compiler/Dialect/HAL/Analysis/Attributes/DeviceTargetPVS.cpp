@@ -43,7 +43,7 @@ void DeviceTargetGlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
   std::function<bool(Attribute)> unionAttr;
   unionAttr = [&](Attribute attr) -> bool {
     return TypeSwitch<Attribute, bool>(attr)
-        .Case<IREE::HAL::DeviceTargetAttr>([&](auto targetAttr) {
+        .Case([&](IREE::HAL::DeviceTargetAttr targetAttr) {
           LLVM_DEBUG({
             llvm::dbgs() << "DeviceTargetGlobalPVS: unioning with target: ";
             attr.print(llvm::dbgs());
@@ -52,7 +52,7 @@ void DeviceTargetGlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
           unionAssumed(targetAttr);
           return true;
         })
-        .Case<IREE::HAL::DeviceFallbackAttr>([&](auto fallbackAttr) {
+        .Case([&](IREE::HAL::DeviceFallbackAttr fallbackAttr) {
           LLVM_DEBUG({
             llvm::dbgs() << "DeviceTargetGlobalPVS: unioning with fallback: ";
             attr.print(llvm::dbgs());
@@ -78,7 +78,7 @@ void DeviceTargetGlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
           unionAssumed(fallbackPVS.getState());
           return true;
         })
-        .Case<IREE::HAL::DeviceSelectAttr>([&](auto selectAttr) {
+        .Case([&](IREE::HAL::DeviceSelectAttr selectAttr) {
           LLVM_DEBUG({
             llvm::dbgs() << "DeviceTargetGlobalPVS: unioning with selected "
                             "child devices: ";

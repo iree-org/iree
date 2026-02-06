@@ -97,7 +97,7 @@ static Type getTypeWithResolvedEncodingLayouts(
 static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable &symbolTable,
                                   Operation *op) {
   return TypeSwitch<Operation *, bool>(op)
-      .Case<TensorDispatchOp>([&](auto op) {
+      .Case([&](TensorDispatchOp op) {
         if (!recognizeDispatchEntryPoints(moduleOp, symbolTable, op)) {
           return false;
         }
@@ -110,35 +110,36 @@ static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable &symbolTable,
         }
         return false;
       })
-      .Case<IREE::Stream::TensorSizeOfOp>(
-          [&](auto op) { return isRecognizedEncodingType(op.getEncoding()); })
+      .Case([&](IREE::Stream::TensorSizeOfOp op) {
+        return isRecognizedEncodingType(op.getEncoding());
+      })
       .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp>(
           [&](auto op) {
             return isRecognizedEncodingType(op.getResultEncoding());
           })
-      .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorConstantOp op) {
         return isRecognizedEncodingType(op.getResultEncoding());
       })
-      .Case<IREE::Stream::TensorFillOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorFillOp op) {
         return isRecognizedEncodingType(op.getTargetEncoding());
       })
-      .Case<IREE::Stream::TensorCloneOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorCloneOp op) {
         return isRecognizedEncodingType(op.getSourceEncoding()) ||
                isRecognizedEncodingType(op.getResultEncoding());
       })
-      .Case<IREE::Stream::TensorSliceOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorSliceOp op) {
         return isRecognizedEncodingType(op.getSourceEncoding()) ||
                isRecognizedEncodingType(op.getResultEncoding());
       })
-      .Case<IREE::Stream::TensorUpdateOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorUpdateOp op) {
         return isRecognizedEncodingType(op.getTargetEncoding()) ||
                isRecognizedEncodingType(op.getUpdateEncoding());
       })
-      .Case<IREE::Stream::TensorEncodeOp>([&](auto op) {
+      .Case([&](IREE::Stream::TensorEncodeOp op) {
         return isRecognizedEncodingType(op.getSourceEncoding()) ||
                isRecognizedEncodingType(op.getResultEncoding());
       })
-      .Default([](Operation *op) { return false; });
+      .Default(false);
 }
 
 /// Returns all the stream tensor ops that implement AffinityOpInterface, where
@@ -489,34 +490,37 @@ LogicalResult StreamTensorOpUpdater::run() {
 
     LogicalResult result =
         TypeSwitch<Operation *, LogicalResult>(affinityOp)
-            .Case<IREE::Stream::TensorDispatchOp>([&](auto op) {
+            .Case([&](IREE::Stream::TensorDispatchOp op) {
               return updateTensorDispatchOp(rewriter, moduleOp,
                                             affinityAnalysis, op,
                                             layoutResolvers, cachedLayoutAttrs);
             })
-            .Case<IREE::Stream::TensorSizeOfOp>([&](auto op) {
+            .Case([&](IREE::Stream::TensorSizeOfOp op) {
               return updateTensorSizeOfOp(rewriter, op, layoutResolvers);
             })
             .Case<IREE::Stream::TensorEmptyOp, IREE::Stream::TensorSplatOp>(
                 [&](auto op) {
                   return updateResultEncoding(rewriter, op, layoutResolvers);
                 })
-            .Case<IREE::Stream::TensorConstantOp>([&](auto op) {
+            .Case([&](IREE::Stream::TensorConstantOp op) {
               return updateTensorConstantOp(rewriter, op, layoutResolvers);
             })
-            .Case<IREE::Stream::TensorFillOp>([&](auto op) {
+            .Case([&](IREE::Stream::TensorFillOp op) {
               return updateTensorFillOp(rewriter, op, layoutResolvers);
             })
-            .Case<IREE::Stream::TensorEncodeOp>([&](auto op) {
+            .Case([&](IREE::Stream::TensorEncodeOp op) {
               return updateTensorEncodeOp(rewriter, op, layoutResolvers);
             })
-            .Case<IREE::Stream::TensorCloneOp>(
-                [&](auto op) { return updateTensorCloneOp(rewriter, op); })
-            .Case<IREE::Stream::TensorSliceOp>(
-                [&](auto op) { return updateTensorSliceOp(rewriter, op); })
-            .Case<IREE::Stream::TensorUpdateOp>(
-                [&](auto op) { return updateTensorUpdateOp(rewriter, op); })
-            .Default([](Operation *op) { return failure(); });
+            .Case([&](IREE::Stream::TensorCloneOp op) {
+              return updateTensorCloneOp(rewriter, op);
+            })
+            .Case([&](IREE::Stream::TensorSliceOp op) {
+              return updateTensorSliceOp(rewriter, op);
+            })
+            .Case([&](IREE::Stream::TensorUpdateOp op) {
+              return updateTensorUpdateOp(rewriter, op);
+            })
+            .Default(failure());
 
     if (failed(result)) {
       return affinityOp->emitOpError(

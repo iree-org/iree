@@ -400,7 +400,7 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
             return IREE::Util::UninitializedAttr::get(rewriter.getContext(),
                                                       newGlobalType);
           })
-          .Case<IREE::Stream::NamedParameterAttr>(
+          .Case(
               // TODO: Remove this case once frontends have caught up, we should
               // not have stream.parameter.named at this level.
               [&](IREE::Stream::NamedParameterAttr attr) {
@@ -408,12 +408,11 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
                     rewriter.getContext(), newGlobalType, attr.getScope(),
                     attr.getKey(), attr.getConfig());
               })
-          .Case<IREE::Flow::NamedParameterAttr>(
-              [&](IREE::Flow::NamedParameterAttr attr) {
-                return IREE::Flow::NamedParameterAttr::get(
-                    rewriter.getContext(), newGlobalType, attr.getScope(),
-                    attr.getKey(), attr.getConfig());
-              })
+          .Case([&](IREE::Flow::NamedParameterAttr attr) {
+            return IREE::Flow::NamedParameterAttr::get(
+                rewriter.getContext(), newGlobalType, attr.getScope(),
+                attr.getKey(), attr.getConfig());
+          })
           .Default([&](Attribute) { return nullptr; });
   if (!newInitialValue) {
     return success();

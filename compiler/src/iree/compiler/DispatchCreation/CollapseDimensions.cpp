@@ -1113,40 +1113,38 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
         llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
-            .Case<linalg::LinalgOp>(
-                [&, &info = info](auto genericOp) -> ResultsType {
-                  FailureOr<linalg::CollapseResult> maybeReplacements =
-                      mlir::linalg::collapseOpIterationDims(
-                          genericOp, info.getReassocation(), rewriter);
-                  if (failed(maybeReplacements)) {
-                    return failure();
-                  }
-                  return maybeReplacements->results;
-                })
-            .Case<IREE::LinalgExt::AttentionOp>(
-                [&, &info = info](auto attentionOp) -> ResultsType {
-                  FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
-                      IREE::LinalgExt::collapseOpIterationDims(
-                          attentionOp, info.getReassocation(), rewriter);
-                  if (failed(maybeReplacements)) {
-                    return failure();
-                  }
-                  return maybeReplacements->results;
-                })
-            .Case<tensor::EmptyOp>([](tensor::EmptyOp) {
+            .Case([&, &info = info](linalg::LinalgOp genericOp) -> ResultsType {
+              FailureOr<linalg::CollapseResult> maybeReplacements =
+                  mlir::linalg::collapseOpIterationDims(
+                      genericOp, info.getReassocation(), rewriter);
+              if (failed(maybeReplacements)) {
+                return failure();
+              }
+              return maybeReplacements->results;
+            })
+            .Case([&, &info = info](
+                      IREE::LinalgExt::AttentionOp attentionOp) -> ResultsType {
+              FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
+                  IREE::LinalgExt::collapseOpIterationDims(
+                      attentionOp, info.getReassocation(), rewriter);
+              if (failed(maybeReplacements)) {
+                return failure();
+              }
+              return maybeReplacements->results;
+            })
+            .Case([](tensor::EmptyOp) {
               // No need to do anything. It will be folded with reshapes.
               return failure();
             })
-            .Case<tensor::ExtractSliceOp>(
-                [&,
-                 &info = info](tensor::ExtractSliceOp sliceOp) -> ResultsType {
-                  FailureOr<Value> result = collapseExtractSlice(
-                      sliceOp, info.getReassocation(), rewriter);
-                  if (failed(result)) {
-                    return failure();
-                  }
-                  return SmallVector<Value>{result.value()};
-                })
+            .Case([&, &info =
+                          info](tensor::ExtractSliceOp sliceOp) -> ResultsType {
+              FailureOr<Value> result = collapseExtractSlice(
+                  sliceOp, info.getReassocation(), rewriter);
+              if (failed(result)) {
+                return failure();
+              }
+              return SmallVector<Value>{result.value()};
+            })
             .Default([&](void *) -> ResultsType {
               llvm_unreachable("no type matched");
               return failure();

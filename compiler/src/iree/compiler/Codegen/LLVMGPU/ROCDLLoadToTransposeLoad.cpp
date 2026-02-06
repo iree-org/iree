@@ -686,7 +686,7 @@ struct PropagateHintThroughDelinearize final
           }
           return success();
         })
-        .Default([](auto) { return failure(); });
+        .Default(failure());
   }
 };
 

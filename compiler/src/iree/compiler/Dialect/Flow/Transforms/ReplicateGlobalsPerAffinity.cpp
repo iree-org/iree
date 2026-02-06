@@ -120,14 +120,14 @@ Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
   }
 
   return TypeSwitch<Operation *, Value>(opOperand->get().getDefiningOp())
-      .Case<IREE::Util::GlobalLoadOpInterface>([&](auto loadOp) {
+      .Case([&](IREE::Util::GlobalLoadOpInterface loadOp) {
         return getOrCreateGlobalLoadForAffinity(loadOp, affinityAttr);
       })
-      .Case<IREE::Stream::AffinityOpInterface>([&](auto affinityOp) {
+      .Case([&](IREE::Stream::AffinityOpInterface affinityOp) {
         return getOrCreateAffinityOpForAffinity(
             affinityOp, cast<OpResult>(opOperand->get()), affinityAttr);
       })
-      .Case<IREE::Flow::TensorReshapeOp>([&](auto reshapeOp) {
+      .Case([&](IREE::Flow::TensorReshapeOp reshapeOp) {
         builder.setInsertionPoint(reshapeOp);
         Value source = getOrCreateValueForAffinity(
             &reshapeOp.getSourceMutable(), affinityAttr);
@@ -430,14 +430,14 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
     LDBG() << "processing op: " << *currentOp;
     worklist.erase(worklist.begin());
     TypeSwitch<Operation *>(currentOp)
-        .Case<IREE::Util::GlobalOpInterface>([&](auto globalOp) {
+        .Case([&](IREE::Util::GlobalOpInterface globalOp) {
           const Explorer::GlobalInfo *globalInfo =
               explorer.getGlobalInfo(globalOp);
           for (auto loadOp : globalInfo->getLoads()) {
             worklist.insert(loadOp);
           }
         })
-        .Case<IREE::Util::GlobalLoadOpInterface>([&](auto loadOp) {
+        .Case([&](IREE::Util::GlobalLoadOpInterface loadOp) {
           explorer.walkTransitiveUses(
               loadOp.getLoadedGlobalValue(), [&](OpOperand &operand) {
                 if (isa<IREE::Util::InitializerOp>(

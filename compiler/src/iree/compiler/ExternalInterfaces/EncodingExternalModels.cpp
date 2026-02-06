@@ -133,7 +133,7 @@ struct EncodingAttrPropagationInterface final
           EncodingAttrPropagationInterface, IREE::Encoding::EncodingAttr> {
   bool isPropagableDown(Attribute attr, OpOperand *target) const {
     return TypeSwitch<Operation *, bool>(target->getOwner())
-        .Case<linalg::GenericOp>([&](auto genericOp) {
+        .Case([&](linalg::GenericOp genericOp) {
           // Only support parallel generic ops.
           if (genericOp.getNumReductionLoops() != 0) {
             return false;
@@ -152,7 +152,7 @@ struct EncodingAttrPropagationInterface final
           }
           return true;
         })
-        .Default([&](auto) { return false; });
+        .Default(false);
   }
 
   FailureOr<IREE::Encoding::PropagationEncoding>
@@ -161,7 +161,7 @@ struct EncodingAttrPropagationInterface final
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationEncoding>>(
                target->getOwner())
-        .Case<linalg::GenericOp>([&](auto genericOp) {
+        .Case([&](linalg::GenericOp genericOp) {
           IREE::Encoding::PropagationEncoding propEncoding;
           propEncoding.operandEncodings.reserve(genericOp->getNumOperands());
           // Append the target and respective operand's indexing maps to the
@@ -200,7 +200,7 @@ struct EncodingAttrPropagationInterface final
           }
           return propEncoding;
         })
-        .Default([&](auto) { return failure(); });
+        .Default(failure());
   }
 };
 
@@ -210,14 +210,14 @@ struct LayoutAttrPropagationInterface final
   bool isPropagableUp(Attribute attr, OpResult target) const {
     auto layoutAttr = cast<IREE::Encoding::LayoutAttr>(attr);
     return TypeSwitch<Operation *, bool>(target.getOwner())
-        .Case<tensor::CastOp>([&](auto castOp) {
+        .Case([&](tensor::CastOp castOp) {
           // CastOp is propagable if it is casting between compatible shapes,
           // because the dimensions need to be consistent with the
           // user_indexing_maps carried by the encoding. The tensor.cast op
           // verifier already guarantees that the shapes are compatible.
           return layoutAttr.isSerialized();
         })
-        .Default([&](auto) { return false; });
+        .Default(false);
   }
 
   FailureOr<IREE::Encoding::PropagationEncoding>
@@ -226,13 +226,13 @@ struct LayoutAttrPropagationInterface final
     return TypeSwitch<Operation *,
                       FailureOr<IREE::Encoding::PropagationEncoding>>(
                target.getOwner())
-        .Case<tensor::CastOp>([&](tensor::CastOp) {
+        .Case([&](tensor::CastOp) {
           IREE::Encoding::PropagationEncoding propEncoding;
           propEncoding.resultEncodings.push_back(encoding);
           propEncoding.operandEncodings.push_back(encoding);
           return propEncoding;
         })
-        .Default([&](auto) { return failure(); });
+        .Default(failure());
   }
 };
 

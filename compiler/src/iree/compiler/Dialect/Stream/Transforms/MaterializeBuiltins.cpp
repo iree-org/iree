@@ -361,12 +361,12 @@ struct MaterializeBuiltinsPass
     auto walkResult = getOperation()->walk(
         [&](IREE::Stream::StreamableOpInterface streamableOp) {
           return TypeSwitch<Operation *, WalkResult>(streamableOp)
-              .Case<IREE::Stream::AsyncSplatOp>([&](auto splatOp) {
+              .Case([&](IREE::Stream::AsyncSplatOp splatOp) {
                 return succeeded(processSplatOp(splatOp, requiredModules))
                            ? WalkResult::advance()
                            : WalkResult::interrupt();
               })
-              .Case<IREE::Stream::AsyncFillOp>([&](auto fillOp) {
+              .Case([&](IREE::Stream::AsyncFillOp fillOp) {
                 return succeeded(processFillOp(fillOp, requiredModules))
                            ? WalkResult::advance()
                            : WalkResult::interrupt();
