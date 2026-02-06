@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -474,8 +475,7 @@ private:
       dimToRes[map.getDimPosition(res)] = res;
     }
 
-    return to_vector(
-        llvm::map_range(indices, [&](int64_t i) { return dimToRes[i]; }));
+    return map_to_vector(indices, [&](int64_t i) { return dimToRes[i]; });
   }
 
   static int64_t productOfDims(VectorType vt, unsigned lo, unsigned hi) {

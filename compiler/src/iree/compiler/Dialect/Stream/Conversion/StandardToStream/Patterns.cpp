@@ -13,6 +13,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -112,14 +113,13 @@ struct SwitchOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto defaultOperands = flattenValues(adaptor.getDefaultOperands());
-    auto caseOperands = llvm::to_vector(llvm::map_range(
-        adaptor.getCaseOperands(), [&](ArrayRef<ValueRange> operands) {
-          return flattenValues(operands);
-        }));
+    auto caseOperands = llvm::map_to_vector(
+        adaptor.getCaseOperands(),
+        [&](ArrayRef<ValueRange> operands) { return flattenValues(operands); });
     rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
         op, adaptor.getFlag().front(), op.getDefaultDestination(),
         defaultOperands, op.getCaseValuesAttr(), op.getCaseDestinations(),
-        llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+        llvm::map_to_vector(caseOperands, asValueRange));
     return success();
   }
 };

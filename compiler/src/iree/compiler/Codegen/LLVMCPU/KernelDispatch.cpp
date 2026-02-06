@@ -4119,8 +4119,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    auto prunedComputeOps = llvm::to_vector(
-        llvm::make_filter_range(computeOps, shouldSetLoweringConfig));
+    auto prunedComputeOps =
+        llvm::filter_to_vector(computeOps, shouldSetLoweringConfig);
     if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();
