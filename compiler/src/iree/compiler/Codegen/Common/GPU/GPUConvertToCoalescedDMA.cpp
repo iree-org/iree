@@ -109,6 +109,30 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
+/// Check if a value traces back to a load_from_buffer whose buffer is NOT
+/// fat_raw_buffer. Bindings exceeding the 2GB limit are not converted to
+/// fat_raw_buffer by ROCDLConfigureBufferInstructions, so DMA (which requires
+/// fat_raw_buffer) cannot be used. Returns true if the source is known to NOT
+/// be from fat_raw_buffer. If no load_from_buffer is found (e.g. in tests),
+/// conservatively returns false (allows DMA).
+static bool sourceIsNotFromFatRawBuffer(Value source) {
+  while (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+    source = extractOp.getSource();
+  }
+  if (auto padOp = source.getDefiningOp<tensor::PadOp>()) {
+    source = padOp.getSource();
+    while (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractOp.getSource();
+    }
+  }
+  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return false;
+  }
+  auto memrefType = dyn_cast<MemRefType>(loadOp.getBuffer().getType());
+  return memrefType && !hasAMDGPUFatRawBufferAddressSpace(memrefType);
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -508,8 +532,13 @@ struct ConvertPadFusionCopyToCoalescedDMA
       return failure();
     }
 
+    // Skip if source binding exceeds the 2GB fat_raw_buffer limit.
+    if (sourceIsNotFromFatRawBuffer(copyOp.getInputs()[0])) {
+      return failure();
+    }
+
     // Check if this is a tensor.pad fusion case.
-    auto pad = traceToTensorPad(copyOp.getInputs()[0]);
+    tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
     if (!pad) {
       return failure(); // Not a pad fusion case
     }
@@ -941,11 +970,16 @@ private:
 
     // Collect copy/gather ops that are eligible for coalesced DMA.
     // Skip ops that are already inside a warp-mapped forall.
+    // For CopyOps, only collect those tagged with UseGlobalLoadDMAAttr (set
+    // by GPUPromoteMatmulOperands) whose source traces to a fat_raw_buffer.
+    // Copies without the attribute or whose source binding exceeds the 2GB
+    // fat_raw_buffer limit are not eligible for DMA.
     funcOp->walk([&](Operation *op) {
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
         auto parentForall = copyOp->getParentOfType<scf::ForallOp>();
         if (!hasWarpMapping(parentForall) &&
-            getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+            getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp) &&
+            !sourceIsNotFromFatRawBuffer(copyOp.getInputs()[0])) {
           opsToTile.push_back(op);
         }
       } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
