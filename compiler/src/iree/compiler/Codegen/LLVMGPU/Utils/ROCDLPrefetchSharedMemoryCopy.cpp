@@ -40,8 +40,9 @@ namespace {
 // Pipeline mode determines the pipelining strategy based on loop contents.
 enum class PipelineMode {
   /// Async copy mode using gather_to_lds.
-  /// - pipelining with multi buffering
-  /// - Less gpu.barrier needed (vmcnt handles synchronization)
+  /// - Pipelining with multi buffering.
+  /// - Barrier before writes to prevent WAR hazards between waves.
+  /// - vmcnt handles intra-wave RAW synchronization for reads.
   AsyncCopy,
 
   /// Stream copy mode using transfer_read + transfer_write.
@@ -72,12 +73,12 @@ struct StageClassification {
   SmallVector<Operation *> getAllOpsInOrder() const {
     SmallVector<Operation *> ops;
     if (mode == PipelineMode::AsyncCopy) {
-      ops.append(loadStage.begin(), loadStage.end());
+      llvm::append_range(ops, loadStage);
     } else {
-      ops.append(readStage.begin(), readStage.end());
-      ops.append(writeStage.begin(), writeStage.end());
+      llvm::append_range(ops, readStage);
+      llvm::append_range(ops, writeStage);
     }
-    ops.append(computeStage.begin(), computeStage.end());
+    llvm::append_range(ops, computeStage);
     return ops;
   }
 };
@@ -540,18 +541,15 @@ computeStageClassification(scf::ForOp forOp, PipelineMode mode,
                            unsigned numStages) {
   LDBG() << "\n=== Computing Stage Classification for Loop ===";
 
-  // Check for nested loops
   if (!forOp.getOps<scf::ForOp>().empty()) {
     LDBG() << "Nested loops not supported";
     return failure();
   }
 
-  // Check loop has sufficient iterations
   if (failed(checkLoopIterations(forOp))) {
     return failure();
   }
 
-  // Identify root operations
   SmallVector<Operation *> loadRoots, readRoots, writeRoots, computeRoots;
   if (failed(identifyRootOperations(forOp, mode, loadRoots, readRoots,
                                     writeRoots, computeRoots))) {
@@ -563,7 +561,6 @@ computeStageClassification(scf::ForOp forOp, PipelineMode mode,
   stages.numStages = numStages;
 
   if (mode == PipelineMode::AsyncCopy) {
-    // Async copy mode: compute slices for load and compute stages
     LDBG() << "\n=== Computing Backward Slices (Async Copy Mode) ===";
     SetVector<Operation *> loadSlice, computeSlice;
 
@@ -583,7 +580,6 @@ computeStageClassification(scf::ForOp forOp, PipelineMode mode,
       return failure();
     }
   } else {
-    // Stream copy mode: compute slices for read, write, and compute stages
     LDBG() << "\n=== Computing Backward Slices (Stream Copy Mode) ===";
     SetVector<Operation *> readSlice, writeSlice, computeSlice;
 
@@ -863,24 +859,20 @@ static bool hasNestedSharedRead(Operation *op) {
 // This includes both vector.transfer_write to shared memory and
 // amdgpu.gather_to_lds which writes directly to LDS.
 static bool hasNestedSharedWrite(Operation *op) {
-  bool found = false;
-  op->walk([&](vector::TransferWriteOp writeOp) {
+  // Check for transfer_write to shared memory.
+  auto transferWriteResult = op->walk([](vector::TransferWriteOp writeOp) {
     if (hasSharedMemory(writeOp.getBase())) {
-      found = true;
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
   });
-  if (found) {
+  if (transferWriteResult.wasInterrupted()) {
     return true;
   }
 
   // Also check for gather_to_lds which writes to shared memory (LDS).
-  op->walk([&](amdgpu::GatherToLDSOp) {
-    found = true;
-    return WalkResult::interrupt();
-  });
-  return found;
+  return op->walk([](amdgpu::GatherToLDSOp) { return WalkResult::interrupt(); })
+      .wasInterrupted();
 }
 
 struct SharedBarrierState {
@@ -989,12 +981,17 @@ static void insertStreamCopyBarriers(RewriterBase &rewriter,
 }
 
 // Inserts barriers for AsyncCopy mode (gather_to_lds based pipelining).
-// In async copy mode with double buffering, we only insert barriers before
+// In async copy mode with multi-buffering, we only insert barriers before
 // shared memory writes (gather_to_lds).
 static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                                     scf::ForOp newForOp) {
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
+
+  // Create workgroup address space for LDS barriers.
+  auto workgroupSpace = gpu::AddressSpaceAttr::get(
+      rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  ArrayAttr addressSpaces = rewriter.getArrayAttr({workgroupSpace});
 
   bool isNested = isInsideLoop(newForOp);
 
@@ -1006,7 +1003,7 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
     for (auto it = parentBlock->begin(); it != newForOp->getIterator(); ++it) {
       if (hasNestedSharedWrite(&*it) && needBarrierBeforeWrite) {
         rewriter.setInsertionPoint(&*it);
-        gpu::BarrierOp::create(rewriter, loc);
+        gpu::BarrierOp::create(rewriter, loc, addressSpaces);
         needBarrierBeforeWrite = false;
       }
       if (hasNestedSharedRead(&*it)) {
@@ -1036,7 +1033,7 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
 
     if (hasNestedSharedWrite(&op) && needBarrierBeforeWrite) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, loc);
+      gpu::BarrierOp::create(rewriter, loc, addressSpaces);
       needBarrierBeforeWrite = false;
     }
 
@@ -1078,18 +1075,14 @@ dumpSchedule(const std::vector<std::pair<Operation *, unsigned>> &finalSchedule,
 /// Checks if a loop contains any gather_to_lds operations (anywhere in the
 /// loop, including nested regions). Used for determining pipeline mode.
 static bool hasGatherToLDS(scf::ForOp forOp) {
-  bool found = false;
-  forOp->walk([&](amdgpu::GatherToLDSOp) {
-    found = true;
-    return WalkResult::interrupt();
-  });
-  return found;
+  return forOp
+      ->walk([](amdgpu::GatherToLDSOp) { return WalkResult::interrupt(); })
+      .wasInterrupted();
 }
 
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp,
                                                unsigned numStages) {
-  // Determine pipeline mode based on loop contents
   PipelineMode mode = hasGatherToLDS(forOp) ? PipelineMode::AsyncCopy
                                             : PipelineMode::StreamCopy;
 

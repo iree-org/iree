@@ -424,29 +424,21 @@ func.func @prefetch_gather_to_lds_two_operands(
   %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
   // 2-stage: 1 prologue iteration
-  // CHECK: amdgpu.gather_to_lds
-  // CHECK: amdgpu.gather_to_lds
+  // CHECK-COUNT-2: amdgpu.gather_to_lds
   // 3-stage: 2 prologue iterations (N-1 for N stages)
-  // CHECK-3STAGE: amdgpu.gather_to_lds
-  // CHECK-3STAGE: amdgpu.gather_to_lds
-  // CHECK-3STAGE: amdgpu.gather_to_lds
-  // CHECK-3STAGE: amdgpu.gather_to_lds
+  // CHECK-3STAGE-COUNT-4: amdgpu.gather_to_lds
   // CHECK: scf.for
   // CHECK-3STAGE: scf.for
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
     // CHECK: gpu.barrier
     // CHECK-3STAGE: gpu.barrier
-    // CHECK: amdgpu.gather_to_lds
-    // CHECK: amdgpu.gather_to_lds
-    // CHECK-3STAGE: amdgpu.gather_to_lds
-    // CHECK-3STAGE: amdgpu.gather_to_lds
+    // CHECK-COUNT-2: amdgpu.gather_to_lds
+    // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds
     amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
 
-    // CHECK: vector.transfer_read
-    // CHECK: vector.transfer_read
-    // CHECK-3STAGE: vector.transfer_read
-    // CHECK-3STAGE: vector.transfer_read
+    // CHECK-COUNT-2: vector.transfer_read
+    // CHECK-3STAGE-COUNT-2: vector.transfer_read
     %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     // CHECK: arith.mulf
