@@ -11,7 +11,7 @@ Configure CMake with the following options:
 -DIREE_TARGET_BACKEND_ROCM=ON
 -DIREE_HAL_DRIVER_AMDGPU=ON
 -DIREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS=gfx1100
--DIREE_HIP_TEST_TARGET_CHIP=gfx1100
+-DIREE_ROCM_TEST_TARGET_CHIP=gfx1100
 ```
 
 Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake#L44) for a list of common targets. Future changes will include family support matching that file.

@@ -2,7 +2,7 @@
   "config_name": "gpu_hip_rdna3",
   "iree_compile_flags": [
     "--iree-hal-target-device=hip",
-    "--iree-hip-target=gfx1100",
+    "--iree-rocm-target=gfx1100",
     "--iree-input-demote-f64-to-f32=false",
     "--iree-opt-level=O0"
   ],

@@ -277,7 +277,7 @@ export PATH="[build-directory]/llvm-project/bin:[build-directory]/tools/bin:$PAT
 
 iree-compile dispatch.mlir \
   --iree-hal-target-device=hip \
-  --iree-hip-target=<target> \
+  --iree-rocm-target=<target> \
   -o original.vmfb \
   --iree-hal-dump-executable-files-to=odump
 # Opt flags are in dump/[...].optimized.ll to a file.
@@ -295,7 +295,7 @@ ld.lld -o altered.hsaco -shared altered.o
 # example.
 iree-compile dispatch.mlir \
   --iree-hal-target-device=hip \
-  --iree-hip-target=<target> \
+  --iree-rocm-target=<target> \
   -o altered.vmfb \
   --iree-hal-substitute-executable-object=[dispatch_name]=altered.hsaco
 ```

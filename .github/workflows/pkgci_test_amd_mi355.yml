@@ -32,7 +32,7 @@ jobs:
       IREE_VULKAN_DISABLE: 1
       IREE_CUDA_ENABLE: 0
       IREE_HIP_ENABLE: 1
-      IREE_HIP_TEST_TARGET_CHIP: "gfx950"
+      IREE_ROCM_TEST_TARGET_CHIP: "gfx950"
     container:
       image: rocm/dev-ubuntu-24.04:7.2
       options: --ipc host

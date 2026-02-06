@@ -41,7 +41,7 @@
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-vm-target-truncate-unsupported-floats",
         "--iree-llvmgpu-enable-prefetch=true",
-        "--iree-hip-waves-per-eu=2",
+        "--iree-rocm-waves-per-eu=2",
         "--iree-execution-model=async-external",
         "--iree-scheduling-dump-statistics-format=json",
         "--iree-scheduling-dump-statistics-file=compilation_info.json",

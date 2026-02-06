@@ -39,7 +39,7 @@ export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 export IREE_CUDA_ENABLE="${IREE_CUDA_ENABLE:-0}"
 export IREE_HIP_ENABLE="${IREE_HIP_ENABLE:-0}"
-export IREE_HIP_TEST_TARGET_CHIP="${IREE_HIP_TEST_TARGET_CHIP:-}"
+export IREE_ROCM_TEST_TARGET_CHIP="${IREE_ROCM_TEST_TARGET_CHIP:-${IREE_HIP_TEST_TARGET_CHIP:-}}"
 
 # Set cmake options based on disabled features.
 declare -a cmake_config_options=()
@@ -59,8 +59,8 @@ fi
 if (( IREE_HIP_ENABLE == 1 )); then
   cmake_config_options+=("-DIREE_HAL_DRIVER_HIP=ON")
 fi
-if [[ -n "${IREE_HIP_TEST_TARGET_CHIP}" ]]; then
-  cmake_config_options+=("-DIREE_HIP_TEST_TARGET_CHIP=${IREE_HIP_TEST_TARGET_CHIP}")
+if [[ -n "${IREE_ROCM_TEST_TARGET_CHIP}" ]]; then
+  cmake_config_options+=("-DIREE_ROCM_TEST_TARGET_CHIP=${IREE_ROCM_TEST_TARGET_CHIP}")
 fi
 
 ###############################################################################

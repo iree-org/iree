@@ -75,7 +75,6 @@ enum class ContainerType {
   HSACO,
 };
 
-// TODO(#18792): rename flags back to iree-rocm- as they are not HIP-specific.
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
@@ -97,13 +96,13 @@ struct ROCMOptions {
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
-    static cl::OptionCategory category("HIP HAL Target");
+    static cl::OptionCategory category("ROCM HAL Target");
 
     binder.opt<std::string>(
-        "iree-hip-target", target, cl::cat(category),
+        "iree-rocm-target", target, cl::cat(category),
         cl::desc(
             // clang-format off
-            "HIP target as expected by LLVM AMDGPU backend; e.g., "
+            "ROCM target as expected by LLVM AMDGPU backend; e.g., "
             "'gfx90a'/'gfx942' for targeting MI250/MI300 GPUs. "
             "Additionally this also supports architecture code names like "
             "'cdna3'/'rdna3' or some product names like 'mi300x'/'rtx7900xtx' "
@@ -112,11 +111,19 @@ struct ROCMOptions {
             "for more details."
             // clang-format on
             ));
+    binder.opt<std::string>(
+        "iree-hip-target", target, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-target instead."),
+        Deprecated("use --iree-rocm-target instead"));
 
     binder.opt<std::string>(
-        "iree-hip-target-features", targetFeatures, cl::cat(category),
-        cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
+        "iree-rocm-target-features", targetFeatures, cl::cat(category),
+        cl::desc("ROCM target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
+    binder.opt<std::string>(
+        "iree-hip-target-features", targetFeatures, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-target-features instead."),
+        Deprecated("use --iree-rocm-target-features instead"));
 
     binder.opt<ContainerType>(
         "iree-rocm-container-type", containerType,
@@ -132,21 +139,34 @@ struct ROCMOptions {
                          clEnumValN(ContainerType::HSACO, "hsaco",
                                     "Raw HSACO image (ELF).")));
 
-    binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
+    binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
-                            cl::desc("Directory of HIP Bitcode."));
+                            cl::desc("Directory of ROCM Bitcode."));
+    binder.opt<std::string>(
+        "iree-hip-bc-dir", bitcodeDirectory, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-bc-dir instead."),
+        Deprecated("use --iree-rocm-bc-dir instead"));
 
-    binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
+    binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
+    binder.opt<int>(
+        "iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-waves-per-eu instead."),
+        Deprecated("use --iree-rocm-waves-per-eu instead"));
 
     binder.opt<std::string>(
-        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
-        cl::desc("Enables microkernels in the HIP compiler backend. May be "
+        "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
+        cl::desc("Enables microkernels in the ROCM compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
     binder.opt<std::string>(
-        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
+        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-enable-ukernels instead."),
+        Deprecated("use --iree-rocm-enable-ukernels instead"));
+
+    binder.opt<std::string>(
+        "iree-rocm-encoding-layout-resolver", encodingLayoutResolver,
         cl::cat(category),
         cl::desc("Selects the way that encodings will be "
                  "resolved. Options are: `none` (resolve to "
@@ -154,27 +174,58 @@ struct ROCMOptions {
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
     binder.opt<std::string>(
+        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
+        cl::cat(category),
+        cl::desc(
+            "Deprecated; use --iree-rocm-encoding-layout-resolver instead."),
+        Deprecated("use --iree-rocm-encoding-layout-resolver instead"));
+
+    binder.opt<std::string>(
         "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
         cl::desc("Path to a module containing a tuning spec (transform "
                  "dialect library). Accepts MLIR text (.mlir) and bytecode "
                  "(.mlirbc) formats."));
 
-    binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
+    binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
-    binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
-                     cl::desc("Enable global instruction selection in llvm."));
+    binder.opt<bool>(
+        "iree-hip-llvm-slp-vec", slpVectorization, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-llvm-slp-vec instead."),
+        Deprecated("use --iree-rocm-llvm-slp-vec instead"));
 
+    binder.opt<bool>("iree-rocm-llvm-global-isel", globalISel,
+                     cl::cat(category),
+                     cl::desc("Enable global instruction selection in llvm."));
+    binder.opt<bool>(
+        "iree-hip-llvm-global-isel", globalISel, cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-llvm-global-isel instead."),
+        Deprecated("use --iree-rocm-llvm-global-isel instead"));
+
+    binder.opt<bool>(
+        "iree-rocm-specialize-dispatches", specializeDispatches,
+        cl::cat(category),
+        cl::desc(
+            "Enable runtime specialization of dynamically shaped dispatches."));
     binder.opt<bool>(
         "iree-hip-specialize-dispatches", specializeDispatches,
         cl::cat(category),
         cl::desc(
-            "Enable runtime specialization of dynamically shaped dispatches."));
-    binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
+            "Deprecated; use --iree-rocm-specialize-dispatches instead."),
+        Deprecated("use --iree-rocm-specialize-dispatches instead"));
+
+    binder.opt<bool>("iree-rocm-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
+    binder.opt<bool>(
+        "iree-hip-enable-tensor-ukernels", enableTensorUKernels,
+        cl::cat(category),
+        cl::desc(
+            "Deprecated; use --iree-rocm-enable-tensor-ukernels instead."),
+        Deprecated("use --iree-rocm-enable-tensor-ukernels instead"));
+
     binder.opt<IREE::Codegen::DenormalFpMath>(
-        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
+        "iree-rocm-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
         cl::desc("Denormal floating point math mode for f32"),
         cl::values(
             clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
@@ -182,23 +233,46 @@ struct ROCMOptions {
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
                        "positive-zero", "Convert denormals to positive zero")));
+    binder.opt<IREE::Codegen::DenormalFpMath>(
+        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
+        cl::desc(
+            "Deprecated; use --iree-rocm-denormal-fp-math-f32 instead."),
+        Deprecated("use --iree-rocm-denormal-fp-math-f32 instead"),
+        cl::values(
+            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
+                       "preserve-sign",
+                       "Convert denormals to zero while preserving sign"),
+            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
+                       "positive-zero",
+                       "Convert denormals to positive zero")));
 
-    binder.opt<bool>("iree-hip-enable-register-spill-warning",
+    binder.opt<bool>("iree-rocm-enable-register-spill-warning",
                      enableRegSpillWarning, cl::cat(category),
                      cl::desc("Report register spilling for AMD GPUs"));
     binder.opt<bool>(
+        "iree-hip-enable-register-spill-warning", enableRegSpillWarning,
+        cl::cat(category),
+        cl::desc("Deprecated; use --iree-rocm-enable-register-spill-warning "
+                 "instead."),
+        Deprecated("use --iree-rocm-enable-register-spill-warning instead"));
+
+    binder.opt<bool>(
+        "iree-rocm-emit-debug-info", debugSymbols, cl::cat(category),
+        cl::desc("Generate and embed debug information (DWARF)."));
+    binder.opt<bool>(
         "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
-        cl::desc("Generate and embed debug information (DWARF) for HIP."));
+        cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),
+        Deprecated("use --iree-rocm-emit-debug-info instead"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
     if (target.empty()) {
       return emitError(builder.getUnknownLoc())
-             << "HIP target not set; did you forget to pass "
-                "'--iree-hip-target'?";
+             << "ROCM target not set; did you forget to pass "
+                "'--iree-rocm-target'?";
     }
     if (GPU::normalizeHIPTarget(target).empty()) {
-      return emitError(builder.getUnknownLoc(), "Unknown HIP target '")
+      return emitError(builder.getUnknownLoc(), "Unknown ROCM target '")
              << target << "'";
     }
     SmallVector<StringRef> features;
@@ -206,7 +280,7 @@ struct ROCMOptions {
     for (StringRef f : features) {
       if (!(f.starts_with("+") || f.starts_with("-"))) {
         return emitError(builder.getUnknownLoc(),
-                         "HIP target feature must be prefixed with '+' or "
+                         "ROCM target feature must be prefixed with '+' or "
                          "'-'; but seen '")
                << f << "'";
       }
@@ -215,7 +289,7 @@ struct ROCMOptions {
         // We only support these two features to be set explicitly. Features
         // like wavefrontsize is controlled and tuned by the compiler.
         return emitError(builder.getUnknownLoc(),
-                         "HIP target feature can only be 'sramecc' or "
+                         "ROCM target feature can only be 'sramecc' or "
                          "'xnack'; but seen '")
                << feature << "'";
       }
@@ -750,7 +824,7 @@ public:
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
-                  "--iree-hip-bc-dir= to a path on your system.";
+                  "--iree-rocm-bc-dir= to a path on your system.";
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
                                         targetArch,

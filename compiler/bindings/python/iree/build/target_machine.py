@@ -72,19 +72,19 @@ def handle_unknown_hal_target_device(mnemonic: str) -> list[TargetMachine]:
 @handle_hal_target_devices_from_flags("hip")
 @expand_cl_arg_defaults
 def amdgpu_hal_target_from_flags(
-    mnemonic: str, *, hip_target=cl_arg_ref("iree_hip_target")
+    mnemonic: str, *, hip_target=cl_arg_ref("iree_rocm_target")
 ) -> list[TargetMachine]:
     if not hip_target:
         raise RuntimeError(
-            "No HIP targets specified. Pass a chip to target as "
-            "--iree-hip-target=gfx..."
+            "No ROCM targets specified. Pass a chip to target as "
+            "--iree-rocm-target=gfx..."
         )
     return [
         TargetMachine(
             f"hip-{hip_target}",
             extra_flags=[
                 "--iree-hal-target-device=hip",
-                f"--iree-hip-target={hip_target}",
+                f"--iree-rocm-target={hip_target}",
             ],
         )
     ]
@@ -142,12 +142,12 @@ def _(p: argparse.ArgumentParser):
     )
 
     hip_g = p.add_argument_group(
-        title="IREE HIP Target Options",
-        description="Options controlling explicit targeting of HIP devices",
+        title="IREE ROCM Target Options",
+        description="Options controlling explicit targeting of ROCM devices",
     )
     hip_g.add_argument(
-        "--iree-hip-target",
-        help="HIP target selection (i.e. 'gfxYYYY')",
+        "--iree-rocm-target",
+        help="ROCM target selection (i.e. 'gfxYYYY')",
     )
 
     cpu_g = p.add_argument_group(
