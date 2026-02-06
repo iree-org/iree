@@ -767,7 +767,7 @@ getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   intrinsic.getUndistributedTileTypes(undistributedTypes);
   auto shape = undistributedTypes[lhsOperandIndex].getShape();
   auto lhsIteratorTypes = intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
-  for (auto [dim, iteratorType] : llvm::zip_equals(shape, lhsIteratorTypes)) {
+  for (auto [dim, iteratorType] : llvm::zip_equal(shape, lhsIteratorTypes)) {
     if (iteratorType == utils::IteratorType::reduction) {
       kSize *= dim;
     }
