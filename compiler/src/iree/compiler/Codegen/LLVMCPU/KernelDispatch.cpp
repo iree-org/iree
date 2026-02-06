@@ -1559,8 +1559,6 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   }
 
   // Find the output element type of the matmul.
-  assert(op->getResultTypes().size() == 1 &&
-         "Expected single output type for matmul op");
   Type outputEltType = getElementTypeOrSelf(op->getResultTypes()[0]);
   if (!outputEltType.isSignlessIntOrFloat()) {
     return;
