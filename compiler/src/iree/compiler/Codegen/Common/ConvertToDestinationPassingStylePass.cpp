@@ -171,11 +171,11 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
                                               Value destinationValue) {
   Operation *op = resultValue.getOwner();
   return TypeSwitch<Operation *, LogicalResult>(op)
-      .Case<DestinationStyleOpInterface>([&](auto op) {
+      .Case([&](DestinationStyleOpInterface op) {
         op.setDpsInitOperand(resultValue.getResultNumber(), destinationValue);
         return success();
       })
-      .Case<tensor::EmptyOp>([&](auto emptyOp) {
+      .Case([&](tensor::EmptyOp emptyOp) {
         emptyOp.replaceAllUsesWith(destinationValue);
         return success();
       })
@@ -229,11 +229,10 @@ modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
     Operation *op = it->getOwner();
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
-            .Case<DestinationStyleOpInterface>(
-                [&](auto) { return resultBuffer; })
+            .Case([&](DestinationStyleOpInterface) { return resultBuffer; })
             .Case<scf::IfOp, scf::ForOp, tensor::InsertSliceOp,
                   vector::TransferWriteOp>([&](auto) { return resultBuffer; })
-            .Case<tensor::InsertSliceOp>([&](auto insertSliceOp) -> Value {
+            .Case([&](tensor::InsertSliceOp insertSliceOp) -> Value {
               if (it->get() == insertSliceOp.getDest()) {
                 return resultBuffer;
               }
@@ -243,7 +242,7 @@ modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
                 [&](auto reshapeOp) {
                   return getReverseOfReshapeOp(b, reshapeOp, resultBuffer);
                 })
-            .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
+            .Case([&](tensor::CastOp castOp) {
               return getReverseOfCastOp(b, castOp, resultBuffer);
             })
             .Default([&](Operation *) { return nullptr; });

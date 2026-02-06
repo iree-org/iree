@@ -3922,7 +3922,7 @@ static bool isSourceImmediatelyResolved(Value resource) {
   return TypeSwitch<Operation *, bool>(definingOp)
       .Case<IREE::Stream::ResourceAllocOp, IREE::Stream::TensorImportOp>(
           [](auto op) { return true; })
-      .Default([](auto op) { return false; });
+      .Default(false);
 }
 
 // Elides barriers that source their operands from immediate operations.

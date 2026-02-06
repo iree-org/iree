@@ -34,14 +34,12 @@ void collectLoopsToPeel(Operation *op,
     return;
   }
 
-  int maxNumLoopsToPeel = TypeSwitch<Operation *, int>(op)
-                              .Case<linalg::LinalgOp>([](auto linalgOp) {
-                                return linalgOp.getNumLoops();
-                              })
-                              .Case<linalg::PackOp>([](auto packOp) {
-                                return packOp.getSourceRank();
-                              })
-                              .Default([](auto) { return 0; });
+  int maxNumLoopsToPeel =
+      TypeSwitch<Operation *, int>(op)
+          .Case(
+              [](linalg::LinalgOp linalgOp) { return linalgOp.getNumLoops(); })
+          .Case([](linalg::PackOp packOp) { return packOp.getSourceRank(); })
+          .Default([](auto) { return 0; });
   for (int i = 0; i < maxNumLoopsToPeel; ++i) {
     op = op->getParentOfType<scf::ForOp>();
     auto loop = cast_or_null<scf::ForOp>(op);

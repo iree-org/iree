@@ -179,7 +179,7 @@ static void updateTensorDimInfo(
           [&](auto op) {
             updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
           })
-      .Case<DestinationStyleOpInterface>([&](auto op) {
+      .Case([&](DestinationStyleOpInterface op) {
         updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
       });
 

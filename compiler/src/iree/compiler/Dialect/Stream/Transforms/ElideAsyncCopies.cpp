@@ -1086,15 +1086,15 @@ static void elideTransferOp(IREE::Stream::AsyncTransferOp transferOp) {
 static bool areSliceUsesSupported(IREE::Stream::AsyncSliceOp sliceOp) {
   for (auto &use : sliceOp.getResult().getUses()) {
     if (!TypeSwitch<Operation *, bool>(use.getOwner())
-             .Case<IREE::Stream::AsyncCopyOp>([&](auto copyOp) {
+             .Case([&](IREE::Stream::AsyncCopyOp copyOp) {
                // Only support folding into source today.
                return !copyOp.isOperandTied(use.getOperandNumber());
              })
-             .Case<IREE::Stream::AsyncDispatchOp>([&](auto dispatchOp) {
+             .Case([&](IREE::Stream::AsyncDispatchOp dispatchOp) {
                // Only support folding into reads today.
                return !dispatchOp.isOperandTied(use.getOperandNumber());
              })
-             .Default([](auto *op) { return false; })) {
+             .Default(false)) {
       return false;
     }
   }
@@ -1256,10 +1256,10 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
   for (auto [owner, operandNumberIt] : consumers) {
     unsigned operandNumber = operandNumberIt; // need C++20 to avoid this :|
     TypeSwitch<Operation *>(owner)
-        .Case<IREE::Stream::AsyncCopyOp>([=](auto copyOp) {
+        .Case([=](IREE::Stream::AsyncCopyOp copyOp) {
           foldSliceIntoCopy(sliceOp, copyOp, operandNumber);
         })
-        .Case<IREE::Stream::AsyncDispatchOp>([=](auto dispatchOp) {
+        .Case([=](IREE::Stream::AsyncDispatchOp dispatchOp) {
           foldSliceIntoDispatch(sliceOp, dispatchOp, operandNumber);
         })
         .Default([](auto *op) {});
@@ -1540,28 +1540,28 @@ static ElisionResults tryElideAsyncCopiesInRegion(
   for (auto &block : region) {
     block.walk([&](Operation *op) {
       return TypeSwitch<Operation *, WalkResult>(op)
-          .Case<IREE::Stream::AsyncCloneOp>([&](auto cloneOp) {
+          .Case([&](IREE::Stream::AsyncCloneOp cloneOp) {
             if (isSafeToElideCloneOp(cloneOp, analysis)) {
               elideCloneOp(cloneOp);
               ++results.clonesElided;
             }
             return WalkResult::advance();
           })
-          .Case<IREE::Stream::AsyncTransferOp>([&](auto transferOp) {
+          .Case([&](IREE::Stream::AsyncTransferOp transferOp) {
             if (isSafeToElideTransferOp(transferOp, analysis, topologyAttr)) {
               elideTransferOp(transferOp);
               ++results.transfersElided;
             }
             return WalkResult::advance();
           })
-          .Case<IREE::Stream::AsyncSliceOp>([&](auto sliceOp) {
+          .Case([&](IREE::Stream::AsyncSliceOp sliceOp) {
             if (isSafeToElideSliceOp(sliceOp, analysis)) {
               elideSliceOp(sliceOp);
               ++results.slicesElided;
             }
             return WalkResult::advance();
           })
-          .Case<IREE::Stream::AsyncUpdateOp>([&](auto updateOp) {
+          .Case([&](IREE::Stream::AsyncUpdateOp updateOp) {
             if (isSafeToElideUpdateOp(updateOp, analysis)) {
               elideUpdateOp(updateOp);
               ++results.updatesElided;

@@ -246,19 +246,17 @@ static LogicalResult lowerWorkgroupCount(
   }
 
   return TypeSwitch<Operation *, LogicalResult>(countOps[0])
-      .Case<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
-          [&](auto countOp) {
-            return lowerWorkgroupCountFromSliceOp(rewriter, countOp,
-                                                  entryPointFn, workgroupCount,
-                                                  maxWorkgroupParallelDims);
-          })
-      .Case<IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(
-          [&](auto countOp) {
-            return lowerDispatchWorkgroupCountForDagRootOp(
-                rewriter, countOp, tileSizes, staticLoopRanges, interchange,
-                partitionedLoops, maxWorkgroupParallelDims);
-          })
-      .Default([&](Operation *) { return success(); });
+      .Case([&](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp countOp) {
+        return lowerWorkgroupCountFromSliceOp(rewriter, countOp, entryPointFn,
+                                              workgroupCount,
+                                              maxWorkgroupParallelDims);
+      })
+      .Case([&](IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp countOp) {
+        return lowerDispatchWorkgroupCountForDagRootOp(
+            rewriter, countOp, tileSizes, staticLoopRanges, interchange,
+            partitionedLoops, maxWorkgroupParallelDims);
+      })
+      .Default(success());
 }
 
 //===---------------------------------------------------------------------===//

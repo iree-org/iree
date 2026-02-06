@@ -169,7 +169,7 @@ void DeviceAnalysis::gatherDeviceTargets(
   do {
     auto attr = worklist.pop_back_val();
     if (!TypeSwitch<Attribute, bool>(attr)
-             .Case<SymbolRefAttr>([&](auto symRefAttr) {
+             .Case([&](SymbolRefAttr symRefAttr) {
                auto globalOp =
                    explorer.getSymbolTables()
                        .lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
@@ -183,20 +183,20 @@ void DeviceAnalysis::gatherDeviceTargets(
                  return false;
                }
              })
-             .Case<IREE::HAL::DeviceTargetAttr>([&](auto targetAttr) {
+             .Case([&](IREE::HAL::DeviceTargetAttr targetAttr) {
                resultSet.insert(targetAttr);
                return true;
              })
-             .Case<IREE::HAL::DeviceFallbackAttr>([&](auto fallbackAttr) {
+             .Case([&](IREE::HAL::DeviceFallbackAttr fallbackAttr) {
                worklist.insert(fallbackAttr.getName());
                return true;
              })
-             .Case<IREE::HAL::DeviceSelectAttr>([&](auto selectAttr) {
+             .Case([&](IREE::HAL::DeviceSelectAttr selectAttr) {
                worklist.insert(selectAttr.getDevices().begin(),
                                selectAttr.getDevices().end());
                return true;
              })
-             .Default([](auto attr) { return false; })) {
+             .Default(false)) {
       // No initial value means fall back to defaults. We do that by
       // inserting all knowable targets.
       gatherLegacyDeviceTargetAttrs(fromOp, resultSet);

@@ -502,15 +502,15 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)
-        .Case<tensor::PadOp>([&](auto padOp) { return true; })
-        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+        .Case([&](tensor::PadOp padOp) { return true; })
+        .Case([&](linalg::LinalgOp linalgOp) {
           AffineMap producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
               cast<OpResult>(fusedOperand.get()));
           // Make sure the producer op has an identity result indexing map. As
           // CPU backend currently can't handle transpose between fused ops.
           return producerIndexingMap.isIdentity();
         })
-        .Default([](Operation *) { return false; });
+        .Default(false);
   }
 
   // By default, padding should be fused with producers. It is hard to square
@@ -712,8 +712,8 @@ static bool isFusableWithProducer(OpOperand &operand,
 
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)
-        .Case<tensor::PadOp>([&](auto padOp) { return true; })
-        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+        .Case([&](tensor::PadOp padOp) { return true; })
+        .Case([&](linalg::LinalgOp linalgOp) {
           if (auto packOp = dyn_cast<linalg::PackOp>(consumer)) {
             // TODO(#12746): fusion of pack with dynamic inner tile size
             // causes an error in backend. Disable for now.
@@ -727,7 +727,7 @@ static bool isFusableWithProducer(OpOperand &operand,
           // CPU backend currently can't handle transpose between fused ops.
           return producerIndexingMap.isIdentity();
         })
-        .Default([](Operation *) { return false; });
+        .Default(false);
   }
 
   if (!isa<IREE::LinalgExt::LinalgFusionOpInterface>(consumer) ||

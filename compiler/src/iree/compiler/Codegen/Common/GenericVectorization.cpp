@@ -78,7 +78,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   std::optional<SmallVector<int64_t>> vectorSizes;
   SmallVector<bool> scalableFlags;
   TypeSwitch<Operation *, void>(op)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+      .Case([&](linalg::LinalgOp linalgOp) {
         std::optional<VectorizationTileSizes> result =
             inferSizesFromIR(linalgOp, /*opResult=*/std::nullopt);
         if (result) {
@@ -92,7 +92,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           vectorSizes = result->vectorSizes;
         }
       })
-      .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
+      .Case([&](tensor::PadOp padOp) {
         auto ty = padOp.getResultType();
         // TODO(hanchung): Infer the vector sizes for pad op after
         // maskedVectorize method allows dynamic result shapes.
@@ -101,7 +101,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         }
         vectorSizes = SmallVector<int64_t>(ty.getShape());
       })
-      .Case<IREE::LinalgExt::GatherOp>([&](IREE::LinalgExt::GatherOp gatherOp) {
+      .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
         std::optional<VectorizationTileSizes> result =
             inferSizesFromIR(gatherOp.getOutput());
         if (result) {

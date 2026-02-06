@@ -96,10 +96,10 @@ SmallVector<Range> getLoopRanges(Operation *op, Location loc,
             tensor::InsertSliceOp>([&](auto op) {
         return getLoopRangesFromValue(op.getSource(), loc, builder);
       })
-      .Case<TilingInterface>([&](TilingInterface op) {
+      .Case([&](TilingInterface op) {
         return getLoopRangesImpl(op, loc, builder);
       })
-      .Case<ReifyRankedShapedTypeOpInterface>([&](auto shapedOp) {
+      .Case([&](ReifyRankedShapedTypeOpInterface shapedOp) {
         return getLoopRangesImpl(shapedOp, loc, builder);
       })
       .Default([](Operation *op) -> SmallVector<Range> {

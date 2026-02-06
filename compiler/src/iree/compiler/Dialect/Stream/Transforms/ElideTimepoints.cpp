@@ -1035,7 +1035,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
     }
   };
   return TypeSwitch<Operation *, bool>(controlFlowOp)
-      .Case<scf::IfOp>([&](auto ifOp) {
+      .Case([&](scf::IfOp ifOp) {
         // scf.if has mutually exclusive branches - sink into all that need it.
         LLVM_DEBUG({
           llvm::dbgs() << "[ElideTimepoints] sinking await into scf.if ";
@@ -1063,7 +1063,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
         }
         return true;
       })
-      .Case<scf::IndexSwitchOp>([&](auto switchOp) {
+      .Case([&](scf::IndexSwitchOp switchOp) {
         // scf.index_switch has mutually exclusive case regions - sink into all
         // that need it.
         LLVM_DEBUG({
@@ -1101,7 +1101,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
         }
         return true;
       })
-      .Default([](auto) { return false; });
+      .Default(false);
 }
 
 // Hoists await past control flow when the value only used after.

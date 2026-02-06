@@ -1156,7 +1156,7 @@ private:
       // - For all other (unknown) operations, assume an identity mapping for
       // any value whose rank matches the operation’s loop count.
       TypeSwitch<Operation *>(op)
-          .Case<IndexingMapOpInterface>([&](auto op) {
+          .Case([&](IndexingMapOpInterface op) {
             propagateOnIndexingMapOp(op, indicesEquivalence,
                                      valueToGlobalDimMaps);
           })
@@ -3172,7 +3172,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
   // These operations have their own logic of lowering config.
   auto result =
       TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          .Case([&](IREE::LinalgExt::CustomOp op) {
             return setDefaultCustomOpLoweringConfig(entryPointFn, op,
                                                     initCPULaunchConfig);
           })
@@ -3184,7 +3184,7 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                 IREE::LinalgExt::WinogradInputTransformOp,
                 IREE::LinalgExt::WinogradOutputTransformOp>(
               [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-          .Default([&](Operation *op) { return failure(); });
+          .Default(failure());
   if (succeeded(result)) {
     return result;
   }

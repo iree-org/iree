@@ -70,14 +70,18 @@ struct UsageInfo {
     for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       funcOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
-            .Case<IREE::Util::BufferConstantOp>(
-                [&](auto op) { bufferConstantOps.push_back(op); })
-            .Case<IREE::Stream::ResourceAllocaOp>(
-                [&](auto op) { allocaOps.push_back(op); })
-            .Case<IREE::Stream::CmdExecuteOp>(
-                [&](auto op) { executeOps.push_back(op); })
-            .Case<IREE::Stream::TimepointAwaitOp>(
-                [&](auto op) { awaitOps.push_back(op); });
+            .Case([&](IREE::Util::BufferConstantOp op) {
+              bufferConstantOps.push_back(op);
+            })
+            .Case([&](IREE::Stream::ResourceAllocaOp op) {
+              allocaOps.push_back(op);
+            })
+            .Case([&](IREE::Stream::CmdExecuteOp op) {
+              executeOps.push_back(op);
+            })
+            .Case([&](IREE::Stream::TimepointAwaitOp op) {
+              awaitOps.push_back(op);
+            });
       });
     }
     for (auto executeOp : executeOps) {
@@ -165,13 +169,11 @@ struct Statistics {
     for (auto executeOp : usageInfo.executeOps) {
       executeOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
-            .Case<IREE::Stream::CmdFillOp>([&](auto op) { ++fillCount; })
-            .Case<IREE::Stream::CmdCopyOp>([&](auto op) { ++copyCount; })
-            .Case<IREE::Stream::CmdCollectiveOp>(
-                [&](auto op) { ++collectiveCount; })
-            .Case<IREE::Stream::CmdDispatchOp>(
-                [&](auto op) { ++dispatchCount; })
-            .Case<IREE::Stream::CmdCallOp>([&](auto op) { ++callCount; });
+            .Case([&](IREE::Stream::CmdFillOp op) { ++fillCount; })
+            .Case([&](IREE::Stream::CmdCopyOp op) { ++copyCount; })
+            .Case([&](IREE::Stream::CmdCollectiveOp op) { ++collectiveCount; })
+            .Case([&](IREE::Stream::CmdDispatchOp op) { ++dispatchCount; })
+            .Case([&](IREE::Stream::CmdCallOp op) { ++callCount; });
       });
     }
 
@@ -435,33 +437,33 @@ static void dumpExecutionCSVTable(const UsageInfo &usageInfo,
   int depth = 0;
   dumpRow = [&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<IREE::Stream::CmdSerialOp>([&](auto op) {
+        .Case([&](IREE::Stream::CmdSerialOp op) {
           ++depth;
           for (auto &nestedOp : op.getBody().front()) {
             dumpRow(&nestedOp);
           }
           --depth;
         })
-        .Case<IREE::Stream::CmdConcurrentOp>([&](auto op) {
+        .Case([&](IREE::Stream::CmdConcurrentOp op) {
           ++depth;
           for (auto &nestedOp : op.getBody().front()) {
             dumpRow(&nestedOp);
           }
           --depth;
         })
-        .Case<IREE::Stream::CmdFillOp>([&](auto op) {
+        .Case([&](IREE::Stream::CmdFillOp op) {
           APInt length;
           matchPattern(op.getTargetLength(), m_ConstantInt(&length));
           os << llvm::formatv(R"({},"fill",,{},,,,)", depth, length);
           os << "\n";
         })
-        .Case<IREE::Stream::CmdCopyOp>([&](auto op) {
+        .Case([&](IREE::Stream::CmdCopyOp op) {
           APInt length;
           matchPattern(op.getLength(), m_ConstantInt(&length));
           os << llvm::formatv(R"({},"copy",,{},,,,)", depth, length);
           os << "\n";
         })
-        .Case<IREE::Stream::CmdDispatchOp>([&](auto op) {
+        .Case([&](IREE::Stream::CmdDispatchOp op) {
           auto workload = op.getWorkload();
           SmallString<32> workloadStr;
           for (unsigned i = 0; i < workload.size(); ++i) {

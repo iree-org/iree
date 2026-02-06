@@ -633,10 +633,10 @@ IdentityResolverAttr::getUnifiedEncoding(ArrayRef<Attribute> encodings) const {
 Type IdentityResolverAttr::convertType(Type type) const {
   using IREE::TensorExt::DispatchTensorType;
   return TypeSwitch<Type, Type>(type)
-      .Case<RankedTensorType>([&](auto rankedTensorType) {
+      .Case([&](RankedTensorType rankedTensorType) {
         return rankedTensorType.dropEncoding();
       })
-      .Case<DispatchTensorType>([&](auto dispatchTensorType) {
+      .Case([&](DispatchTensorType dispatchTensorType) {
         auto boundType =
             dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
         if (!boundType || !boundType.getEncoding()) {

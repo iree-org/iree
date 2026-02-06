@@ -77,11 +77,11 @@ verifyDeviceTargetAttr(Operation *deviceOp,
 static LogicalResult verifyAttr(Operation *deviceOp, Attribute attr,
                                 const TargetRegistry &targetRegistry) {
   return TypeSwitch<Attribute, LogicalResult>(attr)
-      .Case<IREE::HAL::DeviceTargetAttr>([&](auto deviceTargetAttr) {
+      .Case([&](IREE::HAL::DeviceTargetAttr deviceTargetAttr) {
         return verifyDeviceTargetAttr(deviceOp, deviceTargetAttr,
                                       targetRegistry);
       })
-      .Case<IREE::HAL::DeviceSelectAttr>([&](auto deviceSelectAttr) {
+      .Case([&](IREE::HAL::DeviceSelectAttr deviceSelectAttr) {
         for (auto attr : deviceSelectAttr.getDevices().getValue()) {
           if (failed(verifyAttr(deviceOp, attr, targetRegistry))) {
             return failure();

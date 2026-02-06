@@ -38,7 +38,7 @@ struct InstrumentMemoryAccessesPass
     auto workgroupKey = instrumentOp.getWorkgroupKey();
     getOperation()->walk([&](Operation *op) {
       TypeSwitch<Operation *>(op)
-          .Case<memref::LoadOp>([&](auto loadOp) {
+          .Case([&](memref::LoadOp loadOp) {
             OpBuilder builder(loadOp);
             builder.setInsertionPointAfter(loadOp);
             auto instrumentOp = IREE::HAL::InstrumentMemoryLoadOp::create(
@@ -48,7 +48,7 @@ struct InstrumentMemoryAccessesPass
             loadOp.getResult().replaceAllUsesExcept(instrumentOp.getResult(),
                                                     instrumentOp);
           })
-          .Case<memref::StoreOp>([&](auto storeOp) {
+          .Case([&](memref::StoreOp storeOp) {
             OpBuilder builder(storeOp);
             auto instrumentOp = IREE::HAL::InstrumentMemoryStoreOp::create(
                 builder, storeOp.getLoc(), storeOp.getValueToStore().getType(),
@@ -56,7 +56,7 @@ struct InstrumentMemoryAccessesPass
                 storeOp.getMemRef(), storeOp.getIndices());
             storeOp.getValueMutable().assign(instrumentOp.getResult());
           })
-          .Case<vector::LoadOp>([&](auto loadOp) {
+          .Case([&](vector::LoadOp loadOp) {
             OpBuilder builder(loadOp);
             builder.setInsertionPointAfter(loadOp);
             auto instrumentOp = IREE::HAL::InstrumentMemoryLoadOp::create(
@@ -66,7 +66,7 @@ struct InstrumentMemoryAccessesPass
             loadOp.getResult().replaceAllUsesExcept(instrumentOp.getResult(),
                                                     instrumentOp);
           })
-          .Case<vector::StoreOp>([&](auto storeOp) {
+          .Case([&](vector::StoreOp storeOp) {
             OpBuilder builder(storeOp);
             auto instrumentOp = IREE::HAL::InstrumentMemoryStoreOp::create(
                 builder, storeOp.getLoc(), storeOp.getVectorType(), buffer,

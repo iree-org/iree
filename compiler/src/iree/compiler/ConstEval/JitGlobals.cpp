@@ -121,7 +121,7 @@ static bool isParameterized(const SymbolTable &moduleSymbols,
             .Case([=](IREE::Flow::TensorConstantOp accessor) {
               return isAttrParameterized(accessor.getValueAttr());
             })
-            .Default([=](auto) { return false; });
+            .Default(false);
     if (parameterized) {
       return WalkResult::interrupt();
     }

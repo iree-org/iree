@@ -1771,11 +1771,11 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
       sourceType.getShape(), innerTileSizes, innerDimsPos, outerDimsPerm);
 
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
-      .Case<RankedTensorType>([&](auto shapedType) {
+      .Case([&](RankedTensorType shapedType) {
         return RankedTensorType::get(resultTypeShape,
                                      shapedType.getElementType());
       })
-      .Case<MemRefType>([&](auto shapedType) {
+      .Case([&](MemRefType shapedType) {
         return MemRefType::get(resultTypeShape, shapedType.getElementType());
       })
       .Default([&](Type t) {

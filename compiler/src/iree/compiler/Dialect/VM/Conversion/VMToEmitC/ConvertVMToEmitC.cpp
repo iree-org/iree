@@ -4314,11 +4314,11 @@ private:
         std::optional<std::pair<StringRef, StringRef>> vmNames =
             TypeSwitch<Type, std::optional<std::pair<StringRef, StringRef>>>(
                 objectType)
-                .Case<IREE::VM::ListType>([&](auto t) {
+                .Case([&](IREE::VM::ListType t) {
                   return std::make_pair(StringRef("iree_vm_list_t"),
                                         StringRef("iree_vm_list_deref"));
                 })
-                .template Case<IREE::VM::BufferType>([&](auto t) {
+                .Case([&](IREE::VM::BufferType t) {
                   return std::make_pair(StringRef("iree_vm_buffer_t"),
                                         StringRef("iree_vm_buffer_deref"));
                 })
@@ -4640,11 +4640,11 @@ class ListGetOpConversion : public EmitCConversionPattern<OpTy> {
         TypeSwitch<Operation *, std::pair<std::optional<StringRef>,
                                           std::optional<StringRef>>>(
             getOp.getOperation())
-            .Case<IREE::VM::ListGetI32Op>([&](auto op) {
+            .Case([&](IREE::VM::ListGetI32Op op) {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I32"),
                                     StringRef("iree_vm_value_get_i32"));
             })
-            .template Case<IREE::VM::ListGetI64Op>([&](auto op) {
+            .Case([&](IREE::VM::ListGetI64Op op) {
               return std::make_pair(StringRef("IREE_VM_VALUE_TYPE_I64"),
                                     StringRef("iree_vm_value_get_i64"));
             })
@@ -4868,10 +4868,12 @@ class ListSetOpConversion : public EmitCConversionPattern<OpTy> {
 
     std::optional<StringRef> valueConstructor =
         TypeSwitch<Operation *, std::optional<StringRef>>(setOp.getOperation())
-            .Case<IREE::VM::ListSetI32Op>(
-                [&](auto op) { return StringRef("iree_vm_value_make_i32"); })
-            .template Case<IREE::VM::ListSetI64Op>(
-                [&](auto op) { return StringRef("iree_vm_value_make_i64"); })
+            .Case([&](IREE::VM::ListSetI32Op op) {
+              return StringRef("iree_vm_value_make_i32");
+            })
+            .Case([&](IREE::VM::ListSetI64Op op) {
+              return StringRef("iree_vm_value_make_i64");
+            })
             .Default([](Operation *) { return std::nullopt; });
 
     if (!valueConstructor.has_value()) {

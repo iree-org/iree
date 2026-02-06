@@ -300,19 +300,17 @@ bool isReadOnly(Value v) {
     return false;
   }
   return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
+      .Case([&](arith::ConstantOp constantOp) { return true; })
       .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
-      .Case<IREE::TensorExt::DispatchTensorLoadOp>(
-          [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-            return cast<IREE::TensorExt::DispatchTensorType>(
-                       loadOp.getSource().getType())
-                       .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
+      .Case([&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+        return cast<IREE::TensorExt::DispatchTensorType>(
+                   loadOp.getSource().getType())
+                   .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
+      })
+      .Default(false);
 }
 
 LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
@@ -2151,18 +2149,21 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   std::optional<VectorizationTileSizes> result;
   LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
-      .Case<linalg::LinalgOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
-      .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
-      .Case<scf::ForOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case([&](linalg::LinalgOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
+      .Case([&](linalg::PackOp op) { result = inferSizesFromIR(op); })
+      .Case([&](scf::ForOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
       .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
         result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
-      .Case<IREE::Codegen::UKernelGenericOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case([&](IREE::Codegen::UKernelGenericOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
       .Default([&](Operation *) {});
 
   return result;

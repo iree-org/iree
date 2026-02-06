@@ -2344,11 +2344,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
-      .Case<IREE::LinalgExt::FftOp>([&](auto fftOp) {
+      .Case([&](IREE::LinalgExt::FftOp fftOp) {
         LDBG() << "FFT Config";
         return setFftConfig(target, entryPointFn, fftOp);
       })
-      .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
+      .Case([&](IREE::LinalgExt::SortOp sortOp) {
         LDBG() << "Sort Config";
         return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
       })
@@ -2358,12 +2358,12 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG() << "Winograd Config";
         return setWinogradOpConfig(target, entryPointFn, winogradOp);
       })
-      .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
+      .Case([&](IREE::LinalgExt::CustomOp customOp) {
         LDBG() << "CustomOp Config";
         return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
                                                 initGPULaunchConfig);
       })
-      .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
+      .Case([&](IREE::LinalgExt::ScatterOp scatterOp) {
         LDBG() << "ScatterOp Config";
         if (failed(IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
                                                        scatterOp))) {

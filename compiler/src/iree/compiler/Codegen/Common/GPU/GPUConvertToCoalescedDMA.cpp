@@ -807,7 +807,7 @@ private:
               .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
                 return tileAtSubgroupLevel(rewriter, gatherOp);
               })
-              .Default([](Operation *) { return failure(); });
+              .Default(failure());
 
       if (failed(tilingResult)) {
         continue;

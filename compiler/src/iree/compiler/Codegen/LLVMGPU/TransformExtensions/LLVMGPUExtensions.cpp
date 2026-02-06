@@ -1130,7 +1130,7 @@ static Value getBase(Value v) {
               v = op.getSource();
               return true;
             })
-            .Case<memref::TransposeOp>([&](auto op) {
+            .Case([&](memref::TransposeOp op) {
               v = op.getIn();
               return true;
             })
@@ -1138,7 +1138,7 @@ static Value getBase(Value v) {
               v = op.getSrc();
               return true;
             })
-            .Default([](Operation *) { return false; });
+            .Default(false);
     if (!shouldContinue) {
       break;
     }

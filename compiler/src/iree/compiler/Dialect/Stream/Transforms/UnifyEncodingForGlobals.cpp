@@ -656,16 +656,16 @@ static void applyTensorEncodingUpdates(TensorEncodingUpdates &updates) {
     const OperandEncodingUpdates &opUpdates = operandUpdates;
     IRRewriter rewriter(op->getContext());
     TypeSwitch<Operation *>(op)
-        .Case<TensorDispatchOp>([&](auto dispatchOp) {
+        .Case([&](TensorDispatchOp dispatchOp) {
           updateTensorDispatchOp(dispatchOp, opUpdates, rewriter);
         })
-        .Case<TensorCloneOp>([&](auto cloneOp) {
+        .Case([&](TensorCloneOp cloneOp) {
           updateTensorCloneOp(cloneOp, opUpdates, rewriter);
         })
-        .Case<TensorEncodeOp>([&](auto encodeOp) {
+        .Case([&](TensorEncodeOp encodeOp) {
           updateTensorEncodeOp(encodeOp, opUpdates, rewriter);
         })
-        .Case<TensorUpdateOp>([&](auto updateOp) {
+        .Case([&](TensorUpdateOp updateOp) {
           updateTensorUpdateOp(updateOp, opUpdates, rewriter);
         })
         .Case<TensorSizeOfOp, TensorEmptyOp, TensorConstantOp, TensorSplatOp,
@@ -720,7 +720,7 @@ static void collectUpdatesForStreamTensorOps(Explorer &explorer,
       // The fixup will be applied directly to these ops, so updates are not
       // needed for their users.
       TypeSwitch<Operation *>(user)
-          .Case<TensorDispatchOp>([&](auto dispatchOp) {
+          .Case([&](TensorDispatchOp dispatchOp) {
             // The operand number is the index in the full operand list
             // (including workload). We need the index in getMixedOperands() for
             // encoding lookup.
