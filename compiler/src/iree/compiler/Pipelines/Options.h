@@ -101,6 +101,9 @@ struct PreprocessingOptions {
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
 
+  bool preprocessingEnableConv2dToImg2col = false;
+  bool preprocessingEnableConv2dToImg2colAfterQuantizedConv = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };

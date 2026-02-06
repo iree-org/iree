@@ -160,6 +160,17 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       "iree-preprocessing-pdl-spec-filename", preprocessingPDLSpecFilename,
       llvm::cl::desc("File name of a PDL spec to use for preprocessing."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-preprocessing-enable-conv2d-to-img2col-after-quantized-conv",
+      preprocessingEnableConv2dToImg2colAfterQuantizedConv,
+      llvm::cl::desc("Enable Conv2d to Img2col + matmul after "
+                     "QuantizedConvToConvPass in global optimization."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-preprocessing-enable-conv2d-to-img2col",
+      preprocessingEnableConv2dToImg2col,
+      llvm::cl::desc("Enable Conv2d to Img2col + matmul in preprocessing."),
+      llvm::cl::cat(category));
 }
 
 void ParameterOptions::bindOptions(OptionsBinder &binder) {
