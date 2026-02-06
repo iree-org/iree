@@ -4,298 +4,275 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Token post-processors for special token insertion.
+// Post-processor for inserting special tokens around encoded sequences.
 //
-// Post-processors control how special tokens (BOS, EOS, CLS, SEP) are inserted
-// during encoding. This implements the HuggingFace tokenizers post_processor
-// field behavior:
+// The post-processor operates on token IDs produced by the model, inserting
+// special tokens (BOS, EOS, CLS, SEP, etc.) at sequence boundaries. All
+// HuggingFace post-processor types (TemplateProcessing, RobertaProcessing,
+// ByteLevel, Sequence) compile down to a single flat precomputed
+// representation at parse time.
 //
-// - null/missing: No special tokens added (GPT-2 style)
-// - TemplateProcessing: Configurable template-based insertion (BERT, LLaMA)
-// - RobertaProcessing: RoBERTa-specific handling
-// - Sequence: Chain multiple processors (Llama 3 style)
-//
-// Usage:
-//   iree_tokenizer_postprocessor_t pp;
-//   iree_tokenizer_postprocessor_initialize_none(&pp);
-//   // ... or parse from JSON ...
-//   iree_tokenizer_postprocessor_apply_single(&pp, text, encode_fn, emit_fn,
-//   ctx); iree_tokenizer_postprocessor_deinitialize(&pp);
+// Design principles:
+// - Precomputed: all template types compile to flat prefix/infix/suffix arrays
+// - Cache-optimal: entire active template fits in one cache line (44 bytes)
+// - Zero heap for data: template token IDs stored inline in the struct
+// - Single codepath: no vtable dispatch, just array indexing
 
 #ifndef IREE_TOKENIZER_POSTPROCESSOR_H_
 #define IREE_TOKENIZER_POSTPROCESSOR_H_
 
-#include <string.h>
-
 #include "iree/base/api.h"
+#include "iree/tokenizer/types.h"
+
+typedef struct iree_tokenizer_vocab_t iree_tokenizer_vocab_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Postprocessor Types
+// Post-Processor Template
 //===----------------------------------------------------------------------===//
 
-// Post-processor algorithm type.
-typedef enum iree_tokenizer_postprocessor_type_e {
-  // No post-processing (passthrough - no special tokens added).
-  IREE_TOKENIZER_POSTPROCESSOR_NONE = 0,
-  // TemplateProcessing: configurable template-based insertion.
-  IREE_TOKENIZER_POSTPROCESSOR_TEMPLATE,
-  // RobertaProcessing: specialized for RoBERTa models.
-  IREE_TOKENIZER_POSTPROCESSOR_ROBERTA,
-  // ByteLevel: trim offsets, reverse byte mapping (for Sequence chains).
-  IREE_TOKENIZER_POSTPROCESSOR_BYTE_LEVEL,
-  // Sequence of post-processors applied in order.
-  IREE_TOKENIZER_POSTPROCESSOR_SEQUENCE,
-} iree_tokenizer_postprocessor_type_t;
+// Maximum number of special tokens across prefix + infix + suffix.
+// Real-world models use 1-4 total; 7 is generous for future models.
+// Validated at construction time.
+#define IREE_TOKENIZER_POSTPROCESSOR_MAX_PIECES 7
+
+// Precomputed template for a single-sequence or pair-sequence encoding.
+//
+// Stores token IDs and type IDs inline in contiguous arrays, indexed by phase:
+//   PREFIX: token_ids[0 .. prefix_count-1]
+//   INFIX:  token_ids[prefix_count .. prefix_count+infix_count-1]
+//   SUFFIX: token_ids[prefix_count+infix_count .. total-1]
+//
+// sizeof = 44 bytes. Fits in one cache line (64 bytes).
+typedef struct iree_tokenizer_postprocessor_template_t {
+  // Counts (accessed first during phase transitions).
+  uint8_t prefix_count;
+  uint8_t infix_count;
+  uint8_t suffix_count;
+
+  // Type IDs assigned to sequence tokens (not special tokens).
+  // sequence_a_type_id applies to all model-produced tokens in sequence A.
+  // sequence_b_type_id applies to all model-produced tokens in sequence B.
+  uint8_t sequence_a_type_id;
+  uint8_t sequence_b_type_id;
+
+  // Padding to align token_ids to 4 bytes.
+  uint8_t _pad[3];
+
+  // Contiguous token IDs: [prefix...][infix...][suffix...].
+  // Total entries = prefix_count + infix_count + suffix_count.
+  iree_tokenizer_token_id_t token_ids[IREE_TOKENIZER_POSTPROCESSOR_MAX_PIECES];
+
+  // Contiguous type IDs for special tokens (same layout as token_ids).
+  // Each entry is the type_id/segment_id assigned to the corresponding
+  // special token when written to output.
+  uint8_t type_ids[IREE_TOKENIZER_POSTPROCESSOR_MAX_PIECES];
+} iree_tokenizer_postprocessor_template_t;
+static_assert(sizeof(iree_tokenizer_postprocessor_template_t) <= 64,
+              "template must fit in one cache line");
+
+// Returns the total number of special tokens in the template.
+static inline uint8_t iree_tokenizer_postprocessor_template_total_count(
+    const iree_tokenizer_postprocessor_template_t* t) {
+  return t->prefix_count + t->infix_count + t->suffix_count;
+}
 
 //===----------------------------------------------------------------------===//
-// Template Piece (for TemplateProcessing)
+// Post-Processor
 //===----------------------------------------------------------------------===//
 
-// Template piece types (matches HuggingFace TemplateProcessing).
-typedef enum iree_tokenizer_template_piece_type_e {
-  // $A placeholder - encode first input sequence here.
-  IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A = 0,
-  // $B placeholder - encode second input sequence here (pairs only).
-  IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_B = 1,
-  // Special token - emit a specific token ID.
-  IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL = 2,
-} iree_tokenizer_template_piece_type_t;
+// Flags controlling postprocessor behavior.
+typedef uint32_t iree_tokenizer_postprocessor_flags_t;
+enum iree_tokenizer_postprocessor_flags_e {
+  IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE = 0,
+  // Trim leading/trailing whitespace from token offsets (ByteLevel and RoBERTa
+  // post-processor behavior).
+  IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS = 1u << 0,
+  // A prefix space was added during pre-tokenization. Affects offset trimming:
+  // the first leading space of the first token is preserved rather than trimmed
+  // (since it was artificially added and is part of the token's content).
+  IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE = 1u << 1,
+};
 
-// Single piece in a template (e.g., one [CLS] or $A).
-// Compact 8-byte representation for cache efficiency.
-typedef struct iree_tokenizer_template_piece_t {
-  // Token ID for SPECIAL type, -1 for SEQUENCE_A/B.
-  int32_t token_id;
-  // Piece type (iree_tokenizer_template_piece_type_t).
-  uint8_t type;
-  // Segment/type ID (0 or 1) for attention mask differentiation.
-  uint8_t type_id;
-  // Reserved for future use.
-  uint16_t reserved;
-} iree_tokenizer_template_piece_t;
-static_assert(sizeof(iree_tokenizer_template_piece_t) == 8,
-              "template piece must be 8 bytes");
-
-//===----------------------------------------------------------------------===//
-// Type-Specific Configurations
-//===----------------------------------------------------------------------===//
-
-// Configuration for TemplateProcessing.
-// Templates are stored contiguously: [single_pieces...][pair_pieces...]
-typedef struct iree_tokenizer_template_config_t {
-  // Number of pieces in single sequence template.
-  iree_host_size_t single_count;
-  // Number of pieces in pair sequence template (0 if pairs not supported).
-  iree_host_size_t pair_count;
-  // Heap-allocated template pieces (owned). Layout: [single...|pair...]
-  iree_tokenizer_template_piece_t* templates;
-  // Allocator used to free templates.
-  iree_allocator_t allocator;
-} iree_tokenizer_template_config_t;
-
-// Configuration flags for RobertaProcessing.
-typedef enum iree_tokenizer_roberta_flag_bits_e {
-  IREE_TOKENIZER_ROBERTA_FLAG_DEFAULT = 0,
-  // Add prefix space before encoding.
-  IREE_TOKENIZER_ROBERTA_FLAG_ADD_PREFIX_SPACE = 1 << 0,
-  // Trim whitespace offsets.
-  IREE_TOKENIZER_ROBERTA_FLAG_TRIM_OFFSETS = 1 << 1,
-} iree_tokenizer_roberta_flag_bits_t;
-typedef uint32_t iree_tokenizer_roberta_flags_t;
-
-// Configuration for RobertaProcessing.
-// RoBERTa uses format: <s> $A </s> for single, <s> $A </s></s> $B </s> for
-// pair.
-typedef struct iree_tokenizer_roberta_config_t {
-  // CLS token ID (<s>).
-  int32_t cls_id;
-  // SEP token ID (</s>).
-  int32_t sep_id;
-  // Behavior flags.
-  iree_tokenizer_roberta_flags_t flags;
-} iree_tokenizer_roberta_config_t;
-
-// Configuration for ByteLevel post-processor.
-// Used in Sequence chains (e.g., Llama 3).
-typedef struct iree_tokenizer_byte_level_pp_config_t {
-  // Reserved for future use.
-  uint32_t flags;
-} iree_tokenizer_byte_level_pp_config_t;
-
-// Forward declaration for sequence config.
-typedef struct iree_tokenizer_postprocessor_t iree_tokenizer_postprocessor_t;
-
-// Configuration for Sequence post-processor (chain of processors).
-typedef struct iree_tokenizer_postprocessor_sequence_config_t {
-  // Number of child processors.
-  iree_host_size_t count;
-  // Heap-allocated array of child processors (owned).
-  iree_tokenizer_postprocessor_t* children;
-  // Allocator used to free children array.
-  iree_allocator_t allocator;
-} iree_tokenizer_postprocessor_sequence_config_t;
-
-//===----------------------------------------------------------------------===//
-// Postprocessor Value Type
-//===----------------------------------------------------------------------===//
-
-// Post-processor instance with inline configuration.
-// Most post-processors are value types with optional heap allocations.
-// Sequence and Template types own heap-allocated data and must be
-// deinitialized.
+// Post-processor holding precomputed single and pair templates.
+// The tokenizer selects one template at encode init time based on flags.
+// This is a value type with no heap allocations; it can be embedded directly
+// in larger structs (e.g., iree_tokenizer_t).
 typedef struct iree_tokenizer_postprocessor_t {
-  iree_tokenizer_postprocessor_type_t type;
-  union {
-    iree_tokenizer_template_config_t template_;
-    iree_tokenizer_roberta_config_t roberta;
-    iree_tokenizer_byte_level_pp_config_t byte_level;
-    iree_tokenizer_postprocessor_sequence_config_t sequence;
-  } config;
+  // Template for single-sequence encoding (always populated).
+  iree_tokenizer_postprocessor_template_t single;
+
+  // Template for pair-sequence encoding (zeroed if unsupported).
+  // When pair.prefix_count + pair.infix_count + pair.suffix_count == 0 and
+  // pair.sequence_a_type_id == 0 and pair.sequence_b_type_id == 0, pair
+  // encoding is not supported.
+  iree_tokenizer_postprocessor_template_t pair;
+
+  // Behavioral flags (IREE_TOKENIZER_POSTPROCESSOR_FLAG_*).
+  iree_tokenizer_postprocessor_flags_t flags;
 } iree_tokenizer_postprocessor_t;
 
-//===----------------------------------------------------------------------===//
-// Lifecycle
-//===----------------------------------------------------------------------===//
-
-// Initializes a passthrough post-processor (no special tokens added).
-// This is equivalent to HuggingFace's post_processor: null.
-static inline void iree_tokenizer_postprocessor_initialize_none(
-    iree_tokenizer_postprocessor_t* out_pp) {
-  memset(out_pp, 0, sizeof(*out_pp));
-  out_pp->type = IREE_TOKENIZER_POSTPROCESSOR_NONE;
+// Returns true if the postprocessor supports pair encoding.
+static inline bool iree_tokenizer_postprocessor_supports_pair(
+    const iree_tokenizer_postprocessor_t* postprocessor) {
+  return iree_tokenizer_postprocessor_template_total_count(
+             &postprocessor->pair) > 0 ||
+         postprocessor->pair.sequence_a_type_id != 0 ||
+         postprocessor->pair.sequence_b_type_id != 0;
 }
 
-// Initializes a RoBERTa post-processor.
-// Format: <s> $A </s> for single, <s> $A </s></s> $B </s> for pair.
-static inline void iree_tokenizer_postprocessor_initialize_roberta(
-    int32_t cls_id, int32_t sep_id, iree_tokenizer_roberta_flags_t flags,
-    iree_tokenizer_postprocessor_t* out_pp) {
-  memset(out_pp, 0, sizeof(*out_pp));
-  out_pp->type = IREE_TOKENIZER_POSTPROCESSOR_ROBERTA;
-  out_pp->config.roberta.cls_id = cls_id;
-  out_pp->config.roberta.sep_id = sep_id;
-  out_pp->config.roberta.flags = flags;
-}
+// Initializes a postprocessor from precomputed template data.
+// |single_template| is required and specifies the single-sequence template.
+// |pair_template| is optional (NULL if pair encoding is not supported).
+// |flags| controls offset trimming and prefix space behavior.
+// Validates that total piece counts do not exceed MAX_PIECES.
+// The postprocessor is caller-owned storage (stack or embedded in struct).
+iree_status_t iree_tokenizer_postprocessor_initialize(
+    const iree_tokenizer_postprocessor_template_t* single_template,
+    const iree_tokenizer_postprocessor_template_t* pair_template,
+    iree_tokenizer_postprocessor_flags_t flags,
+    iree_tokenizer_postprocessor_t* out_postprocessor);
 
-// Initializes a ByteLevel post-processor (for Sequence chains).
-static inline void iree_tokenizer_postprocessor_initialize_byte_level(
-    uint32_t flags, iree_tokenizer_postprocessor_t* out_pp) {
-  memset(out_pp, 0, sizeof(*out_pp));
-  out_pp->type = IREE_TOKENIZER_POSTPROCESSOR_BYTE_LEVEL;
-  out_pp->config.byte_level.flags = flags;
-}
-
-// Initializes a TemplateProcessing post-processor.
-// TAKES OWNERSHIP of |templates| array (move semantics).
-// |templates| layout: [single_pieces...][pair_pieces...]
-// |single_count| is number of pieces in single template.
-// |pair_count| is number of pieces in pair template (0 if not supported).
-iree_status_t iree_tokenizer_postprocessor_initialize_template(
-    iree_tokenizer_template_piece_t* templates, iree_host_size_t single_count,
-    iree_host_size_t pair_count, iree_allocator_t allocator,
-    iree_tokenizer_postprocessor_t* out_pp);
-
-// Initializes a Sequence post-processor that chains multiple processors.
-// TAKES OWNERSHIP of |children| array (move semantics). The children array is
-// moved and the originals are zeroed. Caller must not deinitialize children
-// after this call.
-iree_status_t iree_tokenizer_postprocessor_initialize_sequence(
-    iree_tokenizer_postprocessor_t* children, iree_host_size_t count,
-    iree_allocator_t allocator, iree_tokenizer_postprocessor_t* out_pp);
-
-// Deinitializes a post-processor, freeing any owned resources.
-// MUST be called for all post-processors regardless of type.
-// Recursively frees Sequence children.
+// Deinitializes a postprocessor. Currently a no-op (no heap resources), but
+// provided for API symmetry and future-proofing.
 void iree_tokenizer_postprocessor_deinitialize(
-    iree_tokenizer_postprocessor_t* pp);
+    iree_tokenizer_postprocessor_t* postprocessor);
 
 //===----------------------------------------------------------------------===//
-// Apply API
+// Encode State
 //===----------------------------------------------------------------------===//
 
-// Callback invoked when a text sequence placeholder ($A or $B) is encountered.
-// The callback should encode the text and emit tokens.
-typedef iree_status_t (*iree_tokenizer_encode_text_fn_t)(
-    void* user_data, iree_string_view_t text);
+// Phase of the postprocessor state machine during encoding.
+// Tracks which portion of the template is being emitted relative to model
+// tokens:
+//   PREFIX → SEQUENCE_A → SUFFIX → DONE
+// For pair encoding (future), the full sequence is:
+//   PREFIX → SEQUENCE_A → INFIX → SEQUENCE_B → SUFFIX → DONE
+typedef enum {
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_IDLE = 0,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX,
+  IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE,
+} iree_tokenizer_postprocessor_phase_t;
 
-// Callback invoked to emit a single special token.
-typedef iree_status_t (*iree_tokenizer_emit_token_fn_t)(void* user_data,
-                                                        int32_t token_id);
+// Per-encode postprocessor state. Embedded in the tokenizer's encode state.
+// When phase is IDLE, all postprocessor operations are no-ops.
+typedef struct iree_tokenizer_postprocessor_encode_state_t {
+  // Active template for this encode (points into the postprocessor struct).
+  const iree_tokenizer_postprocessor_template_t* active_template;
+  // Current emission phase.
+  iree_tokenizer_postprocessor_phase_t phase;
+  // Index within current phase's token array (0..count-1).
+  uint8_t position;
+  // Cached flags from postprocessor (avoids pointer chasing on hot path).
+  iree_tokenizer_postprocessor_flags_t flags;
+  // True after the first model token has been processed for offset trimming.
+  // Used to handle ADD_PREFIX_SPACE: only the very first model token across
+  // the entire encode preserves its leading space.
+  bool first_model_token_trimmed;
+} iree_tokenizer_postprocessor_encode_state_t;
 
-// Applies post-processor for single sequence encoding.
-//
-// Walks the single template (if any) and:
-// - Calls emit_token_fn for each special token piece
-// - Calls encode_text_fn when $A placeholder is encountered
-//
-// For NONE type, simply calls encode_text_fn with the full text.
-// For Sequence type, applies all child processors in order.
-//
-// |pp| is the post-processor configuration.
-// |text| is the input text to encode.
-// |encode_text_fn| is called to encode text sequences.
-// |emit_token_fn| is called to emit special tokens.
-// |user_data| is passed to callbacks.
-//
-// Returns IREE_STATUS_OK on success, or error from callbacks.
-iree_status_t iree_tokenizer_postprocessor_apply_single(
-    const iree_tokenizer_postprocessor_t* pp, iree_string_view_t text,
-    iree_tokenizer_encode_text_fn_t encode_text_fn,
-    iree_tokenizer_emit_token_fn_t emit_token_fn, void* user_data);
+// Initializes encode state for a given postprocessor and template. If the
+// template has no special tokens (total count == 0), the state remains IDLE
+// (all operations are no-ops). The template pointer must remain valid for the
+// lifetime of the encode state.
+static inline void iree_tokenizer_postprocessor_encode_state_initialize(
+    const iree_tokenizer_postprocessor_t* postprocessor,
+    const iree_tokenizer_postprocessor_template_t* active_template,
+    iree_tokenizer_postprocessor_encode_state_t* out_state) {
+  memset(out_state, 0, sizeof(*out_state));
+  // Cache flags for hot path access.
+  out_state->flags = postprocessor->flags;
+  uint8_t total =
+      iree_tokenizer_postprocessor_template_total_count(active_template);
+  if (total > 0) {
+    out_state->active_template = active_template;
+    out_state->phase = active_template->prefix_count > 0
+                           ? IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX
+                           : IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  }
+}
 
-// Applies post-processor for sequence pair encoding.
-//
-// Walks the pair template (if any) and:
-// - Calls emit_token_fn for each special token piece
-// - Calls encode_text_fn when $A or $B placeholders are encountered
-//
-// For NONE type, encodes text_a then text_b with no special tokens.
-// For Sequence type, applies all child processors in order.
-//
-// |pp| is the post-processor configuration.
-// |text_a| is the first input sequence.
-// |text_b| is the second input sequence.
-// |encode_text_fn| is called to encode text sequences.
-// |emit_token_fn| is called to emit special tokens.
-// |user_data| is passed to callbacks.
-//
-// Returns IREE_STATUS_OK on success, or error from callbacks.
-iree_status_t iree_tokenizer_postprocessor_apply_pair(
-    const iree_tokenizer_postprocessor_t* pp, iree_string_view_t text_a,
-    iree_string_view_t text_b, iree_tokenizer_encode_text_fn_t encode_text_fn,
-    iree_tokenizer_emit_token_fn_t emit_token_fn, void* user_data);
+// Returns true if the postprocessor has pending tokens to emit (prefix or
+// suffix phase not yet complete). Used by the tokenizer to report pending work
+// in the streaming API.
+static inline bool iree_tokenizer_postprocessor_encode_state_has_pending(
+    const iree_tokenizer_postprocessor_encode_state_t* state) {
+  return state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX ||
+         state->phase == IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX;
+}
 
 //===----------------------------------------------------------------------===//
-// Special Token Emission
+// Encode Operations
 //===----------------------------------------------------------------------===//
 
-// Emits all prefix tokens (special tokens before $A) for single encoding.
-// Calls emit_token_fn for each prefix token in order.
-// Returns immediately if no prefix tokens are configured.
-//
-// For TemplateProcessing: emits all SPECIAL tokens before SEQUENCE_A.
-// For RobertaProcessing: emits cls_id (<s>).
-// For Sequence: emits prefix from first child with one.
-// For NONE/ByteLevel: emits nothing.
-iree_status_t iree_tokenizer_postprocessor_emit_prefix(
-    const iree_tokenizer_postprocessor_t* pp,
-    iree_tokenizer_emit_token_fn_t emit_token_fn, void* user_data);
+// Emits prefix special tokens into the output if in PREFIX phase.
+// Transitions to SEQUENCE_A when all prefix tokens are emitted.
+// No-op if the phase is not PREFIX.
+// Returns the number of tokens written to output.
+iree_host_size_t iree_tokenizer_postprocessor_emit_prefix(
+    iree_tokenizer_postprocessor_encode_state_t* state,
+    iree_tokenizer_token_output_t output, iree_host_size_t output_offset);
 
-// Emits all suffix tokens (special tokens after $A) for single encoding.
-// Calls emit_token_fn for each suffix token in order.
-// Returns immediately if no suffix tokens are configured.
+// Assigns type_ids to model-produced tokens based on current sequence phase.
+// Uses sequence_a_type_id during SEQUENCE_A (sequence_b_type_id for future pair
+// encoding). No-op if type_ids output is NULL or phase is not a sequence phase.
+void iree_tokenizer_postprocessor_assign_type_ids(
+    const iree_tokenizer_postprocessor_encode_state_t* state,
+    iree_tokenizer_token_output_t output, iree_host_size_t offset,
+    iree_host_size_t count);
+
+// Transitions from sequence phase to SUFFIX after model finalize.
+// If suffix_count is 0, transitions directly to DONE.
+// No-op if phase is not SEQUENCE_A.
+static inline void iree_tokenizer_postprocessor_begin_suffix(
+    iree_tokenizer_postprocessor_encode_state_t* state) {
+  if (state->phase != IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A) return;
+  state->position = 0;
+  state->phase = state->active_template->suffix_count > 0
+                     ? IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX
+                     : IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE;
+}
+
+// Emits suffix special tokens into the output if in SUFFIX phase.
+// Transitions to DONE when all suffix tokens are emitted.
+// No-op if the phase is not SUFFIX.
+// Returns the number of tokens written to output.
+iree_host_size_t iree_tokenizer_postprocessor_emit_suffix(
+    iree_tokenizer_postprocessor_encode_state_t* state,
+    iree_tokenizer_token_output_t output, iree_host_size_t output_offset);
+
+//===----------------------------------------------------------------------===//
+// Offset Trimming
+//===----------------------------------------------------------------------===//
+
+// Trims leading and trailing whitespace from token offsets when
+// TRIM_OFFSETS is set in state->flags (ByteLevel and RoBERTa behavior).
 //
-// For TemplateProcessing: emits all SPECIAL tokens after SEQUENCE_A.
-// For RobertaProcessing: emits sep_id (</s>).
-// For Sequence: emits suffix from last child with one.
-// For NONE/ByteLevel: emits nothing.
-iree_status_t iree_tokenizer_postprocessor_emit_suffix(
-    const iree_tokenizer_postprocessor_t* pp,
-    iree_tokenizer_emit_token_fn_t emit_token_fn, void* user_data);
+// Token offsets point into the original input text. When trim_offsets is
+// enabled, offsets are adjusted to exclude whitespace that was part of the
+// token's encoding but not its semantic content. For ByteLevel tokenizers,
+// the Ġ character (U+0120) represents an original space and counts as
+// leading whitespace for trimming purposes.
+//
+// |state| provides cached TRIM_OFFSETS/ADD_PREFIX_SPACE flags and tracks
+// whether the first model token has been processed (for streaming).
+// |vocab| is required to look up token text for whitespace detection.
+// |output| contains the token IDs and offsets to process.
+// |model_token_start| is the index of the first model token (after any prefix
+// special tokens which have zero offsets and should not be trimmed).
+// |model_token_count| is the number of model-produced tokens to process.
+//
+// No-op if TRIM_OFFSETS is not set in state->flags or output.token_offsets is
+// NULL.
+void iree_tokenizer_postprocessor_trim_token_offsets(
+    iree_tokenizer_postprocessor_encode_state_t* state,
+    const iree_tokenizer_vocab_t* vocab, iree_tokenizer_token_output_t output,
+    iree_host_size_t model_token_start, iree_host_size_t model_token_count);
 
 #ifdef __cplusplus
 }  // extern "C"

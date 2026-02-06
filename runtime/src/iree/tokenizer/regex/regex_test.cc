@@ -15,7 +15,9 @@
 #include <utility>
 #include <vector>
 
+#include "iree/base/internal/unicode.h"
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/tokenizer/regex/compile.h"
 
 namespace {
@@ -40,10 +42,10 @@ class CompiledPattern {
   }
 
   ~CompiledPattern() {
-    if (storage_) {
-      iree_tokenizer_regex_compiled_free(storage_, iree_allocator_system());
-    }
     iree_status_ignore(status_);
+    if (storage_) {
+      iree_allocator_free(iree_allocator_system(), storage_);
+    }
   }
 
   bool ok() const { return iree_status_is_ok(status_); }
@@ -59,9 +61,8 @@ class CompiledPattern {
   std::vector<std::pair<size_t, size_t>> FindMatches(const char* text) {
     matches_.clear();
     if (!ok()) return {};
-    iree_status_t exec_status =
-        iree_tokenizer_regex_exec(&dfa_, IREE_SV(text), MatchCallback, this);
-    iree_status_ignore(exec_status);
+    IREE_EXPECT_OK(
+        iree_tokenizer_regex_exec(&dfa_, IREE_SV(text), MatchCallback, this));
     return matches_;
   }
 
@@ -183,6 +184,185 @@ TEST(Regex, CharacterClassHyphenAtEnd) {
   auto matches = pat.FindMatchTexts("a-z-a");
   ASSERT_EQ(matches.size(), 1);
   EXPECT_EQ(matches[0], "a-z-a");
+}
+
+TEST(Regex, CharacterClassEscapedPunctuation) {
+  // Escaped punctuation in character class should be treated as literal.
+  // Many regex patterns (e.g., SigLIP) over-escape punctuation unnecessarily.
+  CompiledPattern pat("[\\!\\~\\#]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("a!~#b");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "!~#");
+}
+
+TEST(Regex, CharacterClassEscapedPunctuationExtended) {
+  // Test more escaped punctuation characters.
+  CompiledPattern pat("[\\$\\%\\&\\'\\(\\)\\*\\+]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("x$%&'()*+y");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "$%&'()*+");
+}
+
+TEST(Regex, CharacterClassSigLIPStyle) {
+  // Pattern similar to SigLIP's normalizer: punctuation removal character class
+  // with many escaped characters that don't technically need escaping.
+  CompiledPattern pat(
+      "[!\"\\#\\$%\\&'\\(\\)\\*\\+,\\-\\.:;=\\?@\\[\\\\\\]\\^_`\\{\\|\\}\\~]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("hello!world");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "!");
+
+  matches = pat.FindMatchTexts("a~b");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "~");
+
+  matches = pat.FindMatchTexts("test@example.com");
+  ASSERT_EQ(matches.size(), 2);
+  EXPECT_EQ(matches[0], "@");
+  EXPECT_EQ(matches[1], ".");
+}
+
+//===----------------------------------------------------------------------===//
+// Nested Character Class Tests
+//===----------------------------------------------------------------------===//
+
+TEST(Regex, NestedCharClassSimple) {
+  // [a[bc]] is equivalent to [abc].
+  CompiledPattern pat("[a[bc]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xabcyx");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "abc");
+}
+
+TEST(Regex, NestedCharClassEquivalent) {
+  // Verify [a[bc]]+ and [abc]+ produce identical matches.
+  CompiledPattern pat1("[a[bc]]+");
+  CompiledPattern pat2("[abc]+");
+  ASSERT_TRUE(pat1.ok()) << pat1.error_message();
+  ASSERT_TRUE(pat2.ok()) << pat2.error_message();
+
+  const char* test_strings[] = {"abc", "xabcyx", "a", "b", "c", "cab", "bac"};
+  for (const char* str : test_strings) {
+    auto matches1 = pat1.FindMatchTexts(str);
+    auto matches2 = pat2.FindMatchTexts(str);
+    EXPECT_EQ(matches1, matches2) << "Mismatch for input: " << str;
+  }
+}
+
+TEST(Regex, NestedCharClassAdjacent) {
+  // [a[bc][de]] is equivalent to [abcde].
+  CompiledPattern pat("[a[bc][de]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xabcdey");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "abcde");
+}
+
+TEST(Regex, NestedCharClassDeep) {
+  // [a[b[c]]] is equivalent to [abc].
+  CompiledPattern pat("[a[b[c]]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xabcyx");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "abc");
+}
+
+TEST(Regex, NestedCharClassWithRanges) {
+  // [a[0-9]] is equivalent to [a0-9].
+  CompiledPattern pat("[a[0-9]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xa1b2c");
+  ASSERT_EQ(matches.size(), 2);
+  EXPECT_EQ(matches[0], "a1");
+  EXPECT_EQ(matches[1], "2");
+}
+
+TEST(Regex, NestedCharClassOuterNegated) {
+  // [^a[bc]] is NOT {a, b, c}.
+  CompiledPattern pat("[^a[bc]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xyzabc123");
+  ASSERT_EQ(matches.size(), 2);
+  EXPECT_EQ(matches[0], "xyz");
+  EXPECT_EQ(matches[1], "123");
+}
+
+TEST(Regex, NestedCharClassInnerNegatedError) {
+  // [a[^bc]] - nested negation is not supported.
+  CompiledPattern pat("[a[^bc]]");
+  EXPECT_FALSE(pat.ok());
+  EXPECT_NE(std::string(pat.error_message()).find("negated"), std::string::npos)
+      << "Error message should mention negation: " << pat.error_message();
+}
+
+TEST(Regex, NestedCharClassUnclosed) {
+  // [a[bc - missing closing brackets.
+  CompiledPattern pat("[a[bc");
+  EXPECT_FALSE(pat.ok());
+  EXPECT_NE(std::string(pat.error_message()).find("unterminated"),
+            std::string::npos)
+      << "Error message should mention unterminated: " << pat.error_message();
+}
+
+TEST(Regex, NestedCharClassEmpty) {
+  // [[]] - inner class is empty, but outer has content from inner closing.
+  // Actually, [] is empty which would be an error, so [a[]] has 'a' and
+  // the inner [] tries to be empty. Let's test this edge case.
+  CompiledPattern pat("[a[]]+");
+  // The ']' after '[' becomes content of the inner class due to parsing rules.
+  // This is a bit tricky - [] at the start has special handling.
+  // For now, just verify it either parses or gives a clear error.
+  if (pat.ok()) {
+    // If it parses, the inner [] should be empty but the outer has 'a'.
+    auto matches = pat.FindMatchTexts("xaaax");
+    ASSERT_GE(matches.size(), 1);
+  }
+  // Either way is acceptable for this edge case.
+}
+
+TEST(Regex, NestedCharClassWithEscapes) {
+  // [a[\n\t]] - nested class with escape sequences.
+  CompiledPattern pat("[a[\\n\\t]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xa\n\ta");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "a\n\ta");
+}
+
+TEST(Regex, NestedCharClassWithShorthand) {
+  // [a[\d]] - nested class with shorthand.
+  CompiledPattern pat("[a[\\d]]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("xa123ax");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "a123a");
+}
+
+TEST(Regex, BloomStylePattern) {
+  // BLOOM tokenizer uses patterns like [^(\s|[.,!?])]+
+  // This tests the core nested class functionality.
+  CompiledPattern pat("[^(\\s|[.,!?])]+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("Hello, world!");
+  // Should match "Hello" and "world" (excluding punctuation and spaces).
+  ASSERT_EQ(matches.size(), 2);
+  EXPECT_EQ(matches[0], "Hello");
+  EXPECT_EQ(matches[1], "world");
 }
 
 //===----------------------------------------------------------------------===//
@@ -440,7 +620,7 @@ TEST(Regex, GroupCaseInsensitive) {
 
 TEST(Regex, GlobalCaseInsensitiveLiteral) {
   CompiledPattern pat("hello",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("hello HELLO Hello hElLo HeLLO");
@@ -454,7 +634,7 @@ TEST(Regex, GlobalCaseInsensitiveLiteral) {
 
 TEST(Regex, GlobalCaseInsensitiveConcat) {
   CompiledPattern pat("abc",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abc ABC Abc aBc ABc aBC abC AbC");
@@ -463,7 +643,7 @@ TEST(Regex, GlobalCaseInsensitiveConcat) {
 
 TEST(Regex, GlobalCaseInsensitiveAlternation) {
   CompiledPattern pat("cat|dog",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("CAT Dog cat DOG Cat dOg");
@@ -471,7 +651,8 @@ TEST(Regex, GlobalCaseInsensitiveAlternation) {
 }
 
 TEST(Regex, GlobalCaseInsensitiveQuantifier) {
-  CompiledPattern pat("a+", IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+  CompiledPattern pat("a+",
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("aaa AAA aAa AaA");
@@ -484,7 +665,7 @@ TEST(Regex, GlobalCaseInsensitiveQuantifier) {
 
 TEST(Regex, GlobalCaseInsensitiveCharClassRange) {
   CompiledPattern pat("[a-c]+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abc ABC aBc");
@@ -493,7 +674,7 @@ TEST(Regex, GlobalCaseInsensitiveCharClassRange) {
 
 TEST(Regex, GlobalCaseInsensitiveCharClassExplicit) {
   CompiledPattern pat("[abc]+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abc ABC BCA");
@@ -502,7 +683,7 @@ TEST(Regex, GlobalCaseInsensitiveCharClassExplicit) {
 
 TEST(Regex, GlobalCaseInsensitiveGroup) {
   CompiledPattern pat("(?:abc)+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abcABC ABCabc");
@@ -513,7 +694,7 @@ TEST(Regex, GlobalCaseInsensitiveGroup) {
 
 TEST(Regex, GlobalCaseInsensitiveNestedGroups) {
   CompiledPattern pat("(?:a(?:bc))+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abcABC");
@@ -523,7 +704,7 @@ TEST(Regex, GlobalCaseInsensitiveNestedGroups) {
 
 TEST(Regex, GlobalCaseInsensitiveNumbersUnaffected) {
   CompiledPattern pat("a1b2c3",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("a1b2c3 A1B2C3 a1B2c3");
@@ -532,7 +713,7 @@ TEST(Regex, GlobalCaseInsensitiveNumbersUnaffected) {
 
 TEST(Regex, GlobalCaseInsensitiveSpecialsUnaffected) {
   CompiledPattern pat("a\\.b",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("a.b A.B a.B A.b");
@@ -549,7 +730,7 @@ TEST(Regex, InlineCaseInsensitiveStillWorks) {
 
 TEST(Regex, GlobalFlagPlusInlineGroup) {
   CompiledPattern pat("(?i:abc)",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abc ABC AbC");
@@ -558,7 +739,7 @@ TEST(Regex, GlobalFlagPlusInlineGroup) {
 
 TEST(Regex, GlobalCaseInsensitiveContractions) {
   CompiledPattern pat("'s|'t|'re|'ve|'m|'ll|'d",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("I'M he's CAN'T I'LL");
@@ -571,7 +752,7 @@ TEST(Regex, GlobalCaseInsensitiveContractions) {
 
 TEST(Regex, GlobalCaseInsensitiveUnicodeUnaffected) {
   CompiledPattern pat("\\p{L}+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   // Unicode property \p{L} already matches all letter cases.
@@ -581,7 +762,7 @@ TEST(Regex, GlobalCaseInsensitiveUnicodeUnaffected) {
 
 TEST(Regex, GlobalCaseInsensitiveWordShorthand) {
   CompiledPattern pat("\\w+",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   // \w = [a-zA-Z0-9_], already includes both cases.
@@ -591,7 +772,7 @@ TEST(Regex, GlobalCaseInsensitiveWordShorthand) {
 
 TEST(Regex, GlobalCaseInsensitiveDotUnaffected) {
   CompiledPattern pat("a.c",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   auto matches = pat.FindMatchTexts("abc ABC axc AXC a1c A1C");
@@ -938,8 +1119,8 @@ TEST(Regex, GreedyPatternWithBothAnchors) {
   ASSERT_EQ(matches.size(), 1) << "Expected 1 match for ^.*$ on 'hello world'";
   EXPECT_EQ(matches[0], "hello world");
 
-  // With newlines - . does NOT match newline by default.
-  // So ^.*$ on "hello\nworld" should NOT match because .* stops at \n
+  // With newlines — . does not match newline by default.
+  // So ^.*$ on "hello\nworld" should not match because .* stops at \n
   // and we're not at end of string.
   matches = pat.FindMatchTexts("hello\nworld");
   ASSERT_EQ(matches.size(), 0) << "Expected 0 matches: . doesn't match newline";
@@ -1081,7 +1262,7 @@ TEST(Regex, UnicodeEscapeLowercase) {
 }
 
 TEST(Regex, UnicodeEscapeExactMatchNoFalsePositives) {
-  // \u4E2D = 中. Should match ONLY 中, not other CJK characters.
+  // \u4E2D = 中. Should match only 中, not other CJK characters.
   CompiledPattern pat("\\u4E2D+");
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
@@ -1134,15 +1315,15 @@ TEST(Regex, FourSingleCodepointsWithinLimit) {
 }
 
 TEST(Regex, ExceedingRangeLimitError) {
-  // 5 single non-ASCII codepoints exceed the 4-range limit.
-  CompiledPattern pat("[一二三四五]+");
+  // 11 single non-ASCII codepoints exceed the range limit.
+  CompiledPattern pat("[一二三四五六七八九十百]+");
   EXPECT_FALSE(pat.ok());
-  EXPECT_TRUE(strstr(pat.error_message(), "exceeds 4 Unicode ranges") !=
+  EXPECT_TRUE(strstr(pat.error_message(), "too many Unicode ranges") !=
               nullptr);
 }
 
 TEST(Regex, MixedRangesAndSingleCodepoints) {
-  // Mix of Unicode range and single codepoint share the 4-slot pool.
+  // Mix of Unicode range and single codepoints share the range pool.
   // [一-丁中] = range (4E00-4E01, 2 chars) + single (4E2D) = 2 ranges used.
   CompiledPattern pat("[一-丁中]+");
   ASSERT_TRUE(pat.ok()) << pat.error_message();
@@ -2055,7 +2236,7 @@ TEST(Regex, HF_PunctuationWithNewlines) {
 }
 
 //===----------------------------------------------------------------------===//
-// Optional End Anchor Tests (loom-yvnn)
+// Optional End Anchor Tests
 //
 // These tests verify that when an accept state is reachable via BOTH anchored
 // (through $) and unanchored paths, the unanchored path correctly wins.
@@ -2179,6 +2360,556 @@ TEST(Regex, AllPathsEndAnchored) {
   // "abc": Neither 'a' nor 'b' at end.
   matches = pat.FindMatchTexts("abc");
   EXPECT_EQ(matches.size(), 0) << "End anchor required for both branches";
+}
+
+//===----------------------------------------------------------------------===//
+// Consecutive Newline Tests
+//===----------------------------------------------------------------------===//
+
+// These tests verify that consecutive newlines are matched SEPARATELY when
+// followed by non-whitespace, as required by patterns like \s+(?!\S)|\s+.
+
+TEST(Regex, ConsecutiveNewlines_TwoNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\nA"
+  //
+  // First '\n' passes lookahead (followed by whitespace).
+  // Second '\n' fails lookahead (followed by 'A'), uses fallback.
+  // Result: two separate matches.
+  CompiledPattern pat("\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("\n\nA");
+  ASSERT_EQ(matches.size(), 2)
+      << "Consecutive newlines before text should produce separate matches";
+  EXPECT_EQ(matches[0], "\n");  // First newline.
+  EXPECT_EQ(matches[1], "\n");  // Second newline.
+}
+
+TEST(Regex, ConsecutiveNewlines_TwoNewlinesAtEndOfInput) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "A\n\n"
+  //
+  // At EOS, negative lookahead (?!\S) passes (no character = not \S).
+  // So both newlines should be combined into one match.
+  CompiledPattern pat("\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("A\n\n");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "\n\n");  // Both newlines combined at EOS.
+}
+
+TEST(Regex, ConsecutiveNewlines_ThreeNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\n\nA"
+  //
+  // First two '\n': lookahead passes (followed by whitespace).
+  // Third '\n': lookahead fails (followed by 'A'), uses fallback.
+  // Result: Match "\n\n" for first two, then "\n" for third.
+  CompiledPattern pat("\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("\n\n\nA");
+  ASSERT_EQ(matches.size(), 2);
+  EXPECT_EQ(matches[0], "\n\n");  // First two newlines.
+  EXPECT_EQ(matches[1], "\n");    // Third newline.
+}
+
+TEST(Regex, GPT2Pattern_ConsecutiveNewlinesBeforeWord) {
+  // Full GPT-2 pattern with "\n\nAll" (typical paragraph break in text).
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  auto matches = pat.FindMatchTexts("\n\nAll:");
+  ASSERT_GE(matches.size(), 3);
+  // First two matches should be separate newlines.
+  EXPECT_EQ(matches[0], "\n");
+  EXPECT_EQ(matches[1], "\n");
+}
+
+// Streaming test with compiled GPT-2 pattern.
+// This tests the actual code path used by the tokenizer.
+TEST(Regex, GPT2Pattern_ConsecutiveNewlinesBeforeWord_Streaming) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  std::vector<std::pair<size_t, size_t>> matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, pat.dfa());
+
+  // Feed entire input as single chunk (simulating tokenizer behavior).
+  const char* text = "\n\nAll:";
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      pat.dfa(), &state, iree_make_cstring_view(text), 0, /*stride=*/NULL,
+      callback, &matches));
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      pat.dfa(), &state, strlen(text), callback, &matches));
+
+  // First two matches should be separate newlines.
+  ASSERT_GE(matches.size(), 3) << "Expected at least 3 matches";
+  EXPECT_EQ(matches[0].first, 0);
+  EXPECT_EQ(matches[0].second, 1);  // First '\n'
+  EXPECT_EQ(matches[1].first, 1);
+  EXPECT_EQ(matches[1].second, 2);  // Second '\n'
+}
+
+//===----------------------------------------------------------------------===//
+// CJK Text with Punctuation
+//===----------------------------------------------------------------------===//
+
+// Verifies that CJK punctuation without letters matches via [^\s\p{L}\p{N}]+.
+TEST(GPT2, OnlyPunctuation) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // CJK punctuation only - no letters at all.
+  const char* text = "。、《》「」？！";
+
+  std::vector<std::pair<size_t, size_t>> matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+      pat.dfa(), iree_make_cstring_view(text), callback, &matches));
+
+  // Should produce at least one match - punctuation run.
+  // The [^\s\p{L}\p{N}]+ branch matches non-space, non-letter, non-digit chars.
+  EXPECT_GT(matches.size(), 0u)
+      << "Expected punctuation to match [^\\s\\p{L}\\p{N}]+";
+}
+
+// Ruby annotation brackets 《》 (U+300A, U+300B) should terminate letter runs
+// and match as punctuation via [^\s\p{L}\p{N}]+.
+TEST(GPT2, RubyAnnotationBrackets) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // Sample from actual Japanese test file with ruby annotations.
+  // Format: kanji《furigana》 where 《》 are CJK angle brackets.
+  const char* text = "物狂《ものぐる》ほしさ";
+
+  std::vector<std::pair<size_t, size_t>> matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+      pat.dfa(), iree_make_cstring_view(text), callback, &matches));
+
+  // Expected matches:
+  // - "物狂" (letters before 《)
+  // - "《" (punctuation)
+  // - "ものぐる" (letters inside brackets)
+  // - "》" (punctuation)
+  // - "ほしさ" (letters after brackets)
+  ASSERT_GE(matches.size(), 5u)
+      << "Expected at least 5 matches (letters + brackets), got "
+      << matches.size();
+
+  // Verify match boundaries.
+  std::vector<std::string> segments;
+  for (const auto& m : matches) {
+    segments.push_back(std::string(text + m.first, m.second - m.first));
+  }
+
+  // Verify we got the expected segmentation.
+  EXPECT_EQ(segments[0], "物狂");      // Letters before 《
+  EXPECT_EQ(segments[1], "《");        // Opening bracket
+  EXPECT_EQ(segments[2], "ものぐる");  // Letters inside
+  EXPECT_EQ(segments[3], "》");        // Closing bracket
+  EXPECT_EQ(segments[4], "ほしさ");    // Letters after
+}
+
+// Streaming version of RubyAnnotationBrackets - feed text in small chunks.
+TEST(GPT2, RubyAnnotationBrackets_Streaming) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  const char* text = "物狂《ものぐる》ほしさ";
+  size_t text_len = strlen(text);
+
+  // Single-chunk ground truth.
+  std::vector<std::pair<size_t, size_t>> single_chunk_matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(pat.dfa(),
+                                           iree_make_cstring_view(text),
+                                           callback, &single_chunk_matches));
+
+  // Streaming: feed 6 bytes at a time (2 CJK chars or 2 brackets).
+  constexpr size_t kChunkSize = 6;
+  std::vector<std::pair<size_t, size_t>> streaming_matches;
+
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, pat.dfa());
+
+  size_t offset = 0;
+  while (offset < text_len) {
+    size_t chunk_size = std::min(kChunkSize, text_len - offset);
+    size_t incomplete =
+        iree_unicode_utf8_incomplete_tail_length(text + offset, chunk_size);
+    chunk_size -= incomplete;
+    if (chunk_size == 0) {
+      chunk_size = std::min(text_len - offset, (size_t)4);
+    }
+
+    iree_string_view_t chunk = {text + offset, chunk_size};
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        pat.dfa(), &state, chunk, offset, /*stride=*/NULL, callback,
+        &streaming_matches));
+    offset += chunk_size;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      pat.dfa(), &state, text_len, callback, &streaming_matches));
+
+  EXPECT_EQ(streaming_matches, single_chunk_matches)
+      << "Streaming produced " << streaming_matches.size()
+      << " matches vs single-chunk " << single_chunk_matches.size();
+}
+
+// (。？！) should terminate matches and produce separate segments.
+TEST(GPT2, CJKTextWithPunctuation_SingleChunk) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // CJK text with punctuation that should break \p{L}+ matches.
+  // Japanese/Chinese punctuation: 。(U+3002), ？(U+FF1F), ！(U+FF01)
+  const char* text =
+      "今日は天気がいいですね。"  // 36 bytes, ends with 。
+      "明天会更好吗？"            // 21 bytes, ends with ？
+      "こんにちは！";             // 18 bytes, ends with ！
+
+  std::vector<std::pair<size_t, size_t>> matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+      pat.dfa(), iree_make_cstring_view(text), callback, &matches));
+
+  // Should produce multiple matches: letter runs + punctuation marks.
+  EXPECT_GE(matches.size(), 3u)
+      << "Expected multiple matches from CJK text with punctuation, got "
+      << matches.size();
+
+  // No single match should span the entire text - punctuation breaks matches.
+  size_t max_match_size = 0;
+  for (const auto& m : matches) {
+    max_match_size = std::max(max_match_size, m.second - m.first);
+  }
+
+  // Each CJK character is 3 bytes. 36 bytes = 12 chars is reasonable for one
+  // sentence. 75 bytes covering all text would indicate punctuation isn't
+  // breaking matches.
+  EXPECT_LT(max_match_size, 50u)
+      << "Match too large - punctuation should break matches. Max: "
+      << max_match_size;
+}
+
+// Verifies streaming produces identical results to single-chunk processing.
+TEST(GPT2, CJKTextWithPunctuation_Streaming) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  const char* text =
+      "今日は天気がいいですね。"
+      "明天会更好吗？"
+      "こんにちは！";
+
+  size_t text_len = strlen(text);
+
+  // Single-chunk as ground truth.
+  std::vector<std::pair<size_t, size_t>> single_chunk_matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(pat.dfa(),
+                                           iree_make_cstring_view(text),
+                                           callback, &single_chunk_matches));
+
+  // Streaming: feed entire text then finalize.
+  std::vector<std::pair<size_t, size_t>> streaming_matches;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, pat.dfa());
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      pat.dfa(), &state, iree_make_cstring_view(text), 0, /*stride=*/NULL,
+      callback, &streaming_matches));
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      pat.dfa(), &state, text_len, callback, &streaming_matches));
+
+  EXPECT_EQ(streaming_matches, single_chunk_matches)
+      << "Streaming produced " << streaming_matches.size()
+      << " matches vs single-chunk " << single_chunk_matches.size();
+}
+
+// Verifies small-chunk streaming produces identical results to single-chunk.
+// Uses ~16-byte chunks (adjusted to UTF-8 codepoint boundaries).
+TEST(GPT2, CJKTextWithPunctuation_SmallChunks) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  const char* text =
+      "今日は天気がいいですね。"
+      "明天会更好吗？"
+      "こんにちは！";
+
+  size_t text_len = strlen(text);
+
+  // Single-chunk as ground truth.
+  std::vector<std::pair<size_t, size_t>> single_chunk_matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(pat.dfa(),
+                                           iree_make_cstring_view(text),
+                                           callback, &single_chunk_matches));
+
+  // Feed in ~16-byte chunks, adjusted to not split UTF-8 codepoints.
+  // The regex executor requires complete codepoints at chunk boundaries.
+  constexpr size_t kTargetChunkSize = 16;
+  std::vector<std::pair<size_t, size_t>> chunked_matches;
+
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, pat.dfa());
+
+  size_t offset = 0;
+  while (offset < text_len) {
+    size_t remaining = text_len - offset;
+    size_t chunk_size = std::min(kTargetChunkSize, remaining);
+
+    // Adjust chunk_size to end at a UTF-8 codepoint boundary.
+    size_t incomplete =
+        iree_unicode_utf8_incomplete_tail_length(text + offset, chunk_size);
+    chunk_size -= incomplete;
+
+    // If chunk_size is 0, we need more bytes to complete the codepoint.
+    // This shouldn't happen with kTargetChunkSize >= 4.
+    ASSERT_GT(chunk_size, 0u)
+        << "Chunk too small to contain complete codepoint";
+
+    iree_string_view_t chunk = {text + offset, chunk_size};
+
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(pat.dfa(), &state, chunk,
+                                                  offset, /*stride=*/NULL,
+                                                  callback, &chunked_matches))
+        << "Feed failed at offset " << offset;
+
+    offset += chunk_size;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      pat.dfa(), &state, text_len, callback, &chunked_matches));
+
+  EXPECT_EQ(chunked_matches, single_chunk_matches)
+      << "Chunked produced " << chunked_matches.size()
+      << " matches vs single-chunk " << single_chunk_matches.size();
+}
+
+// Verifies behavior when processing a long run of CJK letters with NO
+// punctuation. The \p{L}+ pattern will accumulate state without emitting
+// until finalize(). This tests the streaming accumulation behavior.
+TEST(GPT2, CJKLetterRunWithoutPunctuation) {
+  CompiledPattern pat(
+      "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+      "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // Build a long string of only CJK letters (no punctuation).
+  // Each CJK character is 3 bytes, so 100 chars = 300 bytes.
+  std::string text;
+  const char* cjk_chars[] = {
+      "日", "本", "語", "中", "文", "字", "漢", "字", "言", "語",
+      "今", "天", "明", "天", "昨", "天", "時", "間", "空", "間",
+  };
+  for (int i = 0; i < 100; ++i) {
+    text += cjk_chars[i % 20];
+  }
+
+  size_t text_len = text.length();
+  ASSERT_EQ(text_len, 300u);  // 100 chars * 3 bytes each
+
+  // Single-chunk should produce exactly one match covering entire text.
+  std::vector<std::pair<size_t, size_t>> single_chunk_matches;
+  auto callback = [](void* user_data,
+                     iree_tokenizer_regex_match_t match) -> iree_status_t {
+    auto* m = static_cast<std::vector<std::pair<size_t, size_t>>*>(user_data);
+    m->push_back({match.start, match.end});
+    return iree_ok_status();
+  };
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+      pat.dfa(), iree_make_string_view(text.data(), text.length()), callback,
+      &single_chunk_matches));
+
+  ASSERT_EQ(single_chunk_matches.size(), 1u)
+      << "Expected exactly one match for continuous letter run";
+  EXPECT_EQ(single_chunk_matches[0].first, 0u);
+  EXPECT_EQ(single_chunk_matches[0].second, text_len);
+
+  // Streaming: feed in ~50-byte chunks, respecting UTF-8 boundaries.
+  // Key observation: NO matches should be emitted until finalize().
+  constexpr size_t kTargetChunkSize = 50;
+  std::vector<std::pair<size_t, size_t>> streaming_matches;
+
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, pat.dfa());
+
+  size_t offset = 0;
+  while (offset < text_len) {
+    size_t remaining = text_len - offset;
+    size_t chunk_size = std::min(kTargetChunkSize, remaining);
+
+    // Adjust to UTF-8 boundary (all CJK chars are 3 bytes, so align to 3).
+    // For a pure CJK string, chunk_size should already be aligned, but
+    // use the general-purpose function for correctness.
+    size_t incomplete = iree_unicode_utf8_incomplete_tail_length(
+        text.data() + offset, chunk_size);
+    chunk_size -= incomplete;
+    ASSERT_GT(chunk_size, 0u);
+
+    iree_string_view_t chunk = {text.data() + offset, chunk_size};
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(pat.dfa(), &state, chunk,
+                                                  offset, /*stride=*/NULL,
+                                                  callback, &streaming_matches))
+        << "Feed failed at offset " << offset;
+
+    // No intermediate matches expected - entire text is one \p{L}+ run.
+    EXPECT_EQ(streaming_matches.size(), 0u)
+        << "Unexpected intermediate match at offset " << offset;
+
+    offset += chunk_size;
+  }
+
+  // Only finalize should produce the match.
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      pat.dfa(), &state, text_len, callback, &streaming_matches));
+
+  EXPECT_EQ(streaming_matches.size(), 1u)
+      << "Expected exactly one match after finalize";
+  if (!streaming_matches.empty()) {
+    EXPECT_EQ(streaming_matches[0].first, 0u);
+    EXPECT_EQ(streaming_matches[0].second, text_len);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Backtracking Edge Cases
+//===----------------------------------------------------------------------===//
+
+// Verifies that patterns requiring more bytes than the input don't crash when
+// backtracking. This tests the case where a partial match fails and the
+// backtrack position is past the end of input (next_start >= chunk.size).
+TEST(Regex, BacktrackPastEndOfInput) {
+  // Pattern: requires at least 23 bytes (2 + 21 dots after .*)
+  // Input: only 10 bytes
+  // The pattern will start matching, but fail when it can't match 21 more dots.
+  CompiledPattern pat("..*....................");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // Short input that can't possibly match (needs 23+ bytes).
+  auto matches = pat.FindMatchTexts("abcdefghij");  // 10 bytes
+  EXPECT_EQ(matches.size(), 0) << "Pattern requires 23+ bytes, input has 10";
+
+  // Very short input - single byte.
+  matches = pat.FindMatchTexts("a");
+  EXPECT_EQ(matches.size(), 0);
+
+  // Empty input.
+  matches = pat.FindMatchTexts("");
+  EXPECT_EQ(matches.size(), 0);
+}
+
+// Pattern with many dots that requires exactly N bytes. Tests the boundary
+// condition where backtracking position equals chunk size.
+TEST(Regex, BacktrackExactBoundary) {
+  // Pattern: exactly 5 bytes
+  CompiledPattern pat(".....");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // Input of exactly 4 bytes - one short. Partial match fails at position 4.
+  auto matches = pat.FindMatchTexts("abcd");
+  EXPECT_EQ(matches.size(), 0);
+
+  // Input of exactly 5 bytes - matches.
+  matches = pat.FindMatchTexts("abcde");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "abcde");
+
+  // Input of 6 bytes - matches first 5.
+  matches = pat.FindMatchTexts("abcdef");
+  ASSERT_EQ(matches.size(), 1);
+  EXPECT_EQ(matches[0], "abcde");
+}
+
+// Tests that binary input (non-ASCII bytes) doesn't cause crashes during
+// backtracking. This exercises the multi-byte UTF-8 sequence length handling.
+TEST(Regex, BacktrackWithBinaryInput) {
+  // Pattern: 10 dots
+  CompiledPattern pat("..........");
+  ASSERT_TRUE(pat.ok()) << pat.error_message();
+
+  // Binary input with multi-byte UTF-8 characters (5 bytes total).
+  // Each character is 3 bytes: "一二" = 6 bytes, but we want less than 10.
+  const char* input = "\xE4\xB8\x80";  // Single CJK character "一" (3 bytes)
+  auto matches = pat.FindMatchTexts(input);
+  EXPECT_EQ(matches.size(), 0);
+
+  // Input with invalid UTF-8 start byte (0xFF) followed by ASCII.
+  // This tests that we handle replacement characters correctly.
+  const char binary_input[] = {'\xFF', 'a', 'b', 'c', '\0'};
+  matches = pat.FindMatchTexts(binary_input);
+  EXPECT_EQ(matches.size(), 0);
 }
 
 }  // namespace

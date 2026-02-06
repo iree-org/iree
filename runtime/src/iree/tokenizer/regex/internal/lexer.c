@@ -34,7 +34,7 @@
 static bool iree_tokenizer_regex_insert_sorted_range(
     iree_tokenizer_regex_codepoint_range_t* ranges, uint8_t* range_count,
     uint32_t start, uint32_t end) {
-  if (*range_count >= IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES) {
+  if (*range_count >= IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES) {
     return false;
   }
 
@@ -73,10 +73,6 @@ static bool iree_tokenizer_regex_char_class_add_codepoint(
                                                   codepoint, codepoint);
 }
 
-//===----------------------------------------------------------------------===//
-// Forward Declarations
-//===----------------------------------------------------------------------===//
-
 static void iree_tokenizer_regex_lexer_scan(
     iree_tokenizer_regex_lexer_t* lexer);
 
@@ -86,10 +82,12 @@ static void iree_tokenizer_regex_lexer_scan(
 
 void iree_tokenizer_regex_lexer_initialize(iree_tokenizer_regex_lexer_t* lexer,
                                            iree_string_view_t pattern) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   memset(lexer, 0, sizeof(*lexer));
   lexer->input = pattern;
   lexer->position = 0;
   lexer->has_peeked = false;
+  IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -148,7 +146,7 @@ static inline void iree_tokenizer_regex_lexer_advance_char(
 static void iree_tokenizer_regex_lexer_set_error(
     iree_tokenizer_regex_lexer_t* lexer, iree_host_size_t position,
     const char* message) {
-  lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_ERROR;
+  lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_ERROR;
   lexer->current.position = position;
   lexer->current.length = 1;
   lexer->current.value.error_message = message;
@@ -167,7 +165,7 @@ static void iree_tokenizer_regex_lexer_set_simple(
 static void iree_tokenizer_regex_lexer_set_literal(
     iree_tokenizer_regex_lexer_t* lexer, uint8_t byte,
     iree_host_size_t position, iree_host_size_t length) {
-  lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_LITERAL;
+  lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_LITERAL;
   lexer->current.position = position;
   lexer->current.length = length;
   lexer->current.value.literal = byte;
@@ -269,40 +267,40 @@ static bool iree_tokenizer_regex_lexer_parse_escape(
 
     // Shorthand classes.
     case 'd':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_d;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_d;
       return true;
     case 'D':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_D;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_D;
       return true;
     case 'w':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_w;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_w;
       return true;
     case 'W':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_W;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_W;
       return true;
     case 's':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_s;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_s;
       return true;
     case 'S':
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND;
       lexer->current.position = start_pos;
       lexer->current.length = length;
-      lexer->current.value.shorthand = IREE_TOKENIZER_REGEX_SHORTHAND_S;
+      lexer->current.value.shorthand = IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S;
       return true;
 
     // Unicode property \p{...}.
@@ -338,25 +336,25 @@ static bool iree_tokenizer_regex_lexer_parse_escape(
       if (prop_length == 1) {
         switch (prop[0]) {
           case 'L':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_LETTER;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER;
             break;
           case 'N':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_NUMBER;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_NUMBER;
             break;
           case 'P':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_PUNCT;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_PUNCT;
             break;
           case 'M':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_MARK;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_MARK;
             break;
           case 'S':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_SYMBOL;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SYMBOL;
             break;
           case 'Z':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_SEPARATOR;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SEPARATOR;
             break;
           case 'C':
-            pseudo = IREE_TOKENIZER_REGEX_PSEUDO_OTHER;
+            pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER;
             break;
           default:
             iree_tokenizer_regex_lexer_set_error(lexer, prop_start,
@@ -380,7 +378,7 @@ static bool iree_tokenizer_regex_lexer_parse_escape(
         return false;
       }
 
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_UNICODE_PROP;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_UNICODE_PROP;
       lexer->current.position = start_pos;
       lexer->current.length = lexer->position - start_pos;
       lexer->current.value.unicode_pseudo_byte = pseudo;
@@ -423,7 +421,7 @@ static bool iree_tokenizer_regex_lexer_parse_escape(
       lexer->current.value.char_class.ranges[0].start = (uint32_t)codepoint;
       lexer->current.value.char_class.ranges[0].end = (uint32_t)codepoint;
       lexer->current.value.char_class.range_count = 1;
-      lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_CHAR_CLASS;
+      lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_CHAR_CLASS;
       lexer->current.position = start_pos;
       lexer->current.length = lexer->position - start_pos;
       return true;
@@ -446,23 +444,23 @@ static void iree_tokenizer_regex_bitmap_add_shorthand(
     uint8_t* bitmap, uint16_t* pseudo_mask,
     iree_tokenizer_regex_shorthand_t shorthand) {
   switch (shorthand) {
-    case IREE_TOKENIZER_REGEX_SHORTHAND_d:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_d:
       // [0-9]
       for (int c = '0'; c <= '9'; ++c) BITMAP_SET(bitmap, c);
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_D:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_D:
       // [^0-9] - set all except digits
       memset(bitmap, 0xFF, 32);
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_w:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_w:
       // [a-zA-Z0-9_]
       for (int c = 'a'; c <= 'z'; ++c) BITMAP_SET(bitmap, c);
       for (int c = 'A'; c <= 'Z'; ++c) BITMAP_SET(bitmap, c);
       for (int c = '0'; c <= '9'; ++c) BITMAP_SET(bitmap, c);
       BITMAP_SET(bitmap, '_');
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_W:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_W:
       // [^a-zA-Z0-9_]
       memset(bitmap, 0xFF, 32);
       for (int c = 'a'; c <= 'z'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
@@ -470,7 +468,7 @@ static void iree_tokenizer_regex_bitmap_add_shorthand(
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       bitmap['_' >> 3] &= ~(1u << ('_' & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_s:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_s:
       // [ \t\r\n\f\v] + Unicode whitespace via pseudo-byte
       BITMAP_SET(bitmap, ' ');
       BITMAP_SET(bitmap, '\t');
@@ -479,9 +477,10 @@ static void iree_tokenizer_regex_bitmap_add_shorthand(
       BITMAP_SET(bitmap, '\f');
       BITMAP_SET(bitmap, '\v');
       // Add pseudo-byte for non-ASCII whitespace.
-      *pseudo_mask |= (1u << (IREE_TOKENIZER_REGEX_PSEUDO_WHITESPACE - 0x80));
+      *pseudo_mask |=
+          (1u << (IREE_TOKENIZER_UTIL_REGEX_PSEUDO_WHITESPACE - 0x80));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_S:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S:
       // [^ \t\r\n\f\v] - everything except whitespace
       memset(bitmap, 0xFF, 32);
       bitmap[' ' >> 3] &= ~(1u << (' ' & 7));
@@ -492,7 +491,7 @@ static void iree_tokenizer_regex_bitmap_add_shorthand(
       bitmap['\v' >> 3] &= ~(1u << ('\v' & 7));
       // Clear the whitespace pseudo-byte, set all others.
       *pseudo_mask =
-          0xFF & ~(1u << (IREE_TOKENIZER_REGEX_PSEUDO_WHITESPACE - 0x80));
+          0xFF & ~(1u << (IREE_TOKENIZER_UTIL_REGEX_PSEUDO_WHITESPACE - 0x80));
       break;
   }
 }
@@ -527,6 +526,10 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
   int32_t prev_codepoint = -1;
   bool in_range = false;
 
+  // Track nesting depth for nested character classes like [a[bc]].
+  // We start at depth 1 since we're already inside the initial '['.
+  int nesting_depth = 1;
+
   while (true) {
     char c = iree_tokenizer_regex_lexer_peek_char(lexer);
 
@@ -536,7 +539,20 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
       return false;
     }
 
+    // Handle closing bracket - may close nested class or outer class.
+    // Special case: ']' at the start of a character class (when has_content is
+    // false) is treated as a literal character, not as closing the class.
+    // This matches standard regex behavior: []a] matches ']' or 'a'.
     if (c == ']' && has_content) {
+      if (nesting_depth > 1) {
+        // Closing a nested class - continue parsing outer class.
+        nesting_depth--;
+        iree_tokenizer_regex_lexer_advance_char(lexer);
+        // Don't reset has_content or prev_codepoint - we're still in the same
+        // class and the nested class counts as content.
+        continue;
+      }
+      // nesting_depth == 1: this closes the outermost class.
       iree_tokenizer_regex_lexer_advance_char(lexer);
       break;
     }
@@ -577,26 +593,59 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
           escape_char = c;
           break;
 
+        // Common punctuation that doesn't need escaping in character classes
+        // but is often escaped anyway (e.g., SigLIP patterns). Treat as
+        // literal.
+        case '!':
+        case '"':
+        case '#':
+        case '$':
+        case '%':
+        case '&':
+        case '\'':
+        case '(':
+        case ')':
+        case '*':
+        case '+':
+        case ',':
+        case '.':
+        case '/':
+        case ':':
+        case ';':
+        case '<':
+        case '=':
+        case '>':
+        case '?':
+        case '@':
+        case '_':
+        case '`':
+        case '{':
+        case '|':
+        case '}':
+        case '~':
+          escape_char = c;
+          break;
+
           // Shorthand classes in character class.
-          // NOTE: These reset prev_codepoint, so we must flush any pending
+          // These reset prev_codepoint, so we must flush any pending
           // character.
-#define FLUSH_PREV_CODEPOINT()                                          \
-  do {                                                                  \
-    if (prev_codepoint >= 0) {                                          \
-      if (!iree_tokenizer_regex_char_class_add_codepoint(               \
-              bitmap, ranges, range_count, (uint32_t)prev_codepoint)) { \
-        iree_tokenizer_regex_lexer_set_error(                           \
-            lexer, start_pos,                                           \
-            "character class exceeds 4 Unicode ranges; use \\p{L} for " \
-            "broad matching");                                          \
-        return false;                                                   \
-      }                                                                 \
-    }                                                                   \
+#define FLUSH_PREV_CODEPOINT()                                             \
+  do {                                                                     \
+    if (prev_codepoint >= 0) {                                             \
+      if (!iree_tokenizer_regex_char_class_add_codepoint(                  \
+              bitmap, ranges, range_count, (uint32_t)prev_codepoint)) {    \
+        iree_tokenizer_regex_lexer_set_error(                              \
+            lexer, start_pos,                                              \
+            "character class has too many Unicode ranges; use \\p{L} for " \
+            "broad matching");                                             \
+        return false;                                                      \
+      }                                                                    \
+    }                                                                      \
   } while (0)
         case 'd':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_d);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_d);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -604,7 +653,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         case 'D':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_D);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_D);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -612,7 +661,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         case 'w':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_w);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_w);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -620,7 +669,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         case 'W':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_W);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_W);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -628,7 +677,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         case 's':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_s);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_s);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -636,7 +685,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         case 'S':
           FLUSH_PREV_CODEPOINT();
           iree_tokenizer_regex_bitmap_add_shorthand(
-              bitmap, pseudo_mask, IREE_TOKENIZER_REGEX_SHORTHAND_S);
+              bitmap, pseudo_mask, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S);
           has_content = true;
           prev_codepoint = -1;
           in_range = false;
@@ -674,25 +723,25 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
           uint8_t pseudo = 0;
           switch (prop[0]) {
             case 'L':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_LETTER;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER;
               break;
             case 'N':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_NUMBER;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_NUMBER;
               break;
             case 'P':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_PUNCT;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_PUNCT;
               break;
             case 'M':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_MARK;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_MARK;
               break;
             case 'S':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_SYMBOL;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SYMBOL;
               break;
             case 'Z':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_SEPARATOR;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SEPARATOR;
               break;
             case 'C':
-              pseudo = IREE_TOKENIZER_REGEX_PSEUDO_OTHER;
+              pseudo = IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER;
               break;
             default:
               iree_tokenizer_regex_lexer_set_error(lexer, prop_start,
@@ -703,25 +752,25 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
           for (int cc = 0; cc < 128; ++cc) {
             bool matches = false;
             switch (pseudo) {
-              case IREE_TOKENIZER_REGEX_PSEUDO_LETTER:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER:
                 matches = iree_unicode_is_letter((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_NUMBER:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_NUMBER:
                 matches = iree_unicode_is_number((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_PUNCT:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_PUNCT:
                 matches = iree_unicode_is_punctuation((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_MARK:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_MARK:
                 matches = iree_unicode_is_mark((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_SYMBOL:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SYMBOL:
                 matches = iree_unicode_is_symbol((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_SEPARATOR:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SEPARATOR:
                 matches = iree_unicode_is_separator((uint32_t)cc);
                 break;
-              case IREE_TOKENIZER_REGEX_PSEUDO_OTHER:
+              case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER:
                 matches = iree_unicode_is_other((uint32_t)cc);
                 break;
             }
@@ -768,7 +817,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
                   bitmap, ranges, range_count, (uint32_t)codepoint)) {
             iree_tokenizer_regex_lexer_set_error(
                 lexer, escape_start,
-                "character class exceeds 4 Unicode ranges; use \\p{L} for "
+                "character class has too many Unicode ranges; use \\p{L} for "
                 "broad matching");
             return false;
           }
@@ -817,6 +866,28 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
         iree_tokenizer_regex_lexer_advance_char(lexer);
         continue;
       }
+    }
+
+    // Handle nested character class like [a[bc]].
+    // Nested classes are pure unions: [a[bc]] = [abc].
+    if (c == '[') {
+      FLUSH_PREV_CODEPOINT();
+      iree_host_size_t nested_start = lexer->position;
+      iree_tokenizer_regex_lexer_advance_char(lexer);  // Skip '['.
+
+      // Check for nested negation - not supported.
+      if (iree_tokenizer_regex_lexer_peek_char(lexer) == '^') {
+        iree_tokenizer_regex_lexer_set_error(
+            lexer, nested_start,
+            "negated character class inside character class not supported");
+        return false;
+      }
+
+      nesting_depth++;
+      has_content = true;  // Nested class counts as content.
+      prev_codepoint = -1;
+      in_range = false;
+      continue;
     }
 
     // Regular character - may be ASCII or UTF-8 multi-byte sequence.
@@ -874,8 +945,8 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
                                                       current_codepoint)) {
           iree_tokenizer_regex_lexer_set_error(
               lexer, lexer->position - 1,
-              "character class exceeds 4 Unicode ranges; use \\p{L} for broad "
-              "matching");
+              "character class has too many Unicode ranges; use \\p{L} for "
+              "broad matching");
           return false;
         }
       } else {
@@ -901,7 +972,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
             bitmap, ranges, range_count, (uint32_t)prev_codepoint)) {
       iree_tokenizer_regex_lexer_set_error(
           lexer, start_pos,
-          "character class exceeds 4 Unicode ranges; use \\p{L} for "
+          "character class has too many Unicode ranges; use \\p{L} for "
           "broad matching");
       return false;
     }
@@ -917,7 +988,7 @@ static bool iree_tokenizer_regex_lexer_parse_char_class(
     lexer->current.value.char_class.negated = true;
   }
 
-  lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_CHAR_CLASS;
+  lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_CHAR_CLASS;
   lexer->current.position = start_pos;
   lexer->current.length = lexer->position - start_pos;
   return true;
@@ -1008,7 +1079,7 @@ static bool iree_tokenizer_regex_lexer_parse_quantifier(
     iree_tokenizer_regex_lexer_advance_char(lexer);
   }
 
-  lexer->current.type = IREE_TOKENIZER_REGEX_TOKEN_QUANTIFIER;
+  lexer->current.type = IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUANTIFIER;
   lexer->current.position = start_pos;
   lexer->current.length = lexer->position - start_pos;
   lexer->current.value.quantifier.min = (uint16_t)min;
@@ -1026,8 +1097,8 @@ static void iree_tokenizer_regex_lexer_scan(
   char c = iree_tokenizer_regex_lexer_peek_char(lexer);
 
   if (c == '\0') {
-    iree_tokenizer_regex_lexer_set_simple(lexer, IREE_TOKENIZER_REGEX_TOKEN_EOF,
-                                          start_pos, 0);
+    iree_tokenizer_regex_lexer_set_simple(
+        lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_EOF, start_pos, 0);
     return;
   }
 
@@ -1037,19 +1108,19 @@ static void iree_tokenizer_regex_lexer_scan(
     // Simple meta-characters.
     case '.':
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_DOT, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOT, start_pos, 1);
       return;
     case '^':
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_CARET, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_CARET, start_pos, 1);
       return;
     case '$':
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_DOLLAR, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOLLAR, start_pos, 1);
       return;
     case '|':
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_PIPE, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_PIPE, start_pos, 1);
       return;
     case '*': {
       // Check for possessive (*+) or lazy (*?) modifiers.
@@ -1062,7 +1133,7 @@ static void iree_tokenizer_regex_lexer_scan(
         length = 2;
       }
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_STAR, start_pos, length);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_STAR, start_pos, length);
       return;
     }
     case '+': {
@@ -1074,7 +1145,7 @@ static void iree_tokenizer_regex_lexer_scan(
         length = 2;
       }
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_PLUS, start_pos, length);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_PLUS, start_pos, length);
       return;
     }
     case '?': {
@@ -1086,12 +1157,12 @@ static void iree_tokenizer_regex_lexer_scan(
         length = 2;
       }
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_QUESTION, start_pos, length);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUESTION, start_pos, length);
       return;
     }
     case ')':
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_RPAREN, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN, start_pos, 1);
       return;
 
     // Opening parenthesis - check for special groups.
@@ -1103,19 +1174,21 @@ static void iree_tokenizer_regex_lexer_scan(
         if (spec == ':') {
           iree_tokenizer_regex_lexer_advance_char(lexer);
           iree_tokenizer_regex_lexer_set_simple(
-              lexer, IREE_TOKENIZER_REGEX_TOKEN_GROUP_NC, start_pos, 3);
+              lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NC, start_pos, 3);
           return;
         } else if (spec == '!') {
           iree_tokenizer_regex_lexer_advance_char(lexer);
           iree_tokenizer_regex_lexer_set_simple(
-              lexer, IREE_TOKENIZER_REGEX_TOKEN_GROUP_NEG_LA, start_pos, 3);
+              lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NEG_LA, start_pos,
+              3);
           return;
         } else if (spec == 'i') {
           iree_tokenizer_regex_lexer_advance_char(lexer);
           if (iree_tokenizer_regex_lexer_peek_char(lexer) == ':') {
             iree_tokenizer_regex_lexer_advance_char(lexer);
             iree_tokenizer_regex_lexer_set_simple(
-                lexer, IREE_TOKENIZER_REGEX_TOKEN_GROUP_CASE_I, start_pos, 4);
+                lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_CASE_I, start_pos,
+                4);
             return;
           }
           // Just (?i without colon - error.
@@ -1129,7 +1202,7 @@ static void iree_tokenizer_regex_lexer_scan(
         }
       }
       iree_tokenizer_regex_lexer_set_simple(
-          lexer, IREE_TOKENIZER_REGEX_TOKEN_LPAREN, start_pos, 1);
+          lexer, IREE_TOKENIZER_UTIL_REGEX_TOKEN_LPAREN, start_pos, 1);
       return;
     }
 

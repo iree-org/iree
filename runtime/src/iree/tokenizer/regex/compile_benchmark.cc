@@ -32,8 +32,9 @@ void BM_CompilePattern(benchmark::State& state, const char* pattern) {
     iree_tokenizer_regex_compile_error_t error = {0};
 
     iree_status_t status = iree_tokenizer_regex_compile(
-        iree_make_cstring_view(pattern), IREE_TOKENIZER_REGEX_COMPILE_FLAG_NONE,
-        iree_allocator_system(), &dfa_data, &dfa_size, &error);
+        iree_make_cstring_view(pattern),
+        IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE, iree_allocator_system(),
+        &dfa_data, &dfa_size, &error);
 
     if (!iree_status_is_ok(status)) {
       state.SkipWithError("Compilation failed");
@@ -44,7 +45,7 @@ void BM_CompilePattern(benchmark::State& state, const char* pattern) {
     benchmark::DoNotOptimize(dfa_data);
     benchmark::DoNotOptimize(dfa_size);
 
-    iree_tokenizer_regex_compiled_free(dfa_data, iree_allocator_system());
+    iree_allocator_free(iree_allocator_system(), dfa_data);
   }
 }
 
@@ -252,8 +253,9 @@ void BM_CompileAndLoad(benchmark::State& state, const char* pattern) {
     iree_tokenizer_regex_compile_error_t error = {0};
 
     iree_status_t status = iree_tokenizer_regex_compile_and_load(
-        iree_make_cstring_view(pattern), IREE_TOKENIZER_REGEX_COMPILE_FLAG_NONE,
-        iree_allocator_system(), &dfa, &storage, &error);
+        iree_make_cstring_view(pattern),
+        IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE, iree_allocator_system(),
+        &dfa, &storage, &error);
 
     if (!iree_status_is_ok(status)) {
       state.SkipWithError("Compile and load failed");
@@ -264,7 +266,7 @@ void BM_CompileAndLoad(benchmark::State& state, const char* pattern) {
     benchmark::DoNotOptimize(dfa.header);
     benchmark::DoNotOptimize(dfa.transitions);
 
-    iree_tokenizer_regex_compiled_free(storage, iree_allocator_system());
+    iree_allocator_free(iree_allocator_system(), storage);
   }
 }
 
@@ -313,7 +315,7 @@ BENCHMARK_DEFINE_F(PatternScaling, Alternation)(benchmark::State& state) {
 
     iree_status_t status = iree_tokenizer_regex_compile(
         iree_make_string_view(pattern_.data(), pattern_.size()),
-        IREE_TOKENIZER_REGEX_COMPILE_FLAG_NONE, iree_allocator_system(),
+        IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE, iree_allocator_system(),
         &dfa_data, &dfa_size, &error);
 
     if (!iree_status_is_ok(status)) {
@@ -325,7 +327,7 @@ BENCHMARK_DEFINE_F(PatternScaling, Alternation)(benchmark::State& state) {
     benchmark::DoNotOptimize(dfa_data);
     state.counters["dfa_size"] = static_cast<double>(dfa_size);
 
-    iree_tokenizer_regex_compiled_free(dfa_data, iree_allocator_system());
+    iree_allocator_free(iree_allocator_system(), dfa_data);
   }
 }
 BENCHMARK_REGISTER_F(PatternScaling, Alternation)
@@ -334,5 +336,38 @@ BENCHMARK_REGISTER_F(PatternScaling, Alternation)
     ->Arg(10)
     ->Arg(20)
     ->Arg(50);
+
+//===----------------------------------------------------------------------===//
+// Pathological Patterns (should fail fast, not hang)
+//===----------------------------------------------------------------------===//
+
+// These patterns were discovered by fuzzing and caused multi-second compile
+// times before iteration limits were tightened. They should now fail with
+// RESOURCE_EXHAUSTED within ~100-300ms due to iteration limits.
+
+void BM_PathologicalManyDots(benchmark::State& state) {
+  // Pattern with many dots - each dot expands to 256 transitions.
+  BM_CompilePattern(state, "..*.......................");
+}
+BENCHMARK(BM_PathologicalManyDots);
+
+void BM_PathologicalNestedQuantifiers(benchmark::State& state) {
+  // Nested quantifiers with wildcards.
+  BM_CompilePattern(state, "(.*)+");
+}
+BENCHMARK(BM_PathologicalNestedQuantifiers);
+
+void BM_PathologicalDotAlternation(benchmark::State& state) {
+  // Alternation with wildcards.
+  BM_CompilePattern(state, ".*a|.*b|.*c|.*d|.*e");
+}
+BENCHMARK(BM_PathologicalDotAlternation);
+
+void BM_PathologicalLongDotSequence(benchmark::State& state) {
+  // 50 dots in a row - 50 states with 256 transitions each.
+  BM_CompilePattern(state,
+                    "..................................................");
+}
+BENCHMARK(BM_PathologicalLongDotSequence);
 
 }  // namespace

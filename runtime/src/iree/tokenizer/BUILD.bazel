@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
@@ -13,35 +13,129 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-#===------------------------------------------------------------------------===#
-# Core types
-#===------------------------------------------------------------------------===#
+iree_runtime_cc_library(
+    name = "byte_level_tables",
+    hdrs = ["byte_level_tables.h"],
+)
 
 iree_runtime_cc_library(
-    name = "types",
-    hdrs = ["types.h"],
+    name = "model",
+    srcs = ["model.c"],
+    hdrs = ["model.h"],
+    deps = [
+        ":segmenter",
+        ":types",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "decoder",
+    srcs = ["decoder.c"],
+    hdrs = ["decoder.h"],
     deps = [
         "//runtime/src/iree/base",
     ],
 )
 
-#===------------------------------------------------------------------------===#
-# Tokenizer interface
-#===------------------------------------------------------------------------===#
+iree_runtime_cc_library(
+    name = "normalizer",
+    srcs = ["normalizer.c"],
+    hdrs = ["normalizer.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "postprocessor",
+    srcs = ["postprocessor.c"],
+    hdrs = ["postprocessor.h"],
+    deps = [
+        ":types",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/vocab",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "postprocessor_test",
+    srcs = ["postprocessor_test.cc"],
+    deps = [
+        ":postprocessor",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "segmenter",
+    srcs = ["segmenter.c"],
+    hdrs = ["segmenter.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "special_tokens",
+    srcs = ["special_tokens.c"],
+    hdrs = ["special_tokens.h"],
+    deps = [
+        ":types",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "special_tokens_test",
+    srcs = ["special_tokens_test.cc"],
+    deps = [
+        ":special_tokens",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
 
 iree_runtime_cc_library(
     name = "tokenizer",
     srcs = ["tokenizer.c"],
     hdrs = ["tokenizer.h"],
     deps = [
-        ":decoders",
-        ":literals",
-        ":postprocessors",
+        ":decoder",
+        ":model",
+        ":normalizer",
+        ":postprocessor",
+        ":segmenter",
+        ":special_tokens",
         ":types",
-        ":vocab",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/tokenizer/regex:exec",
-        "//runtime/src/iree/tokenizer/transforms",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer/decoder:byte_fallback",
+        "//runtime/src/iree/tokenizer/vocab",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "tokenizer_test_util",
+    testonly = True,
+    hdrs = ["tokenizer_test_util.h"],
+    deps = [
+        ":tokenizer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/tokenizer/model:bpe",
+        "//runtime/src/iree/tokenizer/model:wordpiece",
+        "//runtime/src/iree/tokenizer/normalizer:bert",
+        "//runtime/src/iree/tokenizer/segmenter:bert",
+        "//runtime/src/iree/tokenizer/segmenter:punctuation",
+        "//runtime/src/iree/tokenizer/segmenter:whitespace",
+        "//runtime/src/iree/tokenizer/testing:test_util",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
     ],
 )
 
@@ -49,147 +143,88 @@ iree_runtime_cc_test(
     name = "tokenizer_test",
     srcs = ["tokenizer_test.cc"],
     deps = [
-        ":bpe",
-        ":decoders",
-        ":literals",
-        ":normalizers",
-        ":postprocessors",
         ":tokenizer",
-        ":vocab_builder",
-        ":wordpiece",
+        ":tokenizer_test_util",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-        "//runtime/src/iree/tokenizer/transforms",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Vocab
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "vocab",
-    srcs = [
-        "vocab.c",
-        "vocab_internal.h",
-    ],
-    hdrs = ["vocab.h"],
-    deps = [
-        ":types",
-        ":vocab_hash",
-        "//runtime/src/iree/base",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "vocab_test",
-    srcs = ["vocab_test.cc"],
+    name = "tokenizer_encode_test",
+    srcs = ["tokenizer_encode_test.cc"],
     deps = [
-        ":vocab",
-        ":vocab_builder",
+        ":special_tokens",
+        ":tokenizer",
+        ":tokenizer_test_util",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Vocab builder
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "vocab_builder",
-    srcs = [
-        "vocab_builder.c",
-        "vocab_internal.h",
-    ],
-    hdrs = ["vocab_builder.h"],
-    deps = [
-        ":types",
-        ":vocab",
-        ":vocab_hash",
-        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/model:unigram",
+        "//runtime/src/iree/tokenizer/model:wordpiece",
+        "//runtime/src/iree/tokenizer/normalizer:bert",
+        "//runtime/src/iree/tokenizer/normalizer:lowercase",
+        "//runtime/src/iree/tokenizer/normalizer:nfc",
+        "//runtime/src/iree/tokenizer/normalizer:nfd",
+        "//runtime/src/iree/tokenizer/normalizer:prepend",
+        "//runtime/src/iree/tokenizer/normalizer:regex_replace",
+        "//runtime/src/iree/tokenizer/normalizer:replace",
+        "//runtime/src/iree/tokenizer/normalizer:sequence",
+        "//runtime/src/iree/tokenizer/normalizer:strip",
+        "//runtime/src/iree/tokenizer/normalizer:strip_accents",
+        "//runtime/src/iree/tokenizer/regex:compile",
+        "//runtime/src/iree/tokenizer/segmenter:bert",
+        "//runtime/src/iree/tokenizer/segmenter:metaspace",
+        "//runtime/src/iree/tokenizer/segmenter:punctuation",
+        "//runtime/src/iree/tokenizer/segmenter:sequence",
+        "//runtime/src/iree/tokenizer/segmenter:split",
+        "//runtime/src/iree/tokenizer/segmenter:whitespace",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "vocab_builder_test",
-    srcs = ["vocab_builder_test.cc"],
+    name = "tokenizer_decode_test",
+    srcs = ["tokenizer_decode_test.cc"],
     deps = [
-        ":vocab_builder",
+        ":tokenizer",
+        ":tokenizer_test_util",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Vocab hash table
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "vocab_hash",
-    srcs = ["vocab_hash.c"],
-    hdrs = ["vocab_hash.h"],
-    deps = [
-        ":types",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/tokenizer/decoder:byte_fallback",
+        "//runtime/src/iree/tokenizer/decoder:byte_level",
+        "//runtime/src/iree/tokenizer/decoder:metaspace",
+        "//runtime/src/iree/tokenizer/decoder:replace",
+        "//runtime/src/iree/tokenizer/decoder:sequence",
+        "//runtime/src/iree/tokenizer/decoder:wordpiece",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "vocab_hash_test",
-    srcs = ["vocab_hash_test.cc"],
+    name = "tokenizer_huggingface_test",
+    srcs = ["tokenizer_huggingface_test.cc"],
     deps = [
-        ":vocab_hash",
+        ":tokenizer",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-cc_binary_benchmark(
-    name = "vocab_hash_benchmark",
-    srcs = ["vocab_hash_benchmark.cc"],
-    deps = [
-        ":vocab_hash",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:benchmark",
-        "//runtime/src/iree/testing:benchmark_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Vocab trie (prefix matching)
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "vocab_trie",
-    srcs = ["vocab_trie.c"],
-    hdrs = ["vocab_trie.h"],
-    deps = [
-        ":types",
-        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/format/huggingface:tokenizer_json",
+        "//runtime/src/iree/tokenizer/testdata:streaming_testdata",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "vocab_trie_test",
-    srcs = ["vocab_trie_test.cc"],
+    name = "tokenizer_consistency_test",
+    srcs = ["tokenizer_consistency_test.cc"],
     deps = [
-        ":vocab_trie",
+        ":tokenizer",
+        ":tokenizer_test_util",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-cc_binary_benchmark(
-    name = "vocab_trie_benchmark",
-    srcs = ["vocab_trie_benchmark.cc"],
-    deps = [
-        ":vocab_hash",
-        ":vocab_trie",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
+        "//runtime/src/iree/tokenizer/regex:compile",
+        "//runtime/src/iree/tokenizer/segmenter:split",
     ],
 )
 
@@ -200,192 +235,102 @@ cc_binary_benchmark(
         ":tokenizer",
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:benchmark_main",
-        "//runtime/src/iree/tokenizer/huggingface:tokenizer_json",
-        "//runtime/src/iree/tokenizer/testdata:tokenizer_testdata",
+        "//runtime/src/iree/tokenizer/decoder:byte_level",
+        "//runtime/src/iree/tokenizer/model:bpe",
+        "//runtime/src/iree/tokenizer/segmenter:whitespace",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
         "@com_google_benchmark//:benchmark",
     ],
 )
 
-#===------------------------------------------------------------------------===#
-# Literals (added tokens)
-#===------------------------------------------------------------------------===#
-
 iree_runtime_cc_library(
-    name = "literals",
-    srcs = ["literals.c"],
-    hdrs = ["literals.h"],
-    deps = [
-        ":types",
-        "//runtime/src/iree/base",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "literals_test",
-    srcs = ["literals_test.cc"],
-    deps = [
-        ":literals",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Token Decoders
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "decoders",
-    srcs = ["decoder.c"],
-    hdrs = ["decoder.h"],
-    deps = [
-        ":types",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:unicode",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "decoder_test",
-    srcs = ["decoder_test.cc"],
-    deps = [
-        ":decoders",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Text Normalizers
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "normalizers",
-    srcs = ["normalizer.c"],
-    hdrs = ["normalizer.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:unicode",
-        "//runtime/src/iree/tokenizer/regex:exec",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "normalizer_test",
-    srcs = ["normalizer_test.cc"],
-    deps = [
-        ":normalizers",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-        "//runtime/src/iree/tokenizer/regex:compile",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Token Post-Processors
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "postprocessors",
-    srcs = ["postprocessor.c"],
-    hdrs = ["postprocessor.h"],
+    name = "types",
+    hdrs = ["types.h"],
     deps = [
         "//runtime/src/iree/base",
     ],
 )
 
-iree_runtime_cc_test(
-    name = "postprocessor_test",
-    srcs = ["postprocessor_test.cc"],
-    deps = [
-        ":postprocessors",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
 #===------------------------------------------------------------------------===#
-# BPE tokenization
+# Fuzz Targets
 #===------------------------------------------------------------------------===#
 
-iree_runtime_cc_library(
-    name = "bpe",
-    srcs = ["bpe.c"],
-    hdrs = ["bpe.h"],
+iree_runtime_cc_fuzz(
+    name = "tokenizer_encode_fuzz",
+    srcs = ["tokenizer_encode_fuzz.cc"],
     deps = [
         ":tokenizer",
-        ":types",
-        ":vocab",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
     ],
 )
 
-iree_runtime_cc_test(
-    name = "bpe_test",
-    srcs = ["bpe_test.cc"],
-    deps = [
-        ":bpe",
-        ":vocab_builder",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# WordPiece tokenization
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "wordpiece",
-    srcs = ["wordpiece.c"],
-    hdrs = ["wordpiece.h"],
+iree_runtime_cc_fuzz(
+    name = "tokenizer_decode_fuzz",
+    srcs = ["tokenizer_decode_fuzz.cc"],
     deps = [
         ":tokenizer",
-        ":types",
-        ":vocab",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
     ],
 )
 
-iree_runtime_cc_test(
-    name = "wordpiece_test",
-    srcs = ["wordpiece_test.cc"],
-    deps = [
-        ":vocab_builder",
-        ":wordpiece",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
-#===------------------------------------------------------------------------===#
-# Unigram tokenization (SentencePiece)
-#===------------------------------------------------------------------------===#
-
-iree_runtime_cc_library(
-    name = "unigram",
-    srcs = [
-        "unigram.c",
-        "vocab_internal.h",
-    ],
-    hdrs = ["unigram.h"],
+iree_runtime_cc_fuzz(
+    name = "tokenizer_ringbuffer_fuzz",
+    srcs = ["tokenizer_ringbuffer_fuzz.cc"],
     deps = [
         ":tokenizer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tokenizer_roundtrip_fuzz",
+    srcs = ["tokenizer_roundtrip_fuzz.cc"],
+    deps = [
+        ":tokenizer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tokenizer_batch_encode_fuzz",
+    srcs = ["tokenizer_batch_encode_fuzz.cc"],
+    deps = [
+        ":tokenizer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tokenizer_batch_decode_fuzz",
+    srcs = ["tokenizer_batch_decode_fuzz.cc"],
+    deps = [
+        ":tokenizer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/testing:fuzzing_util",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "postprocessor_fuzz",
+    srcs = ["postprocessor_fuzz.cc"],
+    deps = [
+        ":postprocessor",
         ":types",
-        ":vocab",
-        ":vocab_hash",
-        ":vocab_trie",
         "//runtime/src/iree/base",
     ],
 )
 
-iree_runtime_cc_test(
-    name = "unigram_test",
-    srcs = ["unigram_test.cc"],
+iree_runtime_cc_fuzz(
+    name = "special_tokens_fuzz",
+    srcs = ["special_tokens_fuzz.cc"],
     deps = [
-        ":unigram",
-        ":vocab_builder",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
+        ":special_tokens",
+        "//runtime/src/iree/base",
     ],
 )

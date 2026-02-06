@@ -48,7 +48,7 @@
 //   iree_tokenizer_regex_compile_error_t error = {0};
 //   iree_status_t status = iree_tokenizer_regex_compile(
 //       iree_make_cstring_view("\\s+(?!\\S)|\\s+"),
-//       IREE_TOKENIZER_REGEX_COMPILE_FLAG_NONE,
+//       IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE,
 //       iree_allocator_system(),
 //       &dfa_data, &dfa_size, &error);
 //   if (!iree_status_is_ok(status)) {
@@ -64,8 +64,8 @@
 //
 //   iree_tokenizer_regex_compiled_free(dfa_data, iree_allocator_system());
 
-#ifndef IREE_TOKENIZER_REGEX_COMPILE_H_
-#define IREE_TOKENIZER_REGEX_COMPILE_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_COMPILE_H_
+#define IREE_TOKENIZER_UTIL_REGEX_COMPILE_H_
 
 #include "iree/base/api.h"
 #include "iree/tokenizer/regex/exec.h"
@@ -79,11 +79,11 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 typedef enum iree_tokenizer_regex_compile_flag_bits_e {
-  IREE_TOKENIZER_REGEX_COMPILE_FLAG_NONE = 0,
+  IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE = 0,
   // Enable case-insensitive matching for the entire pattern.
   // This expands all ASCII letter transitions to include both cases.
-  // NOTE: Only affects ASCII letters (a-z, A-Z), not Unicode letters.
-  IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE = 1 << 0,
+  // Only affects ASCII letters (a-z, A-Z), not Unicode letters.
+  IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE = 1 << 0,
 } iree_tokenizer_regex_compile_flag_bits_t;
 typedef uint32_t iree_tokenizer_regex_compile_flags_t;
 
@@ -94,9 +94,12 @@ typedef uint32_t iree_tokenizer_regex_compile_flags_t;
 // Detailed error information from compilation.
 // Provides position information for error reporting/highlighting.
 typedef struct iree_tokenizer_regex_compile_error_t {
-  iree_host_size_t position;  // Byte offset in pattern where error occurred.
-  iree_host_size_t length;    // Span of problematic text (0 if unknown).
-  const char* message;        // Static error message (not allocated).
+  // Byte offset in pattern where error occurred.
+  iree_host_size_t position;
+  // Span of problematic text (0 if unknown).
+  iree_host_size_t length;
+  // Static error message (not allocated).
+  const char* message;
 } iree_tokenizer_regex_compile_error_t;
 
 //===----------------------------------------------------------------------===//
@@ -140,7 +143,8 @@ iree_status_t iree_tokenizer_regex_compile(
 // |out_error| receives error details on failure (optional, may be NULL).
 //
 // On success, the caller owns |out_dfa_storage| and must free it with
-// iree_tokenizer_regex_compiled_free(). The |out_dfa| points into this storage.
+// iree_tokenizer_regex_compiled_free(). The |out_dfa| points into this
+// storage.
 //
 // Returns: Same as iree_tokenizer_regex_compile().
 iree_status_t iree_tokenizer_regex_compile_and_load(
@@ -148,15 +152,8 @@ iree_status_t iree_tokenizer_regex_compile_and_load(
     iree_allocator_t allocator, iree_tokenizer_regex_dfa_t* out_dfa,
     uint8_t** out_dfa_storage, iree_tokenizer_regex_compile_error_t* out_error);
 
-// Frees compiled DFA data.
-//
-// |dfa_data| is the data returned by iree_tokenizer_regex_compile().
-// |allocator| must be the same allocator used during compilation.
-void iree_tokenizer_regex_compiled_free(uint8_t* dfa_data,
-                                        iree_allocator_t allocator);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_COMPILE_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_COMPILE_H_

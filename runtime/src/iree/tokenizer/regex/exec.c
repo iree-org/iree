@@ -40,38 +40,38 @@ static inline uint8_t iree_tokenizer_regex_codepoint_to_byte(
   // Handle Unicode replacement character (invalid UTF-8) consistently.
   // Map to OTHER to avoid false matches on category patterns.
   if (codepoint == IREE_UNICODE_REPLACEMENT_CHAR) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_OTHER;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER;
   }
 
   // Check whitespace BEFORE category - White_Space property is separate from
   // the Z (Separator) category. This ensures \s matches non-ASCII whitespace
   // like NBSP (U+00A0), ideographic space (U+3000), etc.
   if (iree_unicode_is_whitespace(codepoint)) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_WHITESPACE;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_WHITESPACE;
   }
 
   // Map Unicode category to pseudo-byte.
   iree_unicode_category_t category = iree_unicode_category(codepoint);
   if (category & IREE_UNICODE_CATEGORY_LETTER) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_LETTER;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER;
   }
   if (category & IREE_UNICODE_CATEGORY_NUMBER) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_NUMBER;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_NUMBER;
   }
   if (category & IREE_UNICODE_CATEGORY_PUNCTUATION) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_PUNCT;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_PUNCT;
   }
   if (category & IREE_UNICODE_CATEGORY_MARK) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_MARK;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_MARK;
   }
   if (category & IREE_UNICODE_CATEGORY_SYMBOL) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_SYMBOL;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SYMBOL;
   }
   if (category & IREE_UNICODE_CATEGORY_SEPARATOR) {
-    return IREE_TOKENIZER_REGEX_PSEUDO_SEPARATOR;
+    return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SEPARATOR;
   }
   // Default to OTHER for unclassified codepoints.
-  return IREE_TOKENIZER_REGEX_PSEUDO_OTHER;
+  return IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER;
 }
 
 //===----------------------------------------------------------------------===//
@@ -82,21 +82,21 @@ static inline uint8_t iree_tokenizer_regex_codepoint_to_byte(
 static inline bool iree_tokenizer_regex_shorthand_matches(
     iree_tokenizer_regex_shorthand_t shorthand, uint32_t codepoint) {
   switch (shorthand) {
-    case IREE_TOKENIZER_REGEX_SHORTHAND_s:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_s:
       return iree_unicode_is_whitespace(codepoint);
-    case IREE_TOKENIZER_REGEX_SHORTHAND_S:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S:
       return !iree_unicode_is_whitespace(codepoint);
-    case IREE_TOKENIZER_REGEX_SHORTHAND_d:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_d:
       // \d matches ASCII digits only (common regex behavior).
       return codepoint >= '0' && codepoint <= '9';
-    case IREE_TOKENIZER_REGEX_SHORTHAND_D:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_D:
       return !(codepoint >= '0' && codepoint <= '9');
-    case IREE_TOKENIZER_REGEX_SHORTHAND_w:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_w:
       // \w matches [a-zA-Z0-9_].
       return (codepoint >= 'a' && codepoint <= 'z') ||
              (codepoint >= 'A' && codepoint <= 'Z') ||
              (codepoint >= '0' && codepoint <= '9') || codepoint == '_';
-    case IREE_TOKENIZER_REGEX_SHORTHAND_W:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_W:
       return !((codepoint >= 'a' && codepoint <= 'z') ||
                (codepoint >= 'A' && codepoint <= 'Z') ||
                (codepoint >= '0' && codepoint <= '9') || codepoint == '_');
@@ -108,30 +108,31 @@ static inline bool iree_tokenizer_regex_shorthand_matches(
 // Checks if the lookahead condition at an accepting state should reject the
 // match. Returns true if the match should be rejected (negative lookahead
 // matched), false if the match should be accepted.
-static bool iree_tokenizer_regex_lookahead_rejects(
-    const iree_tokenizer_regex_dfa_t* dfa, uint16_t state,
-    uint32_t next_codepoint) {
+IREE_ATTRIBUTE_ALWAYS_INLINE static inline bool
+iree_tokenizer_regex_lookahead_rejects(const iree_tokenizer_regex_dfa_t* dfa,
+                                       uint16_t state,
+                                       uint32_t next_codepoint) {
   if (!dfa->lookahead) return false;
 
   const iree_tokenizer_regex_lookahead_t* la = &dfa->lookahead[state];
   switch (la->type) {
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE:
       return false;
 
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR:
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK:
       // Negative char lookahead: reject if next char equals specified char.
       // Convert codepoint to DFA byte for comparison (handles pseudo-bytes).
       return iree_tokenizer_regex_codepoint_to_byte(next_codepoint) == la->data;
 
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND:
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK:
       // Negative shorthand lookahead: reject if next char matches shorthand.
       return iree_tokenizer_regex_shorthand_matches(
           (iree_tokenizer_regex_shorthand_t)la->data, next_codepoint);
 
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS:
-    case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS:
+    case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK:
       // Class lookahead requires bitmap lookup - not implemented.
       // Validation should reject DFAs with this lookahead type.
       // If we get here, validation was bypassed - fail safe by not rejecting.
@@ -148,9 +149,10 @@ static inline bool iree_tokenizer_regex_lookahead_has_fallback(
     const iree_tokenizer_regex_dfa_t* dfa, uint16_t state) {
   if (!dfa->lookahead) return false;
   uint8_t type = dfa->lookahead[state].type;
-  return type == IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK ||
-         type == IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK ||
-         type == IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK;
+  return type == IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK ||
+         type ==
+             IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK ||
+         type == IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK;
 }
 
 //===----------------------------------------------------------------------===//
@@ -188,19 +190,19 @@ iree_status_t iree_tokenizer_regex_dfa_load(
       (const iree_tokenizer_regex_dfa_header_t*)data.data;
 
   // Validate magic number.
-  if (header->magic != IREE_TOKENIZER_REGEX_DFA_MAGIC) {
+  if (header->magic != IREE_TOKENIZER_UTIL_REGEX_DFA_MAGIC) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "invalid DFA magic: 0x%08X (expected 0x%08X)",
-                            header->magic, IREE_TOKENIZER_REGEX_DFA_MAGIC);
+                            header->magic, IREE_TOKENIZER_UTIL_REGEX_DFA_MAGIC);
   }
 
   // Validate version.
   if (header->version < 1 ||
-      header->version > IREE_TOKENIZER_REGEX_DFA_MAX_VERSION) {
+      header->version > IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_VERSION) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "unsupported DFA version: %u (supported: 1-%u)",
                             header->version,
-                            IREE_TOKENIZER_REGEX_DFA_MAX_VERSION);
+                            IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_VERSION);
   }
 
   // Validate state count.
@@ -211,12 +213,12 @@ iree_status_t iree_tokenizer_regex_dfa_load(
 
   // Validate state count doesn't collide with NO_TRANSITION sentinel.
   // max valid state is num_states-1, which must be < 0xFFFF.
-  if (header->num_states >= IREE_TOKENIZER_REGEX_NO_TRANSITION) {
+  if (header->num_states >= IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "num_states %u collides with NO_TRANSITION sentinel "
         "(max supported: %u)",
-        header->num_states, IREE_TOKENIZER_REGEX_NO_TRANSITION - 1);
+        header->num_states, IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION - 1);
   }
 
   // Validate start state.
@@ -245,45 +247,78 @@ iree_status_t iree_tokenizer_regex_dfa_load(
   }
 
   // Set up pointers into the binary data (zero-copy).
+  // Defense-in-depth: validate bounds at each pointer advance in case the
+  // expected_size calculation has a bug or header values are corrupt.
   const uint8_t* ptr = data.data + sizeof(iree_tokenizer_regex_dfa_header_t);
+  const uint8_t* data_end = data.data + data.data_length;
+
+// Macro for bounds checking at each pointer advance.
+#define CHECK_DFA_BOUNDS(size, section_name)                            \
+  do {                                                                  \
+    if ((iree_host_size_t)(data_end - ptr) < (size)) {                  \
+      return iree_make_status(                                          \
+          IREE_STATUS_INVALID_ARGUMENT,                                 \
+          "DFA truncated at %s: need %" PRIhsz " bytes, have %" PRIhsz, \
+          (section_name), (size), (iree_host_size_t)(data_end - ptr));  \
+    }                                                                   \
+  } while (0)
 
   out_dfa->header = header;
+
+  // Transitions: num_states * 256 * sizeof(uint16_t)
+  iree_host_size_t transitions_size =
+      (iree_host_size_t)header->num_states * 256 * sizeof(uint16_t);
+  CHECK_DFA_BOUNDS(transitions_size, "transitions");
   out_dfa->transitions = (const uint16_t*)ptr;
-  ptr += (iree_host_size_t)header->num_states * 256 * sizeof(uint16_t);
+  ptr += transitions_size;
 
   iree_host_size_t bitmap_qwords = iree_host_align(header->num_states, 64) / 64;
+  iree_host_size_t bitmap_size = bitmap_qwords * sizeof(uint64_t);
 
+  // Accepting bitmap.
+  CHECK_DFA_BOUNDS(bitmap_size, "accepting_bitmap");
   out_dfa->accepting_bitmap = (const uint64_t*)ptr;
-  ptr += bitmap_qwords * sizeof(uint64_t);
+  ptr += bitmap_size;
 
-  if (header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
+  if (header->flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
+    iree_host_size_t lookahead_size = (iree_host_size_t)header->num_states *
+                                      sizeof(iree_tokenizer_regex_lookahead_t);
+    CHECK_DFA_BOUNDS(lookahead_size, "lookahead");
     out_dfa->lookahead = (const iree_tokenizer_regex_lookahead_t*)ptr;
-    ptr += header->num_states * sizeof(iree_tokenizer_regex_lookahead_t);
+    ptr += lookahead_size;
   } else {
     out_dfa->lookahead = NULL;
   }
 
-  if (header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) {
+  if (header->flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) {
+    CHECK_DFA_BOUNDS(bitmap_size, "start_anchor_bitmap");
     out_dfa->start_anchor_bitmap = (const uint64_t*)ptr;
-    ptr += bitmap_qwords * sizeof(uint64_t);
+    ptr += bitmap_size;
+    CHECK_DFA_BOUNDS(bitmap_size, "end_anchor_bitmap");
     out_dfa->end_anchor_bitmap = (const uint64_t*)ptr;
-    ptr += bitmap_qwords * sizeof(uint64_t);
+    ptr += bitmap_size;
   } else {
     out_dfa->start_anchor_bitmap = NULL;
     out_dfa->end_anchor_bitmap = NULL;
   }
 
-  if (header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_BRANCHES) {
+  if (header->flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_BRANCHES) {
+    iree_host_size_t branches_size =
+        (iree_host_size_t)header->num_states * sizeof(uint64_t);
+    CHECK_DFA_BOUNDS(branches_size, "alive_branches");
     out_dfa->alive_branches = (const uint64_t*)ptr;
-    ptr += (iree_host_size_t)header->num_states * sizeof(uint64_t);
+    ptr += branches_size;
+    CHECK_DFA_BOUNDS(branches_size, "accepting_branches");
     out_dfa->accepting_branches = (const uint64_t*)ptr;
-    ptr += (iree_host_size_t)header->num_states * sizeof(uint64_t);
+    ptr += branches_size;
   } else {
     out_dfa->alive_branches = NULL;
     out_dfa->accepting_branches = NULL;
   }
 
-  if (header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_RANGES) {
+#undef CHECK_DFA_BOUNDS
+
+  if (header->flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_RANGES) {
     // Read range count and validate extended size.
     if (data.data_length <
         (iree_host_size_t)(ptr - data.data) + sizeof(uint32_t)) {
@@ -364,8 +399,8 @@ iree_status_t iree_tokenizer_regex_dfa_validate(
     bool has_transition = false;
     for (int byte = 0; byte < 256 && !has_transition; ++byte) {
       if (iree_tokenizer_regex_dfa_step(dfa, dfa->header->start_state,
-                                        (uint8_t)byte) !=
-          IREE_TOKENIZER_REGEX_NO_TRANSITION) {
+                                        (uint8_t)byte, (uint8_t)byte) !=
+          IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION) {
         has_transition = true;
       }
     }
@@ -381,8 +416,10 @@ iree_status_t iree_tokenizer_regex_dfa_validate(
   // Validate all transitions reference valid states.
   for (uint16_t state = 0; state < num_states; ++state) {
     for (int byte = 0; byte < 256; ++byte) {
-      uint16_t next = iree_tokenizer_regex_dfa_step(dfa, state, (uint8_t)byte);
-      if (next != IREE_TOKENIZER_REGEX_NO_TRANSITION && next >= num_states) {
+      uint16_t next = iree_tokenizer_regex_dfa_step(dfa, state, (uint8_t)byte,
+                                                    (uint8_t)byte);
+      if (next != IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION &&
+          next >= num_states) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
                                 "transition from state %u on byte 0x%02X "
                                 "references invalid state %u",
@@ -395,14 +432,14 @@ iree_status_t iree_tokenizer_regex_dfa_validate(
   if (dfa->lookahead) {
     for (uint16_t state = 0; state < num_states; ++state) {
       uint8_t type = dfa->lookahead[state].type;
-      if (type > IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK) {
+      if (type > IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
                                 "invalid lookahead type %u at state %u", type,
                                 state);
       }
       // LOOKAHEAD_NEG_CLASS requires bitmap support not yet implemented.
-      if (type == IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS ||
-          type == IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK) {
+      if (type == IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS ||
+          type == IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK) {
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                 "LOOKAHEAD_NEG_CLASS at state %u requires "
                                 "bitmap support (not yet implemented)",
@@ -438,19 +475,178 @@ iree_status_t iree_tokenizer_regex_dfa_validate(
 }
 
 //===----------------------------------------------------------------------===//
+// Stride (DFA execution acceleration)
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_tokenizer_regex_stride_allocate(
+    const iree_tokenizer_regex_dfa_t* dfa, iree_allocator_t allocator,
+    iree_tokenizer_regex_stride_t** out_stride) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_stride = NULL;
+
+  uint16_t num_states = dfa->header->num_states;
+  iree_host_size_t boring_bitmap_size = (num_states + 7) / 8;
+
+  // Compute slab layout.
+  iree_host_size_t total_size = 0;
+  iree_host_size_t boring_bitmap_offset = 0;
+  iree_host_size_t self_loop_category_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(
+          sizeof(iree_tokenizer_regex_stride_t), &total_size,
+          IREE_STRUCT_FIELD(boring_bitmap_size, uint8_t, &boring_bitmap_offset),
+          IREE_STRUCT_FIELD(num_states, uint8_t, &self_loop_category_offset)));
+
+  iree_tokenizer_regex_stride_t* stride = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&stride));
+  memset(stride, 0, total_size);
+
+  stride->num_states = num_states;
+  stride->boring_bitmap_offset = boring_bitmap_offset;
+  stride->self_loop_category_offset = self_loop_category_offset;
+
+  // Step 1: Compute byte equivalence classes for ASCII bytes.
+  // Two bytes are equivalent if they produce the same transition in EVERY
+  // state. We use fingerprinting: compute a hash of each byte's transition
+  // column, then assign the same category to bytes with identical columns.
+  //
+  // First pass: for each byte, compute its transition column fingerprint.
+  // We store columns temporarily for comparison (128 bytes * num_states * 2 =
+  // manageable since num_states is typically 20-50).
+  uint8_t category_assignment[128];
+  memset(category_assignment, 0xFF, sizeof(category_assignment));
+  uint8_t next_category = 0;
+
+  for (uint8_t byte_a = 0; byte_a < 128; ++byte_a) {
+    if (category_assignment[byte_a] != 0xFF) continue;  // Already assigned.
+    category_assignment[byte_a] = next_category;
+
+    // Compare byte_a's column against all unassigned bytes.
+    for (uint8_t byte_b = byte_a + 1; byte_b < 128; ++byte_b) {
+      if (category_assignment[byte_b] != 0xFF) continue;
+
+      // Check if byte_a and byte_b have identical transitions in all states.
+      bool equivalent = true;
+      for (uint16_t s = 0; s < num_states; ++s) {
+        if (dfa->transitions[(iree_host_size_t)s * 256 + byte_a] !=
+            dfa->transitions[(iree_host_size_t)s * 256 + byte_b]) {
+          equivalent = false;
+          break;
+        }
+      }
+      if (equivalent) {
+        category_assignment[byte_b] = next_category;
+      }
+    }
+    ++next_category;
+  }
+
+  memcpy(stride->category_table, category_assignment,
+         sizeof(stride->category_table));
+  stride->category_count = next_category;
+
+  // Step 2: Compute boring bitmap.
+  // A state is boring when it needs no bookkeeping: non-accepting, no
+  // lookahead, no anchors, and all branches alive.
+  uint8_t* boring_bitmap =
+      (uint8_t*)((uintptr_t)stride + stride->boring_bitmap_offset);
+  for (uint16_t s = 0; s < num_states; ++s) {
+    bool boring = true;
+    boring &= !iree_tokenizer_regex_dfa_is_accepting(dfa, s);
+    if (dfa->lookahead) {
+      boring &=
+          (dfa->lookahead[s].type == IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE);
+    }
+    if (dfa->start_anchor_bitmap) {
+      boring &= (dfa->start_anchor_bitmap[s / 64] & (1ULL << (s % 64))) == 0;
+    }
+    if (dfa->end_anchor_bitmap) {
+      boring &= (dfa->end_anchor_bitmap[s / 64] & (1ULL << (s % 64))) == 0;
+    }
+    if (dfa->alive_branches) {
+      // A state is boring for branch purposes only if all branches are still
+      // alive (no branch has died, so no commit check can trigger).
+      boring &= (dfa->alive_branches[s / 64] == ~0ULL);
+    }
+    if (boring) {
+      boring_bitmap[s / 8] |= (uint8_t)(1 << (s % 8));
+    }
+  }
+
+  // Step 3: Compute self-loop categories.
+  // For each boring state, check if it has a self-loop on exactly one category.
+  // self_loop_category[S] = C means ALL bytes in category C transition S→S.
+  // 0xFF means no usable self-loop.
+  uint8_t* self_loop_category =
+      (uint8_t*)((uintptr_t)stride + stride->self_loop_category_offset);
+  for (uint16_t s = 0; s < num_states; ++s) {
+    if (!iree_tokenizer_regex_stride_is_boring(stride, s)) {
+      self_loop_category[s] = 0xFF;
+      continue;
+    }
+
+    // Find which category (if any) this state self-loops on.
+    int16_t loop_category = -1;
+    bool valid = true;
+    for (uint8_t byte_idx = 0; byte_idx < 128; ++byte_idx) {
+      if (dfa->transitions[(iree_host_size_t)s * 256 + byte_idx] == s) {
+        uint8_t category = stride->category_table[byte_idx];
+        if (loop_category == -1) {
+          loop_category = category;
+        } else if (category != (uint8_t)loop_category) {
+          // Self-loops on multiple categories — can't use Level 2.
+          valid = false;
+          break;
+        }
+      }
+    }
+
+    if (!valid || loop_category < 0) {
+      self_loop_category[s] = 0xFF;
+      continue;
+    }
+
+    // Verify ALL bytes in this category self-loop (not just some).
+    bool all_loop = true;
+    for (uint8_t byte_idx = 0; byte_idx < 128; ++byte_idx) {
+      if (stride->category_table[byte_idx] == (uint8_t)loop_category) {
+        if (dfa->transitions[(iree_host_size_t)s * 256 + byte_idx] != s) {
+          all_loop = false;
+          break;
+        }
+      }
+    }
+
+    self_loop_category[s] = all_loop ? (uint8_t)loop_category : 0xFF;
+  }
+
+  *out_stride = stride;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+void iree_tokenizer_regex_stride_free(iree_tokenizer_regex_stride_t* stride,
+                                      iree_allocator_t allocator) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_allocator_free(allocator, stride);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+//===----------------------------------------------------------------------===//
 // Streaming Executor
 //===----------------------------------------------------------------------===//
 
 void iree_tokenizer_regex_exec_initialize(
     iree_tokenizer_regex_exec_state_t* state,
     const iree_tokenizer_regex_dfa_t* dfa) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   state->dfa_state = dfa->header->start_state;
   state->match_start = 0;
   state->last_accept = 0;
   state->in_match = false;
   state->has_accept = false;
-  // UTF-8 partial buffer starts empty.
-  state->utf8_partial_length = 0;
   // No pending lookahead at start.
   state->pending_lookahead = false;
   state->pending_lookahead_state = 0;
@@ -464,6 +660,7 @@ void iree_tokenizer_regex_exec_initialize(
   // Rewind buffer starts empty.
   state->rewind_buffer_length = 0;
   state->rewind_buffer_start = 0;
+  IREE_TRACE_ZONE_END(z0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -478,7 +675,7 @@ static inline bool iree_tokenizer_regex_has_early_no_lookahead(
   if (!dfa->lookahead) return false;
   return iree_any_bit_set(
       dfa->lookahead[state].flags,
-      IREE_TOKENIZER_REGEX_LOOKAHEAD_FLAG_HAS_EARLY_NO_LOOKAHEAD);
+      IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_FLAG_HAS_EARLY_NO_LOOKAHEAD);
 }
 
 // Internal helper to emit a match if we have a valid accepting position.
@@ -547,16 +744,6 @@ static inline iree_status_t iree_tokenizer_regex_emit_match(
   return iree_ok_status();
 }
 
-// Helper to determine how many bytes a UTF-8 lead byte indicates.
-// Returns 0 for invalid lead bytes.
-static inline uint8_t iree_tokenizer_regex_utf8_sequence_length(uint8_t byte) {
-  if ((byte & 0x80) == 0x00) return 1;  // 0xxxxxxx - ASCII
-  if ((byte & 0xE0) == 0xC0) return 2;  // 110xxxxx - 2-byte sequence
-  if ((byte & 0xF0) == 0xE0) return 3;  // 1110xxxx - 3-byte sequence
-  if ((byte & 0xF8) == 0xF0) return 4;  // 11110xxx - 4-byte sequence
-  return 0;                             // Invalid or continuation byte
-}
-
 //===----------------------------------------------------------------------===//
 // Lookahead Helpers
 //===----------------------------------------------------------------------===//
@@ -565,7 +752,7 @@ static inline uint8_t iree_tokenizer_regex_utf8_sequence_length(uint8_t byte) {
 static inline bool iree_tokenizer_regex_has_lookahead(
     const iree_tokenizer_regex_dfa_t* dfa, uint16_t state) {
   if (!dfa->lookahead) return false;
-  return dfa->lookahead[state].type != IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+  return dfa->lookahead[state].type != IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
 }
 
 //===----------------------------------------------------------------------===//
@@ -667,13 +854,11 @@ static inline void iree_tokenizer_regex_reset_best_candidate(
 
 // Defers lookahead evaluation to the next chunk or finalize.
 //
-// This is used when we reach an accepting state but cannot evaluate the
-// lookahead condition because:
-//   1. We're at the end of the current chunk, or
-//   2. The next UTF-8 sequence is incomplete (split across chunks).
+// This is used when we reach an accepting state at the end of a chunk.
+// The next codepoint needed for lookahead evaluation is in the next chunk.
 //
 // The pending state is resolved in one of two ways:
-//   - Next exec_feed() call: Uses the first character of the new chunk.
+//   - Next exec_feed() call: Uses the first codepoint of the new chunk.
 //   - exec_finalize() call: Negative lookahead passes at EOS (nothing follows).
 //
 // Parameters:
@@ -718,12 +903,81 @@ static inline void iree_tokenizer_regex_reset_to_start(
   iree_tokenizer_regex_reset_best_candidate(state);
 }
 
+// Evaluates an accepting state, handling lookahead, end anchor, and fallback.
+// Called when the DFA enters an accepting state. Updates state->has_accept,
+// state->last_accept, state->has_accept_fallback, state->last_accept_fallback,
+// and potentially defers lookahead evaluation.
+static inline void iree_tokenizer_regex_evaluate_accepting_state(
+    const iree_tokenizer_regex_dfa_t* dfa,
+    iree_tokenizer_regex_exec_state_t* state, uint16_t accepting_state,
+    iree_host_size_t accept_pos, iree_string_view_t peek_view,
+    iree_host_size_t peek_offset) {
+  if (iree_tokenizer_regex_has_lookahead(dfa, accepting_state)) {
+    // Record fallback for patterns like \s+(?!\S)|\s+.
+    bool has_fallback =
+        iree_tokenizer_regex_lookahead_has_fallback(dfa, accepting_state);
+    if (has_fallback) {
+      state->last_accept_fallback = accept_pos;
+      state->has_accept_fallback = true;
+    }
+
+    if (peek_offset < peek_view.size) {
+      // Next character is available - evaluate lookahead now.
+      iree_host_size_t peek_position = peek_offset;
+      uint32_t next_codepoint =
+          iree_unicode_utf8_decode(peek_view, &peek_position);
+      bool rejected = iree_tokenizer_regex_lookahead_rejects(
+          dfa, accepting_state, next_codepoint);
+      if (!rejected) {
+        state->last_accept = accept_pos;
+        state->has_accept = true;
+        state->pending_lookahead = false;
+      }
+    } else {
+      // At boundary - defer lookahead to next chunk or finalize.
+      iree_tokenizer_regex_defer_lookahead(state, accepting_state, accept_pos);
+    }
+  } else if (iree_tokenizer_regex_requires_end_anchor(dfa, accepting_state)) {
+    // End anchor state: defer acceptance until finalize confirms end of input.
+  } else {
+    // No lookahead or end anchor - accept unconditionally.
+    state->has_accept = true;
+    state->last_accept = accept_pos;
+  }
+}
+
 // Forward declaration for process_rewind_buffer (called by
-// backtrack_via_buffer).
+// backtrack_via_buffer and resume_via_buffer).
 static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
     const iree_tokenizer_regex_dfa_t* dfa,
-    iree_tokenizer_regex_exec_state_t* state, bool uses_unicode,
-    iree_host_size_t next_start_abs);
+    iree_tokenizer_regex_exec_state_t* state, iree_host_size_t next_start_abs);
+
+// Resumes matching from a position in a previous chunk after emitting a match.
+// After a successful match, we restart matching from the match end position.
+// If that position is in a previous chunk (before base_offset), we use the
+// rewind buffer to replay those bytes. Returns IREE_STATUS_OUT_OF_RANGE if
+// |resume_position| is not in the rewind buffer.
+static iree_status_t iree_tokenizer_regex_resume_via_buffer(
+    const iree_tokenizer_regex_dfa_t* dfa,
+    iree_tokenizer_regex_exec_state_t* state,
+    iree_host_size_t resume_position) {
+  iree_host_size_t buffer_end_abs =
+      state->rewind_buffer_start + state->rewind_buffer_length;
+
+  if (resume_position < state->rewind_buffer_start ||
+      resume_position >= buffer_end_abs) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "streaming regex resume failed: "
+                            "resume_position=%" PRIhsz
+                            " not in rewind buffer "
+                            "[%" PRIhsz ", %" PRIhsz ")",
+                            resume_position, state->rewind_buffer_start,
+                            buffer_end_abs);
+  }
+
+  return iree_tokenizer_regex_process_rewind_buffer(dfa, state,
+                                                    resume_position);
+}
 
 // Attempts cross-chunk backtracking using the rewind buffer.
 //
@@ -734,7 +988,6 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
 // Parameters:
 //   dfa: The DFA being executed.
 //   state: Executor state (match_start must be set before calling).
-//   uses_unicode: Whether the DFA uses Unicode pseudo-bytes.
 //   base_offset: Absolute byte offset of the current chunk's first byte.
 //   context: Human-readable context for error message (e.g., "main loop").
 //
@@ -744,8 +997,8 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
 //   - IREE_STATUS_OUT_OF_RANGE if match_start is not in the rewind buffer.
 static iree_status_t iree_tokenizer_regex_backtrack_via_buffer(
     const iree_tokenizer_regex_dfa_t* dfa,
-    iree_tokenizer_regex_exec_state_t* state, bool uses_unicode,
-    iree_host_size_t base_offset, const char* context) {
+    iree_tokenizer_regex_exec_state_t* state, iree_host_size_t base_offset,
+    const char* context) {
   iree_host_size_t buffer_end_abs =
       state->rewind_buffer_start + state->rewind_buffer_length;
 
@@ -764,19 +1017,13 @@ static iree_status_t iree_tokenizer_regex_backtrack_via_buffer(
   // Calculate next start position (match_start + 1 codepoint).
   iree_host_size_t local_match_start =
       state->match_start - state->rewind_buffer_start;
-  iree_host_size_t next_start = local_match_start;
-  if (uses_unicode) {
-    uint8_t lead = state->rewind_buffer[next_start];
-    uint8_t seq_len = iree_tokenizer_regex_utf8_sequence_length(lead);
-    next_start += (seq_len > 0) ? seq_len : 1;
-  } else {
-    next_start += 1;
-  }
+  iree_host_size_t next_start =
+      local_match_start + iree_unicode_utf8_sequence_length(
+                              state->rewind_buffer[local_match_start]);
   iree_host_size_t next_start_abs = state->rewind_buffer_start + next_start;
 
   // Process buffer bytes to set up state for continuing with current chunk.
-  return iree_tokenizer_regex_process_rewind_buffer(dfa, state, uses_unicode,
-                                                    next_start_abs);
+  return iree_tokenizer_regex_process_rewind_buffer(dfa, state, next_start_abs);
 }
 
 // Processes bytes from the rewind buffer for cross-chunk backtracking.
@@ -798,7 +1045,6 @@ static iree_status_t iree_tokenizer_regex_backtrack_via_buffer(
 // Parameters:
 //   dfa: The DFA being executed.
 //   state: Executor state to update.
-//   uses_unicode: Whether the DFA uses Unicode pseudo-bytes.
 //   next_start_abs: Absolute position to start from (match_start + 1).
 //
 // Returns:
@@ -806,8 +1052,7 @@ static iree_status_t iree_tokenizer_regex_backtrack_via_buffer(
 //   - Error status if a callback fails.
 static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
     const iree_tokenizer_regex_dfa_t* dfa,
-    iree_tokenizer_regex_exec_state_t* state, bool uses_unicode,
-    iree_host_size_t next_start_abs) {
+    iree_tokenizer_regex_exec_state_t* state, iree_host_size_t next_start_abs) {
   // Find the starting position within the buffer.
   iree_host_size_t buffer_offset = next_start_abs - state->rewind_buffer_start;
   iree_host_size_t buffer_end = state->rewind_buffer_length;
@@ -827,53 +1072,33 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
   // because matches that complete within the buffer would have been found in
   // a previous chunk. We're just setting up state to continue into the current
   // chunk.
+
+  // Create string view for entire rewind buffer - reused across iterations.
+  const iree_string_view_t buffer_view = iree_make_string_view(
+      (const char*)state->rewind_buffer, state->rewind_buffer_length);
+
   while (buffer_offset < buffer_end) {
-    uint8_t byte = state->rewind_buffer[buffer_offset];
     iree_host_size_t abs_pos = state->rewind_buffer_start + buffer_offset;
-    iree_host_size_t bytes_consumed = 1;
 
-    // Handle Unicode: decode codepoint and map to pseudo-byte if needed.
-    if (uses_unicode && byte >= 0x80) {
-      // Multi-byte UTF-8 sequence.
-      iree_host_size_t remaining = buffer_end - buffer_offset;
-      uint8_t sequence_length = iree_tokenizer_regex_utf8_sequence_length(byte);
-      if (sequence_length > remaining) {
-        // Incomplete UTF-8 at end of buffer - this will continue into chunk.
-        // Store partial bytes for completion with chunk data.
-        state->utf8_partial_length = (uint8_t)remaining;
-        for (iree_host_size_t i = 0; i < remaining; ++i) {
-          state->utf8_partial_buffer[i] =
-              state->rewind_buffer[buffer_offset + i];
-        }
-        break;
-      }
-      // Decode the codepoint.
-      iree_string_view_t seq_view = iree_make_string_view(
-          (const char*)&state->rewind_buffer[buffer_offset], sequence_length);
-      iree_host_size_t decode_pos = 0;
-      uint32_t codepoint = iree_unicode_utf8_decode(seq_view, &decode_pos);
-      byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
-      bytes_consumed = sequence_length;
-    }
+    // Decode UTF-8 codepoint and map to pseudo-byte for DFA transition.
+    // Complete UTF-8 is guaranteed by the caller, so rewind buffer only
+    // contains complete codepoints.
+    uint32_t codepoint = iree_unicode_utf8_decode(buffer_view, &buffer_offset);
+    uint8_t byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
 
-    // Step the DFA.
+    // Step the DFA (check exact codepoint ranges first, then byte lookup).
     uint16_t next_state =
-        iree_tokenizer_regex_dfa_step(dfa, state->dfa_state, byte);
+        iree_tokenizer_regex_dfa_step(dfa, state->dfa_state, codepoint, byte);
 
-    if (next_state == IREE_TOKENIZER_REGEX_NO_TRANSITION) {
+    if (next_state == IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION) {
       // Failed transition - if we were in a match, we need to backtrack.
       if (state->in_match) {
-        // Restart from match_start + 1 within buffer.
+        // Restart from match_start + 1 codepoint within buffer.
         iree_host_size_t local_match_start =
             state->match_start - state->rewind_buffer_start;
-        iree_host_size_t next_start = local_match_start;
-        if (uses_unicode) {
-          uint8_t lead = state->rewind_buffer[next_start];
-          uint8_t seq_len = iree_tokenizer_regex_utf8_sequence_length(lead);
-          next_start += (seq_len > 0) ? seq_len : 1;
-        } else {
-          next_start += 1;
-        }
+        iree_host_size_t next_start =
+            local_match_start + iree_unicode_utf8_sequence_length(
+                                    state->rewind_buffer[local_match_start]);
 
         if (next_start < buffer_end) {
           // Continue backtracking within buffer.
@@ -899,10 +1124,10 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
         iree_tokenizer_regex_reset_best_candidate(state);
       }
       // Try current byte from start state.
+      // Note: buffer_offset is already advanced past this character by decode.
       state->dfa_state = (abs_pos == 0) ? dfa->header->start_state
                                         : dfa->header->unanchored_start_state;
       state->match_start = abs_pos;
-      buffer_offset += bytes_consumed;
       continue;
     }
 
@@ -915,13 +1140,12 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
     state->dfa_state = next_state;
 
     // Track accepting states (but don't emit - that happens in main loop).
+    // buffer_offset is already advanced past this character by decode.
     if (iree_tokenizer_regex_dfa_is_accepting(dfa, next_state)) {
-      state->has_accept = true;
-      state->last_accept =
-          state->rewind_buffer_start + buffer_offset + bytes_consumed;
+      iree_host_size_t accept_pos = state->rewind_buffer_start + buffer_offset;
+      iree_tokenizer_regex_evaluate_accepting_state(
+          dfa, state, next_state, accept_pos, buffer_view, buffer_offset);
     }
-
-    buffer_offset += bytes_consumed;
   }
 
   return iree_ok_status();
@@ -950,17 +1174,17 @@ static iree_status_t iree_tokenizer_regex_process_rewind_buffer(
 //    (copied by the previous chunk's call to this function).
 //
 // If the buffer is too small to hold all needed bytes, we keep the most recent
-// 256 bytes. Backtracking will fail with OUT_OF_RANGE if match_start falls
-// outside the buffer range.
+// IREE_TOKENIZER_UTIL_REGEX_REWIND_BUFFER_SIZE bytes. Backtracking will fail
+// with OUT_OF_RANGE if match_start falls outside the buffer range.
 //
 // Parameters:
 //   state: Executor state with rewind buffer to update.
 //   chunk: The chunk that was just processed.
 //   base_offset: Absolute byte offset of the chunk's first byte.
 static void iree_tokenizer_regex_update_rewind_buffer(
-    iree_tokenizer_regex_exec_state_t* state, iree_const_byte_span_t chunk,
+    iree_tokenizer_regex_exec_state_t* state, iree_string_view_t chunk,
     iree_host_size_t base_offset) {
-  iree_host_size_t chunk_end = base_offset + chunk.data_length;
+  iree_host_size_t chunk_end = base_offset + chunk.size;
 
   if (!state->in_match) {
     // No active match - clear the buffer.
@@ -973,7 +1197,7 @@ static void iree_tokenizer_regex_update_rewind_buffer(
   if (state->match_start >= base_offset) {
     // Match started in this chunk - copy from match_start to end.
     iree_host_size_t local_start = state->match_start - base_offset;
-    iree_host_size_t bytes_to_copy = chunk.data_length - local_start;
+    iree_host_size_t bytes_to_copy = chunk.size - local_start;
     if (bytes_to_copy <= sizeof(state->rewind_buffer)) {
       memcpy(state->rewind_buffer, chunk.data + local_start, bytes_to_copy);
       state->rewind_buffer_length = bytes_to_copy;
@@ -999,18 +1223,23 @@ static void iree_tokenizer_regex_update_rewind_buffer(
   }
 
   // Append current chunk to buffer.
+  // Guard against state corruption: buffer_length must not exceed buffer size.
+  IREE_ASSERT(state->rewind_buffer_length <= sizeof(state->rewind_buffer));
   iree_host_size_t space_left =
       sizeof(state->rewind_buffer) - state->rewind_buffer_length;
-  if (chunk.data_length <= space_left) {
+  if (chunk.size <= space_left) {
     // Entire chunk fits - simple append.
     memcpy(state->rewind_buffer + state->rewind_buffer_length, chunk.data,
-           chunk.data_length);
-    state->rewind_buffer_length += chunk.data_length;
+           chunk.size);
+    state->rewind_buffer_length += chunk.size;
+    IREE_ASSERT(state->rewind_buffer_length <= sizeof(state->rewind_buffer));
     return;
   }
 
   // Chunk doesn't fit - shift buffer to make room.
-  iree_host_size_t shift_needed = chunk.data_length - space_left;
+  // Invariant: chunk.size > space_left (otherwise we'd have returned).
+  IREE_ASSERT(chunk.size > space_left);
+  iree_host_size_t shift_needed = chunk.size - space_left;
   if (shift_needed < state->rewind_buffer_length) {
     // Shift out oldest bytes to make room for new chunk.
     memmove(state->rewind_buffer, state->rewind_buffer + shift_needed,
@@ -1018,16 +1247,17 @@ static void iree_tokenizer_regex_update_rewind_buffer(
     state->rewind_buffer_length -= shift_needed;
     state->rewind_buffer_start += shift_needed;
     memcpy(state->rewind_buffer + state->rewind_buffer_length, chunk.data,
-           chunk.data_length);
-    state->rewind_buffer_length += chunk.data_length;
+           chunk.size);
+    state->rewind_buffer_length += chunk.size;
+    IREE_ASSERT(state->rewind_buffer_length <= sizeof(state->rewind_buffer));
   } else {
     // Entire buffer replaced by this chunk's most recent bytes.
-    iree_host_size_t copy_start =
-        chunk.data_length - sizeof(state->rewind_buffer);
+    iree_host_size_t copy_start = chunk.size - sizeof(state->rewind_buffer);
     memcpy(state->rewind_buffer, chunk.data + copy_start,
            sizeof(state->rewind_buffer));
     state->rewind_buffer_length = sizeof(state->rewind_buffer);
     state->rewind_buffer_start = base_offset + copy_start;
+    IREE_ASSERT(state->rewind_buffer_length <= sizeof(state->rewind_buffer));
   }
 }
 
@@ -1042,18 +1272,6 @@ static void iree_tokenizer_regex_update_rewind_buffer(
 //   Always defer lookahead by recording the pending state. The lookahead will
 //   be evaluated when we hit NO_TRANSITION or end of input.
 //
-// Parameters:
-//   state: Executor state to update.
-//   accepting_state: The accepting DFA state with lookahead condition.
-//   match_end: Byte position where match ends (exclusive).
-static inline void iree_tokenizer_regex_record_pending_lookahead(
-    iree_tokenizer_regex_exec_state_t* state, uint16_t accepting_state,
-    iree_host_size_t match_end) {
-  // Always defer lookahead to the boundary (NO_TRANSITION or EOS).
-  // This ensures quantifier patterns like \s+(?!\S) work correctly.
-  iree_tokenizer_regex_defer_lookahead(state, accepting_state, match_end);
-}
-
 // Evaluates pending lookahead at a boundary.
 //
 // Called when we hit NO_TRANSITION and need to resolve any pending lookahead.
@@ -1065,7 +1283,7 @@ static inline void iree_tokenizer_regex_record_pending_lookahead(
 static inline bool iree_tokenizer_regex_resolve_pending_lookahead(
     const iree_tokenizer_regex_dfa_t* dfa,
     iree_tokenizer_regex_exec_state_t* state, iree_string_view_t chunk_view,
-    iree_host_size_t peek_offset, bool uses_unicode) {
+    iree_host_size_t peek_offset) {
   if (!state->pending_lookahead) {
     return true;  // No pending lookahead - always passes.
   }
@@ -1078,20 +1296,10 @@ static inline bool iree_tokenizer_regex_resolve_pending_lookahead(
   }
 
   // Decode the next character for lookahead evaluation.
-  uint32_t next_codepoint;
-  if (uses_unicode) {
-    uint8_t lead = (uint8_t)chunk_view.data[peek_offset];
-    uint8_t sequence_length = iree_tokenizer_regex_utf8_sequence_length(lead);
-    if (sequence_length > 1 &&
-        peek_offset + sequence_length > chunk_view.size) {
-      // Incomplete UTF-8 at boundary - keep pending for next chunk.
-      return true;  // Don't resolve yet.
-    }
-    iree_host_size_t decode_position = peek_offset;
-    next_codepoint = iree_unicode_utf8_decode(chunk_view, &decode_position);
-  } else {
-    next_codepoint = (uint8_t)chunk_view.data[peek_offset];
-  }
+  // Complete UTF-8 is guaranteed by the caller, so we can decode directly.
+  iree_host_size_t decode_position = peek_offset;
+  uint32_t next_codepoint =
+      iree_unicode_utf8_decode(chunk_view, &decode_position);
 
   // Evaluate the lookahead condition.
   bool rejected = iree_tokenizer_regex_lookahead_rejects(
@@ -1109,12 +1317,9 @@ static inline bool iree_tokenizer_regex_resolve_pending_lookahead(
 
 iree_status_t iree_tokenizer_regex_exec_feed(
     const iree_tokenizer_regex_dfa_t* dfa,
-    iree_tokenizer_regex_exec_state_t* state, iree_const_byte_span_t chunk,
-    iree_host_size_t base_offset,
+    iree_tokenizer_regex_exec_state_t* state, iree_string_view_t chunk,
+    iree_host_size_t base_offset, const iree_tokenizer_regex_stride_t* stride,
     iree_tokenizer_regex_match_callback_fn_t callback, void* user_data) {
-  const bool uses_unicode =
-      (dfa->header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE) != 0;
-
   // Check for start anchor constraint: if the pattern has a start anchor (^),
   // we can only start matching at position 0. If we're in a later chunk
   // (base_offset > 0) and haven't started a match yet, no match is possible.
@@ -1125,220 +1330,97 @@ iree_status_t iree_tokenizer_regex_exec_feed(
     return iree_ok_status();
   }
 
-  // Create a string view of the chunk for UTF-8 decoding operations.
-  // This avoids repeated iree_make_string_view() calls throughout the function.
-  const iree_string_view_t chunk_view =
-      iree_make_string_view((const char*)chunk.data, chunk.data_length);
-
   iree_host_size_t position = 0;
 
   // Resolve pending lookahead from previous chunk if we have new data.
-  // NOTE: If there's a partial UTF-8 sequence, we must complete it first
-  // to get the correct next character for lookahead evaluation.
-  if (state->pending_lookahead && chunk.data_length > 0) {
-    uint32_t next_codepoint;
-    if (uses_unicode && state->utf8_partial_length > 0) {
-      // Complete the partial UTF-8 sequence to get the lookahead character.
-      uint8_t lead = state->utf8_partial_buffer[0];
-      uint8_t expected_length = iree_tokenizer_regex_utf8_sequence_length(lead);
-      uint8_t bytes_needed = expected_length - state->utf8_partial_length;
-
-      if (bytes_needed > 0 && chunk.data_length >= bytes_needed) {
-        // Complete the sequence in a temporary buffer.
-        uint8_t temp_buffer[4];
-        for (uint8_t i = 0; i < state->utf8_partial_length; ++i) {
-          temp_buffer[i] = state->utf8_partial_buffer[i];
-        }
-        for (uint8_t i = 0; i < bytes_needed; ++i) {
-          temp_buffer[state->utf8_partial_length + i] = chunk.data[i];
-        }
-        iree_host_size_t temp_pos = 0;
-        next_codepoint = iree_unicode_utf8_decode(
-            iree_make_string_view((const char*)temp_buffer, expected_length),
-            &temp_pos);
-      } else {
-        // Can't complete the sequence yet - still need more bytes.
-        // Keep pending_lookahead set and let the main partial UTF-8
-        // handler accumulate more bytes. We'll resolve on the next
-        // chunk when the sequence is complete.
-        goto skip_lookahead_resolution;
-      }
-    } else if (uses_unicode) {
-      // Check if the next character itself is incomplete.
-      uint8_t lead = chunk.data[0];
-      uint8_t sequence_length = iree_tokenizer_regex_utf8_sequence_length(lead);
-      if (sequence_length > 1 && chunk.data_length < sequence_length) {
-        // Incomplete - can't evaluate lookahead yet, keep pending.
-        // This is an edge case where the lookahead char itself is split.
-        goto skip_lookahead_resolution;
-      }
-      iree_host_size_t peek_pos = 0;
-      next_codepoint = iree_unicode_utf8_decode(chunk_view, &peek_pos);
-    } else {
-      next_codepoint = chunk.data[0];
-    }
-
-    // Now we can evaluate the lookahead with the actual next character.
-    if (!iree_tokenizer_regex_lookahead_rejects(
-            dfa, state->pending_lookahead_state, next_codepoint)) {
-      // Lookahead passed - accept the pending match.
-      state->last_accept = state->pending_match_end;
-      state->has_accept = true;
-    }
-    state->pending_lookahead = false;
-  }
-skip_lookahead_resolution:
-
-  // Handle partial UTF-8 sequence from previous chunk.
-  if (uses_unicode && state->utf8_partial_length > 0) {
-    // Try to complete the partial sequence from the new chunk.
-    uint8_t lead = state->utf8_partial_buffer[0];
-    uint8_t expected_length = iree_tokenizer_regex_utf8_sequence_length(lead);
-
-    // How many more bytes do we need?
-    uint8_t bytes_needed = expected_length - state->utf8_partial_length;
-    if (bytes_needed > 0 && chunk.data_length >= bytes_needed) {
-      // Copy remaining bytes from chunk into buffer.
-      for (uint8_t i = 0; i < bytes_needed && position < chunk.data_length;
-           ++i) {
-        state->utf8_partial_buffer[state->utf8_partial_length++] =
-            chunk.data[position++];
-      }
-
-      // Now decode the complete codepoint.
-      iree_host_size_t buffer_position = 0;
-      uint32_t codepoint = iree_unicode_utf8_decode(
-          iree_make_string_view((const char*)state->utf8_partial_buffer,
-                                state->utf8_partial_length),
-          &buffer_position);
-      uint8_t byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
-
-      // The absolute position is where this codepoint started (before this
-      // chunk).
-      iree_host_size_t abs_pos = base_offset - (expected_length - bytes_needed);
-
-      // Process this codepoint through the DFA.
-      uint16_t next_state = iree_tokenizer_regex_dfa_step_codepoint(
-          dfa, state->dfa_state, codepoint, byte);
-
-      if (next_state == IREE_TOKENIZER_REGEX_NO_TRANSITION) {
-        if (state->has_accept) {
-          iree_host_size_t match_end = 0;
-          IREE_RETURN_IF_ERROR(iree_tokenizer_regex_emit_match(
-              state, dfa, callback, user_data, &match_end));
-          iree_tokenizer_regex_reset_to_start(state, dfa, match_end);
-        } else if (state->in_match) {
-          // Failed partial match during UTF-8 completion.
-          state->in_match = false;
-
-          if (state->match_start < base_offset) {
-            // match_start in previous chunk - use rewind buffer.
-            IREE_RETURN_IF_ERROR(iree_tokenizer_regex_backtrack_via_buffer(
-                dfa, state, uses_unicode, base_offset, "UTF-8 completion"));
-          } else {
-            // match_start in current chunk - simple reset.
-            state->dfa_state = (abs_pos == 0)
-                                   ? dfa->header->start_state
-                                   : dfa->header->unanchored_start_state;
-          }
-        }
-
-        // Retry this character from start state. Split UTF-8 characters that
-        // fail the current match may still start a new one.
-        uint16_t start_for_retry = (abs_pos == 0)
-                                       ? dfa->header->start_state
-                                       : dfa->header->unanchored_start_state;
-        uint16_t retry_state = iree_tokenizer_regex_dfa_step_codepoint(
-            dfa, start_for_retry, codepoint, byte);
-        if (retry_state != IREE_TOKENIZER_REGEX_NO_TRANSITION) {
-          state->dfa_state = retry_state;
-          state->match_start = abs_pos;
-          state->in_match = true;
-          state->has_accept = false;
-
-          if (iree_tokenizer_regex_dfa_is_accepting(dfa, retry_state) &&
-              (!iree_tokenizer_regex_requires_start_anchor(dfa, retry_state) ||
-               state->match_start == 0)) {
-            iree_host_size_t abs_end = base_offset + position;
-            if (iree_tokenizer_regex_has_lookahead(dfa, retry_state)) {
-              iree_tokenizer_regex_record_pending_lookahead(state, retry_state,
-                                                            abs_end);
-            } else {
-              state->last_accept = abs_end;
-              state->has_accept = true;
-            }
-          }
-        }
-      } else {
-        if (!state->in_match) {
-          state->match_start = abs_pos;
-          state->in_match = true;
-          state->has_accept = false;
-        }
-        state->dfa_state = next_state;
-
-        if (iree_tokenizer_regex_dfa_is_accepting(dfa, next_state) &&
-            (!iree_tokenizer_regex_requires_start_anchor(dfa, next_state) ||
-             state->match_start == 0)) {
-          state->last_accept = base_offset + position;
-          state->has_accept = true;
-        }
-      }
-
-      // Clear the partial buffer.
-      state->utf8_partial_length = 0;
-    } else if (bytes_needed > chunk.data_length) {
-      // Still not enough bytes - add what we have and wait for more.
-      for (iree_host_size_t i = 0; i < chunk.data_length; ++i) {
-        state->utf8_partial_buffer[state->utf8_partial_length++] =
-            chunk.data[i];
-      }
-      return iree_ok_status();
-    }
+  if (state->pending_lookahead && chunk.size > 0) {
+    iree_tokenizer_regex_resolve_pending_lookahead(dfa, state, chunk, 0);
   }
 
   // Main processing loop.
-  while (position < chunk.data_length) {
+  while (position < chunk.size) {
     iree_host_size_t char_start = position;
     iree_host_size_t abs_pos = base_offset + char_start;
 
-    // Decode codepoint and get the byte for DFA transition.
-    uint8_t byte;
-    uint32_t codepoint;
-    if (uses_unicode) {
-      // Check if this might be a partial UTF-8 sequence at chunk end.
-      uint8_t lead = chunk.data[position];
-      uint8_t sequence_length = iree_tokenizer_regex_utf8_sequence_length(lead);
-      if (sequence_length > 1 &&
-          position + sequence_length > chunk.data_length) {
-        // Partial sequence at end of chunk - buffer it for next chunk.
-        state->utf8_partial_length = 0;
-        while (position < chunk.data_length) {
-          state->utf8_partial_buffer[state->utf8_partial_length++] =
-              chunk.data[position++];
-        }
-        break;
-      }
+    // Decode UTF-8 codepoint and map to pseudo-byte for DFA transition.
+    // ASCII fast path: For bytes 0x00-0x7F, codepoint == byte == pseudo-byte.
+    // This avoids function call overhead and the 8-branch category classifier.
+    uint32_t codepoint = 0;
+    uint8_t byte = 0;
+    uint8_t first_byte = (uint8_t)chunk.data[position];
+    if (IREE_LIKELY(first_byte < 0x80)) {
+      // ASCII: trivial decode, no category classification needed.
+      codepoint = first_byte;
+      byte = first_byte;
+      ++position;
 
-      // Complete sequence available - decode it.
-      codepoint = iree_unicode_utf8_decode(chunk_view, &position);
-      byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
+      // Stride acceleration: when in a match and the transition lands in a
+      // boring state (non-accepting, no lookahead, no anchors, all branches
+      // alive), skip all per-byte bookkeeping and run a tight inner loop.
+      if (stride && state->in_match) {
+        // Direct byte-table lookup (ranges never match ASCII codepoints).
+        uint16_t stride_next =
+            dfa->transitions[(iree_host_size_t)state->dfa_state * 256 + byte];
+        if (stride_next != IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION &&
+            iree_tokenizer_regex_stride_is_boring(stride, stride_next)) {
+          state->dfa_state = stride_next;
+
+          // Level 2: self-loop run scanning. If this state loops on itself for
+          // all bytes in the same category, advance until the category changes.
+          uint8_t category = stride->category_table[byte];
+          if (iree_tokenizer_regex_stride_self_loop_category(
+                  stride, stride_next) == category) {
+            while (position < chunk.size) {
+              uint8_t b = (uint8_t)chunk.data[position];
+              if (b >= 0x80 || stride->category_table[b] != category) break;
+              ++position;
+            }
+          }
+
+          // Level 1: tight loop for subsequent ASCII boring transitions.
+          while (position < chunk.size) {
+            uint8_t b = (uint8_t)chunk.data[position];
+            if (IREE_UNLIKELY(b >= 0x80)) break;
+            uint16_t next =
+                dfa->transitions[(iree_host_size_t)state->dfa_state * 256 + b];
+            if (IREE_UNLIKELY(next == IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION))
+              break;
+            if (IREE_UNLIKELY(
+                    !iree_tokenizer_regex_stride_is_boring(stride, next)))
+              break;
+            state->dfa_state = next;
+            ++position;
+
+            // Level 2: self-loop for new state.
+            uint8_t category_inner = stride->category_table[b];
+            if (iree_tokenizer_regex_stride_self_loop_category(stride, next) ==
+                category_inner) {
+              while (position < chunk.size) {
+                uint8_t b2 = (uint8_t)chunk.data[position];
+                if (b2 >= 0x80 || stride->category_table[b2] != category_inner)
+                  break;
+                ++position;
+              }
+            }
+          }
+          continue;
+        }
+      }
     } else {
-      // ASCII-only mode: treat each byte as-is.
-      byte = chunk.data[position];
-      codepoint = byte;
-      position++;
+      // Non-ASCII: full UTF-8 decode and Unicode category classification.
+      codepoint = iree_unicode_utf8_decode(chunk, &position);
+      byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
     }
 
     // Perform DFA transition (check exact ranges first, then byte/pseudo-byte).
-    uint16_t next_state = iree_tokenizer_regex_dfa_step_codepoint(
-        dfa, state->dfa_state, codepoint, byte);
+    uint16_t next_state =
+        iree_tokenizer_regex_dfa_step(dfa, state->dfa_state, codepoint, byte);
 
-    if (next_state == IREE_TOKENIZER_REGEX_NO_TRANSITION) {
+    if (next_state == IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION) {
       // No transition - end of current match attempt.
       // First, resolve any pending lookahead at the current boundary.
-      iree_tokenizer_regex_resolve_pending_lookahead(dfa, state, chunk_view,
-                                                     char_start, uses_unicode);
+      iree_tokenizer_regex_resolve_pending_lookahead(dfa, state, chunk,
+                                                     char_start);
 
       if (state->has_accept || state->has_accept_fallback) {
         // Emit the match we found. emit_match prefers lookahead-passed
@@ -1349,10 +1431,12 @@ skip_lookahead_resolution:
 
         // With start anchor (^), only one match at position 0 is possible.
         // Once we've emitted that match, no more matches can occur.
-        // Clear has_accept to prevent finalize from emitting again.
+        // Reset state before returning so callers see in_match=false.
         if (requires_start) {
+          state->in_match = false;
           state->has_accept = false;
           state->has_accept_fallback = false;
+          iree_tokenizer_regex_reset_best_candidate(state);
           return iree_ok_status();
         }
 
@@ -1364,9 +1448,10 @@ skip_lookahead_resolution:
         if (resume_position >= base_offset) {
           position = resume_position - base_offset;
         } else {
-          // Match ended in previous chunk - continue from current position.
-          // This can only happen in streaming mode.
-          position = char_start;
+          // Match ended in previous chunk - replay from rewind buffer.
+          IREE_RETURN_IF_ERROR(iree_tokenizer_regex_resume_via_buffer(
+              dfa, state, resume_position));
+          position = 0;
         }
         continue;
       } else if (state->in_match) {
@@ -1383,25 +1468,19 @@ skip_lookahead_resolution:
         // Can we backtrack to match_start + 1?
         // Only possible if match_start is in the current chunk.
         if (state->match_start >= base_offset) {
-          // match_start is in this chunk - we can backtrack properly.
+          // match_start is in this chunk - we can backtrack within it.
           iree_host_size_t match_start_local = state->match_start - base_offset;
           // Advance by one codepoint from match_start.
-          iree_host_size_t next_start = match_start_local;
-          if (uses_unicode) {
-            uint8_t lead = chunk.data[next_start];
-            uint8_t sequence_length =
-                iree_tokenizer_regex_utf8_sequence_length(lead);
-            next_start += (sequence_length > 0) ? sequence_length : 1;
-          } else {
-            next_start += 1;
-          }
+          iree_host_size_t next_start =
+              match_start_local + iree_unicode_utf8_sequence_length(
+                                      (uint8_t)chunk.data[match_start_local]);
 
           // With start anchor, don't restart if next_start > 0.
           if (requires_start && next_start > 0) {
             return iree_ok_status();
           }
 
-          if (next_start < chunk.data_length && next_start <= char_start) {
+          if (next_start < chunk.size) {
             // Restart from next_start (match_start + 1 codepoint).
             // Use reset_to_start to properly clear all match state including
             // fallback acceptance and branch tracking.
@@ -1410,11 +1489,14 @@ skip_lookahead_resolution:
             position = next_start;
             continue;
           }
+          // Exhausted all positions in this chunk. In streaming mode, the next
+          // chunk will continue. In one-shot mode, finalize handles cleanup.
+          break;
         }
 
-        // Can't backtrack within current chunk - use rewind buffer.
+        // match_start is in a previous chunk - use rewind buffer.
         IREE_RETURN_IF_ERROR(iree_tokenizer_regex_backtrack_via_buffer(
-            dfa, state, uses_unicode, base_offset, "main loop"));
+            dfa, state, base_offset, "main loop"));
 
         // With start anchor, don't restart if we've moved past position 0.
         if (requires_start && state->match_start > 0) {
@@ -1462,80 +1544,8 @@ skip_lookahead_resolution:
         (!iree_tokenizer_regex_requires_start_anchor(dfa, next_state) ||
          state->match_start == 0)) {
       iree_host_size_t abs_end = base_offset + position;
-      if (iree_tokenizer_regex_has_lookahead(dfa, next_state)) {
-        // Lookahead state: evaluate immediately if next char is available,
-        // otherwise defer to next chunk or finalize.
-        //
-        // For patterns like \s+(?!\S), we visit accepting states multiple
-        // times. Lookahead must be evaluated at EACH position, not just the
-        // final one. If lookahead passes, record the accept. If it fails,
-        // keep any previous accept where lookahead passed.
-        //
-        // For patterns with fallback (\s+(?!\S)|\s+), also track the fallback
-        // position separately. The fallback is always recorded regardless of
-        // whether lookahead passes.
-        bool has_fallback =
-            iree_tokenizer_regex_lookahead_has_fallback(dfa, next_state);
-        if (has_fallback) {
-          // Always record fallback position for mixed alternation patterns.
-          state->last_accept_fallback = abs_end;
-          state->has_accept_fallback = true;
-        }
-
-        if (position < chunk.data_length) {
-          // Next character is available - evaluate lookahead now.
-          uint32_t next_codepoint;
-          if (uses_unicode) {
-            // Decode the next codepoint for lookahead evaluation.
-            uint8_t lead = chunk.data[position];
-            uint8_t sequence_length =
-                iree_tokenizer_regex_utf8_sequence_length(lead);
-            if (sequence_length == 0 ||
-                position + sequence_length > chunk.data_length) {
-              // Invalid or incomplete UTF-8 at peek position - can't evaluate.
-              // Defer to next chunk where we'll have complete data.
-              iree_tokenizer_regex_record_pending_lookahead(state, next_state,
-                                                            abs_end);
-            } else {
-              iree_host_size_t peek_pos = 0;
-              iree_string_view_t peek_view = iree_make_string_view(
-                  (const char*)(chunk.data + position), sequence_length);
-              next_codepoint = iree_unicode_utf8_decode(peek_view, &peek_pos);
-              if (!iree_tokenizer_regex_lookahead_rejects(dfa, next_state,
-                                                          next_codepoint)) {
-                // Lookahead passed - record this as a valid accept.
-                state->last_accept = abs_end;
-                state->has_accept = true;
-                state->pending_lookahead = false;
-              }
-              // If lookahead fails, don't update last_accept. Keep any
-              // previous accept where lookahead passed. Fallback (if any)
-              // was already recorded above.
-            }
-          } else {
-            // Non-Unicode mode: next byte is the lookahead character.
-            next_codepoint = chunk.data[position];
-            if (!iree_tokenizer_regex_lookahead_rejects(dfa, next_state,
-                                                        next_codepoint)) {
-              state->last_accept = abs_end;
-              state->has_accept = true;
-              state->pending_lookahead = false;
-            }
-          }
-        } else {
-          // At chunk boundary - defer lookahead to next chunk or finalize.
-          iree_tokenizer_regex_record_pending_lookahead(state, next_state,
-                                                        abs_end);
-        }
-      } else if (iree_tokenizer_regex_requires_end_anchor(dfa, next_state)) {
-        // End anchor state: defer acceptance until we know we're at end of
-        // input. Continue matching but don't record the accept yet. Finalize
-        // will check if we end in an accepting state with end anchor.
-      } else {
-        // No lookahead or end anchor - accept unconditionally.
-        state->last_accept = abs_end;
-        state->has_accept = true;
-      }
+      iree_tokenizer_regex_evaluate_accepting_state(dfa, state, next_state,
+                                                    abs_end, chunk, position);
     }
 
     // Branch-aware commit check: If we have branch tracking data and
@@ -1564,9 +1574,12 @@ skip_lookahead_resolution:
         }
 
         // With start anchor (^), only one match at position 0 is possible.
+        // Reset state before returning so callers see in_match=false.
         if (requires_start) {
+          state->in_match = false;
           state->has_accept = false;
           state->has_accept_fallback = false;
+          iree_tokenizer_regex_reset_best_candidate(state);
           return iree_ok_status();
         }
 
@@ -1576,6 +1589,11 @@ skip_lookahead_resolution:
         state->last_accept = resume_position;
         if (resume_position >= base_offset) {
           position = resume_position - base_offset;
+        } else {
+          // Match ended in previous chunk - replay from rewind buffer.
+          IREE_RETURN_IF_ERROR(iree_tokenizer_regex_resume_via_buffer(
+              dfa, state, resume_position));
+          position = 0;
         }
         continue;
       }
@@ -1592,71 +1610,24 @@ iree_status_t iree_tokenizer_regex_exec_finalize(
     const iree_tokenizer_regex_dfa_t* dfa,
     iree_tokenizer_regex_exec_state_t* state, iree_host_size_t total_length,
     iree_tokenizer_regex_match_callback_fn_t callback, void* user_data) {
-  // Handle pending lookahead when there's incomplete UTF-8 at EOS.
-  // The incomplete sequence becomes REPLACEMENT_CHAR, which serves as the
-  // "next character" for lookahead evaluation. This must be handled BEFORE
-  // clearing utf8_partial_length so we know whether to evaluate or auto-pass.
-  bool had_incomplete_utf8 = (state->utf8_partial_length > 0);
-  if (state->pending_lookahead && had_incomplete_utf8) {
-    // Evaluate lookahead against REPLACEMENT_CHAR (the incomplete sequence).
-    if (!iree_tokenizer_regex_lookahead_rejects(
-            dfa, state->pending_lookahead_state,
-            IREE_UNICODE_REPLACEMENT_CHAR)) {
-      state->last_accept = state->pending_match_end;
-      state->has_accept = true;
-    }
-    state->pending_lookahead = false;
-  }
-
-  // Handle incomplete UTF-8 sequence at end of stream.
-  // Treat it as an invalid sequence (replacement char) and process through DFA.
-  if (had_incomplete_utf8) {
-    const bool uses_unicode =
-        (dfa->header->flags & IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE) != 0;
-
-    if (uses_unicode) {
-      // Incomplete UTF-8 at EOS is invalid - treat as replacement char.
-      uint32_t codepoint = IREE_UNICODE_REPLACEMENT_CHAR;
-      uint8_t byte = iree_tokenizer_regex_codepoint_to_byte(codepoint);
-      iree_host_size_t abs_pos = total_length - state->utf8_partial_length;
-
-      uint16_t next_state = iree_tokenizer_regex_dfa_step_codepoint(
-          dfa, state->dfa_state, codepoint, byte);
-
-      if (next_state == IREE_TOKENIZER_REGEX_NO_TRANSITION) {
-        // Failed - emit any pending match and reset.
-        if (state->has_accept || state->has_accept_fallback) {
-          IREE_RETURN_IF_ERROR(iree_tokenizer_regex_emit_match(
-              state, dfa, callback, user_data, /*out_match_end=*/NULL));
-          state->has_accept = false;
-          state->has_accept_fallback = false;
-        }
-      } else {
-        state->dfa_state = next_state;
-        if (!state->in_match) {
-          state->match_start = abs_pos;
-          state->in_match = true;
-        }
-        if (iree_tokenizer_regex_dfa_is_accepting(dfa, next_state) &&
-            (!iree_tokenizer_regex_requires_start_anchor(dfa, next_state) ||
-             state->match_start == 0)) {
-          // No lookahead check needed - we already resolved any pending
-          // lookahead above using REPLACEMENT_CHAR.
-          state->last_accept = total_length;
-          state->has_accept = true;
-        }
-      }
-    }
-    state->utf8_partial_length = 0;
-  }
-
-  // Resolve pending lookahead at true end of stream (no incomplete UTF-8).
+  // Resolve pending lookahead at end of stream.
   // With no following character, negative lookahead unconditionally passes:
   //   - a(?!b) at EOS: no 'b' follows, so passes
   //   - \s+(?!\S) at EOS: no non-whitespace follows, so passes
+  //
+  // Only use pending_match_end if we don't already have a better
+  // accept position from a different pattern branch. This can happen when:
+  //   1. Whitespace pattern defers lookahead at chunk boundary
+  //   2. A different branch (e.g., letter pattern) subsequently matches
+  //   3. The letter match sets last_accept to a longer position
+  //   4. We must not overwrite that better position with pending_match_end
   if (state->pending_lookahead) {
-    state->last_accept = state->pending_match_end;
-    state->has_accept = true;
+    // Only use pending lookahead position if no better accept exists,
+    // or if pending extends beyond current accept (same match, extended).
+    if (!state->has_accept || state->pending_match_end > state->last_accept) {
+      state->last_accept = state->pending_match_end;
+      state->has_accept = true;
+    }
     state->pending_lookahead = false;
   }
 
@@ -1690,10 +1661,8 @@ iree_status_t iree_tokenizer_regex_exec(
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, dfa);
 
-  iree_const_byte_span_t chunk =
-      iree_make_const_byte_span((const uint8_t*)text.data, text.size);
-  IREE_RETURN_IF_ERROR(iree_tokenizer_regex_exec_feed(dfa, &state, chunk, 0,
-                                                      callback, user_data));
+  IREE_RETURN_IF_ERROR(iree_tokenizer_regex_exec_feed(
+      dfa, &state, text, 0, /*stride=*/NULL, callback, user_data));
 
   return iree_tokenizer_regex_exec_finalize(dfa, &state, text.size, callback,
                                             user_data);

@@ -1,0 +1,40 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "test_util",
+    testonly = True,
+    hdrs = ["scoped_resource.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "fuzzing_util",
+    testonly = True,
+    srcs = ["fuzzing_util.c"],
+    hdrs = ["fuzzing_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer",
+        "//runtime/src/iree/tokenizer/decoder:byte_level",
+        "//runtime/src/iree/tokenizer/format/huggingface:tokenizer_json",
+        "//runtime/src/iree/tokenizer/model:bpe",
+        "//runtime/src/iree/tokenizer/segmenter:whitespace",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)

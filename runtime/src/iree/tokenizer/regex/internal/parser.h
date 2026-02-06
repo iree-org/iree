@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOKENIZER_REGEX_INTERNAL_PARSER_H_
-#define IREE_TOKENIZER_REGEX_INTERNAL_PARSER_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_INTERNAL_PARSER_H_
+#define IREE_TOKENIZER_UTIL_REGEX_INTERNAL_PARSER_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
@@ -49,4 +49,4 @@ iree_status_t iree_tokenizer_regex_parse(
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_INTERNAL_PARSER_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_INTERNAL_PARSER_H_
