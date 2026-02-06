@@ -85,7 +85,6 @@ struct ROCMOptions {
   std::string enableROCMUkernels = "none";
   std::string encodingLayoutResolver =
       GPU::kDataTilingEncodingLayoutResolverName;
-  std::string tuningSpecPath = "";
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
@@ -180,12 +179,6 @@ struct ROCMOptions {
         cl::desc(
             "Deprecated; use --iree-rocm-encoding-layout-resolver instead."),
         Deprecated("use --iree-rocm-encoding-layout-resolver instead"));
-
-    binder.opt<std::string>(
-        "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
-        cl::desc("Path to a module containing a tuning spec (transform "
-                 "dialect library). Accepts MLIR text (.mlir) and bytecode "
-                 "(.mlirbc) formats."));
 
     binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
@@ -531,7 +524,7 @@ public:
     }
     {
       MaterializeTuningSpecsPassOptions passOptions;
-      passOptions.tuningSpecPath = targetOptions.tuningSpecPath;
+      passOptions.tuningSpecPath = codegenOptions.tuningSpecPath;
       modulePassManager.addPass(createMaterializeTuningSpecsPass(passOptions));
     }
     modulePassManager.addPass(createMaterializeUserConfigsPass());
