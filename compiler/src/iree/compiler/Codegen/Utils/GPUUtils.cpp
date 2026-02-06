@@ -839,7 +839,7 @@ validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
 
 // Disabling clang-tidy for the following functions, as it will be externally
 // linked to the CAPI in a future PR.
-// NOLINTBEGIN
+// NOLINTBEGIN(misc-use-internal-linkage)
 FailureOr<std::pair<int64_t, int64_t>>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
@@ -960,7 +960,7 @@ getXorShuffleParams(IREE::GPU::TargetAttr target,
   }
   return xorShuffleAttr;
 }
-// NOLINTEND
+// NOLINTEND(misc-use-internal-linkage)
 
 FailureOr<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
