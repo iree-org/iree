@@ -775,7 +775,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // to take into account the element type instead of the constants
   // 128 and 32 that were derived for bf16 type with f32 accumulation.
   auto getDimBounds = [&](ArrayRef<int64_t> dims,
-                          bool paddingCanBeExpensive) -> SmallVector<int64_t> {
+                          bool paddingCanBeExpensive =
+                              false) -> SmallVector<int64_t> {
     return llvm::map_to_vector(dims, [&](int64_t dim) {
       if (ShapedType::isDynamic(bounds[dim]) || !canSupportUnaligned ||
           paddingCanBeExpensive) {
@@ -785,6 +786,23 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         return maybePaddedBounds(bounds[dim], 128);
       }
       if (bounds[dim] > 32) {
+        return maybePaddedBounds(bounds[dim], 32);
+      }
+
+      return bounds[dim];
+    });
+  };
+
+  // K dimensions have different padding thresholds.
+  auto getKDimBounds = [&](ArrayRef<int64_t> dims,
+                           bool paddingCanBeExpensive =
+                               false) -> SmallVector<int64_t> {
+    return llvm::map_to_vector(dims, [&](int64_t dim) {
+      if (ShapedType::isDynamic(bounds[dim]) || !canSupportUnaligned ||
+          paddingCanBeExpensive) {
+        return bounds[dim];
+      }
+      if (bounds[dim] > 128) {
         return maybePaddedBounds(bounds[dim], 32);
       }
 
@@ -820,9 +838,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Intentionally padded GEMM proved to be beneficial for performance for
   // the following layouts: 1) [M, K] x [K, N] 2) [M, K] x [N, K]
   // Therefore we disallow padding only when LHS is transposed.
-  GPUMatmulShapeType problem{getDimBounds(mDims, transposedLhs),
-                             getDimBounds(nDims, transposedLhs),
-                             getDimBoundsNoPad(kDims),
+  GPUMatmulShapeType problem{getDimBounds(mDims),
+                             getDimBounds(nDims),
+                             getKDimBounds(kDims, !isGemm),
                              getDimBoundsNoPad(batchDims),
                              lhsElemType,
                              rhsElemType,
