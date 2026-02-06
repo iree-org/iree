@@ -579,9 +579,7 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
 gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
   switch (kind) {
 #define MAP_CASE(X)                                                            \
-  \ 
   case vector::CombiningKind::X:                                               \
-  \ 
     return gpu::AllReduceOperation::X
 
     MAP_CASE(ADD);
