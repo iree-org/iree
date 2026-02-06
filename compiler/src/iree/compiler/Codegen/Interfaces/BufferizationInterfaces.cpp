@@ -294,12 +294,6 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     return success();
   }
 
-  // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
-  // basis.
-  if (!dspOp.hasPureTensorSemantics()) {
-    return op->emitError() << "op does not have tensor semantics";
-  }
-
   // New input operands for the cloned op.
   SmallVector<Value> newOperands, newOutputBuffers;
   AnalysisState analysisState(options);
@@ -307,6 +301,11 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
 
   for (OpOperand &opOperand : op->getOpOperands()) {
     if (dspOp.isScalar(&opOperand)) {
+      newOperands.push_back(opOperand.get());
+      continue;
+    }
+    // Skip operands that are already memrefs (mixed tensor-buffer semantics).
+    if (isa<MemRefType>(opOperand.get().getType())) {
       newOperands.push_back(opOperand.get());
       continue;
     }

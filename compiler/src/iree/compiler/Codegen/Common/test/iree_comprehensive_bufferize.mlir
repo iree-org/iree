@@ -3220,3 +3220,24 @@ func.func @drop_fusion_barrier() -> memref<6xf32> {
 // CHECK-LABEL: func.func @drop_fusion_barrier
 // CHECK:         %[[ALLOC:.+]] = memref.alloc() : memref<6xf32>
 // CHECK:         return %[[ALLOC]]
+
+// -----
+
+// Test bufferization of map_scatter with mixed tensor-buffer semantics.
+// The tensor input should be bufferized while the memref output stays as-is.
+func.func @map_scatter_mixed_semantics(%input: tensor<16xf32>, %output: memref<16xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<16xf32> into memref<16xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @map_scatter_mixed_semantics
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<16xf32>
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<16xf32>
+//       CHECK:   %[[INPUT_BUF:.+]] = bufferization.to_buffer %[[INPUT]]
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT_BUF]] into %[[OUTPUT]]
+//       CHECK:   } : memref<16xf32> into memref<16xf32>
+//       CHECK:   return
