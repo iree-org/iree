@@ -988,8 +988,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   }
   if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled
-    // and scaled GEMM respectively.
+    // and scaled GEMM respectively. C promotion uses thread config, not DMA.
     promotionList.push_back(promotionList.size());
+    if (!promotionArray.empty()) {
+      promotionArray.push_back(
+          IREE::GPU::DerivedThreadConfigAttr::get(context));
+    }
   }
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionArray);
