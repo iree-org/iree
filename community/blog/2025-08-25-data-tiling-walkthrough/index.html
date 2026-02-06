@@ -4993,7 +4993,7 @@ host/device programming model. [<a href="https://llvm.org/devmtg/2025-06/slides/
 <p>Compilation command, that targets gfx942 AMDGPU:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>matmul.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/matmul.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hip-target<span class="o">=</span>gfx942<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-target<span class="o">=</span>gfx942<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-dispatch-creation-data-tiling
 </code></pre></div>
 <p>Test source program, matmul.mlir:</p>

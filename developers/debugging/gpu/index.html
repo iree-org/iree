@@ -5149,7 +5149,7 @@ while potentially making modifications, the process is</p>
 
 iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hip-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>original.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-dump-executable-files-to<span class="o">=</span>odump
 <span class="c1"># Opt flags are in dump/[...].optimized.ll to a file.</span>
@@ -5167,7 +5167,7 @@ ld.lld<span class="w"> </span>-o<span class="w"> </span>altered.hsaco<span class
 <span class="c1"># example.</span>
 iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hip-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-target<span class="o">=</span>&lt;target&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>altered.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-substitute-executable-object<span class="o">=[</span>dispatch_name<span class="o">]=</span>altered.hsaco
 </code></pre></div>

@@ -5008,7 +5008,7 @@ func.func @matmul_reduce_32_1024_2048(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: ten
 <p>While compiling this graph with IREE, the flag
 <code>--iree-hal-dump-executable-files-to=&lt;some directory&gt;</code> can be used to observe
 the created dispatches.</p>
-<div class="highlight"><pre><span></span><code>// RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
+<div class="highlight"><pre><span></span><code>// RUN: iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
             --iree-hal-dump-executable-files-to=&lt;some directory&gt; -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {

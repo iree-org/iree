@@ -4810,13 +4810,13 @@ with your local equivalents as needed.</p>
 <span class="w">  </span>--iree-opt-data-tiling<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-codegen-gpu-native-math-precision<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-codegen-llvmgpu-use-vector-distribution<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hip-waves-per-eu<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-rocm-waves-per-eu<span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-execution-model<span class="o">=</span>async-external<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-scheduling-dump-statistics-format<span class="o">=</span>json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-scheduling-dump-statistics-file<span class="o">=</span>compilation_info.json<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-preprocessing-pass-pipeline<span class="o">=</span><span class="s2">&quot;builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-codegen-transform-dialect-library<span class="o">=</span>/path/to/attention_and_matmul_spec_punet_mi300.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hip-target<span class="o">=</span>gfx942
+<span class="w">  </span>--iree-rocm-target<span class="o">=</span>gfx942
 </code></pre></div>
 <p>After compilation, run the module to produce the new outputs that will become
 the new goldens:</p>

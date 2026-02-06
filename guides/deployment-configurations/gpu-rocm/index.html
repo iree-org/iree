@@ -5202,7 +5202,7 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 
 iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-hip-target<span class="o">=</span><span class="si">${</span><span class="nv">IREE_HIP_TARGET</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">    </span>--iree-rocm-target<span class="o">=</span><span class="si">${</span><span class="nv">IREE_HIP_TARGET</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenetv2.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_hip.vmfb
 </code></pre></div>
 <details class="tip" open="open">
@@ -5216,13 +5216,13 @@ while higher levels enable progressively more aggressive optimizations. See
 <summary>Tip - HIP bitcode files</summary>
 <p>That IREE comes with bundled bitcode files, which are used for linking
 certain intrinsics on AMD GPUs. These will be used automatically or if the
-<code>--iree-hip-bc-dir</code> is empty. As additional support may be needed for
+<code>--iree-rocm-bc-dir</code> is empty. As additional support may be needed for
 different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 <code>/opt/rocm/amdgcn/bitcode</code>.</p>
 </details>
 <h4 id="choosing-hip-targets">Choosing HIP targets<a class="headerlink" href="#choosing-hip-targets" title="Permanent link">link</a></h4>
-<p>A HIP target (<code>iree-hip-target</code>) matching the LLVM AMDGPU backend is needed
+<p>A HIP target (<code>iree-rocm-target</code>) matching the LLVM AMDGPU backend is needed
 to compile towards each GPU chip. Here is a table of commonly used
 architectures:</p>
 <table>
@@ -5383,17 +5383,17 @@ architectures:</p>
 </table>
 <p>For a more comprehensive list of prior GPU generations, you can refer to the
 <a href="https://llvm.org/docs/AMDGPUUsage.html#processors">LLVM AMDGPU backend</a>.</p>
-<p>The <code>iree-hip-target</code> option support three schemes:</p>
+<p>The <code>iree-rocm-target</code> option support three schemes:</p>
 <ol>
-<li>The exact GPU product name (SKU), e.g., <code>--iree-hip-target=mi300x</code>. This
+<li>The exact GPU product name (SKU), e.g., <code>--iree-rocm-target=mi300x</code>. This
     allows the compiler to know about both the target architecture and about
     additional hardware details like the number of compute units. This extra
     information guides some compiler heuristics and allows for SKU-specific
     <a href="../../../reference/tuning/">tuning specs</a>.</li>
 <li>The GPU architecture, as defined by LLVM, e.g.,
-    <code>--iree-hip-target=gfx942</code>. This scheme allows for architecture-specific
+    <code>--iree-rocm-target=gfx942</code>. This scheme allows for architecture-specific
     <a href="../../../reference/tuning/">tuning specs</a> only.</li>
-<li>The architecture code name, e.g., <code>--iree-hip-target=cdna3</code>. This scheme
+<li>The architecture code name, e.g., <code>--iree-rocm-target=cdna3</code>. This scheme
     gets translated to closes matching GPU architecture under the hood.</li>
 </ol>
 <p>We support for common code/SKU names without aiming to be exhaustive. If the
