@@ -926,6 +926,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)},
       {"mma_kind", kind}};
 
+  // TODO(#23370): At the moment we always have to convert
+  // accumulating gemms when using NV_MMA_SYNC intrinsics.
+  if (auto mmaAttr = dyn_cast<GPU::MMAAttr>(kind)) {
+    if (GPU::isNvMmaSync(mmaAttr.getIntrinsic())) {
+      GPU::appendConvertAccGemm(context, attrs);
+    }
+  }
+
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);

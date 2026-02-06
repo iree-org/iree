@@ -108,6 +108,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LoopLikeInterface",
+        "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:ParallelCombiningOpInterface",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SCFDialect",

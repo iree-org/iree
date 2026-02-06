@@ -206,3 +206,31 @@ func.func @acc_gemm_from_buffer(%lhs_buffer : memref<512x128xi8>, %rhs_buffer : 
 //       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //  CHECK-SAME:       outs(%[[INIT]]
 //       CHECK:   iree_codegen.store_to_buffer %[[MATMUL]], %[[INIT_BUFFER]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @acc_gemm_with_convert_attribute(%1 : tensor<512x128xi8>, %2 : tensor<128x512xi8>) {
+  %c0_i32 = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>> -> tensor<512x512xi32>
+  %5 = linalg.matmul {lowering_config = #iree_gpu.lowering_config<{convert_acc_gemm}>}
+    ins(%1, %2 : tensor<512x128xi8>, tensor<128x512xi8>) outs(%4 : tensor<512x512xi32>) -> tensor<512x512xi32>
+  iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1]
+      : tensor<512x512xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<512x512xi32>>
+  return
+}
+// CHECK-LABEL: func @acc_gemm_with_convert_attribute
+//       CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<512x512xi32>
+//       CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : i32) outs(%[[EMPTY]] : tensor<512x512xi32>) -> tensor<512x512xi32>
+//       CHECK: %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:     outs(%[[FILL]]
+//       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[MATMUL]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
+//       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
