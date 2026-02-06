@@ -27,6 +27,14 @@ struct CPUCodegenOptions {
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
 };
 
+struct GPUCodegenOptions {
+  // Enable prefetch in the vector distribute pipeline.
+  bool enablePrefetch = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<GPUCodegenOptions>;
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CODEGENOPTIONS_H_
