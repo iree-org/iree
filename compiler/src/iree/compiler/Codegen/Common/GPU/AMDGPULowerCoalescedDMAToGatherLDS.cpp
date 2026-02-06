@@ -288,6 +288,20 @@ struct LowerCoalescedGatherDMAPattern final
     }
     SmallVector<TransferSegment> segments = std::move(*segmentsOrFailure);
 
+    // OOB padding requires fat_raw_buffer for hardware OOB clamping.
+    if (std::optional<ArrayAttr> inBounds = dmaOp.getInBounds()) {
+      auto srcType = cast<MemRefType>(source.getType());
+      if (!hasAMDGPUFatRawBufferAddressSpace(srcType)) {
+        for (Attribute attr : *inBounds) {
+          if (!cast<BoolAttr>(attr).getValue()) {
+            dmaOp.emitOpError("in_bounds with OOB dimensions requires "
+                              "fat_raw_buffer address space on source");
+            return failure();
+          }
+        }
+      }
+    }
+
     // Set up for code generation.
     rewriter.setInsertionPoint(dmaOp);
     TypedValue<IndexType> laneId = dmaOp.getLane();

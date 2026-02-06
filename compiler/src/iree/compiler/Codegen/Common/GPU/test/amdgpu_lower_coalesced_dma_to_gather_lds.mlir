@@ -1266,3 +1266,36 @@ func.func @gather_dma_inner_dim_oob_64x62(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
+
+// -----
+
+// Test: in_bounds with OOB dimensions on non-fat_raw_buffer source should
+// not be lowered (pattern fails because hardware OOB clamping is unavailable).
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_64 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+
+func.func @no_lower_oob_without_fat_raw_buffer(
+    %source: memref<2x128xf32>,
+    %dest: memref<4x128xf32, #gpu.address_space<workgroup>>)
+    attributes {hal.executable.target = #executable_target_rocm_hsaco_fb,
+                translation_info = #translation_64} {
+  scf.forall (%arg6) in (64) {
+    // expected-error @+2 {{in_bounds with OOB dimensions requires fat_raw_buffer address space on source}}
+    // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
+      memref<2x128xf32>,
+      memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
