@@ -111,6 +111,8 @@ TEST(NumaTest, AllocFreeNullIsNoOp) {
 TEST(NumaTest, BindMemoryBasic) {
   // Should succeed or return PERMISSION_DENIED on systems where mbind()
   // requires CAP_SYS_NICE or cgroup permissions (common in CI containers).
+  // UNIMPLEMENTED is returned when mbind() is not available (e.g. RISC-V
+  // QEMU emulation, minimal kernels).
   void* ptr = NULL;
   iree_numa_alloc_options_t options = iree_numa_alloc_options_default();
   iree_numa_alloc_info_t info;
@@ -118,14 +120,16 @@ TEST(NumaTest, BindMemoryBasic) {
   ASSERT_NE(ptr, nullptr);
 
   iree_status_t status = iree_numa_bind_memory(ptr, 4096, 0);
-  if (iree_status_code(status) == IREE_STATUS_PERMISSION_DENIED) {
+  if (iree_status_code(status) == IREE_STATUS_PERMISSION_DENIED ||
+      iree_status_code(status) == IREE_STATUS_UNIMPLEMENTED) {
     iree_status_ignore(status);
   } else {
     IREE_ASSERT_OK(status);
   }
 
   status = iree_numa_bind_memory(ptr, 4096, IREE_NUMA_NODE_ANY);
-  if (iree_status_code(status) == IREE_STATUS_PERMISSION_DENIED) {
+  if (iree_status_code(status) == IREE_STATUS_PERMISSION_DENIED ||
+      iree_status_code(status) == IREE_STATUS_UNIMPLEMENTED) {
     iree_status_ignore(status);
   } else {
     IREE_ASSERT_OK(status);
