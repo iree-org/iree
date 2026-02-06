@@ -8265,7 +8265,7 @@ result must assume nothing of the contents and use <code>discard</code> access.<
 May introduce copy-on-write behavior if the operand value is used as well as
 the result and users should try to keep the operand to a single use by this
 op.</p>
-<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code>, <code>Stream_TiedResourcePassthrough</code></p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
@@ -12157,7 +12157,7 @@ threads timepoints through to enable proper synchronization.</p>
     from %storage : !stream.resource&lt;transient&gt;{%storage_size}
     =&gt; !stream.timepoint
 </code></pre></div></p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TiedResourcePassthrough</code></p>
 <p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
@@ -12299,7 +12299,7 @@ resolving the version of a resource after a particular point in the
 timeline. As timepoints transitively chain the timepoint must only cover the
 resource availability but not be limited to its original production
 timepoint.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TiedResourcePassthrough</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>TimelineOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_53">Attributes:<a class="headerlink" href="#attributes_53" title="Permanent link">link</a></h5>
@@ -12361,7 +12361,7 @@ identifying when the version of a resource after a particular point in the
 timeline is available. As timepoints transitively chain the timepoint must
 only cover the resource availability but not be limited to its original
 production timepoint.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TiedResourcePassthrough</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
