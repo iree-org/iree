@@ -521,7 +521,8 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Run stablehlo canonicalization patterns with a high benefit to avoid some
     // expensive expansions.
-    populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
+    populateCanonicalizationPatternsNoReorder(context, &patterns,
+                                              /*benefit=*/1024);
 
     // Run custom patterns with a high benefit to override stablehlo patterns.
     patterns.add<ConcatenateOpConversion, FftOpConversion,
