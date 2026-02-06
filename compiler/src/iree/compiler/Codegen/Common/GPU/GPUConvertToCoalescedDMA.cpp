@@ -319,7 +319,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     // After tiling, the input is typically:
     //   tensor.extract_slice %padded[...] [...] [1, 1]
     // We need to trace through extract_slice to find if source is tensor.pad.
-    if (auto pad = traceToTensorPad(input)) {
+    if (tensor::PadOp pad = traceToTensorPad(input)) {
       // Verify pad constraints: low padding must be all zeros, pad value must
       // be 0.
       bool validPad = true;
@@ -893,7 +893,7 @@ private:
     // Check if this is a tensor.pad fusion case.
     bool isPadFusion = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-      if (auto pad = traceToTensorPad(copyOp.getInputs()[0])) {
+      if (tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0])) {
         // Check if padding exists (non-zero low/high pad).
         for (auto [low, high] :
              llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {

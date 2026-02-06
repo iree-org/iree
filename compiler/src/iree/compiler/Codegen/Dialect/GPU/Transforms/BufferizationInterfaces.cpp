@@ -436,10 +436,10 @@ struct CoalescedGatherDMAOpBufferizationInterface
     // terminator (not inside the in_parallel region which will be removed).
     auto inParallelOp = gatherOp->getParentOfType<scf::InParallelOp>();
     if (inParallelOp) {
-      // Insert before the in_parallel terminator (in the forall body)
+      // Insert before the in_parallel terminator (in the forall body).
       rewriter.setInsertionPoint(inParallelOp);
     } else {
-      // Not in in_parallel, just insert at current location
+      // Not in in_parallel, just insert at current location.
       rewriter.setInsertionPoint(gatherOp);
     }
 
