@@ -1091,17 +1091,14 @@ func.func @lower_coalesced_dma_with_in_bounds(
 //   - 64 lanes (one subgroup)
 //   - in_bounds = [false, true]: K-dim may OOB (last tile 121 % 4 = 1), N-dim is aligned
 //
-// With 64 lanes and 4x64 dest shape:
-//   - Elements per lane = 64 / 64 = 1 (each lane reads 1 f32)
+// With 64 lanes, 4x64 dest shape, and dma_sizes = [32, 128]:
+//   - Elements per lane = 256 / 64 = 4 (each lane reads 4xf32 = 128 bits)
 //   - Delinearization basis = (4, 64)
-//   - 4 transfers per lane (one per row)
-//
-// This verifies correct row access pattern: all 4 rows (0-3) are accessed,
-// not just row 0 repeated 4 times (which was the bug before the fix).
+//   - 1 transfer covers all 256 elements
 
 #executable_target_rocm_hsaco_fb_unaligned = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx942", features = "", wgp = <
+  arch = "gfx950", features = "", wgp = <
     compute = fp32, storage = b32, subgroup = shuffle, dot = none, mma = [],
     subgroup_size_choices = [64, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
@@ -1109,7 +1106,7 @@ func.func @lower_coalesced_dma_with_in_bounds(
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
 #translation_64_unaligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 
@@ -1124,12 +1121,12 @@ func.func @lower_coalesced_dma_4x64_tensor_pad_fusion(
     translation_info = #translation_64_unaligned} {
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
   scf.forall (%arg6) in (64) {
-    // Each lane reads 1 element (64 elements / 64 lanes = 1).
-    // CHECK: %[[C1:[a-zA-Z0-9_]+]] = arith.constant 1 : index
-    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C1]]
+    // Each lane reads 4 elements (256 elements / 64 lanes = 4).
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4 : index
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
-    // 4 transfers with delinearization basis (4, 64):
-    // Transfer 1: linearOffset = 0, accesses row 0
+    // 1 transfer with delinearization basis (4, 64):
+    // Transfer 1: linearOffset = 0
     // CHECK: %[[C0:.+]] = arith.constant 0 : index
     // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
     // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 64)
@@ -1138,37 +1135,7 @@ func.func @lower_coalesced_dma_4x64_tensor_pad_fusion(
     // CHECK: %[[FALSE0:.+]] = arith.constant false
     // CHECK: %[[DIM0:.+]] = memref.dim %[[SRC]], %{{.+}}
     // CHECK: %[[FIXED0:.+]] = arith.select %[[FALSE0]], %[[DIM0]], %[[SRC_DELIN0]]#0
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED0]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<1xf32>
-    //
-    // Transfer 2: linearOffset = 64, accesses row 1
-    // CHECK: %[[C64:.+]] = arith.constant 64 : index
-    // CHECK: %[[SRC_LIN64:.+]] = arith.addi %[[C64]], %[[LANE_OFFSET]]
-    // CHECK: %[[SRC_DELIN64:.+]]:2 = affine.delinearize_index %[[SRC_LIN64]] into (4, 64)
-    // CHECK: %[[DST_DELIN64:.+]]:2 = affine.delinearize_index %[[C64]] into (4, 64)
-    // CHECK: %[[FALSE1:.+]] = arith.constant false
-    // CHECK: %[[DIM1:.+]] = memref.dim %[[SRC]], %{{.+}}
-    // CHECK: %[[FIXED1:.+]] = arith.select %[[FALSE1]], %[[DIM1]], %[[SRC_DELIN64]]#0
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED1]], %[[SRC_DELIN64]]#1], %[[DST]][%[[DST_DELIN64]]#0, %[[DST_DELIN64]]#1] : vector<1xf32>
-    //
-    // Transfer 3: linearOffset = 128, accesses row 2
-    // CHECK: %[[C128:.+]] = arith.constant 128 : index
-    // CHECK: %[[SRC_LIN128:.+]] = arith.addi %[[C128]], %[[LANE_OFFSET]]
-    // CHECK: %[[SRC_DELIN128:.+]]:2 = affine.delinearize_index %[[SRC_LIN128]] into (4, 64)
-    // CHECK: %[[DST_DELIN128:.+]]:2 = affine.delinearize_index %[[C128]] into (4, 64)
-    // CHECK: %[[FALSE2:.+]] = arith.constant false
-    // CHECK: %[[DIM2:.+]] = memref.dim %[[SRC]], %{{.+}}
-    // CHECK: %[[FIXED2:.+]] = arith.select %[[FALSE2]], %[[DIM2]], %[[SRC_DELIN128]]#0
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED2]], %[[SRC_DELIN128]]#1], %[[DST]][%[[DST_DELIN128]]#0, %[[DST_DELIN128]]#1] : vector<1xf32>
-    //
-    // Transfer 4: linearOffset = 192, accesses row 3
-    // CHECK: %[[C192:.+]] = arith.constant 192 : index
-    // CHECK: %[[SRC_LIN192:.+]] = arith.addi %[[C192]], %[[LANE_OFFSET]]
-    // CHECK: %[[SRC_DELIN192:.+]]:2 = affine.delinearize_index %[[SRC_LIN192]] into (4, 64)
-    // CHECK: %[[DST_DELIN192:.+]]:2 = affine.delinearize_index %[[C192]] into (4, 64)
-    // CHECK: %[[FALSE3:.+]] = arith.constant false
-    // CHECK: %[[DIM3:.+]] = memref.dim %[[SRC]], %{{.+}}
-    // CHECK: %[[FIXED3:.+]] = arith.select %[[FALSE3]], %[[DIM3]], %[[SRC_DELIN192]]#0
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED3]], %[[SRC_DELIN192]]#1], %[[DST]][%[[DST_DELIN192]]#0, %[[DST_DELIN192]]#1] : vector<1xf32>
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED0]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
@@ -1199,7 +1166,7 @@ func.func @lower_coalesced_dma_4x64_tensor_pad_fusion(
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
 
 #translation_32_pad = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
