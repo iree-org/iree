@@ -182,8 +182,11 @@ public:
     auto &optionInfos = getOptionsStorage();
     auto dummyIt = optionInfos.find(kDummyRootFlag);
     if (dummyIt != optionInfos.end()) {
-      optionInfos[name] = std::move(dummyIt->second);
+      // Erase before inserting: operator[] may grow the map and invalidate
+      // dummyIt.
+      auto value = std::move(dummyIt->second);
       optionInfos.erase(dummyIt);
+      optionInfos[name] = std::move(value);
     }
     getRootFlag() = name;
 
