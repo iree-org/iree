@@ -301,6 +301,392 @@ static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
 }
 
 namespace {
+struct ExpandMemrefResult {
+  Value readIndex;
+  SmallVector<int64_t> expandedShape;
+  SmallVector<int64_t> expandedStrides;
+};
+
+struct PermutationResult {
+  SmallVector<Value> readIndices;
+  SmallVector<unsigned> permutationTargets;
+};
+
+} // anonymous namespace
+
+/// Calculate the sizes and strides for expanding the \p memrefDim dimension of
+/// the \p memrefTy according to the \p vectorDim dimension of the \p
+/// vectorLayout distribution. The distribution takes the dimension dX of the
+/// memref and expands it into <remainder x subgroup x batch x outer x thread x
+/// element> based on the vector layout. The function also constructs IR to
+/// recalculate the index in that dimension for read access.
+static ExpandMemrefResult
+expandMemrefDimForLayout(ImplicitLocOpBuilder &builder,
+                         vector::TransferReadOp readOp, MemRefType memrefTy,
+                         NestedLayoutAttr vectorLayout, int64_t memrefDim,
+                         int64_t vectorDim) {
+  auto calculateStrides = [](ArrayRef<int64_t> sizes,
+                             int64_t baseStride) -> SmallVector<int64_t> {
+    auto suffixProduct = mlir::computeSuffixProduct(sizes);
+    return llvm::to_vector(
+        llvm::map_range(suffixProduct, [baseStride](int64_t stride) {
+          return baseStride * stride;
+        }));
+  };
+
+  auto [strides, _] = memrefTy.getStridesAndOffset();
+  SmallVector<int64_t, 6> expandedShape;
+  // The remaining size of the memref in the distributed dimension is the
+  // original size divided by the product of the distributed sizes in that
+  // dimension.
+  assert(!memrefTy.isDynamicDim(memrefDim));
+  SmallVector<int64_t> undistributedPackedShape =
+      vectorLayout.getPackedShapeForUndistributedDim(vectorDim);
+  int64_t divider = llvm::product_of(undistributedPackedShape);
+  int64_t remainingSize = memrefTy.getDimSize(memrefDim) / divider;
+  expandedShape.push_back(remainingSize);
+  expandedShape.append(undistributedPackedShape);
+
+  // Delinearize the index into the memref over the distributed dimensions.
+  SmallVector<int64_t, 6> basis;
+  basis.push_back(remainingSize);
+  basis.append(undistributedPackedShape);
+  auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+      builder, readOp.getIndices()[memrefDim], {}, basis,
+      /*hasOuterBound=*/true);
+
+  // Calculate the new strides.
+  int64_t baseStride = strides[memrefDim];
+  SmallVector<int64_t> distributedStrides =
+      calculateStrides(undistributedPackedShape, baseStride);
+  distributedStrides.insert(distributedStrides.begin(), baseStride * divider);
+
+  return {delinearizeOp->getResult(0), expandedShape, distributedStrides};
+}
+
+/// Based on the \p vectorRank this function calculcates the permutation and
+/// indices for a `vector.transfer_read` that reads the distributed vector.
+static PermutationResult getExpandedPermutation(ImplicitLocOpBuilder &builder,
+                                                ArrayRef<Value> warpIndices,
+                                                ArrayRef<Value> threadIndices,
+                                                int64_t memRank,
+                                                int64_t vectorRank) {
+
+  auto zeroIndex = arith::ConstantIndexOp::create(builder, 0);
+  SmallVector<unsigned> permutationTargets;
+  permutationTargets.reserve(vectorRank * 3);
+  SmallVector<Value> readIndices;
+  readIndices.reserve(vectorRank * 3);
+  unsigned targetIndex = memRank;
+  auto addDimension = [&](ValueRange indices, bool isPermutationTarget) {
+    readIndices.append(indices.begin(), indices.end());
+    if (isPermutationTarget) {
+      llvm::append_range(
+          permutationTargets,
+          llvm::seq<unsigned>(targetIndex, targetIndex + vectorRank));
+    }
+    targetIndex += vectorRank;
+  };
+  SmallVector<Value, 3> zeroIndices(vectorRank, zeroIndex);
+  // Subgroup dimension
+  addDimension(warpIndices, /*isPermutationTarget=*/false);
+  // Batch dimension
+  addDimension(zeroIndices, /*isPermutationTarget=*/true);
+  // Outer dimension
+  addDimension(zeroIndices, /*isPermutationTarget=*/true);
+  // Thread dimension
+  addDimension(threadIndices, /*isPermutationTarget=*/false);
+  // Element dimension
+  addDimension(zeroIndices, /*isPermutationTarget=*/true);
+
+  return {readIndices, permutationTargets};
+}
+
+namespace {
+
+/// Distribute a vector.transfer_read to a single vector.transfer_read. In
+/// constrast to the more generic DistributeTransferRead pattern, which will
+/// read each element vector individually and then insert them into the larger
+/// result, this pattern aims to generate only a single read.
+/// It achieves this by reinterpreting (memref.reinterpret_cast) the base memory
+/// to match the unpacked distributed vector layout first. It then transposes
+/// the memref (memref.transpose) into the packed distributed vector layout and
+/// then inserts a single transfer_read to read the distributed vector from that
+/// memref.
+///
+/// Assuming a two-dimensional vector layout and memref<A x B x C x D>, the
+/// reinterpretation yields:
+/// memref<A x B x
+///  (C / size1) x Warp1 x Batch1 x Outer1 x Thread1 x Element1 x
+///  (D / size0) x Warp0 x Batch0 x Outer0 x Thread0 x Element0 >
+///
+/// The transpose then yields:
+/// memref<A x B x
+///  (C / size1) x (D / size0) x Warp1 x Warp0 x Batch1 x Batch0 x
+///  Outer1 x Outer0 x Thread1 x Thread0 x Element1 x Element0 >
+///
+/// From that memref, we can read with a single transfer_read a
+/// vector<Batch1 x Batch0 x Outer1 x Outer0 x Element1 x Element0>.
+///
+/// This pattern has a number of prerequisites and will fall back to the more
+/// generic DistributeTransferRead pattern if they are not met.
+struct DistributeTransferReadToSingleRead final
+    : OpDistributionPattern<vector::TransferReadOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferReadToSingleRead(MLIRContext *context, Value threadId,
+                                     int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[readOp.getResult()]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "non-nested transfer_read layout");
+    }
+
+    // Get mask and its layout if present.
+    VectorValue mask = readOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(readOp,
+                                           "non-nested mask vector layout");
+      }
+    }
+
+    // Fall back to the simpler pattern for 0-d vectors, which will only create
+    // a single transfer_read anyway.
+    if (vectorLayout.getRank() == 0) {
+      return rewriter.notifyMatchFailure(readOp, "fallback for 0-d vector");
+    }
+
+    // Fall back to the simpler pattern if only a single element tile is read
+    // per thread, i.e., when batch and outer tile are both all-ones. The simple
+    // pattern will also generate a single read in that case.
+    auto allOnes = [](ArrayRef<int64_t> strides) -> bool {
+      return llvm::all_of(strides, [](int64_t s) { return s == 1; });
+    };
+    if (allOnes(vectorLayout.getBatchTile()) &&
+        allOnes(vectorLayout.getOuterTile())) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "fallback for single tile case");
+    }
+
+    // Require the original read to be in-bounds in all dimensions.
+    if (!llvm::all_of(readOp.getInBoundsValues(), [](bool &b) { return b; })) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "potential out-of-bounds access");
+    }
+
+    // Guard on memrefs for distribution. In isolation this pattern is agnostic
+    // to tensors or memrefs.
+    auto memrefTy = dyn_cast<MemRefType>(readOp.getBase().getType());
+    if (!memrefTy) {
+      return rewriter.notifyMatchFailure(readOp,
+                                         "distribution expects memrefs");
+    }
+
+    // We have to fall back to the simpler pattern for multi-dimensional LDS.
+    // Later passes may introduce padding to reduce bank conflicts into
+    // multi-dimensional LDS allocations, which would render the strides that we
+    // calculate here for the reinterpret cast incorrect.
+    if (vectorLayout.getRank() > 1) {
+      if (auto addressSpaceAttr =
+              llvm::dyn_cast_if_present<gpu::AddressSpaceAttr>(
+                  memrefTy.getMemorySpace())) {
+        if (addressSpaceAttr.getValue() == gpu::AddressSpace::Workgroup) {
+          return failure();
+        }
+      }
+    }
+
+    // We require the memref to  have static shape and stride in the last
+    // `vectorRank` dimensions and also have static offset.
+    int64_t vectorRank = vectorLayout.getRank();
+    int64_t memRank = memrefTy.getRank();
+    int64_t undistributedDims = memRank - vectorRank;
+    auto memMetadata = memrefTy.getStridesAndOffset();
+    SmallVector<int64_t> memStrides = std::get<0>(memMetadata);
+    int64_t memOffset = std::get<1>(memMetadata);
+    if (memOffset == ShapedType::kDynamic ||
+        llvm::any_of(llvm::seq(undistributedDims, memRank), [&](int64_t dim) {
+          return memrefTy.isDynamicDim(dim) ||
+                 (memStrides[dim] == ShapedType::kDynamic);
+        })) {
+      return rewriter.notifyMatchFailure(
+          readOp, "memref type has dynamic shape, stride or offset");
+    }
+
+    // We require the permutation map to be a minor identity map.
+    if (!readOp.getPermutationMap().isMinorIdentity()) {
+      // TODO(sommerlukas): Can we support permutation maps that are not minor
+      // identity maps?
+      return rewriter.notifyMatchFailure(
+          readOp, "permutation map is not minor identity map");
+    }
+
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          readOp, "warp or thread tiles have overlapping strides");
+    }
+
+    // Distribute the mask if present.
+    VectorValue distributedMask = nullptr;
+    if (mask) {
+      distributedMask = getDistributed(rewriter, mask, maskLayout);
+    }
+
+    int64_t distributedRank =
+        vectorLayout.getPackedShapeForUndistributedDim(0).size();
+    int64_t newNumDimensions = (vectorRank * distributedRank) + memRank;
+    SmallVector<int64_t> expandedMemShape;
+    expandedMemShape.reserve(newNumDimensions);
+    SmallVector<Value> expandedReadIndices;
+    expandedReadIndices.reserve(newNumDimensions);
+    SmallVector<int64_t> expandedStrides;
+    expandedStrides.reserve(newNumDimensions);
+
+    // Append information for the undistributed dimensions.
+    llvm::append_range(expandedMemShape,
+                       memrefTy.getShape().take_front(undistributedDims));
+    llvm::append_range(expandedReadIndices,
+                       readOp.getIndices().take_front(undistributedDims));
+    llvm::append_range(
+        expandedStrides,
+        ArrayRef<int64_t>(memStrides).take_front(undistributedDims));
+
+    // Calculate the information for the dimensions of the memref that are going
+    // to be distributed.
+    ImplicitLocOpBuilder builder{readOp->getLoc(), rewriter};
+    llvm::for_each(
+        llvm::enumerate(llvm::to_vector(llvm::seq(undistributedDims, memRank))),
+        [&](auto indices) {
+          int64_t vectorDim = indices.index();
+          int64_t memrefDim = indices.value();
+          ExpandMemrefResult expandedInfo = expandMemrefDimForLayout(
+              builder, readOp, memrefTy, vectorLayout, memrefDim, vectorDim);
+          expandedReadIndices.push_back(expandedInfo.readIndex);
+          expandedMemShape.append(expandedInfo.expandedShape);
+          expandedStrides.append(expandedInfo.expandedStrides);
+        });
+
+    // Construct the expanded memref type. The undistributed dimensions are kept
+    // as they are. For the distributed dimensions, we use the unpacked form
+    // here. An example for a two-dimensional vector from a four-dimensional
+    // memref would result in the following shape:
+    // <undistributed1 x undistributed0 x
+    //    distributed1 x subgroup1 x batch1 x outer1 x thread1 x element1 x
+    //    distributed0 x subgroup0 x batch0 x outer0 x thread0 x element0>
+    // For the correct distribution, the shapes play a relevant role.
+    auto expandedMemrefLayout = StridedLayoutAttr::get(
+        builder.getContext(), memOffset, expandedStrides);
+    auto expandedMemTy =
+        MemRefType::get(expandedMemShape, memrefTy.getElementType(),
+                        expandedMemrefLayout, memrefTy.getMemorySpace());
+
+    // Create a memref.reinterpret_cast operation to reinterpret the original
+    // memref to the new, distributed shape.
+
+    // Collect the size operands. For static dimensions, this is just an
+    // attribute. For dynamic dimensions, we need to create a `memref.dim`
+    // operation.
+    SmallVector<OpFoldResult> outputShapes(llvm::map_range(
+        llvm::enumerate(expandedMemShape),
+        [&](auto dimAndShape) -> OpFoldResult {
+          size_t dim = dimAndShape.index();
+          int64_t shape = dimAndShape.value();
+          if (shape == ShapedType::kDynamic) {
+            assert(dim < undistributedDims &&
+                   "distributed dimensions should be static for sizes");
+            Value constIndex = arith::ConstantIndexOp::create(builder, dim);
+            return memref::DimOp::create(builder, readOp.getBase(), constIndex)
+                ->getResult(0);
+          }
+          return builder.getIndexAttr(shape);
+        }));
+
+    // Collect the stride operands. For static dimensions, this is just an
+    // attribute. For dynamic dimensions, we need to extract it from the
+    // original memref via a `memref.extract_strided_metadata` operation.
+    SmallVector<OpFoldResult> strides(llvm::map_range(
+        llvm::enumerate(expandedStrides),
+        [&](auto dimAndShape) -> OpFoldResult {
+          size_t dim = dimAndShape.index();
+          int64_t stride = dimAndShape.value();
+          if (stride == ShapedType::kDynamic) {
+            assert(dim < undistributedDims &&
+                   "distributed dimensions should be static for strides");
+            auto extractMetadata = memref::ExtractStridedMetadataOp::create(
+                builder, readOp.getBase());
+            return extractMetadata.getStrides()[dim];
+          }
+          return builder.getIndexAttr(stride);
+        }));
+
+    auto expandedMem = memref::ReinterpretCastOp::create(
+        builder, expandedMemTy, readOp.getBase(), builder.getIndexAttr(0),
+        outputShapes, strides);
+
+    // Create a memref.transpose operation to go from unpacked to packed format.
+    // For our example from above, this means that we're transposing to the
+    // following shape:
+    // <undistributed1 x undistributed0 x distributed1 x distributed0 x
+    //    subgroup1 x subgroup0 x batch1 x batch0 x outer1 x outer0 x
+    //    thread1 x thread0 x element1 x element0>
+    SmallVector<int64_t> transposePermutation;
+    transposePermutation.reserve(newNumDimensions);
+    // The undistributed dimensions are not getting transposed.
+    transposePermutation.append(
+        llvm::to_vector(llvm::seq(0l, undistributedDims)));
+    // For the distributed dimensions, we need to create a pattern for the
+    // packing.
+    unsigned start = undistributedDims;
+    for (unsigned dim = 0; dim < distributedRank + 1; ++dim, ++start) {
+      for (unsigned r = 0; r < vectorRank; ++r) {
+        transposePermutation.push_back(start + r * (distributedRank + 1));
+      }
+    }
+    auto transposeMap = AffineMap::getPermutationMap(transposePermutation,
+                                                     builder.getContext());
+    auto transposeMem = memref::TransposeOp::create(
+        builder, expandedMem, AffineMapAttr::get(transposeMap));
+
+    // Construct the remaining indices and the permutation map for the new
+    // transfer_read.
+    PermutationResult permutation = getExpandedPermutation(
+        builder, warpIndices, threadIndices, memRank, vectorRank);
+    expandedReadIndices.append(permutation.readIndices);
+    AffineMap newPermMap = AffineMap::getMultiDimMapWithTargets(
+        expandedMemTy.getRank(), permutation.permutationTargets,
+        rewriter.getContext());
+
+    // Create the new vector.transfer_read operation that is going to read the
+    // entire distributed shape in a single read.
+    Type elementTy = memrefTy.getElementType();
+    auto newVectorTy =
+        VectorType::get(vectorLayout.getDistributedShape(), elementTy);
+    SmallVector<bool> inBounds(3 * vectorRank, true);
+    ArrayAttr inBoundsAttr = builder.getBoolArrayAttr(inBounds);
+    auto newRead = vector::TransferReadOp::create(
+        builder, newVectorTy, transposeMem, expandedReadIndices, newPermMap,
+        readOp.getPadding(), distributedMask, inBoundsAttr);
+
+    replaceOpWithDistributedValues(rewriter, readOp, newRead->getResults());
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
 struct DistributeTransferRead final
@@ -2241,9 +2627,9 @@ struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferGather,
-               DistributeMapScatter>(patterns.getContext(), threadId,
-                                     subgroupSize);
+  patterns.add<DistributeTransferReadToSingleRead, DistributeTransferRead,
+               DistributeTransferGather, DistributeMapScatter>(
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
