@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -242,9 +243,37 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasVerifier = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// Terminator ops.
+//===----------------------------------------------------------------------===//
+
+def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
+    Pure,
+    ReturnLike,
+    Terminator
+  ]> {
+  let summary = "Yield operation for VectorExt operations with regions";
+  let description = [{
+    Yields values from regions in VectorExt operations.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$values);
+
+  let builders = [
+    OpBuilder<(ins), [{ /* nothing to do */ }]>
+  ];
+
+  let assemblyFormat = "attr-dict ($values^ `:` type($values))?";
+}
+
+//===----------------------------------------------------------------------===//
+// LinalgExt-style ops.
+//===----------------------------------------------------------------------===//
+
 def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
   Pure,
-  AttrSizedOperandSegments
+  AttrSizedOperandSegments,
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::VectorExt::YieldOp">
 ]> {
   let summary = "Vectorized arg-reduction using a user-defined comparator.";
   let description = [{
@@ -268,10 +297,10 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input_vec : vector<4x128xf32>)
-      outs(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
     } -> vector<4xf32>, vector<4xi32>
     ```
 
@@ -284,20 +313,23 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%partial_vals, %partial_idxs : vector<4x32xf32>, vector<4x32xi32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
     } -> vector<4xf32>, vector<4xi32>
     ```
 
     The `index_base` is optional and is preserved from the tensor version
     when applicable.
+
+    The `inits` operands provide the initial accumulator values for the
+    reduction (initial max/min value and index).
   }];
 
   let arguments = (ins
     Variadic<AnyVectorOfAnyRank>:$inputs,
-    Variadic<AnyVectorOfAnyRank>:$outputs,
+    Variadic<AnyVectorOfAnyRank>:$inits,
     Optional<Index>:$index_base,
     I64Attr:$dimension
   );
@@ -312,7 +344,7 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     attr-dict
     `dimension` `(` $dimension `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `inits` `(` $inits `:` type($inits) `)`
     (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
     $region (`->` type($results)^)?
   }];
@@ -333,24 +365,28 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
       return getInputs()[1];
     }
 
-    Value getOutputValue() {
-      return getOutputs()[0];
+    ValueRange getInitValues() {
+      return getInits();
     }
 
-    Value getOutputIndex() {
-      return getOutputs()[1];
+    Value getInitValue() {
+      return getInits()[0];
+    }
+
+    Value getInitIndex() {
+      return getInits()[1];
     }
 
     VectorType getInputType() {
       return cast<VectorType>(getInputValue().getType());
     }
 
-    VectorType getOutputValueType() {
-      return cast<VectorType>(getOutputValue().getType());
+    VectorType getInitValueType() {
+      return cast<VectorType>(getInitValue().getType());
     }
 
-    VectorType getOutputIndexType() {
-      return cast<VectorType>(getOutputIndex().getType());
+    VectorType getInitIndexType() {
+      return cast<VectorType>(getInitIndex().getType());
     }
 
     VectorType getInputIndexType() {
@@ -367,8 +403,12 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
       return nullptr;
     }
 
-    Type getOutputIndexElementType() {
-      return getOutputIndexType().getElementType();
+    Type getInitValueElementType() {
+      return getInitValueType().getElementType();
+    }
+
+    Type getInitIndexElementType() {
+      return getInitIndexType().getElementType();
     }
 
     int64_t getInputRank() {

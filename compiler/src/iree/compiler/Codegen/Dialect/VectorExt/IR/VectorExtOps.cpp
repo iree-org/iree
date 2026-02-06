@@ -695,10 +695,9 @@ LogicalResult ArgCompareOp::verify() {
            << numInputs;
   }
 
-  unsigned numOutputs = llvm::size(getOutputs());
-  if (numOutputs != 2) {
-    return op->emitOpError("expected 2 output operands, but got ")
-           << numOutputs;
+  unsigned numInits = llvm::size(getInits());
+  if (numInits != 2) {
+    return op->emitOpError("expected 2 init operands, but got ") << numInits;
   }
 
   unsigned numResults = llvm::size(getResults());
@@ -707,12 +706,12 @@ LogicalResult ArgCompareOp::verify() {
   }
 
   VectorType inputType = getInputType();
-  VectorType outputValueType = getOutputValueType();
-  VectorType outputIndexType = getOutputIndexType();
+  VectorType initValueType = getInitValueType();
+  VectorType initIndexType = getInitIndexType();
 
   int64_t inputRank = inputType.getRank();
-  int64_t outputValueRank = outputValueType.getRank();
-  int64_t outputIndexRank = outputIndexType.getRank();
+  int64_t initValueRank = initValueType.getRank();
+  int64_t initIndexRank = initIndexType.getRank();
   int64_t dimension = getDimension();
 
   if (dimension < 0 || dimension >= inputRank) {
@@ -720,15 +719,15 @@ LogicalResult ArgCompareOp::verify() {
            << dimension << " is out of range [0, " << inputRank << ")";
   }
 
-  if (outputValueRank != inputRank - 1) {
-    return op->emitOpError("output value rank (")
-           << outputValueRank << ") should be input rank - 1 (" << inputRank
+  if (initValueRank != inputRank - 1) {
+    return op->emitOpError("init value rank (")
+           << initValueRank << ") should be input rank - 1 (" << inputRank
            << " - 1)";
   }
 
-  if (outputIndexRank != inputRank - 1) {
-    return op->emitOpError("output index rank (")
-           << outputIndexRank << ") should be input rank - 1 (" << inputRank
+  if (initIndexRank != inputRank - 1) {
+    return op->emitOpError("init index rank (")
+           << initIndexRank << ") should be input rank - 1 (" << inputRank
            << " - 1)";
   }
 
@@ -740,38 +739,38 @@ LogicalResult ArgCompareOp::verify() {
     }
   }
 
-  ArrayRef<int64_t> outputValueShape = outputValueType.getShape();
-  if (!llvm::equal(expectedShape, outputValueShape)) {
+  ArrayRef<int64_t> initValueShape = initValueType.getShape();
+  if (!llvm::equal(expectedShape, initValueShape)) {
     return op->emitOpError(
-               "output value shape must match input shape with reduction "
+               "init value shape must match input shape with reduction "
                "dimension removed. ")
            << "Expected: " << llvm::interleaved_array(expectedShape)
-           << ", but got: " << llvm::interleaved_array(outputValueShape);
+           << ", but got: " << llvm::interleaved_array(initValueShape);
   }
 
-  ArrayRef<int64_t> outputIndexShape = outputIndexType.getShape();
-  if (!llvm::equal(expectedShape, outputIndexShape)) {
+  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
+  if (!llvm::equal(expectedShape, initIndexShape)) {
     return op->emitOpError(
-               "output index shape must match input shape with reduction "
+               "init index shape must match input shape with reduction "
                "dimension removed. ")
            << "Expected: " << llvm::interleaved_array(expectedShape)
-           << ", but got: " << llvm::interleaved_array(outputIndexShape);
+           << ", but got: " << llvm::interleaved_array(initIndexShape);
   }
 
   Type inputElementType = inputType.getElementType();
-  Type outputValueElementType = outputValueType.getElementType();
+  Type initValueElementType = initValueType.getElementType();
 
-  if (inputElementType != outputValueElementType) {
-    return op->emitOpError("input and output value element types must match. ")
+  if (inputElementType != initValueElementType) {
+    return op->emitOpError("input and init value element types must match. ")
            << "Input type: " << inputElementType
-           << ", output value type: " << outputValueElementType;
+           << ", init value type: " << initValueElementType;
   }
 
-  Type outputIndexElementType = getOutputIndexElementType();
-  if (!isa<IntegerType, IndexType>(outputIndexElementType)) {
+  Type initIndexElementType = initIndexType.getElementType();
+  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
     return op->emitOpError(
-               "output index must have integer or index element type, but got ")
-           << outputIndexElementType;
+               "init index must have integer or index element type, but got ")
+           << initIndexElementType;
   }
 
   if (hasExplicitIndexInput()) {
@@ -792,12 +791,12 @@ LogicalResult ArgCompareOp::verify() {
              << inputIndexElementType;
     }
 
-    if (inputIndexElementType != outputIndexElementType) {
+    if (inputIndexElementType != initIndexElementType) {
       return op->emitOpError(
-                 "explicit-index mode: input and output index element types "
+                 "explicit-index mode: input and init index element types "
                  "must match. ")
              << "Input index type: " << inputIndexElementType
-             << ", output index type: " << outputIndexElementType;
+             << ", init index type: " << initIndexElementType;
     }
 
     if (getIndexBase()) {
@@ -838,12 +837,16 @@ LogicalResult ArgCompareOp::verify() {
   }
 
   TypeRange resultTypes = getResultTypes();
-  if (resultTypes[0] != outputValueType) {
-    return op->emitOpError("result type 0 doesn't match output value type");
+  if (resultTypes[0] != initValueType) {
+    return op->emitOpError("result type 0 doesn't match init value type. ")
+           << "Result type: " << resultTypes[0]
+           << ", init value type: " << initValueType;
   }
 
-  if (resultTypes[1] != outputIndexType) {
-    return op->emitOpError("result type 1 doesn't match output index type");
+  if (resultTypes[1] != initIndexType) {
+    return op->emitOpError("result type 1 doesn't match init index type. ")
+           << "Result type: " << resultTypes[1]
+           << ", init index type: " << initIndexType;
   }
 
   return success();

@@ -90,10 +90,10 @@ func.func @arg_compare_no_inputs(%out_val: vector<4xf32>,
   // expected-error @+1 {{expected 1 or 2 input operands, but got 0}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(0)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -110,10 +110,10 @@ func.func @arg_compare_too_many_inputs(%input1: vector<4x128xf32>,
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input1, %input2, %input3 : vector<4x128xf32>, vector<4x128xi32>, vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -123,14 +123,14 @@ func.func @arg_compare_too_many_inputs(%input1: vector<4x128xf32>,
 func.func @arg_compare_wrong_output_count(%input: vector<4x128xf32>,
                                           %out_val: vector<4xf32>)
     -> vector<4xf32> {
-  // expected-error @+1 {{expected 2 output operands, but got 1}}
+  // expected-error @+1 {{expected 2 init operands, but got 1}}
   %result = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val : vector<4xf32>) {
+      inits(%out_val : vector<4xf32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>
   return %result : vector<4xf32>
 }
@@ -145,10 +145,10 @@ func.func @arg_compare_dimension_out_of_bounds(%input: vector<4x128xf32>,
   %result:2 = iree_vector_ext.arg_compare
       dimension(2)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -163,10 +163,10 @@ func.func @arg_compare_negative_dimension(%input: vector<4x128xf32>,
   %result:2 = iree_vector_ext.arg_compare
       dimension(-1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -177,14 +177,14 @@ func.func @arg_compare_wrong_output_rank(%input: vector<4x128xf32>,
                                          %out_val: vector<4x8xf32>,
                                          %out_idx: vector<4xi32>)
     -> (vector<4x8xf32>, vector<4xi32>) {
-  // expected-error @+1 {{output value rank (2) should be input rank - 1 (2 - 1)}}
+  // expected-error @+1 {{init value rank (2) should be input rank - 1 (2 - 1)}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4x8xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4x8xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4x8xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4x8xf32>, vector<4xi32>
 }
@@ -195,14 +195,14 @@ func.func @arg_compare_wrong_output_shape(%input: vector<4x128xf32>,
                                           %out_val: vector<8xf32>,
                                           %out_idx: vector<8xi32>)
     -> (vector<8xf32>, vector<8xi32>) {
-  // expected-error @+1 {{output value shape must match input shape with reduction dimension removed. Expected: [4], but got: [8]}}
+  // expected-error @+1 {{init value shape must match input shape with reduction dimension removed. Expected: [4], but got: [8]}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<8xf32>, vector<8xi32>) {
+      inits(%out_val, %out_idx : vector<8xf32>, vector<8xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<8xf32>, vector<8xi32>
   return %result#0, %result#1 : vector<8xf32>, vector<8xi32>
 }
@@ -213,14 +213,14 @@ func.func @arg_compare_wrong_output_element_type(%input: vector<4x128xf32>,
                                                   %out_val: vector<4xf16>,
                                                   %out_idx: vector<4xi32>)
     -> (vector<4xf16>, vector<4xi32>) {
-  // expected-error @+1 {{input and output value element types must match. Input type: 'f32', output value type: 'f16'}}
+  // expected-error @+1 {{input and init value element types must match. Input type: 'f32', init value type: 'f16'}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf16>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf16>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf16>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf16>, vector<4xi32>
 }
@@ -236,10 +236,10 @@ func.func @arg_compare_explicit_index_shape_mismatch(%input_val: vector<4x128xf3
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input_val, %input_idx : vector<4x128xf32>, vector<8x128xi32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -251,14 +251,14 @@ func.func @arg_compare_explicit_index_element_type_mismatch(%input_val: vector<4
                                                             %out_val: vector<4xf32>,
                                                             %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{explicit-index mode: input and output index element types must match. Input index type: 'i64', output index type: 'i32'}}
+  // expected-error @+1 {{explicit-index mode: input and init index element types must match. Input index type: 'i64', init index type: 'i32'}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input_val, %input_idx : vector<4x128xf32>, vector<4x128xi64>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -273,10 +273,10 @@ func.func @arg_compare_wrong_comparator_args(%input: vector<4x128xf32>,
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32, %c: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -287,14 +287,14 @@ func.func @arg_compare_output_index_not_integer(%input: vector<4x128xf32>,
                                                  %out_val: vector<4xf32>,
                                                  %out_idx: vector<4xf32>)
     -> (vector<4xf32>, vector<4xf32>) {
-  // expected-error @+1 {{output index must have integer or index element type, but got 'f32'}}
+  // expected-error @+1 {{init index must have integer or index element type, but got 'f32'}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xf32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xf32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xf32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xf32>
 }
@@ -310,10 +310,10 @@ func.func @arg_compare_explicit_index_not_integer(%input_val: vector<4x128xf32>,
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input_val, %input_idx : vector<4x128xf32>, vector<4x128xf32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }
@@ -330,11 +330,47 @@ func.func @arg_compare_index_base_with_explicit_index(%input_val: vector<4x128xf
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input_val, %input_idx : vector<4x128xf32>, vector<4x128xi32>)
-      outs(%out_val, %out_idx : vector<4xf32>, vector<4xi32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>)
       index_base(%base : index) {
     ^bb0(%a: f32, %b: f32):
       %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
+      iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi32>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+func.func @arg_compare_result_value_type_mismatch(%input: vector<4x128xf32>,
+                                                   %out_val: vector<4xf32>,
+                                                   %out_idx: vector<4xi32>)
+    -> (vector<4xf16>, vector<4xi32>) {
+  // expected-error @+1 {{result type 0 doesn't match init value type. Result type: 'vector<4xf16>', init value type: 'vector<4xf32>'}}
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<4xf16>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf16>, vector<4xi32>
+}
+
+// -----
+
+func.func @arg_compare_result_index_type_mismatch(%input: vector<4x128xf32>,
+                                                   %out_val: vector<4xf32>,
+                                                   %out_idx: vector<4xi32>)
+    -> (vector<4xf32>, vector<4xi64>) {
+  // expected-error @+1 {{result type 1 doesn't match init index type. Result type: 'vector<4xi64>', init index type: 'vector<4xi32>'}}
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi64>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi64>
 }
