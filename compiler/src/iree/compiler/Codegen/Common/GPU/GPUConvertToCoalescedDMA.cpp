@@ -109,31 +109,6 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
-/// Check if the source of an operation comes directly from fat_raw_buffer
-/// address space.
-static bool sourceIsFromGlobalMemory(Operation *op) {
-  Value source;
-  if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
-    source = copyOp.getInputs()[0];
-  } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
-    source = gatherOp.getSource();
-  } else {
-    return false;
-  }
-
-  // Trace through extract_slice operations to find the origin.
-  while (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
-    source = extractOp.getSource();
-  }
-
-  // Check if the source comes from load_from_buffer with fat_raw_buffer
-  // address space.
-  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
-  if (!loadOp) {
-    return false;
-  }
-  return hasAMDGPUFatRawBufferAddressSpace(loadOp.getBuffer().getType());
-}
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -968,7 +943,13 @@ private:
     // Collect copy/gather ops that are eligible for coalesced DMA.
     // Skip ops that are already inside a warp-mapped forall.
     funcOp->walk([&](Operation *op) {
-      if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
+      if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
+        auto parentForall = copyOp->getParentOfType<scf::ForallOp>();
+        if (!hasWarpMapping(parentForall) &&
+            getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+          opsToTile.push_back(op);
+        }
+      } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
         auto parentForall = op->getParentOfType<scf::ForallOp>();
         if (!hasWarpMapping(parentForall)) {
           opsToTile.push_back(op);
