@@ -676,7 +676,7 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   // reductions in scaled matmul with the last dimension being the block size
   // (32 for gfx950).
   int64_t reductionSize = bounds[reductionDims.back()];
-  if (!ShapedType::isDynamic(reductionSize) &&
+  if (ShapedType::isStatic(reductionSize) &&
       reductionSize % target.getPreferredSubgroupSize() != 0) {
     // Consider the entire reduction dimension.
     reductionSize = 1;
@@ -736,7 +736,7 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   // dispatch.
   for (linalg::LinalgOp linalgOp : *computeOps) {
     int64_t constraint = getThreadLoadsConstraint(linalgOp);
-    if (!ShapedType::isDynamic(constraint)) {
+    if (ShapedType::isStatic(constraint)) {
       while (threadLoads > 1 && constraint % threadLoads != 0) {
         threadLoads /= 2;
       }
