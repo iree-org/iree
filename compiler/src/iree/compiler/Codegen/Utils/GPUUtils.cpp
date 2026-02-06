@@ -758,23 +758,23 @@ getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 /// Returns the number of elements along the K dimensions (all reduction
 /// dimensions) of the given intrinsic. For intrinsics with multiple K
 /// dimensions, returns the product of all K dimensions. This is determined by
-/// looking at all reduction dimensions in the undistributed tile shape. Note
-/// this is for a single intrinsic.
+/// looking at all reduction dimensions in the undistributed tile shape.
 static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
+  int64_t kSize = 1;
+  int64_t lhsOperandIndex = 0;
   SmallVector<VectorType> undistributedTypes;
   intrinsic.getUndistributedTileTypes(undistributedTypes);
-  auto newIndices =
-          llvm::to_vector(llvm::map_range(
-              zip_equal(intrinsic.getOperandIteratorTypes(), undistributedTypes),
-              [&](auto pair) { 
-                utils::IteratorType iteratorType = std::get<0>(pair)
-                if (iteratorType == utils::IteratorType::reduction) {
-                  return std::get<1>(pair).getShape().size();
-                }
-                return 1;
-              }));
-  return llvm::product_of(newIndices[0]);
+  auto shape = undistributedTypes[lhsOperandIndex].getShape();
+  auto lhsIteratorTypes = intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
+  assert(lhsIteratorTypes.size() == shape.size() &&
+         "Iterator types and shape must have the same size");
+  for (int i = 0; i < lhsIteratorTypes.size(); i++) {
+    if (lhsIteratorTypes[i] == utils::IteratorType::reduction) {
+      kSize *= shape[i];
+    }
+  }
+  return kSize;
 }
 
 /// Returns the number of elements each thread accesses for the given intrinsic
