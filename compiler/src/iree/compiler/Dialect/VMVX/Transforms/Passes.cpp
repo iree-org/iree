@@ -82,7 +82,17 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
       .addPass(createCSEPass)
       .addPass([]() { return createConvertVectorToSCFPass(); })
       .addPass(createCanonicalizerPass)
-      .addPass(arith::createArithExpandOpsPass);
+      .addPass([&]() {
+        arith::ArithExpandOpsPassOptions options;
+        options.includeBf16 = true;
+        options.includeF8E8M0 = true;
+        return arith::createArithExpandOpsPass(options);
+      })
+      .addPass(createConvertUnsupportedFloatArithPass)
+      .addPass([]() {
+        return createEmulateNarrowTypePass(
+            EmulateNarrowTypePassOptions{/*disableAtomicRMW=*/true});
+      });
 
   // Handle tensor-type constants.
   modulePassManager.addPass(createIREEBufferizeConstantsPass());
