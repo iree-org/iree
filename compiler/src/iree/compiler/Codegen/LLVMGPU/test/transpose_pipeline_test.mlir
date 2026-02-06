@@ -37,10 +37,10 @@ hal.executable @transpose_dispatch_0 {
 //   CHECK-DAG:   %[[A0:.*]] = memref.assume_alignment %[[B0]]
 //   CHECK-DAG:   %[[B1:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[A1:.*]] = memref.assume_alignment %[[B1]]
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[GR0:.*]] = vector.transfer_read %[[A0]]{{.*}} vector<4xf32>
 //       CHECK:   vector.transfer_write %[[GR0]], %[[A]]{{.*}} : vector<4xf32>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[SR:.*]] = vector.transfer_read %[[A]]{{.*}} vector<4x1xf32>
 //       CHECK:   %[[SC:.*]] = vector.shape_cast %[[SR]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   vector.transfer_write %[[SC]], %[[A1]]{{.*}} : vector<4xf32>
@@ -89,10 +89,10 @@ hal.executable @transpose_single_operand_dispatch_0_generic_768x2048 {
 //   CHECK-DAG:   %[[A1:.*]] = memref.assume_alignment %[[B1]]
 //   CHECK-DAG:   %[[B2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //   CHECK-DAG:   %[[A2:.*]] = memref.assume_alignment %[[B2]]
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[GR0:.*]] = vector.transfer_read %[[A0]]{{.*}} vector<4xf32>
 //       CHECK:   vector.transfer_write %[[GR0]], %[[A]]{{.*}} : vector<4xf32>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[SR:.*]] = vector.transfer_read %[[A]]{{.*}} vector<4x1xf32>
 //       CHECK:   %[[GR1:.*]] = vector.transfer_read %[[A1]]{{.*}} vector<4xf32>
 //       CHECK:   %[[SC:.*]] = vector.shape_cast %[[SR]] : vector<4x1xf32> to vector<4xf32>
@@ -136,7 +136,7 @@ hal.executable @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_no_dispatch_0_generic_768x2048x1024 {
-//   CHECK-NOT:   gpu.barrier
+//   CHECK-NOT:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-NOT:   memref.alloc
 //       CHECK:   return
 
@@ -184,10 +184,10 @@ hal.executable @transpose_3d_yes_dispatch_0_generic_10x768x2048 {
 //   CHECK-DAG:   %[[A1:.*]] = memref.assume_alignment %[[B1]]
 //   CHECK-DAG:   %[[B2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //   CHECK-DAG:   %[[A2:.*]] = memref.assume_alignment %[[B2]]
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[GR0:.*]] = vector.transfer_read %[[A0]]{{.*}} vector<4xf32>
 //       CHECK:   vector.transfer_write %[[GR0]], %[[A]]{{.*}} : vector<4xf32>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[SR:.*]] = vector.transfer_read %[[A]]{{.*}} vector<4x1xf32>
 //       CHECK:   %[[GR1:.*]] = vector.transfer_read %[[A1]]{{.*}} vector<4xf32>
 //       CHECK:   %[[SC:.*]] = vector.shape_cast %[[SR]] : vector<4x1xf32> to vector<4xf32>
@@ -239,12 +239,12 @@ hal.executable @transpose_3d_trans_out_dispatch_0_generic_10x2048x768 {
 //   CHECK-DAG:   %[[BA1:.*]] = memref.assume_alignment %[[B1]]
 //   CHECK-DAG:   %[[B2:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //   CHECK-DAG:   %[[BA2:.*]] = memref.assume_alignment %[[B2]]
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[GR0:.*]] = vector.transfer_read %[[BA0]]{{.*}} vector<4xf32>
 //       CHECK:   vector.transfer_write %[[GR0]], %[[A0]]{{.*}} : vector<4xf32>
 //       CHECK:   %[[GR1:.*]] = vector.transfer_read %[[BA1]]{{.*}} vector<4xf32>
 //       CHECK:   vector.transfer_write %[[GR1]], %[[A1]]{{.*}} : vector<4xf32>
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   %[[SR0:.*]] = vector.transfer_read %[[A0]]{{.*}} vector<4x1xf32>
 //       CHECK:   %[[SR1:.*]] = vector.transfer_read %[[A1]]{{.*}} vector<4x1xf32>
 //       CHECK:   %[[ADD:.*]] = arith.addf %[[SR0]], %[[SR1]] : vector<4x1xf32>
@@ -309,6 +309,6 @@ hal.executable @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
 }
 
 // CHECK-LABEL:   hal.executable public @transpose_3d_diff_dispatch_0_generic_10x768x2048 {
-//   CHECK-NOT:   gpu.barrier
+//   CHECK-NOT:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-NOT:   memref.alloc
 //       CHECK:   return

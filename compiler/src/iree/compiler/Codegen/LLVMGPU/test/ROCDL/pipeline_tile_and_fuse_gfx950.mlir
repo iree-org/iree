@@ -92,13 +92,13 @@ hal.executable public @main {
 // CHECK-DAG:  %[[BUFFER_C:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_BINDING_C]]
 // CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x1x8x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
 // CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x1x4x2x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
-// CHECK:      gpu.barrier
+// CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG:  scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args(%[[C_LOOP_INIT:.+]] = %[[C_INIT]]) -> (vector<1x1x1x8x2x1x1x4xf32>)
 // CHECK-DAG:    %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_A]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    %[[B_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_B]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    vector.transfer_write %[[A_GLOBAL_LOAD]], %[[A_ALLOC]]
 // CHECK-DAG:    vector.transfer_write %[[B_GLOBAL_LOAD]], %[[B_ALLOC]]
-// CHECK:        gpu.barrier
+// CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG:    %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x4x1x1x32xf4E2M1FN>
 // CHECK-DAG:    %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x4x1x1x32xf4E2M1FN>
 // CHECK-DAG:    %[[A_SCALE_READ:.+]] = vector.transfer_read %[[BUFFER_A_SCALE]]{{.*}} vector<8x1x1x4xf8E8M0FNU>

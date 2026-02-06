@@ -194,7 +194,8 @@ struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
     }
 
     rewriter.setInsertionPointAfter(warpOp);
-    (void)gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(),
+                           barrierOp.getAddressSpacesAttr());
     rewriter.eraseOp(barrierOp);
     return success();
   }
@@ -325,7 +326,9 @@ struct VectorReductionToGPUPass final
       options.warpAllocationFn = allocateGlobalSharedMemory;
       options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
                                         gpu::WarpExecuteOnLane0Op warpOp) {
-        gpu::BarrierOp::create(builder, loc);
+        // There's no communication via global memory occurring, so we only need
+        // to fence on workgroup memory.
+        gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
       };
       vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
       (void)applyPatternsGreedily(getOperation(), std::move(patterns));

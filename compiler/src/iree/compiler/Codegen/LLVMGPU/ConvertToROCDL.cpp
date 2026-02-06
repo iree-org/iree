@@ -61,27 +61,6 @@ static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
 
 namespace {
 
-// Transform gpu.barrier -> amdgpu.lds_barrier
-// IREE code generation currently only ever needs to synchronize for
-// LDS operations. This conversion is to make the barrier operations
-// LDS specific because the gpu.barrier contains global memory
-// operations as well.
-struct ReplaceGPUBarrierWithLDSBarrier
-    : public OpRewritePattern<gpu::BarrierOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(gpu::BarrierOp op,
-                                PatternRewriter &rewriter) const override {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.replaceOpWithNewOp<amdgpu::LDSBarrierOp>(op);
-    return success();
-  }
-};
-
-static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
-  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
-}
-
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
 /// waves from interrupting the MFMA region of the high priority wave.
@@ -275,7 +254,6 @@ struct ConvertToROCDLPass final
           /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
-      populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);

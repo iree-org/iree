@@ -2749,7 +2749,7 @@ func.func @tensor_barrier() -> vector<2xf32> {
 // CHECK-LABEL: func @tensor_barrier()
 //       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
-//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   gpu.barrier{{$}}
 //  CHECK-NEXT:   vector.transfer_read %[[ALLOC]]
 
 // -----
@@ -2773,7 +2773,7 @@ func.func @tensor_barrier_in_loop() -> vector<2xf32> {
 //       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
 //       CHECK:   scf.for
 //  CHECK-NEXT:     vector.transfer_write %{{.*}}, %[[ALLOC]]
-//  CHECK-NEXT:     gpu.barrier
+//  CHECK-NEXT:     gpu.barrier{{$}}
 //  CHECK-NEXT:   }
 //       CHECK:   vector.transfer_read %[[ALLOC]]
 
@@ -2817,7 +2817,7 @@ func.func @multi_tensor_barrier() -> vector<2xf32> {
 //       CHECK:   %[[ALLOC1:.+]] = memref.alloc() : memref<2xf32>
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC1]]
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC0]]
-//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   gpu.barrier{{$}}
 //       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC0]]
 //  CHECK-NEXT:   vector.transfer_read %[[ALLOC1]]
 
@@ -2838,10 +2838,10 @@ func.func @barrier_region(%x: index, %y: index) -> vector<3x2xf32> {
 
 // CHECK-LABEL: func @barrier_region
 //       CHECK:   %[[ALLOC:.+]] = memref.alloc()
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier{{$}}
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:   %[[READ:.+]] = vector.transfer_read %[[SUBVIEW]]
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier{{$}}
 //       CHECK:   return %[[READ]]
 
 // -----

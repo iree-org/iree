@@ -377,12 +377,14 @@ void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
       Operation *prevOp = copyOp->getPrevNode();
       if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPoint(copyOp);
-        gpu::BarrierOp::create(builder, copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc(),
+                               gpu::AddressSpace::Workgroup);
       }
       Operation *nextOp = copyOp->getNextNode();
       if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPointAfter(copyOp);
-        gpu::BarrierOp::create(builder, copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc(),
+                               gpu::AddressSpace::Workgroup);
       }
     }
   });
@@ -646,7 +648,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       memref::StoreOp::create(b, l, laneVal, alloc, indices);
       scf::YieldOp::create(b, l);
     });
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
     // Further reduce the outputs from each warps with a single warp reduce.
     Value memrefSize =
         arith::ConstantIndexOp::create(builder, loc, numWarp - 1);

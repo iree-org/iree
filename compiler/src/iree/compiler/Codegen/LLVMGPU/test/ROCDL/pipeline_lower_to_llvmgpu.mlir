@@ -46,7 +46,7 @@ hal.executable public @main {
         %12:2 = affine.delinearize_index %workgroup_id_x into (32, 7) : index, index
         %subview = memref.subview %3[%12#0, 0, 0, 0, 0] [1, 32, 32, 3, 3] [1, 1, 1, 1, 1] : memref<32x32x32x3x3xi8, #hal.descriptor_type<storage_buffer>> to memref<1x32x32x3x3xi8, strided<[9216, 288, 9, 3, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
         %collapse_shape = memref.collapse_shape %subview [[0], [1], [2, 3, 4]] : memref<1x32x32x3x3xi8, strided<[9216, 288, 9, 3, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> into memref<1x32x288xi8, strided<[9216, 288, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
-        gpu.barrier
+        gpu.barrier memfence [#gpu.address_space<workgroup>]
         %13 = vector.transfer_read %collapse_shape[%c0, %c0, %c0], %0 {in_bounds = [true]} : memref<1x32x288xi8, strided<[9216, 288, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<8xi8>
         %alloca = memref.alloca(%7) : memref<?x1x1x1x1xi8, #gpu.address_space<private>>
         scf.if %10 {

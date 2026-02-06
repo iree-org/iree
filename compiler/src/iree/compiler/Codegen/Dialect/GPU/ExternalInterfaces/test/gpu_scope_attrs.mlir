@@ -126,7 +126,7 @@ util.func private @subgroup_scope_barrier() {
 }
 
 // CHECK-LABEL: @subgroup_scope_barrier
-//       CHECK:   gpu.barrier
+//       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //       CHECK:   util.return
 
 // -----

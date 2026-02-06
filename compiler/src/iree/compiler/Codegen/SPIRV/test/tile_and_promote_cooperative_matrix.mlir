@@ -135,12 +135,12 @@ func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info
 //      CHECK: scf.for %{{.+}} = %c0 to %c64 step %c32
 //      CHECK:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c32, %c1, %c32]
 //      CHECK:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c32]
-//      CHECK:   gpu.barrier
+//      CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // CHECK-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      CHECK:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // CHECK-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      CHECK:   gpu.barrier
+//      CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK:   linalg.generic
 // CHECK-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // CHECK-SAME:    __internal_linalg_transform__ = "workgroup_memory"
@@ -159,21 +159,21 @@ func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c32, %c1, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c32]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.generic
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[C_ALLOC]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC: linalg.generic
 //      PROMOTEC:    ins(%{{.+}}, %[[C_ALLOC]]
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 
@@ -247,12 +247,12 @@ func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c32, %c1, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c32]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.generic
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
@@ -327,17 +327,17 @@ func.func @generic_batch_matmul_f16_32x128x512x64() attributes {translation_info
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c32, %c1, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c32]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.generic
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
-//  PROMOTEC-NOT: gpu.barrier
+//  PROMOTEC-NOT: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  PROMOTEC-NOT: memref.copy
 
 // -----
@@ -400,22 +400,22 @@ func.func @batch_matmul_f16_1x64x128x512() attributes {translation_info = #trans
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c512 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c1, %c64, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c128]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.batch_matmul
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[C_ALLOC]]
 //      PROMOTEC: }
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC: linalg.generic
 //      PROMOTEC:    ins(%[[C_ALLOC]]
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 
@@ -484,19 +484,19 @@ func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0] [%c32, %c128]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.matmul
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
 //      PROMOTEC: }
 
-//  PROMOTEC-NOT: gpu.barrier
+//  PROMOTEC-NOT: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  PROMOTEC-NOT: memref.copy
 //      PROMOTEC: %[[BCAST_VIEW:.+]] = memref.subview %[[SPAN2]][%{{.+}}] [128] [1]
 //      PROMOTEC: linalg.generic
@@ -573,19 +573,19 @@ func.func @matmul_f16_f512x4096x64() attributes {translation_info = #translation
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0] [%c32, %c128]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.matmul
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
 //      PROMOTEC: }
 
-//  PROMOTEC-NOT: gpu.barrier
+//  PROMOTEC-NOT: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  PROMOTEC-NOT: memref.copy
 //      PROMOTEC: %[[BCAST_VIEW:.+]] = memref.subview %[[SPAN2]][%{{.+}}] [64] [1]
 //      PROMOTEC: linalg.generic
@@ -659,19 +659,19 @@ func.func @matmul_f16_128x262144x2304() attributes {translation_info = #translat
 //      PROMOTEC: scf.for %{{.+}} = %c0 to %c2304 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0] [%c32, %c128]
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC:   linalg.matmul
 // PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // PROMOTEC-SAME:    outs(%[[C_ALLOC]]
 //      PROMOTEC: }
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      PROMOTEC: linalg.generic
 //      PROMOTEC:    ins(%{{.+}}, %[[C_ALLOC]]
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      PROMOTEC: gpu.barrier
+//      PROMOTEC: gpu.barrier memfence [#gpu.address_space<workgroup>]

@@ -27,7 +27,7 @@ func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {
   %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%1, %2, %3]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%1]
   %11 = scf.for %arg0 = %c0 to %c2048 step %c32 iter_args(%arg1 = %0) -> (!gpu.mma_matrix<16x16xf16, "COp">) {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %14 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 8 - (s1 floordiv 4) * 32)>()[%arg0, %1]
     %15 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 16 + s2 * 32 + s3 * 32 + s0 floordiv 4)>()[%1, %2, %3, %workgroup_id_y]
     %16 = affine.apply affine_map<(d0) -> ((d0 floordiv 32) mod 4)>(%arg0)
@@ -37,7 +37,7 @@ func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {
     %20 = nvgpu.device_async_copy %7[%18, %19], %5[%16, %9, %10], 8 : memref<2048x1024xf16> to memref<4x32x40xf16, 3>
     %21 = nvgpu.device_async_create_group %17, %20
     nvgpu.device_async_wait %21
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %22 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%2]
     %23 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c0] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
     %24 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c16] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
@@ -85,7 +85,7 @@ func.func @nvidia_tenscore_schedule_f16() {
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %6:32 = scf.for %arg0 = %c0 to %c1280 step %c32 iter_args(%arg1 = %cst, %arg2 = %cst, %arg3 = %cst, %arg4 = %cst, %arg5 = %cst, %arg6 = %cst, %arg7 = %cst, %arg8 = %cst, %arg9 = %cst, %arg10 = %cst, %arg11 = %cst, %arg12 = %cst, %arg13 = %cst, %arg14 = %cst, %arg15 = %cst, %arg16 = %cst, %arg17 = %cst, %arg18 = %cst, %arg19 = %cst, %arg20 = %cst, %arg21 = %cst, %arg22 = %cst, %arg23 = %cst, %arg24 = %cst, %arg25 = %cst, %arg26 = %cst, %arg27 = %cst, %arg28 = %cst, %arg29 = %cst, %arg30 = %cst, %arg31 = %cst, %arg32 = %cst) -> (vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>) {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %138 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 8 - (s1 floordiv 4) * 32)>()[%arg0, %0]
     %139 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 32 + s2 * 64 + s3 * 128 + s0 floordiv 4)>()[%0, %1, %2, %workgroup_id_y]
     %140 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 32 + s2 * 64 + s0 floordiv 4)>()[%0, %1, %2]
@@ -129,7 +129,7 @@ func.func @nvidia_tenscore_schedule_f16() {
     %178 = nvgpu.device_async_copy %4[%173, %154], %alloc_2[%142, %174, %177], 8 {bypassL1} : memref<1280x1280xf16> to memref<3x32x256xf16, #gpu.address_space<workgroup>>
     %179 = nvgpu.device_async_create_group %146, %152, %160, %166, %172, %178
     nvgpu.device_async_wait %179
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %180 = gpu.lane_id
     %181 = affine.apply affine_map<(d0)[s0] -> (d0 + s0 * 64 - (d0 floordiv 16) * 16)>(%180)[%1]
     %182 = affine.apply affine_map<(d0) -> ((d0 floordiv 16) * 8)>(%180)
@@ -414,7 +414,7 @@ func.func @nvidia_tenscore_schedule_f16() {
   vector.store %86, %alloc[%71, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
   %87 = vector.extract %6#0[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %87, %alloc[%73, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  gpu.barrier
+  gpu.barrier memfence [#gpu.address_space<workgroup>]
   %88 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 4 + s2 * 8 + s0 floordiv 32)>()[%0, %1, %2]
   %89 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 32) * 256)>()[%0]
   %90 = vector.transfer_read %alloc[%88, %89], %cst_0 {in_bounds = [true]} : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<8xf16>
@@ -481,7 +481,7 @@ func.func @nvidia_tenscore_schedule_f16() {
   %136 = vector.transfer_read %alloc[%135, %89], %cst_0 {in_bounds = [true]} : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<8xf16>
   %137 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 4 + s2 * 8 + s3 * 128 + s0 floordiv 32 + 120)>()[%0, %1, %2, %workgroup_id_y]
   vector.transfer_write %136, %5[%137, %92] {in_bounds = [true]} : vector<8xf16>, memref<512x1280xf16>
-  gpu.barrier
+  gpu.barrier memfence [#gpu.address_space<workgroup>]
   return
 }
 
@@ -491,7 +491,7 @@ func.func @nvidia_tenscore_schedule_f16() {
 //  CHECK-NV-COUNT-6:  nvgpu.device_async_copy
 //          CHECK-NV:  nvgpu.device_async_create_group
 //          CHECK-NV:  nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
-//          CHECK-NV:  gpu.barrier
+//          CHECK-NV:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NV-COUNT-8:  nvgpu.ldmatrix
 //          CHECK-NV:  scf.for
 //  CHECK-NV-COUNT-4:    nvgpu.ldmatrix
@@ -499,7 +499,7 @@ func.func @nvidia_tenscore_schedule_f16() {
 //  CHECK-NV-COUNT-6:    nvgpu.device_async_copy
 //          CHECK-NV:    nvgpu.device_async_create_group
 //          CHECK-NV:    nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
-//          CHECK-NV:    gpu.barrier
+//          CHECK-NV:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NV-COUNT-8:    nvgpu.ldmatrix
 // CHECK-NV-COUNT-32:    nvgpu.mma.sync
 //          CHECK-NV:  }
@@ -738,7 +738,7 @@ func.func @nvidia_tenscore_schedule_f32() {
   %208 = arith.xori %201, %141 : index
   %209 = arith.xori %201, %145 : index
   %210:32 = scf.for %arg0 = %c0 to %c256 step %c32 iter_args(%arg1 = %cst_0, %arg2 = %cst_0, %arg3 = %cst_0, %arg4 = %cst_0, %arg5 = %cst_0, %arg6 = %cst_0, %arg7 = %cst_0, %arg8 = %cst_0, %arg9 = %cst_0, %arg10 = %cst_0, %arg11 = %cst_0, %arg12 = %cst_0, %arg13 = %cst_0, %arg14 = %cst_0, %arg15 = %cst_0, %arg16 = %cst_0, %arg17 = %cst_0, %arg18 = %cst_0, %arg19 = %cst_0, %arg20 = %cst_0, %arg21 = %cst_0, %arg22 = %cst_0, %arg23 = %cst_0, %arg24 = %cst_0, %arg25 = %cst_0, %arg26 = %cst_0, %arg27 = %cst_0, %arg28 = %cst_0, %arg29 = %cst_0, %arg30 = %cst_0, %arg31 = %cst_0, %arg32 = %cst_0) -> (vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>) {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %390 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 4 - (s1 floordiv 8) * 32)>()[%arg0, %0]
     %391 = affine.apply affine_map<(d0) -> ((d0 floordiv 32) mod 3)>(%arg0)
     %392 = nvgpu.device_async_copy %3[%6, %390], %alloc_2[%391, %7, %11], 4 {bypassL1} : memref<256x256xf32> to memref<3x128x32xf32, #gpu.address_space<workgroup>>
@@ -767,7 +767,7 @@ func.func @nvidia_tenscore_schedule_f32() {
     %415 = nvgpu.device_async_copy %4[%414, %47], %alloc_3[%391, %77, %80], 4 {bypassL1} : memref<256x256xf32> to memref<3x32x128xf32, #gpu.address_space<workgroup>>
     %416 = nvgpu.device_async_create_group %392, %393, %394, %395, %396, %397, %398, %399, %401, %403, %405, %407, %409, %411, %413, %415
     nvgpu.device_async_wait %416
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %417 = nvgpu.ldmatrix %alloc_2[%391, %82, %86] {numTiles = 4 : i32, transpose = false} : memref<3x128x32xf32, #gpu.address_space<workgroup>> -> vector<4x1xf32>
     %418 = nvgpu.ldmatrix %alloc_2[%391, %82, %88] {numTiles = 4 : i32, transpose = false} : memref<3x128x32xf32, #gpu.address_space<workgroup>> -> vector<4x1xf32>
     %419 = nvgpu.ldmatrix %alloc_2[%391, %82, %90] {numTiles = 4 : i32, transpose = false} : memref<3x128x32xf32, #gpu.address_space<workgroup>> -> vector<4x1xf32>
@@ -1187,7 +1187,7 @@ func.func @nvidia_tenscore_schedule_f32() {
   vector.store %290, %alloc[%275, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
   %291 = vector.extract %210#0[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %291, %alloc[%277, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  gpu.barrier
+  gpu.barrier memfence [#gpu.address_space<workgroup>]
   %292 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 2 + s2 * 4 + s0 floordiv 32)>()[%0, %1, %2]
   %293 = affine.apply affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 32) * 128)>()[%0]
   %294 = vector.transfer_read %alloc[%292, %293], %cst_1 {in_bounds = [true]} : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<4xf32>
@@ -1318,7 +1318,7 @@ func.func @nvidia_tenscore_schedule_f32() {
   %388 = vector.transfer_read %alloc[%387, %293], %cst_1 {in_bounds = [true]} : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<4xf32>
   %389 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 2 + s2 * 4 + s3 * 128 + s0 floordiv 32 + 124)>()[%0, %1, %2, %workgroup_id_y]
   vector.transfer_write %388, %5[%389, %296] {in_bounds = [true]} : vector<4xf32>, memref<256x256xf32>
-  gpu.barrier
+  gpu.barrier memfence [#gpu.address_space<workgroup>]
   return
 }
 
@@ -1329,7 +1329,7 @@ func.func @nvidia_tenscore_schedule_f32() {
 //  CHECK-NV-COUNT-6:  nvgpu.device_async_copy
 //          CHECK-NV:  nvgpu.device_async_create_group
 //          CHECK-NV:  nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
-//          CHECK-NV:  gpu.barrier
+//          CHECK-NV:  gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NV-COUNT-4:  nvgpu.ldmatrix
 //  CHECK-NV-COUNT-16:  memref.load
 //          CHECK-NV:  scf.for
@@ -1345,7 +1345,7 @@ func.func @nvidia_tenscore_schedule_f32() {
 //  CHECK-NV-COUNT-6:    nvgpu.device_async_copy
 //          CHECK-NV:    nvgpu.device_async_create_group
 //          CHECK-NV:    nvgpu.device_async_wait %{{.*}} {numGroups = 1 : i32}
-//          CHECK-NV:    gpu.barrier
+//          CHECK-NV:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-NV-COUNT-4:    nvgpu.ldmatrix
 //  CHECK-NV-COUNT-16:   memref.load
 // CHECK-NV-COUNT-32:    nvgpu.mma.sync

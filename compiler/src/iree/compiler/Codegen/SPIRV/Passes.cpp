@@ -95,12 +95,16 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);
   if (needsBarrier) {
-    gpu::BarrierOp::create(builder, loc);
+    // We aren't using global memory for communication or destructively
+    // overwriting it in a way that may be visible to other workitems (and,
+    // commonly, we're copyng to or from workgroup memory and thas's what we
+    // must synchronize on), so we use a local-memory-only barrier here.
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
   }
   return success();
 }

@@ -50,7 +50,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    }
 //         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 //         CHECK:    %[[ALLOC:.+]] = memref.alloc() : memref<10xf32, #gpu.address_space<workgroup>>
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    vector.transfer_read %[[ALLOC]]{{.*}}
 //         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 8) : (f32) -> f32
 
@@ -152,7 +152,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x1xf32>
 //         CHECK:      scf.yield
 //         CHECK:    gpu.subgroup_reduce  maxnumf
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    gpu.subgroup_reduce  maxnumf
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1xf32>) {
 //         CHECK:      vector.transfer_read
@@ -162,7 +162,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      arith.addf
 //         CHECK:      scf.yield
 //         CHECK:    gpu.subgroup_reduce  add
-//         CHECK:    gpu.barrier
+//         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    gpu.subgroup_reduce  add
 //         CHECK:    scf.forall
 //         CHECK:      vector.transfer_read
