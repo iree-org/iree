@@ -579,7 +579,9 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
 gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
   switch (kind) {
 #define MAP_CASE(X)                                                            \
+  \ 
   case vector::CombiningKind::X:                                               \
+  \ 
     return gpu::AllReduceOperation::X
 
     MAP_CASE(ADD);
@@ -800,8 +802,43 @@ getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
          llvm::product_of(layout.element);
 }
 
-// Disabling clang-tidy for the following function, as it will be externally
-// linked to the CAPI in a future PR. 
+// TODO(muzasyed): Add more intrinsics for gfx950.
+static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    switch (smma.getIntrinsic()) {
+    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+      return std::pair(/*row_width*/ int64_t(256),
+                       /*access_width*/ int64_t(32));
+    default:
+      return failure();
+    }
+  }
+  return failure();
+}
+
+/// Validate the XOR shuffle parameters for the given intrinsic and operand
+/// index. If the parameters produce an XOR Shuffle that is not valid, return
+/// failure. Else, return the swizzle parameters.
+static FailureOr<std::pair<int64_t, int64_t>>
+validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
+                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex) {
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeTotalTileElems)) {
+    return failure();
+  }
+  int64_t totalTileElems = *maybeTotalTileElems;
+  if (!isXORShuffleValid(swizzle->first, swizzle->second, totalTileElems)) {
+    return failure();
+  }
+  return swizzle;
+}
+
+// Disabling clang-tidy for the following functions, as it will be externally
+// linked to the CAPI in a future PR.
 // NOLINTBEGIN
 FailureOr<std::pair<int64_t, int64_t>>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
@@ -815,7 +852,6 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   }
   return std::pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
 }
-// NOLINTEND
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                        int64_t totalTileElems) {
@@ -853,41 +889,6 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
     return false;
   }
   return true;
-}
-
-/// Validate the XOR shuffle parameters for the given intrinsic and operand
-/// index. If the parameters produce an XOR Shuffle that is not valid, return
-/// failure. Else, return the swizzle parameters.
-static FailureOr<std::pair<int64_t, int64_t>>
-validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
-                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                   int operandIndex) {
-  FailureOr<int64_t> maybeTotalTileElems =
-      getTotalTileElems(intrinsic, operandIndex);
-  if (failed(maybeTotalTileElems)) {
-    return failure();
-  }
-  int64_t totalTileElems = *maybeTotalTileElems;
-  if (!isXORShuffleValid(swizzle->first, swizzle->second, totalTileElems)) {
-    return failure();
-  }
-  return swizzle;
-}
-
-// TODO(muzasyed): Add more intrinsics for gfx950.
-static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
-  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
-    switch (smma.getIntrinsic()) {
-    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return std::pair(/*row_width*/ int64_t(256),
-                       /*access_width*/ int64_t(32));
-    default:
-      return failure();
-    }
-  }
-  return failure();
 }
 
 FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
@@ -959,6 +960,7 @@ getXorShuffleParams(IREE::GPU::TargetAttr target,
   }
   return xorShuffleAttr;
 }
+// NOLINTEND
 
 FailureOr<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
@@ -975,9 +977,8 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
       context, effectiveRowWidth, numAccessElems,
       /*row_stride=*/int64_t(0),
       /*per_phase=*/int64_t(0));
-  Attribute swizzleOperand =
-      IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr, swizzleAttr);
-  return swizzleOperand;
+  return IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr,
+                                            swizzleAttr);
 }
 
 //===----------------------------------------------------------------------===//
