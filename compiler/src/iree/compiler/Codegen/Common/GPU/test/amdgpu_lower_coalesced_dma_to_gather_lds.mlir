@@ -1291,7 +1291,6 @@ func.func @no_lower_oob_without_fat_raw_buffer(
     attributes {hal.executable.target = #executable_target_rocm_hsaco_fb,
                 translation_info = #translation_64} {
   scf.forall (%arg6) in (64) {
-    // expected-error @+2 {{in_bounds with OOB dimensions requires fat_raw_buffer address space on source}}
     // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
       memref<2x128xf32>,

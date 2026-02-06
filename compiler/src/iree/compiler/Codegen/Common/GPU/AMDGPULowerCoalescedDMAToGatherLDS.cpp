@@ -294,9 +294,9 @@ struct LowerCoalescedGatherDMAPattern final
       if (!hasAMDGPUFatRawBufferAddressSpace(srcType)) {
         for (Attribute attr : *inBounds) {
           if (!cast<BoolAttr>(attr).getValue()) {
-            dmaOp.emitOpError("in_bounds with OOB dimensions requires "
-                              "fat_raw_buffer address space on source");
-            return failure();
+            return rewriter.notifyMatchFailure(
+                dmaOp, "in_bounds with OOB dimensions requires "
+                       "fat_raw_buffer address space on source");
           }
         }
       }
@@ -503,7 +503,6 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
-#ifndef NDEBUG
     // Verify all CoalescedGatherDMAOps were lowered. Currently, we require all
     // ops to be successfully lowered. In the future, a fallback lowering path
     // (e.g., using global_load) could handle ops that don't match the pattern.
@@ -514,7 +513,6 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     if (result.wasInterrupted()) {
       return signalPassFailure();
     }
-#endif // NDEBUG
   }
 };
 } // namespace
