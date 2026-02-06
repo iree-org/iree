@@ -1134,28 +1134,41 @@ func.func @lower_coalesced_dma_4x64_tensor_pad_fusion(
     // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
     // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 64)
     // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 64)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN0]]#0, %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<1xf32>
+    // in_bounds = [false, true]: no non-outermost OOB dims, select is identity.
+    // CHECK: %[[FALSE0:.+]] = arith.constant false
+    // CHECK: %[[DIM0:.+]] = memref.dim %[[SRC]], %{{.+}}
+    // CHECK: %[[FIXED0:.+]] = arith.select %[[FALSE0]], %[[DIM0]], %[[SRC_DELIN0]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED0]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<1xf32>
     //
     // Transfer 2: linearOffset = 64, accesses row 1
     // CHECK: %[[C64:.+]] = arith.constant 64 : index
     // CHECK: %[[SRC_LIN64:.+]] = arith.addi %[[C64]], %[[LANE_OFFSET]]
     // CHECK: %[[SRC_DELIN64:.+]]:2 = affine.delinearize_index %[[SRC_LIN64]] into (4, 64)
     // CHECK: %[[DST_DELIN64:.+]]:2 = affine.delinearize_index %[[C64]] into (4, 64)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN64]]#0, %[[SRC_DELIN64]]#1], %[[DST]][%[[DST_DELIN64]]#0, %[[DST_DELIN64]]#1] : vector<1xf32>
+    // CHECK: %[[FALSE1:.+]] = arith.constant false
+    // CHECK: %[[DIM1:.+]] = memref.dim %[[SRC]], %{{.+}}
+    // CHECK: %[[FIXED1:.+]] = arith.select %[[FALSE1]], %[[DIM1]], %[[SRC_DELIN64]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED1]], %[[SRC_DELIN64]]#1], %[[DST]][%[[DST_DELIN64]]#0, %[[DST_DELIN64]]#1] : vector<1xf32>
     //
     // Transfer 3: linearOffset = 128, accesses row 2
     // CHECK: %[[C128:.+]] = arith.constant 128 : index
     // CHECK: %[[SRC_LIN128:.+]] = arith.addi %[[C128]], %[[LANE_OFFSET]]
     // CHECK: %[[SRC_DELIN128:.+]]:2 = affine.delinearize_index %[[SRC_LIN128]] into (4, 64)
     // CHECK: %[[DST_DELIN128:.+]]:2 = affine.delinearize_index %[[C128]] into (4, 64)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN128]]#0, %[[SRC_DELIN128]]#1], %[[DST]][%[[DST_DELIN128]]#0, %[[DST_DELIN128]]#1] : vector<1xf32>
+    // CHECK: %[[FALSE2:.+]] = arith.constant false
+    // CHECK: %[[DIM2:.+]] = memref.dim %[[SRC]], %{{.+}}
+    // CHECK: %[[FIXED2:.+]] = arith.select %[[FALSE2]], %[[DIM2]], %[[SRC_DELIN128]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED2]], %[[SRC_DELIN128]]#1], %[[DST]][%[[DST_DELIN128]]#0, %[[DST_DELIN128]]#1] : vector<1xf32>
     //
     // Transfer 4: linearOffset = 192, accesses row 3
     // CHECK: %[[C192:.+]] = arith.constant 192 : index
     // CHECK: %[[SRC_LIN192:.+]] = arith.addi %[[C192]], %[[LANE_OFFSET]]
     // CHECK: %[[SRC_DELIN192:.+]]:2 = affine.delinearize_index %[[SRC_LIN192]] into (4, 64)
     // CHECK: %[[DST_DELIN192:.+]]:2 = affine.delinearize_index %[[C192]] into (4, 64)
-    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[SRC_DELIN192]]#0, %[[SRC_DELIN192]]#1], %[[DST]][%[[DST_DELIN192]]#0, %[[DST_DELIN192]]#1] : vector<1xf32>
+    // CHECK: %[[FALSE3:.+]] = arith.constant false
+    // CHECK: %[[DIM3:.+]] = memref.dim %[[SRC]], %{{.+}}
+    // CHECK: %[[FIXED3:.+]] = arith.select %[[FALSE3]], %[[DIM3]], %[[SRC_DELIN192]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED3]], %[[SRC_DELIN192]]#1], %[[DST]][%[[DST_DELIN192]]#0, %[[DST_DELIN192]]#1] : vector<1xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
@@ -1211,8 +1224,10 @@ func.func @gather_dma_non_outermost_oob_check(
     // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 8)
     //
     // Bounds check: compare srcIndices[1] >= 6 (source dim 1 size)
+    // CHECK: %[[FALSE:.+]] = arith.constant false
     // CHECK: %[[C6:.+]] = arith.constant 6 : index
-    // CHECK: %[[OOB:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C6]] : index
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C6]] : index
+    // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
     // Replace outermost index with 4 (source dim 0 size) to force hardware OOB
     // CHECK: %[[C4_OOB:.+]] = arith.constant 4 : index
     // CHECK: %[[FIXED_IDX:.+]] = arith.select %[[OOB]], %[[C4_OOB]], %[[SRC_DELIN0]]#0 : index
@@ -1269,8 +1284,10 @@ func.func @gather_dma_inner_dim_oob_64x62(
     // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (64, 64)
     //
     // Bounds check: compare srcIndices[1] >= 62 (source inner dim size).
+    // CHECK: %[[FALSE:.+]] = arith.constant false
     // CHECK: %[[C62:.+]] = arith.constant 62 : index
-    // CHECK: %[[OOB:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C62]] : index
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C62]] : index
+    // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
     // Replace outermost index with 64 (source dim 0 size) to force hardware OOB.
     // CHECK: %[[C64_OOB:.+]] = arith.constant 64 : index
     // CHECK: %[[FIXED_IDX:.+]] = arith.select %[[OOB]], %[[C64_OOB]], %[[SRC_DELIN0]]#0 : index
