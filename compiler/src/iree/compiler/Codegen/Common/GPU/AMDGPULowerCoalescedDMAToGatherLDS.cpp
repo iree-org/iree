@@ -408,10 +408,11 @@ private:
           // Fix: when any non-outermost source index exceeds its dimension,
           // replace the outermost index with sourceShape[0] to force the
           // linearized offset past the buffer end → hardware returns 0.
-          if (inBoundsAttr) {
-            auto sourceType = cast<MemRefType>(source.getType());
+          auto sourceType = cast<MemRefType>(source.getType());
+          if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
             ArrayRef<int64_t> sourceShape = sourceType.getShape();
-            Value anyNonOutermostOOB;
+            Value anyNonOutermostOOB = arith::ConstantOp::create(
+                rewriter, loc, rewriter.getBoolAttr(false));
 
             for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
               if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
@@ -435,26 +436,19 @@ private:
                                                   arith::CmpIPredicate::uge,
                                                   srcIndices[dim], dimSize);
 
-              if (anyNonOutermostOOB) {
-                anyNonOutermostOOB = arith::OrIOp::create(
-                    rewriter, loc, anyNonOutermostOOB, isOOB);
-              } else {
-                anyNonOutermostOOB = isOOB;
-              }
+              anyNonOutermostOOB = arith::OrIOp::create(
+                  rewriter, loc, anyNonOutermostOOB, isOOB);
             }
 
-            if (anyNonOutermostOOB) {
-              Value oobOuterIdx;
-              if (ShapedType::isDynamic(sourceShape[0])) {
-                oobOuterIdx = memref::DimOp::create(rewriter, loc, source, 0);
-              } else {
-                oobOuterIdx = arith::ConstantIndexOp::create(rewriter, loc,
-                                                             sourceShape[0]);
-              }
-              srcIndices[0] =
-                  arith::SelectOp::create(rewriter, loc, anyNonOutermostOOB,
-                                          oobOuterIdx, srcIndices[0]);
+            Value oobOuterIdx;
+            if (ShapedType::isDynamic(sourceShape[0])) {
+              oobOuterIdx = memref::DimOp::create(rewriter, loc, source, 0);
+            } else {
+              oobOuterIdx =
+                  arith::ConstantIndexOp::create(rewriter, loc, sourceShape[0]);
             }
+            srcIndices[0] = arith::SelectOp::create(
+                rewriter, loc, anyNonOutermostOOB, oobOuterIdx, srcIndices[0]);
           }
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
