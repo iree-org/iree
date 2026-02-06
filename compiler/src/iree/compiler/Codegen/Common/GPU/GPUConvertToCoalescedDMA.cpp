@@ -7,11 +7,13 @@
 #include <cstdint>
 #include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -107,6 +109,57 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
+/// Check if the source of a copy traces to a fat_raw_buffer source.
+/// Traces through extract_slice and pad ops to find the originating op.
+/// Returns true if source is a block arg (opaque, allow DMA) or if it
+/// traces to a LoadFromBufferOp with fat_raw_buffer address space.
+/// Returns false if source traces to a LoadFromBufferOp without
+/// fat_raw_buffer, or to any other concrete op (e.g. dispatch.tensor.load).
+static bool sourceIsFromFatRawBuffer(Value source) {
+  // Trace through extract_slice and pad ops.
+  while (true) {
+    if (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractSlice.getSource();
+      continue;
+    }
+    if (auto pad = source.getDefiningOp<tensor::PadOp>()) {
+      source = pad.getSource();
+      continue;
+    }
+    break;
+  }
+
+  // Block args are opaque; conservatively allow DMA.
+  if (isa<BlockArgument>(source)) {
+    return true;
+  }
+
+  // Check if source comes from a LoadFromBufferOp with fat_raw_buffer.
+  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return false;
+  }
+
+  auto memrefType = cast<MemRefType>(loadOp.getBuffer().getType());
+  return hasAMDGPUFatRawBufferAddressSpace(memrefType);
+}
+
+/// Check if the target architecture supports global load DMA.
+/// Returns true only for CDNA4+ (gfx950+) architectures.
+static bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
+  if (!target) {
+    return false;
+  }
+  FailureOr<amdgpu::Chipset> chipset =
+      amdgpu::Chipset::parse(target.getArch());
+  if (failed(chipset)) {
+    return false;
+  }
+  // CDNA4 is gfx950+ (major=9, minor>=5). Other major versions (RDNA, etc.)
+  // do not support global load DMA.
+  return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
+}
+
 /// Returns the subgroup size if the available elements are aligned to DMA
 /// transfer sizes, std::nullopt otherwise.
 static std::optional<int64_t>
@@ -120,7 +173,7 @@ getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
   int64_t elementBits = elementType.getIntOrFloatBitWidth();
 
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!target) {
+  if (!target || !targetSupportsGlobalLoadDMA(target)) {
     return std::nullopt;
   }
 
@@ -532,6 +585,9 @@ protected:
   SmallVector<OpFoldResult>
   computeThreadNumThreads(OpBuilder &builder,
                           linalg::CopyOp copyOp) const override {
+    if (!sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+      return {};
+    }
     auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
     return computeThreadNumThreadsImpl(builder, copyOp, outputType);
   }
@@ -551,8 +607,13 @@ struct ConvertPadFusionCopyToCoalescedDMA
       return failure();
     }
 
+    // Skip if source is not from fat_raw_buffer.
+    if (!sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+      return failure();
+    }
+
     // Check if this is a tensor.pad fusion case.
-    auto pad = traceToTensorPad(copyOp.getInputs()[0]);
+    tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
     if (!pad) {
       return failure(); // Not a pad fusion case
     }
@@ -632,7 +693,7 @@ struct ConvertGatherToCoalescedDMA
     int64_t elementBits = elementType.getIntOrFloatBitWidth();
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
+    if (!target || !targetSupportsGlobalLoadDMA(target)) {
       return failure();
     }
 
@@ -1025,13 +1086,28 @@ private:
   }
 
   LogicalResult applySubgroupTiling(FunctionOpInterface funcOp) {
+    // Check if the target supports global load DMA (gfx950+).
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!targetSupportsGlobalLoadDMA(target)) {
+      return success();
+    }
+
     MLIRContext *context = &getContext();
     SmallVector<Operation *> opsToTile;
 
     // Collect all ops with iree_gpu.use_global_load_dma lowering config.
     // Skip ops that are already inside a warp-mapped forall.
     funcOp->walk([&](Operation *op) {
-      if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
+      if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
+        auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
+        if (!config || !sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+          return;
+        }
+        auto parentForall = op->getParentOfType<scf::ForallOp>();
+        if (!hasWarpMapping(parentForall)) {
+          opsToTile.push_back(op);
+        }
+      } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
         auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
         if (config) {
           auto parentForall = op->getParentOfType<scf::ForallOp>();

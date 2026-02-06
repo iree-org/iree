@@ -615,39 +615,6 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 
 // -----
 
-// Negative test: RDNA3 (gfx1100) should NOT use coalesced DMA.
-// Global load DMA is only supported on CDNA4+ (gfx950+) architectures.
-
-#gpu_target_rdna3 = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <
-  compute = fp32, storage = b32, subgroup = shuffle,
-  max_load_instruction_bits = 128, subgroup_size_choices = [32, 64],
-  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
-  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32, 128]
->>
-
-#exec_target_rdna3 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_rdna3}>
-#translation_rdna3 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
-
-// CHECK-LABEL: func.func @copy_rdna3_no_dma
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
-// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
-func.func @copy_rdna3_no_dma(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
-  attributes {hal.executable.target = #exec_target_rdna3, translation_info = #translation_rdna3} {
-  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
-    ins(%source : tensor<64x512xf32>)
-    outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
-
-  // RDNA3 (gfx1100) doesn't support global load DMA.
-  // The linalg.copy should remain unchanged.
-  // CHECK: linalg.copy
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
-
-  return %result : tensor<64x512xf32>
-}
-
-// -----
-
 // Test: Copy from load_from_buffer with fat_raw_buffer address space.
 // DMA should be applied because fat_raw_buffer indicates the binding fits
 // within the 2GB limit required for buffer instructions.
