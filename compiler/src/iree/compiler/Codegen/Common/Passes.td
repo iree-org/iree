@@ -165,6 +165,23 @@ def ConvertWorkgroupForallToPCFPass
   let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
 }
 
+def ConvertForallToGenericNestWorkgroupPass
+    : InterfacePass<"iree-codegen-convert-forall-to-generic-nest-workgroup",
+                    "mlir::FunctionOpInterface"> {
+  let summary = "Converts scf.forall ops with workgroup mapping to pcf.generic";
+  let description = [{
+    Converts `scf.forall` ops with `#iree_codegen.workgroup_mapping` attributes
+    to a `pcf.generic` op using workgroup scope. The pass always linearizes
+    workgroup IDs to a single dimension.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect",
+    "arith::ArithDialect",
+    "affine::AffineDialect",
+    "scf::SCFDialect"
+  ];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
