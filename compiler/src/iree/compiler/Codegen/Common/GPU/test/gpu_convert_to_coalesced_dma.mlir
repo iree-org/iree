@@ -586,19 +586,19 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x124xf16>
 func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init: tensor<4x124xf16>, %off: index, %sz: index, %high_m: index) -> tensor<4x124xf16>
   attributes {hal.executable.target = #exec_target_pad_unaligned, translation_info = #translation_pad_unaligned} {
-  // Extract a dynamic slice: tensor<?x121xf16>
-  // Row size = 121 * 2 bytes = 242 bytes, NOT 4-byte aligned
+  // Extract a dynamic slice: tensor<?x121xf16>.
+  // Row size = 121 * 2 bytes = 242 bytes, NOT 4-byte aligned.
   %extracted = tensor.extract_slice %source[%off, 0] [%sz, 121] [1, 1]
       : tensor<65x121xf16> to tensor<?x121xf16>
 
-  // Pad to static size
+  // Pad to static size.
   %cst = arith.constant 0.0 : f16
   %padded = tensor.pad %extracted low[0, 0] high[%high_m, 3] {
   ^bb0(%arg0: index, %arg1: index):
     tensor.yield %cst : f16
   } : tensor<?x121xf16> to tensor<4x124xf16>
 
-  // Copy from padded tensor
+  // Copy from padded tensor.
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<4x124xf16>)
     outs(%init : tensor<4x124xf16>) -> tensor<4x124xf16>
