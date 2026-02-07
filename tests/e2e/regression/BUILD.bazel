@@ -36,6 +36,7 @@ iree_lit_test_suite(
         "scalar.mlir",
         "trace_dispatch_tensors.mlir",
         "unused_args.mlir",
+        "zero_transients.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     tags = [
@@ -43,6 +44,7 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "@llvm-project//lld",
