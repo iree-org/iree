@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-convert-to-coalesced-dma,canonicalize))" %s --split-input-file | FileCheck %s
 
-#gpu_target_copy = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_copy = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [32],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -12,13 +12,16 @@
 #translation_copy = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 512, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
-func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
+func.func @copy(%source_buffer: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
   attributes {hal.executable.target = #exec_target_copy, translation_info = #translation_copy} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<64x512xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x512xf32>)
     outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
+
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
 
   // Warp-level forall with contiguous subviews (columns kept whole):
   // With 16 warps (128*512/64/64) and 64 rows: step = ceil(64/16) = 4 rows, 512 cols (whole)
@@ -53,7 +56,7 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
 
 // -----
 
-#gpu_target_gather = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_gather = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -65,15 +68,18 @@ func.func @copy(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tenso
 #translation_gather = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1024, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @gather
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]: tensor<64xi32>
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
-func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
+func.func @gather(%source_buffer: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>, %indices: tensor<64xi32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
   attributes {hal.executable.target = #exec_target_gather, translation_info = #translation_gather} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<64x512xf32>
   %result = iree_linalg_ext.gather {lowering_config = #iree_gpu.use_global_load_dma}
     dimension_map = [0]
     ins(%source, %indices : tensor<64x512xf32>, tensor<64xi32>)
     outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
+
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
 
   // Warp-level forall with contiguous subviews (columns kept whole):
   // With 64 warps and 64 rows: step = ceil(64/64) = 1 row, 512 cols (whole)
@@ -110,7 +116,7 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 // Negative test: Skip coalesced DMA when innermost dimension < subgroup size. This is to ensure we do not go down
 // the slow path (which is not implemented yet).
 
-#gpu_target_small_inner = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_small_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -122,10 +128,11 @@ func.func @gather(%source: tensor<64x512xf32>, %indices: tensor<64xi32>, %init: 
 #translation_small_inner = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_small_innermost_dim
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x32xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<64x32xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x32xf32>
-func.func @copy_small_innermost_dim(%source: tensor<64x32xf32>, %init: tensor<64x32xf32>) -> tensor<64x32xf32>
+func.func @copy_small_innermost_dim(%source_buffer: memref<64x32xf32, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<64x32xf32>) -> tensor<64x32xf32>
   attributes {hal.executable.target = #exec_target_small_inner, translation_info = #translation_small_inner} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<64x32xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<64x32xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x32xf32>)
     outs(%init : tensor<64x32xf32>) -> tensor<64x32xf32>
@@ -176,6 +183,38 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 
 // -----
 
+// Negative test: Skip coalesced DMA when source is not from fat_raw_buffer.
+
+#gpu_target_not_global = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_not_global = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_not_global}>
+#translation_not_global = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_source_not_from_global_memory
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+func.func @copy_source_not_from_global_memory(%source: tensor<64x512xf32>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
+  attributes {hal.executable.target = #exec_target_not_global, translation_info = #translation_not_global} {
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<64x512xf32>)
+    outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
+
+  // Source is a plain tensor argument, not from load_from_buffer with fat_raw_buffer.
+  // The linalg.copy should remain unchanged.
+  // CHECK: linalg.copy
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<64x512xf32>
+}
+
+// -----
+
 // Test: Prefer contiguous subviews when tiling would split the innermost dimension.
 // With 64x128 tensor, workgroup_size=[256,1,1], subgroup_size=64:
 // - 4 warps available (256/64)
@@ -183,7 +222,7 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 // - Instead, we should tile rows to 16 (64/4) and keep columns whole (128)
 // This ensures subviews are contiguous in memory.
 
-#gpu_target_contiguous = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_contiguous = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
@@ -195,13 +234,16 @@ func.func @copy_not_aligned_to_dma(%source_buffer: memref<320xbf16, #amdgpu.addr
 #translation_contiguous = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_prefer_contiguous_subview
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<64x128xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<64x128xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x128xf32>
-func.func @copy_prefer_contiguous_subview(%source: tensor<64x128xf32>, %init: tensor<64x128xf32>) -> tensor<64x128xf32>
+func.func @copy_prefer_contiguous_subview(%source_buffer: memref<64x128xf32, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<64x128xf32>) -> tensor<64x128xf32>
   attributes {hal.executable.target = #exec_target_contiguous, translation_info = #translation_contiguous} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<64x128xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<64x128xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<64x128xf32>)
     outs(%init : tensor<64x128xf32>) -> tensor<64x128xf32>
+
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
 
   // With 4 warps and 64x128 tensor:
   // - Rows are tiled: step = 64/4 = 16
@@ -243,21 +285,22 @@ func.func @copy_prefer_contiguous_subview(%source: tensor<64x128xf32>, %init: te
 // When output comes from tensor.empty(), we can use total elements instead of
 // innermost dimension for the size check, enabling coalesced DMA.
 
-#gpu_target_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_linearize}>
 #translation_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_small_innermost_linearized
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
-func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tensor<128x16xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>>
+func.func @copy_small_innermost_linearized(%source_buffer: memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>>) -> tensor<128x16xf32>
   attributes {hal.executable.target = #exec_target_linearize, translation_info = #translation_linearize} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<128x16xf32>
   %empty = tensor.empty() : tensor<128x16xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<128x16xf32>)
@@ -267,6 +310,7 @@ func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tenso
   // tensor.empty(), we use total elements (2048) for the check, which passes.
   // With 4 warps (256/64), rows are tiled to 32 (128/4), columns kept whole at 16.
 
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<128x16xf32>
 
   // Warp-level forall: step (32, 16) distributes 128 rows across 4 warps
@@ -303,21 +347,22 @@ func.func @copy_small_innermost_linearized(%source: tensor<128x16xf32>) -> tenso
 // Test: 1D tensor copy distributes warps across the single dimension.
 // This tests the 1D tile size computation logic for flattened copies.
 
-#gpu_target_1d = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_1d = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_1d = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_1d}>
 #translation_1d = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_1d_tensor
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<2048xf32>
-func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>
+func.func @copy_1d_tensor(%source_buffer: memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>) -> tensor<2048xf32>
   attributes {hal.executable.target = #exec_target_1d, translation_info = #translation_1d} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2048xf32>
   %empty = tensor.empty() : tensor<2048xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<2048xf32>)
@@ -327,6 +372,7 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
   // - Tile size = ceil(2048/4) = 512 elements per warp
   // - Step = 512, distributing the single dimension across warps
 
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2048xf32>
 
   // Warp-level forall: step (512) distributes 2048 elements across 4 warps
@@ -365,22 +411,23 @@ func.func @copy_1d_tensor(%source: tensor<2048xf32>) -> tensor<2048xf32>
 // 1. Innermost dim (16) < minElementsPerTransfer (64)
 // 2. Output is a function argument, not tensor.empty, so we can't linearize
 
-#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_no_linearize = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_no_linearize = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_linearize}>
 #translation_no_linearize = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_small_innermost_no_linearize
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x16xf32>
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: tensor<128x16xf32>
-func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest: tensor<128x16xf32>) -> tensor<128x16xf32>
+func.func @copy_small_innermost_no_linearize(%source_buffer: memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>>, %dest: tensor<128x16xf32>) -> tensor<128x16xf32>
   attributes {hal.executable.target = #exec_target_no_linearize, translation_info = #translation_no_linearize} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<128x16xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<128x16xf32>
   %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%source : tensor<128x16xf32>)
     outs(%dest : tensor<128x16xf32>) -> tensor<128x16xf32>
@@ -388,6 +435,7 @@ func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest:
   // Innermost dimension (16) < minElementsPerTransfer (64), and output is not
   // tensor.empty(), so linearization is not possible. The copy should remain.
 
+  // CHECK: %[[SRC:.+]] = iree_codegen.load_from_buffer %[[SRC_BUF]]
   // CHECK: %[[RESULT:.+]] = linalg.copy
   // CHECK-SAME: ins(%[[SRC]] : tensor<128x16xf32>)
   // CHECK-SAME: outs(%[[DST]] : tensor<128x16xf32>)
@@ -402,21 +450,22 @@ func.func @copy_small_innermost_no_linearize(%source: tensor<128x16xf32>, %dest:
 // The copy should be converted to coalesced DMA when the input comes from an
 // extract_slice with contiguous innermost dimensions.
 
-#gpu_target_extract_input = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+#gpu_target_extract_input = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
   max_load_instruction_bits = 128, subgroup_size_choices = [64],
   max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
   max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-  dma_sizes = [32]
+  dma_sizes = [32, 128]
 >>
 
 #exec_target_extract_input = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_extract_input}>
 #translation_extract_input = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: func.func @copy_with_extract_slice_input
-// CHECK-SAME:    %[[LARGE_SRC:[a-zA-Z0-9]+]]: tensor<256x128xf32>
-func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> tensor<64x128xf32>
+// CHECK-SAME:    %[[LARGE_SRC_BUF:[a-zA-Z0-9]+]]: memref<256x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+func.func @copy_with_extract_slice_input(%large_source_buffer: memref<256x128xf32, #amdgpu.address_space<fat_raw_buffer>>) -> tensor<64x128xf32>
   attributes {hal.executable.target = #exec_target_extract_input, translation_info = #translation_extract_input} {
+  %large_source = iree_codegen.load_from_buffer %large_source_buffer : memref<256x128xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<256x128xf32>
   // Extract a contiguous slice from the larger source tensor.
   // The innermost dimension (128) is fully taken, so this is a contiguous slice.
   %c32 = arith.constant 32 : index
@@ -450,4 +499,39 @@ func.func @copy_with_extract_slice_input(%large_source: tensor<256x128xf32>) -> 
   // CHECK-NOT: linalg.copy
 
   return %result : tensor<64x128xf32>
+}
+
+// -----
+
+// Negative test: RDNA cards should NOT use coalesced DMA.
+// This tests that even with dma_sizes attribute present, RDNA targets
+// (gfx10xx, gfx11xx, gfx12xx) should not enable global load DMA.
+
+#gpu_target_rdna3 = #iree_gpu.target<arch = "gfx1100", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [32, 64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_rdna3 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_rdna3}>
+#translation_rdna3 = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_rdna3_no_dma
+// CHECK-SAME:    %[[SRC_BUF:[a-zA-Z0-9]+]]: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x512xf32>
+func.func @copy_rdna3_no_dma(%source_buffer: memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>>, %init: tensor<64x512xf32>) -> tensor<64x512xf32>
+  attributes {hal.executable.target = #exec_target_rdna3, translation_info = #translation_rdna3} {
+  %source = iree_codegen.load_from_buffer %source_buffer : memref<64x512xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<64x512xf32>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<64x512xf32>)
+    outs(%init : tensor<64x512xf32>) -> tensor<64x512xf32>
+
+  // RDNA3 (gfx1100) should NOT use coalesced DMA even though dma_sizes is set.
+  // Global load DMA is only supported on CDNA4+ (gfx950+) architectures.
+  // CHECK: linalg.copy
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<64x512xf32>
 }

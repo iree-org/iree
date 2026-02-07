@@ -24,6 +24,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -44,6 +45,19 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+
+bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
+  StringRef targetArch = target.getArch();
+  auto maybeChipset = amdgpu::Chipset::parse(targetArch);
+  if (failed(maybeChipset)) {
+    return false;
+  }
+  // Only enable for CDNA4+ (gfx950+). Exclude RDNA cards (gfx10xx, gfx11xx,
+  // gfx12xx). CDNA cards have major version 9, RDNA cards have major version
+  // >= 10.
+  constexpr amdgpu::Chipset kGfx950{9, 5, 0};
+  return maybeChipset->majorVersion == 9 && *maybeChipset >= kGfx950;
+}
 
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
@@ -651,9 +665,9 @@ checkForDPSOperandComputeOpProducers(DestinationStyleOpInterface dpsOp) {
 static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
-    ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
-    bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool cPromoteIfPadding, bool hasExistingAccumulator = false,
+    ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
+    bool scaled, int64_t splitReductionTripCnt, bool cPromoteIfPadding,
+    bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -934,28 +948,21 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
-  // Use global load DMA attribute (subgroup sizes will be derived from
-  // translation_info).
-  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-  SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
+  // Build promotion list - global load DMA eligibility is determined
+  // dynamically in the GPUConvertToCoalescedDMA pass based on whether
+  // the source comes directly from global memory.
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
-    // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-    // compilation doesn't support it. Once this is fixed, we should use global
-    // load DMA here when possible.
-    promotionArray = {};
     promotionList.append({2, 3});
   }
-  if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
+  bool cWasPromoted = (!mustBeAligned || couldNeedPadding) && cPromoteIfPadding;
+  if (cWasPromoted) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled
     // and scaled GEMM respectively.
     promotionList.push_back(promotionList.size());
   }
-  ArrayRef<Attribute> promotionTypes = useDirectLoad
-                                           ? ArrayRef<Attribute>(promotionArray)
-                                           : ArrayRef<Attribute>{};
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
-                                  promotionTypes);
+                                  /*promotionTypes=*/{});
   if (!mustBeAligned || couldNeedPadding) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
@@ -993,9 +1000,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   return std::pair{loweringConfig, flatWorkgroupSize};
 }
 
-LogicalResult setIGEMMConvolutionLoweringConfig(
-    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, bool useDirectLoad, bool padConv) {
+LogicalResult
+setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op, bool padConv) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -1070,7 +1078,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
-          useDirectLoad, /*isGemm=*/false,
+          /*isGemm=*/false,
           /*scaled=*/false, splitReductionTripCnt,
           /*cPromoteIfPadding=*/cPromoteIfPadding, hasExistingAccumulator,
           convToIgemmInfo);
@@ -1083,7 +1091,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchNumStages=*/2,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
@@ -1101,7 +1109,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
 
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op, bool useDirectLoad) {
+                                      Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp ||
       (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -1129,18 +1137,15 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+          bounds, maps, operands, target, /*isGemm=*/true,
           /*scaled=*/false, splitReductionTripCnt, cPromoteIfPadding,
           hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
   if (failed(configAndWgSize)) {
-    // TODO (muzasyed) : Perform padding appropriately for minimizing bank
-    // conflicts when dealing with scaled matmuls. For now it is disabled.
-    useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-        bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+        bounds, maps, operands, target, /*isGemm=*/true,
         /*scaled=*/true, splitReductionTripCnt, cPromoteIfPadding,
         hasExistingAccumulator);
   }
@@ -1154,7 +1159,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(), /*prefetchNumStages=*/2,
-      /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(

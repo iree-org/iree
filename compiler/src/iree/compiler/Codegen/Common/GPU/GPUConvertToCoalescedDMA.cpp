@@ -7,8 +7,10 @@
 #include <cstdint>
 #include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
@@ -97,17 +99,37 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
+/// Check if the source of an operation comes directly from fat_raw_buffer
+/// address space.
+static bool sourceIsFromGlobalMemory(Operation *op) {
+  Value source;
+  if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
+    source = copyOp.getInputs()[0];
+  } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
+    source = gatherOp.getSource();
+  } else {
+    return false;
+  }
+
+  // Trace through extract_slice operations to find the origin.
+  while (auto extractOp = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+    source = extractOp.getSource();
+  }
+
+  // Check if the source comes from load_from_buffer with fat_raw_buffer
+  // address space.
+  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return false;
+  }
+  return hasAMDGPUFatRawBufferAddressSpace(loadOp.getBuffer().getType());
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
 computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
                             RankedTensorType outputType) {
-  // Check that this operation has the use_global_load_dma config.
-  auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
-  if (!dmaConfig) {
-    return {};
-  }
-
   // Get the function containing this operation.
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
@@ -136,6 +158,10 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   // Get DMA sizes from target to compute minimum transfer size.
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target) {
+    return {};
+  }
+
+  if (!IREE::GPU::targetSupportsGlobalLoadDMA(target)) {
     return {};
   }
 
@@ -387,6 +413,11 @@ struct ConvertToCoalescedDMABase : public OpRewritePattern<OpTy> {
       return failure();
     }
 
+    // Check that source comes from global memory (not tensor.pad).
+    if (!sourceIsFromGlobalMemory(op)) {
+      return failure();
+    }
+
     SmallVector<OpFoldResult> threadNumThreads =
         computeThreadNumThreads(rewriter, op);
     if (threadNumThreads.empty()) {
@@ -432,17 +463,20 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // For gather ops, tile only the innermost dimension to distribute across
-    // threads.
-    auto dmaConfig =
-        getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(gatherOp);
-    if (!dmaConfig) {
+    // Check that source comes from global memory (not tensor.pad).
+    if (!sourceIsFromGlobalMemory(gatherOp)) {
       return failure();
     }
 
     // Get the function containing this operation.
     auto funcOp = gatherOp->getParentOfType<FunctionOpInterface>();
     if (!funcOp) {
+      return failure();
+    }
+
+    // Check target supports global load DMA.
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target || !IREE::GPU::targetSupportsGlobalLoadDMA(target)) {
       return failure();
     }
 
@@ -463,11 +497,6 @@ struct ConvertGatherToCoalescedDMA
 
     Type elementType = outputType.getElementType();
     int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
-      return failure();
-    }
 
     ArrayRef<int64_t> dmaSizes;
     if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
@@ -665,10 +694,6 @@ private:
   FailureOr<scf::SCFTilingResult> tileAtSubgroupLevel(IRRewriter &rewriter,
                                                       OpTy op) {
     MLIRContext *context = &getContext();
-    auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
-    if (!dmaConfig) {
-      return failure();
-    }
 
     // Get the function containing this operation.
     auto funcOp = op->template getParentOfType<FunctionOpInterface>();
@@ -781,18 +806,26 @@ private:
 
   LogicalResult applySubgroupTiling(FunctionOpInterface funcOp) {
     MLIRContext *context = &getContext();
+
+    // Check if target supports global load DMA.
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!target || !IREE::GPU::targetSupportsGlobalLoadDMA(target)) {
+      return success();
+    }
+
     SmallVector<Operation *> opsToTile;
 
-    // Collect all ops with iree_gpu.use_global_load_dma lowering config.
+    // Collect copy/gather ops that are eligible for coalesced DMA.
     // Skip ops that are already inside a warp-mapped forall.
     funcOp->walk([&](Operation *op) {
       if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
-        auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
-        if (config) {
-          auto parentForall = op->getParentOfType<scf::ForallOp>();
-          if (!hasWarpMapping(parentForall)) {
-            opsToTile.push_back(op);
-          }
+        // Check that source comes from global memory (not tensor.pad).
+        if (!sourceIsFromGlobalMemory(op)) {
+          return;
+        }
+        auto parentForall = op->getParentOfType<scf::ForallOp>();
+        if (!hasWarpMapping(parentForall)) {
+          opsToTile.push_back(op);
         }
       }
     });
