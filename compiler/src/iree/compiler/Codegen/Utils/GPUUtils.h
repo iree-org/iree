@@ -177,6 +177,13 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
 mlir::gpu::AllReduceOperation
 combiningKindToAllReduce(vector::CombiningKind kind);
 
+struct XorShuffleParams {
+  int64_t row_width;
+  int64_t access_width;
+  XorShuffleParams(int64_t row_width, int64_t access_width)
+      : row_width(row_width), access_width(access_width) {}
+};
+
 /// For a given MMA intrinsic and operand, returns the lower bound and upper
 /// bound for valid values of XOR shuffle attribute parameters, access width and
 /// row width. For both parameters, the elements ingested per thread at a time
@@ -187,7 +194,7 @@ combiningKindToAllReduce(vector::CombiningKind kind);
 /// the upper bound.
 /// - sweep row elements over all multiple of the access elements, respecting
 /// the upper bound.
-FailureOr<std::pair<int64_t, int64_t>>
+FailureOr<XorShuffleParams>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex);
 
@@ -208,13 +215,13 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
 
 /// Returns XOR shuffle parameters known to be optimal for the given target and
 /// intrinsic based on profiling results.
-FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
+FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex);
 
 /// Note this generic heuristic for untuned cases is not guaranteed to be
 /// optimal for all targets and intrinsics.
-FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
+FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     ArrayRef<int64_t> reductionTileSizes, int operandIndex);
@@ -227,7 +234,7 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
 /// computed by calculating the K tile size and LDS bank width. Note this
 /// generic heuristic for untuned cases is not guaranteed to be optimal for all
 /// targets and intrinsics.
-FailureOr<std::pair<int64_t, int64_t>>
+FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     ArrayRef<int64_t> reductionTileSizes, int operandIndex);

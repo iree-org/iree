@@ -799,14 +799,14 @@ getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 }
 
 // TODO(muzasyed): Add more intrinsics for gfx950.
-static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
+static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
     switch (smma.getIntrinsic()) {
     case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return std::pair(/*row_width*/ int64_t(256),
-                       /*access_width*/ int64_t(32));
+      return XorShuffleParams(/*row_width*/ int64_t(256),
+                              /*access_width*/ int64_t(32));
     default:
       return failure();
     }
@@ -817,8 +817,8 @@ static FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForGfx950(
 /// Validate the XOR shuffle parameters for the given intrinsic and operand
 /// index. If the parameters produce an XOR Shuffle that is not valid, return
 /// failure. Else, return the swizzle parameters.
-static FailureOr<std::pair<int64_t, int64_t>>
-validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
+static FailureOr<XorShuffleParams>
+validateXorShuffle(FailureOr<XorShuffleParams> swizzle,
                    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                    int operandIndex) {
   FailureOr<int64_t> maybeTotalTileElems =
@@ -827,7 +827,8 @@ validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
     return failure();
   }
   int64_t totalTileElems = *maybeTotalTileElems;
-  if (!isXORShuffleValid(swizzle->first, swizzle->second, totalTileElems)) {
+  if (!isXORShuffleValid(swizzle->row_width, swizzle->access_width,
+                         totalTileElems)) {
     return failure();
   }
   return swizzle;
@@ -836,7 +837,7 @@ validateXorShuffle(FailureOr<std::pair<int64_t, int64_t>> swizzle,
 // Disabling clang-tidy for the following functions, as it will be externally
 // linked to the CAPI in a future PR.
 // NOLINTBEGIN(misc-use-internal-linkage)
-FailureOr<std::pair<int64_t, int64_t>>
+FailureOr<XorShuffleParams>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
   FailureOr<int64_t> maybeMinimumAccessElems =
@@ -846,7 +847,7 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return std::pair(*maybeMinimumAccessElems, *maybeTotalTileElems);
+  return XorShuffleParams(*maybeMinimumAccessElems, *maybeTotalTileElems);
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
@@ -887,7 +888,7 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
   return true;
 }
 
-FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
+FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
   FailureOr<amdgpu::Chipset> maybeChipset =
@@ -902,7 +903,7 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForTunedChipset(
   return failure();
 }
 
-FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
+FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
@@ -939,15 +940,15 @@ FailureOr<std::pair<int64_t, int64_t>> getXorShuffleParamsForUntunedChipset(
 
   // Ensure row width is at least access width (minimum 1 column).
   effectiveRowWidth = std::max(effectiveRowWidth, numAccessElems);
-  return validateXorShuffle(std::pair(effectiveRowWidth, numAccessElems),
+  return validateXorShuffle(XorShuffleParams(effectiveRowWidth, numAccessElems),
                             intrinsic, operandIndex);
 }
 
-FailureOr<std::pair<int64_t, int64_t>>
+FailureOr<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
-  FailureOr<std::pair<int64_t, int64_t>> xorShuffleAttr =
+  FailureOr<XorShuffleParams> xorShuffleAttr =
       getXorShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
   if (failed(xorShuffleAttr)) {
     xorShuffleAttr = getXorShuffleParamsForUntunedChipset(
@@ -962,12 +963,13 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                   ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
-  FailureOr<std::pair<int64_t, int64_t>> xorShuffleParams =
+  FailureOr<XorShuffleParams> xorShuffleParams =
       getXorShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
   if (failed(xorShuffleParams)) {
     return failure();
   }
-  auto [effectiveRowWidth, numAccessElems] = xorShuffleParams.value();
+  auto effectiveRowWidth = xorShuffleParams.value().row_width;
+  auto numAccessElems = xorShuffleParams.value().access_width;
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
       context, effectiveRowWidth, numAccessElems,
       /*row_stride=*/int64_t(0),
