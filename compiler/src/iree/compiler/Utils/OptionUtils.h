@@ -114,6 +114,12 @@ public:
     const Deprecated *dep = filterDeprecated(Ms...);
     auto [changedCallback, clCallback] = makeChangedCallback<V>(name, dep);
     OptionInfo &info = getOptionsStorage()[name];
+    // Skip if this option is already registered in this binder's storage.
+    // This allows multiple option structs to share common options via
+    // inheritance without causing duplicate registration errors.
+    if (info.option) {
+      return;
+    }
     if (!scope) {
       // Bind global options.
       auto opt = std::make_unique<llvm::cl::opt<T, /*ExternalStorage=*/true>>(
