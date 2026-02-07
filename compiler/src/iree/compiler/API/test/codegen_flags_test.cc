@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// C API tests for ROCM-specific flags. This test is in the ROCM plugin
-// directory because these flags are registered by ROCMOptions and only
-// available when ROCM is enabled.
+// C API tests for common codegen flags that should be accessible via the
+// embedding API.
 
 #include <gtest/gtest.h>
 
@@ -14,7 +13,7 @@
 
 namespace {
 
-class ROCMCAPITest : public ::testing::Test {
+class CodegenFlagsCAPITest : public ::testing::Test {
 protected:
   static void SetUpTestSuite() { ireeCompilerGlobalInitialize(); }
   static void TearDownTestSuite() { ireeCompilerGlobalShutdown(); }
@@ -25,14 +24,14 @@ protected:
   iree_compiler_session_t *session = nullptr;
 };
 
-TEST_F(ROCMCAPITest, TuningSpecPathFlagAccepted) {
+TEST_F(CodegenFlagsCAPITest, TuningSpecPathFlagAccepted) {
   const char *flag = "--iree-codegen-tuning-spec-path=/tmp/spec.mlir";
   iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, &flag);
   ASSERT_EQ(err, nullptr)
       << "Tuning spec path flag should be accepted via C API";
 }
 
-TEST_F(ROCMCAPITest, DefaultTuningSpecsFlagNotRegistered) {
+TEST_F(CodegenFlagsCAPITest, DefaultTuningSpecsFlagNotRegistered) {
   const char *flag = "--iree-codegen-enable-default-tuning-specs";
   iree_compiler_error_t *err = ireeCompilerSessionSetFlags(session, 1, &flag);
   ASSERT_NE(err, nullptr) << "CLI-only flag should not be accessible via C API";
