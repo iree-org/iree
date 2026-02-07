@@ -128,7 +128,7 @@ struct FoldRelayoutOpIntoMapScatterPattern
       return failure();
     }
     // Folding tensor.pad is handled by a separate pattern.
-    if (!isSupportedRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+    if (!isSupportedSingleInputRelayoutOp(op) || isa<tensor::PadOp>(op)) {
       return failure();
     }
     if (failed(foldIntoMapScatter(rewriter, op, mapScatterOp))) {

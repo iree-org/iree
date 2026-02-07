@@ -358,6 +358,12 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       return isa<VectorType>(getSource().getType());
     }
 
+    // Creates a MapGatherOp with an identity mapping in the transformation
+    // body. Expects the types of `source` and `output` to be the same.
+    static MapGatherOp createIdentityMapGather(OpBuilder &builder,
+                                               Location loc, Value source,
+                                               Value output);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

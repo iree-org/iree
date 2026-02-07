@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-layout-transformation{scope=dispatch},canonicalize,cse))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=dispatch},canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=DISPATCH-SCOPE
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-layout-transformation{scope=workgroup},canonicalize,cse))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=workgroup},canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=WORKGROUP-SCOPE
 
 func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref<8x16xf32>) {
