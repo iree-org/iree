@@ -126,7 +126,7 @@ void addMultiTilingExpertPassPipeline(
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager);
+    OpPassManager &variantPassManager, const CPUCodegenOptions &codegenOptions);
 
 /// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
 /// to LLVM dialect via the structured ops path. The  `variantPassManager`

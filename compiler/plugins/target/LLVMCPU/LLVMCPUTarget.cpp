@@ -243,7 +243,7 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager, codegenOptions_);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
