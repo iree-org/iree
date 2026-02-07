@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
+    "lowering_strategy_from_tuning_spec.mlir"
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
     "pipeline_disable_distribution_tests.mlir"
@@ -68,6 +69,8 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-opt
+  DATA
+    tuning_spec_matmul.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
