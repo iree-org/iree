@@ -1551,3 +1551,17 @@ func.func @batch_mmt4d_generic_form(%lhs: tensor<128x10x32x8x1xf32>, %rhs: tenso
 // CHECK-LABEL: func.func @batch_mmt4d_generic_form(
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG]]}
+
+// -----
+
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+func.func @gather(%source: tensor<16x8x32x128xf16>, %indices: tensor<4xi64>, %out: tensor<4x8x32x128xf16>) -> tensor<4x8x32x128xf16> attributes {hal.executable.target = #executable_target_system_elf_x86_64_} {
+  %0 = iree_linalg_ext.gather dimension_map = [0] ins(%source, %indices : tensor<16x8x32x128xf16>, tensor<4xi64>) outs(%out : tensor<4x8x32x128xf16>) -> tensor<4x8x32x128xf16>
+  return %0 : tensor<4x8x32x128xf16>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 4, 32, 64], vector_common_parallel = [1, 1, 1, 8]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
+//       CHECK: func.func @gather(
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   iree_linalg_ext.gather
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
