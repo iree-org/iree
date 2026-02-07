@@ -567,8 +567,28 @@ struct ScanOpConversion final
       outputTys.push_back(output.getType());
     }
 
+    // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
+    // To support suffix (postfix) scans, we can reverse the input, perform a
+    // prefix scan, and then reverse the output.
+    auto createReverse = [&](Value val, int64_t axis) -> Value {
+      auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
+      SmallVector<int64_t> dimensions;
+      dimensions.push_back(axis);
+      return mlir::stablehlo::ReverseOp::create(
+          rewriter, op.getLoc(), valTy, val,
+          rewriter.getDenseI64ArrayAttr(dimensions));
+    };
+    llvm::SmallVector<Value> scanInputs;
+    if (isPostfix) {
+      for (auto input : inputs) {
+        scanInputs.push_back(createReverse(input, reduceAxis));
+      }
+    } else {
+      scanInputs = inputs;
+    }
+
     auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, inputs, outputs,
+        rewriter, op.getLoc(), outputTys, scanInputs, outputs,
         rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
@@ -581,7 +601,12 @@ struct ScanOpConversion final
     rewriter.applySignatureConversion(&scanOp.getRegion().front(),
                                       signatureConverter);
 
-    rewriter.replaceOp(op, scanOp.getResult(0));
+    Value result = scanOp.getResult(0);
+    if (isPostfix) {
+      result = createReverse(result, reduceAxis);
+    }
+
+    rewriter.replaceOp(op, result);
     return success();
   }
 };

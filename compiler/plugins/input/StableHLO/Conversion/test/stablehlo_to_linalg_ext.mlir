@@ -963,3 +963,38 @@ func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 // CHECK:         iree_linalg_ext.yield %[[ADD]]
 // CHECK:       } -> tensor<7x5xi32>, tensor<7xi32>
 // CHECK:       return %[[SCAN]]#0 : tensor<7x5xi32>
+
+// -----
+
+// CHECK-LABEL: @suffix
+// CHECK-SAME: %[[ARG0:.+]]: tensor<7x5xi32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<i32>
+func.func @suffix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32> {
+  %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
+    ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+    "stablehlo.return"(%787) : (tensor<i32>) -> ()
+  }) {base_dilations = array<i64: 1, 1>, padding = dense<[[0, 0], [0, 4]]> : tensor<2x2xi64>, window_dilations = array<i64: 1, 1>, window_dimensions = array<i64: 1, 5>, window_strides = array<i64: 1, 1>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %reduce : tensor<7x5xi32>
+}
+// CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
+// CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
+// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
+// CHECK:       ^bb0(%[[IN:.+]]: i32, %[[OUT:.+]]: i32):
+// CHECK:         linalg.yield %[[IN]]
+// CHECK:       %[[REV_IN_INIT:.+]] = tensor.empty() : tensor<7x5xi32>
+// CHECK:       %[[REV_IN:.+]] = linalg.generic {{.*}} outs(%[[REV_IN_INIT]] : tensor<7x5xi32>) {
+// CHECK:         tensor.extract
+// CHECK:         linalg.yield
+// CHECK:       } -> tensor<7x5xi32>
+// CHECK:       %[[SCAN:.+]]:2 = iree_linalg_ext.scan dimension(1) inclusive(true) ins(%[[REV_IN]] : tensor<7x5xi32>) outs(%[[OUT0]], %[[FILL]] : tensor<7x5xi32>, tensor<7xi32>)
+// CHECK:       ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32):
+// CHECK:         %[[ADD:.+]] = arith.addi %[[ARG2]], %[[ARG3]] : i32
+// CHECK:         iree_linalg_ext.yield %[[ADD]]
+// CHECK:       } -> tensor<7x5xi32>, tensor<7xi32>
+// CHECK:       %[[REV_OUT_INIT:.+]] = tensor.empty() : tensor<7x5xi32>
+// CHECK:       %[[REV_OUT:.+]] = linalg.generic {{.*}} outs(%[[REV_OUT_INIT]] : tensor<7x5xi32>) {
+// CHECK:         tensor.extract
+// CHECK:         linalg.yield
+// CHECK:       } -> tensor<7x5xi32>
+// CHECK:       return %[[REV_OUT]] : tensor<7x5xi32>
