@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
     "null_values.mlir"
+    "parameters_dynamic.mlir"
     "parameters_scoped.mlir"
     "parameters_unscoped.mlir"
     "repeated_return.mlir"
@@ -76,6 +77,7 @@ iree_lit_test_suite(
     iree::compiler::Utils::td_files
     parameters_a.safetensors
     parameters_b.safetensors
+    parameters_dynamic.safetensors
   LABELS
     "driver=local-task"
     "hostonly"

@@ -1,8 +1,8 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @parameterLoad
-// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
-util.func public @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.fence) {
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence, %[[SCOPE:.+]]: !util.buffer, %[[KEY:.+]]: !util.buffer)
+util.func public @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.fence, %scope: !util.buffer, %key: !util.buffer) {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   %affinity = arith.constant -1 : i64
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0
@@ -19,14 +19,14 @@ util.func public @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal
   // CHECK-SAME: signal(%[[SIGNAL]])
   // CHECK-SAME: type(%[[MEMORY_TYPE]])
   // CHECK-SAME: usage(%[[BUFFER_USAGE]])
-  // CHECK-NEXT: "scope"::"w0"[%[[OFFSET]]] : !hal.buffer{%[[LENGTH]]}
+  // CHECK-NEXT: %[[SCOPE]]::%[[KEY]][%[[OFFSET]]] : !hal.buffer{%[[LENGTH]]}
   %0 = io_parameters.load<%device : !hal.device>
       affinity(%affinity)
       wait(%wait)
       signal(%signal)
       type(%memory_type)
       usage(%buffer_usage) {
-        "scope"::"w0"[%offset] : !hal.buffer{%length}
+        %scope::%key[%offset] : !hal.buffer{%length}
       }
   util.return
 }

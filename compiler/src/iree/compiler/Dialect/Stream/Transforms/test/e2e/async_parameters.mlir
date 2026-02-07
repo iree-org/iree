@@ -19,7 +19,8 @@
 // operations from their consumers.
 
 // CHECK-LABEL: @LoadThenDispatch
-util.func public @LoadThenDispatch(%arg0: index) -> !stream.resource<transient> {
+// CHECK-SAME: %[[ARG0:.+]]: index, %[[MODEL:.+]]: !util.buffer, %[[WEIGHTS:.+]]: !util.buffer
+util.func public @LoadThenDispatch(%arg0: index, %model: !util.buffer, %weights_key: !util.buffer) -> !stream.resource<transient> {
   %c0_i64 = arith.constant 0 : i64
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
@@ -28,8 +29,8 @@ util.func public @LoadThenDispatch(%arg0: index) -> !stream.resource<transient> 
   // Load weights from parameter archive.
   // Parameter load should be hoisted outside execute region.
   // CHECK: stream.cmd.parameter.load
-  // CHECK: "model"::"weights"
-  %weights, %load_tp = stream.async.parameter.load "model"::"weights"[%c0_i64]
+  // CHECK: %[[MODEL]]::%[[WEIGHTS]]
+  %weights, %load_tp = stream.async.parameter.load %model::%weights_key[%c0_i64]
       : !stream.resource<constant>{%c1024} => !stream.timepoint
 
   // Await the parameter load (required for valid IR, pipeline will optimize).
@@ -55,7 +56,8 @@ util.func public @LoadThenDispatch(%arg0: index) -> !stream.resource<transient> 
 // unnecessary synchronization overhead.
 
 // CHECK-LABEL: @GatherMultipleEntriesThenDispatch
-util.func public @GatherMultipleEntriesThenDispatch(%arg0: index) -> !stream.resource<transient> {
+// CHECK-SAME: %[[ARG0:.+]]: index, %[[MODEL:.+]]: !util.buffer, %[[BIAS0:.+]]: !util.buffer, %[[BIAS1:.+]]: !util.buffer
+util.func public @GatherMultipleEntriesThenDispatch(%arg0: index, %model: !util.buffer, %bias0: !util.buffer, %bias1: !util.buffer) -> !stream.resource<transient> {
   %c0_i64 = arith.constant 0 : i64
   %c1024_i64 = arith.constant 1024 : i64
   %c0 = arith.constant 0 : index
@@ -69,11 +71,11 @@ util.func public @GatherMultipleEntriesThenDispatch(%arg0: index) -> !stream.res
   // Gather multiple parameter ranges into buffer.
   // All entries should remain in a single gather operation.
   // CHECK: stream.cmd.parameter.gather
-  // CHECK-NEXT: "model"::"bias0"
-  // CHECK-NEXT: "model"::"bias1"
+  // CHECK-NEXT: %[[MODEL]]::%[[BIAS0]]
+  // CHECK-NEXT: %[[MODEL]]::%[[BIAS1]]
   %gathered, %gather_tp = stream.async.parameter.gather {
-    "model"::"bias0"[%c0_i64] -> %buffer[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c2048},
-    "model"::"bias1"[%c1024_i64] -> %buffer[%c1024 to %c2048 for %c1024] : !stream.resource<transient>{%c2048}
+    %model::%bias0[%c0_i64] -> %buffer[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c2048},
+    %model::%bias1[%c1024_i64] -> %buffer[%c1024 to %c2048 for %c1024] : !stream.resource<transient>{%c2048}
   } : !stream.resource<transient> => !stream.timepoint
 
   //  Await gather (required for valid IR, pipeline will optimize).
@@ -99,7 +101,8 @@ util.func public @GatherMultipleEntriesThenDispatch(%arg0: index) -> !stream.res
 // archive.
 
 // CHECK-LABEL: @DispatchThenScatter
-util.func public @DispatchThenScatter(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+// CHECK-SAME: %[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: index, %[[OUTPUT:.+]]: !util.buffer, %[[RESULT0:.+]]: !util.buffer, %[[RESULT1:.+]]: !util.buffer
+util.func public @DispatchThenScatter(%arg0: !stream.resource<transient>, %arg1: index, %output: !util.buffer, %result0: !util.buffer, %result1: !util.buffer) -> !stream.timepoint {
   %c0_i64 = arith.constant 0 : i64
   %c1024_i64 = arith.constant 1024 : i64
   %c0 = arith.constant 0 : index
@@ -109,15 +112,15 @@ util.func public @DispatchThenScatter(%arg0: !stream.resource<transient>, %arg1:
   // Dispatch produces result to be scattered.
   // CHECK: stream.cmd.execute
   // CHECK: stream.cmd.dispatch @transform_kernel::@dispatch
-  %output = stream.async.dispatch @transform_kernel::@dispatch[%arg1](%arg0[%c0 to %c2048 for %c2048]) : (!stream.resource<transient>{%c2048}) -> !stream.resource<transient>{%c2048}
+  %output_data = stream.async.dispatch @transform_kernel::@dispatch[%arg1](%arg0[%c0 to %c2048 for %c2048]) : (!stream.resource<transient>{%c2048}) -> !stream.resource<transient>{%c2048}
 
   // Scatter should follow dispatch, writing result to parameter archive.
   // CHECK: stream.cmd.parameter.scatter
-  // CHECK-NEXT: "output"::"result0"
-  // CHECK-NEXT: "output"::"result1"
+  // CHECK-NEXT: %[[OUTPUT]]::%[[RESULT0]]
+  // CHECK-NEXT: %[[OUTPUT]]::%[[RESULT1]]
   %scattered, %scatter_tp = stream.async.parameter.scatter {
-    %output[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c2048} -> "output"::"result0"[%c0_i64],
-    %output[%c1024 to %c2048 for %c1024] : !stream.resource<transient>{%c2048} -> "output"::"result1"[%c1024_i64]
+    %output_data[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c2048} -> %output::%result0[%c0_i64],
+    %output_data[%c1024 to %c2048 for %c1024] : !stream.resource<transient>{%c2048} -> %output::%result1[%c1024_i64]
   } : !stream.resource<transient> => !stream.timepoint
 
   // Return the timepoint to anchor the scatter operation.
@@ -135,19 +138,20 @@ util.func public @DispatchThenScatter(%arg0: !stream.resource<transient>, %arg1:
 // synchronization.
 
 // CHECK-LABEL: @LoadComputeScatter
-util.func public @LoadComputeScatter(%arg0: index) -> !stream.timepoint {
+// CHECK-SAME: %[[ARG0:.+]]: index, %[[INPUT:.+]]: !util.buffer, %[[WEIGHTS:.+]]: !util.buffer, %[[OUTPUT:.+]]: !util.buffer, %[[QWEIGHTS:.+]]: !util.buffer
+util.func public @LoadComputeScatter(%arg0: index, %input: !util.buffer, %weights_key: !util.buffer, %output: !util.buffer, %quantized_weights: !util.buffer) -> !stream.timepoint {
   %c0_i64 = arith.constant 0 : i64
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
 
   // Load input parameter.
   // CHECK: stream.cmd.parameter.load
-  // CHECK: "input"::"weights"
-  %input, %load_tp = stream.async.parameter.load "input"::"weights"[%c0_i64]
+  // CHECK: %[[INPUT]]::%[[WEIGHTS]]
+  %input_data, %load_tp = stream.async.parameter.load %input::%weights_key[%c0_i64]
       : !stream.resource<constant>{%c1024} => !stream.timepoint
 
   // Await parameter load (required for valid IR, pipeline will optimize).
-  %input_ready = stream.timepoint.await %load_tp => %input : !stream.resource<constant>{%c1024}
+  %input_ready = stream.timepoint.await %load_tp => %input_data : !stream.resource<constant>{%c1024}
 
   // Transform loaded data via dispatch.
   // CHECK: stream.cmd.execute
@@ -156,9 +160,9 @@ util.func public @LoadComputeScatter(%arg0: index) -> !stream.timepoint {
 
   // Write transformed result back to parameter archive.
   // CHECK: stream.cmd.parameter.scatter
-  // CHECK-NEXT: "output"::"quantized_weights"
+  // CHECK-NEXT: %[[OUTPUT]]::%[[QWEIGHTS]]
   %scattered, %scatter_tp = stream.async.parameter.scatter {
-    %transformed[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c1024} -> "output"::"quantized_weights"[%c0_i64]
+    %transformed[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c1024} -> %output::%quantized_weights[%c0_i64]
   } : !stream.resource<transient> => !stream.timepoint
 
   // Return the timepoint to anchor the scatter operation.
@@ -176,7 +180,8 @@ util.func public @LoadComputeScatter(%arg0: index) -> !stream.timepoint {
 // should be elided.
 
 // CHECK-LABEL: @MultipleParameterOpsTimepointFolding
-util.func public @MultipleParameterOpsTimepointFolding(%arg0: index) -> !stream.resource<transient> {
+// CHECK-SAME: %[[ARG0:.+]]: index, %[[MODEL:.+]]: !util.buffer, %[[WEIGHTS:.+]]: !util.buffer, %[[BIAS:.+]]: !util.buffer
+util.func public @MultipleParameterOpsTimepointFolding(%arg0: index, %model: !util.buffer, %weights_key: !util.buffer, %bias_key: !util.buffer) -> !stream.resource<transient> {
   %c0_i64 = arith.constant 0 : i64
   %c1024_i64 = arith.constant 1024 : i64
   %c0 = arith.constant 0 : index
@@ -186,8 +191,8 @@ util.func public @MultipleParameterOpsTimepointFolding(%arg0: index) -> !stream.
 
   // Load first parameter.
   // CHECK: stream.cmd.parameter.load
-  // CHECK: "model"::"weights"
-  %weights, %load1_tp = stream.async.parameter.load "model"::"weights"[%c0_i64]
+  // CHECK: %[[MODEL]]::%[[WEIGHTS]]
+  %weights, %load1_tp = stream.async.parameter.load %model::%weights_key[%c0_i64]
       : !stream.resource<constant>{%c1024} => !stream.timepoint
 
   // Allocate buffer for second parameter.
@@ -195,8 +200,8 @@ util.func public @MultipleParameterOpsTimepointFolding(%arg0: index) -> !stream.
 
   // Read second parameter into buffer.
   // CHECK: stream.cmd.parameter.read
-  // CHECK: "model"::"bias"
-  %read, %read_tp = stream.async.parameter.read "model"::"bias"[%c1024_i64]
+  // CHECK: %[[MODEL]]::%[[BIAS]]
+  %read, %read_tp = stream.async.parameter.read %model::%bias_key[%c1024_i64]
       -> %buffer[%c0 to %c1024 for %c1024] : !stream.resource<transient>{%c1024} => !stream.timepoint
 
   // Await both parameter operations (required for valid IR, pipeline will optimize).
@@ -224,7 +229,8 @@ util.func public @MultipleParameterOpsTimepointFolding(%arg0: index) -> !stream.
 // decisions.
 
 // CHECK-LABEL: @MixedParameterAndRegularOps
-util.func public @MixedParameterAndRegularOps(%arg0: index) -> !stream.resource<transient> {
+// CHECK-SAME: %[[ARG0:.+]]: index, %[[MODEL:.+]]: !util.buffer, %[[WEIGHTS:.+]]: !util.buffer
+util.func public @MixedParameterAndRegularOps(%arg0: index, %model: !util.buffer, %weights_key: !util.buffer) -> !stream.resource<transient> {
   %c0_i64 = arith.constant 0 : i64
   %c0 = arith.constant 0 : index
   %c1024 = arith.constant 1024 : index
@@ -241,8 +247,8 @@ util.func public @MixedParameterAndRegularOps(%arg0: index) -> !stream.resource<
 
   // Load from parameter archive.
   // CHECK: stream.cmd.parameter.load
-  // CHECK: "model"::"weights"
-  %weights, %load_tp = stream.async.parameter.load "model"::"weights"[%c0_i64]
+  // CHECK: %[[MODEL]]::%[[WEIGHTS]]
+  %weights, %load_tp = stream.async.parameter.load %model::%weights_key[%c0_i64]
       : !stream.resource<constant>{%c1024} => !stream.timepoint
 
   // Await parameter load (required for valid IR, pipeline will optimize).

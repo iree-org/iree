@@ -631,6 +631,84 @@ struct EncodeTensorDispatchOp
 };
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.parameter.load
+//===----------------------------------------------------------------------===//
+
+struct EncodeTensorParameterLoadOp
+    : public OpRewritePattern<IREE::Stream::TensorParameterLoadOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Stream::TensorParameterLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resultType = cast<RankedTensorType>(op.getResultEncoding());
+    auto resultDims = op.getResultEncodingDims();
+    if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
+      return failure();
+    }
+
+    // Calculate the actual storage size, accounting for sub-byte alignment.
+    RankedTensorType alignedType = alignTensorType(resultType);
+    Value resultSize = calculateStorageElementCountInBytes(
+        op.getLoc(), alignedType, resultDims, rewriter);
+    if (!resultSize) {
+      return op.emitOpError("failed to calculate total byte count: ")
+             << alignedType << " does not have integral number of total bytes";
+    }
+
+    // Create the async parameter load (returns resource + timepoint).
+    auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
+    auto loadOp = IREE::Stream::AsyncParameterLoadOp::create(
+        rewriter, op.getLoc(), op.getResult().getType(), timepointType,
+        /*await_timepoint=*/Value(), op.getSourceScope(), op.getSourceKey(),
+        op.getSourceOffset(), resultSize, op.getAffinityAttr());
+
+    // Await the timepoint to synchronize.
+    auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+        rewriter, op.getLoc(), ValueRange{loadOp.getResult()},
+        ValueRange{resultSize}, loadOp.getResultTimepoint());
+    rewriter.replaceOp(op, awaitOp.getResult(0));
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.parameter.write
+//===----------------------------------------------------------------------===//
+
+struct EncodeTensorParameterWriteOp
+    : public OpRewritePattern<IREE::Stream::TensorParameterWriteOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Stream::TensorParameterWriteOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceType = cast<RankedTensorType>(op.getSourceEncoding());
+    auto sourceDims = op.getSourceEncodingDims();
+    if (failed(checkEncoding(op, sourceType, sourceDims, rewriter))) {
+      return failure();
+    }
+
+    // Write the full resource: offset=0, end=size, length=size.
+    Value zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
+    Value sourceSize = op.getSourceSize();
+
+    // Create the async parameter write (returns resource + timepoint).
+    auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
+    auto writeOp = IREE::Stream::AsyncParameterWriteOp::create(
+        rewriter, op.getLoc(), op.getSource().getType(), timepointType,
+        op.getSource(), sourceSize, zeroOffset,
+        /*source_end=*/sourceSize,
+        /*source_length=*/sourceSize, op.getTargetScope(), op.getTargetKey(),
+        op.getTargetOffset(),
+        /*await_timepoint=*/Value(), op.getAffinityAttr());
+
+    // Await the timepoint to synchronize.
+    auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+        rewriter, op.getLoc(), ValueRange{writeOp.getResult()},
+        ValueRange{sourceSize}, writeOp.getResultTimepoint());
+    rewriter.replaceOp(op, awaitOp.getResult(0));
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // --iree-stream-encode-host-tensors
 //===----------------------------------------------------------------------===//
 
@@ -644,7 +722,8 @@ struct EncodeHostTensorsPass
         EncodeTensorEmptyOp, EncodeTensorConstantOp, EncodeTensorSplatOp,
         EncodeTensorCloneOp, EncodeTensorSliceOp, EncodeTensorFillOp,
         EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp,
-        EncodeTensorDispatchOp>(&getContext());
+        EncodeTensorDispatchOp, EncodeTensorParameterLoadOp,
+        EncodeTensorParameterWriteOp>(&getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();

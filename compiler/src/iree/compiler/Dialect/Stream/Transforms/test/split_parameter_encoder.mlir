@@ -396,7 +396,9 @@ util.initializer {
 // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG: %[[C256:.+]] = arith.constant 256 : index
 // CHECK-DAG: %[[C0_I64:.+]] = arith.constant 0 : i64
-// CHECK: %[[PARAM_RESOURCE:.+]], %[[PARAM_TP:.+]] = stream.async.parameter.load {{.+}} await(%[[IMPORT_TP]]) "model"::"iterative_param"[%[[C0_I64]]] : !stream.resource<constant>{%[[C1024]]} => !stream.timepoint
+// CHECK-DAG: %[[LOAD_SCOPE:.+]] = util.buffer.constant : !util.buffer = "model"
+// CHECK-DAG: %[[LOAD_KEY:.+]] = util.buffer.constant : !util.buffer = "iterative_param"
+// CHECK: %[[PARAM_RESOURCE:.+]], %[[PARAM_TP:.+]] = stream.async.parameter.load {{.+}} await(%[[IMPORT_TP]]) %[[LOAD_SCOPE]]::%[[LOAD_KEY]][%[[C0_I64]]] : !stream.resource<constant>{%[[C1024]]} => !stream.timepoint
 // CHECK: %[[INPUT:.+]] = stream.timepoint.await %[[PARAM_TP]] => %[[PARAM_RESOURCE]] : !stream.resource<constant>{%[[C1024]]}
 // CHECK: %[[LOOP_RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C3]] step %[[C1]] iter_args(%[[ARG:.+]] = %[[INPUT]]) -> (!stream.resource<constant>) {
 // CHECK:   %[[C100:.+]] = arith.constant 100 : i32
@@ -406,8 +408,10 @@ util.initializer {
 // CHECK: %[[UPDATE_END:.+]] = arith.addi %[[PACK_SIZE]]#1, %[[C1024]] : index
 // CHECK: %[[UPDATED:.+]] = stream.async.update {{.+}} %[[LOOP_RESULT]], %[[ALLOCA_READY]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]]] : !stream.resource<constant>{%[[C1024]]} -> %[[ALLOCA_READY]] as !stream.resource<transient>{%[[PACK_SIZE]]#0}
 // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier {{.+}} %[[UPDATED]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} => !stream.timepoint
+// CHECK-DAG: %[[SCATTER_KEY:.+]] = util.buffer.constant : !util.buffer = "parameter0"
+// CHECK-DAG: %[[SCATTER_SCOPE:.+]] = util.buffer.constant : !util.buffer = ""
 // CHECK: %[[SCATTER_RESULT:.+]], %[[SCATTER_TP:.+]] = stream.async.parameter.scatter {{.+}} await(%[[BARRIER_TP]]) {
-// CHECK-NEXT:   %[[BARRIER_RESULT]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]] for %[[C1024]]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} -> ""::"parameter0"[%[[C0_I64]]]
+// CHECK-NEXT:   %[[BARRIER_RESULT]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]] for %[[C1024]]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} -> %[[SCATTER_SCOPE]]::%[[SCATTER_KEY]][%[[C0_I64]]]
 // CHECK-NEXT: } : !stream.resource<transient> => !stream.timepoint
 // CHECK: %[[JOIN_TP:.+]] = stream.timepoint.join max(%[[SCATTER_TP]]) => !stream.timepoint
 // CHECK: %[[DEALLOCA_TP:.+]] = stream.resource.dealloca {{.+}} await(%[[JOIN_TP]]) => %[[SCATTER_RESULT]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} => !stream.timepoint
@@ -471,7 +475,9 @@ util.initializer {
 // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG: %[[C256:.+]] = arith.constant 256 : index
 // CHECK-DAG: %[[C0_I64:.+]] = arith.constant 0 : i64
-// CHECK: %[[PARAM_RESOURCE:.+]], %[[PARAM_TP:.+]] = stream.async.parameter.load {{.+}} await(%[[IMPORT_TP]]) "model"::"conditional_param"[%[[C0_I64]]] : !stream.resource<constant>{%[[C1024]]} => !stream.timepoint
+// CHECK-DAG: %[[LOAD_SCOPE:.+]] = util.buffer.constant : !util.buffer = "model"
+// CHECK-DAG: %[[LOAD_KEY:.+]] = util.buffer.constant : !util.buffer = "conditional_param"
+// CHECK: %[[PARAM_RESOURCE:.+]], %[[PARAM_TP:.+]] = stream.async.parameter.load {{.+}} await(%[[IMPORT_TP]]) %[[LOAD_SCOPE]]::%[[LOAD_KEY]][%[[C0_I64]]] : !stream.resource<constant>{%[[C1024]]} => !stream.timepoint
 // CHECK: %[[INPUT:.+]] = stream.timepoint.await %[[PARAM_TP]] => %[[PARAM_RESOURCE]] : !stream.resource<constant>{%[[C1024]]}
 // CHECK: %[[IF_RESULT:.+]] = scf.if %[[TRUE]] -> (!stream.resource<constant>) {
 // CHECK:   %[[C42:.+]] = arith.constant 42 : i32
@@ -483,8 +489,10 @@ util.initializer {
 // CHECK: %[[UPDATE_END:.+]] = arith.addi %[[PACK_SIZE]]#1, %[[C1024]] : index
 // CHECK: %[[UPDATED:.+]] = stream.async.update {{.+}} %[[IF_RESULT]], %[[ALLOCA_READY]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]]] : !stream.resource<constant>{%[[C1024]]} -> %[[ALLOCA_READY]] as !stream.resource<transient>{%[[PACK_SIZE]]#0}
 // CHECK: %[[BARRIER_RESULT:.+]], %[[BARRIER_TP:.+]] = stream.timepoint.barrier {{.+}} %[[UPDATED]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} => !stream.timepoint
+// CHECK-DAG: %[[SCATTER_KEY:.+]] = util.buffer.constant : !util.buffer = "parameter0"
+// CHECK-DAG: %[[SCATTER_SCOPE:.+]] = util.buffer.constant : !util.buffer = ""
 // CHECK: %[[SCATTER_RESULT:.+]], %[[SCATTER_TP:.+]] = stream.async.parameter.scatter {{.+}} await(%[[BARRIER_TP]]) {
-// CHECK-NEXT:   %[[BARRIER_RESULT]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]] for %[[C1024]]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} -> ""::"parameter0"[%[[C0_I64]]]
+// CHECK-NEXT:   %[[BARRIER_RESULT]][%[[PACK_SIZE]]#1 to %[[UPDATE_END]] for %[[C1024]]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} -> %[[SCATTER_SCOPE]]::%[[SCATTER_KEY]][%[[C0_I64]]]
 // CHECK-NEXT: } : !stream.resource<transient> => !stream.timepoint
 // CHECK: %[[JOIN_TP:.+]] = stream.timepoint.join max(%[[SCATTER_TP]]) => !stream.timepoint
 // CHECK: %[[DEALLOCA_TP:.+]] = stream.resource.dealloca {{.+}} await(%[[JOIN_TP]]) => %[[SCATTER_RESULT]] : !stream.resource<transient>{%[[PACK_SIZE]]#0} => !stream.timepoint

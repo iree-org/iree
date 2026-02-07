@@ -54,6 +54,7 @@ iree_lit_test_suite(
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
+            "parameters_dynamic.mlir",
             "parameters_scoped.mlir",
             "parameters_unscoped.mlir",
             "repeated_return.mlir",
@@ -87,6 +88,7 @@ iree_lit_test_suite(
         "iree-link-module-c.mlir",
         "parameters_a.safetensors",
         "parameters_b.safetensors",
+        "parameters_dynamic.safetensors",
         # For iree-tblgen tests:
         "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",

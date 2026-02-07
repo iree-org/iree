@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALTypes.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Modules/IO/Parameters/IR/IOParametersBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -45,8 +46,8 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
     HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
-    OptionalAttr<StrAttr>:$source_scope,
-    StrArrayAttr:$source_keys,
+    Optional<Util_BufferType>:$source_scope,
+    Variadic<Util_BufferType>:$source_keys,
     Variadic<I64>:$source_offsets,
     HAL_MemoryType:$memory_types,
     HAL_BufferUsage:$buffer_usage,
@@ -96,8 +97,8 @@ def IOParameters_GatherOp : IOParameters_Op<"gather", [
     HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
-    OptionalAttr<StrAttr>:$source_scope,
-    StrArrayAttr:$source_keys,
+    Optional<Util_BufferType>:$source_scope,
+    Variadic<Util_BufferType>:$source_keys,
     Variadic<I64>:$source_offsets,
     HAL_Buffer:$target_buffer,
     Variadic<HAL_DeviceSize>:$target_offsets,
@@ -141,8 +142,8 @@ def IOParameters_ScatterOp : IOParameters_Op<"scatter", [
     HAL_Buffer:$source_buffer,
     Variadic<HAL_DeviceSize>:$source_offsets,
     Variadic<HAL_DeviceSize>:$source_lengths,
-    OptionalAttr<StrAttr>:$target_scope,
-    StrArrayAttr:$target_keys,
+    Optional<Util_BufferType>:$target_scope,
+    Variadic<Util_BufferType>:$target_keys,
     Variadic<I64>:$target_offsets
   );
 
