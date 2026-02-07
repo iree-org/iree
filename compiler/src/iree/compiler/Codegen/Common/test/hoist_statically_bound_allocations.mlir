@@ -249,3 +249,140 @@ func.func @nested_op_scalable_alloc_linalg_use(%arg0 : index) {
 // CHECK-UNBOUNDED-VSCALE-LABEL: func @nested_op_scalable_alloc_linalg_use(
 //       CHECK-UNBOUNDED-VSCALE: scf.for
 //       CHECK-UNBOUNDED-VSCALE:   memref.alloc
+
+// -----
+
+// The yield is the iter_arg itself — dimension trivially preserved. The
+// alloca's size comes from memref.dim of the iter_arg, and
+// computeAllocationBound traces through the loop to the init value.
+func.func @hoist_alloca_yield_iter_arg(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %static = memref.alloca() : memref<1x4xf32>
+  %sv = memref.subview %static[0, 0][1, %arg0][1, 1]
+      : memref<1x4xf32> to memref<1x?xf32, strided<[4, 1]>>
+  %init = memref.cast %sv
+      : memref<1x?xf32, strided<[4, 1]>> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+  %result = scf.for %i = %c0 to %arg0 step %c1
+      iter_args(%iter = %init) -> (memref<1x?xf32, strided<[?, ?], offset: ?>>) {
+    %dim = memref.dim %iter, %c1 : memref<1x?xf32, strided<[?, ?], offset: ?>>
+    %alloca = memref.alloca(%dim) : memref<1x?xf32>
+    linalg.fill ins(%cst : f32) outs(%alloca : memref<1x?xf32>)
+    scf.yield %iter : memref<1x?xf32, strided<[?, ?], offset: ?>>
+  }
+  return
+}
+// CHECK-LABEL: func @hoist_alloca_yield_iter_arg(
+//       CHECK:   %[[HOISTED:.+]] = memref.alloca() : memref<1x4xf32>
+//       CHECK:   scf.for
+//   CHECK-NOT:     memref.alloca(
+//       CHECK:     %[[DIM:.+]] = memref.dim
+//       CHECK:     %[[SV:.+]] = memref.subview %[[HOISTED]][0, 0] [1, %[[DIM]]] [1, 1]
+//       CHECK:     linalg.fill
+
+// -----
+
+// The yield traces through cast and subview to an alloca whose dynamic size at
+// dimIndex is memref.dim of the iter_arg (self-referential). This exercises the
+// cast/subview walk in the function.
+func.func @hoist_alloca_yield_self_ref_subview(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %static = memref.alloca() : memref<1x4xf32>
+  %sv = memref.subview %static[0, 0][1, %arg0][1, 1]
+      : memref<1x4xf32> to memref<1x?xf32, strided<[4, 1]>>
+  %init = memref.cast %sv
+      : memref<1x?xf32, strided<[4, 1]>> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+  %result = scf.for %i = %c0 to %arg0 step %c1
+      iter_args(%iter = %init) -> (memref<1x?xf32, strided<[?, ?], offset: ?>>) {
+    %dim = memref.dim %iter, %c1 : memref<1x?xf32, strided<[?, ?], offset: ?>>
+    %alloca = memref.alloca(%dim) : memref<1x?xf32>
+    linalg.fill ins(%cst : f32) outs(%alloca : memref<1x?xf32>)
+    %val = memref.load %alloca[%c0, %c0] : memref<1x?xf32>
+    // Yield traces: cast → subview → alloca (exercises the walk loop).
+    %sub = memref.subview %alloca[0, 0][1, %dim][1, 1]
+        : memref<1x?xf32> to memref<1x?xf32, strided<[?, 1]>>
+    %cast = memref.cast %sub
+        : memref<1x?xf32, strided<[?, 1]>> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+    scf.yield %cast : memref<1x?xf32, strided<[?, ?], offset: ?>>
+  }
+  return
+}
+// CHECK-LABEL: func @hoist_alloca_yield_self_ref_subview(
+//       CHECK:   %[[HOISTED:.+]] = memref.alloca() : memref<1x4xf32>
+//       CHECK:   scf.for
+//   CHECK-NOT:     memref.alloca(
+//       CHECK:     %[[DIM:.+]] = memref.dim
+//       CHECK:     %[[SV:.+]] = memref.subview %[[HOISTED]][0, 0] [1, %[[DIM]]] [1, 1]
+//       CHECK:     linalg.fill
+//       CHECK:     memref.load
+
+// -----
+
+// The yield is an inner scf.for result. The inner loop preserves the dimension
+// via the case that yield is iter_arg, and the recursive check verifies the
+// inner loop.
+func.func @hoist_alloca_yield_nested_loop(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %static = memref.alloca() : memref<1x4xf32>
+  %sv = memref.subview %static[0, 0][1, %arg0][1, 1]
+      : memref<1x4xf32> to memref<1x?xf32, strided<[4, 1]>>
+  %init = memref.cast %sv
+      : memref<1x?xf32, strided<[4, 1]>> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+  %result = scf.for %i = %c0 to %arg0 step %c1
+      iter_args(%outer_iter = %init) -> (memref<1x?xf32, strided<[?, ?], offset: ?>>) {
+    %inner = scf.for %j = %c0 to %arg0 step %c1
+        iter_args(%inner_iter = %outer_iter) -> (memref<1x?xf32, strided<[?, ?], offset: ?>>) {
+      %dim = memref.dim %inner_iter, %c1 : memref<1x?xf32, strided<[?, ?], offset: ?>>
+      %alloca = memref.alloca(%dim) : memref<1x?xf32>
+      linalg.fill ins(%cst : f32) outs(%alloca : memref<1x?xf32>)
+      scf.yield %inner_iter : memref<1x?xf32, strided<[?, ?], offset: ?>>
+    }
+    scf.yield %inner : memref<1x?xf32, strided<[?, ?], offset: ?>>
+  }
+  return
+}
+// CHECK-LABEL: func @hoist_alloca_yield_nested_loop(
+//       CHECK:   %[[HOISTED:.+]] = memref.alloca() : memref<1x4xf32>
+//       CHECK:   scf.for
+//       CHECK:     scf.for
+//   CHECK-NOT:       memref.alloca(
+//       CHECK:       %[[DIM:.+]] = memref.dim
+//       CHECK:       %[[SV:.+]] = memref.subview %[[HOISTED]][0, 0] [1, %[[DIM]]] [1, 1]
+//       CHECK:       linalg.fill
+
+// -----
+
+// Negative test: the yield uses an alloca sized by a different value (%arg1)
+// rather than the iter_arg's dimension, so the dimension is not preserved
+// across iterations. The alloca should NOT be hoisted.
+func.func @no_hoist_alloca_yield_dim_not_preserved(%arg0 : index, %arg1 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %static = memref.alloca() : memref<1x4xf32>
+  %sv = memref.subview %static[0, 0][1, %arg0][1, 1]
+      : memref<1x4xf32> to memref<1x?xf32, strided<[4, 1]>>
+  %init = memref.cast %sv
+      : memref<1x?xf32, strided<[4, 1]>> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+  %result = scf.for %iv = %c0 to %arg0 step %c1
+      iter_args(%iter = %init) -> (memref<1x?xf32, strided<[?, ?], offset: ?>>) {
+    %dim = memref.dim %iter, %c1 : memref<1x?xf32, strided<[?, ?], offset: ?>>
+    %inner = memref.alloca(%dim) : memref<1x?xf32>
+    linalg.fill ins(%cst : f32) outs(%inner : memref<1x?xf32>)
+    // Yield an alloca with a different size — dimension not preserved.
+    %other = memref.alloca(%arg1) : memref<1x?xf32>
+    %cast = memref.cast %other
+        : memref<1x?xf32> to memref<1x?xf32, strided<[?, ?], offset: ?>>
+    scf.yield %cast : memref<1x?xf32, strided<[?, ?], offset: ?>>
+  }
+  return
+}
+// CHECK-LABEL: func @no_hoist_alloca_yield_dim_not_preserved(
+//       CHECK:   scf.for
+//       CHECK:     %[[DIM:.+]] = memref.dim
+//       CHECK:     memref.alloca(%[[DIM]]) : memref<1x?xf32>
