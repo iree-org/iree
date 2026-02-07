@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
@@ -521,6 +522,12 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   // Lower `ukernel.*` ops to function calls
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
+  // Lower PCF ops to SCF.
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::PCF::createResolveTokensPass)
+      .addPass(IREE::PCF::createConvertSRefToMemRefPass)
+      .addPass(IREE::PCF::createLowerStructuralPCFPass);
+
   FunctionLikeNest(modulePassManager)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
@@ -793,6 +800,22 @@ void registerCodegenLLVMCPUPasses() {
       [](OpPassManager &modulePassManager) {
         buildLLVMCPULinkingPassPipeline(modulePassManager);
       });
+
+  struct LowerToLLVMPipelineOptions
+      : public PassPipelineOptions<LowerToLLVMPipelineOptions> {
+    Option<bool> enableArmSME{
+        *this, "enable-arm-sme",
+        llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+  };
+
+  static PassPipelineRegistration<LowerToLLVMPipelineOptions>
+      LLVMCPULowerToLLVMPipeline(
+          "iree-codegen-llvmcpu-lower-to-llvm-pipeline",
+          "Runs the lower to LLVM pipeline for CPU",
+          [](OpPassManager &modulePassManager,
+             LowerToLLVMPipelineOptions const &options) {
+            addLowerToLLVMPasses(modulePassManager, options.enableArmSME);
+          });
 }
 
 } // namespace mlir::iree_compiler
