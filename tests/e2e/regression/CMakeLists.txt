@@ -21,9 +21,11 @@ iree_lit_test_suite(
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
+    "zero_transients.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
+    iree-compile
     iree-opt
     iree-run-mlir
   LABELS
