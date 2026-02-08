@@ -177,6 +177,35 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
 mlir::gpu::AllReduceOperation
 combiningKindToAllReduce(vector::CombiningKind kind);
 
+/// This struct matches the parameters of the `iree_codegen.xor_shuffle`
+/// attribute. Notably only the first two parameters are used in this struct
+/// because the other parameters are not used in the current implementation of
+/// the XOR shuffle.
+/// The parameters are:
+/// - rowElems: number of elements across which we apply a swizzle.
+/// - accessElems: number of elements in one swizzle group.
+/// So for example:
+/// For data of length 8: [0][1][2][3][4][5][6][7]
+/// and an XOR shuffle with rowElems = 4, accessElems = 2,
+/// we can apply a swizzle to each logical row of 4 elements in groups of 2
+/// elements.
+///
+/// Original data:
+/// |               | swizzle group 0   | swizzle group 1   |
+/// |---------------|-------------------|-------------------|
+/// Logical row 0:  | [0][1]            | [2][3]            |
+/// Logical row 1:  | [4][5]            | [6][7]            |
+///
+/// Swizzled data:
+/// |               | swizzle group 0   | swizzle group 1   |
+/// |---------------|-------------------|-------------------|
+/// Logical row 0:  | [0][1]            | [2][3]            |
+/// Logical row 1:  | [6][7]            | [4][5]            |
+///
+/// Final result: [0][1][2][3][6][7][4][5]
+/// Note that when the swizzle was applied, the swaps were performed on
+/// groups of 2 elements at a time (accessElems), across the 4 elements in the
+/// row (rowElems).
 struct XorShuffleParams {
   int64_t rowElems;
   int64_t accessElems;

@@ -765,8 +765,9 @@ getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   int64_t lhsOperandIndex = 0;
   SmallVector<VectorType> undistributedTypes;
   intrinsic.getUndistributedTileTypes(undistributedTypes);
-  auto shape = undistributedTypes[lhsOperandIndex].getShape();
-  auto lhsIteratorTypes = intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
+  ArrayRef<int64_t> shape = undistributedTypes[lhsOperandIndex].getShape();
+  SmallVector<utils::IteratorType> lhsIteratorTypes =
+      intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
   for (auto [dim, iteratorType] : llvm::zip_equal(shape, lhsIteratorTypes)) {
     if (iteratorType == utils::IteratorType::reduction) {
       kSize *= dim;
@@ -798,16 +799,16 @@ getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
          llvm::product_of(layout.element);
 }
 
-// TODO(muzasyed): Add more intrinsics for gfx950.
 static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
     switch (smma.getIntrinsic()) {
     case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return XorShuffleParams({/*rowElems*/ int64_t(256),
-                               /*accessElems*/ int64_t(32)});
+      return XorShuffleParams({/*rowElems=*/256,
+                               /*accessElems=*/32});
     default:
+      // TODO(muzasyed): Add more intrinsics for gfx950.
       return failure();
     }
   }
@@ -847,8 +848,8 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return XorShuffleParams({/*rowElems*/ *maybeMinimumAccessElems,
-                           /*accessElems*/ *maybeTotalTileElems});
+  return XorShuffleParams({/*rowElems=*/*maybeMinimumAccessElems,
+                           /*accessElems=*/*maybeTotalTileElems});
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
@@ -941,8 +942,8 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 
   // Ensure row width is at least access width (minimum 1 column).
   effectiverowElems = std::max(effectiverowElems, numAccessElems);
-  return validateXorShuffle(XorShuffleParams({/*rowElems*/ effectiverowElems,
-                                              /*accessElems*/ numAccessElems}),
+  return validateXorShuffle(XorShuffleParams({/*rowElems=*/effectiverowElems,
+                                              /*accessElems=*/numAccessElems}),
                             intrinsic, operandIndex);
 }
 
@@ -970,8 +971,8 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
   if (failed(xorShuffleParams)) {
     return failure();
   }
-  auto effectiverowElems = xorShuffleParams.value().rowElems;
-  auto numAccessElems = xorShuffleParams.value().accessElems;
+  int64_t effectiverowElems = xorShuffleParams.value().rowElems;
+  int64_t numAccessElems = xorShuffleParams.value().accessElems;
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
       context, effectiverowElems, numAccessElems,
       /*row_stride=*/int64_t(0),
