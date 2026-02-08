@@ -198,17 +198,27 @@ public:
       // the PATH instead.
       auto hostTriple = llvm::Triple(llvm::sys::getProcessTriple());
       if (hostTriple.isMacOSX()) {
-        for (auto [i, shader, entryPoint] :
-             llvm::zip_equal(llvm::seq(mslShaders.size()), mslShaders,
-                             mslEntryPointNames)) {
-          std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
-              options.targetPlatform, shader.source, entryPoint);
-          if (!lib) {
-            return variantOp.emitError()
-                   << "failed to compile to MTLLibrary from MSL:\n\n"
-                   << shader.source << "\n\n";
+        auto xcrunPath = findMetalToolchain();
+        if (xcrunPath) {
+          for (auto [i, shader, entryPoint] :
+               llvm::zip_equal(llvm::seq(mslShaders.size()), mslShaders,
+                               mslEntryPointNames)) {
+            std::string errMsg;
+            std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
+                options.targetPlatform, shader.source, entryPoint, *xcrunPath,
+                errMsg);
+            if (!lib) {
+              return variantOp.emitError()
+                     << "failed to compile MSL to metallib for entry point '"
+                     << entryPoint << "': " << errMsg;
+            }
+            metallibs[i] = std::move(lib);
           }
-          metallibs[i] = std::move(lib);
+        } else {
+          variantOp.emitRemark()
+              << "Metal offline compilation tools (xcrun metal/metallib) not "
+                 "found; embedding MSL source for runtime compilation. "
+                 "Install Xcode for ahead-of-time compilation.";
         }
       }
     }
