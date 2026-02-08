@@ -143,6 +143,8 @@ Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   if (isa<IREE::Util::NullAttr>(value)) {
     return IREE::Util::NullOp::create(builder, loc, type);
+  } else if (isa<IREE::Util::BufferType>(type)) {
+    return IREE::Util::BufferConstantOp::create(builder, loc, value);
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
     return arith::ConstantOp::create(builder, loc, type,
                                      cast<TypedAttr>(value));

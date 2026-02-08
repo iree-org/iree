@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/VM/Conversion/BuiltinRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/Attributes.h"
@@ -41,6 +42,11 @@ void populateUtilListToVMPatterns(MLIRContext *context,
 void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
+                                    RewritePatternSet &patterns);
+void populateUtilStringToVMPatterns(MLIRContext *context,
+                                    ConversionTarget &conversionTarget,
+                                    TypeConverter &typeConverter,
+                                    BuiltinRegistry &builtins,
                                     RewritePatternSet &patterns);
 void populateUtilStructuralToVMPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
@@ -125,6 +131,7 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
                               ImportTable &importTable,
+                              BuiltinRegistry &builtins,
                               RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
@@ -143,6 +150,8 @@ void populateUtilToVMPatterns(MLIRContext *context,
                                patterns);
   populateUtilStatusToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
+  populateUtilStringToVMPatterns(context, conversionTarget, typeConverter,
+                                 builtins, patterns);
   populateUtilStructuralToVMPatterns(context, conversionTarget, typeConverter,
                                      importTable, patterns);
 }

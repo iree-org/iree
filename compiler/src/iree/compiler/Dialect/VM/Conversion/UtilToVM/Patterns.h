@@ -13,11 +13,14 @@
 
 namespace mlir::iree_compiler {
 
+class BuiltinRegistry;
+
 // Appends IREE special hint ops to VM dialect patterns.
 void populateUtilToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
                               ImportTable &importTable,
+                              BuiltinRegistry &builtins,
                               RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler

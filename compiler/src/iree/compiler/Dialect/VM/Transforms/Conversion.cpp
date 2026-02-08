@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/VM/Conversion/BuiltinRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -139,6 +140,7 @@ class ConversionPass
 
     // Populated below after all type converters are registered.
     ImportTable importTable;
+    BuiltinRegistry builtins;
 
     RewritePatternSet patterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
@@ -150,7 +152,7 @@ class ConversionPass
     // Convert util.optimization_barrier to vm.optimization_barrier.
     conversionTarget.addIllegalOp<IREE::Util::OptimizationBarrierOp>();
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
-                             importTable, patterns);
+                             importTable, builtins, patterns);
 
     conversionTarget.addIllegalDialect<affine::AffineDialect>();
     populateAffineToStdConversionPatterns(patterns);
@@ -179,11 +181,18 @@ class ConversionPass
       return signalPassFailure(); // error emitted already
     }
 
+    // Insert declarations for all registered builtin helpers so that
+    // conversion patterns can reference them without module-level lookups.
+    builtins.declareAll(innerModuleOp);
+
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(patterns)))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }
+
+    // Erase unused builtin declarations and populate used ones with bodies.
+    builtins.finalize();
   }
 
   IREE::VM::TargetOptions targetOptionsFromConversionPass() {

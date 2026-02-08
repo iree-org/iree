@@ -1396,6 +1396,7 @@ def OpGroupBufferOps : OpDocGroup {
 let opDocGroup = OpGroupBufferOps in {
 
 def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
+  ConstantLike,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{Constant host-side byte buffer.}];
@@ -1434,6 +1435,7 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
   }];
 
   let hasVerifier = 1;
+  let hasFolder = 1;
 }
 
 def Util_BufferAllocOp : Util_PureOp<"buffer.alloc", [
@@ -1865,6 +1867,82 @@ def Util_BufferHashOp : Util_Op<"buffer.hash", [
 }
 
 } // OpGroupBufferOps
+
+//===----------------------------------------------------------------------===//
+// String formatting
+//===----------------------------------------------------------------------===//
+
+def OpGroupStringOps : OpDocGroup {
+  let summary = "String formatting ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupStringOps in {
+
+def Util_StringFormatOp : Util_PureOp<"string.format", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Formats a string from a template and arguments.}];
+  let description = [{
+    Produces a `!util.buffer` containing the formatted string. Uses `{}`-style
+    substitution: `{}` for sequential args, `{N}` for explicit ordinal. `{{`
+    and `}}` produce literal braces. Cannot mix `{}` and `{N}` in the same
+    format string.
+
+    Integer args are converted to unsigned decimal. Buffer args are copied
+    as-is. Folds to `util.buffer.constant` when all arguments are constant.
+    Partially folds when some arguments are constant by merging constant
+    segments into the format string literals.
+
+    Example:
+    ```mlir
+    %key = util.string.format "blk.{}.attn_q.weight"(%idx) : (index) -> !util.buffer
+    %multi = util.string.format "blk.{}.ffn.{}.weight"(%a, %b) : (index, index) -> !util.buffer
+    ```
+  }];
+  let arguments = (ins
+    StrAttr:$format,
+    Variadic<AnyTypeOf<[Index, AnySignlessInteger, Util_BufferType]>>:$args
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+  let assemblyFormat = [{
+    $format `(` $args `)` attr-dict `:` functional-type($args, $result)
+  }];
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def Util_StringItoaOp : Util_PureOp<"string.itoa", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Converts an integer to its decimal string representation.}];
+  let description = [{
+    Produces a `!util.buffer` containing the unsigned decimal string
+    representation of the input integer value. Folds to `util.buffer.constant`
+    when the input is constant.
+
+    Example:
+    ```mlir
+    %str = util.string.itoa %value : index -> !util.buffer
+    ```
+  }];
+  let arguments = (ins
+    AnyTypeOf<[Index, AnySignlessInteger]>:$value
+  );
+  let results = (outs
+    Util_BufferType:$result
+  );
+  let assemblyFormat = [{
+    $value attr-dict `:` type($value) `->` type($result)
+  }];
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+} // OpGroupStringOps
 
 //===----------------------------------------------------------------------===//
 // Status
