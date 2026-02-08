@@ -166,6 +166,7 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
     tools/import_onnx/importer_externalization_overrides.py
     tools/ir_tool/__main__.py
     tools/scripts/iree_compile/__main__.py
+    tools/scripts/iree_link/__main__.py
     tools/scripts/iree_opt/__main__.py
 )
 
