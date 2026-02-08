@@ -304,6 +304,23 @@ iree_status_t iree_json_parse_double(iree_string_view_t value, double* out);
 // Returns error for any other value including "null".
 iree_status_t iree_json_parse_bool(iree_string_view_t value, bool* out);
 
+// Looks up a required boolean field.
+// Returns error if the key is not found, the value is "null", or the value is
+// not a valid boolean ("true" or "false").
+iree_status_t iree_json_lookup_bool(iree_string_view_t object_value,
+                                    iree_string_view_t key, bool* out);
+
+// Looks up a required string field, unescapes it, and writes to |buffer|.
+// Returns error if the key is not found, the value is "null", or the buffer is
+// too small for the unescaped content.
+//
+// |buffer| provides the output storage (data and capacity via size).
+// |out_length| receives the actual length written (not NUL-terminated).
+iree_status_t iree_json_lookup_string(iree_string_view_t object_value,
+                                      iree_string_view_t key,
+                                      iree_mutable_string_view_t buffer,
+                                      iree_host_size_t* out_length);
+
 // Looks up an optional boolean field with a default value.
 // Returns |default_value| if the key is not found or the value is "null".
 // Returns error if the value is present but not a valid boolean.
@@ -318,19 +335,17 @@ iree_status_t iree_json_try_lookup_int64(iree_string_view_t object_value,
                                          iree_string_view_t key,
                                          int64_t default_value, int64_t* out);
 
-// Looks up an optional string field, unescapes it, and writes to buffer.
+// Looks up an optional string field, unescapes it, and writes to |buffer|.
 // Returns |default_value| copied to buffer if key is not found or value is
 // "null". Returns error if value is present but not a string, or if the buffer
 // is too small for the unescaped content.
 //
-// |out_buffer| receives the unescaped UTF-8 string (not NUL-terminated).
-// |buffer_capacity| is the size of the output buffer in bytes.
-// |out_length| receives the actual length written.
+// |buffer| provides the output storage (data and capacity via size).
+// |out_length| receives the actual length written (not NUL-terminated).
 iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
                                           iree_string_view_t key,
                                           iree_string_view_t default_value,
-                                          char* out_buffer,
-                                          iree_host_size_t buffer_capacity,
+                                          iree_mutable_string_view_t buffer,
                                           iree_host_size_t* out_length);
 
 //===----------------------------------------------------------------------===//
