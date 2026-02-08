@@ -144,6 +144,25 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "csprng",
+    srcs = ["csprng.c"],
+    hdrs = ["csprng.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "csprng_test",
+    srcs = ["csprng_test.cc"],
+    deps = [
+        ":csprng",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.c",
