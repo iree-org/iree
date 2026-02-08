@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Utils::CodegenOptions
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
   PUBLIC
@@ -188,6 +189,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Codegen::Utils::CodegenOptions
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Transforms

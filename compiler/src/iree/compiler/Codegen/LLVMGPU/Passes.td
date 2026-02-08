@@ -109,6 +109,11 @@ def ROCDLPrefetchSharedMemoryPass :
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let options = [
+    Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
+      /*default=*/"GPUCodegenOptions::FromFlags::get()",
+      "Session-scoped GPU codegen options controlling prefetch, etc.">,
+  ];
 }
 
 def LLVMGPUTensorCoreVectorizationPass :
