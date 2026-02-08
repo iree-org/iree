@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -167,6 +168,19 @@ struct GPUReduceBankConflictsPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
+
+    // Skip bank conflict reduction if gather_to_lds DMA ops are present.
+    // DMA operations have their own optimized memory access patterns that
+    // write directly to LDS with hardware-controlled coalescing. Padding
+    // shared memory would interfere with the expected DMA memory layout.
+    bool hasGatherToLDS = false;
+    funcOp.walk([&](amdgpu::GatherToLDSOp) {
+      hasGatherToLDS = true;
+      return WalkResult::interrupt();
+    });
+    if (hasGatherToLDS) {
+      return;
+    }
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     unsigned sharedMemLimit =

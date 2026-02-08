@@ -392,3 +392,35 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 //   CHECK-NOT:   tensor.expand_shape
 //       CHECK:   linalg.matmul
 //       CHECK: return
+
+// -----
+
+// Verify that when use_global_load_dma is requested but input comes from
+// tensor.pad, it falls back to derived_thread_config since the padded data
+// is not from global memory. Non-padded inputs should still use DMA.
+
+#lowering_config_dma_with_pad = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]}>
+
+func.func @no_dma_for_padded_input(%a : tensor<4x127xf32>, %b: tensor<128x128xf32>) -> tensor<4x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<4x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<4x128xf32>) -> tensor<4x128xf32>
+  %padded = tensor.pad %a low[0, 0] high[0, 1] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : f32
+  } : tensor<4x127xf32> to tensor<4x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config_dma_with_pad}
+    ins(%padded, %b : tensor<4x128xf32>, tensor<128x128xf32>) outs(%fill : tensor<4x128xf32>) -> tensor<4x128xf32>
+  return %mm : tensor<4x128xf32>
+}
+
+// Padded input falls back to derived_thread_config, non-padded uses DMA.
+// CHECK-LABEL: func.func @no_dma_for_padded_input
+//       CHECK:   tensor.pad
+//       CHECK:   linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//       CHECK:   linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
+//       CHECK:   linalg.matmul
