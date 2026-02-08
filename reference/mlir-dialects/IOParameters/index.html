@@ -6461,13 +6461,6 @@ the mapping and use it to repack files/defrag memory in the future.</p>
 This is equivalent to one read per parameter but allows implementations that
 can batch operations to do so without additional overhead.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-</table>
-
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6492,6 +6485,14 @@ can batch operations to do so without additional overhead.</p>
 <tr>
 <td style="text-align: center;"><code>signal_fence</code></td>
 <td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
@@ -6534,13 +6535,6 @@ the parameter origin or result in a copy as if an allocate + read had been
 used.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>Util_SizeAwareOp</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-</table>
-
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6565,6 +6559,14 @@ used.</p>
 <tr>
 <td style="text-align: center;"><code>signal_fence</code></td>
 <td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
@@ -6618,13 +6620,6 @@ into one or more parameters. This is equivalent to one write per parameter
 but allows implementations that can batch operations to do so without
 additional overhead.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
-</table>
-
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6661,6 +6656,14 @@ additional overhead.</p>
 <tr>
 <td style="text-align: center;"><code>source_lengths</code></td>
 <td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offsets</code></td>

@@ -2746,6 +2746,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tensor-parameter-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tensor parameter ops
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tensor parameter ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamtensorparameterload-streamtensorparameterloadop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.tensor.parameter.load (Stream::TensorParameterLoadOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamtensorparameterwrite-streamtensorparameterwriteop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.tensor.parameter.write (Stream::TensorParameterWriteOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#test-only-ops-for-stream-dialect-testing" class="md-nav__link">
     <span class="md-ellipsis">
       Test-only ops for Stream dialect testing
@@ -2784,7 +2817,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_72" class="md-nav__link">
+  <a href="#attributes_74" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7202,6 +7235,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#tensor-parameter-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tensor parameter ops
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tensor parameter ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamtensorparameterload-streamtensorparameterloadop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.tensor.parameter.load (Stream::TensorParameterLoadOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streamtensorparameterwrite-streamtensorparameterwriteop" class="md-nav__link">
+    <span class="md-ellipsis">
+      stream.tensor.parameter.write (Stream::TensorParameterWriteOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#test-only-ops-for-stream-dialect-testing" class="md-nav__link">
     <span class="md-ellipsis">
       Test-only ops for Stream dialect testing
@@ -7240,7 +7306,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_72" class="md-nav__link">
+  <a href="#attributes_74" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -7856,6 +7922,11 @@ breaking execution correctness.</p>
 <li><a href="#streamtensorupdate-streamtensorupdateop">stream.tensor.update (Stream::TensorUpdateOp)</a></li>
 </ul>
 </li>
+<li><a href="#tensor-parameter-ops">Tensor parameter ops</a><ul>
+<li><a href="#streamtensorparameterload-streamtensorparameterloadop">stream.tensor.parameter.load (Stream::TensorParameterLoadOp)</a></li>
+<li><a href="#streamtensorparameterwrite-streamtensorparameterwriteop">stream.tensor.parameter.write (Stream::TensorParameterWriteOp)</a></li>
+</ul>
+</li>
 <li><a href="#test-only-ops-for-stream-dialect-testing">Test-only ops for Stream dialect testing</a><ul>
 <li><a href="#streamtesttimeline_aware-streamtesttimelineawareop">stream.test.timeline_aware (Stream::TestTimelineAwareOp)</a></li>
 <li><a href="#streamtesttimeline_op-streamtesttimelineop">stream.test.timeline_op (Stream::TestTimelineOp)</a></li>
@@ -7863,7 +7934,7 @@ breaking execution correctness.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_72">Attributes</a><ul>
+<li><a href="#attributes_74">Attributes</a><ul>
 <li><a href="#collectiveattr">CollectiveAttr</a></li>
 <li><a href="#namedparameterattr">NamedParameterAttr</a></li>
 <li><a href="#partitioningconfigattr">PartitioningConfigAttr</a></li>
@@ -9171,8 +9242,6 @@ batch operations for better performance.</p>
 <h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9185,6 +9254,14 @@ batch operations for better performance.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
 <td>variadic of 64-bit signless integer</td>
@@ -9259,14 +9336,12 @@ ordering with other timeline operations.</p>
 %ordered, %ordered_timepoint = stream.async.parameter.load await(%tp) &quot;scope&quot;::&quot;key2&quot;[%offset]
     : !stream.resource&lt;constant&gt;{%size} =&gt; !stream.timepoint
 </code></pre></div></p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9282,6 +9357,14 @@ ordering with other timeline operations.</p>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
 <td>A timepoint indicating execution availability.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_key</code></td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
@@ -9335,13 +9418,11 @@ returned with the specified range updated.</p>
     -&gt; %target[%target_offset to %target_end for %length]
     : !stream.resource&lt;staging&gt;{%target_size} =&gt; !stream.timepoint
 </code></pre></div></p>
-<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9373,6 +9454,14 @@ returned with the specified range updated.</p>
 <tr>
 <td style="text-align: center;"><code>target_length</code></td>
 <td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_key</code></td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
@@ -9431,8 +9520,6 @@ data flow dependencies.</p>
 <h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9464,6 +9551,14 @@ data flow dependencies.</p>
 <tr>
 <td style="text-align: center;"><code>source_lengths</code></td>
 <td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offsets</code></td>
@@ -9514,13 +9609,11 @@ proper data flow dependencies.</p>
     -&gt; &quot;scope&quot;::&quot;key&quot;[%param_offset]
     : !stream.resource&lt;staging&gt;{%source_size} =&gt; !stream.timepoint
 </code></pre></div></p>
-<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9552,6 +9645,14 @@ proper data flow dependencies.</p>
 <tr>
 <td style="text-align: center;"><code>source_length</code></td>
 <td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_key</code></td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offset</code></td>
@@ -9809,8 +9910,6 @@ without additional timeline overhead.</p>
 <h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9823,6 +9922,14 @@ without additional timeline overhead.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
 <td>variadic of 64-bit signless integer</td>
@@ -9889,8 +9996,6 @@ and <code>stream.cmd.parameter.read</code> had been used per parameter.</p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9903,6 +10008,14 @@ and <code>stream.cmd.parameter.read</code> had been used per parameter.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>source_offsets</code></td>
 <td>variadic of 64-bit signless integer</td>
@@ -9951,13 +10064,11 @@ and <code>stream.cmd.parameter.read</code> had been used per parameter.</p>
 </code></pre></div>
 <p>Asynchronously reads a resource from an external parameter provider into the
 provided target resource range.</p>
-<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -9970,6 +10081,14 @@ provided target resource range.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_key</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>source_offset</code></td>
 <td>64-bit signless integer</td>
@@ -10034,8 +10153,6 @@ can batch operations to do so without additional overhead.</p>
 <h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -10063,6 +10180,14 @@ can batch operations to do so without additional overhead.</p>
 <tr>
 <td style="text-align: center;"><code>source_lengths</code></td>
 <td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_keys</code></td>
+<td>variadic of A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offsets</code></td>
@@ -10104,13 +10229,11 @@ can batch operations to do so without additional overhead.</p>
 </code></pre></div>
 <p>Asynchronously writes a resource to an external parameter provider from
 the provided source resource range.</p>
-<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
@@ -10138,6 +10261,14 @@ the provided source resource range.</p>
 <tr>
 <td style="text-align: center;"><code>source_length</code></td>
 <td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_key</code></td>
+<td>A reference counted byte buffer.</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_offset</code></td>
@@ -13487,6 +13618,163 @@ is the entire updated target value.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="tensor-parameter-ops">Tensor parameter ops<a class="headerlink" href="#tensor-parameter-ops" title="Permanent link">link</a></h3>
+<h4 id="streamtensorparameterload-streamtensorparameterloadop"><code>stream.tensor.parameter.load</code> (Stream::TensorParameterLoadOp)<a class="headerlink" href="#streamtensorparameterload-streamtensorparameterloadop" title="Permanent link">link</a></h4>
+<p><em>Loads a new resource from a parameter archive.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.parameter.load` (`on` `(` $affinity^ `)`)?
+              custom&lt;ParameterReference&gt;($source_scope, $source_key)
+              `` `[` $source_offset `]`
+              `:` $result_encoding (`` `{` $result_encoding_dims^ `}`)?
+              `in` type($result) `` `{` $result_size `}`
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Allocates a new resource and populates it with data from a parameter archive
+file (or in-memory buffer) at the specified byte offset. This is the
+tensor-phase equivalent of <code>stream.async.parameter.load</code> and retains tensor
+encoding metadata for proper size calculation during encoding.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%r = stream.tensor.parameter.load %key[%offset]
+    : tensor&lt;4x8xf32&gt; in !stream.resource&lt;*&gt;{%size}
+%r = stream.tensor.parameter.load %scope::%key[%offset]
+    : tensor&lt;?x8xf32&gt;{%dim0} in !stream.resource&lt;*&gt;{%size}
+</code></pre></div></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_71">Attributes:<a class="headerlink" href="#attributes_71" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>result_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
+</table>
+
+<h5 id="operands_81">Operands:<a class="headerlink" href="#operands_81" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_key</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_offset</code></td>
+<td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_encoding_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_size</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_73">Results:<a class="headerlink" href="#results_73" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>resource or external resource or transient resource or variable resource or constant resource</td>
+</tr>
+</tbody>
+</table>
+<h4 id="streamtensorparameterwrite-streamtensorparameterwriteop"><code>stream.tensor.parameter.write</code> (Stream::TensorParameterWriteOp)<a class="headerlink" href="#streamtensorparameterwrite-streamtensorparameterwriteop" title="Permanent link">link</a></h4>
+<p><em>Writes a resource to a parameter archive.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.parameter.write` (`on` `(` $affinity^ `)`)?
+              $source `-&gt;` custom&lt;ParameterReference&gt;($target_scope, $target_key)
+              `` `[` $target_offset `]`
+              `:` $source_encoding (`` `{` $source_encoding_dims^ `}`)?
+              `in` type($source) `` `{` $source_size `}`
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Writes data from a source resource to a parameter archive file (or in-memory
+buffer) at the specified byte offset. The source resource is returned
+unchanged to establish proper data flow dependencies. This is the
+tensor-phase equivalent of <code>stream.async.parameter.write</code> and retains tensor
+encoding metadata for proper size calculation during encoding.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%r = stream.tensor.parameter.write %source -&gt; %key[%offset]
+    : tensor&lt;4x8xf32&gt; in !stream.resource&lt;*&gt;{%size}
+%r = stream.tensor.parameter.write %source -&gt; %scope::%key[%offset]
+    : tensor&lt;?x8xf32&gt;{%dim0} in !stream.resource&lt;*&gt;{%size}
+</code></pre></div></p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<h5 id="attributes_72">Attributes:<a class="headerlink" href="#attributes_72" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>source_encoding</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
+<tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
+</table>
+
+<h5 id="operands_82">Operands:<a class="headerlink" href="#operands_82" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>resource or external resource or transient resource or variable resource or constant resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_encoding_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_size</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_scope</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_key</code></td>
+<td>A reference counted byte buffer.</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_offset</code></td>
+<td>64-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_74">Results:<a class="headerlink" href="#results_74" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>resource or external resource or transient resource or variable resource or constant resource</td>
+</tr>
+</tbody>
+</table>
 <h3 id="test-only-ops-for-stream-dialect-testing">Test-only ops for Stream dialect testing<a class="headerlink" href="#test-only-ops-for-stream-dialect-testing" title="Permanent link">link</a></h3>
 <p>Ops used only in unit tests.</p>
 <h4 id="streamtesttimeline_aware-streamtesttimelineawareop"><code>stream.test.timeline_aware</code> (Stream::TestTimelineAwareOp)<a class="headerlink" href="#streamtesttimeline_aware-streamtesttimelineawareop" title="Permanent link">link</a></h4>
@@ -13505,7 +13793,7 @@ requiring HAL/etc dialect dependencies.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TimelineAwareOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_81">Operands:<a class="headerlink" href="#operands_81" title="Permanent link">link</a></h5>
+<h5 id="operands_83">Operands:<a class="headerlink" href="#operands_83" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13528,7 +13816,7 @@ requiring HAL/etc dialect dependencies.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_73">Results:<a class="headerlink" href="#results_73" title="Permanent link">link</a></h5>
+<h5 id="results_75">Results:<a class="headerlink" href="#results_75" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13590,14 +13878,14 @@ model resource-timepoint flows. For example:
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_71">Attributes:<a class="headerlink" href="#attributes_71" title="Permanent link">link</a></h5>
+<h5 id="attributes_73">Attributes:<a class="headerlink" href="#attributes_73" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
 <tr><td><code>await_limit</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
 </table>
 
-<h5 id="operands_82">Operands:<a class="headerlink" href="#operands_82" title="Permanent link">link</a></h5>
+<h5 id="operands_84">Operands:<a class="headerlink" href="#operands_84" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13624,7 +13912,7 @@ model resource-timepoint flows. For example:
 </tr>
 </tbody>
 </table>
-<h5 id="results_74">Results:<a class="headerlink" href="#results_74" title="Permanent link">link</a></h5>
+<h5 id="results_76">Results:<a class="headerlink" href="#results_76" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -13643,7 +13931,7 @@ model resource-timepoint flows. For example:
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_72">Attributes<a class="headerlink" href="#attributes_72" title="Permanent link">link</a></h2>
+<h2 id="attributes_74">Attributes<a class="headerlink" href="#attributes_74" title="Permanent link">link</a></h2>
 <h3 id="collectiveattr">CollectiveAttr<a class="headerlink" href="#collectiveattr" title="Permanent link">link</a></h3>
 <p><em>Collective operation and specification.</em></p>
 <p>Syntax:</p>
