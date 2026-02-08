@@ -60,7 +60,7 @@ EXAMPLES
     iree-bazel-fuzz -d //path/to:target
 
     # Overnight fuzzing: all fuzz targets under a path (Ctrl+C to stop)
-    iree-bazel-fuzz //runtime/src/iree/tokenizer2/... -- -jobs=128
+    iree-bazel-fuzz //runtime/src/iree/tokenizer/... -- -jobs=128
 
     # Time-limited multi-target fuzzing
     iree-bazel-fuzz //runtime/... -- -jobs=64 -max_total_time=3600
