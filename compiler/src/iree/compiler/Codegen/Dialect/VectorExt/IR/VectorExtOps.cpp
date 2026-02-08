@@ -682,6 +682,176 @@ Type TransferGatherOp::getExpectedMaskType() {
   return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
 
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgCompareOp::verify() {
+  Operation *op = getOperation();
+
+  unsigned numInputs = llvm::size(getInputs());
+  if (numInputs != 1 && numInputs != 2) {
+    return op->emitOpError("expected 1 or 2 input operands, but got ")
+           << numInputs;
+  }
+
+  unsigned numInits = llvm::size(getInits());
+  if (numInits != 2) {
+    return op->emitOpError("expected 2 init operands, but got ") << numInits;
+  }
+
+  unsigned numResults = llvm::size(getResults());
+  if (numResults != 2) {
+    return op->emitOpError("expected 2 results, but got ") << numResults;
+  }
+
+  VectorType inputType = getInputType();
+  VectorType initValueType = getInitValueType();
+  VectorType initIndexType = getInitIndexType();
+
+  int64_t inputRank = inputType.getRank();
+  int64_t initValueRank = initValueType.getRank();
+  int64_t initIndexRank = initIndexType.getRank();
+  int64_t dimension = getDimension();
+
+  if (dimension < 0 || dimension >= inputRank) {
+    return op->emitOpError("dimension ")
+           << dimension << " is out of range [0, " << inputRank << ")";
+  }
+
+  if (initValueRank != inputRank - 1) {
+    return op->emitOpError("init value rank (")
+           << initValueRank << ") should be input rank - 1 (" << inputRank
+           << " - 1)";
+  }
+
+  if (initIndexRank != inputRank - 1) {
+    return op->emitOpError("init index rank (")
+           << initIndexRank << ") should be input rank - 1 (" << inputRank
+           << " - 1)";
+  }
+
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i != dimension) {
+      expectedShape.push_back(inputType.getDimSize(i));
+    }
+  }
+
+  ArrayRef<int64_t> initValueShape = initValueType.getShape();
+  if (!llvm::equal(expectedShape, initValueShape)) {
+    return op->emitOpError(
+               "init value shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initValueShape);
+  }
+
+  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
+  if (!llvm::equal(expectedShape, initIndexShape)) {
+    return op->emitOpError(
+               "init index shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initIndexShape);
+  }
+
+  Type inputElementType = inputType.getElementType();
+  Type initValueElementType = initValueType.getElementType();
+
+  if (inputElementType != initValueElementType) {
+    return op->emitOpError("input and init value element types must match. ")
+           << "Input type: " << inputElementType
+           << ", init value type: " << initValueElementType;
+  }
+
+  Type initIndexElementType = initIndexType.getElementType();
+  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
+    return op->emitOpError(
+               "init index must have integer or index element type, but got ")
+           << initIndexElementType;
+  }
+
+  if (hasExplicitIndexInput()) {
+    VectorType inputIndexType = getInputIndexType();
+    ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
+    if (inputIndexShape != inputShape) {
+      return op->emitOpError(
+                 "explicit-index mode: value and index inputs must have the "
+                 "same shape. ")
+             << "Value shape: " << llvm::interleaved_array(inputShape)
+             << ", index shape: " << llvm::interleaved_array(inputIndexShape);
+    }
+
+    Type inputIndexElementType = getInputIndexElementType();
+    if (!isa<IntegerType, IndexType>(inputIndexElementType)) {
+      return op->emitOpError("explicit-index mode: index input must have "
+                             "integer or index element type, but got ")
+             << inputIndexElementType;
+    }
+
+    if (inputIndexElementType != initIndexElementType) {
+      return op->emitOpError(
+                 "explicit-index mode: input and init index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexElementType
+             << ", init index type: " << initIndexElementType;
+    }
+
+    if (getIndexBase()) {
+      return op->emitOpError(
+          "index_base must not be used with explicit indices");
+    }
+  }
+
+  Region &comparator = getRegion();
+  if (comparator.getNumArguments() != 2) {
+    return op->emitOpError("comparator region must have exactly 2 arguments");
+  }
+
+  Type arg0Type = comparator.getArgument(0).getType();
+  Type arg1Type = comparator.getArgument(1).getType();
+
+  if (arg0Type != inputElementType || arg1Type != inputElementType) {
+    return op->emitOpError(
+               "comparator arguments must match input value element type. ")
+           << "Expected: " << inputElementType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  Block &block = comparator.front();
+  Operation *terminator = block.getTerminator();
+
+  unsigned numYieldOperands = terminator->getNumOperands();
+  if (numYieldOperands != 1) {
+    return op->emitOpError(
+               "expected comparator region to yield 1 operand, but got ")
+           << numYieldOperands;
+  }
+
+  Type yieldType = terminator->getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return op->emitOpError("comparator region must yield i1, but got ")
+           << yieldType;
+  }
+
+  TypeRange resultTypes = getResultTypes();
+  if (resultTypes[0] != initValueType) {
+    return op->emitOpError("result type 0 doesn't match init value type. ")
+           << "Result type: " << resultTypes[0]
+           << ", init value type: " << initValueType;
+  }
+
+  if (resultTypes[1] != initIndexType) {
+    return op->emitOpError("result type 1 doesn't match init index type. ")
+           << "Result type: " << resultTypes[1]
+           << ", init index type: " << initIndexType;
+  }
+
+  return success();
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep

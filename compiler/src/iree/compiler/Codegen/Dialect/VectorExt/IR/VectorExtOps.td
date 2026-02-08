@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -239,6 +240,182 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Terminator ops.
+//===----------------------------------------------------------------------===//
+
+def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
+    Pure,
+    ReturnLike,
+    Terminator
+  ]> {
+  let summary = "Yield operation for VectorExt operations with regions";
+  let description = [{
+    Yields values from regions in VectorExt operations.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$values);
+
+  let builders = [
+    OpBuilder<(ins), [{ /* nothing to do */ }]>
+  ];
+
+  let assemblyFormat = "attr-dict ($values^ `:` type($values))?";
+}
+
+//===----------------------------------------------------------------------===//
+// LinalgExt-style ops.
+//===----------------------------------------------------------------------===//
+
+def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
+  Pure,
+  AttrSizedOperandSegments,
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::VectorExt::YieldOp">
+]> {
+  let summary = "Vectorized arg-reduction using a user-defined comparator.";
+  let description = [{
+    The `iree_vector_ext.arg_compare` op is the vectorized form of
+    `iree_linalg_ext.arg_compare`. It performs a reduction over a given
+    dimension of a vector, returning both the selected value and its
+    corresponding index.
+
+    This operation is created by vectorizing `iree_linalg_ext.arg_compare`
+    through the GenericVectorizationPass. It wraps the operation with
+    vector.transfer_read/write but keeps the core reduction semantics intact.
+
+    The comparator region defines the selection rule (e.g., "greater than"
+    for argmax or "less than" for argmin).
+
+    Example (implicit-index mode - argmax over dim 1):
+    ```mlir
+    %input_vec = vector<4x128xf32>
+    %out_val_vec = vector<4xf32>
+    %out_idx_vec = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input_vec : vector<4x128xf32>)
+      inits(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    Example (explicit-index mode):
+    ```mlir
+    %partial_vals = vector<4x32xf32>
+    %partial_idxs = vector<4x32xi32>
+    %out_val = vector<4xf32>
+    %out_idx = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : vector<4x32xf32>, vector<4x32xi32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    The `index_base` is optional and is preserved from the tensor version
+    when applicable.
+
+    The `inits` operands provide the initial accumulator values for the
+    reduction (initial max/min value and index).
+  }];
+
+  let arguments = (ins
+    Variadic<AnyVectorOfAnyRank>:$inputs,
+    Variadic<AnyVectorOfAnyRank>:$inits,
+    Optional<Index>:$index_base,
+    I64Attr:$dimension
+  );
+
+  let results = (outs
+    Variadic<AnyVectorOfAnyRank>:$results
+  );
+
+  let regions = (region SizedRegion<1>:$region);
+
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `inits` `(` $inits `:` type($inits) `)`
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    Value getInputValue() {
+      return getInputs()[0];
+    }
+
+    bool hasExplicitIndexInput() {
+      return getInputs().size() == 2;
+    }
+
+    Value getInputIndex() {
+      if (!hasExplicitIndexInput()) {
+        return nullptr;
+      }
+      return getInputs()[1];
+    }
+
+    ValueRange getInitValues() {
+      return getInits();
+    }
+
+    Value getInitValue() {
+      return getInits()[0];
+    }
+
+    Value getInitIndex() {
+      return getInits()[1];
+    }
+
+    VectorType getInputType() {
+      return cast<VectorType>(getInputValue().getType());
+    }
+
+    VectorType getInitValueType() {
+      return cast<VectorType>(getInitValue().getType());
+    }
+
+    VectorType getInitIndexType() {
+      return cast<VectorType>(getInitIndex().getType());
+    }
+
+    VectorType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<VectorType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    Type getInputIndexElementType() {
+      if (VectorType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getInitValueElementType() {
+      return getInitValueType().getElementType();
+    }
+
+    Type getInitIndexElementType() {
+      return getInitIndexType().getElementType();
+    }
+
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+  }];
+
   let hasVerifier = 1;
 }
 
