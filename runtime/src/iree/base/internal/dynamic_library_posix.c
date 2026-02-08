@@ -321,6 +321,13 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   return iree_ok_status();
 }
 
+void* iree_dynamic_library_try_lookup_symbol(iree_dynamic_library_t* library,
+                                             const char* symbol_name) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(symbol_name);
+  return dlsym(library->handle, symbol_name);
+}
+
 iree_status_t iree_dynamic_library_attach_symbols_from_file(
     iree_dynamic_library_t* library, const char* file_path) {
   return iree_ok_status();
