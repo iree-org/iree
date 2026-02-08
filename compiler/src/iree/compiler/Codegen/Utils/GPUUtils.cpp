@@ -805,8 +805,8 @@ static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
   if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
     switch (smma.getIntrinsic()) {
     case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-      return XorShuffleParams(/*row_width*/ int64_t(256),
-                              /*access_width*/ int64_t(32));
+      return XorShuffleParams({/*rowElems*/ int64_t(256),
+                               /*accessElems*/ int64_t(32)});
     default:
       return failure();
     }
@@ -827,7 +827,7 @@ validateXorShuffle(FailureOr<XorShuffleParams> swizzle,
     return failure();
   }
   int64_t totalTileElems = *maybeTotalTileElems;
-  if (!isXORShuffleValid(swizzle->row_width, swizzle->access_width,
+  if (!isXORShuffleValid(swizzle->rowElems, swizzle->accessElems,
                          totalTileElems)) {
     return failure();
   }
@@ -847,7 +847,8 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return XorShuffleParams(*maybeMinimumAccessElems, *maybeTotalTileElems);
+  return XorShuffleParams({/*rowElems*/ *maybeMinimumAccessElems,
+                           /*accessElems*/ *maybeTotalTileElems});
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
@@ -908,9 +909,9 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
   // Compute XOR shuffle swizzle parameters for bank conflict avoidance.
-  // - row_width: Select entirety of K Tile size, may not prevent bank
+  // - rowElems: Select entirety of K Tile size, may not prevent bank
   //              conflicts if the K tile size is too small.
-  // - access_width: number of contiguous elements each thread accesses,
+  // - accessElems: number of contiguous elements each thread accesses,
   //                 derived from the MMA intrinsic's element layout.
   int64_t numAccessElems = getNumAccessElems(intrinsic, operandIndex).value();
 
@@ -936,11 +937,12 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 
   // Row width must be less than or equal to the row size (in elements) of LDS
   // bank width to prevent bank conflicts.
-  int64_t effectiveRowWidth = std::min(ldsBankWidthBits, kTileSize);
+  int64_t effectiverowElems = std::min(ldsBankWidthBits, kTileSize);
 
   // Ensure row width is at least access width (minimum 1 column).
-  effectiveRowWidth = std::max(effectiveRowWidth, numAccessElems);
-  return validateXorShuffle(XorShuffleParams(effectiveRowWidth, numAccessElems),
+  effectiverowElems = std::max(effectiverowElems, numAccessElems);
+  return validateXorShuffle(XorShuffleParams({/*rowElems*/ effectiverowElems,
+                                              /*accessElems*/ numAccessElems}),
                             intrinsic, operandIndex);
 }
 
@@ -968,10 +970,10 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
   if (failed(xorShuffleParams)) {
     return failure();
   }
-  auto effectiveRowWidth = xorShuffleParams.value().row_width;
-  auto numAccessElems = xorShuffleParams.value().access_width;
+  auto effectiverowElems = xorShuffleParams.value().rowElems;
+  auto numAccessElems = xorShuffleParams.value().accessElems;
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
-      context, effectiveRowWidth, numAccessElems,
+      context, effectiverowElems, numAccessElems,
       /*row_stride=*/int64_t(0),
       /*per_phase=*/int64_t(0));
   return IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr,

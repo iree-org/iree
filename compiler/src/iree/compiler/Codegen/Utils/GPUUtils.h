@@ -178,10 +178,8 @@ mlir::gpu::AllReduceOperation
 combiningKindToAllReduce(vector::CombiningKind kind);
 
 struct XorShuffleParams {
-  int64_t row_width;
-  int64_t access_width;
-  XorShuffleParams(int64_t row_width, int64_t access_width)
-      : row_width(row_width), access_width(access_width) {}
+  int64_t rowElems;
+  int64_t accessElems;
 };
 
 /// For a given MMA intrinsic and operand, returns the lower bound and upper
