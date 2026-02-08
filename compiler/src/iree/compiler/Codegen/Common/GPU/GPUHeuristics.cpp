@@ -192,6 +192,32 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   return isAligned && isDistributableLhs && isDistributableRhs;
 }
 
+/// Checks if the schedule's tile sizes satisfy LDS DMA alignment constraints.
+/// Tile products must be multiples of (dmaSize / elementBitWidth) *
+/// subgroup_size elements for fewer DMA transfers.
+static bool isLDSDMAAligned(const GPUMMASchedule &schedule, int64_t lhsBitwidth,
+                            int64_t rhsBitwidth, std::optional<int64_t> dmaSize,
+                            int64_t subgroupSize) {
+  if (!dmaSize) {
+    return true;
+  }
+
+  int64_t mTile = schedule.getTotalMSize() * schedule.getTotalMTileSize();
+  int64_t nTile = schedule.getTotalNSize() * schedule.getTotalNTileSize();
+  int64_t kTile = schedule.getTotalKSize() * schedule.getTotalKTileSize();
+
+  int64_t lhsElements = mTile * kTile;
+  int64_t rhsElements = kTile * nTile;
+
+  int64_t lhsElementsPerTransfer = *dmaSize / lhsBitwidth * subgroupSize;
+  int64_t rhsElementsPerTransfer = *dmaSize / rhsBitwidth * subgroupSize;
+
+  bool isLhsAligned = (lhsElements % lhsElementsPerTransfer) == 0;
+  bool isRhsAligned = (rhsElements % rhsElementsPerTransfer) == 0;
+
+  return isLhsAligned && isRhsAligned;
+}
+
 /// Tries to fit the schedule into shared memory by decrementing the size of the
 /// schedule dimensions from outermost to innermost until a valid schedule is
 /// found. The schedule sizes are reduced in the order of mTileSizes,
@@ -666,7 +692,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
-    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
+    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt,
+    std::optional<int64_t> dmaSize) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -697,9 +724,11 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
           problem.aScaleType ? problem.aScaleType.getIntOrFloatBitWidth() : 0;
       int64_t rhsScaleBitwidth =
           problem.bScaleType ? problem.bScaleType.getIntOrFloatBitWidth() : 0;
-      bool isAligned =
+      bool isScheduleValid =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
+      bool isDmaAligned = isLDSDMAAligned(schedule, lhsBitwidth, rhsBitwidth,
+                                          dmaSize, subgroupSize);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
           schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
           rhsScaleBitwidth, problem.numHorizontallyFusedOps);
@@ -717,7 +746,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
              << " bytes";
 
-      bool isValid = isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
+      bool isValid = isScheduleValid && isDmaAligned &&
+                     sharedMemoryUsed <= sharedMemLimitInBytes;
       if (isValid) {
         // Only emit remark for the shared memory usage of the valid schedule.
         remark::analysis(loc, remark::RemarkOpts::name("SharedMemoryUsage")

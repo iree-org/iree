@@ -24,6 +24,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -44,6 +45,23 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+
+/// Returns true if the target supports global load DMA (LDS DMA) operations.
+/// Only CDNA4+ (gfx950 and newer) architectures support this feature.
+/// Excludes RDNA cards (gfx10xx, gfx11xx, gfx12xx) which have major version
+/// >= 10.
+static bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
+  StringRef targetArch = target.getArch();
+  auto maybeChipset = amdgpu::Chipset::parse(targetArch);
+  if (failed(maybeChipset)) {
+    return false;
+  }
+  // Only enable for CDNA4+ (gfx950+). Exclude RDNA cards (gfx10xx, gfx11xx,
+  // gfx12xx). CDNA cards have major version 9, RDNA cards have major version
+  // >= 10.
+  constexpr amdgpu::Chipset kGfx950{9, 5, 0};
+  return maybeChipset->majorVersion == 9 && *maybeChipset >= kGfx950;
+}
 
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
@@ -434,11 +452,23 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     wgpCount = chip.getWgpCount();
   }
 
+  // To leverage LDS DMA with fewer transfers, tile size must be aligned to the
+  // largest DMA size.
+  std::optional<int64_t> dmaSize = std::nullopt;
+  if (targetSupportsGlobalLoadDMA(target)) {
+    DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
+    if (dmaSizesAttr && !dmaSizesAttr.empty()) {
+      ArrayRef<int64_t> dmaSizes = dmaSizesAttr.asArrayRef();
+      dmaSize = *llvm::max_element(dmaSizes);
+    }
+  }
+
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
+      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt,
+      dmaSize);
   return schedule;
 }
 

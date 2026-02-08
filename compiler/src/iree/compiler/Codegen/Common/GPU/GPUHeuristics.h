@@ -151,13 +151,17 @@ struct GPUMMASchedule {
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
+/// When |dmaSize| is provided, ensures tile products are multiples of
+/// (dmaSize / elementBitWidth) * subgroup_size elements for fewer LDS DMA
+/// transfers.
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool mustBeAligned = true,
-    bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0,
+    std::optional<int64_t> dmaSize = std::nullopt);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
 /// |intrinsics| to target the given attention matmul problems, |qkMatmul|
