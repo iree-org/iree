@@ -51,13 +51,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     (void)iree_unicode_is_other(codepoint);
     (void)iree_unicode_is_whitespace(codepoint);
     (void)iree_unicode_is_control(codepoint);
-    (void)iree_unicode_is_cjk(codepoint);
     (void)iree_unicode_is_hiragana(codepoint);
     (void)iree_unicode_is_katakana(codepoint);
     (void)iree_unicode_is_hangul(codepoint);
 
     // Case folding.
-    (void)iree_unicode_to_lower(codepoint);
+    uint32_t lower_out[2];
+    (void)iree_unicode_to_lower(codepoint, lower_out);
     (void)iree_unicode_to_upper(codepoint);
 
     // NFD decomposition.
@@ -95,7 +95,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     bool is_other = iree_unicode_is_other(codepoint);
     (void)iree_unicode_is_whitespace(codepoint);
     (void)iree_unicode_is_control(codepoint);
-    (void)iree_unicode_is_cjk(codepoint);
     (void)iree_unicode_is_hiragana(codepoint);
     (void)iree_unicode_is_katakana(codepoint);
     (void)iree_unicode_is_hangul(codepoint);
@@ -125,14 +124,22 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
 
     // Test case folding and NFD.
-    uint32_t lower = iree_unicode_to_lower(codepoint);
+    uint32_t lower_out[2];
+    iree_host_size_t lower_count = iree_unicode_to_lower(codepoint, lower_out);
     uint32_t upper = iree_unicode_to_upper(codepoint);
     uint32_t nfd = iree_unicode_nfd_base(codepoint);
     (void)iree_unicode_ccc(codepoint);
 
     // Invariant: case folding idempotency.
     // Applying the same case operation twice should yield the same result.
-    FUZZ_ASSERT(iree_unicode_to_lower(lower) == lower);
+    // For lowercase: each output codepoint should lowercase to itself.
+    for (iree_host_size_t i = 0; i < lower_count; ++i) {
+      uint32_t lower2_out[2];
+      iree_host_size_t lower2_count =
+          iree_unicode_to_lower(lower_out[i], lower2_out);
+      FUZZ_ASSERT(lower2_count == 1);
+      FUZZ_ASSERT(lower2_out[0] == lower_out[i]);
+    }
     FUZZ_ASSERT(iree_unicode_to_upper(upper) == upper);
 
     // Note: NFD decomposition may be multi-level (e.g., ẳ → ạ → a), so
