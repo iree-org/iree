@@ -2107,13 +2107,12 @@ convertAsyncParameterLoadOp(IREE::Stream::AsyncParameterLoadOp asyncOp) {
   OpBuilder builder(asyncOp);
   SmallVector<Type> resultTypes = {asyncOp.getResult().getType()};
   SmallVector<Value> resultSizes = {asyncOp.getResultSize()};
-  SmallVector<StringRef> sourceKeys = {asyncOp.getSourceKey()};
+  SmallVector<Value> sourceKeys = {asyncOp.getSourceKey()};
   SmallVector<Value> sourceOffsets = {asyncOp.getSourceOffset()};
   auto cmdOp = IREE::Stream::CmdParameterLoadOp::create(
       builder, asyncOp.getLoc(), resultTypes,
-      builder.getType<IREE::Stream::TimepointType>(),
-      asyncOp.getSourceScopeAttr(), builder.getStrArrayAttr(sourceKeys),
-      sourceOffsets, resultSizes, asyncOp.getAwaitTimepoint(),
+      builder.getType<IREE::Stream::TimepointType>(), asyncOp.getSourceScope(),
+      sourceKeys, sourceOffsets, resultSizes, asyncOp.getAwaitTimepoint(),
       asyncOp.getAffinityAttr());
   asyncOp.getResult().replaceAllUsesWith(cmdOp.getResults()[0]);
   asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
@@ -2126,7 +2125,7 @@ convertAsyncParameterReadOp(IREE::Stream::AsyncParameterReadOp asyncOp) {
   OpBuilder builder(asyncOp);
   auto cmdOp = IREE::Stream::CmdParameterReadOp::create(
       builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
-      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeyAttr(),
+      asyncOp.getSourceScope(), asyncOp.getSourceKey(),
       asyncOp.getSourceOffset(), asyncOp.getTarget(), asyncOp.getTargetSize(),
       asyncOp.getTargetOffset(), asyncOp.getTargetLength(),
       asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
@@ -2142,8 +2141,8 @@ convertAsyncParameterWriteOp(IREE::Stream::AsyncParameterWriteOp asyncOp) {
   auto cmdOp = IREE::Stream::CmdParameterWriteOp::create(
       builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
       asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffset(),
-      asyncOp.getSourceLength(), asyncOp.getTargetScopeAttr(),
-      asyncOp.getTargetKeyAttr(), asyncOp.getTargetOffset(),
+      asyncOp.getSourceLength(), asyncOp.getTargetScope(),
+      asyncOp.getTargetKey(), asyncOp.getTargetOffset(),
       asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
   asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
   asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());
@@ -2156,7 +2155,7 @@ convertAsyncParameterGatherOp(IREE::Stream::AsyncParameterGatherOp asyncOp) {
   OpBuilder builder(asyncOp);
   auto cmdOp = IREE::Stream::CmdParameterGatherOp::create(
       builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
-      asyncOp.getSourceScopeAttr(), asyncOp.getSourceKeysAttr(),
+      asyncOp.getSourceScope(), asyncOp.getSourceKeys(),
       asyncOp.getSourceOffsets(), asyncOp.getTarget(), asyncOp.getTargetSize(),
       asyncOp.getTargetOffsets(), asyncOp.getTargetLengths(),
       asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
@@ -2172,8 +2171,8 @@ convertAsyncParameterScatterOp(IREE::Stream::AsyncParameterScatterOp asyncOp) {
   auto cmdOp = IREE::Stream::CmdParameterScatterOp::create(
       builder, asyncOp.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
       asyncOp.getSource(), asyncOp.getSourceSize(), asyncOp.getSourceOffsets(),
-      asyncOp.getSourceLengths(), asyncOp.getTargetScopeAttr(),
-      asyncOp.getTargetKeysAttr(), asyncOp.getTargetOffsets(),
+      asyncOp.getSourceLengths(), asyncOp.getTargetScope(),
+      asyncOp.getTargetKeys(), asyncOp.getTargetOffsets(),
       asyncOp.getAwaitTimepoint(), asyncOp.getAffinityAttr());
   asyncOp.getResult().replaceAllUsesWith(asyncOp.getSource());
   asyncOp.getResultTimepoint().replaceAllUsesWith(cmdOp.getResultTimepoint());

@@ -3,14 +3,17 @@
 // Tests that pipelined scf.for iterations await previous iteration timepoints.
 
 // CHECK-LABEL: @scf_for_pipelined
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>
 util.func public @scf_for_pipelined(%arg: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
 
-  // Initial work produces timepoint.
-  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op
+  // Initial work produces timepoint. The pass inserts an immediate timepoint
+  // for function-arg resources and threads it through the await clause.
+  // CHECK: %[[IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op await(%[[IMM]]) => with(%[[ARG]])
   %init, %init_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
   // Await before loop.
@@ -18,12 +21,12 @@ util.func public @scf_for_pipelined(%arg: !stream.resource<external>) -> !stream
   %init_ready = stream.timepoint.await %init_tp => %init : !stream.resource<external>{%c128}
 
   // Loop: each iteration awaits previous iteration's work.
-  // CHECK: %[[FOR_RESULT:.+]]:2 = scf.for %{{.+}} = %c0 to %c3 step %c1
-  // CHECK-SAME: iter_args(%[[ITER:.+]] = %[[INIT]], %{{.+}} = %[[INIT_TP]])
+  // The pass adds the timepoint as an additional iter_arg.
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[INIT]], %[[ITER_TP:.+]] = %[[INIT_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
   %result = scf.for %i = %c0 to %c3 step %c1 iter_args(%iter = %init_ready) -> !stream.resource<external> {
-    // Process iter, produces new timepoint.
-    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op with(%[[ITER]])
+    // Process iter.
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
     %next, %next_tp = stream.test.timeline_op with(%iter) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
     // Await for next iteration.
@@ -33,7 +36,7 @@ util.func public @scf_for_pipelined(%arg: !stream.resource<external>) -> !stream
     scf.yield %next_ready : !stream.resource<external>
   }
 
-  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT]]#0
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
   // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[RESULT]] : !stream.resource<external>
   util.return %result : !stream.resource<external>
@@ -44,24 +47,24 @@ util.func public @scf_for_pipelined(%arg: !stream.resource<external>) -> !stream
 // Tests that scf.for with independent parallel ops preserves concurrency.
 
 // CHECK-LABEL: @scf_for_parallel_selective
+// CHECK-SAME: %[[RES0:.+]]: !stream.resource<external>, %[[RES1:.+]]: !stream.resource<external>
 util.func public @scf_for_parallel_selective(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c1 = arith.constant 1 : index
   %c64 = arith.constant 64 : index
 
-  // Two independent initial resources.
+  // Two independent initial resources get immediate timepoints.
   // CHECK: %[[INIT_TP0:.+]] = stream.timepoint.immediate
   // CHECK: %[[INIT_TP1:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR_RESULT:.+]]:4 = scf.for %{{.+}} = %c0 to %c3 step %c1
-  // CHECK-SAME: iter_args(%[[ITER0:.+]] = %arg0, %{{.+}} = %[[INIT_TP0]], %[[ITER1:.+]] = %arg1, %{{.+}} = %[[INIT_TP1]])
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER0:.+]] = %[[RES0]], %[[ITER0_TP:.+]] = %[[INIT_TP0]], %[[ITER1:.+]] = %[[RES1]], %[[ITER1_TP:.+]] = %[[INIT_TP1]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint, !stream.resource<external>, !stream.timepoint)
   %result:2 = scf.for %i = %c0 to %c3 step %c1 iter_args(%iter0 = %arg0, %iter1 = %arg1) -> (!stream.resource<external>, !stream.resource<external>) {
     // Two INDEPENDENT operations (can run concurrently).
-    // CHECK: %[[NEXT0:.+]], %[[NEXT_TP0:.+]] = stream.test.timeline_op with(%[[ITER0]])
+    // CHECK: %[[NEXT0:.+]], %[[NEXT_TP0:.+]] = stream.test.timeline_op await(%[[ITER0_TP]]) => with(%[[ITER0]])
     %next0, %tp0 = stream.test.timeline_op with(%iter0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
-    // CHECK: %[[NEXT1:.+]], %[[NEXT_TP1:.+]] = stream.test.timeline_op with(%[[ITER1]])
+    // CHECK: %[[NEXT1:.+]], %[[NEXT_TP1:.+]] = stream.test.timeline_op await(%[[ITER1_TP]]) => with(%[[ITER1]])
     %next1, %tp1 = stream.test.timeline_op with(%iter1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // Await both before yielding.
@@ -74,7 +77,7 @@ util.func public @scf_for_parallel_selective(%arg0: !stream.resource<external>, 
     scf.yield %ready0, %ready1 : !stream.resource<external>, !stream.resource<external>
   }
 
-  // CHECK: %[[SIZE1:.+]] = stream.resource.size %[[FOR_RESULT]]#2
+  // CHECK: %[[SIZE1:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#2
   // CHECK: %[[FINAL1:.+]] = stream.timepoint.await %[[FOR_RESULT]]#3 => %[[FOR_RESULT]]#2 : !stream.resource<external>{%[[SIZE1]]}
   // CHECK: %[[SIZE0:.+]] = stream.resource.size %[[FOR_RESULT]]#0
   // CHECK: %[[FINAL0:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE0]]}
@@ -87,23 +90,23 @@ util.func public @scf_for_parallel_selective(%arg0: !stream.resource<external>, 
 // Tests that scf.while correctly handles bidirectional timepoint flow.
 
 // CHECK-LABEL: @scf_while_bidirectional
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>, %{{.+}}: index
 util.func public @scf_while_bidirectional(%arg: !stream.resource<external>, %limit: index) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
 
   // Initial work.
-  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op
+  // CHECK: %[[WHILE_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op await(%[[WHILE_IMM]]) => with(%[[ARG]])
   %init, %init_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
   // CHECK: stream.timepoint.await %[[INIT_TP]] => %[[INIT]]
   %init_ready = stream.timepoint.await %init_tp => %init : !stream.resource<external>{%c128}
 
   // While loop: condition needs to await body's timepoint.
-  // CHECK: %[[WHILE_RESULT:.+]]:3 = scf.while
-  // CHECK-SAME: (%[[BEFORE_ITER:.+]] = %[[INIT]], %[[BEFORE_TP:.+]] = %[[INIT_TP]], %[[BEFORE_COUNT:.+]] = %c0)
-  // CHECK-SAME: : (!stream.resource<external>, !stream.timepoint, index)
-  // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint, index)
+  // CHECK: %[[WHILE_RESULT:.+]]:3 = scf.while (%[[BEFORE_ITER:.+]] = %[[INIT]], %[[BEFORE_TP:.+]] = %[[INIT_TP]], %[[BEFORE_COUNT:.+]] =
+  // CHECK-SAME: : (!stream.resource<external>, !stream.timepoint, index) -> (!stream.resource<external>, !stream.timepoint, index)
   %result:2 = scf.while (%iter = %init_ready, %count = %c0) : (!stream.resource<external>, index) -> (!stream.resource<external>, index) {
     // Condition: check if should continue.
     // CHECK: %[[COND:.+]] = arith.cmpi slt, %[[BEFORE_COUNT]], %{{.+}}
@@ -111,15 +114,15 @@ util.func public @scf_while_bidirectional(%arg: !stream.resource<external>, %lim
     // CHECK: scf.condition(%[[COND]]) %[[BEFORE_ITER]], %[[BEFORE_TP]], %[[BEFORE_COUNT]] : !stream.resource<external>, !stream.timepoint, index
     scf.condition(%cond) %iter, %count : !stream.resource<external>, index
   } do {
-  // CHECK: ^bb0(%[[BODY_ITER:.+]]: !stream.resource<external>, %{{.+}}: !stream.timepoint, %[[BODY_COUNT:.+]]: index):
+  // CHECK: ^bb0(%[[BODY_ITER:.+]]: !stream.resource<external>, %[[BODY_TP:.+]]: !stream.timepoint, %[[BODY_COUNT:.+]]: index):
   ^bb0(%body_iter: !stream.resource<external>, %body_count: index):
     // Body: produce next iteration's work.
-    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op with(%[[BODY_ITER]])
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[BODY_TP]]) => with(%[[BODY_ITER]])
     %next, %next_tp = stream.test.timeline_op with(%body_iter) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
     %next_ready = stream.timepoint.await %next_tp => %next : !stream.resource<external>{%c128}
-    // CHECK: %[[NEXT_COUNT:.+]] = arith.addi %[[BODY_COUNT]], %c1
+    // CHECK: %[[NEXT_COUNT:.+]] = arith.addi %[[BODY_COUNT]], %{{.+}}
     %next_count = arith.addi %body_count, %c1 : index
 
     // CHECK: scf.yield %[[NEXT]], %[[NEXT_TP]], %[[NEXT_COUNT]] : !stream.resource<external>, !stream.timepoint, index
@@ -137,14 +140,16 @@ util.func public @scf_while_bidirectional(%arg: !stream.resource<external>, %lim
 // Tests that scf.if correctly merges timepoints from both branches.
 
 // CHECK-LABEL: @scf_if_merge
+// CHECK-SAME: %[[COND:.+]]: i1, %[[RES0:.+]]: !stream.resource<external>, %[[RES1:.+]]: !stream.resource<external>
 util.func public @scf_if_merge(%cond: i1, %arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c64 = arith.constant 64 : index
 
   // scf.if: both branches do async work.
-  // CHECK: %[[IF_RESULT:.+]]:2 = scf.if %{{.+}} -> (!stream.resource<external>, !stream.timepoint)
+  // CHECK: %[[IF_RESULT:.+]]:2 = scf.if %[[COND]] -> (!stream.resource<external>, !stream.timepoint)
   %result = scf.if %cond -> !stream.resource<external> {
     // Then: work on arg0.
-    // CHECK: %[[THEN:.+]], %[[THEN_TP:.+]] = stream.test.timeline_op with(%arg1)
+    // CHECK: %[[THEN_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[THEN:.+]], %[[THEN_TP:.+]] = stream.test.timeline_op await(%[[THEN_IMM]]) => with(%[[RES0]])
     %then_result, %then_tp = stream.test.timeline_op with(%arg0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[THEN_TP]] => %[[THEN]]
@@ -153,7 +158,8 @@ util.func public @scf_if_merge(%cond: i1, %arg0: !stream.resource<external>, %ar
     scf.yield %then_ready : !stream.resource<external>
   } else {
     // Else: work on arg1.
-    // CHECK: %[[ELSE:.+]], %[[ELSE_TP:.+]] = stream.test.timeline_op with(%arg2)
+    // CHECK: %[[ELSE_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[ELSE:.+]], %[[ELSE_TP:.+]] = stream.test.timeline_op await(%[[ELSE_IMM]]) => with(%[[RES1]])
     %else_result, %else_tp = stream.test.timeline_op with(%arg1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[ELSE_TP]] => %[[ELSE]]
@@ -162,10 +168,11 @@ util.func public @scf_if_merge(%cond: i1, %arg0: !stream.resource<external>, %ar
     scf.yield %else_ready : !stream.resource<external>
   }
 
-  // Use result (need to merge timepoints from both branches).
+  // Use result: the timeline op consumes the if result resource and its
+  // merged timepoint.
   // CHECK: %[[SIZE:.+]] = stream.resource.size %[[IF_RESULT]]#0
-  // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[IF_RESULT]]#1 => %[[IF_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
-  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op with(%[[RESULT]])
+  // CHECK: %[[AWAITED:.+]] = stream.timepoint.await %[[IF_RESULT]]#1 => %[[IF_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
+  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op await(%[[IF_RESULT]]#1) => with(%[[IF_RESULT]]#0)
   %final, %final_tp = stream.test.timeline_op with(%result) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[FINAL_READY:.+]] = stream.timepoint.await %[[FINAL_TP]] => %[[FINAL]]
@@ -225,11 +232,10 @@ util.func public @nested_if_for(%cond: i1, %arg: !stream.resource<external>) -> 
   %result = scf.if %cond -> !stream.resource<external> {
     // Then: pipelined loop.
     // CHECK: %[[LOOP_INIT_TP:.+]] = stream.timepoint.immediate
-    // CHECK: %[[LOOP_RESULT:.+]]:2 = scf.for %{{.+}} = %c0 to %c2 step %c1
-    // CHECK-SAME: iter_args(%[[LOOP_ITER:.+]] = %[[ARG]], %{{.+}} = %[[LOOP_INIT_TP]])
+    // CHECK: %[[LOOP_RESULT:.+]]:2 = scf.for {{.*}} iter_args(%[[LOOP_ITER:.+]] = %[[ARG]], %[[LOOP_ITER_TP:.+]] = %[[LOOP_INIT_TP]])
     // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
     %loop_result = scf.for %i = %c0 to %c2 step %c1 iter_args(%iter = %arg) -> !stream.resource<external> {
-      // CHECK: %[[LOOP_NEXT:.+]], %[[LOOP_NEXT_TP:.+]] = stream.test.timeline_op with(%[[LOOP_ITER]])
+      // CHECK: %[[LOOP_NEXT:.+]], %[[LOOP_NEXT_TP:.+]] = stream.test.timeline_op await(%[[LOOP_ITER_TP]]) => with(%[[LOOP_ITER]])
       %next, %next_tp = stream.test.timeline_op with(%iter) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
       // CHECK: stream.timepoint.await %[[LOOP_NEXT_TP]] => %[[LOOP_NEXT]]
@@ -243,7 +249,8 @@ util.func public @nested_if_for(%cond: i1, %arg: !stream.resource<external>) -> 
     scf.yield %loop_result : !stream.resource<external>
   } else {
     // Else: single operation.
-    // CHECK: %[[ELSE:.+]], %[[ELSE_TP:.+]] = stream.test.timeline_op with(%[[ARG]])
+    // CHECK: %[[ELSE_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[ELSE:.+]], %[[ELSE_TP:.+]] = stream.test.timeline_op await(%[[ELSE_IMM]]) => with(%[[ARG]])
     %else_result, %else_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[ELSE_TP]] => %[[ELSE]]
@@ -263,14 +270,17 @@ util.func public @nested_if_for(%cond: i1, %arg: !stream.resource<external>) -> 
 // Tests that multi-resource operations with selective joins preserve concurrency.
 
 // CHECK-LABEL: @multi_resource_selective
+// CHECK-SAME: %[[RES0:.+]]: !stream.resource<external>, %[[RES1:.+]]: !stream.resource<external>
 util.func public @multi_resource_selective(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c64 = arith.constant 64 : index
 
   // Two independent async operations.
-  // CHECK: %[[RESULT0:.+]], %[[TP0:.+]] = stream.test.timeline_op with(%arg0)
+  // CHECK: %[[IMM0:.+]] = stream.timepoint.immediate
+  // CHECK: %[[RESULT0:.+]], %[[TP0:.+]] = stream.test.timeline_op await(%[[IMM0]]) => with(%[[RES0]])
   %result0, %tp0 = stream.test.timeline_op with(%arg0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
-  // CHECK: %[[RESULT1:.+]], %[[TP1:.+]] = stream.test.timeline_op with(%arg1)
+  // CHECK: %[[IMM1:.+]] = stream.timepoint.immediate
+  // CHECK: %[[RESULT1:.+]], %[[TP1:.+]] = stream.test.timeline_op await(%[[IMM1]]) => with(%[[RES1]])
   %result1, %tp1 = stream.test.timeline_op with(%arg1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // Await both.
@@ -279,9 +289,9 @@ util.func public @multi_resource_selective(%arg0: !stream.resource<external>, %a
   // CHECK: stream.timepoint.await %[[TP1]] => %[[RESULT1]]
   %ready1 = stream.timepoint.await %tp1 => %result1 : !stream.resource<external>{%c64}
 
-  // Final operation uses ONLY result0 (should not wait for tp1).
-  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op with(%[[READY0]])
-  // CHECK-NOT: await(%[[TP1]])
+  // Final operation uses ONLY result0: should not depend on tp1.
+  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op await(%[[TP0]]) => with(%[[RESULT0]])
+  // CHECK-NOT: stream.timepoint.join
   %final, %final_tp = stream.test.timeline_op with(%ready0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[FINAL_READY:.+]] = stream.timepoint.await %[[FINAL_TP]] => %[[FINAL]]
@@ -295,18 +305,21 @@ util.func public @multi_resource_selective(%arg0: !stream.resource<external>, %a
 // Tests that pass does not create false dependencies between independent resources.
 
 // CHECK-LABEL: @no_false_dependencies
+// CHECK-SAME: %[[RES0:.+]]: !stream.resource<external>, %[[RES1:.+]]: !stream.resource<external>
 util.func public @no_false_dependencies(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
   %c64 = arith.constant 64 : index
 
   // Timeline A: arg0 to result0.
-  // CHECK: %[[RESULT0:.+]], %[[TP0:.+]] = stream.test.timeline_op with(%arg0)
+  // CHECK: %[[IMM0:.+]] = stream.timepoint.immediate
+  // CHECK: %[[RESULT0:.+]], %[[TP0:.+]] = stream.test.timeline_op await(%[[IMM0]]) => with(%[[RES0]])
   %result0, %tp0 = stream.test.timeline_op with(%arg0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[READY0:.+]] = stream.timepoint.await %[[TP0]] => %[[RESULT0]]
   %ready0 = stream.timepoint.await %tp0 => %result0 : !stream.resource<external>{%c64}
 
   // Timeline B: arg1 to result1 (completely independent).
-  // CHECK: %[[RESULT1:.+]], %[[TP1:.+]] = stream.test.timeline_op with(%arg1)
+  // CHECK: %[[IMM1:.+]] = stream.timepoint.immediate
+  // CHECK: %[[RESULT1:.+]], %[[TP1:.+]] = stream.test.timeline_op await(%[[IMM1]]) => with(%[[RES1]])
   %result1, %tp1 = stream.test.timeline_op with(%arg1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[READY1:.+]] = stream.timepoint.await %[[TP1]] => %[[RESULT1]]
@@ -323,18 +336,20 @@ util.func public @no_false_dependencies(%arg0: !stream.resource<external>, %arg1
 // Tests that scf.index_switch correctly merges timepoints from all branches.
 
 // CHECK-LABEL: @scf_index_switch_merge
+// CHECK-SAME: %[[IDX:.+]]: index, %[[RES0:.+]]: !stream.resource<external>, %[[RES1:.+]]: !stream.resource<external>
 util.func public @scf_index_switch_merge(%index: index, %arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c64 = arith.constant 64 : index
 
   // scf.index_switch with multiple branches, each doing async work.
-  // CHECK: %[[SWITCH_RESULT:.+]]:2 = scf.index_switch %{{.+}} -> !stream.resource<external>, !stream.timepoint
+  // CHECK: %[[SWITCH_RESULT:.+]]:2 = scf.index_switch %[[IDX]] -> !stream.resource<external>, !stream.timepoint
   %result = scf.index_switch %index -> !stream.resource<external>
   // CHECK: case 0 {
   case 0 {
     // Case 0: work on arg0.
-    // CHECK: %[[CASE0:.+]], %[[CASE0_TP:.+]] = stream.test.timeline_op with(%arg1)
+    // CHECK: %[[CASE0_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[CASE0:.+]], %[[CASE0_TP:.+]] = stream.test.timeline_op await(%[[CASE0_IMM]]) => with(%[[RES0]])
     %case0_res, %case0_tp = stream.test.timeline_op with(%arg0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
     // CHECK: stream.timepoint.await %[[CASE0_TP]] => %[[CASE0]]
     %case0_ready = stream.timepoint.await %case0_tp => %case0_res : !stream.resource<external>{%c64}
@@ -344,7 +359,8 @@ util.func public @scf_index_switch_merge(%index: index, %arg0: !stream.resource<
   // CHECK: case 1 {
   case 1 {
     // Case 1: work on arg1.
-    // CHECK: %[[CASE1:.+]], %[[CASE1_TP:.+]] = stream.test.timeline_op with(%arg2)
+    // CHECK: %[[CASE1_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[CASE1:.+]], %[[CASE1_TP:.+]] = stream.test.timeline_op await(%[[CASE1_IMM]]) => with(%[[RES1]])
     %case1_res, %case1_tp = stream.test.timeline_op with(%arg1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
     // CHECK: stream.timepoint.await %[[CASE1_TP]] => %[[CASE1]]
     %case1_ready = stream.timepoint.await %case1_tp => %case1_res : !stream.resource<external>{%c64}
@@ -354,7 +370,9 @@ util.func public @scf_index_switch_merge(%index: index, %arg0: !stream.resource<
   // CHECK: default {
   default {
     // Default: work on both.
-    // CHECK: %[[DEFAULT:.+]], %[[DEFAULT_TP:.+]] = stream.test.timeline_op with(%arg1, %arg2)
+    // CHECK: %[[DEFAULT_IMM0:.+]] = stream.timepoint.immediate
+    // CHECK: %[[DEFAULT_IMM1:.+]] = stream.timepoint.immediate
+    // CHECK: %[[DEFAULT:.+]], %[[DEFAULT_TP:.+]] = stream.test.timeline_op await(%[[DEFAULT_IMM0]], %[[DEFAULT_IMM1]]) => with(%[[RES0]], %[[RES1]])
     %default_res, %default_tp = stream.test.timeline_op with(%arg0, %arg1) : (!stream.resource<external>{%c64}, !stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
     // CHECK: stream.timepoint.await %[[DEFAULT_TP]] => %[[DEFAULT]]
     %default_ready = stream.timepoint.await %default_tp => %default_res : !stream.resource<external>{%c64}
@@ -362,10 +380,10 @@ util.func public @scf_index_switch_merge(%index: index, %arg0: !stream.resource<
     scf.yield %default_ready : !stream.resource<external>
   }
 
-  // Final operation depends on merged timepoint from switch.
+  // Final operation uses the switch result.
   // CHECK: %[[SIZE:.+]] = stream.resource.size %[[SWITCH_RESULT]]#0
   // CHECK: %[[MERGED:.+]] = stream.timepoint.await %[[SWITCH_RESULT]]#1 => %[[SWITCH_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
-  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op with(%[[MERGED]])
+  // CHECK: %[[FINAL:.+]], %[[FINAL_TP:.+]] = stream.test.timeline_op await(%[[SWITCH_RESULT]]#1) => with(%[[SWITCH_RESULT]]#0)
   %final, %final_tp = stream.test.timeline_op with(%result) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
   // CHECK: %[[FINAL_READY:.+]] = stream.timepoint.await %[[FINAL_TP]] => %[[FINAL]]
   %final_ready = stream.timepoint.await %final_tp => %final : !stream.resource<external>{%c64}
@@ -375,9 +393,10 @@ util.func public @scf_index_switch_merge(%index: index, %arg0: !stream.resource<
 
 // -----
 
-// Tests that scf.for with empty loop (upper ≤ lower) correctly propagates initial iter_args.
+// Tests that scf.for with empty loop (upper <= lower) correctly propagates initial iter_args.
 
 // CHECK-LABEL: @scf_for_empty_loop
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>
 util.func public @scf_for_empty_loop(%arg: !stream.resource<external>) -> !stream.resource<external> {
   %c5 = arith.constant 5 : index
   %c10 = arith.constant 10 : index
@@ -385,19 +404,19 @@ util.func public @scf_for_empty_loop(%arg: !stream.resource<external>) -> !strea
   %c128 = arith.constant 128 : index
 
   // Initial work produces timepoint.
-  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op
+  // CHECK: %[[EMPTY_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op await(%[[EMPTY_IMM]]) => with(%[[ARG]])
   %init, %init_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
   // CHECK: stream.timepoint.await %[[INIT_TP]] => %[[INIT]]
   %init_ready = stream.timepoint.await %init_tp => %init : !stream.resource<external>{%c128}
 
   // Empty loop: 10 to 5 with step 1 executes 0 times.
-  // CHECK: %[[FOR_RESULT:.+]]:2 = scf.for %{{.+}} = %c10 to %c5 step %c1
-  // CHECK-SAME: iter_args(%[[ITER:.+]] = %[[INIT]], %{{.+}} = %[[INIT_TP]])
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[INIT]], %[[ITER_TP:.+]] = %[[INIT_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
   %result = scf.for %i = %c10 to %c5 step %c1 iter_args(%iter = %init_ready) -> !stream.resource<external> {
     // Loop body: transformed but never executes at runtime.
-    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op with(%[[ITER]])
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
     %next, %next_tp = stream.test.timeline_op with(%iter) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
     // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
     %next_ready = stream.timepoint.await %next_tp => %next : !stream.resource<external>{%c128}
@@ -406,7 +425,7 @@ util.func public @scf_for_empty_loop(%arg: !stream.resource<external>) -> !strea
   }
 
   // Result equals initial values (loop never ran).
-  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT]]#0
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
   // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[RESULT]] : !stream.resource<external>
   util.return %result : !stream.resource<external>
@@ -417,13 +436,15 @@ util.func public @scf_for_empty_loop(%arg: !stream.resource<external>) -> !strea
 // Tests that scf.while with early exit correctly handles timepoint propagation.
 
 // CHECK-LABEL: @scf_while_early_exit
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>, %{{.+}}: index
 util.func public @scf_while_early_exit(%arg: !stream.resource<external>, %threshold: index) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
 
   // Initial work.
-  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op
+  // CHECK: %[[EXIT_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op await(%[[EXIT_IMM]]) => with(%[[ARG]])
   %init, %init_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
   // CHECK: stream.timepoint.await %[[INIT_TP]] => %[[INIT]]
@@ -443,10 +464,10 @@ util.func public @scf_while_early_exit(%arg: !stream.resource<external>, %thresh
     // CHECK: scf.condition(%[[COND]]) %[[BEFORE_ITER]], %[[BEFORE_TP]] : !stream.resource<external>, !stream.timepoint
     scf.condition(%cond) %iter : !stream.resource<external>
   } do {
-  // CHECK: ^bb0(%[[BODY_ITER:.+]]: !stream.resource<external>, %{{.+}}: !stream.timepoint):
+  // CHECK: ^bb0(%[[BODY_ITER:.+]]: !stream.resource<external>, %[[BODY_TP:.+]]: !stream.timepoint):
   ^bb0(%body_iter: !stream.resource<external>):
     // Body: produce next iteration.
-    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op with(%[[BODY_ITER]])
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[BODY_TP]]) => with(%[[BODY_ITER]])
     %next, %next_tp = stream.test.timeline_op with(%body_iter) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
@@ -469,13 +490,15 @@ util.func public @scf_while_early_exit(%arg: !stream.resource<external>, %thresh
 // This tests the pass-by-reference fix for resourceTimepointMap.
 
 // CHECK-LABEL: @scf_while_condition_with_timeline_op
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>, %{{.+}}: index
 util.func public @scf_while_condition_with_timeline_op(%arg: !stream.resource<external>, %limit: index) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
 
   // Initial work.
-  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op
+  // CHECK: %[[COND_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[INIT:.+]], %[[INIT_TP:.+]] = stream.test.timeline_op await(%[[COND_IMM]]) => with(%[[ARG]])
   %init, %init_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
   // CHECK: stream.timepoint.await %[[INIT_TP]] => %[[INIT]]
@@ -488,15 +511,15 @@ util.func public @scf_while_condition_with_timeline_op(%arg: !stream.resource<ex
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
   %result = scf.while (%iter = %init_ready) : (!stream.resource<external>) -> !stream.resource<external> {
     // Condition: do work on the resource, then decide based on size.
-    // CHECK: %[[COND_WORK:.+]], %[[COND_WORK_TP:.+]] = stream.test.timeline_op with(%[[BEFORE_ITER]])
+    // CHECK: %[[COND_WORK:.+]], %[[COND_WORK_TP:.+]] = stream.test.timeline_op await(%[[BEFORE_TP]]) => with(%[[BEFORE_ITER]])
     %cond_result, %cond_tp = stream.test.timeline_op with(%iter) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128} => !stream.timepoint
 
     // CHECK: %[[COND_READY:.+]] = stream.timepoint.await %[[COND_WORK_TP]] => %[[COND_WORK]]
     %cond_ready = stream.timepoint.await %cond_tp => %cond_result : !stream.resource<external>{%c128}
 
-    // CHECK: %[[SIZE:.+]] = stream.resource.size %[[COND_READY]]
+    // CHECK: %[[COND_SIZE:.+]] = stream.resource.size %[[COND_READY]]
     %size = stream.resource.size %cond_ready : !stream.resource<external>
-    // CHECK: %[[COND:.+]] = arith.cmpi slt, %[[SIZE]], %{{.+}}
+    // CHECK: %[[COND:.+]] = arith.cmpi slt, %[[COND_SIZE]], %{{.+}}
     %cond = arith.cmpi slt, %size, %limit : index
 
     // The condition passes the MODIFIED resource with its NEW timepoint.
@@ -521,6 +544,7 @@ util.func public @scf_while_condition_with_timeline_op(%arg: !stream.resource<ex
 // Tests RNN cell pattern with recurrent hidden state dependencies.
 
 // CHECK-LABEL: @rnn_cell_recurrence
+// CHECK-SAME: %[[INPUT:.+]]: !stream.resource<external>, %[[INITIAL_HIDDEN:.+]]: !stream.resource<external>, %{{.+}}: index
 util.func public @rnn_cell_recurrence(%input: !stream.resource<external>, %initial_hidden: !stream.resource<external>, %seq_len: index) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -528,12 +552,12 @@ util.func public @rnn_cell_recurrence(%input: !stream.resource<external>, %initi
 
   // RNN loop: hidden state recurs through iterations.
   // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR_RESULT:.+]]:2 = scf.for %{{.+}} = %c0 to %{{.+}} step %c1
-  // CHECK-SAME: iter_args(%[[HIDDEN:.+]] = %arg1, %{{.+}} = %[[INIT_TP]])
+  // CHECK: scf.for {{.*}} iter_args(%[[HIDDEN:.+]] = %[[INITIAL_HIDDEN]], %[[HIDDEN_TP:.+]] = %[[INIT_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
   %hidden_final = scf.for %t = %c0 to %seq_len step %c1 iter_args(%hidden = %initial_hidden) -> !stream.resource<external> {
     // RNN cell: combine input with previous hidden state.
-    // CHECK: %[[CELL_OUT:.+]], %[[CELL_TP:.+]] = stream.test.timeline_op with(%arg0, %[[HIDDEN]])
+    // CHECK: %[[INPUT_IMM:.+]] = stream.timepoint.immediate
+    // CHECK: %[[CELL_OUT:.+]], %[[CELL_TP:.+]] = stream.test.timeline_op await(%[[INPUT_IMM]], %[[HIDDEN_TP]]) => with(%[[INPUT]], %[[HIDDEN]])
     %cell_output, %cell_tp = stream.test.timeline_op with(%input, %hidden) : (!stream.resource<external>{%c64}, !stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[CELL_TP]] => %[[CELL_OUT]]
@@ -543,7 +567,7 @@ util.func public @rnn_cell_recurrence(%input: !stream.resource<external>, %initi
     scf.yield %next_hidden : !stream.resource<external>
   }
 
-  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT]]#0
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
   // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[RESULT]] : !stream.resource<external>
   util.return %hidden_final : !stream.resource<external>
@@ -554,6 +578,7 @@ util.func public @rnn_cell_recurrence(%input: !stream.resource<external>, %initi
 // Tests that scf.for with read-only resource correctly handles timepoint propagation.
 
 // CHECK-LABEL: @scf_for_readonly_resource
+// CHECK-SAME: %[[READONLY:.+]]: !stream.resource<external>, %[[INITIAL:.+]]: !stream.resource<external>
 util.func public @scf_for_readonly_resource(%readonly: !stream.resource<external>, %initial: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
@@ -563,24 +588,23 @@ util.func public @scf_for_readonly_resource(%readonly: !stream.resource<external
   // Loop: readonly is passed through unchanged, initial is updated each iteration.
   // CHECK: %[[READONLY_TP:.+]] = stream.timepoint.immediate
   // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR_RESULT:.+]]:4 = scf.for %{{.+}} = %c0 to %c3 step %c1
-  // CHECK-SAME: iter_args(%[[RO:.+]] = %arg0, %[[RO_TP:.+]] = %[[READONLY_TP]], %[[ITER:.+]] = %arg1, %[[ITER_TP:.+]] = %[[INIT_TP]])
+  // CHECK: scf.for {{.*}} iter_args(%[[RO:.+]] = %[[READONLY]], %[[RO_TP:.+]] = %[[READONLY_TP]], %[[ITER:.+]] = %[[INITIAL]], %[[ITER_TP:.+]] = %[[INIT_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint, !stream.resource<external>, !stream.timepoint)
   %result:2 = scf.for %i = %c0 to %c3 step %c1 iter_args(%ro = %readonly, %acc = %initial) -> (!stream.resource<external>, !stream.resource<external>) {
     // Use both readonly and accumulator resources.
-    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op with(%[[RO]], %[[ITER]])
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[RO_TP]], %[[ITER_TP]]) => with(%[[RO]], %[[ITER]])
     %next, %next_tp = stream.test.timeline_op with(%ro, %acc) : (!stream.resource<external>{%c64}, !stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
     %next_ready = stream.timepoint.await %next_tp => %next : !stream.resource<external>{%c64}
 
-    // Readonly is passed through unchanged (with carried timepoint), accumulator is updated.
+    // Readonly is passed through unchanged, accumulator is updated.
     // CHECK: scf.yield %[[RO]], %[[RO_TP]], %[[NEXT]], %[[NEXT_TP]] : !stream.resource<external>, !stream.timepoint, !stream.resource<external>, !stream.timepoint
     scf.yield %ro, %next_ready : !stream.resource<external>, !stream.resource<external>
   }
 
   // Return accumulator result (readonly is discarded).
-  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT]]#2
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#2
   // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[FOR_RESULT]]#3 => %[[FOR_RESULT]]#2 : !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[RESULT]] : !stream.resource<external>
   util.return %result#1 : !stream.resource<external>
@@ -591,26 +615,27 @@ util.func public @scf_for_readonly_resource(%readonly: !stream.resource<external
 // Tests that partial chained dependencies don't create unnecessary joins.
 
 // CHECK-LABEL: @partial_chained_dependencies
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>
 util.func public @partial_chained_dependencies(%arg: !stream.resource<external>) -> !stream.resource<external> {
   %c64 = arith.constant 64 : index
 
   // A: initial work.
-  // CHECK: %[[A:.+]], %[[A_TP:.+]] = stream.test.timeline_op with(%arg0)
+  // CHECK: %[[CHAIN_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[A:.+]], %[[A_TP:.+]] = stream.test.timeline_op await(%[[CHAIN_IMM]]) => with(%[[ARG]])
   %a, %a_tp = stream.test.timeline_op with(%arg) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[A_READY:.+]] = stream.timepoint.await %[[A_TP]] => %[[A]]
   %a_ready = stream.timepoint.await %a_tp => %a : !stream.resource<external>{%c64}
 
   // B: depends on A.
-  // CHECK: %[[B:.+]], %[[B_TP:.+]] = stream.test.timeline_op with(%[[A_READY]])
+  // CHECK: %[[B:.+]], %[[B_TP:.+]] = stream.test.timeline_op await(%[[A_TP]]) => with(%[[A]])
   %b, %b_tp = stream.test.timeline_op with(%a_ready) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[B_READY:.+]] = stream.timepoint.await %[[B_TP]] => %[[B]]
   %b_ready = stream.timepoint.await %b_tp => %b : !stream.resource<external>{%c64}
 
   // C: depends on B only, NOT on A.
-  // CHECK: %[[C:.+]], %[[C_TP:.+]] = stream.test.timeline_op with(%[[B_READY]])
-  // CHECK-NOT: with(%[[A_READY]]
+  // CHECK: %[[C:.+]], %[[C_TP:.+]] = stream.test.timeline_op await(%[[B_TP]]) => with(%[[B]])
   %c, %c_tp = stream.test.timeline_op with(%b_ready) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
   // CHECK: %[[C_READY:.+]] = stream.timepoint.await %[[C_TP]] => %[[C]]
@@ -625,6 +650,7 @@ util.func public @partial_chained_dependencies(%arg: !stream.resource<external>)
 // Tests beam search pattern with multiple independent candidates.
 
 // CHECK-LABEL: @beam_search_pattern
+// CHECK-SAME: %[[BEAM0:.+]]: !stream.resource<external>, %[[BEAM1:.+]]: !stream.resource<external>, %{{.+}}: index
 util.func public @beam_search_pattern(%beam0: !stream.resource<external>, %beam1: !stream.resource<external>, %seq_len: index) -> (!stream.resource<external>, !stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -633,16 +659,15 @@ util.func public @beam_search_pattern(%beam0: !stream.resource<external>, %beam1
   // Beam search loop: maintain 2 independent beams.
   // CHECK: %[[BEAM0_TP:.+]] = stream.timepoint.immediate
   // CHECK: %[[BEAM1_TP:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR_RESULT:.+]]:4 = scf.for %{{.+}} = %c0 to %{{.+}} step %c1
-  // CHECK-SAME: iter_args(%[[B0:.+]] = %arg0, %{{.+}} = %[[BEAM0_TP]], %[[B1:.+]] = %arg1, %{{.+}} = %[[BEAM1_TP]])
+  // CHECK: scf.for {{.*}} iter_args(%[[B0:.+]] = %[[BEAM0]], %[[B0_TP:.+]] = %[[BEAM0_TP]], %[[B1:.+]] = %[[BEAM1]], %[[B1_TP:.+]] = %[[BEAM1_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint, !stream.resource<external>, !stream.timepoint)
   %beams:2 = scf.for %t = %c0 to %seq_len step %c1 iter_args(%b0 = %beam0, %b1 = %beam1) -> (!stream.resource<external>, !stream.resource<external>) {
     // Update beam0 independently.
-    // CHECK: %[[NEXT_B0:.+]], %[[NEXT_B0_TP:.+]] = stream.test.timeline_op with(%[[B0]])
+    // CHECK: %[[NEXT_B0:.+]], %[[NEXT_B0_TP:.+]] = stream.test.timeline_op await(%[[B0_TP]]) => with(%[[B0]])
     %next_b0, %tp0 = stream.test.timeline_op with(%b0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // Update beam1 independently (no dependency on beam0).
-    // CHECK: %[[NEXT_B1:.+]], %[[NEXT_B1_TP:.+]] = stream.test.timeline_op with(%[[B1]])
+    // CHECK: %[[NEXT_B1:.+]], %[[NEXT_B1_TP:.+]] = stream.test.timeline_op await(%[[B1_TP]]) => with(%[[B1]])
     %next_b1, %tp1 = stream.test.timeline_op with(%b1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
     // Await both beams.
@@ -657,7 +682,7 @@ util.func public @beam_search_pattern(%beam0: !stream.resource<external>, %beam1
   }
 
   // Return both final beams (processed in reverse order).
-  // CHECK: %[[SIZE1:.+]] = stream.resource.size %[[FOR_RESULT]]#2
+  // CHECK: %[[SIZE1:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#2
   // CHECK: %[[FINAL_B1:.+]] = stream.timepoint.await %[[FOR_RESULT]]#3 => %[[FOR_RESULT]]#2 : !stream.resource<external>{%[[SIZE1]]}
   // CHECK: %[[SIZE0:.+]] = stream.resource.size %[[FOR_RESULT]]#0
   // CHECK: %[[FINAL_B0:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE0]]}
@@ -670,6 +695,7 @@ util.func public @beam_search_pattern(%beam0: !stream.resource<external>, %beam1
 // Tests pipeline parallelism with multiple stages running concurrently.
 
 // CHECK-LABEL: @pipeline_parallelism
+// CHECK-SAME: %[[PIPE_COND:.+]]: i1, %[[DATA:.+]]: !stream.resource<external>
 util.func public @pipeline_parallelism(%cond: i1, %data: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
@@ -678,15 +704,14 @@ util.func public @pipeline_parallelism(%cond: i1, %data: !stream.resource<extern
 
   // Pipeline loop: alternate between two stages based on condition.
   // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR_RESULT:.+]]:2 = scf.for %{{.+}} = %c0 to %c2 step %c1
-  // CHECK-SAME: iter_args(%[[ITER:.+]] = %arg1, %{{.+}} = %[[INIT_TP]])
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[DATA]], %[[ITER_TP:.+]] = %[[INIT_TP]])
   // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
   %result = scf.for %i = %c0 to %c2 step %c1 iter_args(%acc = %data) -> !stream.resource<external> {
     // Pipeline stage selection.
-    // CHECK: %[[STAGE_IF:.+]]:2 = scf.if {{.+}} -> (!stream.resource<external>, !stream.timepoint)
+    // CHECK: %[[STAGE_IF:.+]]:2 = scf.if %[[PIPE_COND]] -> (!stream.resource<external>, !stream.timepoint)
     %stage_result = scf.if %cond -> !stream.resource<external> {
       // Stage 1: preprocessing.
-      // CHECK: %[[STAGE1:.+]], %[[STAGE1_TP:.+]] = stream.test.timeline_op with(%[[ITER]])
+      // CHECK: %[[STAGE1:.+]], %[[STAGE1_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
       %s1, %s1_tp = stream.test.timeline_op with(%acc) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
       // CHECK: stream.timepoint.await %[[STAGE1_TP]] => %[[STAGE1]]
@@ -696,7 +721,7 @@ util.func public @pipeline_parallelism(%cond: i1, %data: !stream.resource<extern
       scf.yield %s1_ready : !stream.resource<external>
     } else {
       // Stage 2: processing.
-      // CHECK: %[[STAGE2:.+]], %[[STAGE2_TP:.+]] = stream.test.timeline_op with(%[[ITER]])
+      // CHECK: %[[STAGE2:.+]], %[[STAGE2_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
       %s2, %s2_tp = stream.test.timeline_op with(%acc) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
 
       // CHECK: stream.timepoint.await %[[STAGE2_TP]] => %[[STAGE2]]
@@ -712,7 +737,7 @@ util.func public @pipeline_parallelism(%cond: i1, %data: !stream.resource<extern
     scf.yield %stage_result : !stream.resource<external>
   }
 
-  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT]]#0
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
   // CHECK: %[[FINAL:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[FINAL]] : !stream.resource<external>
   util.return %result : !stream.resource<external>
@@ -721,11 +746,11 @@ util.func public @pipeline_parallelism(%cond: i1, %data: !stream.resource<extern
 // -----
 
 // Deeply nested control flow stress test exercising:
-// 1. Pass-by-reference: timeline op in while condition must thread timepoint
-// 2. Sibling isolation: scf.if branches must not share timepoint mappings
-// 3. Check-after-add: awaits must be inserted for outer-scope resources
-// 4. Multi-level nesting: scf.for → scf.if → scf.while with correct flow
-// 5. Cross-level resource flow: outer resources used/modified at inner levels
+// - Pass-by-reference: timeline op in while condition must thread timepoint
+// - Sibling isolation: scf.if branches must not share timepoint mappings
+// - Check-after-add: awaits must be inserted for outer-scope resources
+// - Multi-level nesting: scf.for -> scf.if -> scf.while with correct flow
+// - Cross-level resource flow: outer resources used/modified at inner levels
 
 // CHECK-LABEL: @deeply_nested_stress_test
 // CHECK-SAME: %[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>
@@ -742,8 +767,7 @@ util.func public @deeply_nested_stress_test(
   // Outer scf.for: carries two independent resources through iterations.
   // CHECK: %[[ARG0_TP:.+]] = stream.timepoint.immediate
   // CHECK: %[[ARG1_TP:.+]] = stream.timepoint.immediate
-  // CHECK: %[[FOR:.+]]:4 = scf.for %[[I:.+]] = %c0 to %c2 step %c1
-  // CHECK-SAME: iter_args(%[[FOR_RES0:.+]] = %[[ARG0]], %[[FOR_TP0:.+]] = %[[ARG0_TP]], %[[FOR_RES1:.+]] = %[[ARG1]], %[[FOR_TP1:.+]] = %[[ARG1_TP]])
+  // CHECK: %[[FOR:.+]]:4 = scf.for {{.*}} iter_args(%[[FOR_RES0:.+]] = %[[ARG0]], %[[FOR_TP0:.+]] = %[[ARG0_TP]], %[[FOR_RES1:.+]] = %[[ARG1]], %[[FOR_TP1:.+]] = %[[ARG1_TP]])
   %result:2 = scf.for %i = %c0 to %c2 step %c1
       iter_args(%iter0 = %arg0, %iter1 = %arg1) -> (!stream.resource<external>, !stream.resource<external>) {
 
@@ -757,7 +781,7 @@ util.func public @deeply_nested_stress_test(
       // CHECK: %[[WHILE:.+]]:2 = scf.while (%[[W_RES:.+]] = %[[FOR_RES0]], %[[W_TP:.+]] = %[[FOR_TP0]])
       %while_result = scf.while (%w_iter = %iter0) : (!stream.resource<external>) -> !stream.resource<external> {
         // Condition: timeline op operates on iter, result passed to scf.condition.
-        // CHECK: %[[COND_WORK:.+]], %[[COND_WORK_TP:.+]] = stream.test.timeline_op with(%[[W_RES]])
+        // CHECK: %[[COND_WORK:.+]], %[[COND_WORK_TP:.+]] = stream.test.timeline_op await(%[[W_TP]]) => with(%[[W_RES]])
         %cond_res, %cond_tp = stream.test.timeline_op with(%w_iter) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
         // CHECK: stream.timepoint.await %[[COND_WORK_TP]] => %[[COND_WORK]]
         %cond_ready = stream.timepoint.await %cond_tp => %cond_res : !stream.resource<external>{%c64}
@@ -768,14 +792,12 @@ util.func public @deeply_nested_stress_test(
       } do {
       ^bb0(%body_iter: !stream.resource<external>):
         // Body: pass through (tests block arg timepoint threading).
-        // Capture block args and verify they're yielded back unchanged.
         // CHECK: ^bb0(%[[BODY_RES:.+]]: !stream.resource<external>, %[[BODY_TP:.+]]: !stream.timepoint):
         // CHECK:   scf.yield %[[BODY_RES]], %[[BODY_TP]] : !stream.resource<external>, !stream.timepoint
         scf.yield %body_iter : !stream.resource<external>
       }
 
       // Then branch yields while result AND the OTHER resource (iter1) unchanged.
-      // iter1 keeps its timepoint from the for loop - no new immediate needed.
       // CHECK: %[[THEN_SIZE:.+]] = stream.resource.size %[[WHILE]]#0
       // CHECK: stream.timepoint.await %[[WHILE]]#1 => %[[WHILE]]#0 : !stream.resource<external>{%[[THEN_SIZE]]}
       // CHECK: scf.yield %[[WHILE]]#0, %[[WHILE]]#1, %[[FOR_RES1]], %[[FOR_TP1]]
@@ -784,12 +806,12 @@ util.func public @deeply_nested_stress_test(
       // ELSE branch: simple timeline ops on BOTH resources.
       // Tests that else branch doesn't see then branch's while mappings.
 
-      // CHECK: %[[ELSE0:.+]], %[[ELSE0_TP:.+]] = stream.test.timeline_op with(%[[FOR_RES0]])
+      // CHECK: %[[ELSE0:.+]], %[[ELSE0_TP:.+]] = stream.test.timeline_op await(%[[FOR_TP0]]) => with(%[[FOR_RES0]])
       %else0, %else0_tp = stream.test.timeline_op with(%iter0) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
       // CHECK: stream.timepoint.await %[[ELSE0_TP]] => %[[ELSE0]]
       %else0_ready = stream.timepoint.await %else0_tp => %else0 : !stream.resource<external>{%c64}
 
-      // CHECK: %[[ELSE1:.+]], %[[ELSE1_TP:.+]] = stream.test.timeline_op with(%[[FOR_RES1]])
+      // CHECK: %[[ELSE1:.+]], %[[ELSE1_TP:.+]] = stream.test.timeline_op await(%[[FOR_TP1]]) => with(%[[FOR_RES1]])
       %else1, %else1_tp = stream.test.timeline_op with(%iter1) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
       // CHECK: stream.timepoint.await %[[ELSE1_TP]] => %[[ELSE1]]
       %else1_ready = stream.timepoint.await %else1_tp => %else1 : !stream.resource<external>{%c64}
@@ -798,7 +820,7 @@ util.func public @deeply_nested_stress_test(
       scf.yield %else0_ready, %else1_ready : !stream.resource<external>, !stream.resource<external>
     }
 
-    // Awaits after scf.if (these sink down from original code).
+    // Awaits after scf.if.
     // CHECK: %[[IF_SIZE1:.+]] = stream.resource.size %[[IF]]#2
     // CHECK: stream.timepoint.await %[[IF]]#3 => %[[IF]]#2 : !stream.resource<external>{%[[IF_SIZE1]]}
     // CHECK: %[[IF_SIZE0:.+]] = stream.resource.size %[[IF]]#0
@@ -815,4 +837,183 @@ util.func public @deeply_nested_stress_test(
   // CHECK: %[[FINAL0:.+]] = stream.timepoint.await %[[FOR]]#1 => %[[FOR]]#0 : !stream.resource<external>{%[[FINAL_SIZE0]]}
   // CHECK: util.return %[[FINAL0]], %[[FINAL1]]
   util.return %result#0, %result#1 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
+// Tests that parameter loads in scf.for correctly thread timepoints through
+// loop iterations. This is the transformer layer loop pattern: each iteration
+// loads weights by a dynamic key and uses them in a dispatch.
+
+// CHECK-LABEL: @parameter_load_in_scf_for
+// CHECK-SAME: %{{.+}}: !util.buffer, %[[ACTIVATION:.+]]: !stream.resource<external>, %{{.+}}: index
+util.func public @parameter_load_in_scf_for(
+    %scope: !util.buffer,
+    %activation: !stream.resource<external>,
+    %num_layers: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c1024 = arith.constant 1024 : index
+  %c64 = arith.constant 64 : index
+
+  // Each iteration: load weights by dynamic key, dispatch matmul.
+  // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[ACTIVATION]], %[[ITER_TP:.+]] = %[[INIT_TP]])
+  // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
+  %result = scf.for %i = %c0 to %num_layers step %c1
+      iter_args(%act = %activation) -> !stream.resource<external> {
+    // Compute a key for this layer (in real code this would be dynamic).
+    %key = util.buffer.constant : !util.buffer = "layer_weights"
+
+    // Load weights from parameter archive.
+    // CHECK: %[[WEIGHTS:.+]], %[[LOAD_TP:.+]] = stream.async.parameter.load
+    // CHECK-SAME: !stream.resource<constant>
+    // CHECK-SAME: => !stream.timepoint
+    %weights, %load_tp = stream.async.parameter.load %scope::%key[%c0_i64]
+        : !stream.resource<constant>{%c1024} => !stream.timepoint
+
+    // Await the load.
+    // CHECK: stream.timepoint.await %[[LOAD_TP]] => %[[WEIGHTS]]
+    %weights_ready = stream.timepoint.await %load_tp => %weights
+        : !stream.resource<constant>{%c1024}
+
+    // Simulate a dispatch using the loaded weights + activation.
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]], %[[LOAD_TP]]) => with(%[[ITER]], %[[WEIGHTS]])
+    %next, %next_tp = stream.test.timeline_op with(%act, %weights_ready)
+        : (!stream.resource<external>{%c64}, !stream.resource<constant>{%c1024})
+        -> !stream.resource<external>{%c64} => !stream.timepoint
+
+    // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
+    %next_ready = stream.timepoint.await %next_tp => %next
+        : !stream.resource<external>{%c64}
+
+    // CHECK: scf.yield %[[NEXT]], %[[NEXT_TP]]
+    scf.yield %next_ready : !stream.resource<external>
+  }
+
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
+  // CHECK: %[[FINAL:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
+  // CHECK: util.return %[[FINAL]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// Tests that parameter writes in scf.for correctly thread timepoints.
+// This is the training checkpoint pattern: each iteration writes an activation
+// to a parameter archive.
+
+// CHECK-LABEL: @parameter_write_in_scf_for
+// CHECK-SAME: %{{.+}}: !util.buffer, %[[ACTIVATION:.+]]: !stream.resource<external>, %{{.+}}: index
+util.func public @parameter_write_in_scf_for(
+    %scope: !util.buffer,
+    %activation: !stream.resource<external>,
+    %num_layers: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c64 = arith.constant 64 : index
+
+  // Each iteration: compute something, then write to checkpoint.
+  // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[ACTIVATION]], %[[ITER_TP:.+]] = %[[INIT_TP]])
+  // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
+  %result = scf.for %i = %c0 to %num_layers step %c1
+      iter_args(%act = %activation) -> !stream.resource<external> {
+    // Compute next activation.
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
+    %next, %next_tp = stream.test.timeline_op with(%act)
+        : (!stream.resource<external>{%c64})
+        -> !stream.resource<external>{%c64} => !stream.timepoint
+
+    // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
+    %next_ready = stream.timepoint.await %next_tp => %next
+        : !stream.resource<external>{%c64}
+
+    // Checkpoint: write activation to parameter archive.
+    %key = util.buffer.constant : !util.buffer = "checkpoint"
+    // CHECK: %[[WRITTEN:.+]], %[[WRITE_TP:.+]] = stream.async.parameter.write
+    // CHECK-SAME: => !stream.timepoint
+    %written, %write_tp = stream.async.parameter.write
+        %next_ready[%c0 to %c64 for %c64] -> %scope::%key[%c0_i64]
+        : !stream.resource<external>{%c64} => !stream.timepoint
+
+    // Await the write.
+    // CHECK: stream.timepoint.await %[[WRITE_TP]] => %[[WRITTEN]]
+    %write_ready = stream.timepoint.await %write_tp => %written
+        : !stream.resource<external>{%c64}
+
+    // CHECK: scf.yield %[[WRITTEN]], %[[WRITE_TP]]
+    scf.yield %write_ready : !stream.resource<external>
+  }
+
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
+  // CHECK: %[[FINAL:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
+  // CHECK: util.return %[[FINAL]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// Tests write-then-load round-trip in scf.for: each iteration writes the
+// current activation to a checkpoint, then loads a different parameter.
+// This verifies that the write's tied result correctly sequences with the
+// subsequent load within the same iteration.
+
+// CHECK-LABEL: @parameter_write_then_load_in_scf_for
+// CHECK-SAME: %{{.+}}: !util.buffer, %{{.+}}: !util.buffer, %{{.+}}: !util.buffer, %[[ACTIVATION:.+]]: !stream.resource<external>, %{{.+}}: index
+util.func public @parameter_write_then_load_in_scf_for(
+    %scope: !util.buffer,
+    %checkpoint_key: !util.buffer,
+    %weights_key: !util.buffer,
+    %activation: !stream.resource<external>,
+    %num_layers: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c1024 = arith.constant 1024 : index
+  %c64 = arith.constant 64 : index
+
+  // CHECK: %[[INIT_TP:.+]] = stream.timepoint.immediate
+  // CHECK: scf.for {{.*}} iter_args(%[[ITER:.+]] = %[[ACTIVATION]], %[[ITER_TP:.+]] = %[[INIT_TP]])
+  %result = scf.for %i = %c0 to %num_layers step %c1
+      iter_args(%act = %activation) -> !stream.resource<external> {
+
+    // Write current activation to checkpoint.
+    // CHECK: %[[WRITTEN:.+]], %[[WRITE_TP:.+]] = stream.async.parameter.write
+    %written, %write_tp = stream.async.parameter.write
+        %act[%c0 to %c64 for %c64] -> %scope::%checkpoint_key[%c0_i64]
+        : !stream.resource<external>{%c64} => !stream.timepoint
+
+    // CHECK: stream.timepoint.await %[[WRITE_TP]] => %[[WRITTEN]]
+    %write_ready = stream.timepoint.await %write_tp => %written
+        : !stream.resource<external>{%c64}
+
+    // Load weights for this layer.
+    // CHECK: %[[WEIGHTS:.+]], %[[LOAD_TP:.+]] = stream.async.parameter.load
+    %weights, %load_tp = stream.async.parameter.load %scope::%weights_key[%c0_i64]
+        : !stream.resource<constant>{%c1024} => !stream.timepoint
+
+    // CHECK: stream.timepoint.await %[[LOAD_TP]] => %[[WEIGHTS]]
+    %weights_ready = stream.timepoint.await %load_tp => %weights
+        : !stream.resource<constant>{%c1024}
+
+    // Dispatch: matmul(activation, weights).
+    // CHECK: %[[NEXT:.+]], %[[NEXT_TP:.+]] = stream.test.timeline_op await(%[[WRITE_TP]], %[[LOAD_TP]]) => with(%[[WRITTEN]], %[[WEIGHTS]])
+    %next, %next_tp = stream.test.timeline_op with(%write_ready, %weights_ready)
+        : (!stream.resource<external>{%c64}, !stream.resource<constant>{%c1024})
+        -> !stream.resource<external>{%c64} => !stream.timepoint
+
+    // CHECK: stream.timepoint.await %[[NEXT_TP]] => %[[NEXT]]
+    %next_ready = stream.timepoint.await %next_tp => %next
+        : !stream.resource<external>{%c64}
+
+    scf.yield %next_ready : !stream.resource<external>
+  }
+
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[FOR_RESULT:.+]]#0
+  // CHECK: %[[FINAL:.+]] = stream.timepoint.await %[[FOR_RESULT]]#1 => %[[FOR_RESULT]]#0 : !stream.resource<external>{%[[SIZE]]}
+  // CHECK: util.return %[[FINAL]]
+  util.return %result : !stream.resource<external>
 }

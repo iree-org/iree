@@ -24,21 +24,110 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static Value getStringRodata(Location loc, StringAttr attr,
-                             OpBuilder &builder) {
-  if (!attr) {
+// Returns the scope buffer for a parameter operation. If the scope operand is
+// null (no scope), returns a zero ref. Otherwise the value is already a
+// !vm.ref<!vm.buffer> from the type converter and is passed through.
+static Value getScopeBuffer(Location loc, Value scopeBuffer,
+                            OpBuilder &builder) {
+  if (!scopeBuffer) {
     return IREE::VM::ConstRefZeroOp::create(
         builder, loc,
         IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()));
   }
-  return IREE::VM::RodataInlineOp::create(builder, loc, attr);
+  return scopeBuffer;
 }
 
-static std::pair<Value, Value> buildKeyTable(Location loc, ArrayAttr keysAttr,
+// Builds a key_table + key_data pair from the given key buffer operands.
+// When all keys originate from vm.rodata.inline ops (the common case for
+// compile-time constant parameter names), we use the efficient
+// vm.rodata.table.inline op to pack them at compile time. For dynamic keys
+// (e.g., from util.string.format), we construct the table at runtime using
+// VM buffer ops.
+//
+// The runtime ABI expects:
+//   key_table: buffer of {uint32_t offset, uint32_t length} entries
+//   key_data:  buffer of concatenated key strings
+static std::pair<Value, Value> buildKeyTable(Location loc, ValueRange keys,
                                              OpBuilder &builder) {
-  auto tableOp = IREE::VM::RodataTableInlineOp::create(
-      builder, loc, builder.getIntegerType(32), keysAttr);
-  return {tableOp.getTableResult(), tableOp.getDataResult()};
+  // Try the fast path: all keys are compile-time constants.
+  SmallVector<Attribute> keyStringAttrs;
+  bool allConstant = true;
+  for (Value key : keys) {
+    auto rodataOp = key.getDefiningOp<IREE::VM::RodataInlineOp>();
+    if (!rodataOp) {
+      allConstant = false;
+      break;
+    }
+    keyStringAttrs.push_back(rodataOp.getValue());
+  }
+  if (allConstant) {
+    auto tableOp = IREE::VM::RodataTableInlineOp::create(
+        builder, loc, builder.getIntegerType(32),
+        builder.getArrayAttr(keyStringAttrs));
+    return {tableOp.getTableResult(), tableOp.getDataResult()};
+  }
+
+  // Dynamic path: construct key_table and key_data at runtime.
+  // Each table entry is {uint32_t offset, uint32_t length} = 8 bytes.
+  auto i32Type = builder.getIntegerType(32);
+  auto i64Type = builder.getIntegerType(64);
+  auto bufferRefType =
+      IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>());
+  int64_t entrySize = 8; // sizeof(iree_io_parameters_string_entry_t)
+  int64_t tableSize = keys.size() * entrySize;
+  auto alignment = IREE::VM::ConstI32Op::create(builder, loc, sizeof(uint32_t));
+
+  // Get each key's length.
+  SmallVector<Value> keyLengths;
+  for (Value key : keys) {
+    keyLengths.push_back(
+        IREE::VM::BufferLengthOp::create(builder, loc, i64Type, key));
+  }
+
+  // Compute total data size and allocate the concatenated key_data buffer.
+  Value totalDataSize = keyLengths[0];
+  for (size_t i = 1; i < keyLengths.size(); ++i) {
+    totalDataSize = IREE::VM::AddI64Op::create(builder, loc, i64Type,
+                                               totalDataSize, keyLengths[i]);
+  }
+  Value keyData = IREE::VM::BufferAllocOp::create(builder, loc, bufferRefType,
+                                                  totalDataSize, alignment);
+
+  // Allocate the key_table buffer.
+  Value tableSizeValue = IREE::VM::ConstI64Op::create(builder, loc, tableSize);
+  Value keyTable = IREE::VM::BufferAllocOp::create(builder, loc, bufferRefType,
+                                                   tableSizeValue, alignment);
+
+  // Copy each key into key_data and write the table entry.
+  Value currentOffset = IREE::VM::ConstI64Op::create(builder, loc, 0);
+  auto zero = IREE::VM::ConstI64Op::create(builder, loc, 0);
+  for (size_t i = 0; i < keys.size(); ++i) {
+    // Copy key bytes into key_data at currentOffset.
+    IREE::VM::BufferCopyOp::create(builder, loc, keys[i], zero, keyData,
+                                   currentOffset, keyLengths[i]);
+
+    // Write table entry: {offset, length} as two i32 values.
+    // BufferStoreI32Op takes element indices (not byte offsets); each entry
+    // has two uint32_t fields so entry i starts at element index i * 2.
+    Value entryOffsetElement =
+        IREE::VM::ConstI64Op::create(builder, loc, i * 2);
+    Value entryLengthElement =
+        IREE::VM::ConstI64Op::create(builder, loc, i * 2 + 1);
+    Value offsetI32 =
+        IREE::VM::TruncI64I32Op::create(builder, loc, i32Type, currentOffset);
+    Value lengthI32 =
+        IREE::VM::TruncI64I32Op::create(builder, loc, i32Type, keyLengths[i]);
+    IREE::VM::BufferStoreI32Op::create(builder, loc, keyTable,
+                                       entryOffsetElement, offsetI32);
+    IREE::VM::BufferStoreI32Op::create(builder, loc, keyTable,
+                                       entryLengthElement, lengthI32);
+
+    // Advance offset for next key.
+    currentOffset = IREE::VM::AddI64Op::create(builder, loc, i64Type,
+                                               currentOffset, keyLengths[i]);
+  }
+
+  return {keyTable, keyData};
 }
 
 static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
@@ -105,7 +194,7 @@ struct LoadOpConversion
   matchAndRewrite(IREE::IO::Parameters::LoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto [keyTable, keyData] =
-        buildKeyTable(loadOp.getLoc(), adaptor.getSourceKeysAttr(), rewriter);
+        buildKeyTable(loadOp.getLoc(), adaptor.getSourceKeys(), rewriter);
     SmallVector<Value> targetOffsets(
         adaptor.getSourceOffsets().size(),
         IREE::VM::ConstI64Op::create(rewriter, loadOp.getLoc(), 0));
@@ -125,8 +214,7 @@ struct LoadOpConversion
             adaptor.getQueueAffinity(),
             adaptor.getWaitFence(),
             adaptor.getSignalFence(),
-            getStringRodata(loadOp.getLoc(), adaptor.getSourceScopeAttr(),
-                            rewriter),
+            getScopeBuffer(loadOp.getLoc(), adaptor.getSourceScope(), rewriter),
             adaptor.getQueueAffinity(),
             castToImportType(adaptor.getMemoryTypes(), rewriter.getI32Type(),
                              rewriter),
@@ -164,7 +252,7 @@ struct GatherOpConversion
   matchAndRewrite(IREE::IO::Parameters::GatherOp gatherOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto [keyTable, keyData] =
-        buildKeyTable(gatherOp.getLoc(), adaptor.getSourceKeysAttr(), rewriter);
+        buildKeyTable(gatherOp.getLoc(), adaptor.getSourceKeys(), rewriter);
     auto spans = buildIndirectSpans(
         gatherOp.getLoc(), adaptor.getSourceOffsets(),
         adaptor.getTargetOffsets(), adaptor.getTargetLengths(), rewriter);
@@ -175,8 +263,8 @@ struct GatherOpConversion
             adaptor.getQueueAffinity(),
             adaptor.getWaitFence(),
             adaptor.getSignalFence(),
-            getStringRodata(gatherOp.getLoc(), adaptor.getSourceScopeAttr(),
-                            rewriter),
+            getScopeBuffer(gatherOp.getLoc(), adaptor.getSourceScope(),
+                           rewriter),
             adaptor.getTargetBuffer(),
             keyTable,
             keyData,
@@ -201,8 +289,8 @@ struct ScatterOpConversion
   LogicalResult
   matchAndRewrite(IREE::IO::Parameters::ScatterOp scatterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto [keyTable, keyData] = buildKeyTable(
-        scatterOp.getLoc(), adaptor.getTargetKeysAttr(), rewriter);
+    auto [keyTable, keyData] =
+        buildKeyTable(scatterOp.getLoc(), adaptor.getTargetKeys(), rewriter);
     auto spans = buildIndirectSpans(
         scatterOp.getLoc(), adaptor.getTargetOffsets(),
         adaptor.getSourceOffsets(), adaptor.getSourceLengths(), rewriter);
@@ -214,8 +302,8 @@ struct ScatterOpConversion
             adaptor.getWaitFence(),
             adaptor.getSignalFence(),
             adaptor.getSourceBuffer(),
-            getStringRodata(scatterOp.getLoc(), adaptor.getTargetScopeAttr(),
-                            rewriter),
+            getScopeBuffer(scatterOp.getLoc(), adaptor.getTargetScope(),
+                           rewriter),
             keyTable,
             keyData,
             spans,

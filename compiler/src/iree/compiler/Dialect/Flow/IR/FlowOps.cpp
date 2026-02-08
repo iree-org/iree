@@ -205,6 +205,41 @@ static void printShapedOperandList(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+// Parses/prints a parameter reference using SSA value operands:
+//   %scope::%key   (with scope)
+//   %key           (without scope)
+
+static ParseResult
+parseParameterReference(OpAsmParser &parser,
+                        std::optional<OpAsmParser::UnresolvedOperand> &scope,
+                        OpAsmParser::UnresolvedOperand &key) {
+  OpAsmParser::UnresolvedOperand firstOperand;
+  if (failed(parser.parseOperand(firstOperand))) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalColon())) {
+    scope = firstOperand;
+    if (failed(parser.parseColon()) || failed(parser.parseOperand(key))) {
+      return failure();
+    }
+  } else {
+    key = firstOperand;
+  }
+  return success();
+}
+
+static void printParameterReference(OpAsmPrinter &p, Operation *op, Value scope,
+                                    Value key) {
+  if (scope) {
+    p.printOperand(scope);
+    p << "::";
+  }
+  p.printOperand(key);
+}
+
+//===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
 
@@ -1784,6 +1819,23 @@ ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
 
 ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
   return ValueRange{};
+}
+
+//===----------------------------------------------------------------------===//
+// flow.parameter.write
+//===----------------------------------------------------------------------===//
+
+Value ParameterWriteOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+ParameterWriteOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // result tied to source
+}
+
+SmallVector<int64_t> ParameterWriteOp::getTiedResultOperandIndices() {
+  return {0}; // result tied to source
 }
 
 //===----------------------------------------------------------------------===//

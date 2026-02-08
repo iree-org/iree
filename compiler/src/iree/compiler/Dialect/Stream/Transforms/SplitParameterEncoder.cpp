@@ -1778,9 +1778,15 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
       if (auto constantOp = dyn_cast<IREE::Stream::AsyncConstantOp>(clonedOp)) {
         if (auto parameterAttr =
                 dyn_cast<NamedParameterAttr>(constantOp.getValue())) {
-          // Extract parameter scope and key from the attribute.
-          StringAttr scopeAttr = parameterAttr.getScope();
-          StringAttr keyAttr = parameterAttr.getKey();
+          // Materialize parameter scope and key as util.buffer.constant.
+          Value scopeValue;
+          if (auto scopeAttr = parameterAttr.getScope()) {
+            scopeValue = IREE::Util::BufferConstantOp::create(
+                funcBuilder, constantOp.getLoc(), scopeAttr.getValue());
+          }
+          Value keyValue = IREE::Util::BufferConstantOp::create(
+              funcBuilder, constantOp.getLoc(),
+              parameterAttr.getKey().getValue());
           // Create zero offset for full parameter load.
           Value zeroOffset = i64Set.get(0);
           Value resultSize = constantOp.getResultSize();
@@ -1789,8 +1795,8 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
               funcBuilder, constantOp.getLoc(),
               constantOp.getResult().getType(),
               funcBuilder.getType<IREE::Stream::TimepointType>(),
-              /*await_timepoint=*/lastTimepoint, scopeAttr, keyAttr, zeroOffset,
-              resultSize, targetPlan.affinityAttr);
+              /*await_timepoint=*/lastTimepoint, scopeValue, keyValue,
+              zeroOffset, resultSize, targetPlan.affinityAttr);
           // Await the result timepoint to get a resolved resource that can be
           // used by streamable ops without explicit synchronization.
           auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
@@ -1846,7 +1852,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
       SmallVector<Value> sourceOffsets;
       SmallVector<Value> sourceEnds;
       SmallVector<Value> sourceLengths;
-      SmallVector<Attribute> targetKeys;
+      SmallVector<Value> targetKeyValues;
       SmallVector<Value> targetOffsets;
       for (auto &reservation : outputReservations) {
         outputLocs.push_back(reservation.output->getLoc());
@@ -1855,7 +1861,9 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
         Value packedSize = indexSet.get(reservation.parameterSubrange->length);
         sourceOffsets.push_back(packedOffset);
         sourceLengths.push_back(packedSize);
-        targetKeys.push_back(reservation.parameterAttr.getKey());
+        targetKeyValues.push_back(IREE::Util::BufferConstantOp::create(
+            funcBuilder, reservation.output->getLoc(),
+            reservation.parameterAttr.getKey().getValue()));
         targetOffsets.push_back(
             i64Set.get(reservation.parameterSubrange->offset));
       }
@@ -1866,11 +1874,17 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
             funcBuilder.getFusedLoc(outputLocs), offset, length);
         sourceEnds.push_back(end);
       }
+      // Materialize scope as util.buffer.constant (null Value for no scope).
+      Value scopeValue;
+      if (scope) {
+        scopeValue = IREE::Util::BufferConstantOp::create(
+            funcBuilder, funcBuilder.getFusedLoc(outputLocs), scope.getValue());
+      }
       auto scatterOp = IREE::Stream::AsyncParameterScatterOp::create(
           funcBuilder, funcBuilder.getFusedLoc(outputLocs), outputSlab,
-          outputSlabSize, sourceOffsets, sourceEnds, sourceLengths, scope,
-          funcBuilder.getArrayAttr(targetKeys), targetOffsets,
-          outputBarrierOp.getResultTimepoint(), targetPlan.affinityAttr);
+          outputSlabSize, sourceOffsets, sourceEnds, sourceLengths, scopeValue,
+          targetKeyValues, targetOffsets, outputBarrierOp.getResultTimepoint(),
+          targetPlan.affinityAttr);
       // AsyncParameterScatterOp returns (resource, timepoint) tuple.
       outputSlab = scatterOp.getResult();
       scatterTimepoints.push_back(scatterOp.getResultTimepoint());

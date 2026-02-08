@@ -646,6 +646,52 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   }
 }
 
+// Consumes timepoints from resource operands of a generic timeline op and folds
+// them into the op's await_timepoint. This handles timeline ops like
+// stream.async.parameter.write that take resource operands preceded by
+// stream.timepoint.await ops: the await's timepoint is extracted and set on
+// the timeline op, and the unawaited resource replaces the awaited one as the
+// operand.
+static void expandTimelineOp(IREE::Stream::TimelineOpInterface timelineOp,
+                             IRMapping &resourceTimepointMap) {
+  Operation *op = timelineOp.getOperation();
+  OpBuilder builder(op);
+  SetVector<Value> newTimepoints;
+
+  // Preserve existing await timepoints.
+  for (Value awaitTimepoint : timelineOp.getAwaitTimepoints()) {
+    newTimepoints.insert(awaitTimepoint);
+  }
+
+  // Consume timepoints from resource operands.
+  for (auto &operand : op->getOpOperands()) {
+    if (!isResourceType(operand.get().getType())) {
+      continue;
+    }
+    auto [timepoint, resource] = consumeTimepoint(
+        op->getLoc(), operand.get(), resourceTimepointMap, builder);
+    newTimepoints.insert(timepoint);
+    if (resource != operand.get()) {
+      operand.set(resource);
+    }
+  }
+
+  // Set the combined await timepoints.
+  if (newTimepoints.empty()) {
+    timelineOp.setAwaitTimepoint(nullptr);
+  } else {
+    timelineOp.setAwaitTimepoints(newTimepoints.takeVector(), builder);
+  }
+
+  // Map result resources to this op's result timepoint so downstream consumers
+  // can chain without host synchronization.
+  for (auto result : op->getResults()) {
+    if (isResourceType(result.getType())) {
+      resourceTimepointMap.map(result, timelineOp.getResultTimepoint());
+    }
+  }
+}
+
 // Expands a RegionBranchOpInterface op (scf.if, scf.for, etc) to yield expanded
 // values.
 static void
@@ -755,6 +801,9 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
     expandAwaitOp(awaitOp, resourceTimepointMap);
   } else if (auto executeOp = dyn_cast<IREE::Stream::AsyncExecuteOp>(op)) {
     expandAsyncExecuteOp(executeOp, resourceTimepointMap);
+  } else if (auto timelineOp =
+                 dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
+    expandTimelineOp(timelineOp, resourceTimepointMap);
   } else if (auto regionBranchOp =
                  dyn_cast<IREE::Util::MutableRegionBranchOpInterface>(op)) {
     expandRegionBranchOp(regionBranchOp, symbolTable, globalMap,

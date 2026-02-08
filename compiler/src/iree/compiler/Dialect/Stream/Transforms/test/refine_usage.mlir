@@ -704,7 +704,7 @@ util.func private @clone_external_resource_transients_inherits_source(%external:
 // write to a parameter archive but does not modify the resource data.
 
 // CHECK-LABEL: @clone_external_parameter_write_inherits_source
-util.func private @clone_external_parameter_write_inherits_source(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+util.func private @clone_external_parameter_write_inherits_source(%external: !stream.resource<external>, %size: index, %scope: !util.buffer, %key: !util.buffer) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c0_i64 = arith.constant 0 : i64
@@ -713,8 +713,26 @@ util.func private @clone_external_parameter_write_inherits_source(%external: !st
       %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
   // CHECK: stream.async.parameter.write {{.*}} !stream.resource<external>
   %result, %result_tp = stream.async.parameter.write
-      %clone[%c0 to %c128 for %c128] -> "scope"::"key"[%c0_i64]
+      %clone[%c0 to %c128 for %c128] -> %scope::%key[%c0_i64]
       : !stream.resource<*>{%size} => !stream.timepoint
   %awaited = stream.timepoint.await %result_tp => %result : !stream.resource<*>{%size}
   util.return %awaited : !stream.resource<*>
+}
+
+// -----
+
+// Tests that async.parameter.load with unknown lifetime is refined to constant.
+// Parameter loads produce freshly allocated constant resources.
+
+// CHECK-LABEL: @parameter_load_refines_to_constant
+util.func private @parameter_load_refines_to_constant(%scope: !util.buffer, %key: !util.buffer) -> !stream.resource<*> {
+  %c0_i64 = arith.constant 0 : i64
+  %c1024 = arith.constant 1024 : index
+  // CHECK: stream.async.parameter.load {{.*}} : !stream.resource<constant>{%c1024}
+  %loaded, %load_tp = stream.async.parameter.load %scope::%key[%c0_i64]
+      : !stream.resource<*>{%c1024} => !stream.timepoint
+  // CHECK: stream.timepoint.await {{.*}} !stream.resource<constant>
+  %ready = stream.timepoint.await %load_tp => %loaded : !stream.resource<*>{%c1024}
+  // CHECK: util.return {{.*}} : !stream.resource<constant>
+  util.return %ready : !stream.resource<*>
 }
