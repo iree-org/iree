@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -756,19 +757,21 @@ static bool hasSharedMemory(Value val) {
 // Helper to check if operation or its nested ops have shared memory reads.
 static bool hasNestedSharedRead(Operation *op) {
   bool found = false;
-  op->walk([&](Operation *readOp) {
-    if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(readOp)) {
-      if (hasSharedMemory(transferReadOp.getBase())) {
-        found = true;
-        return WalkResult::interrupt();
+  op->walk([&](MemoryEffectOpInterface memoryEffectOp) {
+    SmallVector<MemoryEffects::EffectInstance> effects;
+    memoryEffectOp.getEffects(effects);
+    for (MemoryEffects::EffectInstance effect : effects) {
+      // Ignore non-read effects. We are just looking for read operations.
+      if (!isa<MemoryEffects::Read>(effect.getEffect())) {
+        continue;
       }
-      return WalkResult::advance();
-    }
-    auto transposeLoadOp = dyn_cast<amdgpu::TransposeLoadOp>(readOp);
-    if (!transposeLoadOp) {
-      return WalkResult::advance();
-    }
-    if (hasSharedMemory(transposeLoadOp.getSrc())) {
+      // We also only care about shared memory reads.
+      Value readBuffer = effect.getValue();
+      // effect.getValue() could return nullptr, so we also need to check that
+      // readBuffer exists.
+      if (!readBuffer || !hasSharedMemory(readBuffer)) {
+        continue;
+      }
       found = true;
       return WalkResult::interrupt();
     }
