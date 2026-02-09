@@ -114,6 +114,21 @@ public:
     const Deprecated *dep = filterDeprecated(Ms...);
     auto [changedCallback, clCallback] = makeChangedCallback<V>(name, dep);
     OptionInfo &info = getOptionsStorage()[name];
+
+    // Skip if this option is already registered in this binder's storage.
+    // This allows multiple option structs to share common options via
+    // inheritance without causing duplicate registration errors.
+    if (info.option) {
+      // If different addresses are passed, it indicates misuse - the option
+      // value would only be written to the first registered address, leaving
+      // others stale.
+      assert(info.valueAddress == &value &&
+             "Option registered multiple times with different storage "
+             "addresses. Use static storage for shared options.");
+      return;
+    }
+    info.valueAddress = &value;
+
     if (!scope) {
       // Bind global options.
       auto opt = std::make_unique<llvm::cl::opt<T, /*ExternalStorage=*/true>>(
@@ -349,6 +364,11 @@ private:
     PrintCallback print = nullptr;
     ChangedCallback isChanged = nullptr;
     DefaultCallback isDefault = nullptr;
+
+    // Address of the value storage for this option. Used to detect misuse
+    // where the same option name is registered with different storage
+    // locations (which would cause one to be silently ignored).
+    const void *valueAddress = nullptr;
 
     // For options with optimization level defaults.
     std::unique_ptr<OptOverrideBase> optOverrides = nullptr;
