@@ -170,13 +170,24 @@ struct AttentionOpConversion
     }
 
     // Attention only works for FloatType.
-    FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
-
+    Type elementType = op.getQueryType().getElementType();
+    bool lowPrecision = elementType.getIntOrFloatBitWidth() <= 8;
+    FloatType targetType = cast<FloatType>(elementType);
+    
     double dk = static_cast<double>(headDim);
-    dk = 1.0 / std::sqrt(dk);
+    mlir::linalg::Linalg_Op opTy;
+    if(lowPrecision) {
+      dk = std::sqrt(dk) / M_LOG2E;
+      opTy = mlir::linalg::Linalg_Op::DivOp;
+    } else {
+      dk = (1.0 / std::sqrt(dk)) * M_LOG2E;
+      opTy = mlir::linalg::Linalg_Op::MulOp;
+    }
     Value scale = arith::ConstantOp::create(
         rewriter, loc, targetType, rewriter.getFloatAttr(targetType, dk));
-
+    Value scaleTensor =
+        rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
+    Value scaledQuery = opTy::create(rewriter, loc, query, scaleTensor).getResult();
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
         getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
@@ -193,7 +204,7 @@ struct AttentionOpConversion
     }
 
     auto attention = IREE::LinalgExt::AttentionOp::create(
-        rewriter, loc, result.getType(), query, key, value, scale, result,
+        rewriter, loc, result.getType(), scaledQuery, key, value, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {

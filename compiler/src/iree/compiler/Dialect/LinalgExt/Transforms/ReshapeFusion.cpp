@@ -1063,13 +1063,13 @@ static Operation *createCollapsedOp(AttentionOp origOp,
       origOp.getLoopIteratorTypes(), collapsingInfo));
 
   Value maskOperand;
-  if (inputOperands.size() > 4) {
+  if (inputOperands.size() > 3) {
     maskOperand = inputOperands[4];
   }
 
   auto collapsedOp = AttentionOp::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands[0],
-      inputOperands[1], inputOperands[2], inputOperands[3], outputOperands[0],
+      inputOperands[1], inputOperands[2], outputOperands[0],
       rewriter.getAffineMapArrayAttr(indexingMaps), maskOperand);
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
