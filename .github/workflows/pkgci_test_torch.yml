@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: a4bf747011551229c5e2b08c7eab7947472949f9
+          ref: bc632229bada42381ab25674f736e17cb592d8ba
           path: iree-test-suites
           lfs: false
 
