@@ -39,6 +39,12 @@ bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 /// Returns if scalable vectorization is enabled or not.
 bool isScalableVectorizationEnabled();
 
+/// Returns the runtime value of vscale specified by the user. This is not meant
+/// to be used for codegen and is meant to circumvent the current limitation on
+/// host-side querying of this value at runtime. This is temporary until #21317
+/// is resolved.
+unsigned getUserVscaleValue();
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_
