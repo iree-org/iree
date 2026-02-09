@@ -103,6 +103,12 @@ func.func @block_attention_dims() {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @block_attention_dims_load_from_buffer() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 8.837890e-02 : f16
