@@ -633,6 +633,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     arith::populateExpandBFloat16Patterns(patterns);
+    arith::populateExpandF4E2M1Patterns(patterns);
+    arith::populateExpandF8E8M0Patterns(patterns);
     arith::BitcastOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(moduleOp, std::move(patterns)))) {
       moduleOp.emitOpError() << "failed running bf16 extf/trunc patterns";
