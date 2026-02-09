@@ -36,8 +36,8 @@ using IREE::LinalgExt::MapScatterOp;
 // Preprocessing Utilities
 //===----------------------------------------------------------------------===//
 
-void simplifyComplexRelayoutOps(RewriterBase &rewriter,
-                                FunctionOpInterface funcOp) {
+static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
+                                       FunctionOpInterface funcOp) {
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<linalg::PackOp> packOps(
       funcOp.getFunctionBody().getOps<linalg::PackOp>());
@@ -77,36 +77,6 @@ void simplifyComplexRelayoutOps(RewriterBase &rewriter,
 // Combining Layout Transformation Ops
 //===----------------------------------------------------------------------===//
 
-/// Builds an index transformation that applies a permutation to the indices.
-/// Used by both map_scatter and map_gather transpose folding.
-static auto buildTransposeIndexTransform(ArrayRef<int64_t> perm) {
-  return [perm = SmallVector<int64_t>(perm)](
-             ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
-    SmallVector<Value> indexValues(indices.begin(), indices.end());
-    return applyPermutation(indexValues, perm);
-  };
-}
-
-/// Builds an index transformation that linearizes indices with `linearizeDims`
-/// and delinearizes with `delinearizeDims`. Used by both map_scatter and
-/// map_gather reshape folding.
-static auto buildReshapeIndexTransform(RewriterBase &rewriter, Location loc,
-                                       ArrayRef<OpFoldResult> linearizeDims,
-                                       ArrayRef<OpFoldResult> delinearizeDims) {
-  return
-      [&rewriter, loc, linearizeDims = SmallVector<OpFoldResult>(linearizeDims),
-       delinearizeDims = SmallVector<OpFoldResult>(delinearizeDims)](
-          ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
-        SmallVector<Value> indexValues(indices.begin(), indices.end());
-        auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
-            rewriter, loc, indexValues, linearizeDims, /*disjoint=*/true);
-        auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
-            rewriter, loc, linearizeIndexOp.getResult(), delinearizeDims,
-            /*hasOuterBound=*/true);
-        return delinearizeIndexOp->getResults();
-      };
-}
-
 /// Folds an `op` that does not affect index computation into a `mapScatterOp`.
 /// This is used for ops like `linalg::CopyOp`.
 static MapScatterOp
@@ -128,10 +98,15 @@ static MapScatterOp foldTransposeIntoMapScatter(RewriterBase &rewriter,
   assert(mapScatterOp.getInput() == transposeOp->getResult(0) &&
          "expected transposeOp to be the producer of mapScatterOp");
 
-  ArrayRef<int64_t> perm = transposeOp.getPermutation();
+  SmallVector<int64_t> perm(transposeOp.getPermutation());
   rewriter.modifyOpInPlace(mapScatterOp, [&]() {
     mapScatterOp.insertTransformationAtStart(
-        rewriter, buildTransposeIndexTransform(perm), perm.size());
+        rewriter,
+        [perm](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+          SmallVector<Value> indexValues(indices.begin(), indices.end());
+          return applyPermutation(indexValues, perm);
+        },
+        perm.size());
     mapScatterOp.getInputMutable().assign(transposeOp.getInput());
   });
   return mapScatterOp;
@@ -157,11 +132,20 @@ foldReshapeIntoMapScatter(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
   SmallVector<OpFoldResult> resultDims =
       tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
 
+  Location mapScatterLoc = mapScatterOp->getLoc();
   rewriter.modifyOpInPlace(mapScatterOp, [&]() {
     mapScatterOp.insertTransformationAtStart(
         rewriter,
-        buildReshapeIndexTransform(rewriter, mapScatterOp->getLoc(), srcDims,
-                                   resultDims),
+        [&rewriter, mapScatterLoc, srcDims,
+         resultDims](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+          SmallVector<Value> indexValues(indices.begin(), indices.end());
+          auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
+              rewriter, mapScatterLoc, indexValues, srcDims, /*disjoint=*/true);
+          auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
+              rewriter, mapScatterLoc, linearizeIndexOp.getResult(), resultDims,
+              /*hasOuterBound=*/true);
+          return delinearizeIndexOp->getResults();
+        },
         srcDims.size());
     mapScatterOp.getInputMutable().assign(reshapeOp->getOperand(0));
   });
@@ -899,12 +883,15 @@ foldTransposeIntoMapGather(RewriterBase &rewriter,
   assert(transposeOp.getInput() == mapGatherOp.getResult(0) &&
          "expected mapGatherOp to be the producer of transposeOp input");
 
-  ArrayRef<int64_t> perm = transposeOp.getPermutation();
-  SmallVector<int64_t> inversePerm = invertPermutationVector(perm);
+  SmallVector<int64_t> inversePerm =
+      invertPermutationVector(transposeOp.getPermutation());
 
   return foldConsumerIntoMapGatherImpl(
       rewriter, transposeOp, mapGatherOp,
-      buildTransposeIndexTransform(inversePerm));
+      [inversePerm](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+        SmallVector<Value> indexValues(indices.begin(), indices.end());
+        return applyPermutation(indexValues, inversePerm);
+      });
 }
 
 /// Fold a consumer reshape op (expand_shape or collapse_shape) into a producer
@@ -925,7 +912,16 @@ foldReshapeIntoMapGather(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
 
   return foldConsumerIntoMapGatherImpl(
       rewriter, reshapeOp, mapGatherOp,
-      buildReshapeIndexTransform(rewriter, loc, resultDims, srcDims));
+      [&rewriter, loc, resultDims,
+       srcDims](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+        SmallVector<Value> indexValues(indices.begin(), indices.end());
+        auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
+            rewriter, loc, indexValues, resultDims, /*disjoint=*/true);
+        auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
+            rewriter, loc, linearizeIndexOp.getResult(), srcDims,
+            /*hasOuterBound=*/true);
+        return delinearizeIndexOp->getResults();
+      });
 }
 
 /// Fold a consumer tensor::ExpandShapeOp into a producer `mapGatherOp`.
@@ -973,9 +969,11 @@ foldExtractSliceIntoMapGather(RewriterBase &rewriter,
       Value strideValue =
           getValueOrCreateConstantIndexOp(rewriter, loc, stride);
       // original_idx = offset + idx * stride
-      Value scaledIdx = arith::MulIOp::create(rewriter, loc, idx, strideValue);
+      Value scaledIdx = arith::MulIOp::create(rewriter, loc, idx, strideValue,
+                                              arith::IntegerOverflowFlags::nsw);
       Value originalIdx =
-          arith::AddIOp::create(rewriter, loc, offsetValue, scaledIdx);
+          arith::AddIOp::create(rewriter, loc, offsetValue, scaledIdx,
+                                arith::IntegerOverflowFlags::nsw);
       originalIndices.push_back(originalIdx);
     }
     return originalIndices;
@@ -1003,9 +1001,7 @@ static FailureOr<MapGatherOp> foldPadIntoMapGather(RewriterBase &rewriter,
 
   // Check if the map_gather already has a real (non-poison) padding value.
   // If so, we cannot safely replace it as that would lose the existing padding.
-  Block &transformBody = mapGatherOp.getTransformationRegion().front();
-  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
-  Value currentPadValue = yieldOp.getOperand(yieldOp.getNumOperands() - 1);
+  Value currentPadValue = mapGatherOp.getPaddingValue();
   if (!currentPadValue.getDefiningOp<ub::PoisonOp>()) {
     return rewriter.notifyMatchFailure(
         padOp, "map_gather already has a non-poison padding value; folding "
@@ -1021,7 +1017,8 @@ static FailureOr<MapGatherOp> foldPadIntoMapGather(RewriterBase &rewriter,
     for (auto [idx, low] : llvm::zip_equal(newOutputIndices, lowPad)) {
       Value lowValue = getValueOrCreateConstantIndexOp(rewriter, loc, low);
       // source_idx = idx - low_pad
-      Value sourceIdx = arith::SubIOp::create(rewriter, loc, idx, lowValue);
+      Value sourceIdx = arith::SubIOp::create(rewriter, loc, idx, lowValue,
+                                              arith::IntegerOverflowFlags::nsw);
       sourceIndices.push_back(sourceIdx);
     }
     return sourceIndices;

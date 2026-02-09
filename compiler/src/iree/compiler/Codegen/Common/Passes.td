@@ -202,7 +202,8 @@ def CombineSourceLayoutTransformationPass :
     "affine::AffineDialect",
     "arith::ArithDialect",
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
-    "tensor::TensorDialect"
+    "tensor::TensorDialect",
+    "ub::UBDialect"
   ];
 }
 

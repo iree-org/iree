@@ -353,6 +353,10 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
     // from output to source index is identity.
     bool isIdentity();
 
+    // Return the padding value yielded by the transformation region.
+    // The padding value is the last operand of the yield op.
+    Value getPaddingValue();
+
     // Return true if the map_gather op has vector semantics.
     bool isVectorized() {
       return isa<VectorType>(getSource().getType());

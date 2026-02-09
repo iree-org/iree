@@ -749,6 +749,12 @@ bool MapGatherOp::isIdentity() {
   return true;
 }
 
+Value MapGatherOp::getPaddingValue() {
+  Block &transformBody = getTransformationRegion().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  return yieldOp.getOperand(yieldOp.getNumOperands() - 1);
+}
+
 void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *ctx) {
   results.add<ConvertIdentityMapGatherScatterToCopy<MapGatherOp>>(ctx);
