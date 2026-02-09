@@ -118,9 +118,9 @@ CONTROL_JOB_REGEXES = frozenset(
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
+        "linux_x64_clang_debug",
         "windows_x64_msvc",
         "test_torch",
-        "linux_x64_clang_debug",
     ]
 )
 
