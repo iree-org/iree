@@ -452,3 +452,23 @@ hal.executable private @interface_wg_size {
 // CHECK-LABEL: llvm.func @interface_wg_size
 //       CHECK:   %[[WGDIMX:.+]] = nvvm.read.ptx.sreg.ntid.x
 //       CHECK:   %[[WGDIMY:.+]] = nvvm.read.ptx.sreg.ntid.y
+
+// -----
+
+#pipeline_layout_barrier = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @barrier_test {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @global_subgroup_barrier layout(#pipeline_layout_barrier)
+    builtin.module {
+      func.func @global_subgroup_barrier() {
+        iree_gpu.global_subgroup_barrier
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: llvm.func @global_subgroup_barrier
+//       CHECK:   nvvm.barrier0

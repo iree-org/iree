@@ -343,4 +343,23 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// GlobalSubgroupBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_GlobalSubgroupBarrierOp : Op<IREEGPU_Dialect,
+    "global_subgroup_barrier", []> {
+  let summary = "Synchronization-only barrier across all subgroups.";
+  let description = [{
+    All subgroups in the workgroup must reach any instance of this op before
+    any can proceed past it. Unlike `gpu.barrier`, this op has no memory
+    fence semantics - memory operations can be freely reordered with respect
+    to it. Fences are handled separately.
+  }];
+
+  let arguments = (ins);
+  let results = (outs);
+  let assemblyFormat = "attr-dict";
+}
+
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
