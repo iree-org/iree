@@ -212,3 +212,56 @@ TEST(OptionUtils, OverrideRootAndSetChild) {
   EXPECT_EQ(opts.parentOption, llvm::OptimizationLevel::O0);
   EXPECT_EQ(opts.childOption, true);
 }
+
+TEST(OptionUtils, SkipsDuplicateRegistrationWithSameStorage) {
+  std::string storage;
+  auto binder = OptionsBinder::local();
+  // First registration succeeds. Second registration with same storage should
+  // be silently skipped.
+  binder.opt<std::string>("test-dup-option", storage,
+                          llvm::cl::desc("first registration"));
+  binder.opt<std::string>("test-dup-option", storage,
+                          llvm::cl::desc("second registration"));
+
+  // Verify the option still works after duplicate registration attempt.
+  int argc = 1;
+  const char *argv[] = {"--test-dup-option=hello"};
+  EXPECT_TRUE(succeeded(binder.parseArguments(argc, argv)));
+  EXPECT_EQ(storage, "hello");
+}
+
+TEST(OptionUtils, AllowsSameStorageWithDifferentNames) {
+  // Same storage with different names should work, because this is how IREE
+  // implements deprecated option aliases.
+  std::string storage;
+  auto binder = OptionsBinder::local();
+  binder.opt<std::string>("test-new-name", storage,
+                          llvm::cl::desc("new option name"));
+  binder.opt<std::string>("test-old-name", storage,
+                          llvm::cl::desc("deprecated alias"));
+
+  // Both option names should write to the same storage.
+  int argc = 1;
+  const char *argv1[] = {"--test-new-name=value1"};
+  EXPECT_TRUE(succeeded(binder.parseArguments(argc, argv1)));
+  EXPECT_EQ(storage, "value1");
+  const char *argv2[] = {"--test-old-name=value2"};
+  EXPECT_TRUE(succeeded(binder.parseArguments(argc, argv2)));
+  EXPECT_EQ(storage, "value2");
+}
+
+#if GTEST_HAS_DEATH_TEST
+#ifndef NDEBUG
+TEST(OptionUtilsDeathTest, RejectsDuplicateRegistrationWithDifferentStorage) {
+  auto callFunc = [] {
+    std::string storage1, storage2;
+    auto binder = OptionsBinder::local();
+    binder.opt<std::string>("test-diff-storage-option", storage1,
+                            llvm::cl::desc("first registration"));
+    binder.opt<std::string>("test-diff-storage-option", storage2,
+                            llvm::cl::desc("second registration"));
+  };
+  EXPECT_DEATH(callFunc(), "Use static storage for shared options");
+}
+#endif // NDEBUG
+#endif // GTEST_HAS_DEATH_TEST
