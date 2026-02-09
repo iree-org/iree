@@ -1001,14 +1001,7 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                                     scf::ForOp newForOp) {
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
-
-  // Create workgroup address space for LDS barriers.
-  auto workgroupSpace = gpu::AddressSpaceAttr::get(
-      rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  ArrayAttr addressSpaces = rewriter.getArrayAttr({workgroupSpace});
-
   bool isNested = isInsideLoop(newForOp);
-
   if (isNested) {
     // Nested loop: insert barriers in prologue before writes.
     // The epilogue of the previous outer iteration may have read from shared
@@ -1017,7 +1010,7 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
     for (auto it = parentBlock->begin(); it != newForOp->getIterator(); ++it) {
       if (hasNestedSharedWrite(&*it) && needBarrierBeforeWrite) {
         rewriter.setInsertionPoint(&*it);
-        gpu::BarrierOp::create(rewriter, loc, addressSpaces);
+        gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
         needBarrierBeforeWrite = false;
       }
       if (hasNestedSharedRead(&*it)) {
@@ -1047,7 +1040,7 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
 
     if (hasNestedSharedWrite(&op) && needBarrierBeforeWrite) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, loc, addressSpaces);
+      gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
       needBarrierBeforeWrite = false;
     }
 
