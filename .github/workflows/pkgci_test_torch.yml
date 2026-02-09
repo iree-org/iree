@@ -37,9 +37,11 @@ jobs:
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
+            rocm-package: gfx110X-all
           - name: amdgpu_hip_gfx1201_O3
             config-file: torch_ops_gpu_hip_gfx1201_O3.json
             runs-on: [Linux, X64, gfx1201]
+            rocm-package: gfx120X-all
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
@@ -47,6 +49,7 @@ jobs:
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
+            rocm-package: gfx94X-dcgpu
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
@@ -77,13 +80,36 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: eb166d9307973c4f2199d7b2809216ae17b808af
+          ref: a4bf747011551229c5e2b08c7eab7947472949f9
           path: iree-test-suites
           lfs: false
+
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/torch_ops/requirements.txt
+      - name: Install ROCm packages
+        if: matrix.rocm-package != ''
+        run: |
+          pip install rocm
+
+          PYTHON_VERSION=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
+          ROCM_CORE_PATH="${{ env.VENV_DIR }}/lib/${PYTHON_VERSION}/site-packages/_rocm_sdk_core"
+          ROCM_DEVEL_PATH="${{ env.VENV_DIR }}/lib/${PYTHON_VERSION}/site-packages/_rocm_sdk_devel"
+
+          echo "ROCM_CORE_PATH=${ROCM_CORE_PATH}" >> $GITHUB_ENV
+          echo "ROCM_DEVEL_PATH=${ROCM_DEVEL_PATH}" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${ROCM_CORE_PATH}/lib:${ROCM_DEVEL_PATH}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+          echo "PATH=${ROCM_CORE_PATH}/bin:${ROCM_DEVEL_PATH}/bin:${PATH}" >> $GITHUB_ENV
+
+      - name: Verify ROCm installation
+        if: matrix.rocm-index != ''
+        run: |
+          echo "ROCM_CORE_PATH: ${{ env.ROCM_CORE_PATH }}"
+          echo "ROCM_DEVEL_PATH: ${{ env.ROCM_DEVEL_PATH }}"
+          echo "LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}"
+          echo "PATH: ${{ env.PATH }}"
+
       - name: Run Torch ops test suite
         env:
           # Enable hip logging on errors.
