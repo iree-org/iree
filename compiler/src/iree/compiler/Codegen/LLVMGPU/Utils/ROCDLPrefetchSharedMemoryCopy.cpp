@@ -756,8 +756,19 @@ static bool hasSharedMemory(Value val) {
 // Helper to check if operation or its nested ops have shared memory reads.
 static bool hasNestedSharedRead(Operation *op) {
   bool found = false;
-  op->walk([&](vector::TransferReadOp readOp) {
-    if (hasSharedMemory(readOp.getBase())) {
+  op->walk([&](Operation *readOp) {
+    if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(readOp)) {
+      if (hasSharedMemory(transferReadOp.getBase())) {
+        found = true;
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    }
+    auto transposeLoadOp = dyn_cast<amdgpu::TransposeLoadOp>(readOp);
+    if (!transposeLoadOp) {
+      return WalkResult::advance();
+    }
+    if (hasSharedMemory(transposeLoadOp.getSrc())) {
       found = true;
       return WalkResult::interrupt();
     }

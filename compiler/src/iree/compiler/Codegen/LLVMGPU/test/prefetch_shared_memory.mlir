@@ -578,3 +578,44 @@ func.func @gather_to_lds_subview_escape_no_multibuffer(
       : vector<1xf32>, memref<128xf32>
   return
 }
+
+// -----
+
+// Test that amdgpu.transpose_load from shared memory is treated as a shared
+// memory read for barrier placement.
+
+// CHECK-LABEL: @prefetch_transpose_load
+// CHECK-SAME: (%[[GLOBAL:.*]]: memref<128xf16>)
+func.func @prefetch_transpose_load(%arg0: memref<128xf16>) {
+  %cst = arith.constant dense<0.000000e+00> : vector<4xf16>
+  %cst_0 = arith.constant 0.000000e+00 : f16
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %alloc = memref.alloc() : memref<4xf16, #gpu.address_space<workgroup>>
+  // CHECK: %[[SHARED:.*]] = memref.alloc() : memref<4xf16, #gpu.address_space<workgroup>>
+  // CHECK: vector.transfer_read %[[GLOBAL]]
+  // CHECK: vector.transfer_write {{.*}}, %[[SHARED]]
+  // CHECK: scf.for
+  %0 = scf.for %arg1 = %c0 to %c128 step %c1 iter_args(%arg2 = %cst) -> (vector<4xf16>) {
+    %1 = vector.transfer_read %arg0[%arg1], %cst_0 : memref<128xf16>, vector<4xf16>
+    vector.transfer_write %1, %alloc[%c0] {in_bounds = [true]} : vector<4xf16>, memref<4xf16, #gpu.address_space<workgroup>>
+    // CHECK:      vector.transfer_read %[[GLOBAL]]
+    // CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
+    // CHECK-NEXT: amdgpu.transpose_load %[[SHARED]]
+    // CHECK:      arith.addf
+    // CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
+    // CHECK-NEXT: amdgpu.sched_barrier allow = <none>
+    // CHECK:      vector.transfer_write {{.*}}, %[[SHARED]]
+    // CHECK:      scf.yield
+    %2 = amdgpu.transpose_load %alloc[%c0] : memref<4xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
+    %3 = arith.addf %2, %arg2 : vector<4xf16>
+    scf.yield %3 : vector<4xf16>
+  }
+  // CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
+  // CHECK-NEXT: amdgpu.transpose_load %[[SHARED]]
+  // CHECK:      arith.addf
+  // CHECK:      vector.transfer_write {{.*}}, %[[GLOBAL]]
+  vector.transfer_write %0, %arg0[%c0] {in_bounds = [true]} : vector<4xf16>, memref<128xf16>
+  return
+}
