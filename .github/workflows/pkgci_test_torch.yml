@@ -37,11 +37,11 @@ jobs:
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
-            rocm-package: gfx110X-all
+            rocm-index: https://rocm.repo.amd.com/whl/gfx110X-dgpu/
           - name: amdgpu_hip_gfx1201_O3
             config-file: torch_ops_gpu_hip_gfx1201_O3.json
             runs-on: [Linux, X64, gfx1201]
-            rocm-package: gfx120X-all
+            rocm-index: https://rocm.repo.amd.com/whl/gfx120X-all/
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
@@ -49,7 +49,7 @@ jobs:
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
-            rocm-package: gfx94X-dcgpu
+            rocm-index: https://rocm.repo.amd.com/whl/gfx94X-dcgpu/
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
@@ -89,9 +89,9 @@ jobs:
           source ${VENV_DIR}/bin/activate
           python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Install ROCm packages
-        if: matrix.rocm-package != ''
+        if: matrix.rocm-index != ''
         run: |
-          pip install rocm
+          pip install --index-url ${{ matrix.rocm-index }} "rocm[libraries,devel]"
 
           PYTHON_VERSION=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
           ROCM_CORE_PATH="${{ env.VENV_DIR }}/lib/${PYTHON_VERSION}/site-packages/_rocm_sdk_core"
