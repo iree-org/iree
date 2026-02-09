@@ -38,7 +38,7 @@ static llvm::cl::opt<int> clVscaleFromUser(
         "propagates vscale ops into the host-side code, this value has to be "
         "explicitly set by the user, e.g. for SVE data-tiling on the AArch64 "
         "backend."),
-    llvm::cl::init(-1));
+    llvm::cl::Hidden, llvm::cl::init(-1));
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
