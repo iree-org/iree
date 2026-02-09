@@ -11,8 +11,8 @@
 !acc_base_ty = tensor<1x1x${FOLD1(SUBGROUPS_M)}${FOLD1(SUBGROUPS_N)}${FOLD1(INTRINSICS_M)}${FOLD1(INTRINSICS_N)}4x16x4xf32>
 !lhs_base_ty = tensor<1x?x${FOLD1(SUBGROUPS_M)}${FOLD1(INTRINSICS_M)}4x16x${FOLD1(INTRINSICS_K)}${INTERNAL_K}x${ELEM_TYPE}>
 !rhs_base_ty = tensor<1x?x${FOLD1(SUBGROUPS_N)}${FOLD1(INTRINSICS_N)}4x16x${FOLD1(INTRINSICS_K)}${INTERNAL_K}x${ELEM_TYPE}>
-!lhs_expand_ty = tensor<1x?x4x${SUBGROUPS_M}x${INTRINSICS_M}x4x4x2x2x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
-!rhs_expand_ty = tensor<1x?x4x${SUBGROUPS_N}x${INTRINSICS_N}x4x8x2x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
+!lhs_expand_ty = tensor<1x?x4x${SUBGROUPS_M}x${INTRINSICS_M}x4x8x2x${INTRINSICS_K}x${INTERNAL_K}x${ELEM_TYPE}>
+!rhs_expand_ty = tensor<1x?x4x${SUBGROUPS_N}x${INTRINSICS_N}x4x8x2x${INTRINSICS_K}x${INTERNAL_K}x${ELEM_TYPE}>
 !lhs_in_ty = tensor<?x4x${SUBGROUPS_M*INTRINSICS_M}x32x${2*INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
 !rhs_in_ty = tensor<?x4x${SUBGROUPS_N*INTRINSICS_N}x32x${2*INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
 !lhs_shared_ty = memref<4x${SUBGROUPS_M*INTRINSICS_M}x64x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}, #gpu.address_space<workgroup>>
@@ -76,11 +76,11 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
   %dim = tensor.dim %rhs_base, %c1 : !rhs_base_ty
   %nDim = arith.divui %dim, %c4 : index
 
-  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6, 7, 8], [9]] output_shape [1, %nDim, 4, ${SUBGROUPS_M}, ${INTRINSICS_M}, 4, 4, 2, 2, ${INTRINSICS_K*INTERNAL_K}] : !lhs_base_ty into !lhs_expand_ty
-  %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6, 7], [8]] output_shape [1, %nDim, 4, ${SUBGROUPS_N}, ${INTRINSICS_N}, 4, 8, 2, ${INTRINSICS_K*INTERNAL_K}] : !rhs_base_ty into !rhs_expand_ty
+  %lhs_expand = tensor.expand_shape %lhs_base ${EXPAND_REASSOC_FOLD1([[1], ["?", 4], [SUBGROUPS_M], [INTRINSICS_M], [4], [8, 2], [INTRINSICS_K], [INTERNAL_K]])} output_shape [1, %nDim, 4, ${SUBGROUPS_M}, ${INTRINSICS_M}, 4, 8, 2, ${INTRINSICS_K}, ${INTERNAL_K}] : !lhs_base_ty into !lhs_expand_ty
+  %rhs_expand = tensor.expand_shape %rhs_base ${EXPAND_REASSOC_FOLD1([[1], ["?", 4], [SUBGROUPS_N], [INTRINSICS_N], [4], [8, 2], [INTRINSICS_K], [INTERNAL_K]])} output_shape [1, %nDim, 4, ${SUBGROUPS_N}, ${INTRINSICS_N}, 4, 8, 2, ${INTRINSICS_K}, ${INTERNAL_K}] : !rhs_base_ty into !rhs_expand_ty
 
-  %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3, 4], [5, 6, 7], [8, 9]] : !lhs_expand_ty into !lhs_in_ty
-  %rhs = tensor.collapse_shape %rhs_expand [[0, 1], [2], [3, 4], [5, 6], [7, 8]] : !rhs_expand_ty into !rhs_in_ty
+  %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3, 4], [5, 6], [7, 8, 9]] : !lhs_expand_ty into !lhs_in_ty
+  %rhs = tensor.collapse_shape %rhs_expand [[0, 1], [2], [3, 4], [5, 6], [7, 8, 9]] : !rhs_expand_ty into !rhs_in_ty
 
   %lhs_shared = memref.alloc() : !lhs_shared_ty
   %rhs_shared = memref.alloc() : !rhs_shared_ty
@@ -104,7 +104,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
     vector.transfer_write %rhs_vec_local_t, %rhs_shared[%delin#0, %delin#1, %inner, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x2x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !rhs_shared_ty
   } {mapping = [#gpu.thread<linear_dim_0>]}
 
-  gpu.barrier
+  gpu.barrier memfence [#gpu.address_space<workgroup>]
 
   %0 = tensor.empty() : !acc_base_ty
   $assert (SUBGROUPS_M*SUBGROUPS_N) == 8, "workgroup size must be 8x64=512"
@@ -154,7 +154,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
       %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -166,7 +166,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       // Global loads of rhs.
@@ -191,7 +191,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       %lhs_vec_1_t = vector.shape_cast %lhs_vec_1 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
       %rhs_vec_1_t = vector.shape_cast %rhs_vec_1 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -203,7 +203,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       // Local loads of lhs and rhs.
@@ -217,7 +217,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       %lhs_vec_3_t = vector.shape_cast %lhs_vec_3 : vector<1x${INTRINSICS_M}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
       %rhs_vec_3_t = vector.shape_cast %rhs_vec_3 : vector<1x${INTRINSICS_N}x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}> to vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -229,7 +229,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       } :vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       // Local stores of lhs and rhs.
@@ -245,7 +245,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
         vector.transfer_write %lhs_vec_local_${4*j+2}_t, %lhs_shared [%c2, %glb${j}_lhs, %glb_inner, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x2x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared_ty
         vector.transfer_write %lhs_vec_local_${4*j+3}_t, %lhs_shared [%c3, %glb${j}_lhs, %glb_inner, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x2x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared_ty
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -257,7 +257,7 @@ util.func @pingpong_dt_large_${ELEM_TYPE}(%lhs_base: !lhs_base_ty, %rhs_base: !r
       } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       scf.yield %dot3 : vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>

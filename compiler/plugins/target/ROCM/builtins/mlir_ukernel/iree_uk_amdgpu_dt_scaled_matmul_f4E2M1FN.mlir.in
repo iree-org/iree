@@ -9,31 +9,32 @@
 // Generated from iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir.in
 
 // Input LHS and RHS layouts.
-!lhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_M)}${FOLD1(INTRINSICS_M)}${FOLD1(INTRINSICS_K)}4x16x32xf4E2M1FN>
-!rhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_N)}${FOLD1(INTRINSICS_N)}${FOLD1(INTRINSICS_K)}4x16x32xf4E2M1FN>
+!lhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_M)}${FOLD1(INTRINSICS_M)}${FOLD1(INTRINSICS_K)}4x16x${INTERNAL_K}xf4E2M1FN>
+!rhs_ty = tensor<1x?x1x${FOLD1(SUBGROUPS_N)}${FOLD1(INTRINSICS_N)}${FOLD1(INTRINSICS_K)}4x16x${INTERNAL_K}xf4E2M1FN>
 
-!lhs_byte_ty = tensor<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x16xi8>
-!rhs_byte_ty = tensor<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x16xi8>
+!lhs_byte_ty = tensor<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x${INTERNAL_K//2}xi8>
+!rhs_byte_ty = tensor<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x${INTERNAL_K//2}xi8>
 
 // Buffer types keep all dimensions (no folding) for simpler stride handling
-!lhs_buffer_ty = memref<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}, ${INTRINSICS_M*INTRINSICS_K*4*16*16}, ${INTRINSICS_K*4*16*16}, ${4*16*16}, ${16*16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_buffer_ty = memref<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x16xi8, strided<[?, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}, ${INTRINSICS_N*INTRINSICS_K*4*16*16}, ${INTRINSICS_K*4*16*16}, ${4*16*16}, ${16*16}, 16, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_buffer_ty = memref<1x?x1x${SUBGROUPS_M}x${INTRINSICS_M}x${INTRINSICS_K}x4x16x${INTERNAL_K//2}xi8, strided<[?, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${INTRINSICS_M*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${4*16*(INTERNAL_K//2)}, ${16*(INTERNAL_K//2)}, ${INTERNAL_K//2}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_buffer_ty = memref<1x?x1x${SUBGROUPS_N}x${INTRINSICS_N}x${INTRINSICS_K}x4x16x${INTERNAL_K//2}xi8, strided<[?, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${INTRINSICS_N*INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${INTRINSICS_K*4*16*(INTERNAL_K//2)}, ${4*16*(INTERNAL_K//2)}, ${16*(INTERNAL_K//2)}, ${INTERNAL_K//2}, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
-!lhs_buffer_collapse_ty = memref<?x${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
-!rhs_buffer_collapse_ty = memref<?x${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*16}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!lhs_buffer_collapse_ty = memref<?x${SUBGROUPS_M*INTRINSICS_M*INTRINSICS_K*4*16*(INTERNAL_K//2)}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+!rhs_buffer_collapse_ty = memref<?x${SUBGROUPS_N*INTRINSICS_N*INTRINSICS_K*4*16*(INTERNAL_K//2)}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
 // Shared memory: rows = 2 (double buffer) * intrinsics * subgroups * intrinsics_k
-!lhs_shared_ty = memref<${2*INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
-!rhs_shared_ty = memref<${2*INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K}x1024xi8, #gpu.address_space<workgroup>>
+!lhs_shared_ty = memref<${2*INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K}x${32*INTERNAL_K}xi8, #gpu.address_space<workgroup>>
+!rhs_shared_ty = memref<${2*INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K}x${32*INTERNAL_K}xi8, #gpu.address_space<workgroup>>
 
-!lhs_copy_vec_ty = vector<16xi8>
-!rhs_copy_vec_ty = vector<16xi8>
+$assert (4*INTERNAL_K) == 128, "load 128 bits per instruction"
+!lhs_copy_vec_ty = vector<${INTERNAL_K//2}xi8>
+!rhs_copy_vec_ty = vector<${INTERNAL_K//2}xi8>
 
-!lhs_byte_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x16xi8>
-!lhs_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x32xf4E2M1FN>
+!lhs_byte_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x${INTERNAL_K//2}xi8>
+!lhs_vec_ty = vector<${INTRINSICS_M}x1x${INTRINSICS_K}x${INTERNAL_K}xf4E2M1FN>
 
-!rhs_byte_vec_ty = vector<${INTRINSICS_N}x1x${INTRINSICS_K}x16xi8>
-!rhs_vec_ty = vector<${INTRINSICS_N}x1x${INTRINSICS_K}x32xf4E2M1FN>
+!rhs_byte_vec_ty = vector<${INTRINSICS_N}x1x${INTRINSICS_K}x${INTERNAL_K//2}xi8>
+!rhs_vec_ty = vector<${INTRINSICS_N}x1x${INTRINSICS_K}x${INTERNAL_K}xf4E2M1FN>
 
 // Input scale layouts - keep all dimensions for buffer compatibility
 !lhs_scale_ty = tensor<1x?x${SUBGROUPS_M}x4x16x${INTRINSICS_M}x${INTRINSICS_K}xf8E8M0FNU>
@@ -49,8 +50,9 @@
 !lhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_M*4*16*INTRINSICS_M*INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 !rhs_scale_buffer_collapse_ty = memref<?x${SUBGROUPS_N*4*16*INTRINSICS_N*INTRINSICS_K}xi8, strided<[?, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
 
-!lhs_scale_copy_vec_ty = vector<16xi8>
-!rhs_scale_copy_vec_ty = vector<16xi8>
+$assert (4*INTERNAL_K) == 128, "load 128 bits per instruction"
+!lhs_scale_copy_vec_ty = vector<${INTERNAL_K//2}xi8>
+!rhs_scale_copy_vec_ty = vector<${INTERNAL_K//2}xi8>
 
 // Scale shared memory: rows = 2 (double buffer) * subgroups
 // Width = 4*16*INTRINSICS_M/N*INTRINSICS_K (scale data per subgroup per K)
@@ -125,18 +127,16 @@ util.func @pingpong_dt_medium_f4E2M1FN(
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   %c1024 = arith.constant 1024 : index
   %c4096 = arith.constant 4096 : index
-
-  %cINT_M = arith.constant ${INTRINSICS_M} : index
-  %cINT_N = arith.constant ${INTRINSICS_N} : index
-  %cSUB_MN = arith.constant ${SUBGROUPS_M*SUBGROUPS_N} : index
-  %cINT_MK = arith.constant ${INTRINSICS_M*INTRINSICS_K} : index
-  %cINT_NK = arith.constant ${INTRINSICS_N*INTRINSICS_K} : index
-  %cLHS_SHARED = arith.constant ${INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K} : index
-  %cRHS_SHARED = arith.constant ${INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K} : index
 
   %cst_lhs = arith.constant 0 : i8
   %cst_rhs = arith.constant 0 : i8
@@ -183,13 +183,13 @@ util.func @pingpong_dt_medium_f4E2M1FN(
         %buffer_num = arith.andi %i, %c1 : index
 
         // Copy RHS from global memory to LDS.
-        scf.for %j = %c0 to %cINT_N step %c1 {
-          %buffer_unroll = arith.muli %j, %c4096 : index
+        scf.for %j = %c0 to %c${INTRINSICS_N} step %c1 {
+          %buffer_unroll = arith.muli %j, %c${SUBGROUPS_M*SUBGROUPS_N*64*16}: index
           %buffer_thread = arith.muli %id, %c16 : index
           %buffer_inner = arith.addi %buffer_unroll, %buffer_thread : index
 
-          %shared_num = arith.muli %buffer_num, %cRHS_SHARED : index
-          %shared_unroll = arith.muli %j, %cSUB_MN : index
+          %shared_num = arith.muli %buffer_num, %c${INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K} : index
+          %shared_unroll = arith.muli %j, %c${SUBGROUPS_M*SUBGROUPS_N} : index
           %shared_subgroup = arith.addi %shared_unroll, %ids#0 : index
           %shared_outer = arith.addi %shared_num, %shared_subgroup : index
           %shared_inner = arith.muli %ids#1, %c16 : index
@@ -215,13 +215,13 @@ util.func @pingpong_dt_medium_f4E2M1FN(
         rocdl.s.barrier
 
         // Copy LHS from global memory to LDS.
-        scf.for %j = %c0 to %cINT_M step %c1 {
-          %buffer_unroll = arith.muli %j, %c4096 : index
+        scf.for %j = %c0 to %c${INTRINSICS_M} step %c1 {
+          %buffer_unroll = arith.muli %j, %c${SUBGROUPS_M*SUBGROUPS_N*64*16} : index
           %buffer_thread = arith.muli %id, %c16 : index
           %buffer_inner = arith.addi %buffer_unroll, %buffer_thread : index
 
-          %shared_num = arith.muli %buffer_num, %cLHS_SHARED : index
-          %shared_unroll = arith.muli %j, %cSUB_MN : index
+          %shared_num = arith.muli %buffer_num, %c${INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K} : index
+          %shared_unroll = arith.muli %j, %c${SUBGROUPS_M*SUBGROUPS_N} : index
           %shared_subgroup = arith.addi %shared_unroll, %ids#0 : index
           %shared_outer = arith.addi %shared_num, %shared_subgroup : index
           %shared_inner = arith.muli %ids#1, %c16 : index
@@ -257,11 +257,11 @@ util.func @pingpong_dt_medium_f4E2M1FN(
 
 
   %0 = tensor.empty() : !return_ty
-  %1 = scf.forall (%id) in (256) shared_outs(%out = %0) -> !return_ty {
+  %1 = scf.forall (%id) in (${SUBGROUPS_M*SUBGROUPS_N*64}) shared_outs(%out = %0) -> !return_ty {
     %init = arith.constant dense<0.0> : !acc_ty
     %ids:2 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 64) : index, index
     %subgroups:2 = affine.delinearize_index %ids#0 into (${SUBGROUPS_M}, ${SUBGROUPS_N}) : index, index
-    %threads:2 = affine.delinearize_index %ids#1 into (${INTRINSICS_M}, 16) : index, index
+    %threads:2 = affine.delinearize_index %ids#1 into (4, 16) : index, index
 
     // Misalign by one group.
     rocdl.s.barrier
@@ -272,17 +272,17 @@ util.func @pingpong_dt_medium_f4E2M1FN(
 
       %buffer_num = arith.andi %i, %c1 : index
 
-      %lhs_num = arith.muli %buffer_num, %cLHS_SHARED : index
-      %lhs_subgroup = arith.muli %subgroups#0, %cINT_MK : index
+      %lhs_num = arith.muli %buffer_num, %c${INTRINSICS_M*SUBGROUPS_M*INTRINSICS_K} : index
+      %lhs_subgroup = arith.muli %subgroups#0, %c${INTRINSICS_M*INTRINSICS_K} : index
       %lhs_outer = arith.addi %lhs_num, %lhs_subgroup : index
       %lhs_inner = arith.muli %ids#1, %c16 : index
 
       %lhs_scale_num = arith.muli %buffer_num, %c2 : index
       %lhs_scale_outer = arith.addi %lhs_scale_num, %subgroups#0 : index
-      %lhs_scale_inner = arith.muli %ids#1, %cINT_MK : index
+      %lhs_scale_inner = arith.muli %ids#1, %c${INTRINSICS_M*INTRINSICS_K} : index
 
-      %rhs_num = arith.muli %buffer_num, %cRHS_SHARED : index
-      %rhs_subgroup = arith.muli %subgroups#1, %cINT_NK : index
+      %rhs_num = arith.muli %buffer_num, %c${INTRINSICS_N*SUBGROUPS_N*INTRINSICS_K} : index
+      %rhs_subgroup = arith.muli %subgroups#1, %c${INTRINSICS_N*INTRINSICS_K} : index
       %rhs_outer = arith.addi %rhs_num, %rhs_subgroup : index
       %rhs_inner = arith.muli %ids#1, %c16 : index
 

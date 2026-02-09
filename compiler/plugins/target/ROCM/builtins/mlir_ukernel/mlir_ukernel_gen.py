@@ -45,6 +45,56 @@ def fold1(val):
     return f"{val}x" if val != 1 else ""
 
 
+def expand_reassoc_fold1(brackets):
+    """
+    Build tensor.expand_shape reassociation from a list of brackets.
+
+    Each bracket is a list describing the expanded dimensions that map to one
+    base dimension. The number of expand dims for a bracket is len(bracket).
+    If a bracket has exactly one element and that element equals 1 (and it is
+    not the first bracket), that bracket is merged with the next.
+
+    Example (in template: ${EXPAND_REASSOC_FOLD1(...)}):
+      EXPAND_REASSOC_FOLD1([[1], ["?", 4], [SUBGROUPS_M], [INTRINSICS_M], [4],
+                            [8, 2], [INTRINSICS_K], [INTERNAL_K]])
+      With SUBGROUPS_M=1, INTRINSICS_M=8, the 3rd bracket merges with the 4th,
+      giving 7 groups instead of 8:
+      [[0], [1, 2], [3, 4], [5], [6, 7], [8], [9]].
+    """
+    # Assign consecutive expand indices to each bracket.
+    expand_indices_per_bracket = []
+    idx = 0
+    for b in brackets:
+        size = len(b)
+        expand_indices_per_bracket.append(list(range(idx, idx + size)))
+        idx += size
+
+    # Merge: when a bracket has a single element and that value is 1, merge
+    # with next (except for the first bracket, which is never merged).
+    merged_groups = []
+    i = 0
+    while i < len(expand_indices_per_bracket):
+        group = list(expand_indices_per_bracket[i])
+        if (
+            i > 0
+            and i < len(brackets)
+            and len(brackets[i]) == 1
+            and brackets[i][0] == 1
+            and i + 1 < len(expand_indices_per_bracket)
+        ):
+            group.extend(expand_indices_per_bracket[i + 1])
+            i += 1
+        merged_groups.append(group)
+        i += 1
+
+    # Format as reassociation attribute.
+    return (
+        "["
+        + ", ".join("[" + ", ".join(str(x) for x in g) + "]" for g in merged_groups)
+        + "]"
+    )
+
+
 def extract_internal_k(intrinsic_name: str) -> int:
     """
     Extract the K dimension from an intrinsic name and divide by 4.
@@ -102,7 +152,8 @@ def process_template(text: str, params: Dict[str, Any]) -> str:
             end_pos = line.index("}", start_pos + 2)
             if start_pos != 0:
                 output_parts.append('"' + line[:start_pos].replace('"', '\\"') + '"')
-            output_parts.append("str(" + line[start_pos + 2 : end_pos] + ")")
+            expr = line[start_pos + 2 : end_pos]
+            output_parts.append("str(" + expr + ")")
             line = line[end_pos + 1 :]
         if line:
             output_parts.append('"' + line.replace('"', '\\"') + '"')
@@ -170,6 +221,7 @@ def process_template(text: str, params: Dict[str, Any]) -> str:
     exec_globals["FOLD1"] = fold1
     output_stream = io.StringIO()
     exec_globals["OUT_STREAM"] = output_stream
+    exec_globals["EXPAND_REASSOC_FOLD1"] = expand_reassoc_fold1
 
     # Compile and execute the generated Python code.
     python_code = "\n".join(python_lines)

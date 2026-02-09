@@ -83,14 +83,14 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
   $assert (SUBGROUPS_M*SUBGROUPS_N) == 8, "workgroup size must be 8x64=512"
   %1 = scf.forall (%id) in (${SUBGROUPS_M*SUBGROUPS_N*64}) shared_outs(%out = %0) -> tensor<1x${SUBGROUPS_M*INTRINSICS_M}x16x${SUBGROUPS_N*INTRINSICS_N}x16xf32> {
     %ids:4 = affine.delinearize_index %id into (${SUBGROUPS_M}, ${SUBGROUPS_N}, 4, 16) : index, index, index, index
-    %m_outer_id = arith.muli %ids#0, %c${INTERNAL_M} overflow<nsw, nuw> : index
-    %n_outer_id = arith.muli %ids#1, %c${INTERNAL_N} overflow<nsw, nuw> : index
+    %m_outer_id = arith.muli %ids#0, %c${INTRINSICS_M} overflow<nsw, nuw> : index
+    %n_outer_id = arith.muli %ids#1, %c${INTRINSICS_N} overflow<nsw, nuw> : index
     %inner_id = arith.muli %ids#2, %c${INTERNAL_K} overflow<nsw, nuw> : index
     %inner_id_acc = arith.muli %ids#2, %c4 overflow<nsw, nuw> : index
 
     %wt:3 = affine.delinearize_index %id into (${SUBGROUPS_M*SUBGROUPS_N}, 8, 8) : index, index, index
-    %bpo_lhs = arith.muli %wt#0, %c{SUBGROUPS_M*INTRINSICS_M*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
-    %bpo_rhs = arith.muli %wt#0, %c{SUBGROUPS_N*INTRINSICS_N*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
+    %bpo_lhs = arith.muli %wt#0, %c${SUBGROUPS_M*INTRINSICS_M*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
+    %bpo_rhs = arith.muli %wt#0, %c${SUBGROUPS_N*INTRINSICS_N*16//SUBGROUPS_M//SUBGROUPS_N} overflow<nsw, nuw> : index
     %glb0_lhs = arith.addi %wt#1, %bpo_lhs overflow<nsw, nuw> : index
     %glb0_rhs = arith.addi %wt#1, %bpo_rhs overflow<nsw, nuw> : index
     $for j in range(1, SUBGROUPS_M*INTRINSICS_M*2//SUBGROUPS_M//SUBGROUPS_N):
@@ -136,7 +136,7 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
         %lhs_thread_${j} = tensor.extract_slice %lhs_block [0, %glb${j}_lhs, %gko] [1, 1, ${INTRINSICS_K*INTERNAL_K}] [1, 1, 1] : !lhs_block_in to tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
         %lhs_vec_local_${j} = vector.transfer_read %lhs_thread_${j} [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -148,7 +148,7 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
       } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       $for j in range(SUBGROUPS_N*INTRINSICS_N*2//SUBGROUPS_M//SUBGROUPS_N):
@@ -157,7 +157,7 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
       $for j in range(1, SUBGROUPS_M*INTRINSICS_M*2//SUBGROUPS_M//SUBGROUPS_N):
         vector.transfer_write %lhs_vec_local_${j}, %lhs_shared [%glb${j}_lhs, %gko] {in_bounds = [true, true]} : vector<1x${INTRINSICS_K*INTERNAL_K}x${ELEM_TYPE}>, !lhs_shared
 
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
@@ -169,7 +169,7 @@ util.func private @pingpong_medium_${ELEM_TYPE}_expanded(%lhs_base: !lhs_in_ty, 
       } : vector<${INTRINSICS_M}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}>, vector<${INTRINSICS_N}x${INTRINSICS_K}x1x${INTERNAL_K}x${ELEM_TYPE}> into vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
 
       rocdl.s.setprio 0
-      gpu.barrier
+      gpu.barrier memfence [#gpu.address_space<workgroup>]
       rocdl.sched.barrier 0
 
       scf.yield %dot2 : vector<${INTRINSICS_M}x${INTRINSICS_N}x1x4xf32>
