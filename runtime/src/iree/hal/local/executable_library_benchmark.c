@@ -168,7 +168,7 @@ static iree_status_t iree_hal_executable_library_run(
       iree_hal_local_executable_cast(executable);
 
   // Allocate workgroup-local memory that each invocation can use.
-  iree_byte_span_t local_memory = iree_make_byte_span(NULL, 0);
+  iree_byte_span_t local_memory = iree_byte_span_empty();
   iree_host_size_t local_memory_size =
       local_executable->dispatch_attrs
           ? local_executable->dispatch_attrs[FLAG_export_ordinal]

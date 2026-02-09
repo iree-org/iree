@@ -46,7 +46,7 @@ EXAMPLES
     iree-bazel-test //runtime/src/iree/base:status_test
 
     # Test multiple targets at once
-    iree-bazel-test //runtime/src/iree/tokenizer2/... //tools/test:iree-tokenize.txt
+    iree-bazel-test //runtime/src/iree/tokenizer/... //tools/test:iree-tokenize.txt
 
     # Test all tools
     iree-bazel-test //tools/...

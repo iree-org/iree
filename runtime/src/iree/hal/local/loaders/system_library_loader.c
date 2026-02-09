@@ -101,8 +101,8 @@ static iree_status_t iree_hal_system_executable_load(
     iree_hal_system_executable_t* executable,
     iree_const_byte_span_t executable_data, iree_allocator_t host_allocator) {
   // Check to see if the library has a footer indicating embedded debug data.
-  iree_const_byte_span_t library_data = iree_make_const_byte_span(NULL, 0);
-  iree_const_byte_span_t debug_data = iree_make_const_byte_span(NULL, 0);
+  iree_const_byte_span_t library_data = iree_const_byte_span_empty();
+  iree_const_byte_span_t debug_data = iree_const_byte_span_empty();
   const iree_hal_system_executable_footer_t* footer =
       iree_hal_system_executable_try_query_footer(executable_data);
   if (footer) {

@@ -468,7 +468,8 @@ iree_status_t iree_json_lookup_object_value(iree_string_view_t object_value,
   IREE_RETURN_IF_ERROR(iree_json_enumerate_object(
       object_value, iree_json_lookup_object_value_visitor, &state));
   if (!state.found) {
-    return iree_status_from_code(IREE_STATUS_NOT_FOUND);
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "JSON key '%.*s' not found",
+                            (int)key.size, key.data);
   }
   return iree_ok_status();
 }
@@ -1150,6 +1151,36 @@ iree_status_t iree_json_parse_bool(iree_string_view_t value, bool* out) {
                           (int)value.size, value.data);
 }
 
+iree_status_t iree_json_lookup_bool(iree_string_view_t object_value,
+                                    iree_string_view_t key, bool* out) {
+  iree_string_view_t value = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(
+      iree_json_lookup_object_value(object_value, key, &value));
+  if (iree_string_view_equal(value, IREE_SV("null"))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "required field '%.*s' must not be null",
+                            (int)key.size, key.data);
+  }
+  return iree_json_parse_bool(value, out);
+}
+
+iree_status_t iree_json_lookup_string(iree_string_view_t object_value,
+                                      iree_string_view_t key,
+                                      iree_mutable_string_view_t buffer,
+                                      iree_host_size_t* out_length) {
+  iree_string_view_t value = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(
+      iree_json_lookup_object_value(object_value, key, &value));
+  if (iree_string_view_equal(value, IREE_SV("null"))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "required field '%.*s' must not be null",
+                            (int)key.size, key.data);
+  }
+  // The value from iree_json_lookup_object_value for strings is the content
+  // between quotes (inner content with escape sequences still present).
+  return iree_json_unescape_string(value, buffer.size, buffer.data, out_length);
+}
+
 iree_status_t iree_json_try_lookup_bool(iree_string_view_t object_value,
                                         iree_string_view_t key,
                                         bool default_value, bool* out) {
@@ -1181,8 +1212,7 @@ iree_status_t iree_json_try_lookup_int64(iree_string_view_t object_value,
 iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
                                           iree_string_view_t key,
                                           iree_string_view_t default_value,
-                                          char* out_buffer,
-                                          iree_host_size_t buffer_capacity,
+                                          iree_mutable_string_view_t buffer,
                                           iree_host_size_t* out_length) {
   // Manually parse to get raw value (with quotes for strings).
   iree_string_view_t str = object_value;
@@ -1220,12 +1250,12 @@ iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
 
   // If not found or null, use default.
   if (!found || iree_string_view_equal(raw_value, IREE_SV("null"))) {
-    if (default_value.size > buffer_capacity) {
+    if (default_value.size > buffer.size) {
       *out_length = default_value.size;
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "buffer too small for default value");
     }
-    memcpy(out_buffer, default_value.data, default_value.size);
+    memcpy(buffer.data, default_value.data, default_value.size);
     *out_length = default_value.size;
     return iree_ok_status();
   }
@@ -1240,7 +1270,7 @@ iree_status_t iree_json_try_lookup_string(iree_string_view_t object_value,
   // Strip surrounding quotes and unescape.
   iree_string_view_t content =
       iree_string_view_substr(raw_value, 1, raw_value.size - 2);
-  return iree_json_unescape_string(content, buffer_capacity, out_buffer,
+  return iree_json_unescape_string(content, buffer.size, buffer.data,
                                    out_length);
 }
 
@@ -1303,55 +1333,38 @@ iree_status_t iree_json_validate_object_keys(
     return iree_ok_status();
   }
 
-  // Build error message listing unknown keys and supported keys.
-  // Use a fixed-size buffer for the message.
-  char message[512];
-  iree_host_size_t message_length = 0;
-
-  // Add unknown keys to message.
-  message_length +=
-      snprintf(message + message_length, sizeof(message) - message_length,
-               "unknown key%s: ", state.unknown_key_count == 1 ? "" : "s");
+  // Build a simple error message showing the first few unknown keys.
+  // We don't list all supported keys - the caller knows what they passed.
+  // Format: "unknown keys: 'foo', 'bar', ... (N total; M keys supported)"
   iree_host_size_t displayed_count =
       state.unknown_key_count < IREE_ARRAYSIZE(state.unknown_keys)
           ? state.unknown_key_count
           : IREE_ARRAYSIZE(state.unknown_keys);
-  for (iree_host_size_t i = 0; i < displayed_count; ++i) {
-    if (i > 0) {
-      message_length += snprintf(message + message_length,
-                                 sizeof(message) - message_length, ", ");
-    }
-    message_length += snprintf(
-        message + message_length, sizeof(message) - message_length, "'%.*s'",
-        (int)state.unknown_keys[i].size, state.unknown_keys[i].data);
-  }
-  if (state.unknown_key_count > displayed_count) {
-    message_length += snprintf(
-        message + message_length, sizeof(message) - message_length,
-        ", ... (+%zu more)", state.unknown_key_count - displayed_count);
-  }
 
-  // Add supported keys to message.
-  message_length += snprintf(message + message_length,
-                             sizeof(message) - message_length, " (supported: ");
-  for (iree_host_size_t i = 0; i < allowed_key_count && i < 16; ++i) {
-    if (i > 0) {
-      message_length += snprintf(message + message_length,
-                                 sizeof(message) - message_length, ", ");
-    }
-    message_length +=
-        snprintf(message + message_length, sizeof(message) - message_length,
-                 "%.*s", (int)allowed_keys[i].size, allowed_keys[i].data);
-  }
-  if (allowed_key_count > 16) {
-    message_length += snprintf(message + message_length,
-                               sizeof(message) - message_length, ", ...");
-  }
-  message_length +=
-      snprintf(message + message_length, sizeof(message) - message_length, ")");
+  // For simplicity, show at most 3 unknown key names to avoid buffer issues.
+  if (displayed_count > 3) displayed_count = 3;
 
-  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "%.*s",
-                          (int)message_length, message);
+  if (displayed_count == 1) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unknown key '%.*s' (%" PRIhsz " keys supported)",
+                            (int)state.unknown_keys[0].size,
+                            state.unknown_keys[0].data, allowed_key_count);
+  } else if (displayed_count == 2) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unknown keys: '%.*s', '%.*s'%s (%" PRIhsz " keys supported)",
+        (int)state.unknown_keys[0].size, state.unknown_keys[0].data,
+        (int)state.unknown_keys[1].size, state.unknown_keys[1].data,
+        state.unknown_key_count > 2 ? ", ..." : "", allowed_key_count);
+  } else {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unknown keys: '%.*s', '%.*s', '%.*s'%s (%" PRIhsz " keys supported)",
+        (int)state.unknown_keys[0].size, state.unknown_keys[0].data,
+        (int)state.unknown_keys[1].size, state.unknown_keys[1].data,
+        (int)state.unknown_keys[2].size, state.unknown_keys[2].data,
+        state.unknown_key_count > 3 ? ", ..." : "", allowed_key_count);
+  }
 }
 
 //===----------------------------------------------------------------------===//

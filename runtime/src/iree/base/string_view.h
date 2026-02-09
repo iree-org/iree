@@ -52,6 +52,37 @@ static inline iree_string_view_t iree_make_cstring_view(const char* str) {
   return v;
 }
 
+// A mutable string view into a non-NUL-terminated char buffer.
+// Unlike iree_string_view_t, the data pointer is non-const for writing.
+// Useful for output buffers where we track capacity and written length.
+typedef struct iree_mutable_string_view_t {
+  char* data;
+  iree_host_size_t size;
+} iree_mutable_string_view_t;
+
+// Returns an empty mutable string view.
+static inline iree_mutable_string_view_t iree_mutable_string_view_empty(void) {
+  iree_mutable_string_view_t v = {NULL, 0};
+  return v;
+}
+
+// Returns true if the given mutable string view is empty.
+#define iree_mutable_string_view_is_empty(sv) \
+  (((sv).data == NULL) || ((sv).size == 0))
+
+static inline iree_mutable_string_view_t iree_make_mutable_string_view(
+    char* str, iree_host_size_t str_length) {
+  iree_mutable_string_view_t v = {str, str_length};
+  return v;
+}
+
+// Converts a mutable string view to a const string view.
+static inline iree_string_view_t iree_make_const_string_view(
+    iree_mutable_string_view_t mutable_view) {
+  iree_string_view_t v = {mutable_view.data, mutable_view.size};
+  return v;
+}
+
 // A pair of strings.
 typedef struct iree_string_pair_t {
   union {

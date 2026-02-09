@@ -467,15 +467,16 @@ iree_status_t iree_tokenizer_from_bpe_json(iree_string_view_t json,
     iree_string_view_t model;
     status = iree_tokenizer_json_extract_model(json, &model);
     if (iree_status_is_ok(status)) {
-      char suffix_buffer[16];  // Must match bpe.c state storage.
+      char suffix_storage[16];  // Must match bpe.c state storage.
       iree_host_size_t suffix_length = 0;
       // Empty default means no suffix if key is missing or null.
       status = iree_json_try_lookup_string(
           model, IREE_SV("end_of_word_suffix"), iree_string_view_empty(),
-          suffix_buffer, sizeof(suffix_buffer), &suffix_length);
+          iree_make_mutable_string_view(suffix_storage, sizeof(suffix_storage)),
+          &suffix_length);
       if (iree_status_is_ok(status) && suffix_length > 0) {
         status = iree_tokenizer_bpe_set_end_of_word_suffix(
-            tokenizer, iree_make_string_view(suffix_buffer, suffix_length));
+            tokenizer, iree_make_string_view(suffix_storage, suffix_length));
       }
     }
   }

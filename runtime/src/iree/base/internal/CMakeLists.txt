@@ -143,6 +143,29 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    csprng
+  HDRS
+    "csprng.h"
+  SRCS
+    "csprng.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    csprng_test
+  SRCS
+    "csprng_test.cc"
+  DEPS
+    ::csprng
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     dynamic_library
   HDRS
     "dynamic_library.h"
@@ -270,6 +293,17 @@ iree_cc_library(
     ::internal
     iree::base
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    memory_test
+  SRCS
+    "memory_test.cc"
+  DEPS
+    ::memory
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

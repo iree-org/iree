@@ -15,7 +15,7 @@
 
 static iree_status_t query_arch_test_file_data(
     iree_const_byte_span_t* out_file_data) {
-  *out_file_data = iree_make_const_byte_span(NULL, 0);
+  *out_file_data = iree_const_byte_span_empty();
 
   iree_string_view_t pattern = iree_string_view_empty();
 #if defined(IREE_ARCH_ARM_32)

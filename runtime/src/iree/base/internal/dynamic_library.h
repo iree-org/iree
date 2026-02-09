@@ -62,6 +62,12 @@ void iree_dynamic_library_release(iree_dynamic_library_t* library);
 iree_status_t iree_dynamic_library_lookup_symbol(
     iree_dynamic_library_t* library, const char* symbol_name, void** out_fn);
 
+// Tries to lookup a symbol from the dynamic library exports without creating
+// a status. Returns NULL if the symbol is not found. Use
+// iree_dynamic_library_lookup_symbol if error details are needed.
+void* iree_dynamic_library_try_lookup_symbol(iree_dynamic_library_t* library,
+                                             const char* symbol_name);
+
 // Loads a debug database (PDB/DWARF/etc) from the given path providing debug
 // symbols for this library and attaches it to the symbol store (if active).
 iree_status_t iree_dynamic_library_attach_symbols_from_file(
