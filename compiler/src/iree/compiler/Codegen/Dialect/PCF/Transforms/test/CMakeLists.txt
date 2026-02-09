@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "convert_sref_to_memref.mlir"
     "fuse_consumers.mlir"
     "fuse_pcf_writes.mlir"
+    "fuse_producers.mlir"
     "lower_structural_pcf.mlir"
     "resolve_tokens.mlir"
   TOOLS

@@ -110,6 +110,42 @@ void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp loopOp,
                          TilingInterface target,
                          const ConsumerFusionParams &params);
 
+struct ProducerFusionParams {
+  // Which result index of the scoped op has a fusable producer init.
+  unsigned resultIndex;
+  // The producer op to fuse (implements TilingInterface + DPS). Stored as
+  // Operation* to avoid requiring the full TilingInterface definition here.
+  Operation *producer;
+  // Read sites on the corresponding sref arg that consume the init value.
+  SmallVector<PCF::ReadSliceOp> readSlices;
+};
+
+// Helpers to match a DPS producer as fusable into a pcf.generic/loop op
+// through its tied init argument. The producer must:
+//   1. Implement TilingInterface and DestinationStyleOpInterface.
+//   2. Have a single result.
+//   3. Have all operands dominating the scoped op.
+//   4. Feed into a tied init of the scoped op whose corresponding sref arg
+//      has only read_slice and write_slice users.
+//
+// On success, |params| is populated with the result index, producer op, and
+// list of read_slice ops to replace with tiled producer computations.
+LogicalResult matchTilableProducer(RewriterBase &rewriter,
+                                   PCF::GenericOp genericOp,
+                                   ProducerFusionParams &params);
+LogicalResult matchTilableProducer(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                                   ProducerFusionParams &params);
+
+// Fuses the matched producer into the scoped op by:
+//   1. Replacing the tied init with the producer's DPS init.
+//   2. Generating tiled producer computations at each read_slice site via
+//      TilingInterface::generateResultTileValue.
+//   3. Erasing the original producer if it has no remaining uses.
+void fuseTilableProducer(RewriterBase &rewriter, PCF::GenericOp genericOp,
+                         const ProducerFusionParams &params);
+void fuseTilableProducer(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                         const ProducerFusionParams &params);
+
 // Pattern set for dropping unused results from scoped ops. Due to memory
 // effects this requires cascading operation erasure and is unsuitable for
 // a canonicalization pattern.
