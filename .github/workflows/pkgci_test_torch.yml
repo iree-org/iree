@@ -49,7 +49,6 @@ jobs:
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
-            rocm-index: https://repo.amd.com/rocm/whl/gfx94X-dcgpu/
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
@@ -80,7 +79,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 1ff05dc53a4fdacac881461ac4ec1dee999dd158
+          ref: 20648bde5e6bb551b7c2ffbcf66410a10191fd7b
           path: iree-test-suites
           lfs: false
 
