@@ -2500,6 +2500,31 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::GatherOp gatherOp) {
+  assert(!getLoweringConfig(gatherOp) && "expected lowering_config is not set");
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      gatherOp, DistributionHeuristicConfig{});
+  int64_t batchRank = gatherOp.getBatchRank();
+  int64_t sliceRank = gatherOp.getOutputSliceRank();
+  int64_t iterationRank = batchRank + sliceRank;
+
+  // Vectorize innermost slice dim.
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
+  if (sliceRank > 0) {
+    vecTileSizes.back() = getVectorSize(entryPointFn, gatherOp.getOutputType());
+  }
+
+  LoweringConfigGenerator generator(gatherOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, gatherOp, loweringConfig,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
 /// Sets the lowering configuration for dispatch region for winograd ops:
 ///   linalg_ext.winograd.filter_transform
 ///   linalg_ext.winograd.input_transform
@@ -3177,8 +3202,8 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                                     initCPULaunchConfig);
           })
           .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-                linalg::PackOp, tensor::PadOp, linalg::UnPackOp,
-                linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+                IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
+                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,
                 IREE::LinalgExt::WinogradInputTransformOp,
