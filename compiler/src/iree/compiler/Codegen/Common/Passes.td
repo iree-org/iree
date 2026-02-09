@@ -91,9 +91,31 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
 
-def ConvertBf16ToUInt16BuffersPass :
-    Pass<"iree-codegen-convert-bf16-to-uint16-buffers", ""> {
-  let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
+def ConvertUnsupportedFloatToIntBuffersPass :
+    Pass<"iree-codegen-convert-unsupported-float-to-int-buffers", ""> {
+  let summary = "Convert unsupported float buffer types to integer types of same bit width.";
+  let description = [{
+    Converts buffer operations with unsupported float element types to use
+    integer types of the same bit width. This is used for backends that don't
+    support certain float types natively (e.g., SPIR-V without fp8 extensions).
+
+    The actual float arithmetic should already be emulated by
+    ConvertUnsupportedFloatArithPass before this pass runs.
+  }];
+  let options = [
+    Option<"includeBf16", "include-bf16", "bool", /*default=*/"true",
+           "Convert BF16 buffers to i16">,
+    Option<"includeF8E5M2", "include-f8e5m2", "bool", /*default=*/"true",
+           "Convert F8E5M2 buffers to i8">,
+    Option<"includeF8E4M3FN", "include-f8e4m3fn", "bool", /*default=*/"true",
+           "Convert F8E4M3FN buffers to i8">,
+    Option<"includeF8E5M2FNUZ", "include-f8e5m2fnuz", "bool", /*default=*/"true",
+           "Convert F8E5M2FNUZ buffers to i8">,
+    Option<"includeF8E4M3FNUZ", "include-f8e4m3fnuz", "bool", /*default=*/"true",
+           "Convert F8E4M3FNUZ buffers to i8">,
+    Option<"includeF8E8M0FNU", "include-f8e8m0fnu", "bool", /*default=*/"true",
+           "Convert F8E8M0FNU (MX scale) buffers to i8">,
+  ];
 }
 
 def ConvertUnsupportedFloatArithPass
