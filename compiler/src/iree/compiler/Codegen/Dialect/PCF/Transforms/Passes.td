@@ -58,6 +58,30 @@ def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
                            "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 
+def FuseProducersPass : Pass<"iree-pcf-fuse-producers", ""> {
+  let summary = "Fuses DPS producers into pcf.generic/loop ops through tied init args.";
+  let description = [{
+    Pass for fusing producer operations into `pcf.generic` and `pcf.loop` ops.
+
+    The input is IR containing PCF parallel ops whose tied init values are
+    produced by operations implementing `TilingInterface` and
+    `DestinationStyleOpInterface` (e.g. `linalg.fill`).
+
+    The pass matches each tied init that is the single result of a DPS producer.
+    For each `pcf.read_slice` on the corresponding sref argument, it generates a
+    tiled version of the producer via `generateResultTileValue` and replaces the
+    read with the tiled result. The scoped op's init is updated to the producer's
+    DPS init, and the original producer is erased if unused.
+
+    The underlying fusion patterns are exposed via `matchTilableProducer()` and
+    `fuseTilableProducer()` for use in custom pipelines.
+  }];
+  let dependentDialects = ["::mlir::arith::ArithDialect",
+                           "::mlir::affine::AffineDialect",
+                           "::mlir::vector::VectorDialect",
+                           "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
+}
+
 def FusePCFWritesPass : Pass<"iree-pcf-fuse-pcf-writes", ""> {
   let summary = "Consolidates pcf.write_slice ops in loop bodies";
   let description = [{
