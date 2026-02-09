@@ -16,8 +16,8 @@ namespace mlir::iree_compiler {
 // backend-specific options as needed.
 //
 // Note: We need static members because they are shared across all derived
-// instances to avoid duplicate LLVM cl::opt registration when multiple backends
-// inherit from this class.
+// instances to bind LLVM cl::opt registration at the single storage when
+// multiple backends inherit from this class.
 struct CodegenOptions {
   // Path to a module containing a tuning spec.
   static std::string tuningSpecPath;
