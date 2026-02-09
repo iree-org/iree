@@ -183,6 +183,10 @@ collectViewOpsToClone(memref::AllocOp alloc, scf::ForOp forOp) {
       if (viewOpsToClone.contains(user)) {
         continue;
       }
+      // Dealloc should not block view-op cloning.
+      if (isa<memref::DeallocOp>(user)) {
+        continue;
+      }
       LDBG() << "Cannot clone view ops: found use outside loop: " << *user;
       return failure();
     }
@@ -904,11 +908,18 @@ struct SharedBarrierState {
 // `needBarrierBeforeRead`, so the following read receives the barrier. This
 // keeps the minimum number of synchronizations while still enforcing the R↔W
 // ordering required by the pipelined schedule.
-static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
-                                                Location loc,
-                                                Block::iterator begin,
-                                                Block::iterator end,
-                                                SharedBarrierState state) {
+//
+// When `multiBuffered` is true, writes do NOT set `needBarrierBeforeRead`.
+// Use this only in async copy mode loop body, where only gather_to_lds write
+// present, and multi-buffering ensures that reads and writes target different
+// buffers. In this case, a single barrier placed before each write satisfies
+// both requirements: it acts as a WAR barrier for the upcoming write and as a
+// RAW barrier for the upcoming read (the previous iteration's writes are
+// guaranteed visible once all wavefronts pass the barrier).
+static SharedBarrierState
+insertBarriersInRange(RewriterBase &rewriter, Location loc,
+                      Block::iterator begin, Block::iterator end,
+                      SharedBarrierState state, bool multiBuffered = false) {
   for (auto it = begin; it != end; ++it) {
     Operation &op = *it;
     bool hasSharedRead = hasNestedSharedRead(&op);
@@ -933,7 +944,7 @@ static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
     if (hasSharedRead) {
       state.needBarrierBeforeWrite = true;
     }
-    if (hasSharedWrite) {
+    if (hasSharedWrite && !multiBuffered) {
       state.needBarrierBeforeRead = true;
     }
   }
@@ -995,59 +1006,41 @@ static void insertStreamCopyBarriers(RewriterBase &rewriter,
 }
 
 // Inserts barriers for AsyncCopy mode (gather_to_lds based pipelining).
-// In async copy mode with multi-buffering, we only insert barriers before
-// shared memory writes (gather_to_lds).
+// In this mode:
+// - Prologue writes to shared memory via gather_to_lds
+// - Loop body writes (gather_to_lds) then reads for compute
+// - Multi-buffering ensures writes and reads target different LDS slots
 static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                                     scf::ForOp newForOp) {
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
+  SharedBarrierState state;
+
   bool isNested = isInsideLoop(newForOp);
+
   if (isNested) {
-    // Nested loop: insert barriers in prologue before writes.
-    // The epilogue of the previous outer iteration may have read from shared
-    // memory, so we need barriers before any writes in the prologue.
-    bool needBarrierBeforeWrite = true;
-    for (auto it = parentBlock->begin(); it != newForOp->getIterator(); ++it) {
-      if (hasNestedSharedWrite(&*it) && needBarrierBeforeWrite) {
-        rewriter.setInsertionPoint(&*it);
-        gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
-        needBarrierBeforeWrite = false;
-      }
-      if (hasNestedSharedRead(&*it)) {
-        needBarrierBeforeWrite = true;
-      }
-    }
+    state.needBarrierBeforeWrite = true;
+    state = insertBarriersInRange(rewriter, loc, parentBlock->begin(),
+                                  newForOp->getIterator(), state);
   }
 
-  // Loop body: only insert barriers before writes.
-  //
-  // Why barrier before write:
-  //   The write buffer (gather_to_lds target) was read by the previous
-  //   iteration. A barrier ensures all wavefronts complete their reads
-  //   before any wavefront starts writing, preventing write-after-read races.
-  //
-  // Why no barrier before read:
-  //   The LLVM backend inserts s_waitcnt vmcnt(N) before ds_read instructions
-  //   via alias scope metadata. vmcnt is per-wavefront and ensures that
-  //   wavefront's gather_to_lds DMAs complete before its ds_reads execute.
-  //   Cross-wavefront synchronization is already handled by the barrier
-  //   before write in the previous iteration.
+  // Back-edge WAR hazard: previous iteration's reads → this iteration's
+  // writes. The barrier before writes also covers the prologue→first
+  // iteration synchronization.
+  state.needBarrierBeforeWrite = true;
+
+  // Loop body: multiBuffered=true because gather_to_lds writes and
+  // subsequent reads target different LDS slots (no write→read barrier).
   Block *body = newForOp.getBody();
-  bool needBarrierBeforeWrite = true;
+  state = insertBarriersInRange(rewriter, loc, body->begin(),
+                                std::prev(body->end()), state,
+                                /*multiBuffered=*/true);
 
-  for (auto it = body->begin(); it != std::prev(body->end()); ++it) {
-    Operation &op = *it;
-
-    if (hasNestedSharedWrite(&op) && needBarrierBeforeWrite) {
-      rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
-      needBarrierBeforeWrite = false;
-    }
-
-    if (hasNestedSharedRead(&op)) {
-      needBarrierBeforeWrite = true;
-    }
-  }
+  // Epilogue reads from the last iteration's writes.
+  state.needBarrierBeforeRead = true;
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
+                        state);
 }
 
 // Dispatches to the appropriate barrier insertion strategy based on mode.

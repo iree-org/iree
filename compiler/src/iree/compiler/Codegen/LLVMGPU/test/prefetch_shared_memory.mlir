@@ -452,10 +452,10 @@ func.func @prefetch_gather_to_lds_two_operands(
     // CHECK-3STAGE: scf.yield
     scf.yield %sum : vector<1xf32>
   }
-  // 2-stage: 1 epilogue compute iteration
+  // CHECK: gpu.barrier
   // CHECK: vector.transfer_read
   // CHECK: arith.mulf
-  // 3-stage: 2 epilogue compute iterations
+  // CHECK-3STAGE: gpu.barrier
   // CHECK-3STAGE: vector.transfer_read
   // CHECK-3STAGE: arith.mulf
   // CHECK-3STAGE: vector.transfer_read
