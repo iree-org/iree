@@ -221,8 +221,9 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       auto alignment = arith::ConstantIndexOp::create(builder, loc, size);
       paddedDynamicDims[dim] = arith::CeilDivSIOp::create(
           builder, loc, paddedDynamicDims[dim], alignment);
-      paddedDynamicDims[dim] = arith::MulIOp::create(
-          builder, loc, paddedDynamicDims[dim], alignment);
+      paddedDynamicDims[dim] =
+          arith::MulIOp::create(builder, loc, paddedDynamicDims[dim], alignment,
+                                arith::IntegerOverflowFlags::nsw);
     } else {
       paddedShape[dim] = llvm::alignTo(paddedShape[dim], size);
     }
@@ -245,7 +246,8 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
   Value result =
       arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : paddedDynamicDims) {
-    result = arith::MulIOp::create(builder, loc, result, dim);
+    result = arith::MulIOp::create(builder, loc, result, dim,
+                                   arith::IntegerOverflowFlags::nsw);
   }
 
   // Always pack the elements back-to-back for subtypes.
