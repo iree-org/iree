@@ -101,6 +101,8 @@ func.func @block_attention_dims() {
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
 
+// -----
+
 func.func @block_attention_dims_load_from_buffer() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 8.837890e-02 : f16

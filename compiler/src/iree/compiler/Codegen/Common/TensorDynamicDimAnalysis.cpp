@@ -132,17 +132,13 @@ static void updateTensorDimInfo(
     const DataFlowSolver &solver,
     TensorDynamicDimAnalysis::TensorDimDivisibilityInfo &divisibilityInfo,
     TensorDynamicDimAnalysis::TensorDimRangeInfo &rangeInfo) {
-  RankedTensorType resultType =
+  auto resultType =
       cast<RankedTensorType>(loadFromBufferOp.getTensor().getType());
   if (resultType.hasStaticShape()) {
     return;
   }
 
-  auto bufferType =
-      dyn_cast<MemRefType>(loadFromBufferOp.getBuffer().getType());
-  if (!bufferType) {
-    return;
-  }
+  auto bufferType = cast<MemRefType>(loadFromBufferOp.getBuffer().getType());
 
   std::optional<ValueRange> maybeBufferDynamicDims =
       IREE::Util::findDynamicDims(loadFromBufferOp.getBuffer());
@@ -154,12 +150,11 @@ static void updateTensorDimInfo(
   Value result = loadFromBufferOp.getResult();
   uint64_t dynamicDimIndex = 0;
   for (auto [dimIndex, dimSize] : llvm::enumerate(bufferType.getShape())) {
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       continue;
     }
-    Value dynamicDim = bufferDynamicDims[dynamicDimIndex++];
-    updateTensorDimInfo(result, dimIndex, dynamicDim, solver, divisibilityInfo,
-                        rangeInfo);
+    updateTensorDimInfo(result, dimIndex, bufferDynamicDims[dynamicDimIndex++],
+                        solver, divisibilityInfo, rangeInfo);
   }
 }
 
