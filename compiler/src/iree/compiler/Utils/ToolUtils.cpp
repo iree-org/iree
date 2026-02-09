@@ -286,7 +286,7 @@ std::string findPlatformLibDirectory(StringRef platformName) {
   }
 
   SmallString<256> libPath(dylibPath);
-  // Trim patth to lib dir: some/path/lib/libIREECompiler.so -> some/path/lib
+  // Trim path to lib dir: some/path/lib/libIREECompiler.so -> some/path/lib
   llvm::sys::path::remove_filename(libPath);
 
   // Try IREE's convention: lib/iree_platform_libs/<platform>/
