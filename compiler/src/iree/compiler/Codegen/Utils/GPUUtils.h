@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -176,6 +177,102 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
 mlir::gpu::AllReduceOperation
 combiningKindToAllReduce(vector::CombiningKind kind);
 
+/// This struct matches the parameters of the `iree_codegen.xor_shuffle`
+/// attribute. Notably only the first two parameters are used in this struct
+/// because the other parameters are not used in the current implementation of
+/// the XOR shuffle.
+/// The parameters are:
+/// - rowElems: number of elements across which we apply a swizzle.
+/// - accessElems: number of elements in one swizzle group.
+/// So for example:
+/// For data of length 8: [0][1][2][3][4][5][6][7]
+/// and an XOR shuffle with rowElems = 4, accessElems = 2,
+/// we can apply a swizzle to each logical row of 4 elements in groups of 2
+/// elements.
+///
+/// Original data:
+/// |               | swizzle group 0   | swizzle group 1   |
+/// |---------------|-------------------|-------------------|
+/// Logical row 0:  | [0][1]            | [2][3]            |
+/// Logical row 1:  | [4][5]            | [6][7]            |
+///
+/// Swizzled data:
+/// |               | swizzle group 0   | swizzle group 1   |
+/// |---------------|-------------------|-------------------|
+/// Logical row 0:  | [0][1]            | [2][3]            |
+/// Logical row 1:  | [6][7]            | [4][5]            |
+///
+/// Final result: [0][1][2][3][6][7][4][5]
+/// Note that when the swizzle was applied, the swaps were performed on
+/// groups of 2 elements at a time (accessElems), across the 4 elements in the
+/// row (rowElems).
+struct XorShuffleParams {
+  int64_t rowElems;
+  int64_t accessElems;
+};
+
+/// For a given MMA intrinsic and operand, returns the lower bound and upper
+/// bound for valid values of XOR shuffle attribute parameters, access width and
+/// row width. For both parameters, the elements ingested per thread at a time
+/// is used as the minimum bound and the total number of elements in the tile is
+/// used as the upper bound. Note that if you want to do a sweep over valid XOR
+/// swizzles, this is how the sweep should be done:
+/// - sweep access elements over all multiples of the minimum bound, respecting
+/// the upper bound.
+/// - sweep row elements over all multiple of the access elements, respecting
+/// the upper bound.
+FailureOr<XorShuffleParams>
+getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    int operandIndex);
+
+/// Returns true if the XOR shuffle is valid for the given number of row
+/// elements, number of access elements, and total tile elements.
+/// Else returns false.
+/// An XOR Shuffle can be invalid for many reasons:
+/// - The number of row elements exceeds the total elements in the tile.
+/// - The number of access elements exceeds the total elements in the row.
+/// - The number of row elements does not evenly divide the total elements in
+/// the tile.
+/// - The number of access elements does not evenly divide the number of row
+/// elements.
+/// - The number of columns in a row does not evenly divide the total number of
+/// tile elements.
+bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+                       int64_t totalTileElems);
+
+/// Returns XOR shuffle parameters known to be optimal for the given target and
+/// intrinsic based on profiling results.
+FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex);
+
+/// Note this generic heuristic for untuned cases is not guaranteed to be
+/// optimal for all targets and intrinsics.
+FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+
+/// Returns the XOR shuffle parameters (row elements and access elements) for
+/// the given target, intrinsic, and operand index. For some targets and
+/// intrinsics, the optimal XOR shuffle for a given operand might be known. For
+/// these cases of "Tuned" targets and intrinsics, a look up table is used to
+/// obtain values for the XOR shuffle attributes. Otherwise, these values are
+/// computed by calculating the K tile size and LDS bank width. Note this
+/// generic heuristic for untuned cases is not guaranteed to be optimal for all
+/// targets and intrinsics.
+FailureOr<XorShuffleParams>
+getXorShuffleParams(IREE::GPU::TargetAttr target,
+                    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex);
+
+/// Returns the XOR shuffle attribute for the given target, intrinsic, and
+/// operand index.
+FailureOr<Attribute>
+getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
+                  IREE::GPU::TargetAttr target,
+                  IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex);
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
