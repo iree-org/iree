@@ -40,6 +40,14 @@ def AttrBasedPipelinePass : Pass<"iree-preprocessing-attr-based-pipeline", ""> {
   ];
 }
 
+def Convert1X1FilterConv2DToMatmulPass:
+    Pass<"iree-preprocessing-convert-1x1-filter-conv2d-to-matmul", ""> {
+  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
 def ConvertConv2DToImg2ColPass :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
