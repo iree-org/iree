@@ -642,7 +642,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("attr"), py::arg("fragment"));
 
   //===-------------------------------------------------------------------===//
-  // XOR shuffle utilities (for use by SharkTuner)
+  // Binding to XOR shuffle utility functions
   //===-------------------------------------------------------------------===//
 
   py::class_<ireeGPUXorShuffleBounds>(iree_gpu_module, "XorShuffleBounds")
