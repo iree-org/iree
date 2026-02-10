@@ -4,22 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===----------------------------------------------------------------------===//
-// InsertBatchDimForBatchlessConv Pass
-//===----------------------------------------------------------------------===//
-//
-// This pass detects convolution operations that have been generalized and
-// had their batch dimension (N=1) stripped by IREE codegen transformations.
-// It restores the batch dimension by inserting tensor.expand_shape and
-// tensor.collapse_shape operations, enabling upstream convolution-specific
-// patterns (like DownscaleConv and vectorization) to match and apply.
-//
-// The reshape operations are expected to be folded into dispatch tensor
-// load/store operations by the PropagateReshapesByExpansion pass, resulting
-// in zero runtime cost.
-//
-//===----------------------------------------------------------------------===//
-
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -108,13 +92,12 @@ static Value prependUnitDimToTensor(RewriterBase &rewriter, Location loc,
 
 /// Shifts all existing dimensions in an affine map by 1 and prepends d0.
 /// (d0, d1, ...) -> (...) becomes (d0, d1, d2, ...) -> (d0, ...)
-static AffineMap shiftAndPrependDimToMap(AffineMap oldMap, unsigned newNumDims,
-                                         MLIRContext *ctx) {
+static AffineMap shiftAndPrependDimToMap(AffineMap oldMap, MLIRContext *ctx) {
   AffineMap shifted = oldMap.shiftDims(1);
   SmallVector<AffineExpr> newResults;
   newResults.push_back(getAffineDimExpr(0, ctx)); // New leading dim.
   llvm::append_range(newResults, shifted.getResults());
-  return AffineMap::get(newNumDims, 0, newResults, ctx);
+  return AffineMap::get(oldMap.getNumDims() + 1, 0, newResults, ctx);
 }
 
 /// Inserts a unit batch dimension into a batchless convolution operation.
@@ -130,7 +113,6 @@ static linalg::GenericOp insertUnitBatchDimension(RewriterBase &rewriter,
                                                   linalg::GenericOp op) {
   Location loc = op.getLoc();
   MLIRContext *ctx = rewriter.getContext();
-  unsigned newNumLoops = op.getNumLoops() + 1;
 
   // Process all input operands.
   // - Operand 0 (image): expand tensor and prepend dim to map.
@@ -145,7 +127,7 @@ static linalg::GenericOp insertUnitBatchDimension(RewriterBase &rewriter,
     if (inputOperand->getOperandNumber() == 0) {
       // Image input: expand and prepend dim to map.
       newInputs.push_back(prependUnitDimToTensor(rewriter, loc, input));
-      newMaps.push_back(shiftAndPrependDimToMap(oldMap, newNumLoops, ctx));
+      newMaps.push_back(shiftAndPrependDimToMap(oldMap, ctx));
     } else {
       // Other inputs (filter, zero points): keep as-is, just shift map.
       newInputs.push_back(input);
@@ -158,8 +140,8 @@ static linalg::GenericOp insertUnitBatchDimension(RewriterBase &rewriter,
   Value output = outputOperand->get();
   auto outputType = cast<RankedTensorType>(output.getType());
   Value expandedOutput = prependUnitDimToTensor(rewriter, loc, output);
-  AffineMap newOutputMap = shiftAndPrependDimToMap(
-      op.getMatchingIndexingMap(outputOperand), newNumLoops, ctx);
+  AffineMap newOutputMap =
+      shiftAndPrependDimToMap(op.getMatchingIndexingMap(outputOperand), ctx);
   newMaps.push_back(newOutputMap);
 
   // New iterator types: prepend parallel (batch) to existing types.
