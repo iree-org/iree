@@ -2842,13 +2842,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-combine-layout-transformation" class="md-nav__link">
+  <a href="#-iree-codegen-combine-result-layout-transformation" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-codegen-combine-layout-transformation
+      -iree-codegen-combine-result-layout-transformation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-codegen-combine-layout-transformation">
+    <nav class="md-nav" aria-label="-iree-codegen-combine-result-layout-transformation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2862,6 +2862,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-combine-source-layout-transformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-combine-source-layout-transformation
+    </span>
+  </a>
   
 </li>
       
@@ -6088,13 +6097,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-codegen-combine-layout-transformation" class="md-nav__link">
+  <a href="#-iree-codegen-combine-result-layout-transformation" class="md-nav__link">
     <span class="md-ellipsis">
-      -iree-codegen-combine-layout-transformation
+      -iree-codegen-combine-result-layout-transformation
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="-iree-codegen-combine-layout-transformation">
+    <nav class="md-nav" aria-label="-iree-codegen-combine-result-layout-transformation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6108,6 +6117,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-codegen-combine-source-layout-transformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-combine-source-layout-transformation
+    </span>
+  </a>
   
 </li>
       
@@ -7376,7 +7394,7 @@ iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.</p>
 <p><em>Adhoc canonicalization of selected loop-carried values/dependencies for scf.for ops</em></p>
 <h3 id="-iree-codegen-cleanup-buffer-alloc-view"><code>-iree-codegen-cleanup-buffer-alloc-view</code><a class="headerlink" href="#-iree-codegen-cleanup-buffer-alloc-view" title="Permanent link">link</a></h3>
 <p><em>Performs cleanups over HAL interface/buffer allocation/view operations</em></p>
-<h3 id="-iree-codegen-combine-layout-transformation"><code>-iree-codegen-combine-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-layout-transformation" title="Permanent link">link</a></h3>
+<h3 id="-iree-codegen-combine-result-layout-transformation"><code>-iree-codegen-combine-result-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-result-layout-transformation" title="Permanent link">link</a></h3>
 <p><em>Combines layout transformation operations into a single map_scatter operation.</em></p>
 <p>Starting from the specified leaf ops, iteratively combine producer
 layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
@@ -7387,6 +7405,12 @@ store_to_buffer op.</p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-scope : Specify the roots for layout transformation combination.
 </code></pre></div>
+<h3 id="-iree-codegen-combine-source-layout-transformation"><code>-iree-codegen-combine-source-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-source-layout-transformation" title="Permanent link">link</a></h3>
+<p><em>Combines layout transformation operations into a single map_gather operation.</em></p>
+<p>Starting from <code>iree_codegen.load_from_buffer</code> ops, iteratively combine
+consumer layout/indexing transformation ops (linalg.transpose,
+tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
+tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.</p>
 <h3 id="-iree-codegen-concretize-pad-result-shape"><code>-iree-codegen-concretize-pad-result-shape</code><a class="headerlink" href="#-iree-codegen-concretize-pad-result-shape" title="Permanent link">link</a></h3>
 <p><em>Concretizes tensor.pad op's result shape if its source opimplements OffsetSizeAndStrideOpInterface.</em></p>
 <h3 id="-iree-codegen-config-tracking-canonicalize"><code>-iree-codegen-config-tracking-canonicalize</code><a class="headerlink" href="#-iree-codegen-config-tracking-canonicalize" title="Permanent link">link</a></h3>
