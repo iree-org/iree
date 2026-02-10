@@ -575,8 +575,8 @@ def test_get_xor_shuffle_bounds():
     # Returns (min_access_elems, total_tile_elems): elements per thread (lower bound),
     # total elements in the tile (upper bound).
     min_access_elems, total_tile_elems = bounds
-    assert min_access_elems == 4, "min_access_elems should be 4"
-    assert total_tile_elems == 256, "total_tile_elems should be 256"
+    assert min_access_elems == 4
+    assert total_tile_elems == 256
     # Operand 1 (RHS) should also yield bounds.
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
