@@ -109,9 +109,9 @@ func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: t
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 0, 1, 1]
-//  CHECK-SAME:     subgroup = [0, 1, 0, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 2, 1, 16, 32, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 0, 2, 1]
+//  CHECK-SAME:     subgroup = [4, 1, 4, 1, 1, 0, 0]
+//  CHECK-SAME:     workgroup = [4, 2, 4, 16, 32, 0, 0]
 
 // -----
 
@@ -233,12 +233,12 @@ func.func @matmul_dynamic_M(%arg0: tensor<?x256xf32>, %arg1: tensor<256x256xf32>
 }
 
 // CHECK-LABEL: func.func @matmul_dynamic_M(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 4]
-//  CHECK-SAME:     thread = [1, 4, 0]
-//  CHECK-SAME:     workgroup = [1, 256, 0]
+//  CHECK-SAME:     reduction = [0, 0, 16]
+//  CHECK-SAME:     subgroup = [2, 4, 0]
+//  CHECK-SAME:     workgroup = [64, 128, 0]
 
 // -----
 
@@ -373,7 +373,7 @@ func.func @aligned_dynamic_matmul_with_two_reduce_dim(%arg0: tensor<192x?x16xf32
 // CHECK:       linalg.generic
 // CHECK-SAME:  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 // CHECK-SAME:  promote_operands = [0, 1]
-// CHECK-SAME:  reduction = [0, 1, 0, 4],
+// CHECK-SAME:  reduction = [0, 4, 0, 4],
 // CHECK-SAME:  subgroup = [2, 0, 1, 0],
 // CHECK-SAME:  workgroup = [64, 0, 16, 0]}
 
@@ -393,12 +393,12 @@ func.func @unaligned_dynamic_matmul_with_two_reduce_dim(%arg0: tensor<196x?x4xf3
 }
 
 // CHECK-LABEL: func.func @unaligned_dynamic_matmul_with_two_reduce_dim(
-// CHECK-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
 // CHECK:       linalg.generic
 // CHECK-SAME:  promote_operands = [0, 1]
-// CHECK-SAME:  reduction = [0, 4, 0, 4],
-// CHECK-SAME:  thread = [1, 0, 1, 0],
-// CHECK-SAME:  workgroup = [4, 0, 16, 0]}
+// CHECK-SAME:  reduction = [0, 16, 0, 1],
+// CHECK-SAME:  subgroup = [2, 0, 1, 0],
+// CHECK-SAME:  workgroup = [64, 0, 16, 0]}
 
 // -----
 
@@ -1173,3 +1173,52 @@ func.func @gemm_with_dps_init_producer(
 
 //     CHECK-LABEL: gemm_with_dps_init_producer
 //           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+
+  // Test for dynamic matmul with util.assume.int providing bounds information.
+  // The assumption %arg0<umin = 0, umax = 1024, udiv = 16> indicates the dynamic
+  // dimension is divisible by 16, enabling better tile selection.
+  func.func @dynamic_dims_with_bounds(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2048x4096xf32>) -> tensor<?x4096xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = util.assume.int %arg0<umin = 0, umax = 1024, udiv = 16> : index
+    %init = tensor.empty(%0) : tensor<?x4096xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+    %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+        outs(%fill : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+    return %matmul : tensor<?x4096xf32>
+  }
+
+  // CHECK-LABEL: func.func @dynamic_dims_with_bounds(
+  //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+  //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+  //       CHECK:   linalg.fill ins
+  //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+  //  CHECK-SAME:     promote_operands = [0, 1]
+  //  CHECK-SAME:     reduction = [0, 0, 4]
+  //  CHECK-SAME:     subgroup = [4, 4, 0]
+  //  CHECK-SAME:     workgroup = [128, 128, 0]
+
+  // -----
+
+  // Test for dynamic matmul without bounds assumptions.
+  // Without util.assume.int, the compiler has no information about the dynamic
+  // dimension alignment, potentially resulting in different tiling decisions.
+  func.func @dynamic_dims_no_bounds(%arg0 : index, %lhs : tensor<?x2048xf32>, %rhs : tensor<2048x4096xf32>) -> tensor<?x4096xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %init = tensor.empty(%arg0) : tensor<?x4096xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+    %matmul = linalg.matmul ins(%lhs, %rhs : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+        outs(%fill : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+    return %matmul : tensor<?x4096xf32>
+  }
+
+  // CHECK-LABEL: func.func @dynamic_dims_no_bounds(
+  //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+  //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>
+  //       CHECK:   linalg.fill ins
+  //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+  //  CHECK-SAME:     promote_operands = [0, 1]
+  //  CHECK-SAME:     reduction = [0, 0, 4]
+  //  CHECK-SAME:     subgroup = [4, 4, 0]
+  //  CHECK-SAME:     workgroup = [128, 128, 0]

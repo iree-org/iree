@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -25,7 +27,7 @@ static llvm::cl::opt<bool> clEnableBlockedMatmuls(
     "iree-codegen-block-dynamic-dimensions-of-contractions",
     llvm::cl::desc("developer flag to gaurd blocking dynamic dimensions of "
                    "contraction-like ops"),
-    llvm::cl::Hidden, llvm::cl::init(true));
+    llvm::cl::Hidden, llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 
@@ -303,7 +305,9 @@ blockDynamicDimensions(RewriterBase &rewriter,
                                       attentionOp);
       })
       .Case([&](linalg::LinalgOp linalgOp) {
-        if (clEnableBlockedMatmuls) {
+        if (clEnableBlockedMatmuls ||
+            !(linalg::isaContractionOpInterface(linalgOp) ||
+              IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp))) {
           return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
         }
         return success();

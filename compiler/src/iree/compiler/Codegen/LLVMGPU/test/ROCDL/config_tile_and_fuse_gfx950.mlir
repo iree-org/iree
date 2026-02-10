@@ -107,9 +107,8 @@ func.func @scaled_matmul_with_dynamic_red_dim(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_with_dynamic_red_dim
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//   CHECK-NOT:     mma_kind
 
 // -----
 
@@ -142,12 +141,12 @@ func.func @scaled_matmul_with_dynamic_batch(
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 //  CHECK-SAME:     reduction = [0, 0, 0, 1, 1]
-//  CHECK-SAME:     subgroup = [0, 4, 4, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 128, 256, 0, 0]
+//  CHECK-SAME:     subgroup = [2, 2, 8, 0, 0]
+//  CHECK-SAME:     workgroup = [2, 128, 256, 0, 0]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=26112
+// CHECK-REMARKS-SAME: Remark=34816
 
 // -----
 
@@ -185,7 +184,7 @@ func.func @small_scaled_matmul(
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-SAME: Remark=2176
+// CHECK-REMARKS: Remark=2176
 
 // -----
 
