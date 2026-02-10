@@ -654,13 +654,12 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    [](const ireeGPUXorShuffleBounds &self) {
                      return self.totalTileElems;
                    })
-      .def("__repr__",
-           [](const ireeGPUXorShuffleBounds &self) {
-             return "XorShuffleBounds(min_access_elems=" +
-                    std::to_string(self.minAccessElems) +
-                    ", total_tile_elems=" +
-                    std::to_string(self.totalTileElems) + ")";
-           });
+      .def("__repr__", [](const ireeGPUXorShuffleBounds &self) {
+        return "XorShuffleBounds(min_access_elems=" +
+               std::to_string(self.minAccessElems) +
+               ", total_tile_elems=" + std::to_string(self.totalTileElems) +
+               ")";
+      });
 
   iree_gpu_module.def(
       "get_xor_shuffle_bounds",

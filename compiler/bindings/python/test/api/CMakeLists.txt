@@ -24,4 +24,3 @@ iree_py_test(
   SRCS
     "tuner_api_test.py"
 )
-

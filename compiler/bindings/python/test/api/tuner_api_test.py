@@ -576,13 +576,11 @@ def test_get_xor_shuffle_bounds():
     # total_tile_elems = total elements in the tile (upper bound). Example: for
     # a tile of 512 elements with 32 elements per thread, min_access_elems=32
     # and total_tile_elems=512; valid XOR shuffle configs sweep between these.
-    assert hasattr(bounds, "min_access_elems") and hasattr(
-        bounds, "total_tile_elems"
-    )
+    assert hasattr(bounds, "min_access_elems") and hasattr(bounds, "total_tile_elems")
     assert bounds.min_access_elems >= 0 and bounds.total_tile_elems >= 0
-    assert bounds.min_access_elems <= bounds.total_tile_elems, (
-        "For bounds, min_access_elems <= total_tile_elems"
-    )
+    assert (
+        bounds.min_access_elems <= bounds.total_tile_elems
+    ), "For bounds, min_access_elems <= total_tile_elems"
     # Operand 1 (RHS) should also yield bounds.
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
