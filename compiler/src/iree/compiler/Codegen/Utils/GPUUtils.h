@@ -228,7 +228,7 @@ struct XorShuffleBounds {
 /// the upper bound.
 /// - sweep row elements over all multiple of the access elements, respecting
 /// the upper bound.
-FailureOr<XorShuffleParams>
+FailureOr<XorShuffleBounds>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex);
 

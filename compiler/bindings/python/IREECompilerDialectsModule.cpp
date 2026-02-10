@@ -645,36 +645,22 @@ NB_MODULE(_ireeCompilerDialects, m) {
   // Binding to XOR shuffle utility functions
   //===-------------------------------------------------------------------===//
 
-  py::class_<ireeGPUXorShuffleBounds>(iree_gpu_module, "XorShuffleBounds")
-      .def_prop_ro("min_access_elems",
-                   [](const ireeGPUXorShuffleBounds &self) {
-                     return self.minAccessElems;
-                   })
-      .def_prop_ro("total_tile_elems",
-                   [](const ireeGPUXorShuffleBounds &self) {
-                     return self.totalTileElems;
-                   })
-      .def("__repr__", [](const ireeGPUXorShuffleBounds &self) {
-        return "XorShuffleBounds(min_access_elems=" +
-               std::to_string(self.minAccessElems) +
-               ", total_tile_elems=" + std::to_string(self.totalTileElems) +
-               ")";
-      });
-
   iree_gpu_module.def(
       "get_xor_shuffle_bounds",
-      [](MlirAttribute intrinsic,
-         int operandIndex) -> std::optional<ireeGPUXorShuffleBounds> {
-        ireeGPUXorShuffleBounds bounds = {};
-        if (ireeGPUGetXorShuffleBounds(intrinsic, operandIndex, &bounds)) {
-          return bounds;
+      [](MlirAttribute mmaIntrinsic,
+         int operandIndex) -> std::optional<std::tuple<int64_t, int64_t>> {
+        int64_t minAccessElems = 0, totalTileElems = 0;
+        if (ireeGPUGetXorShuffleBounds(mmaIntrinsic, operandIndex,
+                                        &minAccessElems, &totalTileElems)) {
+          return std::make_tuple(minAccessElems, totalTileElems);
         }
         return std::nullopt;
       },
       "Returns the bounds for valid XOR shuffle parameters (min_access_elems, "
       "total_tile_elems) for the given MMA intrinsic and operand index. See "
-      "GPUUtils for sweep semantics.",
-      py::arg("intrinsic"), py::arg("operand_index"));
+      "GPUUtils for sweep semantics. Returns (min_access_elems, total_tile_elems) "
+      "or None on failure.",
+      py::arg("mmaIntrinsic"), py::arg("operand_index"));
 
   iree_gpu_module.def(
       "is_xor_shuffle_valid",

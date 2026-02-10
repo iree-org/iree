@@ -850,7 +850,7 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return XorShuffleBounds({*maybeMinimumAccessElems, *maybeTotalTileElems});
+  return XorShuffleBounds{*maybeMinimumAccessElems, *maybeTotalTileElems};
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
