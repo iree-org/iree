@@ -1861,7 +1861,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -1893,7 +1893,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -1951,7 +1951,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -1981,7 +1981,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2098,7 +2098,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2130,7 +2130,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2162,7 +2162,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2194,7 +2194,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2225,7 +2225,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2257,7 +2257,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2290,7 +2290,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
     "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
@@ -2392,7 +2392,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     --iree-dispatch-creation-data-tiling=true
     --iree-rocm-encoding-layout-resolver=data-tiling
-    --iree-hip-enable-tensor-ukernels
+    --iree-rocm-enable-tensor-ukernels
   LABELS
     "noasan"
     "nomsan"
