@@ -173,6 +173,24 @@ FailureOr<PCF::WriteSliceOp>
 composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
                                     PCF::WriteSliceOp writeSliceOp);
 
+/// Folds an scf.forall containing a pcf.loop into a single pcf.generic.
+///
+/// Validates structural requirements:
+/// - All ops in scf.forall.in_parallel are tensor.parallel_insert_slice.
+/// - All insert sources come from the same pcf.loop result.
+/// - All insert destinations are scf.forall shared_outs.
+/// - The pcf.loop is the last op before terminator in forall body.
+/// - The pcf.loop has single count argument (linearized).
+/// - All pcf.loop region ref arg users are pcf.write_slice ops.
+/// - Ref args have SyncOnReturnAttr sync scope.
+///
+/// Does NOT validate mapping or scope attributes (caller's responsibility).
+/// Does NOT create workgroup_count_hint (caller's responsibility).
+///
+/// On success, the forall and inner loop are replaced with a pcf.generic.
+FailureOr<PCF::GenericOp> foldForallIntoPCFLoop(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp);
+
 } // namespace mlir::iree_compiler::IREE::PCF
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_PCF_TRANSFORMS_TRANSFORMS_H_
