@@ -572,11 +572,8 @@ def test_get_xor_shuffle_bounds():
     mma_attr = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16)
     bounds = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=0)
     assert bounds is not None, "get_xor_shuffle_bounds should succeed for MMAAttr"
-    # Returns (min_access_elems, total_tile_elems): elements per thread (lower bound),
-    # total elements in the tile (upper bound).
     min_access_elems, total_tile_elems = bounds
     assert min_access_elems == 4
     assert total_tile_elems == 256
-    # Operand 1 (RHS) should also yield bounds.
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
