@@ -534,15 +534,13 @@ void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
 bool ireeGPUGetXorShuffleBounds(MlirAttribute mmaIntrinsic,
                                 int32_t operandIndex, int64_t *minAccessElems,
                                 int64_t *totalTileElems) {
-  assert(!mlirAttributeIsNull(mmaIntrinsic) && "mmaIntrinsic cannot be null");
-  assert(minAccessElems && totalTileElems &&
-         "minAccessElems and totalTileElems cannot be null");
   auto innerTileDesc = llvm::dyn_cast<
       mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>(
       unwrap(mmaIntrinsic));
-  if (!innerTileDesc) {
-    return false;
-  }
+  assert(!mlirAttributeIsNull(mmaIntrinsic) && "mmaIntrinsic cannot be null");
+  assert(minAccessElems && "minAccessElems cannot be null");
+  assert(totalTileElems && "totalTileElems cannot be null");
+  assert(innerTileDesc && "innerTileDesc cannot be null");
   mlir::FailureOr<mlir::iree_compiler::XorShuffleBounds> result =
       mlir::iree_compiler::getXorShuffleBounds(innerTileDesc, operandIndex);
   if (llvm::failed(result)) {

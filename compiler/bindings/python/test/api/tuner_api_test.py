@@ -573,22 +573,9 @@ def test_get_xor_shuffle_bounds():
     bounds = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=0)
     assert bounds is not None, "get_xor_shuffle_bounds should succeed for MMAAttr"
     # Returns (min_access_elems, total_tile_elems): elements per thread (lower bound),
-    # total elements in the tile (upper bound). Example: for a tile of 512 elements
-    # with 32 elements per thread, min_access_elems=32 and total_tile_elems=512.
+    # total elements in the tile (upper bound).
     min_access_elems, total_tile_elems = bounds
-    assert min_access_elems >= 0 and total_tile_elems >= 0
-    assert (
-        min_access_elems <= total_tile_elems
-    ), "For bounds, min_access_elems <= total_tile_elems"
+    assert min_access_elems == 4 and total_tile_elems == 256
     # Operand 1 (RHS) should also yield bounds.
     bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
     assert bounds_rhs is not None
-
-
-@run
-def test_get_xor_shuffle_bounds_invalid_input():
-    """Test that get_xor_shuffle_bounds returns None for non-intrinsic attribute."""
-    # Passing a non-InnerTileDesc attribute should return None.
-    attr = ir.IntegerAttr.get(ir.IntegerType.get_signless(64), 0)
-    bounds = iree_gpu.get_xor_shuffle_bounds(attr, operand_index=0)
-    assert bounds is None

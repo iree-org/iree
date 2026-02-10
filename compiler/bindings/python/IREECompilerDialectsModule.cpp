@@ -485,7 +485,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
             if (!mlirAttributeIsNull(basisInfo.mappingAttr)) {
               mapping = getIntArrayAttrValues(basisInfo.mappingAttr);
             }
-            return std::make_tuple(counts, mapping);
+            return std::tuple(counts, mapping);
           })
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
@@ -633,10 +633,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       });
 
   iree_gpu_module.def(
-      "get_single_subgroup_layout",
-      [](MlirAttribute attr, int fragment) {
-        return ireeGPUGetSingleSubgroupLayout(attr, fragment);
-      },
+      "get_single_subgroup_layout", ireeGPUGetSingleSubgroupLayout,
       "Returns the single subgroup layout (element, thread, outer, "
       "tstrides) for a given MMA or VirtualMMA intrinsic and fragment. ",
       py::arg("attr"), py::arg("fragment"));
@@ -652,7 +649,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
         int64_t minAccessElems = 0, totalTileElems = 0;
         if (ireeGPUGetXorShuffleBounds(mmaIntrinsic, operandIndex,
                                        &minAccessElems, &totalTileElems)) {
-          return std::make_tuple(minAccessElems, totalTileElems);
+          return std::tuple(minAccessElems, totalTileElems);
         }
         return std::nullopt;
       },
@@ -663,11 +660,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("mmaIntrinsic"), py::arg("operand_index"));
 
   iree_gpu_module.def(
-      "is_xor_shuffle_valid",
-      [](int64_t numRowElems, int64_t numAccessElems, int64_t totalTileElems) {
-        return ireeGPUIsXORShuffleValid(numRowElems, numAccessElems,
-                                        totalTileElems);
-      },
+      "is_xor_shuffle_valid", ireeGPUIsXORShuffleValid,
       "Returns true if the XOR shuffle is valid for the given parameters.",
       py::arg("num_row_elems"), py::arg("num_access_elems"),
       py::arg("total_tile_elems"));
