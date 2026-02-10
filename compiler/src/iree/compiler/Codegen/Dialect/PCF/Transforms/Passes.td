@@ -32,6 +32,36 @@ def ConvertForallToLoopsPass : Pass<"iree-pcf-convert-forall-to-loops", ""> {
   let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 
+def TestFoldForallIntoPCFLoopPass : Pass<"iree-pcf-test-fold-forall-into-pcf-loop", ""> {
+  let summary = "Test pass for foldForallIntoPCFLoop transform";
+  let description = [{
+    Test pass for folding `scf.forall` ops containing `pcf.loop` ops into a
+    single `pcf.generic` operation.
+
+    The input is IR containing `scf.forall` ops with `iree_codegen.local_mapping`
+    attributes that contain a `pcf.loop` with `#pcf.sequential` scope as the
+    last operation before the terminator.
+
+    Structural requirements validated:
+    - All ops in `scf.forall.in_parallel` are `tensor.parallel_insert_slice`.
+    - All insert sources come from the same `pcf.loop` result.
+    - All insert destinations are `scf.forall` shared_outs.
+    - The `pcf.loop` is the last op before terminator in forall body.
+    - The `pcf.loop` has a single count argument (linearized).
+    - All `pcf.loop` region ref arg users are `pcf.write_slice` ops.
+    - Ref args have `SyncOnReturnAttr` sync scope.
+
+    The underlying transform is exposed via `foldForallIntoPCFLoop()` for use
+    in custom pipelines with different matching criteria.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect"
+  ];
+}
+
 def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
   let summary = "Fuses all consumers of pcf.generic/loop ops";
   let description = [{
