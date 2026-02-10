@@ -12,7 +12,6 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -21,12 +20,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 //===----------------------------------------------------------------------===//
 // Command Line Options
 //===----------------------------------------------------------------------===//
-
-static llvm::cl::opt<bool> clDetensoring(
-    "iree-dispatch-creation-enable-detensoring",
-    llvm::cl::desc(
-        "Enable changing of tensor operations into scalar operations."),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
     "iree-dispatch-creation-element-wise-fuse-multi-reduction",
@@ -165,9 +158,6 @@ static void addDispatchRegionCreationPreprocessingPasses(
           DispatchCreation::createFuseMultiUseElementwiseProducerPass)
 
       // 6. Some more "post elementwise fusion passes".
-      //    a. Detensorize.
-      //       TODO: This is probably not in the right place.
-      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
