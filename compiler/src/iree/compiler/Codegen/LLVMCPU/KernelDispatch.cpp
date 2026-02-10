@@ -1577,8 +1577,8 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   // Numbers picked experimentally for a range of element types.
   constexpr int64_t m = 8, n = 2, k = 1;
 
-  // Multiply "horizontal" extents by the number of elements that fit in a vector
-  // register.
+  // Multiply "horizontal" extents by the number of elements that fit in a
+  // vector register.
   sizes.append({m, n * outNumElements, k * outNumElements});
 
   // Mark N dimension as scalable, if doing scalable vectorization.
