@@ -187,9 +187,10 @@ ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
 // Returns the lower and upper bounds for valid XOR shuffle parameters for a
 // given MMA intrinsic and operand index. On success, writes to minAccessElems
 // and totalTileElems and returns true. Returns false on failure.
-MLIR_CAPI_EXPORTED bool ireeGPUGetXorShuffleBounds(
-    MlirAttribute mmaIntrinsic, int32_t operandIndex,
-    int64_t *minAccessElems, int64_t *totalTileElems);
+MLIR_CAPI_EXPORTED bool ireeGPUGetXorShuffleBounds(MlirAttribute mmaIntrinsic,
+                                                   int32_t operandIndex,
+                                                   int64_t *minAccessElems,
+                                                   int64_t *totalTileElems);
 
 // Returns true if the XOR shuffle is valid for the given parameters.
 MLIR_CAPI_EXPORTED bool ireeGPUIsXORShuffleValid(int64_t numRowElems,

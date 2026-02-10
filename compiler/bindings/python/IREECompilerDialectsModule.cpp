@@ -651,15 +651,15 @@ NB_MODULE(_ireeCompilerDialects, m) {
          int operandIndex) -> std::optional<std::tuple<int64_t, int64_t>> {
         int64_t minAccessElems = 0, totalTileElems = 0;
         if (ireeGPUGetXorShuffleBounds(mmaIntrinsic, operandIndex,
-                                        &minAccessElems, &totalTileElems)) {
+                                       &minAccessElems, &totalTileElems)) {
           return std::make_tuple(minAccessElems, totalTileElems);
         }
         return std::nullopt;
       },
       "Returns the bounds for valid XOR shuffle parameters (min_access_elems, "
       "total_tile_elems) for the given MMA intrinsic and operand index. See "
-      "GPUUtils for sweep semantics. Returns (min_access_elems, total_tile_elems) "
-      "or None on failure.",
+      "GPUUtils for sweep semantics. Returns (min_access_elems, "
+      "total_tile_elems) or None on failure.",
       py::arg("mmaIntrinsic"), py::arg("operand_index"));
 
   iree_gpu_module.def(
