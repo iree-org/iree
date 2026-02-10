@@ -1549,12 +1549,17 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
     SmallVectorImpl<bool> &scalableSizeFlags) {
   assert(sizes.empty() && "Pre-condition enforced by caller");
 
-  // Check we have a matrix multiplication.
+  // Check we have a (batch) matrix multiplication.
   FailureOr<linalg::ContractionDimensions> cDims =
       linalg::inferContractionDims(op);
   if (failed(cDims) || cDims->m.size() != 1 || cDims->n.size() != 1 ||
-      cDims->k.size() != 1 || cDims->m[0] != 0 || cDims->n[0] != 1 ||
-      cDims->k[0] != 2) {
+      cDims->k.size() != 1) {
+    return;
+  }
+  if ((cDims->batch.size() == 0 &&
+       (cDims->m[0] != 0 || cDims->n[0] != 1 || cDims->k[0] != 2)) ||
+      (cDims->batch.size() == 1 &&
+       (cDims->m[0] != 1 || cDims->n[0] != 2 || cDims->k[0] != 3))) {
     return;
   }
 
