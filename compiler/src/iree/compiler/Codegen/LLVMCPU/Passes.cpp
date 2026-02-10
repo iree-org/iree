@@ -655,12 +655,14 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
 }
 
 void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
-    OpPassManager &modulePassManager) {
+    OpPassManager &modulePassManager, const CPUCodegenOptions &cpuOpts) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager,
                                                  clUseSoftmaxInterFusion);
   }
+  modulePassManager.addPass(createMaterializeTuningSpecsPass(
+      MaterializeTuningSpecsPassOptions{cpuOpts.tuningSpecPath}));
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
       .addPass(createMaterializeDeviceEncodingPass)
@@ -683,10 +685,10 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
 }
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager) {
+    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts) {
   variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager);
+  buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager, cpuOpts);
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
@@ -760,7 +762,9 @@ void registerCodegenLLVMCPUPasses() {
       "iree-codegen-llvmcpu-configuration-pipeline",
       "Runs the translation strategy configuration pipeline on Linalg for CPU",
       [](OpPassManager &modulePassManager) {
-        buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager);
+        const CPUCodegenOptions &cpuOpts = CPUCodegenOptions::FromFlags::get();
+        buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager,
+                                                         cpuOpts);
       });
 
   static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
