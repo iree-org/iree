@@ -84,59 +84,6 @@ func.func @indexing_map_invalid_index_vector_shape(%indices: vector<128x64xindex
 
 // -----
 
-func.func @arg_compare_no_inputs(%out_val: vector<4xf32>,
-                                 %out_idx: vector<4xi32>)
-    -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{expected 1 or 2 input operands, but got 0}}
-  %result:2 = iree_vector_ext.arg_compare
-      dimension(0)
-      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_vector_ext.yield %cmp : i1
-  } -> vector<4xf32>, vector<4xi32>
-  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
-}
-
-// -----
-
-func.func @arg_compare_too_many_inputs(%input1: vector<4x128xf32>,
-                                       %input2: vector<4x128xi32>,
-                                       %input3: vector<4x128xf32>,
-                                       %out_val: vector<4xf32>,
-                                       %out_idx: vector<4xi32>)
-    -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{expected 1 or 2 input operands, but got 3}}
-  %result:2 = iree_vector_ext.arg_compare
-      dimension(1)
-      ins(%input1, %input2, %input3 : vector<4x128xf32>, vector<4x128xi32>, vector<4x128xf32>)
-      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_vector_ext.yield %cmp : i1
-  } -> vector<4xf32>, vector<4xi32>
-  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
-}
-
-// -----
-
-func.func @arg_compare_wrong_output_count(%input: vector<4x128xf32>,
-                                          %out_val: vector<4xf32>)
-    -> vector<4xf32> {
-  // expected-error @+1 {{expected 2 init operands, but got 1}}
-  %result = iree_vector_ext.arg_compare
-      dimension(1)
-      ins(%input : vector<4x128xf32>)
-      inits(%out_val : vector<4xf32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_vector_ext.yield %cmp : i1
-  } -> vector<4xf32>
-  return %result : vector<4xf32>
-}
-
-// -----
-
 func.func @arg_compare_dimension_out_of_bounds(%input: vector<4x128xf32>,
                                                %out_val: vector<4xf32>,
                                                %out_idx: vector<4xi32>)
@@ -345,7 +292,7 @@ func.func @arg_compare_result_value_type_mismatch(%input: vector<4x128xf32>,
                                                    %out_val: vector<4xf32>,
                                                    %out_idx: vector<4xi32>)
     -> (vector<4xf16>, vector<4xi32>) {
-  // expected-error @+1 {{result type 0 doesn't match init value type. Result type: 'vector<4xf16>', init value type: 'vector<4xf32>'}}
+  // expected-error @+1 {{result value type doesn't match init value type. Result type: 'vector<4xf16>', init value type: 'vector<4xf32>'}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -363,7 +310,7 @@ func.func @arg_compare_result_index_type_mismatch(%input: vector<4x128xf32>,
                                                    %out_val: vector<4xf32>,
                                                    %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi64>) {
-  // expected-error @+1 {{result type 1 doesn't match init index type. Result type: 'vector<4xi64>', init index type: 'vector<4xi32>'}}
+  // expected-error @+1 {{result index type doesn't match init index type. Result type: 'vector<4xi64>', init index type: 'vector<4xi32>'}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)

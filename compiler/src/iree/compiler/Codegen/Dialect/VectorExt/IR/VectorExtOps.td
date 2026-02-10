@@ -282,12 +282,21 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     dimension of a vector, returning both the selected value and its
     corresponding index.
 
-    This operation is created by vectorizing `iree_linalg_ext.arg_compare`
-    through the GenericVectorizationPass. It wraps the operation with
-    vector.transfer_read/write but keeps the core reduction semantics intact.
+    **Comparator region semantics:**
 
-    The comparator region defines the selection rule (e.g., "greater than"
-    for argmax or "less than" for argmin).
+    The comparator region defines the predication logic that determines the
+    selection rule for the reduction (e.g., "greater than" for argmax or
+    "less than" for argmin). The region takes two scalar values of the input
+    element type as arguments and returns a single `i1` result via
+    `iree_vector_ext.yield`.
+
+    The region is invoked during the reduction to determine which element to
+    select: when the comparison yields `true`, the first argument is selected;
+    otherwise, the second argument is selected.
+
+    The region must contain only pure operations (operations with the `Pure`
+    trait). This ensures the comparator can be safely executed in any order
+    during the reduction.
 
     Example (implicit-index mode - argmax over dim 1):
     ```mlir
@@ -320,22 +329,28 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     } -> vector<4xf32>, vector<4xi32>
     ```
 
-    The `index_base` is optional and is preserved from the tensor version
-    when applicable.
+    The `index_base` is an optional offset value that, when specified, is added
+    to the computed indices in the result. This is useful when reducing over a
+    sliced subregion where the indices need to be adjusted to reflect their
+    position in the original vector. The `index_base` can only be used in
+    implicit-index mode (single input).
 
     The `inits` operands provide the initial accumulator values for the
     reduction (initial max/min value and index).
   }];
 
   let arguments = (ins
-    Variadic<AnyVectorOfAnyRank>:$inputs,
-    Variadic<AnyVectorOfAnyRank>:$inits,
+    AnyVectorOfAnyRank:$input_value,
+    Optional<AnyVectorOfAnyRank>:$input_index,
+    AnyVectorOfAnyRank:$init_value,
+    AnyVectorOfAnyRank:$init_index,
     Optional<Index>:$index_base,
     I64Attr:$dimension
   );
 
   let results = (outs
-    Variadic<AnyVectorOfAnyRank>:$results
+    AnyVectorOfAnyRank:$result_value,
+    AnyVectorOfAnyRank:$result_index
   );
 
   let regions = (region SizedRegion<1>:$region);
@@ -343,41 +358,18 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `inits` `(` $inits `:` type($inits) `)`
+    `ins` `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
+    `inits` `(` $init_value `,` $init_index `:` type($init_value) `,` type($init_index) `)`
     (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
-    $region (`->` type($results)^)?
+    $region `->` type($result_value) `,` type($result_index)
   }];
 
   let extraClassDeclaration = [{
-    Value getInputValue() {
-      return getInputs()[0];
-    }
-
     bool hasExplicitIndexInput() {
-      return getInputs().size() == 2;
+      return getInputIndex() != nullptr;
     }
 
-    Value getInputIndex() {
-      if (!hasExplicitIndexInput()) {
-        return nullptr;
-      }
-      return getInputs()[1];
-    }
-
-    ValueRange getInitValues() {
-      return getInits();
-    }
-
-    Value getInitValue() {
-      return getInits()[0];
-    }
-
-    Value getInitIndex() {
-      return getInits()[1];
-    }
-
-    VectorType getInputType() {
+    VectorType getInputValueType() {
       return cast<VectorType>(getInputValue().getType());
     }
 
@@ -403,6 +395,10 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
       return nullptr;
     }
 
+    Type getInputValueElementType() {
+      return getInputValueType().getElementType();
+    }
+
     Type getInitValueElementType() {
       return getInitValueType().getElementType();
     }
@@ -412,7 +408,7 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
     }
 
     int64_t getInputRank() {
-      return getInputType().getRank();
+      return getInputValueType().getRank();
     }
   }];
 

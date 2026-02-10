@@ -689,23 +689,7 @@ Type TransferGatherOp::getExpectedMaskType() {
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  unsigned numInputs = llvm::size(getInputs());
-  if (numInputs != 1 && numInputs != 2) {
-    return op->emitOpError("expected 1 or 2 input operands, but got ")
-           << numInputs;
-  }
-
-  unsigned numInits = llvm::size(getInits());
-  if (numInits != 2) {
-    return op->emitOpError("expected 2 init operands, but got ") << numInits;
-  }
-
-  unsigned numResults = llvm::size(getResults());
-  if (numResults != 2) {
-    return op->emitOpError("expected 2 results, but got ") << numResults;
-  }
-
-  VectorType inputType = getInputType();
+  VectorType inputType = getInputValueType();
   VectorType initValueType = getInitValueType();
   VectorType initIndexType = getInitIndexType();
 
@@ -836,16 +820,17 @@ LogicalResult ArgCompareOp::verify() {
            << yieldType;
   }
 
-  TypeRange resultTypes = getResultTypes();
-  if (resultTypes[0] != initValueType) {
-    return op->emitOpError("result type 0 doesn't match init value type. ")
-           << "Result type: " << resultTypes[0]
+  Type resultValueType = getResult(0).getType();
+  if (resultValueType != initValueType) {
+    return op->emitOpError("result value type doesn't match init value type. ")
+           << "Result type: " << resultValueType
            << ", init value type: " << initValueType;
   }
 
-  if (resultTypes[1] != initIndexType) {
-    return op->emitOpError("result type 1 doesn't match init index type. ")
-           << "Result type: " << resultTypes[1]
+  Type resultIndexType = getResult(1).getType();
+  if (resultIndexType != initIndexType) {
+    return op->emitOpError("result index type doesn't match init index type. ")
+           << "Result type: " << resultIndexType
            << ", init index type: " << initIndexType;
   }
 
