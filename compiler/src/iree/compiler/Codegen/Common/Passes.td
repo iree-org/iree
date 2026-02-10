@@ -187,8 +187,8 @@ def ConvertWorkgroupForallToPCFPass
   let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
 }
 
-def CombineLayoutTransformationPass :
-    InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+def CombineResultLayoutTransformationPass :
+    InterfacePass<"iree-codegen-combine-result-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
@@ -217,6 +217,25 @@ def CombineLayoutTransformationPass :
     "iree_compiler::IREE::Util::UtilDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
+  ];
+}
+
+def CombineSourceLayoutTransformationPass :
+    InterfacePass<"iree-codegen-combine-source-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_gather operation.";
+  let description = [{
+    Starting from `iree_codegen.load_from_buffer` ops, iteratively combine
+    consumer layout/indexing transformation ops (linalg.transpose,
+    tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
+    tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "tensor::TensorDialect",
+    "ub::UBDialect"
   ];
 }
 

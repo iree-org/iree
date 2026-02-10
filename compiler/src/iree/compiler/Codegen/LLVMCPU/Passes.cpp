@@ -123,7 +123,7 @@ addTileAndDistributePasses(OpPassManager &funcPassManager,
     funcPassManager.addPass(
         createTileAndDistributeToWorkgroupsUsingForallOpPass());
     funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
-    funcPassManager.addPass(createCombineLayoutTransformationPass());
+    funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   } else {
     funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
     funcPassManager.addPass(createCSEPass());

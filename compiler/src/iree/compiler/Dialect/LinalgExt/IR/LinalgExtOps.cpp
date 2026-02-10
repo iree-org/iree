@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -746,9 +747,48 @@ bool MapGatherOp::isIdentity() {
   return true;
 }
 
+Value MapGatherOp::getPaddingValue() {
+  Block &transformBody = getTransformationRegion().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  return yieldOp.getOperand(yieldOp.getNumOperands() - 1);
+}
+
 void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *ctx) {
   results.add<ConvertIdentityMapGatherScatterToCopy<MapGatherOp>>(ctx);
+}
+
+MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
+                                                 Location loc, Value source,
+                                                 Value output) {
+  assert(source.getType() == output.getType() &&
+         "expected source and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapGatherOp =
+      MapGatherOp::create(builder, loc, resultType, source, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapGatherOp.getTransformationRegion();
+  auto outputType = cast<ShapedType>(output.getType());
+  SmallVector<Location> blockArgLocs(outputType.getRank(), loc);
+  SmallVector<Type> indexTypes(outputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+
+  // Add a poison padding value. The identity transformation shouldn't need it
+  // since source and output have the same shape. Using poison indicates that
+  // no real padding is needed, and allows foldPadIntoMapGather to detect
+  // whether it's safe to set a new padding value.
+  Type elementType = outputType.getElementType();
+  Value padding = ub::PoisonOp::create(builder, loc, elementType);
+  yieldedValues.push_back(padding);
+  IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
+  return mapGatherOp;
 }
 
 //===----------------------------------------------------------------------===//
