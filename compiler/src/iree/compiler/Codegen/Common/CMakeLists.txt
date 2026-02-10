@@ -198,6 +198,7 @@ iree_cc_library(
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRLoopLikeInterface
