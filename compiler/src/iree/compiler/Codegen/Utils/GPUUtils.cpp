@@ -840,7 +840,7 @@ validateXorShuffle(FailureOr<XorShuffleParams> swizzle,
 // Disabling clang-tidy for the following functions, as it will be externally
 // linked to the CAPI in a future PR.
 // NOLINTBEGIN(misc-use-internal-linkage)
-FailureOr<XorShuffleParams>
+FailureOr<XorShuffleBounds>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex) {
   FailureOr<int64_t> maybeMinimumAccessElems =
@@ -850,8 +850,7 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
     return failure();
   }
-  return XorShuffleParams({/*rowElems=*/*maybeMinimumAccessElems,
-                           /*accessElems=*/*maybeTotalTileElems});
+  return XorShuffleBounds({*maybeMinimumAccessElems, *maybeTotalTileElems});
 }
 
 bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,

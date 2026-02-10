@@ -530,3 +530,35 @@ void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
     assert(false && "Unexpected attribute type in MMA intrinsics array");
   }
 }
+
+static mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface
+unwrapInnerTileDesc(MlirAttribute attr) {
+  return llvm::dyn_cast<
+      mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>(
+      unwrap(attr));
+}
+
+bool ireeGPUGetXorShuffleBounds(MlirAttribute intrinsic, int32_t operandIndex,
+                                ireeGPUXorShuffleBounds *outBounds) {
+  if (!intrinsic.ptr || !outBounds) {
+    return false;
+  }
+  auto innerTileDesc = unwrapInnerTileDesc(intrinsic);
+  if (!innerTileDesc) {
+    return false;
+  }
+  auto result =
+      mlir::iree_compiler::getXorShuffleBounds(innerTileDesc, operandIndex);
+  if (mlir::failed(result)) {
+    return false;
+  }
+  outBounds->minAccessElems = result->minAccessElems;
+  outBounds->totalTileElems = result->totalTileElems;
+  return true;
+}
+
+bool ireeGPUIsXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+                              int64_t totalTileElems) {
+  return mlir::iree_compiler::isXORShuffleValid(
+      numRowElems, numAccessElems, totalTileElems);
+}

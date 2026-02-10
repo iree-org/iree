@@ -19,6 +19,8 @@ VER_0 {
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
     ireeCodegenGetExecutableVariantOps;
     ireeGPUGetSingleSubgroupLayout;
+    ireeGPUGetXorShuffleBounds;
+    ireeGPUIsXORShuffleValid;
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
     ireeCodegenInferScaledContractionDimensions;

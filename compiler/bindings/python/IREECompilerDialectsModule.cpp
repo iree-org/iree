@@ -642,6 +642,52 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("attr"), py::arg("fragment"));
 
   //===-------------------------------------------------------------------===//
+  // XOR shuffle utilities (for use by SharkTuner)
+  //===-------------------------------------------------------------------===//
+
+  py::class_<ireeGPUXorShuffleBounds>(iree_gpu_module, "XorShuffleBounds")
+      .def_prop_ro("min_access_elems",
+                   [](const ireeGPUXorShuffleBounds &self) {
+                     return self.minAccessElems;
+                   })
+      .def_prop_ro("total_tile_elems",
+                   [](const ireeGPUXorShuffleBounds &self) {
+                     return self.totalTileElems;
+                   })
+      .def("__repr__",
+           [](const ireeGPUXorShuffleBounds &self) {
+             return "XorShuffleBounds(min_access_elems=" +
+                    std::to_string(self.minAccessElems) +
+                    ", total_tile_elems=" +
+                    std::to_string(self.totalTileElems) + ")";
+           });
+
+  iree_gpu_module.def(
+      "get_xor_shuffle_bounds",
+      [](MlirAttribute intrinsic,
+         int operandIndex) -> std::optional<ireeGPUXorShuffleBounds> {
+        ireeGPUXorShuffleBounds bounds = {};
+        if (ireeGPUGetXorShuffleBounds(intrinsic, operandIndex, &bounds)) {
+          return bounds;
+        }
+        return std::nullopt;
+      },
+      "Returns the bounds for valid XOR shuffle parameters (min_access_elems, "
+      "total_tile_elems) for the given MMA intrinsic and operand index. See "
+      "GPUUtils for sweep semantics.",
+      py::arg("intrinsic"), py::arg("operand_index"));
+
+  iree_gpu_module.def(
+      "is_xor_shuffle_valid",
+      [](int64_t numRowElems, int64_t numAccessElems, int64_t totalTileElems) {
+        return ireeGPUIsXORShuffleValid(numRowElems, numAccessElems,
+                                        totalTileElems);
+      },
+      "Returns true if the XOR shuffle is valid for the given parameters.",
+      py::arg("num_row_elems"), py::arg("num_access_elems"),
+      py::arg("total_tile_elems"));
+
+  //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps
   //===-------------------------------------------------------------------===//
 
