@@ -485,7 +485,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
             if (!mlirAttributeIsNull(basisInfo.mappingAttr)) {
               mapping = getIntArrayAttrValues(basisInfo.mappingAttr);
             }
-            return std::make_tuple(counts, mapping);
+            return std::tuple(counts, mapping);
           })
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
@@ -633,13 +633,37 @@ NB_MODULE(_ireeCompilerDialects, m) {
       });
 
   iree_gpu_module.def(
-      "get_single_subgroup_layout",
-      [](MlirAttribute attr, int fragment) {
-        return ireeGPUGetSingleSubgroupLayout(attr, fragment);
-      },
+      "get_single_subgroup_layout", ireeGPUGetSingleSubgroupLayout,
       "Returns the single subgroup layout (element, thread, outer, "
       "tstrides) for a given MMA or VirtualMMA intrinsic and fragment. ",
       py::arg("attr"), py::arg("fragment"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to XOR shuffle utility functions
+  //===-------------------------------------------------------------------===//
+
+  iree_gpu_module.def(
+      "get_xor_shuffle_bounds",
+      [](MlirAttribute mmaIntrinsic,
+         int operandIndex) -> std::optional<std::tuple<int64_t, int64_t>> {
+        int64_t minAccessElems = 0, totalTileElems = 0;
+        if (ireeGPUGetXorShuffleBounds(mmaIntrinsic, operandIndex,
+                                       &minAccessElems, &totalTileElems)) {
+          return std::tuple(minAccessElems, totalTileElems);
+        }
+        return std::nullopt;
+      },
+      "Returns the bounds for valid XOR shuffle parameters (min_access_elems, "
+      "total_tile_elems) for the given MMA intrinsic and operand index. See "
+      "GPUUtils for sweep semantics. Returns (min_access_elems, "
+      "total_tile_elems) or None on failure.",
+      py::arg("mmaIntrinsic"), py::arg("operand_index"));
+
+  iree_gpu_module.def(
+      "is_xor_shuffle_valid", ireeGPUIsXORShuffleValid,
+      "Returns true if the XOR shuffle is valid for the given parameters.",
+      py::arg("num_row_elems"), py::arg("num_access_elems"),
+      py::arg("total_tile_elems"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps

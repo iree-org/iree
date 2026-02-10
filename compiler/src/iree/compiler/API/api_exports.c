@@ -28,6 +28,8 @@ extern void ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID();
 extern void ireeCodegenDispatchLoweringPassPipelineAttrGetValue();
 extern void ireeCodegenGetExecutableVariantOps();
 extern void ireeGPUGetSingleSubgroupLayout();
+extern void ireeGPUGetXorShuffleBounds();
+extern void ireeGPUIsXORShuffleValid();
 extern void ireeCodegenGetTunerRootOps();
 extern void ireeCodegenGetAttentionOpDetail();
 extern void ireeCodegenInferScaledContractionDimensions();
@@ -949,6 +951,8 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
   x += (uintptr_t)&ireeCodegenGetExecutableVariantOps;
   x += (uintptr_t)&ireeGPUGetSingleSubgroupLayout;
+  x += (uintptr_t)&ireeGPUGetXorShuffleBounds;
+  x += (uintptr_t)&ireeGPUIsXORShuffleValid;
   x += (uintptr_t)&ireeCodegenGetTunerRootOps;
   x += (uintptr_t)&ireeCodegenGetAttentionOpDetail;
   x += (uintptr_t)&ireeCodegenInferScaledContractionDimensions;

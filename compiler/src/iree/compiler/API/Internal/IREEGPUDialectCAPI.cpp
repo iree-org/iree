@@ -530,3 +530,29 @@ void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
     assert(false && "Unexpected attribute type in MMA intrinsics array");
   }
 }
+
+bool ireeGPUGetXorShuffleBounds(MlirAttribute mmaIntrinsic,
+                                int32_t operandIndex, int64_t *minAccessElems,
+                                int64_t *totalTileElems) {
+  assert(!mlirAttributeIsNull(mmaIntrinsic) && "mmaIntrinsic cannot be null");
+  auto innerTileDesc = llvm::dyn_cast<
+      mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>(
+      unwrap(mmaIntrinsic));
+  assert(innerTileDesc && "innerTileDesc cannot be null");
+  assert(minAccessElems && "minAccessElems cannot be null");
+  assert(totalTileElems && "totalTileElems cannot be null");
+  mlir::FailureOr<mlir::iree_compiler::XorShuffleBounds> result =
+      mlir::iree_compiler::getXorShuffleBounds(innerTileDesc, operandIndex);
+  if (llvm::failed(result)) {
+    return false;
+  }
+  *minAccessElems = result->minAccessElems;
+  *totalTileElems = result->totalTileElems;
+  return true;
+}
+
+bool ireeGPUIsXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+                              int64_t totalTileElems) {
+  return mlir::iree_compiler::isXORShuffleValid(numRowElems, numAccessElems,
+                                                totalTileElems);
+}

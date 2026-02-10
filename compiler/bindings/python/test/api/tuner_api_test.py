@@ -6,6 +6,7 @@
 
 from iree.compiler import ir
 from iree.compiler.dialects import iree_codegen
+from iree.compiler.dialects import iree_gpu
 from iree.compiler.dialects import affine
 from iree.compiler.ir import AffineMap, AffineDimExpr
 
@@ -545,3 +546,34 @@ def test_infer_scaled_contraction_dimensions():
     assert dims_batched.n == [2], f"Got {dims_batched.n}"
     assert dims_batched.k == [3], f"Got {dims_batched.k}"
     assert dims_batched.kB == [4], f"Got {dims_batched.kB}"
+
+
+@run
+def test_is_xor_shuffle_valid():
+    """Test XOR shuffle validation (pure function, no MLIR attributes)."""
+    # Valid: row and access divide tile; row >= access; tile >= row.
+    assert iree_gpu.is_xor_shuffle_valid(256, 32, 512)
+    assert iree_gpu.is_xor_shuffle_valid(512, 64, 512)
+    assert iree_gpu.is_xor_shuffle_valid(32, 8, 512)
+    # Invalid: row exceeds tile.
+    assert not iree_gpu.is_xor_shuffle_valid(512, 32, 256)
+    # Invalid: access exceeds row.
+    assert not iree_gpu.is_xor_shuffle_valid(256, 512, 512)
+    # Invalid: row does not evenly divide tile.
+    assert not iree_gpu.is_xor_shuffle_valid(300, 32, 512)
+    # Invalid: access does not evenly divide row.
+    assert not iree_gpu.is_xor_shuffle_valid(256, 33, 512)
+
+
+@run
+def test_get_xor_shuffle_bounds():
+    """Test XOR shuffle bounds for an MMA intrinsic (for use by SharkTuner)."""
+    # Use an MMA intrinsic that supports getXorShuffleBounds (InnerTileDescAttrInterface).
+    mma_attr = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16)
+    bounds = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=0)
+    assert bounds is not None, "get_xor_shuffle_bounds should succeed for MMAAttr"
+    min_access_elems, total_tile_elems = bounds
+    assert min_access_elems == 4
+    assert total_tile_elems == 256
+    bounds_rhs = iree_gpu.get_xor_shuffle_bounds(mma_attr, operand_index=1)
+    assert bounds_rhs is not None

@@ -211,6 +211,13 @@ struct XorShuffleParams {
   int64_t accessElems;
 };
 
+/// Bounds for valid XOR shuffle parameters (min access elements per thread,
+/// total elements in the tile). Used when sweeping over valid configs.
+struct XorShuffleBounds {
+  int64_t minAccessElems;
+  int64_t totalTileElems;
+};
+
 /// For a given MMA intrinsic and operand, returns the lower bound and upper
 /// bound for valid values of XOR shuffle attribute parameters, access width and
 /// row width. For both parameters, the elements ingested per thread at a time
@@ -221,7 +228,7 @@ struct XorShuffleParams {
 /// the upper bound.
 /// - sweep row elements over all multiple of the access elements, respecting
 /// the upper bound.
-FailureOr<XorShuffleParams>
+FailureOr<XorShuffleBounds>
 getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                     int operandIndex);
 
