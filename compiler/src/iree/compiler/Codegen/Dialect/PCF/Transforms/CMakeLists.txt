@@ -30,6 +30,7 @@ iree_cc_library(
   SRCS
     "ConvertForallToLoops.cpp"
     "ConvertSRefToMemRef.cpp"
+    "FoldForallIntoPCFLoop.cpp"
     "FuseConsumers.cpp"
     "FusePCFWrites.cpp"
     "LowerStructuralPCF.cpp"
