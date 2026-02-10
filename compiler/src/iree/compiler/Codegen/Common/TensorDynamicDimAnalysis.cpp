@@ -14,6 +14,7 @@
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-dynamic-dim-analysis"
@@ -138,7 +139,7 @@ static void updateTensorDimInfo(
     return;
   }
 
-  auto bufferType = cast<MemRefType>(loadFromBufferOp.getBuffer().getType());
+  MemRefType bufferType = loadFromBufferOp.getBuffer().getType();
 
   std::optional<ValueRange> maybeBufferDynamicDims =
       IREE::Util::findDynamicDims(loadFromBufferOp.getBuffer());
