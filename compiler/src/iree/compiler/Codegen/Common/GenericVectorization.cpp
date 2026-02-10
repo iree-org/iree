@@ -108,6 +108,13 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           vectorSizes = result->vectorSizes;
         }
       })
+      .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
+        std::optional<VectorizationTileSizes> result =
+            inferSizesFromIR(argCompareOp.getDpsInits()[0]);
+        if (result) {
+          vectorSizes = result->vectorSizes;
+        }
+      })
       .Default([&](Operation *) {});
 
   if (vectorSizes) {
@@ -163,7 +170,8 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
-    } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
+    } else if (isa<IREE::LinalgExt::GatherOp, IREE::LinalgExt::ArgCompareOp>(
+                   op)) {
       candidates.push_back(op);
     }
   });
@@ -206,6 +214,10 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
       (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
           rewriter, gatherOp, vectorSizes);
+    } else if (auto argCompareOp =
+                   dyn_cast<IREE::LinalgExt::ArgCompareOp>(op)) {
+      (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
+          rewriter, argCompareOp, vectorSizes);
     } else {
       FailureOr<linalg::VectorizationResult> result =
           linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
