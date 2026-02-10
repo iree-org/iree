@@ -36,6 +36,10 @@ using IREE::LinalgExt::MapScatterOp;
 // Preprocessing Utilities
 //===----------------------------------------------------------------------===//
 
+/// Convert complex ops into simpler ops by decomposing or raising to a named
+/// op.
+///  - `PackOp`s and `UnPackOp`s are decomposed.
+///  - Transpose `linalg::GenericOp`s are raised to `linalg::TransposeOp`s.
 static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
                                        FunctionOpInterface funcOp) {
   OpBuilder::InsertionGuard g(rewriter);
@@ -819,7 +823,7 @@ static FailureOr<MapGatherOp> foldConsumerIntoMapGatherImpl(
     RewriterBase &rewriter, Operation *consumerOp, MapGatherOp mapGatherOp,
     function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
         indexTransformBuilder,
-    Value newFillValue = nullptr) {
+    std::optional<Value> newFillValue = std::nullopt) {
   Location loc = consumerOp->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(consumerOp);
@@ -844,12 +848,12 @@ static FailureOr<MapGatherOp> foldConsumerIntoMapGatherImpl(
                                            newRank);
 
   // Optionally update fill value (for pad ops).
-  if (newFillValue) {
+  if (newFillValue.has_value()) {
     Block &transformBody = newMapGather.getTransformationRegion().front();
     auto yieldOp =
         cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
     rewriter.modifyOpInPlace(yieldOp, [&]() {
-      yieldOp.setOperand(yieldOp.getNumOperands() - 1, newFillValue);
+      yieldOp.setOperand(yieldOp.getNumOperands() - 1, *newFillValue);
     });
   }
 

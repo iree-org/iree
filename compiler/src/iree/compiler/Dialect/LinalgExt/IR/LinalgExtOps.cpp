@@ -730,12 +730,10 @@ bool MapGatherOp::isIdentity() {
   if (getSourceType() != getOutputType()) {
     return false;
   }
-
   // Bail out on dynamic shapes.
   if (!getSourceType().hasStaticShape()) {
     return false;
   }
-
   // Check that the block arguments are directly yielded in the order that they
   // are defined in the block (excluding padding).
   Block &transformBody = getTransformationRegion().getBlocks().front();
