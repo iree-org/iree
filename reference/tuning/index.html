@@ -5135,10 +5135,8 @@ flags:</p>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <code>--iree-codegen-tuning-spec-path</code> flag is a part of <code>ROCMOptions</code> and
-only available for the ROCM/HIP backends. It can be set programmatically via
-the C API using <code>ireeCompilerSessionSetFlags()</code>. The other two flags are
-global options available for all backends.</p>
+<p>The <code>--iree-codegen-tuning-spec-path</code> flag can be set programmatically via
+the C API using <code>ireeCompilerSessionSetFlags()</code>.</p>
 </div>
 <p>Note that both default and user-provided specs can be enabled at the same time.
 The compiler will link them together and invoke the user-provided spec before
