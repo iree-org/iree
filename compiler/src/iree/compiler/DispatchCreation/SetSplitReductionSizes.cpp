@@ -353,15 +353,18 @@ getMatmulLikeReductionSizes(PartialReductionOpInterface op,
   int64_t mSize = getSizeAt(mDims);
   int64_t nSize = getSizeAt(nDims);
   int64_t kSize = getSizeAt(kDims);
+  int64_t outputSize = mSize * nSize * batchSize;
   int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
 
-  // When the reduction size is small relative to the M/N sizes, split
-  // reduction often has no effect or even degrades performance.
-  if (ratio <= 5) {
-    LDBG() << "skipping op; small raito between reduction and output sizes";
+  // When the output size is large, the workload tends to distributed across
+  // many workgroups, making split reduction little to no effect.
+  if (outputSize > 2048 * 4096) {
+    LDBG() << "skipping op; large output size";
     return std::nullopt;
   }
 
+  // When the reduction size is small relative to the M/N sizes, split
+  // reduction often has no effect or even degrades performance.
   if (kSize < 18000 && ratio < 48) {
     LDBG() << "skipping op; small reduction size";
     return std::nullopt;
@@ -372,20 +375,17 @@ getMatmulLikeReductionSizes(PartialReductionOpInterface op,
   // workgroups, thereby reducing the need for extensive splitting along the
   // reduction dimensions.
   SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-  int64_t outputSize = mSize * nSize * batchSize;
   int64_t limitParallelLoops;
   if (outputSize <= 16 * 16 || kSize > 1e7) {
     limitParallelLoops = 2048;
-  } else if (outputSize <= 36 * 36 || kSize > 1e6) {
-    limitParallelLoops = 256;
+  } else if (outputSize <= 64 * 64 || kSize > 1e6) {
+    limitParallelLoops = 128;
   } else if (outputSize <= 128 * 128) {
     limitParallelLoops = 64;
   } else if (outputSize <= 256 * 256) {
     limitParallelLoops = 32;
   } else if (outputSize <= 512 * 512) {
     limitParallelLoops = 16;
-  } else if (outputSize <= 1024 * 1024) {
-    limitParallelLoops = 8;
   } else {
     limitParallelLoops = std::min<int64_t>(8, tileSizes[0]);
   }
