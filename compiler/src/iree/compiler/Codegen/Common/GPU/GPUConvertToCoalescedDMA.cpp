@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -107,6 +108,32 @@ static bool tracesToTensorEmpty(Value value) {
 
   Value initValue = forallOp.getOutputs()[sharedOutIndex];
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
+}
+
+/// Traces a tensor value back through extract_slice and pad operations to
+/// check if the underlying buffer has fat raw buffer address space.
+/// Coalesced DMA lowers to gather_to_lds which requires fat raw buffer or
+/// global address space. Buffers that exceed 2GB are not eligible for fat
+/// raw buffer instructions and retain #hal.descriptor_type, which the
+/// AMDGPU dialect does not recognize. Returns false if the source is known
+/// to be incompatible with gather_to_lds.
+static bool sourceBufferSupportsDMA(Value tensor) {
+  while (true) {
+    if (auto extractSlice = tensor.getDefiningOp<tensor::ExtractSliceOp>()) {
+      tensor = extractSlice.getSource();
+    } else if (auto pad = tensor.getDefiningOp<tensor::PadOp>()) {
+      tensor = pad.getSource();
+    } else {
+      break;
+    }
+  }
+  auto loadOp = tensor.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return true;
+  }
+  auto memrefType = cast<MemRefType>(loadOp.getBuffer().getType());
+  return !isa_and_nonnull<IREE::HAL::DescriptorTypeAttr>(
+      memrefType.getMemorySpace());
 }
 
 /// Helper to compute thread number of threads based on translation_info.
@@ -460,6 +487,12 @@ struct ConvertToCoalescedDMABase : public OpRewritePattern<OpTy> {
       return failure();
     }
 
+    // Skip DMA for sources whose underlying buffer was not converted to fat
+    // raw buffer (e.g., buffers exceeding 2GB).
+    if (!sourceBufferSupportsDMA(op.getInputs()[0])) {
+      return failure();
+    }
+
     SmallVector<OpFoldResult> threadNumThreads =
         computeThreadNumThreads(rewriter, op);
     if (threadNumThreads.empty()) {
@@ -505,6 +538,12 @@ struct ConvertPadFusionCopyToCoalescedDMA
     // Only match copies with use_global_load_dma config.
     auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
     if (!config) {
+      return failure();
+    }
+
+    // Skip DMA for sources whose underlying buffer was not converted to fat
+    // raw buffer (e.g., buffers exceeding 2GB).
+    if (!sourceBufferSupportsDMA(copyOp.getInputs()[0])) {
       return failure();
     }
 
@@ -554,6 +593,12 @@ struct ConvertGatherToCoalescedDMA
                                 PatternRewriter &rewriter) const override {
     auto forallOp = gatherOp->getParentOfType<scf::ForallOp>();
     if (!hasWarpMapping(forallOp)) {
+      return failure();
+    }
+
+    // Skip DMA for sources whose underlying buffer was not converted to fat
+    // raw buffer (e.g., buffers exceeding 2GB).
+    if (!sourceBufferSupportsDMA(gatherOp.getSource())) {
       return failure();
     }
 
@@ -949,12 +994,14 @@ private:
       if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
         auto parentForall = copyOp->getParentOfType<scf::ForallOp>();
         if (!hasWarpMapping(parentForall) &&
-            getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+            getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp) &&
+            sourceBufferSupportsDMA(copyOp.getInputs()[0])) {
           opsToTile.push_back(op);
         }
-      } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
+      } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
         auto parentForall = op->getParentOfType<scf::ForallOp>();
-        if (!hasWarpMapping(parentForall)) {
+        if (!hasWarpMapping(parentForall) &&
+            sourceBufferSupportsDMA(gatherOp.getSource())) {
           opsToTile.push_back(op);
         }
       }
