@@ -32,6 +32,9 @@ IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
+# Create install directory now--we need to get its real path later.
+mkdir -p "${INSTALL_DIR}"
+
 declare -a args
 args=(
   "-G" "Ninja"

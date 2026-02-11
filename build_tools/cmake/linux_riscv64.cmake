@@ -26,16 +26,12 @@ if(NOT "${RISCV_TOOLCHAIN_ROOT}" STREQUAL "")
   set(CMAKE_RANLIB       "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_PREFIX}llvm-ranlib")
   set(CMAKE_STRIP        "${RISCV_TOOLCHAIN_ROOT}/bin/${RISCV_TOOLCHAIN_PREFIX}llvm-strip")
   set(CMAKE_SYSROOT "${RISCV_TOOLCHAIN_ROOT}/sysroot")
-  list(APPEND CMAKE_FIND_ROOT_PATH "${RISCV_TOOLCHAIN_ROOT}")
-  list(APPEND CMAKE_PREFIX_PATH "${RISCV_TOOLCHAIN_ROOT}")
-  list(APPEND CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/sysroot/lib64/lp64d")
 endif()
 
 # Specify ISA spec for march=rv64gc. This is to resolve the mismatch between
 # llvm and binutil ISA version.
 set(RISCV_COMPILER_FLAGS "\
     -march=rv64i2p1ma2p1f2p2d2p2c2p0 -mabi=lp64d")
-set(RISCV_LINKER_FLAGS "-lstdc++ -lpthread -lm -ldl")
 set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=riscv64"
   "--iree-llvmcpu-target-abi=lp64d"
@@ -43,9 +39,6 @@ set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
   "--riscv-v-fixed-length-vector-lmul-max=8"
   CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 
-set(CMAKE_C_FLAGS             "${RISCV_COMPILER_FLAGS} ${CMAKE_C_FLAGS}")
-set(CMAKE_CXX_FLAGS           "${RISCV_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
-set(CMAKE_ASM_FLAGS           "${RISCV_COMPILER_FLAGS} ${CMAKE_ASM_FLAGS}")
-set(CMAKE_SHARED_LINKER_FLAGS "${RISCV_LINKER_FLAGS} ${CMAKE_SHARED_LINKER_FLAGS}")
-set(CMAKE_MODULE_LINKER_FLAGS "${RISCV_LINKER_FLAGS} ${CMAKE_MODULE_LINKER_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS    "${RISCV_LINKER_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
+set(CMAKE_C_FLAGS_INIT   "${RISCV_COMPILER_FLAGS}")
+set(CMAKE_CXX_FLAGS_INIT "${RISCV_COMPILER_FLAGS}")
+set(CMAKE_ASM_FLAGS_INIT "${RISCV_COMPILER_FLAGS}")
