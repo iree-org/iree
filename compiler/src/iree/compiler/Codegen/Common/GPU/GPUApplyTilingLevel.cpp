@@ -107,7 +107,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
   // Apply cleanup patterns.
   {
     RewritePatternSet patterns(context);
-    IREE::GPU::populateFoldSwizzleHintOpPatterns(patterns);
+    IREE::GPU::populateFoldAllocationHintOpPatterns(patterns);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
     tensor::populateFoldTensorEmptyPatterns(patterns);
