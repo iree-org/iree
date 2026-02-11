@@ -51,7 +51,6 @@
 #include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 struct CUDAOptions {
   std::string clTarget = "sm_60";
@@ -114,7 +113,6 @@ struct CUDAOptions {
     return success();
   }
 };
-} // namespace
 
 static constexpr char kPtxasCompilerName[] = "ptxas";
 
@@ -386,7 +384,7 @@ public:
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -407,12 +405,12 @@ class CUDATargetBackend final : public TargetBackend {
 public:
   CUDATargetBackend(const CUDAOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "cuda"; }
+  std::string getLegacyDefaultDeviceID() const final { return "cuda"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(getExecutableTarget(context));
   }
 
@@ -434,7 +432,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     // TODO: Derive the use of TransformDialect from inner
     // `LLVMGPULowerExecutableTargetPass`.
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
@@ -449,23 +447,23 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     buildLLVMGPUCodegenPassPipeline(passManager, false,
                                     /*preserveDebugInfo=*/false);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildLLVMGPULinkingPassPipeline(passManager, "cuda");
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
@@ -718,16 +716,15 @@ private:
   const CUDAOptions &options;
 };
 
-namespace {
-struct CUDASession
+struct CUDASession final
     : public PluginSession<CUDASession, CUDAOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"cuda", ...
     targets.add("cuda",
                 [&]() { return std::make_shared<CUDATargetDevice>(options); });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"cuda", ...
     targets.add("cuda", [&]() {
       LLVMInitializeNVPTXTarget();
@@ -740,7 +737,6 @@ struct CUDASession
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_cuda(

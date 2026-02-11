@@ -362,19 +362,17 @@ static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
   }
 }
 
-} // namespace
-
 class ROCMTargetBackend final : public TargetBackend {
 public:
   ROCMTargetBackend(const ROCMOptions &options, GPUCodegenOptions codegenOpts)
       : targetOptions(options), codegenOptions(std::move(codegenOpts)) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "hip"; }
+  std::string getLegacyDefaultDeviceID() const final { return "hip"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     if (auto target = getExecutableTarget(deviceID, context)) {
       executableTargetAttrs.push_back(target);
     }
@@ -466,7 +464,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
@@ -482,7 +480,7 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     if (targetOptions.specializeDispatches) {
       if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
@@ -533,12 +531,12 @@ public:
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     buildLLVMGPUCodegenPassPipeline(passManager, true,
                                     targetOptions.debugSymbols);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildLLVMGPULinkingPassPipeline(passManager, "rocm");
   }
 
@@ -603,7 +601,7 @@ public:
   LogicalResult
   serializeExecutable(const SerializationOptions &serializationOptions,
                       IREE::HAL::ExecutableVariantOp variantOp,
-                      OpBuilder &executableBuilder) override {
+                      OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = targetOptions.target;
@@ -1152,7 +1150,7 @@ public:
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -1175,7 +1173,7 @@ public:
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -1192,16 +1190,14 @@ public:
   }
 };
 
-namespace {
-
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() { IREE::ROCM::registerROCMTargetPasses(); }
-  void onRegisterDialects(DialectRegistry &registry) {
+  void onRegisterDialects(DialectRegistry &registry) final {
     registry.insert<IREE::ROCM::ROCMDialect>();
   }
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"amdgpu", ...
     targets.add("amdgpu", [&]() {
       return std::make_shared<AMDGPUTargetDevice>(options);
@@ -1210,7 +1206,7 @@ struct ROCMSession final
     targets.add("hip",
                 [&]() { return std::make_shared<HIPTargetDevice>(options); });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();
@@ -1226,7 +1222,7 @@ struct ROCMSession final
   struct Registration : PluginSession::Registration {
     using PluginSession::Registration::Registration;
     std::unique_ptr<AbstractPluginSession>
-    createUninitializedSession(OptionsBinder &localOptionsBinder) override {
+    createUninitializedSession(OptionsBinder &localOptionsBinder) final {
       auto instance = std::make_unique<ROCMSession>();
       // Bootstrap target options from global CLI if available.
       if (globalCLIOptions) {
@@ -1242,7 +1238,7 @@ struct ROCMSession final
 
       return instance;
     }
-    void initializeCLI() override {
+    void initializeCLI() final {
       PluginSession::Registration::initializeCLI();
       globalCLICodegenOptions = &GPUCodegenOptions::FromFlags::get();
     }

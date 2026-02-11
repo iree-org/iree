@@ -18,7 +18,6 @@
 #include "iree/schemas/webgpu_executable_def_builder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -44,13 +43,13 @@ struct WebGPUSPIRVOptions {
 };
 
 // TODO: WebGPUOptions for choosing the version/extensions/etc.
-class WebGPUTargetDevice : public TargetDevice {
+class WebGPUTargetDevice final : public TargetDevice {
 public:
   WebGPUTargetDevice(const WebGPUSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto configAttr = b.getDictionaryAttr({});
 
@@ -66,17 +65,17 @@ public:
   }
 };
 
-class WebGPUSPIRVTargetBackend : public TargetBackend {
+class WebGPUSPIRVTargetBackend final : public TargetBackend {
 public:
   WebGPUSPIRVTargetBackend(const WebGPUSPIRVOptions &options)
       : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "webgpu"; }
+  std::string getLegacyDefaultDeviceID() const final { return "webgpu"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(getExecutableTarget(context));
   }
 
@@ -97,7 +96,7 @@ public:
   //     does not use the Flow dialect (TranslateExecutables calls this
   //     function and _does not_ query which passes are used by the dynamic
   //     pipeline created by buildTranslationPassPipeline)
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
                     spirv::SPIRVDialect, gpu::GPUDialect,
                     IREE::GPU::IREEGPUDialect>();
@@ -105,12 +104,12 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     buildSPIRVCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     buildSPIRVCodegenPassPipeline(passManager);
 
     // Prepare SPIR-V for WebGPU by expanding or removing unsupported ops.
@@ -126,7 +125,7 @@ public:
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
     if (!llvm::hasSingleElement(spirvModuleOps)) {
@@ -263,16 +262,16 @@ private:
   const WebGPUSPIRVOptions &options;
 };
 
-struct WebGPUSPIRVSession
+struct WebGPUSPIRVSession final
     : public PluginSession<WebGPUSPIRVSession, WebGPUSPIRVOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"webgpu", ...
     targets.add("webgpu", [=]() {
       return std::make_shared<WebGPUTargetDevice>(options);
     });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"webgpu-spirv", ...
     targets.add("webgpu-spirv", [=]() {
       return std::make_shared<WebGPUSPIRVTargetBackend>(options);
