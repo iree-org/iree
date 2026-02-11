@@ -27,7 +27,6 @@
 #include "spirv-tools/libspirv.hpp"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 
 struct WebGPUSPIRVOptions {
@@ -280,7 +279,6 @@ struct WebGPUSPIRVSession final
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(

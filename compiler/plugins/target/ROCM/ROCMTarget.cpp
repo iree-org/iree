@@ -62,7 +62,6 @@
 #include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 
 enum class ContainerType {
@@ -1260,7 +1259,6 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
 }
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
