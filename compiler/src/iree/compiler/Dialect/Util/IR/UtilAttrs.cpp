@@ -357,27 +357,6 @@ static LogicalResult serializeGenericFloatElements(DenseFPElementsAttr attr,
   return success();
 }
 
-// Expands 8-values per byte raw data from DenseIntElementsAttr to 0/1 byte
-// values in the output.
-static LogicalResult serializeBitIntegerValuesAsBytes(DenseIntElementsAttr attr,
-                                                      llvm::raw_ostream &os) {
-  auto rawData = attr.getRawData();
-  char bytes[8];
-  for (size_t i = 0; i < rawData.size(); ++i) {
-    int32_t bits = rawData[i];
-    bytes[i * 8 + 0] = bits & 0x1;
-    bytes[i * 8 + 1] = (bits & 0x2) >> 1;
-    bytes[i * 8 + 2] = (bits & 0x4) >> 2;
-    bytes[i * 8 + 3] = (bits & 0x8) >> 3;
-    bytes[i * 8 + 4] = (bits & 0x10) >> 4;
-    bytes[i * 8 + 5] = (bits & 0x20) >> 5;
-    bytes[i * 8 + 6] = (bits & 0x40) >> 6;
-    bytes[i * 8 + 7] = (bits & 0x80) >> 7;
-  }
-  os.write(bytes, sizeof(bytes));
-  return success();
-}
-
 // Performs slow generic serialization of all of the elements in |elementsAttr|.
 // Respects the target |endian| setting, performing byte swaps if required.
 static LogicalResult serializeGenericElementData(Location loc,
@@ -389,15 +368,10 @@ static LogicalResult serializeGenericElementData(Location loc,
     // element type is not integer or floating-point.
     unsigned bitWidth = attr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
-    case 1: {
+    case 1:
       // NOTE: i1 is treated as i8 in a lot of places in MLIR/IREE and will need
       // a larger cleanup to serialize as a sub-byte value like the others.
-      // In this one case, we know that DenseIntElementsAttr has been
-      // prematurely optimized to densely pack bit values ala std::vector<bool>.
-      // Further, it packs them linearly, regardless of shape, so we have to
-      // do a simple expansion.
-      return serializeBitIntegerValuesAsBytes(attr, os);
-    }
+      return serializeRawData(loc, attr, os);
     case 8:
       return serializeRawData(loc, attr, os);
     case 16:
@@ -458,8 +432,7 @@ static LogicalResult serializeGenericResourceElementData(
   if (auto integerType = dyn_cast<IntegerType>(elementType)) {
     // At the time of writing, DenseResourceElementsAttr byte aligned physical
     // element types only with the exception of i1, which is stored as a full
-    // byte. This is in contrast to DenseElementsAttr which has an exception for
-    // i1 where it is bit-packed.
+    // byte.
     unsigned bitWidth = integerType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 1:
