@@ -4,14 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ValueRange.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.cpp.inc"
 
@@ -276,6 +282,162 @@ SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
   }
   return result;
 }
+
+//===----------------------------------------------------------------------===//
+// CPU MMA intrinsic layout (MxNxK shape and element types)
+//===----------------------------------------------------------------------===//
+
+struct CPUOpaqueMmaLayout {
+  int64_t mSize = 0;
+  int64_t nSize = 0;
+  int64_t kSize = 0;
+  Type aType;
+  Type bType;
+  Type cType;
+};
+
+static std::tuple<int64_t, int64_t, int64_t>
+getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {
+  switch (intrinsic) {
+  case MMAIntrinsic::None:
+    return {0, 0, 0};
+  case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+    return {1, 8, 1};
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+    return {1, 16, 1};
+  case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+    return {1, 32, 1};
+  case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+    return {1, 16, 2};
+  default:
+    return {0, 0, 0};
+  }
+}
+
+static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
+                                                       MMAIntrinsic intrinsic) {
+  Type f64 = Float64Type::get(context);
+  Type f32 = Float32Type::get(context);
+  Type f16 = Float16Type::get(context);
+  Type bf16 = BFloat16Type::get(context);
+  Type i32 = IntegerType::get(context, 32);
+  Type i16 = IntegerType::get(context, 16);
+  Type i8 = IntegerType::get(context, 8);
+  switch (intrinsic) {
+  case MMAIntrinsic::None:
+    return {Type(), Type(), Type()};
+  case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+    return {f64, f64, f64};
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+    return {f32, f32, f32};
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+    return {f16, f16, f32};
+  case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+    return {f16, f16, f16};
+  case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+    return {bf16, bf16, f32};
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+    return {i16, i16, i32};
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+    return {i8, i8, i32};
+  default:
+    return {Type(), Type(), Type()};
+  }
+}
+
+static CPUOpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
+                                             MMAIntrinsic intrinsic) {
+  CPUOpaqueMmaLayout o;
+  std::tie(o.aType, o.bType, o.cType) = getABCElementTypes(context, intrinsic);
+  std::tie(o.mSize, o.nSize, o.kSize) = getMNKShapeFromIntrinsic(intrinsic);
+  return o;
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
+
+int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
+LogicalResult
+DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return linalg::inferContractionDims(maps);
+}
+
+void DataTiledMMAAttr::getUndistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
+  MLIRContext *ctx = getContext();
+  MMAIntrinsic intrinsic = getIntrinsic();
+  if (intrinsic == MMAIntrinsic::None) {
+    result.clear();
+    return;
+  }
+  CPUOpaqueMmaLayout o = getOpaqueMMALayout(ctx, intrinsic);
+  int64_t m = o.mSize * getIntrinsicsM();
+  int64_t n = o.nSize * getIntrinsicsN();
+  int64_t k = o.kSize * getIntrinsicsK();
+  result.assign({VectorType::get({m, k}, o.aType),
+                 VectorType::get({k, n}, o.bType),
+                 VectorType::get({m, n}, o.cType)});
+}
+
+void DataTiledMMAAttr::getDistributedTileTypes(
+    SmallVectorImpl<VectorType> &result) const {
+  // CPU has no thread distribution; use same tile types as undistributed.
+  getUndistributedTileTypes(result);
+}
+
+std::optional<SmallVector<int64_t, 2>>
+DataTiledMMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                   int64_t logicalDim) const {
+  return std::nullopt;
+}
+
+LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  return failure();
+}
+
+Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
+  return Attribute();
+}
+
+OpFoldResult
+DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
+                                             Operation *opToDistribute) const {
+  return OpFoldResult();
+}
+
+LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
+  return failure();
+}
+
+//===----------------------------------------------------------------------===//
+// InnerTiledSemanticsAttr
+//===----------------------------------------------------------------------===//
+
+void InnerTiledSemanticsAttr::getTileTypes(
+    IREE::Codegen::InnerTileDescAttrInterface kind,
+    SmallVectorImpl<VectorType> &result) const {
+  // CPU has no thread distribution; always use undistributed tile types.
+  kind.getUndistributedTileTypes(result);
+}
+
+bool InnerTiledSemanticsAttr::getOpaque() const { return false; }
 
 //===----------------------------------------------------------------------===//
 // Attribute Registration

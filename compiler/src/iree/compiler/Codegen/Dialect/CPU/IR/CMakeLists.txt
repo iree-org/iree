@@ -15,18 +15,22 @@ iree_cc_library(
     IREECPUDialect
   HDRS
     "IREECPUDialect.h"
+    "IREECPUEnums.h"
     "IREECPUTypes.h"
   TEXTUAL_HDRS
     "IREECPUAttrs.cpp.inc"
     "IREECPUAttrs.h.inc"
     "IREECPUDialect.cpp.inc"
     "IREECPUDialect.h.inc"
+    "IREECPUEnums.cpp.inc"
+    "IREECPUEnums.h.inc"
   SRCS
     "IREECPUAttrs.cpp"
     "IREECPUDialect.cpp"
   DEPS
     ::IREECPUAttrs
     ::IREECPUDialectGen
+    ::IREECPUEnums
     LLVMSupport
     MLIRAffineDialect
     MLIRIR
@@ -48,6 +52,16 @@ iree_tablegen_library(
   OUTS
     --gen-dialect-decls IREECPUDialect.h.inc
     --gen-dialect-defs IREECPUDialect.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    IREECPUEnums
+  TD_FILE
+    "IREECPUEnums.td"
+  OUTS
+    --gen-enum-decls --dialect=iree_cpu IREECPUEnums.h.inc
+    --gen-enum-defs --dialect=iree_cpu IREECPUEnums.cpp.inc
 )
 
 iree_tablegen_library(
