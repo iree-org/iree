@@ -353,19 +353,27 @@ getMatmulLikeReductionSizes(PartialReductionOpInterface op,
   int64_t mSize = getSizeAt(mDims);
   int64_t nSize = getSizeAt(nDims);
   int64_t kSize = getSizeAt(kDims);
+
+  // TODO(vivian): Take element type into account, and use total bytes instead
+  // of output size.
   int64_t outputSize = mSize * nSize * batchSize;
   int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
 
+  // The constants below are determined based on empirical data.
+  const int64_t largeOutputSize = 2048 * 4096;
+  const int64_t largeKSize = 18000;
+  const int64_t ratioThreshold = 48;
+
   // When the output size is large, the workload tends to distributed across
   // many workgroups, making split reduction little to no effect.
-  if (outputSize > 2048 * 4096) {
+  if (outputSize > largeOutputSize) {
     LDBG() << "skipping op; large output size";
     return std::nullopt;
   }
 
   // When the reduction size is small relative to the M/N sizes, split
   // reduction often has no effect or even degrades performance.
-  if (kSize < 18000 && ratio < 48) {
+  if (kSize < largeKSize && ratio < ratioThreshold) {
     LDBG() << "skipping op; small reduction size";
     return std::nullopt;
   }
