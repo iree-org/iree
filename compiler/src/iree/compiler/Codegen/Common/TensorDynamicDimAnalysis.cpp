@@ -5,8 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
-#include <cstdint>
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "llvm/Support/Debug.h"
@@ -14,7 +12,6 @@
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-dynamic-dim-analysis"
@@ -126,38 +123,6 @@ static void updateTensorDimInfo(
   }
 }
 
-// Update the tensor dimension information for result of an
-// `iree_codegen.load_from_buffer` operation.
-static void updateTensorDimInfo(
-    IREE::Codegen::LoadFromBufferOp loadFromBufferOp,
-    const DataFlowSolver &solver,
-    TensorDynamicDimAnalysis::TensorDimDivisibilityInfo &divisibilityInfo,
-    TensorDynamicDimAnalysis::TensorDimRangeInfo &rangeInfo) {
-  auto resultType =
-      cast<RankedTensorType>(loadFromBufferOp.getTensor().getType());
-  if (resultType.hasStaticShape()) {
-    return;
-  }
-
-  std::optional<ValueRange> maybeBufferDynamicDims =
-      IREE::Util::findDynamicDims(loadFromBufferOp.getBuffer());
-  if (!maybeBufferDynamicDims.has_value()) {
-    return;
-  }
-  ValueRange bufferDynamicDims = maybeBufferDynamicDims.value();
-
-  Value result = loadFromBufferOp.getResult();
-  uint64_t dynamicDimIndex = 0;
-  MemRefType bufferType = loadFromBufferOp.getBuffer().getType();
-  for (auto [dimIndex, dimSize] : llvm::enumerate(bufferType.getShape())) {
-    if (ShapedType::isStatic(dimSize)) {
-      continue;
-    }
-    updateTensorDimInfo(result, dimIndex, bufferDynamicDims[dynamicDimIndex++],
-                        solver, divisibilityInfo, rangeInfo);
-  }
-}
-
 // Update the tensor dimension information for result of a `tensor.empty`
 // operation.
 static void updateTensorDimInfo(
@@ -210,10 +175,10 @@ static void updateTensorDimInfo(
   });
 
   TypeSwitch<Operation *, void>(op)
-      .Case<IREE::TensorExt::DispatchTensorLoadOp,
-            IREE::Codegen::LoadFromBufferOp, tensor::EmptyOp>([&](auto op) {
-        updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
-      })
+      .Case<IREE::TensorExt::DispatchTensorLoadOp, tensor::EmptyOp>(
+          [&](auto op) {
+            updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
+          })
       .Case([&](DestinationStyleOpInterface op) {
         updateTensorDimInfo(op, solver, divisibilityInfo, rangeInfo);
       });
