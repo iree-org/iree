@@ -454,9 +454,8 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
       // Convert parsed kernel parameters to executable export parameter format
       iree_hal_hip_kernel_info_t* kernel_meta = &fat_binary_info.kernels[i];
       if (kernel_meta->parameters != NULL) {
-        // Allocate parameter array
-        kernel_info->parameter_count =
-            kernel_meta->binding_count + kernel_meta->constant_count;
+        // Allocate parameter array using the actual parameter count from metadata
+        kernel_info->parameter_count = kernel_meta->parameter_count;
         if (kernel_info->parameter_count > 0) {
           status = iree_allocator_malloc(
               host_allocator,
@@ -470,32 +469,30 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
           }
 
           // Fill in parameters from parsed kernel metadata
-          iree_host_size_t param_idx = 0;
-          uint16_t binding_ordinal = 0;
-          uint16_t constant_offset = 0;
-
           for (iree_host_size_t p = 0; p < kernel_info->parameter_count; ++p) {
             iree_hal_hip_kernel_param_t* src_param =
                 &kernel_meta->parameters[p];
             iree_hal_hip_kernel_export_parameter_t* dst_param =
-                &kernel_info->parameters[param_idx++];
+                &kernel_info->parameters[p];
 
             // Determine parameter type based on parsed value_kind
             if (src_param->type == 1) {
               // Pointer/buffer parameter
               dst_param->export.type =
                   IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
-              dst_param->export.offset = binding_ordinal;
-              binding_ordinal += 1;
-              dst_param->export.size = 8;  // Size is ignored for bindings
+              // Use the actual kernel ABI offset from metadata.
+              // This is critical for native kernels where we need to pack
+              // arguments at the correct offsets in the kernarg buffer.
+              dst_param->export.offset = (uint16_t)src_param->offset;
+              dst_param->export.size = 8;  // Pointer size
               dst_param->buffer_offset = src_param->offset;
             } else {
               // Value/constant parameter
               dst_param->export.type =
                   IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
-              dst_param->export.offset = constant_offset;
-              constant_offset += src_param->size;
-              dst_param->export.size = (uint8_t)src_param->size;
+              // Use the actual kernel ABI offset from metadata.
+              dst_param->export.offset = (uint16_t)src_param->offset;
+              dst_param->export.size = src_param->size;  // Don't truncate to uint8_t
               dst_param->buffer_offset = src_param->offset;
             }
 

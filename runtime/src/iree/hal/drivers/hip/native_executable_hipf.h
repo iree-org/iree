@@ -174,8 +174,12 @@ typedef struct iree_hal_hip_kernel_info_t {
   // Number of push constants (typically value parameters).
   uint32_t constant_count;
 
-  // Array of parameter information (allocated inline after this struct).
-  // Total count is binding_count + constant_count.
+  // Actual number of parameters in the 'parameters' array.
+  // This is the total count of all parsed arguments from metadata.
+  uint32_t parameter_count;
+
+  // Array of parameter information (allocated separately).
+  // Total count is 'parameter_count'.
   iree_hal_hip_kernel_param_t* parameters;
 } iree_hal_hip_kernel_info_t;
 

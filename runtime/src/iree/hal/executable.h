@@ -103,14 +103,15 @@ typedef uint16_t iree_hal_executable_export_parameter_flags_t;
 typedef struct iree_hal_executable_export_parameter_t {
   // Type of the parameter.
   iree_hal_executable_export_parameter_type_t type;
-  // Size of the parameter in bytes. Does not contain padding.
-  uint8_t size;
   // Flags indicating parameter behavior.
   iree_hal_executable_export_parameter_flags_t flags;
-  // Parameter name if available, otherwise empty.
-  iree_string_view_t name;
   // Offset of the parameter in bytes or binding ordinal, depending on type.
   uint16_t offset;
+  // Size of the parameter in bytes. Does not contain padding.
+  // Expanded to 32 bits to support large structures (e.g., TensorIterator).
+  uint32_t size;
+  // Parameter name if available, otherwise empty.
+  iree_string_view_t name;
 } iree_hal_executable_export_parameter_t;
 
 // Handle to a loaded executable.

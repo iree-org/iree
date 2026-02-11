@@ -2064,6 +2064,7 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
 
         kernels[k].binding_count = binding_count;
         kernels[k].constant_count = constant_count;
+        kernels[k].parameter_count = (uint32_t)arg_count;
 
         // Allocate and fill parameter array with actual metadata
         iree_hal_hip_kernel_param_t* params = NULL;
@@ -2091,6 +2092,7 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
         kernels[k].block_dims[2] = 1;
         kernels[k].binding_count = 0;
         kernels[k].constant_count = 0;
+        kernels[k].parameter_count = 0;
         kernels[k].parameters = NULL;
       }
     }

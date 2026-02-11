@@ -715,6 +715,19 @@ static iree_status_t iree_hal_hip_device_query_i64(
     return iree_ok_status();
   }
 
+  if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
+      // Return the compute unit (multiprocessor) count from the first device.
+      hipDeviceProp_tR0000 prop;
+      IREE_HIP_RETURN_IF_ERROR(
+          device->hip_symbols,
+          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
+          "hipGetDeviceProperties");
+      *out_value = (int64_t)prop.multiProcessorCount;
+      return iree_ok_status();
+    }
+  }
+
   if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = device->device_count;
