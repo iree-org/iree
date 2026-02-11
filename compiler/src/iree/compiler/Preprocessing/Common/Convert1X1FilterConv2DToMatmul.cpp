@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/AffineExpr.h"
@@ -12,10 +12,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::GlobalOptimization {
+namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_DEF_CONVERT1X1FILTERCONV2DTOMATMULPASS
-#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
 namespace {
 
@@ -97,4 +97,4 @@ struct Convert1X1FilterConv2DToMatmulPass
   }
 };
 } // namespace
-} // namespace mlir::iree_compiler::GlobalOptimization
+} // namespace mlir::iree_compiler::Preprocessing
