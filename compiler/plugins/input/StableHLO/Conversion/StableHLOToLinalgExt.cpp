@@ -283,8 +283,9 @@ struct ScatterOpConversion final
     }
 
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
-        rewriter, op.getLoc(), originalType, ValueRange{updates, indices},
-        ValueRange{original}, scatterDimMap, op.getUniqueIndices());
+        rewriter, op.getLoc(), originalType,
+        /*updates=*/updates, /*indices=*/indices, /*original=*/original,
+        scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),
@@ -568,7 +569,8 @@ struct ScanOpConversion final
     }
 
     auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, inputs, outputs,
+        rewriter, op.getLoc(), outputTys,
+        /*input=*/input0, /*output=*/outputs[0], /*accumulator=*/outputs[1],
         rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
@@ -654,8 +656,8 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
       newResultTypes.push_back(op->getResultTypes()[i]);
     }
     auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
-        op, newResultTypes, ValueRange{operand},
-        ValueRange{negInfTensor, posInfTensor}, kDim);
+        op, newResultTypes, /*values=*/operand, /*indices=*/Value(),
+        /*output_values=*/negInfTensor, /*output_indices=*/posInfTensor, kDim);
 
     // Define the region of TopK with a GT comparison
     SmallVector<Type> types(2, valueElementType);

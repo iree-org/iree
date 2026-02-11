@@ -557,7 +557,7 @@ struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
         rewriter, scatterOp.getLoc(), scatterOp.getIndices(), reassoc);
 
     rewriter.modifyOpInPlace(scatterOp, [&]() {
-      scatterOp.setOperand(ScatterOp::kIndicesOpNum, collapseOp.getResult());
+      scatterOp.getIndicesMutable().set(collapseOp.getResult());
     });
     return success();
   }
@@ -757,8 +757,8 @@ struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
 
     auto newGather = GatherOp::create(
         rewriter, gatherOp.getLoc(), TypeRange{reducedOutput.getType()},
-        ValueRange{reducedSource, reducedIndices}, ValueRange{reducedOutput},
-        gatherOp.getDimensionMap());
+        /*source=*/reducedSource, /*indices=*/reducedIndices,
+        /*output=*/reducedOutput, gatherOp.getDimensionMap());
     rewriter.replaceOp(gatherOp,
                        rankExpandValue(rewriter, loc, gatherOp.getOutput(),
                                        newGather.getResult(0), options));
@@ -824,7 +824,7 @@ struct DropScatterUnitDims final : public OpRewritePattern<ScatterOp> {
 
     auto newScatter = ScatterOp::create(
         rewriter, scatterOp.getLoc(), TypeRange{original.getType()},
-        ValueRange{updates, indices}, ValueRange{original},
+        /*updates=*/updates, /*indices=*/indices, /*original=*/original,
         scatterOp.getDimensionMap(), scatterOp.getUniqueIndices());
     rewriter.inlineRegionBefore(scatterOp.getRegion(), newScatter.getRegion(),
                                 newScatter.getRegion().begin());

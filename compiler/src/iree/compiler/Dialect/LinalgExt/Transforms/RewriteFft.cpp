@@ -180,7 +180,10 @@ static SmallVector<Value> generateFFT(ImplicitLocOpBuilder &b,
     inputs.append(getCoeffConstants(b, direction, s));
     results =
         FftOp::create(b, TypeRange{results[0].getType(), results[1].getType()},
-                      inputs, results)
+                      /*stage=*/inputs[0],
+                      /*real_coeff=*/inputs.size() > 1 ? inputs[1] : Value(),
+                      /*imag_coeff=*/inputs.size() > 2 ? inputs[2] : Value(),
+                      /*real=*/results[0], /*imag=*/results[1])
             .getResults();
   }
 

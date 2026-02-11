@@ -200,7 +200,7 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
   }
 
   // Get the rank of the operation.
-  auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+  auto outputType = cast<RankedTensorType>(op.getDpsInits()[0].getType());
   int64_t rank = outputType.getRank();
 
   // threadNumThreads contains only the innermost dimension's num threads.
@@ -453,8 +453,7 @@ struct ConvertGatherToCoalescedDMA
     }
 
     // Validate that innermost dimension is large enough for coalesced DMA.
-    auto outputType =
-        cast<RankedTensorType>(gatherOp.getOutputs()[0].getType());
+    auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
     if (ShapedType::isDynamic(innermostDim)) {
@@ -696,7 +695,7 @@ private:
     }
 
     // Get the output type to determine rank and shape.
-    auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+    auto outputType = cast<RankedTensorType>(op.getDpsInits()[0].getType());
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 

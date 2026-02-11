@@ -69,14 +69,14 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
     }
 
     auto newInput = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, transformOp.getInputs()[0], newInputType);
+        rewriter, loc, transformOp.getInput(), newInputType);
     auto newInit = tensor::createCanonicalRankReducingExtractSliceOp(
-        rewriter, loc, transformOp.getOutputs()[0], newOutputType);
+        rewriter, loc, transformOp.getOutput(), newOutputType);
     auto rankReducedTransform = clone(rewriter, transformOp, newOutputType,
                                       ValueRange{newInput, newInit});
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, rankReducedTransform->getResult(0),
-        transformOp.getOutputs()[0]);
+        transformOp.getOutput());
     rewriter.replaceOp(transformOp, insertSliceOp);
 
     return success();
