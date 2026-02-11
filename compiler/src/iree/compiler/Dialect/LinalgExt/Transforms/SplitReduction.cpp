@@ -183,12 +183,9 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
 
   // Parallel topk
   auto parallelTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
-      rewriter, loc,
-      /*resultTypes=*/parallelTopkResultTypes,
-      /*values=*/parallelTopkIns[0],
+      rewriter, loc, parallelTopkResultTypes, parallelTopkIns[0],
       /*indices=*/parallelTopkIns.size() > 1 ? parallelTopkIns[1] : Value(),
-      /*output_values=*/parallelTopkOuts[0],
-      /*output_indices=*/parallelTopkOuts[1], kDimParallel);
+      parallelTopkOuts[0], parallelTopkOuts[1], kDimParallel);
   rewriter.cloneRegionBefore(topkOp.getRegion(), parallelTopkOp.getRegion(),
                              parallelTopkOp.getRegion().end());
 
@@ -262,11 +259,9 @@ TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
 
   // Combined final topk
   auto reductionTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
-      rewriter, loc,
-      /*resultTypes=*/topkOp->getResultTypes(),
-      /*values=*/valuesCollapsed, /*indices=*/indicesCollapsed,
-      /*output_values=*/topkOp.getOutputValues(),
-      /*output_indices=*/topkOp.getOutputIndices(), kDimOrig);
+      rewriter, loc, topkOp->getResultTypes(), valuesCollapsed,
+      indicesCollapsed, topkOp.getOutputValues(), topkOp.getOutputIndices(),
+      kDimOrig);
   rewriter.cloneRegionBefore(topkOp.getRegion(), reductionTopkOp.getRegion(),
                              reductionTopkOp.getRegion().end());
   return reductionTopkOp;

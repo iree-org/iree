@@ -260,7 +260,7 @@ public:
         isNchwFchw ? nchwImageDims : nhwcImageDims;
     Value winogradInput =
         IREE::LinalgExt::WinogradInputTransformOp::create(
-            rewriter, loc, inputTfInit.getType(), /*input=*/input,
+            rewriter, loc, inputTfInit.getType(), input,
             /*output=*/inputTfInit, outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
