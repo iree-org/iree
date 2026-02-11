@@ -139,8 +139,6 @@ static void updateTensorDimInfo(
     return;
   }
 
-  MemRefType bufferType = loadFromBufferOp.getBuffer().getType();
-
   std::optional<ValueRange> maybeBufferDynamicDims =
       IREE::Util::findDynamicDims(loadFromBufferOp.getBuffer());
   if (!maybeBufferDynamicDims.has_value()) {
@@ -150,6 +148,7 @@ static void updateTensorDimInfo(
 
   Value result = loadFromBufferOp.getResult();
   uint64_t dynamicDimIndex = 0;
+  MemRefType bufferType = loadFromBufferOp.getBuffer().getType();
   for (auto [dimIndex, dimSize] : llvm::enumerate(bufferType.getShape())) {
     if (ShapedType::isStatic(dimSize)) {
       continue;
