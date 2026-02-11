@@ -56,7 +56,9 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool coalesceLoops = false);
 
 /// Adds padding to `memref.alloc` ops to reduce shared memory bank conflicts.
-/// The `paddingSizeBits` argument should be picked based on the target
+/// Allocs with `BankConflictPaddingHintOp` hints use the hinted padding.
+/// Allocs without hints fall back to \p paddingSizeBits.
+/// The \p paddingSizeBits argument should be picked based on the target
 /// architecture, striking balance between minimizing bank conflicts and keeping
 /// the data aligned. Smaller values (close to the bank bitwidth) achieve the
 /// former, while larger (~= widest load size) the latter. We want to

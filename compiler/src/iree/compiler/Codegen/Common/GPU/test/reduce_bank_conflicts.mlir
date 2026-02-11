@@ -81,8 +81,6 @@ func.func @no_pad_alloc_collapse_shape(%a: memref<1024x1024xf32>) {
 // CHECK-SAME:      memref<1024x1024xf32>, vector<4xf32>
 // CHECK:         vector.transfer_write %[[VEC_READ]], %[[C]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true]} :
 // CHECK-SAME:      vector<4xf32>, memref<4x32x64xf32, #gpu.address_space<workgroup>>
-
-
 func.func @no_pad_alloc_collapse_shape_throughsubview(%a: memref<1024x1024xf32>) {
   %0 = memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
   %subview = memref.subview %0[0, 0, 0, 0, 0] [4, 2, 16, 8, 8] [1, 1, 1, 1, 1]
@@ -115,7 +113,6 @@ func.func @no_pad_alloc_collapse_shape_throughsubview(%a: memref<1024x1024xf32>)
 // CHECK:         %[[C0:.*]] = arith.constant 0 : index
 // CHECK:         vector.transfer_write %[[V]], %[[C]][%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true]} :
 // CHECK-SAME:      vector<4xf32>, memref<32x8x8xf32, strided<[80, 10, 1]>, #gpu.address_space<workgroup>>
-
 func.func @pad_alloc_collapse_outer_shape(%v: vector<4xf32>) {
   %0 = memref.alloc() : memref<2x16x8x8xf32, #gpu.address_space<workgroup>>
   %subview = memref.subview %0[0, 0, 0, 0] [2, 16, 8, 8] [1, 1, 1, 1]
@@ -180,5 +177,101 @@ func.func @no_padding_if_at_limit() {
 // CHECK-SAME:      memref<4x32x126xf32, strided<[4096, 128, 1]>, #gpu.address_space<workgroup>>
 func.func @pad_if_below_limit() {
   %0 = memref.alloc() : memref<4x32x126xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+//
+// Tests below exercise hint-based padding (BankConflictPaddingHintOp).
+// Hints override the fallback padding-bits value for the hinted alloc.
+//
+
+// Hint with 32-bit padding (1 float): alloc padded to 65.
+// CHECK-LABEL: func.func @pad_with_hint_32bit
+// CHECK:         memref.alloc() : memref<4x32x65xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     iree_gpu.bank_conflict_padding_hint
+func.func @pad_with_hint_32bit() {
+  %0 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %hinted = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 32]
+      : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// Hint with 128-bit padding (4 floats): alloc padded to 68.
+// CHECK-LABEL: func.func @pad_with_hint_128bit
+// CHECK:         memref.alloc() : memref<4x32x68xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     iree_gpu.bank_conflict_padding_hint
+func.func @pad_with_hint_128bit() {
+  %0 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %hinted = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 128]
+      : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// Mixed: hinted alloc gets hint padding, unhinted alloc gets fallback.
+// CHECK-LABEL: func.func @mixed_hinted_and_unhinted
+// CHECK-DAG:     memref.alloc() : memref<2x16x65xf32, #gpu.address_space<workgroup>>
+// CHECK-DAG:     memref.alloc() : memref<2x16x66xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     iree_gpu.bank_conflict_padding_hint
+func.func @mixed_hinted_and_unhinted() {
+  %0 = memref.alloc() : memref<2x16x64xf32, #gpu.address_space<workgroup>>
+  %hinted = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 32]
+      : memref<2x16x64xf32, #gpu.address_space<workgroup>>
+  %1 = memref.alloc() : memref<2x16x64xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// Hint with zero padding results in no padding for that alloc.
+// CHECK-LABEL: func.func @hint_zero_padding
+// CHECK:         memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
+// CHECK-NOT:     iree_gpu.bank_conflict_padding_hint
+func.func @hint_zero_padding() {
+  %0 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %hinted = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 0]
+      : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// Multiple hints on the same alloc result in no padding.
+// CHECK-LABEL: func.func @conflicting_hints_no_padding
+// CHECK:         memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
+// CHECK-NOT:     iree_gpu.bank_conflict_padding_hint
+func.func @conflicting_hints_no_padding() {
+  %0 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %hint1 = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 32]
+      : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %hint2 = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 64]
+      : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  return
+}
+
+// -----
+
+// Collapse_shape prevents padding even with a hint.
+// CHECK-LABEL: func.func @no_pad_collapse_shape_with_hint
+// CHECK:         memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
+// CHECK-NOT:     memref.subview
+func.func @no_pad_collapse_shape_with_hint(%a: memref<1024x1024xf32>) {
+  %0 = memref.alloc() : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
+  %hinted = iree_gpu.bank_conflict_padding_hint %0 [padding_bits = 64]
+      : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>>
+  %1 = memref.collapse_shape %hinted [[0], [1, 2], [3, 4]]
+    : memref<4x2x16x8x8xf32, #gpu.address_space<workgroup>> into memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %3 = vector.transfer_read %a[%c0, %c0], %cst_0 {in_bounds = [true]} :
+    memref<1024x1024xf32>, vector<4xf32>
+  vector.transfer_write %3, %1[%c0, %c0, %c0] {in_bounds = [true]} :
+    vector<4xf32>, memref<4x32x64xf32, #gpu.address_space<workgroup>>
   return
 }
