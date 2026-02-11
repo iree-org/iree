@@ -242,4 +242,73 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasVerifier = 1;
 }
 
+def IREEVectorExt_GatherOp : IREEVectorExt_PureOp<"gather", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    DeclareOpInterfaceMethods<MaskableOpInterface>,
+    AttrSizedOperandSegments,
+    TypesMatchWith<"", "base", "padding", "getElementTypeOrSelf($_self)">
+  ]> {
+  let arguments = (ins AnyShaped:$base,
+                       Variadic<Index>:$offsets,
+                       Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                       AffineMapArrayAttr:$indexing_maps,
+                       AnyType:$padding,
+                       Optional<VectorOfAnyRankOf<[I1]>>:$mask);
+  let results = (outs AnyVectorOfAnyRank:$vector);
+
+  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
+
+  let description = [{
+  }];
+
+  let extraClassDeclaration = [{
+    // MaskableOpInterface methods.
+    bool supportsPassthru() { return true; }
+
+    SmallVector<AffineMap> getIndexingMapsArray() {
+      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
+    }
+  }];
+
+  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) ( `,` type($mask)^)?";
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
+def IREEVectorExt_ScatterOp : IREEVectorExt_PureOp<"scatter", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    DeclareOpInterfaceMethods<MaskableOpInterface>,
+    AttrSizedOperandSegments,
+    AllElementTypesMatch<["valueToStore", "base"]>
+  ]> {
+  let arguments = (ins AnyShaped:$base,
+                       Variadic<Index>:$offsets,
+                       Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                       AnyVectorOfAnyRank:$valueToStore,
+                       AffineMapArrayAttr:$indexing_maps,
+                       Optional<VectorOfAnyRankOf<[I1]>>:$mask);
+  let results = (outs Optional<AnyRankedTensor>:$result);
+
+  let summary = [{Scatters values from an SSA vector into memory or a tensor}];
+
+  let description = [{
+  }];
+
+  let extraClassDeclaration = [{
+    SmallVector<AffineMap> getIndexingMapsArray() {
+      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
+    }
+  }];
+
+  let assemblyFormat = "$valueToStore `,` $base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? (`,` $mask^)? attr-dict `:` type($base) `,` type($valueToStore) ( `,` type($mask)^)? (`->` type($result)^)?";
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
 #endif  // IREE_DIALECT_VECTOREXT_OPS
