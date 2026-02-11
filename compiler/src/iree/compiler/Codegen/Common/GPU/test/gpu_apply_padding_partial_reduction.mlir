@@ -317,3 +317,142 @@ func.func @reduction_static_incomplete_tile(%arg0: tensor<1x1024xf32>, %arg1: te
    } -> tensor<1xf32>
   return %0 : tensor<1xf32>
 }
+
+// -----
+
+// Test propagation of the padding to the linalg.generic as producer of the
+// input to the reduction.
+
+// CHECK-LABEL:  @propagate_producer
+// CHECK-SAME:      %[[ARG0:.*]]: tensor<2x448xf16>
+// CHECK:           %[[POISON_0:.*]] = ub.poison : f16
+// CHECK:           %[[PAD_0:.*]] = tensor.pad %[[ARG0]] low[0, 0] high[0, 64]
+// CHECK:             tensor.yield %[[POISON_0]] : f16
+// CHECK:           %[[COPY_0:.*]] = linalg.copy ins(%[[PAD_0]] : tensor<2x512xf16>)
+// CHECK:           %[[ELEMENTWISE:.*]] = linalg.generic {{.+}} ins(%[[COPY_0]]{{.+}})
+// CHECK:           %[[REDUCTION:.*]] = linalg.generic {{.+}} ins(%[[ELEMENTWISE]] : tensor<2x512xf16>)
+
+func.func @propagate_producer(%input: tensor<2x448xf16>, %offset: tensor<2xf16>) -> tensor<2xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+
+  %init = tensor.empty() : tensor<2xf16>
+  %filled = linalg.fill ins(%cst : f16) outs(%init : tensor<2xf16>) -> tensor<2xf16>
+
+  %empty = tensor.empty() : tensor<2x448xf16>
+
+  %elementwise = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>,
+      affine_map<(d0, d1) -> (d0, d1)>
+    ],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%input, %offset : tensor<2x448xf16>, tensor<2xf16>)
+    outs(%empty : tensor<2x448xf16>) {
+  ^bb0(%in: f16, %in2: f16, %out: f16):
+    %sub = arith.subf %in, %in2 : f16
+    linalg.yield %sub : f16
+  } -> tensor<2x448xf16>
+
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>
+    ],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%elementwise : tensor<2x448xf16>)
+    outs(%filled : tensor<2xf16>)
+    attrs = {lowering_config = #iree_gpu.lowering_config<{
+      lane_basis = [[0, 64], [0, 1]],
+      partial_reduction = [0, 512],
+      subgroup_basis = [[1, 1], [0, 1]],
+      thread = [0, 8],
+      workgroup = [1, 0]
+    }>} {
+  ^bb0(%in: f16, %acc: f16):
+    %square = arith.mulf %in, %in : f16
+    %sum = arith.addf %square, %acc : f16
+    linalg.yield %sum : f16
+  } -> tensor<2xf16>
+
+  return %result : tensor<2xf16>
+}
+
+// -----
+
+// Test propagation of the padding through a producer chain of linalg.generic as
+// input to the reduction.
+
+// CHECK-LABEL:   @propagate_producer_chain
+// CHECK-SAME:      %[[ARG0:.*]]: tensor<2x448xf16>, %[[ARG1:.*]]: tensor<2x448xf16>
+// CHECK:           %[[POISON_0:.*]] = ub.poison : f16
+// CHECK:           %[[PAD_0:.*]] = tensor.pad %[[ARG0]] low[0, 0] high[0, 64]
+// CHECK:             tensor.yield %[[POISON_0]] : f16
+// CHECK:           %[[COPY_0:.*]] = linalg.copy ins(%[[PAD_0]] {{.+}})
+// CHECK:           %[[PAD_1:.*]] = tensor.pad %[[ARG1]] low[0, 0] high[0, 64] {
+// CHECK:             tensor.yield %[[POISON_0]] : f16
+// CHECK:           %[[COPY_1:.*]] = linalg.copy ins(%[[PAD_1]] {{.+}})
+// CHECK:           %[[ADD:.*]] = linalg.generic {{.+}} ins(%[[COPY_0]], %[[COPY_1]] : tensor<2x512xf16>, tensor<2x512xf16>)
+// CHECK:           %[[OFFSET:.*]] = linalg.generic {{.+}} ins(%[[ADD]]{{.+}})
+// CHECK:           %[[REDUCTION:.*]] = linalg.generic {{.+}} ins(%[[OFFSET]] : tensor<2x512xf16>)
+
+func.func @propagate_producer_chain(%a: tensor<2x448xf16>, %b: tensor<2x448xf16>, %offset: tensor<2xf16>) -> tensor<2xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+
+  %empty_add = tensor.empty() : tensor<2x448xf16>
+  %add = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0, d1)>
+    ],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%a, %b : tensor<2x448xf16>, tensor<2x448xf16>)
+    outs(%empty_add : tensor<2x448xf16>) {
+  ^bb0(%in: f16, %in2: f16, %out: f16):
+    %add_element = arith.addf %in, %in2 : f16
+    linalg.yield %add_element : f16
+  } -> tensor<2x448xf16>
+
+
+  %empty_offset = tensor.empty() : tensor<2x448xf16>
+  %offset_result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>,
+      affine_map<(d0, d1) -> (d0, d1)>
+    ],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%add, %offset : tensor<2x448xf16>, tensor<2xf16>)
+    outs(%empty_offset : tensor<2x448xf16>) {
+  ^bb0(%in: f16, %in2: f16, %out: f16):
+    %sub = arith.subf %in, %in2 : f16
+    linalg.yield %sub : f16
+  } -> tensor<2x448xf16>
+
+  %init = tensor.empty() : tensor<2xf16>
+  %filled = linalg.fill ins(%cst : f16) outs(%init : tensor<2xf16>) -> tensor<2xf16>
+
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>
+    ],
+    iterator_types = ["parallel", "reduction"]
+  } ins(%offset_result : tensor<2x448xf16>)
+    outs(%filled : tensor<2xf16>)
+    attrs = {lowering_config = #iree_gpu.lowering_config<{
+      lane_basis = [[0, 64], [0, 1]],
+      partial_reduction = [0, 512],
+      subgroup_basis = [[1, 1], [0, 1]],
+      thread = [0, 8],
+      workgroup = [1, 0]
+    }>} {
+  ^bb0(%in: f16, %acc: f16):
+    %square = arith.mulf %in, %in : f16
+    %sum = arith.addf %square, %acc : f16
+    linalg.yield %sum : f16
+  } -> tensor<2xf16>
+
+  return %result : tensor<2xf16>
+}

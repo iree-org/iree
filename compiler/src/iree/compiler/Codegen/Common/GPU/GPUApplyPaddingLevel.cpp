@@ -61,6 +61,15 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
   return targets;
 }
 
+static bool hasLoweringConfig(Operation *op) {
+  if (!isa<TilingInterface>(op)) {
+    return false;
+  }
+  return getLoweringConfig(op) != nullptr;
+}
+
+/// tensor.pad is not DPS, which causes issues with dimension reification. By
+/// adding a no-op linalg.copy on their result, we make them DPS.
 static void makePadDPS(RewriterBase &rewriter, tensor::PadOp padOp) {
   Location loc = padOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -132,18 +141,50 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
   llvm::SmallDenseSet<TilingInterface> targetOps =
       getTiledOps(funcOp, tilingLevel);
 
-  MaskListener maskListener;
-  IRRewriter rewriter(funcOp, &maskListener);
   for (TilingInterface op : targetOps) {
+    MaskListener maskListener;
+    IRRewriter rewriter(funcOp, &maskListener);
     // If some op does not get padded, that is fine for now.
     (void)applyPaddingLevel(rewriter, op, tilingLevel);
-  }
+    // Propagate padding up by padding producers if possible.
+    while (!maskListener.pads.empty()) {
+      tensor::PadOp padOp = maskListener.pads.back();
+      maskListener.pads.pop_back();
 
-  // To workaround tensor.pad ops not being DPS and causing issues with dim
-  // reification, we explicitly make tensor.pad ops DPS by add a no-op
-  // linalg.copy on their result.
-  for (tensor::PadOp padOp : maskListener.pads) {
-    makePadDPS(rewriter, padOp);
+      auto resultVal = dyn_cast<OpResult>(padOp.getSource());
+      if (!resultVal) {
+        makePadDPS(rewriter, padOp);
+        continue;
+      }
+      Operation *producer = resultVal.getOwner();
+      if (hasLoweringConfig(producer)) {
+        // Skip operations that have their own lowering config to avoid
+        // incompatible padding.
+        makePadDPS(rewriter, padOp);
+        continue;
+      }
+
+      auto maskingIface = dyn_cast<TensorMaskingOpInterface>(producer);
+      if (!maskingIface) {
+        makePadDPS(rewriter, padOp);
+        continue;
+      }
+      rewriter.setInsertionPointAfter(padOp);
+      SmallVector<OpFoldResult> padSizes =
+          tensor::getMixedSizes(rewriter, padOp.getLoc(), padOp.getResult());
+      FailureOr<Value> paddedResult = maskingIface.maskAsProducer(
+          rewriter, resultVal.getResultNumber(), padSizes);
+      if (failed(paddedResult)) {
+        makePadDPS(rewriter, padOp);
+        continue;
+      }
+      DominanceInfo domInfo(padOp);
+      rewriter.replaceUsesWithIf(
+          padOp.getResult(), paddedResult.value(), [&](OpOperand &use) {
+            Operation *user = use.getOwner();
+            return domInfo.properlyDominates(paddedResult.value(), user);
+          });
+    }
   }
 }
 
