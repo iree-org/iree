@@ -250,7 +250,8 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
 def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
     Pure,
     ReturnLike,
-    Terminator
+    Terminator,
+    ParentOneOf<["ArgCompareOp"]>
   ]> {
   let summary = "Yield operation for VectorExt operations with regions";
   let description = [{
@@ -273,7 +274,36 @@ def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
 def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
   Pure,
   AttrSizedOperandSegments,
-  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::VectorExt::YieldOp">
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::VectorExt::YieldOp">,
+  AllElementTypesMatch<["input_value", "init_value"]>,
+  AllTypesMatch<["init_value", "result_value"]>,
+  AllTypesMatch<["init_index", "result_index"]>,
+  PredOpTrait<"dimension must be in range [0, input_rank)",
+    CPred<"$dimension >= 0 && $dimension < "
+          "::llvm::cast<::mlir::VectorType>($input_value.getType()).getRank()">>,
+  // Reduction removes one dimension, so init rank = input rank - 1.
+  PredOpTrait<"init value rank must be input rank - 1",
+    CPred<"::llvm::cast<::mlir::VectorType>($input_value.getType()).getRank() - 1 == "
+          "::llvm::cast<::mlir::VectorType>($init_value.getType()).getRank()">>,
+  PredOpTrait<"init index rank must be input rank - 1",
+    CPred<"::llvm::cast<::mlir::VectorType>($input_value.getType()).getRank() - 1 == "
+          "::llvm::cast<::mlir::VectorType>($init_index.getType()).getRank()">>,
+  // Init shape matches input shape with reduction dimension removed.
+  // E.g., reducing vector<4x128xf32> on dim 1 produces vector<4xf32>.
+  TypesMatchWith<"init value shape must match input shape with reduction dimension removed",
+                 "input_value", "init_value",
+                 "ArgCompareOp::getExpectedInitType(::llvm::cast<::mlir::VectorType>($_self), "
+                 "getDimension(), $init_value.getType())">,
+  TypesMatchWith<"init index shape must match input shape with reduction dimension removed",
+                 "input_value", "init_index",
+                 "ArgCompareOp::getExpectedInitType(::llvm::cast<::mlir::VectorType>($_self), "
+                 "getDimension(), $init_index.getType())">,
+  // Indices must be integer or index type.
+  PredOpTrait<"init index must have integer or index element type",
+    CPred<"::mlir::isa<::mlir::IntegerType>("
+          "::llvm::cast<::mlir::VectorType>($init_index.getType()).getElementType()) || "
+          "::mlir::isa<::mlir::IndexType>("
+          "::llvm::cast<::mlir::VectorType>($init_index.getType()).getElementType())">>
 ]> {
   let summary = "Vectorized arg-reduction using a user-defined comparator.";
   let description = [{
@@ -365,6 +395,25 @@ def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
   }];
 
   let extraClassDeclaration = [{
+    // Helper for TypesMatchWith: compute expected init type based on input type and reduction dimension.
+    // If dimension is out of bounds, return initType unchanged to let the dimension bounds check fail.
+    static Type getExpectedInitType(VectorType inputType, int64_t dimension, Type initType) {
+      int64_t rank = inputType.getRank();
+      // Return initType if dimension is invalid - let the dimension bounds check catch this.
+      if (dimension < 0 || dimension >= rank) {
+        return initType;
+      }
+
+      SmallVector<int64_t> expectedShape;
+      for (int64_t i = 0; i < rank; ++i) {
+        if (i != dimension) {
+          expectedShape.push_back(inputType.getDimSize(i));
+        }
+      }
+      Type initElemType = ::llvm::cast<VectorType>(initType).getElementType();
+      return VectorType::get(expectedShape, initElemType);
+    }
+
     bool hasExplicitIndexInput() {
       return getInputIndex() != nullptr;
     }

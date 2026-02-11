@@ -88,7 +88,7 @@ func.func @arg_compare_dimension_out_of_bounds(%input: vector<4x128xf32>,
                                                %out_val: vector<4xf32>,
                                                %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{dimension 2 is out of range [0, 2)}}
+  // expected-error @+1 {{failed to verify that dimension must be in range [0, input_rank)}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(2)
       ins(%input : vector<4x128xf32>)
@@ -106,7 +106,7 @@ func.func @arg_compare_negative_dimension(%input: vector<4x128xf32>,
                                           %out_val: vector<4xf32>,
                                           %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{dimension -1 is out of range [0, 2)}}
+  // expected-error @+1 {{failed to verify that dimension must be in range [0, input_rank)}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(-1)
       ins(%input : vector<4x128xf32>)
@@ -124,7 +124,7 @@ func.func @arg_compare_wrong_output_rank(%input: vector<4x128xf32>,
                                          %out_val: vector<4x8xf32>,
                                          %out_idx: vector<4xi32>)
     -> (vector<4x8xf32>, vector<4xi32>) {
-  // expected-error @+1 {{init value rank (2) should be input rank - 1 (2 - 1)}}
+  // expected-error @+1 {{failed to verify that init value rank must be input rank - 1}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -142,7 +142,7 @@ func.func @arg_compare_wrong_output_shape(%input: vector<4x128xf32>,
                                           %out_val: vector<8xf32>,
                                           %out_idx: vector<8xi32>)
     -> (vector<8xf32>, vector<8xi32>) {
-  // expected-error @+1 {{init value shape must match input shape with reduction dimension removed. Expected: [4], but got: [8]}}
+  // expected-error @+1 {{failed to verify that init value shape must match input shape with reduction dimension removed}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -160,7 +160,7 @@ func.func @arg_compare_wrong_output_element_type(%input: vector<4x128xf32>,
                                                   %out_val: vector<4xf16>,
                                                   %out_idx: vector<4xi32>)
     -> (vector<4xf16>, vector<4xi32>) {
-  // expected-error @+1 {{input and init value element types must match. Input type: 'f32', init value type: 'f16'}}
+  // expected-error @+1 {{failed to verify that all of {input_value, init_value} have same element type}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -234,7 +234,7 @@ func.func @arg_compare_output_index_not_integer(%input: vector<4x128xf32>,
                                                  %out_val: vector<4xf32>,
                                                  %out_idx: vector<4xf32>)
     -> (vector<4xf32>, vector<4xf32>) {
-  // expected-error @+1 {{init index must have integer or index element type, but got 'f32'}}
+  // expected-error @+1 {{failed to verify that init index must have integer or index element type}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -292,7 +292,7 @@ func.func @arg_compare_result_value_type_mismatch(%input: vector<4x128xf32>,
                                                    %out_val: vector<4xf32>,
                                                    %out_idx: vector<4xi32>)
     -> (vector<4xf16>, vector<4xi32>) {
-  // expected-error @+1 {{result value type doesn't match init value type. Result type: 'vector<4xf16>', init value type: 'vector<4xf32>'}}
+  // expected-error @+1 {{failed to verify that all of {init_value, result_value} have same type}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -310,7 +310,7 @@ func.func @arg_compare_result_index_type_mismatch(%input: vector<4x128xf32>,
                                                    %out_val: vector<4xf32>,
                                                    %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi64>) {
-  // expected-error @+1 {{result index type doesn't match init index type. Result type: 'vector<4xi64>', init index type: 'vector<4xi32>'}}
+  // expected-error @+1 {{failed to verify that all of {init_index, result_index} have same type}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)

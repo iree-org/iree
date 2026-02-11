@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -689,86 +690,25 @@ Type TransferGatherOp::getExpectedMaskType() {
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  VectorType inputType = getInputValueType();
-  VectorType initValueType = getInitValueType();
-  VectorType initIndexType = getInitIndexType();
-
-  int64_t inputRank = inputType.getRank();
-  int64_t initValueRank = initValueType.getRank();
-  int64_t initIndexRank = initIndexType.getRank();
-  int64_t dimension = getDimension();
-
-  if (dimension < 0 || dimension >= inputRank) {
-    return op->emitOpError("dimension ")
-           << dimension << " is out of range [0, " << inputRank << ")";
-  }
-
-  if (initValueRank != inputRank - 1) {
-    return op->emitOpError("init value rank (")
-           << initValueRank << ") should be input rank - 1 (" << inputRank
-           << " - 1)";
-  }
-
-  if (initIndexRank != inputRank - 1) {
-    return op->emitOpError("init index rank (")
-           << initIndexRank << ") should be input rank - 1 (" << inputRank
-           << " - 1)";
-  }
-
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  SmallVector<int64_t> expectedShape;
-  for (int64_t i = 0; i < inputRank; ++i) {
-    if (i != dimension) {
-      expectedShape.push_back(inputType.getDimSize(i));
-    }
-  }
-
-  ArrayRef<int64_t> initValueShape = initValueType.getShape();
-  if (!llvm::equal(expectedShape, initValueShape)) {
-    return op->emitOpError(
-               "init value shape must match input shape with reduction "
-               "dimension removed. ")
-           << "Expected: " << llvm::interleaved_array(expectedShape)
-           << ", but got: " << llvm::interleaved_array(initValueShape);
-  }
-
-  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
-  if (!llvm::equal(expectedShape, initIndexShape)) {
-    return op->emitOpError(
-               "init index shape must match input shape with reduction "
-               "dimension removed. ")
-           << "Expected: " << llvm::interleaved_array(expectedShape)
-           << ", but got: " << llvm::interleaved_array(initIndexShape);
-  }
-
-  Type inputElementType = inputType.getElementType();
-  Type initValueElementType = initValueType.getElementType();
-
-  if (inputElementType != initValueElementType) {
-    return op->emitOpError("input and init value element types must match. ")
-           << "Input type: " << inputElementType
-           << ", init value type: " << initValueElementType;
-  }
-
-  Type initIndexElementType = initIndexType.getElementType();
-  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
-    return op->emitOpError(
-               "init index must have integer or index element type, but got ")
-           << initIndexElementType;
-  }
-
+  // Most constraints are enforced in ODS; only conditional logic remains here.
   if (hasExplicitIndexInput()) {
+    VectorType inputType = getInputValueType();
     VectorType inputIndexType = getInputIndexType();
+    VectorType initIndexType = getInitIndexType();
     ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
-    if (inputIndexShape != inputShape) {
+    ArrayRef<int64_t> inputValueShape = inputType.getShape();
+
+    if (inputIndexShape != inputValueShape) {
       return op->emitOpError(
                  "explicit-index mode: value and index inputs must have the "
                  "same shape. ")
-             << "Value shape: " << llvm::interleaved_array(inputShape)
+             << "Value shape: " << llvm::interleaved_array(inputValueShape)
              << ", index shape: " << llvm::interleaved_array(inputIndexShape);
     }
 
     Type inputIndexElementType = getInputIndexElementType();
+    Type initIndexElementType = initIndexType.getElementType();
+
     if (!isa<IntegerType, IndexType>(inputIndexElementType)) {
       return op->emitOpError("explicit-index mode: index input must have "
                              "integer or index element type, but got ")
@@ -794,6 +734,8 @@ LogicalResult ArgCompareOp::verify() {
     return op->emitOpError("comparator region must have exactly 2 arguments");
   }
 
+  VectorType inputType = getInputValueType();
+  Type inputElementType = inputType.getElementType();
   Type arg0Type = comparator.getArgument(0).getType();
   Type arg1Type = comparator.getArgument(1).getType();
 
@@ -820,18 +762,13 @@ LogicalResult ArgCompareOp::verify() {
            << yieldType;
   }
 
-  Type resultValueType = getResult(0).getType();
-  if (resultValueType != initValueType) {
-    return op->emitOpError("result value type doesn't match init value type. ")
-           << "Result type: " << resultValueType
-           << ", init value type: " << initValueType;
-  }
-
-  Type resultIndexType = getResult(1).getType();
-  if (resultIndexType != initIndexType) {
-    return op->emitOpError("result index type doesn't match init index type. ")
-           << "Result type: " << resultIndexType
-           << ", init index type: " << initIndexType;
+  // Since ArgCompareOp is marked Pure, all operations in the comparator must
+  // also be pure.
+  for (Operation &op : block.getOperations()) {
+    if (!isPure(&op)) {
+      return op.emitOpError(
+          "comparator region must contain only pure operations");
+    }
   }
 
   return success();
