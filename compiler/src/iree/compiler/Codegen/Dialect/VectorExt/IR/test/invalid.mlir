@@ -88,7 +88,7 @@ func.func @arg_compare_dimension_out_of_bounds(%input: vector<4x128xf32>,
                                                %out_val: vector<4xf32>,
                                                %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{failed to verify that dimension must be in range [0, input_rank)}}
+  // expected-error @+1 {{dimension}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(2)
       ins(%input : vector<4x128xf32>)
@@ -106,7 +106,7 @@ func.func @arg_compare_negative_dimension(%input: vector<4x128xf32>,
                                           %out_val: vector<4xf32>,
                                           %out_idx: vector<4xi32>)
     -> (vector<4xf32>, vector<4xi32>) {
-  // expected-error @+1 {{failed to verify that dimension must be in range [0, input_rank)}}
+  // expected-error @+1 {{dimension}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(-1)
       ins(%input : vector<4x128xf32>)
@@ -124,7 +124,7 @@ func.func @arg_compare_wrong_output_rank(%input: vector<4x128xf32>,
                                          %out_val: vector<4x8xf32>,
                                          %out_idx: vector<4xi32>)
     -> (vector<4x8xf32>, vector<4xi32>) {
-  // expected-error @+1 {{failed to verify that init value rank must be input rank - 1}}
+  // expected-error @+1 {{init value rank (2) must be input rank - 1 (1)}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -142,7 +142,7 @@ func.func @arg_compare_wrong_output_shape(%input: vector<4x128xf32>,
                                           %out_val: vector<8xf32>,
                                           %out_idx: vector<8xi32>)
     -> (vector<8xf32>, vector<8xi32>) {
-  // expected-error @+1 {{failed to verify that init value shape must match input shape with reduction dimension removed}}
+  // expected-error @+1 {{init value shape must match input shape with reduction dimension removed}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -234,7 +234,7 @@ func.func @arg_compare_output_index_not_integer(%input: vector<4x128xf32>,
                                                  %out_val: vector<4xf32>,
                                                  %out_idx: vector<4xf32>)
     -> (vector<4xf32>, vector<4xf32>) {
-  // expected-error @+1 {{failed to verify that init index must have integer or index element type}}
+  // expected-error @+1 {{init index must have integer or index element type}}
   %result:2 = iree_vector_ext.arg_compare
       dimension(1)
       ins(%input : vector<4x128xf32>)
@@ -320,4 +320,39 @@ func.func @arg_compare_result_index_type_mismatch(%input: vector<4x128xf32>,
       iree_vector_ext.yield %cmp : i1
   } -> vector<4xf32>, vector<4xi64>
   return %result#0, %result#1 : vector<4xf32>, vector<4xi64>
+}
+
+// -----
+
+func.func @arg_compare_yield_wrong_operand_count(%input: vector<4x128xf32>,
+                                                  %out_val: vector<4xf32>,
+                                                  %out_idx: vector<4xi32>)
+    -> (vector<4xf32>, vector<4xi32>) {
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      // expected-error @+1 {{expected 1 yield operand, but got 2}}
+      iree_vector_ext.yield %cmp, %cmp : i1, i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+
+// -----
+
+func.func @arg_compare_yield_wrong_operand_type(%input: vector<4x128xf32>,
+                                                 %out_val: vector<4xf32>,
+                                                 %out_idx: vector<4xi32>)
+    -> (vector<4xf32>, vector<4xi32>) {
+  %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input : vector<4x128xf32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      // expected-error @+1 {{expected yield operand to have type i1, but got 'f32'}}
+      iree_vector_ext.yield %a : f32
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
 }

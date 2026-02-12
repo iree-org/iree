@@ -684,17 +684,100 @@ Type TransferGatherOp::getExpectedMaskType() {
 }
 
 //===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyYieldForArgCompare(YieldOp yieldOp,
+                                              ArgCompareOp argCompareOp) {
+  unsigned numOperands = yieldOp.getNumOperands();
+  if (numOperands != 1) {
+    return yieldOp.emitOpError("expected 1 yield operand, but got ")
+           << numOperands;
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return yieldOp.emitOpError(
+               "expected yield operand to have type i1, but got ")
+           << yieldType;
+  }
+
+  return success();
+}
+
+LogicalResult YieldOp::verify() {
+  // ParentOneOf<["ArgCompareOp"]> ODS trait ensures parent is ArgCompareOp.
+  auto argCompareOp = cast<ArgCompareOp>((*this)->getParentOp());
+  return verifyYieldForArgCompare(*this, argCompareOp);
+}
+
+//===----------------------------------------------------------------------===//
 // ArgCompareOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  // Most constraints are enforced in ODS; only conditional logic remains here.
+  VectorType inputType = getInputValueType();
+  VectorType initValueType = getInitValueType();
+  VectorType initIndexType = getInitIndexType();
+
+  int64_t inputRank = inputType.getRank();
+  int64_t initValueRank = initValueType.getRank();
+  int64_t initIndexRank = initIndexType.getRank();
+  int64_t dimension = getDimension();
+
+  if (dimension < 0 || dimension >= inputRank) {
+    return op->emitOpError("dimension ")
+           << dimension << " is out of range [0, " << inputRank << ")";
+  }
+
+  if (initValueRank != inputRank - 1) {
+    return op->emitOpError("init value rank (")
+           << initValueRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  if (initIndexRank != inputRank - 1) {
+    return op->emitOpError("init index rank (")
+           << initIndexRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i != dimension) {
+      expectedShape.push_back(inputType.getDimSize(i));
+    }
+  }
+
+  ArrayRef<int64_t> initValueShape = initValueType.getShape();
+  if (expectedShape != initValueShape) {
+    return op->emitOpError(
+               "init value shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initValueShape);
+  }
+
+  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
+  if (expectedShape != initIndexShape) {
+    return op->emitOpError(
+               "init index shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initIndexShape);
+  }
+
+  Type initIndexElementType = initIndexType.getElementType();
+  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
+    return op->emitOpError(
+               "init index must have integer or index element type, but got ")
+           << initIndexElementType;
+  }
+
   if (hasExplicitIndexInput()) {
-    VectorType inputType = getInputValueType();
     VectorType inputIndexType = getInputIndexType();
-    VectorType initIndexType = getInitIndexType();
     ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
     ArrayRef<int64_t> inputValueShape = inputType.getShape();
 
@@ -729,37 +812,22 @@ LogicalResult ArgCompareOp::verify() {
     }
   }
 
-  Region &comparator = getRegion();
-  if (comparator.getNumArguments() != 2) {
+  // Region structure is enforced by ODS (SizedRegion<1> and
+  // SingleBlockImplicitTerminator), so we can directly access it.
+  Block &block = getRegion().front();
+  if (block.getNumArguments() != 2) {
     return op->emitOpError("comparator region must have exactly 2 arguments");
   }
 
-  VectorType inputType = getInputValueType();
   Type inputElementType = inputType.getElementType();
-  Type arg0Type = comparator.getArgument(0).getType();
-  Type arg1Type = comparator.getArgument(1).getType();
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
 
   if (arg0Type != inputElementType || arg1Type != inputElementType) {
     return op->emitOpError(
                "comparator arguments must match input value element type. ")
            << "Expected: " << inputElementType << ", but got: " << arg0Type
            << " and " << arg1Type;
-  }
-
-  Block &block = comparator.front();
-  Operation *terminator = block.getTerminator();
-
-  unsigned numYieldOperands = terminator->getNumOperands();
-  if (numYieldOperands != 1) {
-    return op->emitOpError(
-               "expected comparator region to yield 1 operand, but got ")
-           << numYieldOperands;
-  }
-
-  Type yieldType = terminator->getOperand(0).getType();
-  if (!yieldType.isInteger(1)) {
-    return op->emitOpError("comparator region must yield i1, but got ")
-           << yieldType;
   }
 
   // Since ArgCompareOp is marked Pure, all operations in the comparator must
