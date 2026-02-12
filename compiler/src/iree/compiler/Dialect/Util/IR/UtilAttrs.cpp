@@ -371,7 +371,6 @@ static LogicalResult serializeGenericElementData(Location loc,
     case 1:
       // NOTE: i1 is treated as i8 in a lot of places in MLIR/IREE and will need
       // a larger cleanup to serialize as a sub-byte value like the others.
-      return serializeRawData(loc, attr, os);
     case 8:
       return serializeRawData(loc, attr, os);
     case 16:
@@ -436,13 +435,9 @@ static LogicalResult serializeGenericResourceElementData(
     unsigned bitWidth = integerType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 1:
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 8:
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 16:
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 32:
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 64:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     default:
