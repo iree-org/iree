@@ -148,8 +148,7 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
     (void)applyPaddingLevel(rewriter, op, tilingLevel);
     // Propagate padding up by padding producers if possible.
     while (!maskListener.pads.empty()) {
-      tensor::PadOp padOp = maskListener.pads.back();
-      maskListener.pads.pop_back();
+      tensor::PadOp padOp = maskListener.pads.pop_back_val();
 
       auto resultVal = dyn_cast<OpResult>(padOp.getSource());
       if (!resultVal) {

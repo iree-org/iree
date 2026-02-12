@@ -181,7 +181,7 @@ FailureOr<Value> maskProducerTilingInterfaceOpImpl(
   // Determine the new padded iteration domain size.
   SmallVector<Range> iterDomain = tilingInterfaceOp.getIterationDomain(b);
   SmallVector<OpFoldResult> paddedDomainSizes =
-      llvm::map_to_vector(iterDomain, [&](Range r) { return r.size; });
+      llvm::map_to_vector(iterDomain, [](Range r) { return r.size; });
   for (auto [expr, paddedSize] :
        llvm::zip_equal(iterDomainToSizeMap.getResults(), sizes)) {
     auto dimExpr = dyn_cast<AffineDimExpr>(expr);
