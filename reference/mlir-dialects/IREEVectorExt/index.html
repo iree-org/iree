@@ -1985,6 +1985,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_vector_extarg_compare-vectorextargcompareop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.arg_compare (VectorExt::ArgCompareOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
@@ -2020,13 +2029,22 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_vector_extyield-vectorextyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.yield (VectorExt::YieldOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_3" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -4796,6 +4814,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_vector_extarg_compare-vectorextargcompareop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.arg_compare (VectorExt::ArgCompareOp)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_vector_extto_layout-vectorexttolayoutop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_vector_ext.to_layout (VectorExt::ToLayoutOp)
@@ -4831,13 +4858,22 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_vector_extyield-vectorextyieldop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_vector_ext.yield (VectorExt::YieldOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_2" class="md-nav__link">
+  <a href="#attributes_3" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -4935,13 +4971,15 @@ beyond what is currently available in the Vector Dialect.</p>
 <ul>
 <li><a href="#iree_vector_ext-dialect">'iree_vector_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
+<li><a href="#iree_vector_extarg_compare-vectorextargcompareop">iree_vector_ext.arg_compare (VectorExt::ArgCompareOp)</a></li>
 <li><a href="#iree_vector_extto_layout-vectorexttolayoutop">iree_vector_ext.to_layout (VectorExt::ToLayoutOp)</a></li>
 <li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
 <li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
 <li><a href="#iree_vector_exttransfer_gather-vectorexttransfergatherop">iree_vector_ext.transfer_gather (VectorExt::TransferGatherOp)</a></li>
+<li><a href="#iree_vector_extyield-vectorextyieldop">iree_vector_ext.yield (VectorExt::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes_2">Attributes</a><ul>
+<li><a href="#attributes_3">Attributes</a><ul>
 <li><a href="#nestedlayoutattr">NestedLayoutAttr</a><ul>
 <li><a href="#subgroups-per-workgroup">Subgroups per Workgroup</a></li>
 <li><a href="#threads-per-subgroup">Threads per Subgroup:</a></li>
@@ -4956,6 +4994,125 @@ beyond what is currently available in the Vector Dialect.</p>
 </ul>
 </div>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
+<h3 id="iree_vector_extarg_compare-vectorextargcompareop"><code>iree_vector_ext.arg_compare</code> (VectorExt::ArgCompareOp)<a class="headerlink" href="#iree_vector_extarg_compare-vectorextargcompareop" title="Permanent link">link</a></h3>
+<p><em>Vectorized arg-reduction using a user-defined comparator.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.arg_compare` attr-dict
+              `dimension` `(` $dimension `)`
+              `ins` `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
+              `inits` `(` $init_value `,` $init_index `:` type($init_value) `,` type($init_index) `)`
+              (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+              $region `-&gt;` type($result_value) `,` type($result_index)
+</code></pre></div>
+<p>The <code>iree_vector_ext.arg_compare</code> op is the vectorized form of
+<code>iree_linalg_ext.arg_compare</code>. It performs a reduction over a given
+dimension of a vector, returning both the selected value and its
+corresponding index.</p>
+<p><strong>Comparator region semantics:</strong></p>
+<p>The comparator region defines the predication logic that determines the
+selection rule for the reduction (e.g., "greater than" for argmax or
+"less than" for argmin). The region takes two scalar values of the input
+element type as arguments and returns a single <code>i1</code> result via
+<code>iree_vector_ext.yield</code>.</p>
+<p>The region is invoked during the reduction to determine which element to
+select: when the comparison yields <code>true</code>, the first argument is selected;
+otherwise, the second argument is selected.</p>
+<p>The region must contain only pure operations (operations with the <code>Pure</code>
+trait). This ensures the comparator can be safely executed in any order
+during the reduction.</p>
+<p>Example (implicit-index mode - argmax over dim 1):
+<div class="highlight"><pre><span></span><code>%input_vec = vector&lt;4x128xf32&gt;
+%out_val_vec = vector&lt;4xf32&gt;
+%out_idx_vec = vector&lt;4xi32&gt;
+%result:2 = iree_vector_ext.arg_compare
+  dimension(1)
+  ins(%input_vec : vector&lt;4x128xf32&gt;)
+  inits(%out_val_vec, %out_idx_vec : vector&lt;4xf32&gt;, vector&lt;4xi32&gt;) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_vector_ext.yield %cmp : i1
+} -&gt; vector&lt;4xf32&gt;, vector&lt;4xi32&gt;
+</code></pre></div></p>
+<p>Example (explicit-index mode):
+<div class="highlight"><pre><span></span><code>%partial_vals = vector&lt;4x32xf32&gt;
+%partial_idxs = vector&lt;4x32xi32&gt;
+%out_val = vector&lt;4xf32&gt;
+%out_idx = vector&lt;4xi32&gt;
+%result:2 = iree_vector_ext.arg_compare
+  dimension(1)
+  ins(%partial_vals, %partial_idxs : vector&lt;4x32xf32&gt;, vector&lt;4x32xi32&gt;)
+  inits(%out_val, %out_idx : vector&lt;4xf32&gt;, vector&lt;4xi32&gt;) {
+^bb0(%a: f32, %b: f32):
+  %cmp = arith.cmpf ogt, %a, %b : f32
+  iree_vector_ext.yield %cmp : i1
+} -&gt; vector&lt;4xf32&gt;, vector&lt;4xi32&gt;
+</code></pre></div></p>
+<p>The <code>index_base</code> is an optional offset value that, when specified, is added
+to the computed indices in the result. This is useful when reducing over a
+sliced subregion where the indices need to be adjusted to reflect their
+position in the original vector. The <code>index_base</code> can only be used in
+implicit-index mode (single input).</p>
+<p>The <code>inits</code> operands provide the initial accumulator values for the
+reduction (initial max/min value and index).</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;IREE::VectorExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+</table>
+
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>input_value</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>input_index</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>init_value</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>init_index</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>index_base</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result_value</code></td>
+<td>vector of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_index</code></td>
+<td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_vector_extto_layout-vectorexttolayoutop"><code>iree_vector_ext.to_layout</code> (VectorExt::ToLayoutOp)<a class="headerlink" href="#iree_vector_extto_layout-vectorexttolayoutop" title="Permanent link">link</a></h3>
 <p><em>Layout conversion operator.</em></p>
 <p>Syntax:</p>
@@ -4968,7 +5125,7 @@ change has to be materialized through shared memory.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface</td><td>VectorLayoutInterface instance</td></tr>
@@ -4976,7 +5133,7 @@ change has to be materialized through shared memory.</p>
 <tr><td><code>mma_kind</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4991,7 +5148,7 @@ change has to be materialized through shared memory.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5017,7 +5174,7 @@ distributed vectors.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultElementType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5032,7 +5189,7 @@ distributed vectors.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5058,7 +5215,7 @@ distributed vectors.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultElementType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5073,7 +5230,7 @@ distributed vectors.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5158,7 +5315,7 @@ memory. This mapping can be exploited to simplify gathered dimensions
 to contiguous dimensions.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MaskableOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VectorTransferOpInterface</code></p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>indexed</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
@@ -5167,7 +5324,7 @@ to contiguous dimensions.</p>
 <tr><td><code>in_bounds</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
 </table>
 
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5198,7 +5355,7 @@ to contiguous dimensions.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5213,7 +5370,31 @@ to contiguous dimensions.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_2">Attributes<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h2>
+<h3 id="iree_vector_extyield-vectorextyieldop"><code>iree_vector_ext.yield</code> (VectorExt::YieldOp)<a class="headerlink" href="#iree_vector_extyield-vectorextyieldop" title="Permanent link">link</a></h3>
+<p><em>Yield operation for VectorExt operations with regions</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.yield` attr-dict ($values^ `:` type($values))?
+</code></pre></div>
+<p>Yields values from regions in VectorExt operations.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ArgCompareOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>values</code></td>
+<td>variadic of any type</td>
+</tr>
+</tbody>
+</table>
+<h2 id="attributes_3">Attributes<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h2>
 <h3 id="nestedlayoutattr">NestedLayoutAttr<a class="headerlink" href="#nestedlayoutattr" title="Permanent link">link</a></h3>
 <p><em>A layout representing a mapping from GPU thread hierarchy to a shape.</em></p>
 <p>Syntax:</p>
