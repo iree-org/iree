@@ -35,6 +35,7 @@ iree_lit_test_suite(
         "libm_linking.mlir",
         "scalar.mlir",
         "trace_dispatch_tensors.mlir",
+        "transients_test.mlir",
         "unused_args.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
@@ -43,6 +44,7 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "@llvm-project//lld",
