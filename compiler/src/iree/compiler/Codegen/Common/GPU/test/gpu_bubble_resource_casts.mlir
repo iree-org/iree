@@ -72,7 +72,7 @@ func.func @bubble_pad(%arg0: tensor<1xf32>) -> tensor<2xf32> {
 
 func.func @bubble_expand_and_collapse(%arg0: tensor<3x2xf32>) -> tensor<2x3xf32> {
   %0 = tensor.collapse_shape %arg0 [[0, 1]] : tensor<3x2xf32> into tensor<6xf32>
-  %1 = tensor.expand_shape %0 [[0, 1]] output_shape [3, 2]
+  %1 = tensor.expand_shape %0 [[0, 1]] output_shape [2, 3]
       : tensor<6xf32> into tensor<2x3xf32>
   %2 = iree_gpu.buffer_resource_cast %1 : tensor<2x3xf32>
   return %2 : tensor<2x3xf32>
