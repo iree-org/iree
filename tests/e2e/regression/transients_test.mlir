@@ -1,4 +1,4 @@
-// RUN: iree-compile --iree-hal-target-backends=rocm --iree-rocm-target=mi300x --iree-opt-level=O3 --compile-to=stream %s | FileCheck %s
+// RUN: iree-compile --iree-hal-target-backends=llvm-cpu --iree-opt-level=O3 --compile-to=stream %s | FileCheck %s
 
 // No transient allocations created.
 util.func @test_no_transients(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256x512xf32>,
