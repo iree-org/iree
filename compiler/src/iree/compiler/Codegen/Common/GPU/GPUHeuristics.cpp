@@ -666,7 +666,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, Location loc,
     bool transposedLhs, bool transposedRhs, bool canUpcastAcc,
-    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt) {
+    bool mustBeAligned, bool doCPromotion, int64_t splitReductionTripCnt,
+    std::optional<int64_t> dmaLinearizationAlignment) {
 
   SmallVector<GPUIntrinsicType> sortedIntrinsics =
       sortMMAIntrinsics(problem, intrinsics);
@@ -726,6 +727,34 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       }
       return isValid;
     };
+    // If DMA linearization alignment is requested, first try to find a
+    // schedule that satisfies both LDS budget and DMA alignment.
+    if (dmaLinearizationAlignment) {
+      auto isValidWithDMA = [&](const GPUMMASchedule &schedule) -> bool {
+        if (!isValidSchedule(schedule)) {
+          return false;
+        }
+        int64_t tileM = schedule.getTotalMSize() *
+                        schedule.getTotalMTileSize() *
+                        schedule.getTotalMSubgroupCount();
+        int64_t tileN = schedule.getTotalNSize() *
+                        schedule.getTotalNTileSize() *
+                        schedule.getTotalNSubgroupCount();
+        int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
+        int64_t alignment = *dmaLinearizationAlignment;
+        bool lhsAligned = (tileM * tileK) % alignment == 0;
+        bool rhsAligned = (tileN * tileK) % alignment == 0;
+        return lhsAligned && rhsAligned;
+      };
+      FailureOr<GPUMMASchedule> alignedSchedule =
+          fitScheduleInSharedMemory(schedule, isValidWithDMA);
+      if (succeeded(alignedSchedule)) {
+        return alignedSchedule;
+      }
+      LDBG() << "DMA-aligned schedule not found, falling back to "
+                "non-aligned schedule";
+    }
+    // Fallback: LDS budget check only (no DMA alignment).
     return fitScheduleInSharedMemory(schedule, isValidSchedule);
   }
   return failure();

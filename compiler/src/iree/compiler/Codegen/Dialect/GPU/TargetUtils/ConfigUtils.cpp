@@ -341,7 +341,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem, Location loc,
     bool transposedLhs, bool transposedRhs, bool isGemm,
     bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false,
-    int64_t splitReductionTripCnt = 0) {
+    int64_t splitReductionTripCnt = 0, bool useDirectLoad = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -427,6 +427,23 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   assert(maybeSeeds.has_value() && "expected seeds to be found");
   GPUMMAHeuristicSeeds seeds = maybeSeeds.value();
 
+  // When direct load is explicitly enabled (not auto-forced for scaled
+  // matmuls), VGPRs previously used for global load staging are freed,
+  // allowing more accumulator tiles per subgroup.
+  if (useDirectLoad && !scaled) {
+    seeds.bestMNTileCountPerSubgroup *= 2;
+  }
+
+  // Compute DMA linearization alignment when using direct load.
+  // The alignment ensures that LDS tile sizes are divisible by
+  // subgroupSize * (128 / elementBits), enabling optimal 128-bit DMA
+  // transfers.
+  std::optional<int64_t> dmaLinearizationAlignment = std::nullopt;
+  if (useDirectLoad) {
+    int64_t elementBits = problem.aType.getIntOrFloatBitWidth();
+    dmaLinearizationAlignment = targetSubgroupSize * (128 / elementBits);
+  }
+
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   std::optional<int64_t> wgpCount = std::nullopt;
@@ -438,7 +455,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, loc, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt);
+      /*mustBeAligned=*/mustBeAligned, doCPromotion, splitReductionTripCnt,
+      dmaLinearizationAlignment);
   return schedule;
 }
 
@@ -840,7 +858,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Location loc = operands[0].getLoc();
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, loc, transposedLhs, transposedRhs, isGemm,
-      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt);
+      /*mustBeAligned=*/true, doCPromotion, scaled, splitReductionTripCnt,
+      useDirectLoad);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
@@ -850,7 +869,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     bool doCPromotionUnaligned = cPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, loc, transposedLhs, transposedRhs, isGemm,
-        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt);
+        mustBeAligned, doCPromotionUnaligned, scaled, splitReductionTripCnt,
+        useDirectLoad);
   }
 
   if (!schedule) {

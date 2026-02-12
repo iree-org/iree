@@ -157,7 +157,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     int64_t subgroupSize, std::optional<int64_t> cuCount, Location loc,
     bool transposedLhs = false, bool transposedRhs = false,
     bool canUpcastAcc = false, bool mustBeAligned = true,
-    bool doCPromotion = false, int64_t splitReductionTripCnt = 0);
+    bool doCPromotion = false, int64_t splitReductionTripCnt = 0,
+    std::optional<int64_t> dmaLinearizationAlignment = std::nullopt);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
 /// |intrinsics| to target the given attention matmul problems, |qkMatmul|
