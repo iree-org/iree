@@ -118,6 +118,8 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
+      .addPredicatedPass(transformOptions.enableConv2DToImg2Col,
+                         createConvertConv2DToImg2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
