@@ -265,6 +265,11 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
+    // AVX-512 has native opmask registers for efficient masking.
+    if (hasAVX512fFeature(targetAttr.getConfiguration())) {
+      return VectorPreProcStrategy::Masking;
+    }
+
     if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
