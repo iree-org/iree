@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
 include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -239,6 +240,183 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Terminator ops.
+//===----------------------------------------------------------------------===//
+
+def IREEVectorExt_YieldOp : IREEVectorExt_PureOp<"yield", [
+    Pure,
+    ReturnLike,
+    Terminator,
+    ParentOneOf<["ArgCompareOp"]>
+  ]> {
+  let summary = "Yield operation for VectorExt operations with regions";
+  let description = [{
+    Yields values from regions in VectorExt operations.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$values);
+
+  let builders = [
+    OpBuilder<(ins), [{ /* nothing to do */ }]>
+  ];
+
+  let assemblyFormat = "attr-dict ($values^ `:` type($values))?";
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// LinalgExt-style ops.
+//===----------------------------------------------------------------------===//
+
+def IREEVectorExt_ArgCompareOp : IREEVectorExt_PureOp<"arg_compare", [
+  Pure,
+  AttrSizedOperandSegments,
+  SingleBlockImplicitTerminator<"IREE::VectorExt::YieldOp">,
+  AllElementTypesMatch<["input_value", "init_value"]>,
+  AllTypesMatch<["init_value", "result_value"]>,
+  AllTypesMatch<["init_index", "result_index"]>
+]> {
+  let summary = "Vectorized arg-reduction using a user-defined comparator.";
+  let description = [{
+    The `iree_vector_ext.arg_compare` op is the vectorized form of
+    `iree_linalg_ext.arg_compare`. It performs a reduction over a given
+    dimension of a vector, returning both the selected value and its
+    corresponding index.
+
+    **Comparator region semantics:**
+
+    The comparator region defines the predication logic that determines the
+    selection rule for the reduction (e.g., "greater than" for argmax or
+    "less than" for argmin). The region takes two scalar values of the input
+    element type as arguments and returns a single `i1` result via
+    `iree_vector_ext.yield`.
+
+    The region is invoked during the reduction to determine which element to
+    select: when the comparison yields `true`, the first argument is selected;
+    otherwise, the second argument is selected.
+
+    The region must contain only pure operations (operations with the `Pure`
+    trait). This ensures the comparator can be safely executed in any order
+    during the reduction.
+
+    Example (implicit-index mode - argmax over dim 1):
+    ```mlir
+    %input_vec = vector<4x128xf32>
+    %out_val_vec = vector<4xf32>
+    %out_idx_vec = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%input_vec : vector<4x128xf32>)
+      inits(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    Example (explicit-index mode):
+    ```mlir
+    %partial_vals = vector<4x32xf32>
+    %partial_idxs = vector<4x32xi32>
+    %out_val = vector<4xf32>
+    %out_idx = vector<4xi32>
+    %result:2 = iree_vector_ext.arg_compare
+      dimension(1)
+      ins(%partial_vals, %partial_idxs : vector<4x32xf32>, vector<4x32xi32>)
+      inits(%out_val, %out_idx : vector<4xf32>, vector<4xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+    } -> vector<4xf32>, vector<4xi32>
+    ```
+
+    The `index_base` is an optional offset value that, when specified, is added
+    to the computed indices in the result. This is useful when reducing over a
+    sliced subregion where the indices need to be adjusted to reflect their
+    position in the original vector. The `index_base` can only be used in
+    implicit-index mode (single input).
+
+    The `inits` operands provide the initial accumulator values for the
+    reduction (initial max/min value and index).
+  }];
+
+  let arguments = (ins
+    AnyVectorOfAnyRank:$input_value,
+    Optional<AnyVectorOfAnyRank>:$input_index,
+    AnyVectorOfAnyRank:$init_value,
+    AnyVectorOfAnyRank:$init_index,
+    Optional<Index>:$index_base,
+    I64Attr:$dimension
+  );
+
+  let results = (outs
+    AnyVectorOfAnyRank:$result_value,
+    AnyVectorOfAnyRank:$result_index
+  );
+
+  let regions = (region SizedRegion<1>:$region);
+
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    `ins` `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
+    `inits` `(` $init_value `,` $init_index `:` type($init_value) `,` type($init_index) `)`
+    (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
+    $region `->` type($result_value) `,` type($result_index)
+  }];
+
+  let extraClassDeclaration = [{
+    bool hasExplicitIndexInput() {
+      return getInputIndex() != nullptr;
+    }
+
+    VectorType getInputValueType() {
+      return getInputValue().getType();
+    }
+
+    VectorType getInitValueType() {
+      return getInitValue().getType();
+    }
+
+    VectorType getInitIndexType() {
+      return getInitIndex().getType();
+    }
+
+    VectorType getInputIndexType() {
+      if (Value idx = getInputIndex()) {
+        return cast<VectorType>(idx.getType());
+      }
+      return nullptr;
+    }
+
+    Type getInputIndexElementType() {
+      if (VectorType idxType = getInputIndexType()) {
+        return idxType.getElementType();
+      }
+      return nullptr;
+    }
+
+    Type getInputValueElementType() {
+      return getInputValueType().getElementType();
+    }
+
+    Type getInitValueElementType() {
+      return getInitValueType().getElementType();
+    }
+
+    Type getInitIndexElementType() {
+      return getInitIndexType().getElementType();
+    }
+
+    int64_t getInputRank() {
+      return getInputValueType().getRank();
+    }
+  }];
+
   let hasVerifier = 1;
 }
 
