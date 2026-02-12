@@ -511,6 +511,7 @@ func.func @copy_pair_one_unconvertible(
     %src1: tensor<64x32xf32>, %init1: tensor<64x32xf32>)
     -> (tensor<64x128xf32>, tensor<64x32xf32>)
   attributes {hal.executable.target = #exec_target_pair_one_bad, translation_info = #translation_pair_one_bad} {
+  // minElementsPerTransfer = subgroupSize(64) * minElementsPerLane(32/32=1) = 64.
   // First copy is DMA-convertible (128 % 64 == 0), but second is not (32 % 64 != 0).
   // Since not ALL copies are convertible, neither should be converted.
   %r0 = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
@@ -591,6 +592,7 @@ func.func @copy_mixed_attrs_one_unconvertible(
     %src1: tensor<64x32xf32>, %init1: tensor<64x32xf32>)
     -> (tensor<64x128xf32>, tensor<64x32xf32>)
   attributes {hal.executable.target = #exec_target_mixed_bad, translation_info = #translation_mixed_bad} {
+  // minElementsPerTransfer = subgroupSize(64) * minElementsPerLane(32/32=1) = 64.
   // First copy is DMA-convertible, but second is not (32 % 64 != 0).
   %r0 = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%src0 : tensor<64x128xf32>)
@@ -606,4 +608,44 @@ func.func @copy_mixed_attrs_one_unconvertible(
   // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
 
   return %r0, %r1 : tensor<64x128xf32>, tensor<64x32xf32>
+}
+
+// -----
+
+// Negative test: No DMA intent — all copies have only derived_thread_config.
+// The pre-check should be skipped entirely, leaving copies unchanged.
+
+#gpu_target_no_intent = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_no_intent = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_no_intent}>
+#translation_no_intent = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @copy_no_dma_intent
+func.func @copy_no_dma_intent(
+    %src0: tensor<64x128xf32>, %init0: tensor<64x128xf32>,
+    %src1: tensor<32x256xf32>, %init1: tensor<32x256xf32>)
+    -> (tensor<64x128xf32>, tensor<32x256xf32>)
+  attributes {hal.executable.target = #exec_target_no_intent, translation_info = #translation_no_intent} {
+  // Both copies are DMA-convertible by size, but neither has use_global_load_dma.
+  // Without DMA intent the pre-check is skipped and copies stay as-is.
+  %r0 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+    ins(%src0 : tensor<64x128xf32>)
+    outs(%init0 : tensor<64x128xf32>) -> tensor<64x128xf32>
+  %r1 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+    ins(%src1 : tensor<32x256xf32>)
+    outs(%init1 : tensor<32x256xf32>) -> tensor<32x256xf32>
+
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  // CHECK: linalg.copy
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK: linalg.copy
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+
+  return %r0, %r1 : tensor<64x128xf32>, tensor<32x256xf32>
 }

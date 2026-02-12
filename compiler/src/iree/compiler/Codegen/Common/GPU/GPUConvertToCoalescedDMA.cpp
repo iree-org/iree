@@ -97,11 +97,11 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
-/// Check DMA alignment for available elements against target DMA sizes.
-/// Returns subgroup size if aligned, std::nullopt otherwise.
-static std::optional<int64_t> checkDMAAlignment(FunctionOpInterface funcOp,
-                                                Type elementType,
-                                                int64_t availableElements) {
+/// Returns the subgroup size if the available elements are aligned to DMA
+/// transfer sizes, std::nullopt otherwise.
+static std::optional<int64_t>
+getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
+                          int64_t availableElements) {
   std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
   if (!subgroupSize) {
     return std::nullopt;
@@ -172,8 +172,8 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     }
   }
 
-  auto subgroupSize =
-      checkDMAAlignment(funcOp, outputType.getElementType(), availableElements);
+  auto subgroupSize = getDMAAlignedSubgroupSize(
+      funcOp, outputType.getElementType(), availableElements);
   if (!subgroupSize) {
     return {};
   }
@@ -200,6 +200,9 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   // The pre-check runs before tiling, so the output is directly a
   // tensor.empty() (not yet inside forall block args). A simple defining op
   // check suffices here, unlike tracesToTensorEmpty used post-tiling.
+  // TODO: If the pass pipeline changes such that copies are already inside
+  // forall ops at pre-check time, switch to tracesToTensorEmpty here to avoid
+  // undercounting availableElements (currently safe but conservative).
   int64_t availableElements = innermostDim;
   Value output = copyOp.getOutputs()[0];
   if (output.getDefiningOp<tensor::EmptyOp>()) {
@@ -208,8 +211,8 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     }
   }
 
-  return checkDMAAlignment(funcOp, outputType.getElementType(),
-                           availableElements)
+  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   availableElements)
       .has_value();
 }
 
@@ -658,6 +661,13 @@ struct GPUConvertToCoalescedDMAPass final
 
     if (hasDMAIntent) {
       bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+      LLVM_DEBUG({
+        if (!allConvertible) {
+          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                       << "downgrading " << promotedCopies.size()
+                       << " copies to derived_thread_config\n";
+        }
+      });
       for (linalg::CopyOp copyOp : promotedCopies) {
         if (allConvertible) {
           setLoweringConfig(copyOp,
