@@ -48,14 +48,6 @@ def Convert1X1FilterConv2DToMatmulPass:
   ];
 }
 
-def ConvertConv2DToImg2ColPass :
-    Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
 
 def ConvertConvFilterToChannelsLastPass:
     Pass<"iree-preprocessing-convert-conv-filter-to-channels-last", ""> {
