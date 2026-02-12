@@ -212,22 +212,12 @@ struct InsertBatchDimForBatchlessConvPass final
     linalg::GenericOp newConvOp =
         insertUnitBatchDimension(rewriter, batchlessConv);
 
-    // Run reshape propagation to push expand/collapse shapes to boundaries.
+    // Phase 1: Bubble up expand_shape (only for ops BEFORE conv).
     {
       RewritePatternSet reshapePatterns(context);
       populateReshapeToInterfaceTensorPatterns(reshapePatterns);
 
-      // Bubble expand_shape upward: only for ops BEFORE the conv.
-      linalg::ControlFusionFn expandControlFn = [&](OpOperand *fusedOperand) {
-        Operation *op = fusedOperand->getOwner();
-        if (op->getBlock() != newConvOp->getBlock()) {
-          return false;
-        }
-        return op != newConvOp.getOperation();
-      };
-
-      // Sink collapse_shape downward: only for ops AFTER the conv.
-      linalg::ControlFusionFn collapseControlFn = [&](OpOperand *fusedOperand) {
+      linalg::ControlFusionFn controlFn = [&](OpOperand *fusedOperand) {
         Operation *op = fusedOperand->getOwner();
         if (op->getBlock() != newConvOp->getBlock()) {
           return false;
@@ -236,16 +226,37 @@ struct InsertBatchDimForBatchlessConvPass final
       };
 
       linalg::populateFoldReshapeOpsByExpansionPatterns(reshapePatterns,
-                                                        expandControlFn);
-      linalg::populateFoldReshapeOpsByCollapsingPatterns(reshapePatterns,
-                                                         collapseControlFn);
+                                                        controlFn);
       tensor::populateFoldTensorEmptyPatterns(reshapePatterns);
       tensor::populateBubbleUpExpandShapePatterns(reshapePatterns);
       linalg::FillOp::getCanonicalizationPatterns(reshapePatterns, context);
-      tensor::CollapseShapeOp::getCanonicalizationPatterns(reshapePatterns,
-                                                           context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(reshapePatterns,
                                                          context);
+
+      if (failed(applyPatternsGreedily(getOperation(),
+                                       std::move(reshapePatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Phase 2: Sink down collapse_shape (only for ops AFTER conv).
+    {
+      RewritePatternSet reshapePatterns(context);
+      populateReshapeToInterfaceTensorPatterns(reshapePatterns);
+
+      linalg::ControlFusionFn controlFn = [&](OpOperand *fusedOperand) {
+        Operation *op = fusedOperand->getOwner();
+        if (op->getBlock() != newConvOp->getBlock()) {
+          return false;
+        }
+        return newConvOp->isBeforeInBlock(op);
+      };
+
+      linalg::populateFoldReshapeOpsByExpansionPatterns(reshapePatterns,
+                                                        controlFn);
+      tensor::populateFoldTensorEmptyPatterns(reshapePatterns);
+      tensor::CollapseShapeOp::getCanonicalizationPatterns(reshapePatterns,
+                                                           context);
 
       if (failed(applyPatternsGreedily(getOperation(),
                                        std::move(reshapePatterns)))) {
