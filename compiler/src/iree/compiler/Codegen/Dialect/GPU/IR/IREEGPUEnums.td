@@ -373,6 +373,20 @@ def VMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F16", 0>;
 def VMFMA_F32_32x32x16_F16  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F16", 1>;
 def VMFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F8E4M3FNUZ", 2>;
 def VMFMA_F32_32x32x16_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F8E4M3FNUZ", 3>;
+// Sparse-trick virtual MFMAs: use smfmac (structured-sparse MMA) to perform
+// dense M=8 matmuls at ~2x throughput by encoding 8 rows as 16 "sparse" rows
+// via lane pairing. See buildUnderlyingOperations in IREEGPUAttrs.cpp.
+def VSMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VSMFMA_F32_16x16x32_F16", 4>;
+def VSMFMA_I32_16x16x64_I8   : I32EnumAttrCase<"VSMFMA_I32_16x16x64_I8", 5>;
+def VSMFMA_F32_16x16x64_BF16 : I32EnumAttrCase<"VSMFMA_F32_16x16x64_BF16", 6>;
+def VSMFMA_F32_16x16x64_F8E5M2FNUZ
+    : I32EnumAttrCase<"VSMFMA_F32_16x16x64_F8E5M2FNUZ", 7>;
+def VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ
+    : I32EnumAttrCase<"VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ", 8>;
+def VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ
+    : I32EnumAttrCase<"VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ", 9>;
+def VSMFMA_F32_16x16x64_F8E4M3FNUZ
+    : I32EnumAttrCase<"VSMFMA_F32_16x16x64_F8E4M3FNUZ", 10>;
 
 def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
     "Descriptor for different Virtual MMA intrinsics", [
@@ -380,6 +394,14 @@ def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
       VMFMA_F32_32x32x16_F16,
       VMFMA_F32_16x16x32_F8E4M3FNUZ,
       VMFMA_F32_32x32x16_F8E4M3FNUZ,
+      // Sparse-trick virtual MFMAs (M=8 skinny GEMMs via smfmac).
+      VSMFMA_F32_16x16x32_F16,
+      VSMFMA_I32_16x16x64_I8,
+      VSMFMA_F32_16x16x64_BF16,
+      VSMFMA_F32_16x16x64_F8E5M2FNUZ,
+      VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ,
+      VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ,
+      VSMFMA_F32_16x16x64_F8E4M3FNUZ,
     ]>;
 
 // Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above

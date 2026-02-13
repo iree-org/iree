@@ -207,26 +207,76 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                            "A/B vector k batch mismatch");
       }
 
-      // Perform contraction by doing separate outer product with amdgpu.mfma
-      // operation and accumulate to the same vector.
-      for (int k = 0; k < kBatch; ++k) {
-        // Fills the batch offsets for LHS and RHS. For the K dimension it's the
-        // induction variable; for the M/N dimension we need to extract from the
-        // result batch offsets.
-        fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
-                                lhsBatchOffsets, rhsBatchOffsets, lhsMap,
-                                rhsMap);
-        LDBG() << "current lhs batch offsets: "
-               << llvm::interleaved_array(lhsBatchOffsets);
-        LDBG() << "current rhs batch offsets: "
-               << llvm::interleaved_array(rhsBatchOffsets);
+      // Check if deferred accumulator collapse is applicable.
+      // For VSMFMA intrinsics with kBatch > 1, we expand the ACC once before
+      // the K-loop and collapse once after, avoiding redundant expand/collapse
+      // on every iteration.
+      auto virtualMma = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind);
+      std::optional<VectorType> expandedAccType;
+      if (virtualMma && *kBatch > 1) {
+        expandedAccType = virtualMma.getExpandedAccType();
+      }
 
-        Value lhsSlice =
-            vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
-        Value rhsSlice =
-            vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
-        accSlice =
-            computeMMA(rewriter, loc, mmaKind, lhsSlice, rhsSlice, accSlice);
+      if (expandedAccType) {
+        // === Deferred collapse path ===
+        auto [aVectorType, bVectorType, cVectorType] =
+            mmaKind.getABCVectorTypes();
+
+        // Shape-cast to collapsed 1D, then expand once.
+        Value cFlat =
+            vector::ShapeCastOp::create(rewriter, loc, cVectorType, accSlice);
+        Value workingAcc = virtualMma.expandAccumulator(rewriter, loc, cFlat);
+
+        for (int k = 0; k < *kBatch; ++k) {
+          fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
+                                  lhsBatchOffsets, rhsBatchOffsets, lhsMap,
+                                  rhsMap);
+          LDBG() << "current lhs batch offsets: "
+                 << llvm::interleaved_array(lhsBatchOffsets);
+          LDBG() << "current rhs batch offsets: "
+                 << llvm::interleaved_array(rhsBatchOffsets);
+
+          Value lhsSlice =
+              vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
+          Value rhsSlice =
+              vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
+          Value aCast =
+              vector::ShapeCastOp::create(rewriter, loc, aVectorType, lhsSlice);
+          Value bCast =
+              vector::ShapeCastOp::create(rewriter, loc, bVectorType, rhsSlice);
+
+          SmallVector<Value> mmaResults;
+          [[maybe_unused]] LogicalResult createdMmaOp =
+              mmaKind.buildUnderlyingOperations(rewriter, loc, {aCast, bCast},
+                                                {workingAcc}, mmaResults);
+          assert(succeeded(createdMmaOp) &&
+                 "Should never fail to construct mma op");
+          workingAcc = mmaResults[0];
+        }
+
+        // Collapse once, then shape-cast back.
+        Value collapsed =
+            virtualMma.collapseAccumulator(rewriter, loc, workingAcc);
+        accSlice = vector::ShapeCastOp::create(rewriter, loc,
+                                               accSlice.getType(), collapsed);
+      } else {
+        // === Standard path ===
+        for (int k = 0; k < *kBatch; ++k) {
+          fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
+                                  lhsBatchOffsets, rhsBatchOffsets, lhsMap,
+                                  rhsMap);
+          LDBG() << "current lhs batch offsets: "
+                 << llvm::interleaved_array(lhsBatchOffsets);
+          LDBG() << "current rhs batch offsets: "
+                 << llvm::interleaved_array(rhsBatchOffsets);
+
+          Value lhsSlice =
+              vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
+          Value rhsSlice =
+              vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
+          accSlice =
+              computeMMA(rewriter, loc, mmaKind, lhsSlice, rhsSlice, accSlice);
+        }
       }
       finalTile = vector::InsertOp::create(rewriter, loc, accSlice, finalTile,
                                            resultBatchOffsets);

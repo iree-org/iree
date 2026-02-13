@@ -1212,6 +1212,16 @@ getMNKShape(VirtualMMAIntrinsic type) {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {32, 32, 16};
+  // Sparse-trick virtual MFMAs: semantic M=8 (not 16).
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+    return {8, 16, 32};
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ:
+    return {8, 16, 64};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1234,6 +1244,31 @@ getABCElementTypes(MLIRContext *context, VirtualMMAIntrinsic type) {
     return {f16, f16, f32};
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
     return {f16, f16, f32};
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+    return {f16, f16, f32};
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8: {
+    Type i8 = IntegerType::get(context, 8);
+    Type i32 = IntegerType::get(context, 32);
+    return {i8, i8, i32};
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16: {
+    Type bf16 = BFloat16Type::get(context);
+    return {bf16, bf16, f32};
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ: {
+    Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+    return {f8E5M2FNUZ, f8E5M2FNUZ, f32};
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ: {
+    Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+    return {f8E5M2FNUZ, f8E4M3FNUZ, f32};
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ: {
+    Type f8E5M2FNUZ = Float8E5M2FNUZType::get(context);
+    return {f8E4M3FNUZ, f8E5M2FNUZ, f32};
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ:
+    return {f8E4M3FNUZ, f8E4M3FNUZ, f32};
   }
   assert(false && "unhandled virtual mma layout type.");
   return {};
@@ -1283,7 +1318,14 @@ int64_t VirtualMMAAttr::getSubgroupSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ: {
     return 64;
   }
   }
@@ -1332,6 +1374,16 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ: {
     return 1;
   }
+  // Sparse-trick: single smfmac per invocation, K-loop handled externally.
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ: {
+    return 1;
+  }
   }
   assert(false && "unhandled virtual mma layout type.");
   return 0;
@@ -1350,8 +1402,20 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
   }
   SmallVector<VectorType> threadTypes;
   getDistributedTileTypes(threadTypes);
-  if (!llvm::equal(threadTypes,
-                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+
+  // Inputs (LHS, RHS) must always match exactly.
+  if (!llvm::equal(ArrayRef(threadTypes).take_front(inputs.size()),
+                   inputs.getTypes())) {
+    return failure();
+  }
+
+  // Output (ACC) can match either collapsed or expanded type.
+  // When the caller passes an expanded ACC, we skip internal expand/collapse
+  // to support deferred accumulator collapse across K-loop iterations.
+  VectorType accType = cast<VectorType>(outputs[0].getType());
+  std::optional<VectorType> expandedAccType = getExpandedAccType();
+  bool accIsExpanded = expandedAccType && (accType == *expandedAccType);
+  if (accType != threadTypes.back() && !accIsExpanded) {
     return failure();
   }
 
@@ -1393,8 +1457,275 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     results.push_back(acc);
     return success();
   }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16: {
+    // Sparse trick for skinny GEMMs (M=8): uses smfmac (structured-sparse
+    // MMA) to perform a dense M=8 matmul at ~2x throughput. Lane pairs
+    // (even/odd) share the same M-row; each provides half the K-elements
+    // as "sparse" data, and the sparsity index selects which half.
+    //
+    // inputs[0]: vector<8xf16>  — dense A (lane pairs share same data)
+    // inputs[1]: vector<8xf16>  — standard B
+    // outputs[0]: vector<2xf32> (collapsed) or vector<4xf32> (expanded)
+    if (getColMajor()) {
+      return failure();
+    }
+
+    auto accExpandedTy = *expandedAccType;
+    auto i8Ty = builder.getIntegerType(8);
+    auto idxVecTy = VectorType::get({4}, i8Ty);
+
+    // 1. Get or expand ACC.
+    Value accForSmfmac = accIsExpanded
+                             ? outputs[0]
+                             : expandAccumulator(builder, loc, outputs[0]);
+
+    // 2. Lane parity: even lanes select first half of each K-group,
+    //    odd lanes select the second half.
+    Value laneId = gpu::LaneIdOp::create(builder, loc, /*upper_bound=*/nullptr);
+    Value cst2 = arith::ConstantIndexOp::create(builder, loc, 2);
+    Value cstZero = arith::ConstantIndexOp::create(builder, loc, 0);
+    Value laneRem = arith::RemUIOp::create(builder, loc, laneId, cst2);
+    Value isOdd = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                        laneRem, cstZero);
+
+    // 3. Shuffle A → sparse format (2:4 structured sparsity).
+    //    Dense input has 8 f16 = 2 groups of 4 K-elements.
+    //    Even lanes: positions {0,1} from each group → indices {0,1,4,5}.
+    //    Odd lanes:  positions {2,3} from each group → indices {2,3,6,7}.
+    Value evenA = vector::ShuffleOp::create(builder, loc, inputs[0], inputs[0],
+                                            ArrayRef<int64_t>{0, 1, 4, 5});
+    Value oddA = vector::ShuffleOp::create(builder, loc, inputs[0], inputs[0],
+                                           ArrayRef<int64_t>{2, 3, 6, 7});
+    Value sparseA = arith::SelectOp::create(builder, loc, isOdd, oddA, evenA);
+
+    // 4. Sparsity index (vector<4xi8>): 2 nibbles in first byte, rest pad.
+    //    nibble 0x4 = 0100b → selects positions {0,1} in group-of-4.
+    //    nibble 0xE = 1110b → selects positions {2,3} in group-of-4.
+    const int8_t evenIdxF16[] = {0x44, 0, 0, 0};
+    Value evenIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int8_t>(evenIdxF16)));
+    const int8_t oddIdxF16[] = {static_cast<int8_t>(0xEE), 0, 0, 0};
+    Value oddIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int8_t>(oddIdxF16)));
+    Value sparseIdx =
+        arith::SelectOp::create(builder, loc, isOdd, oddIdx, evenIdx);
+
+    // 5. Physical smfmac 16x16x32 (semantic M=8 via lane pairing).
+    Value smfmaResult = amdgpu::SparseMFMAOp::create(
+        builder, loc, accExpandedTy, /*m=*/16, /*n=*/16, /*k=*/32, sparseA,
+        inputs[1], accForSmfmac, sparseIdx);
+
+    // 6. Return expanded or collapsed based on input mode.
+    if (accIsExpanded) {
+      results.push_back(smfmaResult);
+    } else {
+      results.push_back(collapseAccumulator(builder, loc, smfmaResult));
+    }
+    return success();
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16: {
+    // Same sparse trick as F16 variant, but for bf16 with K=64.
+    // BF16 is 16-bit, so uses vector<4xi8> sparsity indices (not
+    // vector<2xi16>). Each thread holds 16 bf16 = 4 groups of 4 K-elements.
+    if (getColMajor()) {
+      return failure();
+    }
+
+    auto accExpandedTy = *expandedAccType;
+    auto i8Ty = builder.getIntegerType(8);
+    auto idxVecTy = VectorType::get({4}, i8Ty);
+
+    // 1. Get or expand ACC.
+    Value accForSmfmac = accIsExpanded
+                             ? outputs[0]
+                             : expandAccumulator(builder, loc, outputs[0]);
+
+    // 2. Lane parity.
+    Value laneId = gpu::LaneIdOp::create(builder, loc, /*upper_bound=*/nullptr);
+    Value cst2 = arith::ConstantIndexOp::create(builder, loc, 2);
+    Value cstZero = arith::ConstantIndexOp::create(builder, loc, 0);
+    Value laneRem = arith::RemUIOp::create(builder, loc, laneId, cst2);
+    Value isOdd = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                        laneRem, cstZero);
+
+    // 3. Shuffle A → sparse format.
+    //    Dense input has 16 bf16 = 4 groups of 4 K-elements.
+    //    Even: {0,1,4,5,8,9,12,13}  Odd: {2,3,6,7,10,11,14,15}
+    Value evenA =
+        vector::ShuffleOp::create(builder, loc, inputs[0], inputs[0],
+                                  ArrayRef<int64_t>{0, 1, 4, 5, 8, 9, 12, 13});
+    Value oddA = vector::ShuffleOp::create(
+        builder, loc, inputs[0], inputs[0],
+        ArrayRef<int64_t>{2, 3, 6, 7, 10, 11, 14, 15});
+    Value sparseA = arith::SelectOp::create(builder, loc, isOdd, oddA, evenA);
+
+    // 4. Sparsity index (vector<4xi8>): 4 nibbles in first 2 bytes, rest pad.
+    //    nibble 0x4 = 0100b → selects positions {0,1} in group-of-4.
+    //    nibble 0xE = 1110b → selects positions {2,3} in group-of-4.
+    const int8_t evenIdxBF16[] = {0x44, 0x44, 0, 0};
+    Value evenIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int8_t>(evenIdxBF16)));
+    const int8_t oddIdxBF16[] = {static_cast<int8_t>(0xEE),
+                                 static_cast<int8_t>(0xEE), 0, 0};
+    Value oddIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int8_t>(oddIdxBF16)));
+    Value sparseIdx =
+        arith::SelectOp::create(builder, loc, isOdd, oddIdx, evenIdx);
+
+    // 5. Physical smfmac 16x16x64.
+    Value smfmaResult = amdgpu::SparseMFMAOp::create(
+        builder, loc, accExpandedTy, /*m=*/16, /*n=*/16, /*k=*/64, sparseA,
+        inputs[1], accForSmfmac, sparseIdx);
+
+    // 6. Return expanded or collapsed based on input mode.
+    if (accIsExpanded) {
+      results.push_back(smfmaResult);
+    } else {
+      results.push_back(collapseAccumulator(builder, loc, smfmaResult));
+    }
+    return success();
+  }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8: {
+    // Same sparse trick as F16 variant, but for 8-bit K=64 element types
+    // (i8, f8E5M2FNUZ, f8E4M3FNUZ, and mixed f8).
+    // Each thread holds 16 elements along K (4 groups of 4).
+    // 8-bit types use vector<2xi16> sparsity indices.
+    if (getColMajor()) {
+      return failure();
+    }
+
+    auto accExpandedTy = *expandedAccType;
+    auto i16Ty = builder.getIntegerType(16);
+    auto idxVecTy = VectorType::get({2}, i16Ty);
+
+    // 1. Get or expand ACC.
+    Value accForSmfmac = accIsExpanded
+                             ? outputs[0]
+                             : expandAccumulator(builder, loc, outputs[0]);
+
+    // 2. Lane parity.
+    Value laneId = gpu::LaneIdOp::create(builder, loc, /*upper_bound=*/nullptr);
+    Value cst2 = arith::ConstantIndexOp::create(builder, loc, 2);
+    Value cstZero = arith::ConstantIndexOp::create(builder, loc, 0);
+    Value laneRem = arith::RemUIOp::create(builder, loc, laneId, cst2);
+    Value isOdd = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                        laneRem, cstZero);
+
+    // 3. Shuffle A → sparse format.
+    //    Dense input has 16 i8 = 4 groups of 4 K-elements.
+    //    Even: {0,1,4,5,8,9,12,13}  Odd: {2,3,6,7,10,11,14,15}
+    Value evenA =
+        vector::ShuffleOp::create(builder, loc, inputs[0], inputs[0],
+                                  ArrayRef<int64_t>{0, 1, 4, 5, 8, 9, 12, 13});
+    Value oddA = vector::ShuffleOp::create(
+        builder, loc, inputs[0], inputs[0],
+        ArrayRef<int64_t>{2, 3, 6, 7, 10, 11, 14, 15});
+    Value sparseA = arith::SelectOp::create(builder, loc, isOdd, oddA, evenA);
+
+    // 4. Sparsity index (vector<2xi16>): 4 nibbles in first i16, rest pad.
+    const int16_t evenIdxI8[] = {0x4444, 0};
+    Value evenIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int16_t>(evenIdxI8)));
+    const int16_t oddIdxI8[] = {static_cast<int16_t>(0xEEEE), 0};
+    Value oddIdx = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(idxVecTy, ArrayRef<int16_t>(oddIdxI8)));
+    Value sparseIdx =
+        arith::SelectOp::create(builder, loc, isOdd, oddIdx, evenIdx);
+
+    // 5. Physical smfmac 16x16x64.
+    Value smfmaResult = amdgpu::SparseMFMAOp::create(
+        builder, loc, accExpandedTy, /*m=*/16, /*n=*/16, /*k=*/64, sparseA,
+        inputs[1], accForSmfmac, sparseIdx);
+
+    // 6. Return expanded or collapsed based on input mode.
+    if (accIsExpanded) {
+      results.push_back(smfmaResult);
+    } else {
+      results.push_back(collapseAccumulator(builder, loc, smfmaResult));
+    }
+    return success();
+  }
   }
   return failure();
+}
+
+std::optional<VectorType> VirtualMMAAttr::getExpandedAccType() const {
+  switch (getIntrinsic()) {
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ:
+    return VectorType::get({4}, Float32Type::get(getContext()));
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+    return VectorType::get({4}, IntegerType::get(getContext(), 32));
+  default:
+    return std::nullopt;
+  }
+}
+
+Value VirtualMMAAttr::expandAccumulator(OpBuilder &builder, Location loc,
+                                        Value acc) const {
+  std::optional<VectorType> expandedTy = getExpandedAccType();
+  assert(expandedTy && "expandAccumulator called on non-VSMFMA intrinsic");
+
+  Type elemTy = expandedTy->getElementType();
+  Value zero;
+  if (isa<FloatType>(elemTy)) {
+    zero = arith::ConstantOp::create(builder, loc,
+                                     DenseElementsAttr::get(*expandedTy, 0.0f));
+  } else {
+    zero = arith::ConstantOp::create(
+        builder, loc,
+        DenseElementsAttr::get(*expandedTy, static_cast<int32_t>(0)));
+  }
+  Value c0 = vector::ExtractOp::create(builder, loc, acc, 0);
+  Value c1 = vector::ExtractOp::create(builder, loc, acc, 1);
+  Value expanded = vector::InsertOp::create(builder, loc, c0, zero, 0);
+  expanded = vector::InsertOp::create(builder, loc, c1, expanded, 2);
+  return expanded;
+}
+
+Value VirtualMMAAttr::collapseAccumulator(OpBuilder &builder, Location loc,
+                                          Value acc) const {
+  std::optional<VectorType> expandedTy = getExpandedAccType();
+  assert(expandedTy && "collapseAccumulator called on non-VSMFMA intrinsic");
+
+  // Get the collapsed type (2-element vector with same element type).
+  Type elemTy = expandedTy->getElementType();
+  auto collapsedTy = VectorType::get({2}, elemTy);
+
+  Value r0 = vector::ExtractOp::create(builder, loc, acc, 0);
+  Value r1 = vector::ExtractOp::create(builder, loc, acc, 1);
+  Value r2 = vector::ExtractOp::create(builder, loc, acc, 2);
+  Value r3 = vector::ExtractOp::create(builder, loc, acc, 3);
+
+  Value sum01, sum23;
+  if (isa<FloatType>(elemTy)) {
+    sum01 = arith::AddFOp::create(builder, loc, r0, r1);
+    sum23 = arith::AddFOp::create(builder, loc, r2, r3);
+  } else {
+    sum01 = arith::AddIOp::create(builder, loc, r0, r1);
+    sum23 = arith::AddIOp::create(builder, loc, r2, r3);
+  }
+
+  Value zero = arith::ConstantOp::create(
+      builder, loc,
+      DenseElementsAttr::get(collapsedTy, builder.getZeroAttr(elemTy)));
+  Value collapsed = vector::InsertOp::create(builder, loc, sum01, zero, 0);
+  collapsed = vector::InsertOp::create(builder, loc, sum23, collapsed, 1);
+  return collapsed;
 }
 
 int64_t VirtualMMAAttr::getBlockSize() const {
@@ -1402,7 +1733,14 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16:
   case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16: {
+  case VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ: {
     return 1;
   }
   }
@@ -1467,6 +1805,51 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
     case kMMAOperandAcc:
       return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
               /*element=*/{4, 1}};
+    }
+  // Sparse-trick virtual MFMAs (M=8 skinny GEMMs via smfmac).
+  //
+  // LHS: Lane-pairing layout. thread={8,4} with tstride={2,16} means
+  // vtid_M = (laneId/2)%8, so lane pairs (0,1), (2,3), etc. share the same
+  // M-row. Thread product 8*4=32 < subgroup_size(64), which is permitted by
+  // MMASingleSubgroupLayout invariant 3 (lane sharing).
+  //
+  // ACC: element={2,1} (collapsed from smfmac's physical {4,1}). Each lane
+  // holds 2 M-rows, which are expanded/collapsed inside buildUnderlying-
+  // Operations.
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x32_F16:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      // element={1,8}: each thread loads 8 f16 = 16 bytes along K.
+      // Tile: M=1*8*1=8, K=1*4*8=32.
+      return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 8}};
+    case kMMAOperandRhs:
+      // Standard MFMA 16x16 RHS (K x N), unaffected by the sparse trick.
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{8, 1}};
+    case kMMAOperandAcc:
+      // Collapsed accumulator: Tile: M=1*4*2=8, N=1*16*1=16.
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
+    }
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_BF16:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_F32_16x16x64_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      // element={1,16}: each thread loads 16 elements = 16 bytes along K.
+      // Tile: M=1*8*1=8, K=1*4*16=64.
+      return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 16}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{16, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
     }
   }
   assert(false && "unhandled virtual mma layout type.");
