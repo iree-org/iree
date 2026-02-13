@@ -1529,9 +1529,10 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
         /*cbsz=*/0, /*abid=*/0);
 
     // 6. Return expanded or collapsed based on input mode.
-    results.push_back(accIsExpanded
-                          ? smfmacResult
-                          : collapseAccumulator(builder, loc, smfmacResult));
+    Value result = accIsExpanded
+                       ? smfmacResult
+                       : collapseAccumulator(builder, loc, smfmacResult);
+    results.push_back(result);
     return success();
   }
   case VirtualMMAIntrinsic::VSMFMA_I32_16x16x64_I8: {
@@ -1575,9 +1576,10 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
         /*cbsz=*/0, /*abid=*/0);
 
     // 6. Return expanded or collapsed based on input mode.
-    results.push_back(accIsExpanded
-                          ? smfmacResult
-                          : collapseAccumulator(builder, loc, smfmacResult));
+    Value result = accIsExpanded
+                       ? smfmacResult
+                       : collapseAccumulator(builder, loc, smfmacResult);
+    results.push_back(result);
     return success();
   }
   }
