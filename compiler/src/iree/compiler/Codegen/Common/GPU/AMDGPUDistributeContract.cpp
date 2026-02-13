@@ -207,6 +207,31 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                            "A/B vector k batch mismatch");
       }
 
+      // Check if deferred accumulator collapse is applicable.
+      // For VSMFMA intrinsics with kBatch > 1, we expand the ACC once before
+      // the K-loop and collapse once after, avoiding redundant expand/collapse
+      // on every iteration.
+      auto virtualMmaAttr = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind);
+      std::optional<VectorType> expandedAccumulatorType;
+      if (virtualMmaAttr && kBatch.has_value() && kBatch.value() > 1) {
+        expandedAccumulatorType = virtualMmaAttr.getExpandedAccType();
+      }
+
+      Value currentAccumulator = accSlice;
+      std::optional<VectorType> lhsVectorType;
+      std::optional<VectorType> rhsVectorType;
+      if (expandedAccumulatorType.has_value()) {
+        auto [lhsType, rhsType, accType] = mmaKind.getABCVectorTypes();
+        lhsVectorType = lhsType;
+        rhsVectorType = rhsType;
+
+        // Shape-cast to collapsed 1D, then expand once before the K-loop.
+        Value flattenedAccumulator =
+            vector::ShapeCastOp::create(rewriter, loc, accType, accSlice);
+        currentAccumulator = virtualMmaAttr.expandAccumulator(
+            rewriter, loc, flattenedAccumulator);
+      }
+
       // Perform contraction by doing separate outer product with amdgpu.mfma
       // operation and accumulate to the same vector.
       for (int k = 0; k < kBatch; ++k) {
@@ -225,8 +250,34 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
-        accSlice =
-            computeMMA(rewriter, loc, mmaKind, lhsSlice, rhsSlice, accSlice);
+        if (expandedAccumulatorType.has_value()) {
+          Value lhsMmaInput = vector::ShapeCastOp::create(
+              rewriter, loc, lhsVectorType.value(), lhsSlice);
+          Value rhsMmaInput = vector::ShapeCastOp::create(
+              rewriter, loc, rhsVectorType.value(), rhsSlice);
+
+          SmallVector<Value> mmaResults;
+          [[maybe_unused]] LogicalResult createdMmaOp =
+              mmaKind.buildUnderlyingOperations(
+                  rewriter, loc, {lhsMmaInput, rhsMmaInput},
+                  {currentAccumulator}, mmaResults);
+          assert(succeeded(createdMmaOp) &&
+                 "Should never fail to construct mma op");
+          currentAccumulator = mmaResults.front();
+        } else {
+          currentAccumulator = computeMMA(rewriter, loc, mmaKind, lhsSlice,
+                                          rhsSlice, currentAccumulator);
+        }
+      }
+
+      if (expandedAccumulatorType.has_value()) {
+        // Collapse once after the K-loop.
+        Value collapsedAccumulator = virtualMmaAttr.collapseAccumulator(
+            rewriter, loc, currentAccumulator);
+        accSlice = vector::ShapeCastOp::create(
+            rewriter, loc, accSlice.getType(), collapsedAccumulator);
+      } else {
+        accSlice = currentAccumulator;
       }
       finalTile = vector::InsertOp::create(rewriter, loc, accSlice, finalTile,
                                            resultBatchOffsets);
