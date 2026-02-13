@@ -1344,11 +1344,11 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
 // Returns true on odd lanes and false on even lanes.
 static Value createOddLanePredicate(OpBuilder &builder, Location loc) {
   Value laneId = gpu::LaneIdOp::create(builder, loc, /*upper_bound=*/nullptr);
-  Value two = arith::ConstantIndexOp::create(builder, loc, 2);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
-  Value laneParity = arith::RemUIOp::create(builder, loc, laneId, two);
-  return arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
-                               laneParity, zero);
+  Value lowBit = arith::AndIOp::create(builder, loc, laneId, one);
+  return arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne, lowBit,
+                               zero);
 }
 
 // Rearranges a dense LHS fragment into sparse-trick ordering for even/odd
