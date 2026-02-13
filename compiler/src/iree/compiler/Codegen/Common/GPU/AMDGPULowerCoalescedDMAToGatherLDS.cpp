@@ -507,7 +507,11 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     // ops to be successfully lowered. In the future, a fallback lowering path
     // (e.g., using global_load) could handle ops that don't match the pattern.
     WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
-      op.emitOpError("failed to lower coalesced_gather_dma op");
+      op.emitOpError(
+          "failed to lower to gather_to_lds; possible causes: source "
+          "lacks fat_raw_buffer address space for OOB padding, destination "
+          "is not contiguous, or element sizes are incompatible with "
+          "dma_sizes");
       return WalkResult::interrupt();
     });
     if (result.wasInterrupted()) {

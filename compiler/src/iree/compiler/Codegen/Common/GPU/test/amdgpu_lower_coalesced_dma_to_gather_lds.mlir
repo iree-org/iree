@@ -1060,20 +1060,29 @@ func.func @lower_coalesced_dma_with_in_bounds(
   // Lowering uses dest shape (4x128) to compute transfer pattern.
   // Reads beyond source row 2 will return 0 via hardware OOB.
   //
+  // Since only the outermost dim (dim 0) is OOB, no non-outermost bounds check
+  // is needed. The identity select (select false, oobIdx, srcIdx) is emitted
+  // and will be folded away by canonicalization.
+  //
   // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
   scf.forall (%arg6) in (32) {
     // 4 rows * 128 cols = 512 elements total, 4 elements per lane = 4 transfers
     // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
     // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
     //
-    // Transfer 1: row 0
-    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
-    // Transfer 2: row 1
-    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
-    // Transfer 3: row 2 (OOB in source, hardware returns 0)
-    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
-    // Transfer 4: row 3 (OOB in source, hardware returns 0)
-    // CHECK: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // Transfer 1: linearOffset = 0
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 128)
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 128)
+    // No non-outermost OOB dims, so select is identity (false → original index).
+    // CHECK: %[[FALSE0:.+]] = arith.constant false
+    // CHECK: %[[C2:.+]] = arith.constant 2 : index
+    // CHECK: %[[FIXED0:.+]] = arith.select %[[FALSE0]], %[[C2]], %[[SRC_DELIN0]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED0]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
+    //
+    // Transfers 2-4: same pattern for remaining rows
+    // CHECK-COUNT-3: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
     // CHECK-NOT: amdgpu.gather_to_lds
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
@@ -1291,7 +1300,7 @@ func.func @no_lower_oob_without_fat_raw_buffer(
     attributes {hal.executable.target = #executable_target_rocm_hsaco_fb,
                 translation_info = #translation_64} {
   scf.forall (%arg6) in (64) {
-    // expected-error @+1 {{failed to lower coalesced_gather_dma op}}
+    // expected-error @+1 {{failed to lower to gather_to_lds; possible causes: source lacks fat_raw_buffer address space for OOB padding, destination is not contiguous, or element sizes are incompatible with dma_sizes}}
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
       memref<2x128xf32>,
       memref<4x128xf32, #gpu.address_space<workgroup>>, index

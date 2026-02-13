@@ -643,9 +643,14 @@ func.func @copy_from_fat_raw_buffer(
     ins(%source : tensor<64x512xbf16>)
     outs(%init : tensor<64x512xbf16>) -> tensor<64x512xbf16>
 
-  // fat_raw_buffer source: sourceIsNotFromFatRawBuffer returns false, DMA applied.
+  // fat_raw_buffer source allows DMA.
   // 2 warps (128/64), 64 rows → step = 32 rows, 512 cols whole.
-  // CHECK: iree_gpu.coalesced_gather_dma
+  // CHECK: %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUF]]
+  // CHECK: scf.forall (%[[IV0:.+]], %[[IV1:.+]]) {{.*}} shared_outs(%[[WARP_INIT:.+]] = %[[INIT]])
+  // CHECK:   %[[SLICE_SRC:.+]] = tensor.extract_slice %[[SOURCE]][%[[IV0]], 0]
+  // CHECK:   %[[SLICE_DST:.+]] = tensor.extract_slice %[[WARP_INIT]][%[[IV0]], 0]
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%{{.+}} = %[[SLICE_DST]])
+  // CHECK:     iree_gpu.coalesced_gather_dma %[[SLICE_SRC]] into %{{.+}} lane(%[[LANE]])
   // CHECK-NOT: linalg.copy
 
   return %result : tensor<64x512xbf16>
@@ -683,7 +688,10 @@ func.func @copy_from_fat_raw_buffer_small(
   // Small tensor (4x256 bf16) from fat_raw_buffer.
   // Innermost dim 256 >= min transfer (64*32/16=128), so DMA is applied.
   // 1 warp (64/64), 4 rows → step = 4 rows, 256 cols whole.
-  // CHECK: iree_gpu.coalesced_gather_dma
+  // CHECK: %[[SOURCE:.+]] = iree_codegen.load_from_buffer %[[BUF]]
+  // CHECK: scf.forall {{.*}} shared_outs(%{{.+}} = %[[INIT]])
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] =
+  // CHECK:     iree_gpu.coalesced_gather_dma %[[SOURCE]] into %[[INNER_INIT]] lane(%[[LANE]])
   // CHECK-NOT: linalg.copy
 
   return %result : tensor<4x256xbf16>
