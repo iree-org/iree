@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
@@ -555,6 +556,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createGPUFuseSubgroupConsumersPass());
   CombineResultLayoutTransformationPassOptions combineLayoutOptions;
   combineLayoutOptions.scope =
       IREE::Codegen::RelayoutCombinationScope::Workgroup;
@@ -998,6 +1000,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createCSEPass());
 
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
+
+  // Lower PCF ops before Linalg/LinalgExt -> SCF conversion.
+  // Order: resolve sync tokens, convert sref to memref, then lower structural
+  // PCF ops (generic/loop) to SCF.
+  FunctionLikeNest(modulePassManager)
+      .addPass(IREE::PCF::createResolveTokensPass)
+      .addPass(IREE::PCF::createConvertSRefToMemRefPass)
+      .addPass(IREE::PCF::createLowerStructuralPCFPass);
 
   FunctionLikeNest(modulePassManager)
       // LinalgExt -> SCF
