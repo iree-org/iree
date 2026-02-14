@@ -588,8 +588,8 @@ struct ScanOpConversion final
     }
 
     auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, scanInputs, outputs,
-        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
+        rewriter, op.getLoc(), outputTys, scanInputs[0], outputs[0], outputs[1],
+        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
                                 scanOp.getRegion().begin());
