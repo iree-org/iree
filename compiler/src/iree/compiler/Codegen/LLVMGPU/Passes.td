@@ -95,7 +95,10 @@ def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
       let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
           "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
-  let dependentDialects = ["amdgpu::AMDGPUDialect"];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "amdgpu::AMDGPUDialect"
+  ];
   let options = [
     Option<"numStages", "num-stages", "unsigned",
            /*default=*/"2",
@@ -106,6 +109,11 @@ def ROCDLPrefetchSharedMemoryPass :
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let options = [
+    Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
+      /*default=*/"GPUCodegenOptions::FromFlags::get()",
+      "Session-scoped GPU codegen options controlling prefetch, etc.">,
+  ];
 }
 
 def LLVMGPUTensorCoreVectorizationPass :

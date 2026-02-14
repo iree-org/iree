@@ -417,7 +417,7 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
 
   // Allocate argument storage on the native stack. It only needs to survive the
   // begin call as it's consumed by the invokee.
-  iree_byte_span_t arguments = iree_make_byte_span(NULL, 0);
+  iree_byte_span_t arguments = iree_byte_span_empty();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_vm_function_call_compute_cconv_fragment_size(
@@ -442,7 +442,7 @@ IREE_API_EXPORT iree_status_t iree_vm_begin_invoke(
   // storage. This reduces the overall available stack space but not by much,
   // and if the stack needs to dynamically grow the inlined storage will still
   // be available.
-  iree_byte_span_t results = iree_make_byte_span(NULL, 0);
+  iree_byte_span_t results = iree_byte_span_empty();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_function_call_compute_cconv_fragment_size(
               cconv_results, /*segment_size_list=*/NULL, &results.data_length));

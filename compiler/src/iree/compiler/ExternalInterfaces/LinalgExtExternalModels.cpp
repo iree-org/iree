@@ -7,6 +7,7 @@
 #include "iree/compiler/ExternalInterfaces/LinalgExtExternalModels.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -69,22 +70,22 @@ struct SoftmaxFusionOpInterfaceAdapter
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
     Builder b(op->getContext());
-    return llvm::to_vector(llvm::map_range(
+    return llvm::map_to_vector(
         cast<linalg::SoftmaxOp>(op).getDpsInputs(),
         [&b](Value operand) -> AffineMap {
           auto rank = cast<ShapedType>(operand.getType()).getRank();
           return b.getMultiDimIdentityMap(rank);
-        }));
+        });
   }
 
   SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
     Builder b(op->getContext());
-    return llvm::to_vector(llvm::map_range(
+    return llvm::map_to_vector(
         cast<linalg::SoftmaxOp>(op).getDpsInits(),
         [&b](Value operand) -> AffineMap {
           auto rank = cast<ShapedType>(operand.getType()).getRank();
           return b.getMultiDimIdentityMap(rank);
-        }));
+        });
   }
 
   SmallVector<int64_t> getStaticLoopRanges(Operation *op) const {

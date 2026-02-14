@@ -9,10 +9,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
-#include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -27,7 +25,6 @@
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 struct VMVXOptions {
   bool enableMicrokernels = false;
@@ -40,7 +37,6 @@ struct VMVXOptions {
         llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"));
   }
 };
-} // namespace
 
 static IREE::HAL::ExecutableTargetAttr
 getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
@@ -62,12 +58,12 @@ class VMVXTargetBackend final : public TargetBackend {
 public:
   VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "local"; }
+  std::string getLegacyDefaultDeviceID() const final { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(getVMVXExecutableTarget(
         options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
   }
@@ -75,13 +71,13 @@ public:
   void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
                                 DictionaryAttr deviceConfigAttr,
                                 SmallVectorImpl<IREE::HAL::ExecutableTargetAttr>
-                                    &executableTargetAttrs) const override {
+                                    &executableTargetAttrs) const final {
     executableTargetAttrs.push_back(getVMVXExecutableTarget(
         options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
   }
 
   TargetBackend::SupportedTypes
-  getSupportedTypes(MLIRContext *context) const override {
+  getSupportedTypes(MLIRContext *context) const final {
     SupportedTypes s;
     Builder b(context);
 
@@ -105,7 +101,7 @@ public:
     return s;
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     registry
         .insert<IREE::CPU::IREECPUDialect, IREE::Codegen::IREECodegenDialect,
                 IREE::Encoding::IREEEncodingDialect,
@@ -125,12 +121,12 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -139,13 +135,13 @@ public:
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildVMVXLinkingPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     // Add reflection information used at runtime specific to the HAL interface.
     auto vmModule =
         *variantOp.getInnerModule().getOps<IREE::VM::ModuleOp>().begin();
@@ -232,29 +228,29 @@ class VMVXInlineTargetBackend final : public TargetBackend {
 public:
   VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "local"; }
+  std::string getLegacyDefaultDeviceID() const final { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(getVMVXExecutableTarget(
         options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
 
@@ -262,11 +258,10 @@ private:
   const VMVXOptions &options;
 };
 
-namespace {
-struct VMVXSession
+struct VMVXSession final
     : public PluginSession<VMVXSession, VMVXOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"vmvx", ...
     targets.add("vmvx",
                 [=]() { return std::make_shared<VMVXTargetBackend>(options); });
@@ -278,7 +273,6 @@ struct VMVXSession
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_vmvx(

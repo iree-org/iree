@@ -1170,25 +1170,133 @@ iree_generated_e2e_runner_test(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+###########################################################################
+##
+## CUDA backend
+##
+###########################################################################
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_vecdist_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUVectorDistributeCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_tileandfuse_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUTileAndFuseCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_vecdist_f16_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUVectorDistributeCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cuda_tileandfuse_f16_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=easy_large_static"
+    "--compilation_info=LLVMGPUTileAndFuseCUDA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-target=sm_80"
+  LABELS
+    "requires-gpu-sm80"
+)
+
+###########################################################################
+##
+## HIP backend
+##
+###########################################################################
+
 # To distinguish between CDNA(gfx9), RDNA3(gfx11), and RDNA4(gfx12)
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx9")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx94")
   set(_CDNA_ARCH "cdna3")
   set(_F8E4M3_TYPE "f8E4M3FNUZ")
   set(_F8E5M2_TYPE "f8E5M2FNUZ")
-elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+elseif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
   set(_CDNA_ARCH "cdna4")
   set(_F8E4M3_TYPE "f8E4M3FN")
   set(_F8E5M2_TYPE "f8E5M2")
 endif()
 
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94" OR IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx94" OR IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
 
 iree_generated_e2e_runner_test(
   NAME
@@ -1667,7 +1775,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-ukernels=multi_mma"
+    "--iree-rocm-enable-ukernels=multi_mma"
     "--iree-dispatch-creation-data-tiling"
   LABELS
     "noasan"
@@ -1753,8 +1861,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -1785,8 +1893,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -1843,7 +1951,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -1873,7 +1981,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -1930,7 +2038,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
     "--iree-dispatch-creation-set-encoding-strategy=padding"
-    "--iree-hip-encoding-layout-resolver=pad"
+    "--iree-rocm-encoding-layout-resolver=pad"
   LABELS
     "noasan"
     "nomsan"
@@ -1959,7 +2067,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
     "--iree-dispatch-creation-set-encoding-strategy=padding"
-    "--iree-hip-encoding-layout-resolver=pad"
+    "--iree-rocm-encoding-layout-resolver=pad"
   LABELS
     "noasan"
     "nomsan"
@@ -1990,8 +2098,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2022,8 +2130,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2054,8 +2162,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2086,7 +2194,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-enable-tensor-ukernels"
+    "--iree-rocm-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2117,8 +2225,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2149,8 +2257,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2182,8 +2290,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-hip-enable-tensor-ukernels"
-    "--iree-hip-specialize-dispatches"
+    "--iree-rocm-enable-tensor-ukernels"
+    "--iree-rocm-specialize-dispatches"
   LABELS
     "noasan"
     "nomsan"
@@ -2194,7 +2302,7 @@ iree_generated_e2e_runner_test(
 
 endif()
 
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
 
 iree_generated_e2e_runner_test(
   NAME
@@ -2249,7 +2357,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     --iree-dispatch-creation-data-tiling=true
-    --iree-hip-encoding-layout-resolver=data-tiling
+    --iree-rocm-encoding-layout-resolver=data-tiling
   LABELS
     "noasan"
     "nomsan"
@@ -2283,8 +2391,8 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     --iree-dispatch-creation-data-tiling=true
-    --iree-hip-encoding-layout-resolver=data-tiling
-    --iree-hip-enable-tensor-ukernels
+    --iree-rocm-encoding-layout-resolver=data-tiling
+    --iree-rocm-enable-tensor-ukernels
   LABELS
     "noasan"
     "nomsan"
@@ -2428,11 +2536,11 @@ iree_generated_e2e_runner_test(
 endif()
 
 
-elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
+elseif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx11")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(
@@ -2584,11 +2692,11 @@ iree_generated_e2e_runner_test(
     "requires-gpu-rdna3"
 )
 
-elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx120[01]")
+elseif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx120[01]")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(
@@ -2833,11 +2941,11 @@ iree_generated_e2e_runner_test(
     "requires-gpu-rdna4"
 )
 
-elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx1250")
+elseif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1250")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(

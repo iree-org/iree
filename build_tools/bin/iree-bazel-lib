@@ -22,6 +22,11 @@ _IREE_BAZEL_COLOR_NC='\033[0m'
 # Tool name for logging (set via iree_bazel_init).
 _IREE_BAZEL_TOOL_NAME=""
 
+# Bazel startup args for info/cquery (e.g., --output_base).
+# Tools can set via iree_bazel_set_startup_args.
+declare -a IREE_BAZEL_STARTUP_ARGS=()
+IREE_BAZEL_EXECROOT=""
+
 # -----------------------------------------------------------------------------
 # Logging functions
 # -----------------------------------------------------------------------------
@@ -71,7 +76,7 @@ configuration, provide better defaults, and work from any subdirectory.
 - `iree-bazel-run <target> [bazel-args] [-- program-args]` - Build and run binary
 - `iree-bazel-try [options] -e 'code' [-- program-args]` - Quick C/C++ experiments
 
-**Additional tools:** `iree-bazel-query`, `iree-bazel-fuzz` (see `--help`)
+**Additional tools:** `iree-bazel-query`, `iree-bazel-cquery`, `iree-bazel-fuzz` (see `--help`)
 
 **Examples:**
 ```shell
@@ -158,6 +163,12 @@ iree_bazel_init() {
     IREE_BAZEL_ORIG_CWD="${PWD}"
     IREE_BAZEL_DRY_RUN="${IREE_BAZEL_DRY_RUN:-0}"
     IREE_BAZEL_VERBOSE="${IREE_BAZEL_VERBOSE:-0}"
+}
+
+# Set startup args for bazel info/cquery and clear cached execroot.
+iree_bazel_set_startup_args() {
+    IREE_BAZEL_STARTUP_ARGS=("$@")
+    IREE_BAZEL_EXECROOT=""
 }
 
 # Set up the worktree environment.
@@ -257,10 +268,12 @@ iree_bazel_build_default_configs() {
     fi
 
     # Use mold linker if available (significantly faster than ld/gold).
-    if command -v mold &>/dev/null; then
-        IREE_BAZEL_DEFAULT_CONFIGS+=(--config=mold)
-        iree_debug "Using mold linker"
-    fi
+    # TODO(benvanik): this breaks --features=thin_lto, so leaving it opt-in for
+    #                 now (--config=mold) until I can find a good way to choose.
+    # if command -v mold &>/dev/null; then
+    #     IREE_BAZEL_DEFAULT_CONFIGS+=(--config=mold)
+    #     iree_debug "Using mold linker"
+    # fi
 
     # TODO: Auto-detect available hardware/SDKs.
     # if [[ -n "${HIP_PATH:-}" ]]; then
@@ -277,6 +290,27 @@ iree_bazel_build_default_configs() {
 # Build and execution
 # -----------------------------------------------------------------------------
 
+# Get execroot for the current Bazel server (cached).
+# Must be called from the worktree root directory.
+iree_bazel_get_execroot() {
+    if [[ -n "${IREE_BAZEL_EXECROOT}" ]]; then
+        echo "${IREE_BAZEL_EXECROOT}"
+        return 0
+    fi
+    local BAZEL_BIN
+    BAZEL_BIN=$(iree_get_bazel_command)
+    local info_output execroot
+    info_output=$("${BAZEL_BIN}" "${IREE_BAZEL_STARTUP_ARGS[@]}" info execution_root 2>/dev/null || true)
+    execroot=$(echo "${info_output}" | sed -n 's/^execution_root: //p')
+    if [[ -z "${execroot}" ]]; then
+        execroot="${info_output}"
+    fi
+    if [[ -n "${execroot}" ]]; then
+        IREE_BAZEL_EXECROOT="${execroot}"
+        echo "${IREE_BAZEL_EXECROOT}"
+    fi
+}
+
 # Get the output file path for a bazel target.
 # Must be called from the worktree root directory.
 # Args:
@@ -288,12 +322,18 @@ iree_bazel_get_binary_path() {
     shift
     local BAZEL_BIN
     BAZEL_BIN=$(iree_get_bazel_command)
-    local relative_path
+    local relative_paths relative_path execroot
     # Pass all bazel args to cquery so it uses the same configuration as build.
-    relative_path=$("${BAZEL_BIN}" cquery --output=files "${target}" "$@" 2>/dev/null)
-    # Convert to absolute path (bazel returns paths relative to workspace).
+    relative_paths=$("${BAZEL_BIN}" "${IREE_BAZEL_STARTUP_ARGS[@]}" cquery --output=files "${target}" "$@" 2>/dev/null)
+    relative_path="${relative_paths%%$'\n'*}"
     if [[ -n "${relative_path}" ]]; then
-        echo "${PWD}/${relative_path}"
+        execroot=$(iree_bazel_get_execroot)
+        if [[ -n "${execroot}" ]]; then
+            echo "${execroot}/${relative_path}"
+        else
+            # Fallback to workspace-relative path if execroot is unavailable.
+            echo "${PWD}/${relative_path}"
+        fi
     fi
 }
 
@@ -409,6 +449,12 @@ iree_bazel_build_quiet() {
     trap "rm -f '${log_file}'" RETURN
 
     if "${BAZEL_BIN}" build --color=yes "${target}" "$@" >"${log_file}" 2>&1; then
+        # Check for warnings in log and report count.
+        local warning_count
+        warning_count=$(grep -c -E '(warning:|WARNING:)' "${log_file}" 2>/dev/null || echo 0)
+        if [[ "${warning_count}" -gt 0 ]]; then
+            iree_warn "Build succeeded with ${warning_count} warning(s) (use -v to see)"
+        fi
         return 0
     else
         local exit_code=$?

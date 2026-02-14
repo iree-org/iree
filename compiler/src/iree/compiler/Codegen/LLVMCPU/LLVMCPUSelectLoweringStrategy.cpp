@@ -184,7 +184,7 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
             owSize = shapeAfterTiling[2];
             return success();
           })
-          .Case<linalg::Conv2DNchwFchwOp>([&](auto) {
+          .Case([&](linalg::Conv2DNchwFchwOp) {
             // shape: N, OC, OH, OW, (IC), KH, KW
             khSize = shapeAfterTiling[5];
             kwSize = shapeAfterTiling[6];
@@ -200,7 +200,7 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
             owSize = shapeAfterTiling[3];
             return success();
           })
-          .Default([&](auto) { return failure(); });
+          .Default(failure());
   if (failed(isSizeExtracted)) {
     return op->emitOpError("unsupported conv types");
   }

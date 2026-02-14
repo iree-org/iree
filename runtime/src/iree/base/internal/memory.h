@@ -68,6 +68,96 @@ void iree_memory_jit_context_end(void);
 // executing code from any pages that have been written during load.
 void iree_memory_flush_icache(void* base_address, iree_host_size_t length);
 
+//===----------------------------------------------------------------------===//
+// Secure memory operations
+//===----------------------------------------------------------------------===//
+
+// Locks a memory region to prevent it from being paged to swap.
+// Use for sensitive data like cryptographic keys that should never be written
+// to disk. The region should be unlocked with iree_memory_unlock when no longer
+// needed.
+//
+// Platform implementations:
+//   Linux/BSD/macOS: mlock()
+//   Windows:         VirtualLock()
+//
+// May fail if the process has insufficient privileges or exceeds the locked
+// memory limit (RLIMIT_MEMLOCK on POSIX). Failure is not fatal for security
+// but reduces protection.
+iree_status_t iree_memory_lock(void* ptr, iree_host_size_t size);
+
+// Unlocks a previously locked memory region, allowing paging.
+void iree_memory_unlock(void* ptr, iree_host_size_t size);
+
+// Advises the OS to exclude a memory region from core dumps.
+// Use for sensitive data that should not appear in crash dumps.
+//
+// Platform implementations:
+//   Linux:   madvise(MADV_DONTDUMP)
+//   macOS:   Not available (no-op)
+//   Windows: Not directly available (no-op)
+//
+// This is best-effort; the call succeeds even if the platform doesn't support
+// the feature.
+void iree_memory_protect_sensitive(void* ptr, iree_host_size_t size);
+
+// Securely wipes a memory region to prevent sensitive data recovery.
+// The wipe is performed in a way that the compiler cannot optimize away.
+//
+// Platform implementations:
+//   Windows:              SecureZeroMemory
+//   C11 Annex K / macOS:  memset_s
+//   Linux/Android/BSD:    explicit_bzero
+//   Other platforms:      volatile writes with memory barrier
+//
+// Use immediately before freeing memory that contained secrets (keys, tokens).
+// Note: This does not guarantee the data is unrecoverable from physical memory
+// or swap; use iree_memory_lock to prevent swapping of sensitive regions.
+void iree_memory_wipe(void* ptr, iree_host_size_t size);
+
+//===----------------------------------------------------------------------===//
+// C11 aligned_alloc shim
+//===----------------------------------------------------------------------===//
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// WARNING: DO NOT USE THIS FUNCTION FOR NORMAL ALLOCATIONS.
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+// This function BYPASSES the iree_allocator_t infrastructure entirely. Using it
+// means:
+//   - No integration with custom allocators (arena, pool, tracking, etc)
+//   - No ability to use iree_allocator_free() - must use iree_aligned_free()
+//   - Memory accounting and debugging tools cannot track these allocations
+//   - Breaks the allocator abstraction that enables embedded/custom deployments
+//
+// VALID USES (require explicit approval):
+//   - NUMA allocation fallback (numa_*.c) - special physical placement needs
+//   - Status storage (status.c internal) - bootstrapping before allocators
+//     exist and that allocators use for handling when they fail
+//   - Test/benchmark code where allocator integration is irrelevant
+//
+// FOR ALIGNED ALLOCATIONS IN NORMAL CODE:
+//   - Embed aligned data within a larger struct that is normally allocated
+//   - Use iree_allocator_malloc with extra padding and manual alignment
+//   - Reconsider whether 64-byte alignment is actually necessary
+//
+// If you think you need this function, you are almost certainly wrong.
+// Ask for guidance before using it.
+
+// Allocates |size| bytes of uninitialized storage whose alignment is specified
+// by |alignment|. The |size| parameter must be an integral multiple of
+// |alignment|. The returned pointer must be freed using iree_aligned_free.
+//
+// This is a thin wrapper around C11's aligned_alloc when available:
+// https://en.cppreference.com/w/c/memory/aligned_alloc
+//
+// When not available (such as on MSVC) a fallback will be used:
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
+iree_status_t iree_aligned_alloc(iree_host_size_t alignment,
+                                 iree_host_size_t size, void** out_ptr);
+void iree_aligned_free(void* ptr);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

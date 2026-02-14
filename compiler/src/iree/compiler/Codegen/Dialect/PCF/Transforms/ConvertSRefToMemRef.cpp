@@ -388,7 +388,7 @@ ChangeStatus StridedLayoutValueElement::updateBlockArgument(
               }
               return true;
             })
-            .Default([&](Operation *) { return false; });
+            .Default(false);
   }
   if (!didUpdate) {
     solver.getExplorer().walkIncomingBranchOperands(
@@ -797,7 +797,7 @@ struct ConvertWriteSliceOp final : OpConversionPattern<PCF::WriteSliceOp> {
               writeOp, writeOp.getSource(), destSlice, offsets, inBounds);
           return success();
         })
-        .Default([](Type) { return failure(); });
+        .Default(failure());
   }
 };
 
@@ -840,7 +840,7 @@ struct ConvertReadSliceOp final : OpConversionPattern<PCF::ReadSliceOp> {
               readOp, vector, sourceSlice, offsets, zeroPadding, inBounds);
           return success();
         })
-        .Default([](Type) { return failure(); });
+        .Default(failure());
   }
 };
 

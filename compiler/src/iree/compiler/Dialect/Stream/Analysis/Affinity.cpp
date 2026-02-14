@@ -759,7 +759,7 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                 newState.unionAssumed(sourceAffinityAttr);
               }
             })
-            .Case<IREE::Util::GlobalLoadOpInterface>([&](auto loadOp) {
+            .Case([&](IREE::Util::GlobalLoadOpInterface loadOp) {
               auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
                   loadOp.getGlobalName(), loadOp);
               auto &globalPVS = solver.getElementFor<GlobalAffinityPVS>(
@@ -779,7 +779,7 @@ ChangeStatus ValueProducerAffinityPVS::updateValue(Value value,
                 newState ^= globalPVS.getState();
               }
             })
-            .Case<mlir::arith::SelectOp>([&](auto op) {
+            .Case([&](mlir::arith::SelectOp op) {
               auto &truePVS = solver.getElementFor<ValueProducerAffinityPVS>(
                   *this, Position::forValue(op.getTrueValue()),
                   DFX::Resolution::REQUIRED);

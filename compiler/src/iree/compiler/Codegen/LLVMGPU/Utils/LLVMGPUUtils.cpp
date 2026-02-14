@@ -362,8 +362,9 @@ void reorderTranspose(RewriterBase &rewriter,
   }
 }
 
-void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
-                ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies) {
+void addSharedMemoryBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
+                            ArrayRef<Operation *> aliasGroup,
+                            bool hasAsyncCopies) {
   Block *entryBlock = &(*funcOp.getBlocks().begin());
   bool needBarrier = false;
   if (alloc->getBlock() != entryBlock) {
@@ -396,7 +397,8 @@ void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
     nvgpu::DeviceAsyncWaitOp::create(builder, funcOp.getLoc(), groupToken,
                                      builder.getI32IntegerAttr(0));
   }
-  gpu::BarrierOp::create(builder, alloc->getLoc());
+  gpu::BarrierOp::create(builder, alloc->getLoc(),
+                         gpu::AddressSpace::Workgroup);
 }
 
 void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp) {
@@ -421,7 +423,7 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp) {
   // reading from the previous alias group before starting a new one.
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     for (Operation *alloc : aliasGroups[i]) {
-      addBarrier(funcOp, alloc, aliasGroups[i]);
+      addSharedMemoryBarrier(funcOp, alloc, aliasGroups[i]);
     }
   }
 

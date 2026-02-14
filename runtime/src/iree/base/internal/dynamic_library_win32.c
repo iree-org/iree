@@ -9,9 +9,9 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/threading/call_once.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
@@ -331,6 +331,13 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   }
   *out_fn = fn;
   return iree_ok_status();
+}
+
+void* iree_dynamic_library_try_lookup_symbol(iree_dynamic_library_t* library,
+                                             const char* symbol_name) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(symbol_name);
+  return (void*)GetProcAddress(library->module, symbol_name);
 }
 
 iree_status_t iree_dynamic_library_append_symbol_path_to_builder(

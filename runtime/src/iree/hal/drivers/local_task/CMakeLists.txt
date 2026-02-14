@@ -35,8 +35,8 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::internal::cpu
     iree::base::internal::event_pool
-    iree::base::internal::synchronization
     iree::base::internal::wait_handle
+    iree::base::threading
     iree::hal
     iree::hal::local
     iree::hal::local::executable_environment

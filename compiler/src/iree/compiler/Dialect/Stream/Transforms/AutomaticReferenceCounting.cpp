@@ -974,15 +974,15 @@ static bool analyzeRegionBranchOp(RegionBranchOpInterface regionBranchOp,
 
   // Dispatch to pattern-specific handlers using TypeSwitch.
   return llvm::TypeSwitch<Operation *, bool>(op)
-      .Case<scf::ForOp>([&](scf::ForOp forOp) {
+      .Case([&](scf::ForOp forOp) {
         return analyzeForLoop(forOp, asmState, lastUseSet, coverage,
                               indeterminateResources, handledResources);
       })
-      .Case<scf::IfOp>([&](scf::IfOp ifOp) {
+      .Case([&](scf::IfOp ifOp) {
         return analyzeIfOp(ifOp, asmState, lastUseSet, coverage,
                            indeterminateResources, handledResources);
       })
-      .Case<scf::WhileOp>([&](scf::WhileOp whileOp) {
+      .Case([&](scf::WhileOp whileOp) {
         return analyzeWhileOp(whileOp, asmState, lastUseSet, coverage,
                               indeterminateResources, handledResources);
       })

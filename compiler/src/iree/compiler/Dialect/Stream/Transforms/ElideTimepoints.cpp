@@ -1035,7 +1035,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
     }
   };
   return TypeSwitch<Operation *, bool>(controlFlowOp)
-      .Case<scf::IfOp>([&](auto ifOp) {
+      .Case([&](scf::IfOp ifOp) {
         // scf.if has mutually exclusive branches - sink into all that need it.
         LLVM_DEBUG({
           llvm::dbgs() << "[ElideTimepoints] sinking await into scf.if ";
@@ -1063,7 +1063,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
         }
         return true;
       })
-      .Case<scf::IndexSwitchOp>([&](auto switchOp) {
+      .Case([&](scf::IndexSwitchOp switchOp) {
         // scf.index_switch has mutually exclusive case regions - sink into all
         // that need it.
         LLVM_DEBUG({
@@ -1101,7 +1101,7 @@ static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
         }
         return true;
       })
-      .Default([](auto) { return false; });
+      .Default(false);
 }
 
 // Hoists await past control flow when the value only used after.
@@ -1212,6 +1212,48 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
               return WalkResult::advance();
             }
 
+            // For CF loop block arguments, the operand replacement (Phase 2)
+            // will be rejected because the async value from the loop body
+            // can't dominate the block argument. Timepoint absorption (Phase 1)
+            // is still valid when the await timepoint dominates the timeline op
+            // (originates outside the loop). When it does NOT dominate — e.g.,
+            // the timepoint is produced by the same timeline op — absorption
+            // would create a self-referential await that canonicalize removes,
+            // causing fixed-point oscillation. Skip entirely in that case.
+            if (auto blockArg = dyn_cast<BlockArgument>(operand.get())) {
+              Block *argBlock = blockArg.getOwner();
+              bool isInSCFRegion = false;
+              Operation *parentOp = argBlock->getParentOp();
+              while (parentOp) {
+                if (isa<mlir::RegionBranchOpInterface>(parentOp)) {
+                  isInSCFRegion = true;
+                  break;
+                }
+                if (parentOp->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+                  break;
+                }
+                parentOp = parentOp->getParentOp();
+              }
+              if (!isInSCFRegion) {
+                bool hasBackEdge = false;
+                for (Block *pred : argBlock->getPredecessors()) {
+                  if (pred == argBlock || domInfo.dominates(argBlock, pred)) {
+                    hasBackEdge = true;
+                    break;
+                  }
+                }
+                if (hasBackEdge &&
+                    !domInfo.properlyDominates(awaitTimepoint,
+                                               timelineOp.getOperation())) {
+                  LLVM_DEBUG({
+                    llvm::dbgs() << "[ElideTimepoints] skipping fold: CF loop "
+                                 << "back-edge with non-dominating timepoint\n";
+                  });
+                  return WalkResult::advance();
+                }
+              }
+            }
+
             // Check if timeline op's awaits cover this await timepoint.
             bool isCovered = analysis.covers(awaitTimepoint,
                                              timelineOp.getAwaitTimepoints());
@@ -1230,7 +1272,6 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
               });
               modifications.push_back(
                   {timelineOp, operand.get(), asyncValue, true});
-              didChange = true;
             } else {
               // REACTIVE: Timeline op DOES cover the await timepoint.
               // The timeline op already awaits this timepoint (or something
@@ -1244,7 +1285,6 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
               });
               modifications.push_back(
                   {timelineOp, operand.get(), asyncValue, false});
-              didChange = true;
             }
           }
           return WalkResult::advance();
@@ -1268,23 +1308,28 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
     SmallVector<Value> newAwaitTimepoints(timelineOp.getAwaitTimepoints());
 
     // Add unique timepoints (avoid duplicates).
+    bool absorbed = false;
     for (Value timepoint : timepoints) {
       if (!llvm::is_contained(newAwaitTimepoints, timepoint)) {
         newAwaitTimepoints.push_back(timepoint);
+        absorbed = true;
       }
     }
 
-    timelineOp.setAwaitTimepoints(newAwaitTimepoints, builder);
-    LLVM_DEBUG({
-      llvm::dbgs() << "[ElideTimepoints] absorbed await into timeline op ";
-      timelineOp.print(llvm::dbgs(), analysis.getAsmState());
-      llvm::dbgs() << "\n";
-    });
+    if (absorbed) {
+      timelineOp.setAwaitTimepoints(newAwaitTimepoints, builder);
+      didChange = true;
+      LLVM_DEBUG({
+        llvm::dbgs() << "[ElideTimepoints] absorbed await into timeline op ";
+        timelineOp.print(llvm::dbgs(), analysis.getAsmState());
+        llvm::dbgs() << "\n";
+      });
+    }
   }
 
   // Phase 2: Replace all operand values with async values.
   // Use replaceUsesWithIf to safely update only the uses within the timeline
-  // ops we're modifying.
+  // ops we're modifying. Track whether any replacements actually applied.
   for (auto &mod : modifications) {
     mod.oldValue.replaceUsesWithIf(mod.newValue, [&](OpOperand &use) {
       if (use.getOwner() != mod.timelineOp.getOperation()) {
@@ -1294,6 +1339,7 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
       // For block arguments, check if the block containing mod.newValue
       // dominates the block argument's owner block.
       // For regular values, check if mod.newValue dominates the defining op.
+      bool canReplace = false;
       if (auto blockArg = dyn_cast<BlockArgument>(mod.oldValue)) {
         // mod.oldValue is a block argument.
         Block *argBlock = blockArg.getOwner();
@@ -1333,17 +1379,23 @@ static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
         if (!defOp) {
           // mod.newValue is itself a block argument, check block dominance.
           auto newBlockArg = cast<BlockArgument>(mod.newValue);
-          return domInfo.properlyDominates(newBlockArg.getOwner(), argBlock);
+          canReplace =
+              domInfo.properlyDominates(newBlockArg.getOwner(), argBlock);
+        } else {
+          // Check if the block containing the defining op dominates the block
+          // argument's owner block.
+          canReplace = domInfo.properlyDominates(defOp->getBlock(), argBlock);
         }
-        // Check if the block containing the defining op dominates the block
-        // argument's owner block.
-        return domInfo.properlyDominates(defOp->getBlock(), argBlock);
       } else {
         // mod.oldValue is a regular SSA value. Check if mod.newValue dominates
         // its defining operation.
-        return domInfo.properlyDominates(mod.newValue,
-                                         mod.oldValue.getDefiningOp());
+        canReplace = domInfo.properlyDominates(mod.newValue,
+                                               mod.oldValue.getDefiningOp());
       }
+      if (canReplace) {
+        didChange = true;
+      }
+      return canReplace;
     });
   }
 

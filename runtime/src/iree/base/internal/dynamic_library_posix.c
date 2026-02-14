@@ -13,9 +13,9 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/threading/call_once.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)
@@ -319,6 +319,13 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   }
   *out_fn = fn;
   return iree_ok_status();
+}
+
+void* iree_dynamic_library_try_lookup_symbol(iree_dynamic_library_t* library,
+                                             const char* symbol_name) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(symbol_name);
+  return dlsym(library->handle, symbol_name);
 }
 
 iree_status_t iree_dynamic_library_attach_symbols_from_file(

@@ -26,6 +26,8 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -76,6 +78,14 @@ static bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
 }
 
+bool isNvMmaSync(MMAIntrinsic intrinsic) {
+  return getArchID(intrinsic) == 0x2000;
+}
+
+static bool isNvWmma(MMAIntrinsic intrinsic) {
+  return getArchID(intrinsic) == 0x2100;
+}
+
 int64_t getIntrinsicSubgroupSize(ScaledMMAIntrinsic intrinsic) {
   switch (intrinsic) {
   case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
@@ -117,13 +127,15 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_32x32x16_F16:
   case MMAIntrinsic::WMMAR3_F32_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_F16:
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16:
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::WMMA_F32_16x16x32_F16:
     return {f16, f16, f32};
   case MMAIntrinsic::WMMAR3_F16_16x16x16_F16:
   case MMAIntrinsic::WMMAR4_F16_16x16x16_F16:
-  case MMAIntrinsic::WMMA_F16_16x16x32_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
+  case MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16:
+  case MMAIntrinsic::WMMA_F16_16x16x32_F16:
     return {f16, f16, f16};
   case MMAIntrinsic::MFMA_F32_16x16x8_BF16:
   case MMAIntrinsic::MFMA_F32_32x32x4_BF16:
@@ -514,6 +526,21 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     case kMMAOperandAcc:
       return gfx12WmmaAcc16x16;
     }
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16:
+  case MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return {/*outer=*/{2, 2}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
+              /*element=*/{1, 2}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{2, 1}, /*thread=*/{4, 8}, /*strides=*/{1, 4},
+              /*element=*/{2, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{2, 1}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
+              /*element=*/{1, 2}};
+    default:
+      return {};
+    }
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {};
@@ -564,14 +591,15 @@ struct OpaqueMmaLayout {
 
 static std::tuple<int64_t, int64_t, int64_t>
 getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {
-  if (is_AMD(intrinsic)) {
-    auto lhs = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
-    auto rhs = getSingleSubgroupLayout(intrinsic, kMMAOperandRhs);
-    return {lhs.outer[0] * lhs.thread[0] * lhs.element[0],
-            rhs.outer[1] * rhs.thread[1] * rhs.element[1],
-            lhs.outer[1] * lhs.thread[1] * lhs.element[1]};
+  if (intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16 ||
+      intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16) {
+    return getUnsupportedMNKShape(intrinsic);
   }
-  return getUnsupportedMNKShape(intrinsic);
+  auto lhs = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
+  auto rhs = getSingleSubgroupLayout(intrinsic, kMMAOperandRhs);
+  return {lhs.outer[0] * lhs.thread[0] * lhs.element[0],
+          rhs.outer[1] * rhs.thread[1] * rhs.element[1],
+          lhs.outer[1] * lhs.thread[1] * lhs.element[1]};
 }
 
 int64_t getMSize(MMAIntrinsic intrinsic) {
@@ -606,6 +634,11 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
     return IREE::GPU::getSingleSubgroupLayout(
         vmmaAttr.getIntrinsic(), operandIndex,
         operandIndex == kMMAOperandAcc && vmmaAttr.getColMajor());
+  }
+  if (auto smmaAttr = dyn_cast<ScaledMMAAttr>(mmaKind)) {
+    return IREE::GPU::getSingleSubgroupLayout(
+        smmaAttr.getIntrinsic(), operandIndex,
+        operandIndex == kScaledMMAOperandAcc && smmaAttr.getColMajor());
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -655,6 +688,12 @@ static VectorType getThreadVectorType(MLIRContext *context,
   Type elemType = isIntrinsicLhs<MMAIntrinsicType>(operandIndex)   ? o.aType
                   : isIntrinsicRhs<MMAIntrinsicType>(operandIndex) ? o.bType
                                                                    : o.cType;
+  if constexpr (std::is_same_v<MMAIntrinsicType, MMAIntrinsic>) {
+    if (isNvMmaSync(intrinsic)) {
+      return VectorType::get(
+          {s.outer[0] * s.outer[1], s.element[0] * s.element[1]}, elemType);
+    }
+  }
   return VectorType::get(
       {s.element[0] * s.element[1] * s.outer[0] * s.outer[1]}, elemType);
 }
@@ -690,8 +729,15 @@ int64_t MMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
+SmallVector<SmallVector<utils::IteratorType>>
+MMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
 Attribute MMAAttr::getDistributionMappingKind() const {
-  // Explicit distribution currently unsupported for NV intrinsics.
+  // Explicit distribution currently unsupported for NV WMMA intrinsics.
   MMAIntrinsic intrinsic = getIntrinsic();
   if (intrinsic == MMAIntrinsic::NV_WMMA_F16_16x16x16_F16 ||
       intrinsic == MMAIntrinsic::NV_WMMA_F32_16x16x16_F16) {
@@ -751,6 +797,26 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
   if (is_AMD_WMMA(intrinsic)) {
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
                                   layout.nSize, layout.kSize, lhs, rhs, acc)
+        .getResult();
+  }
+  if (isNvMmaSync(intrinsic)) {
+    // Transpose the two outer dimensions to model the column-major register
+    // ordering expected by mma.sync. The input shape differs between pipelines:
+    // VectorDistribute produces 2x2x1x2, TileAndFuse produces 2x1x2x2.
+    // Remove the unit dimension to simplify the transpose.
+    auto nonUnitVecType = VectorType::get({2, 2, 2}, builder.getF16Type());
+    auto reshaped =
+        vector::ShapeCastOp::create(builder, loc, nonUnitVecType, lhs);
+    auto permAttr = builder.getDenseI64ArrayAttr({1, 0, 2});
+    auto transposed = vector::TransposeOp::create(builder, loc, nonUnitVecType,
+                                                  reshaped, permAttr);
+    lhs = vector::ShapeCastOp::create(builder, loc, lhs.getType(), transposed);
+    Attribute mmaShape[] = {builder.getI64IntegerAttr(layout.mSize),
+                            builder.getI64IntegerAttr(layout.nSize),
+                            builder.getI64IntegerAttr(layout.kSize)};
+    ArrayAttr mmShapeAttr = builder.getArrayAttr(mmaShape);
+
+    return nvgpu::MmaSyncOp::create(builder, loc, lhs, rhs, acc, mmShapeAttr)
         .getResult();
   }
   return {};
@@ -959,6 +1025,13 @@ int64_t DataTiledMMAAttr::getSubgroupSize() const {
 int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
   return getSubgroupSize() * getSubgroupsM() * getSubgroupsN() *
          getSubgroupsK();
+}
+
+SmallVector<SmallVector<utils::IteratorType>>
+DataTiledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -1303,18 +1376,18 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     Value acc = outputs[0];
     for (int i = 0; i < unrollKFactor; i++) {
       int64_t offset = vectorWidth * i;
-      Value sliced_lhs = vector::ExtractStridedSliceOp::create(
+      Value slicedLhs = vector::ExtractStridedSliceOp::create(
           builder, loc, inputs[0], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
-      Value sliced_rhs = vector::ExtractStridedSliceOp::create(
+      Value slicedRhs = vector::ExtractStridedSliceOp::create(
           builder, loc, inputs[1], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       if (getColMajor()) {
-        std::swap(sliced_lhs, sliced_rhs);
+        std::swap(slicedLhs, slicedRhs);
       }
       acc = amdgpu::MFMAOp::create(builder, loc, outputs[0].getType(), m, n,
-                                   nativeKSize, getBlockSize(), sliced_lhs,
-                                   sliced_rhs, acc)
+                                   nativeKSize, getBlockSize(), slicedLhs,
+                                   slicedRhs, acc)
                 .getResult();
     }
     results.push_back(acc);
@@ -1335,6 +1408,13 @@ int64_t VirtualMMAAttr::getBlockSize() const {
   }
   assert(false && "unhandled virtual mma layout type.");
   return 0;
+}
+
+SmallVector<SmallVector<utils::IteratorType>>
+VirtualMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
@@ -1681,6 +1761,17 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   return success();
 }
 
+SmallVector<SmallVector<utils::IteratorType>>
+ScaledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
 //===----------------------------------------------------------------------===//
 // DataTiledScaledMMA Attributes
 //===----------------------------------------------------------------------===//
@@ -1886,6 +1977,17 @@ int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
 LogicalResult
 DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return IREE::LinalgExt::inferScaledContractionDims(maps);
+}
+
+SmallVector<SmallVector<utils::IteratorType>>
+DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
+  return {{utils::IteratorType::parallel, utils::IteratorType::reduction,
+           utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::reduction,
+           utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::reduction},
+          {utils::IteratorType::reduction, utils::IteratorType::parallel},
+          {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
 //===----------------------------------------------------------------------===//

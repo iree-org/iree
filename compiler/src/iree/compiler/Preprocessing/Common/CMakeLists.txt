@@ -28,6 +28,7 @@ iree_cc_library(
   SRCS
     "ApplyPDLPatterns.cpp"
     "AttrBasedPipelinePass.cpp"
+    "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertConvFilterToChannelsLast.cpp"
     "ConvertConvToChannelsLast.cpp"

@@ -1,0 +1,243 @@
+// RUN: iree-opt --split-input-file --iree-codegen-convert-unsupported-float-to-int-buffers %s | FileCheck %s
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+// CHECK-LABEL: @bf16_conversion
+func.func @bf16_conversion() {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+
+  // CHECK-DAG: %[[BUF0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
+  // CHECK-DAG: %[[BUF1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
+  // CHECK-DAG: %[[BUF2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(64) offset(%c0) : memref<?xi16, #spirv.storage_class<StorageBuffer>>{%c8}
+  // CHECK-DAG: memref.load %[[BUF0]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
+  // CHECK-DAG: memref.load %[[BUF1]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
+  // CHECK: memref.store %{{.+}}, %[[BUF2]][%arg0] : memref<?xi16, #spirv.storage_class<StorageBuffer>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<?xbf16, #spirv.storage_class<StorageBuffer>>{%c8}
+  %3 = gpu.thread_id  x
+  %4 = gpu.block_dim  x
+  scf.for %arg0 = %3 to %c8 step %4 {
+    %5 = memref.load %0[%arg0] : memref<?xbf16, #spirv.storage_class<StorageBuffer>>
+    %6 = memref.load %1[%arg0] : memref<?xbf16, #spirv.storage_class<StorageBuffer>>
+    %7 = arith.extf %5 : bf16 to f32
+    %8 = arith.extf %6 : bf16 to f32
+    %9 = arith.addf %7, %8 : f32
+    %10 = arith.truncf %9 : f32 to bf16
+    memref.store %10, %2[%arg0] : memref<?xbf16, #spirv.storage_class<StorageBuffer>>
+  }
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @bf16_constant
+func.func @bf16_constant() -> bf16 {
+  // CHECK: %[[CNST:.+]] = arith.constant 16256 : i16
+  %c0 = arith.constant 1.0 : bf16
+  // CHECK: return %[[CNST]]
+  return %c0 : bf16
+}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+// CHECK-LABEL: @iree_uk_mmt4d
+// CHECK-SAME:    memref<i16>
+// CHECK-SAME:    memref<i16>
+// CHECK-SAME:    memref<f32>
+func.func private @iree_uk_mmt4d(memref<bf16>, index, index, memref<bf16>, index, index, memref<f32>, index, index, index, index, index, i32, i32, i32, i32) attributes {hal.import.bitcode = true, hal.import.fields = ["processor_data"], llvm.bareptr = true}
+
+// CHECK-LABEL: @mmt4d_bf16xbf16xf32
+// CHECK:         func.call
+// CHECK-SAME:    memref<i16>
+// CHECK-SAME:    memref<i16>
+// CHECK-SAME:    memref<f32>
+func.func @mmt4d_bf16xbf16xf32() {
+  %c32 = arith.constant 32 : index
+  %c24 = arith.constant 24 : index
+  %c3 = arith.constant 3 : index
+  %c8_i32 = arith.constant 8 : i32
+  %c1_i32 = arith.constant 1 : i32
+  %c1029_i32 = arith.constant 1029 : i32
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x3x8x1xbf16>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(ReadOnly) : memref<1x3x8x1xbf16, strided<[24, 8, 1, 1], offset: 32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c128) : memref<1x1x8x8xf32, strided<[64, 64, 8, 1], offset: 32>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  scf.for %arg0 = %workgroup_id_y to %c1 step %workgroup_count_y {
+    scf.for %arg1 = %workgroup_id_x to %c1 step %workgroup_count_x {
+      %base_buffer, %offset, %sizes:4, %strides:4 = memref.extract_strided_metadata %0 : memref<1x3x8x1xbf16> -> memref<bf16>, index, index, index, index, index, index, index, index, index
+      %base_buffer_0, %offset_1, %sizes_2:4, %strides_3:4 = memref.extract_strided_metadata %1 : memref<1x3x8x1xbf16, strided<[24, 8, 1, 1], offset: 32>> -> memref<bf16>, index, index, index, index, index, index, index, index, index
+      %base_buffer_4, %offset_5, %sizes_6:4, %strides_7:4 = memref.extract_strided_metadata %2 : memref<1x1x8x8xf32, strided<[64, 64, 8, 1], offset: 32>> -> memref<f32>, index, index, index, index, index, index, index, index, index
+      func.call @iree_uk_mmt4d(%base_buffer, %c0, %c24, %base_buffer_0, %c32, %c24, %base_buffer_4, %c32, %c64, %c1, %c1, %c3, %c8_i32, %c8_i32, %c1_i32, %c1029_i32) : (memref<bf16>, index, index, memref<bf16>, index, index, memref<f32>, index, index, index, index, index, i32, i32, i32, i32) -> ()
+    }
+  }
+  return
+}
+
+// -----
+// CHECK-LABEL: func.func @outerproduct_bf16_preserved
+func.func @outerproduct_bf16_preserved(%arg0 : vector<1xbf16>, %arg1 : vector<1xbf16>, %arg2 : vector<1x1xbf16>) -> vector<1x1xbf16> {
+  // CHECK: vector.outerproduct {{.+}}, {{.+}}, {{.+}} {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
+  %0 = vector.outerproduct %arg0, %arg1, %arg2 {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
+  return %0 : vector<1x1xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @load_trunc_f32_bf16
+func.func @load_trunc_f32_bf16(%arg0 : memref<32xf32>, %arg1 : memref<32xbf16>) {
+  // CHECK-SAME:  %[[ARG0:.+]]: memref<32xf32>
+  // CHECK-SAME:  %[[ARG1:.+]]: memref<32xi16>
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]][%[[C0]]] : memref<32xf32>, vector<4xf32>
+  // CHECK: %[[TRUNC:.+]] = arith.truncf %[[LOAD]] : vector<4xf32> to vector<4xbf16>
+  // CHECK: %[[CAST:.+]] = arith.bitcast %[[TRUNC]] : vector<4xbf16> to vector<4xi16>
+  // CHECK: vector.store %[[CAST]], %[[ARG1]][%[[C0]]] : memref<32xi16>, vector<4xi16>
+  %c0 = arith.constant 0 : index
+  %load = vector.load %arg0[%c0] : memref<32xf32>, vector<4xf32>
+  %trunc = arith.truncf %load : vector<4xf32> to vector<4xbf16>
+  vector.store %trunc, %arg1[%c0] : memref<32xbf16>, vector<4xbf16>
+  return
+}
+
+// -----
+
+// Test that iree_codegen.extract_strided_metadata (or any other op from iree_codegen)
+// is rewritten correctly, along with any following ops.
+// See issue https://github.com/iree-org/iree/issues/17177
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+// CHECK-LABEL: module @extract_strided_metadata
+module @extract_strided_metadata {
+  func.func private @external_func(memref<bf16>, index) attributes {llvm.bareptr = [true]}
+  // CHECK: func.func private @external_func(memref<i16>, index)
+  func.func @external_func_entry_point() attributes {translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>} {
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+    %1 = arith.index_castui %0 : i32 to index
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
+    // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} : memref<1x8x768xi16,
+    %base_buffer, %offset, %sizes:3, %strides:3 = iree_codegen.extract_strided_metadata %2 : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>> -> memref<bf16>, index, index, index, index, index, index, index
+    // CHECK: %[[BASE:[^,]+]], %[[OFFSET:[^,]+]], {{.+}} = iree_codegen.extract_strided_metadata %[[SUBSPAN]] : memref<1x8x768xi16,
+    call @external_func(%base_buffer, %offset) : (memref<bf16>, index) -> ()
+    // CHECK: call @external_func(%[[BASE]], %[[OFFSET]]) : (memref<i16>, index)
+    return
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_bf16
+// CHECK-SAME:    %[[ARG0:.+]]: i16, %[[ARG1:.+]]: i16
+func.func @from_elements_bf16(%arg0 : bf16, %arg1 : bf16) -> vector<2xbf16> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi16>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xbf16>
+  // CHECK: return %[[VEC]] : vector<2xi16>
+  return %0 : vector<2xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_bf16_2d
+// CHECK-SAME:    %[[ARG0:.+]]: i16, %[[ARG1:.+]]: i16, %[[ARG2:.+]]: i16, %[[ARG3:.+]]: i16
+func.func @from_elements_bf16_2d(%arg0 : bf16, %arg1 : bf16, %arg2 : bf16, %arg3 : bf16) -> vector<2x2xbf16> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]] : vector<2x2xi16>
+  %0 = vector.from_elements %arg0, %arg1, %arg2, %arg3 : vector<2x2xbf16>
+  // CHECK: return %[[VEC]] : vector<2x2xi16>
+  return %0 : vector<2x2xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @to_elements_bf16
+// CHECK-SAME:    %[[ARG:.+]]: vector<2xi16>
+func.func @to_elements_bf16(%arg0 : vector<2xbf16>) -> (bf16, bf16) {
+  // CHECK: %[[E:.+]]:2 = vector.to_elements %[[ARG]] : vector<2xi16>
+  %0, %1 = vector.to_elements %arg0 : vector<2xbf16>
+  // CHECK: return %[[E]]#0, %[[E]]#1 : i16, i16
+  return %0, %1 : bf16, bf16
+}
+
+// -----
+
+// CHECK-LABEL: func.func @to_elements_bf16_2d
+// CHECK-SAME:    %[[ARG:.+]]: vector<2x2xi16>
+func.func @to_elements_bf16_2d(%arg0 : vector<2x2xbf16>) -> (bf16, bf16, bf16, bf16) {
+  // CHECK: %[[E:.+]]:4 = vector.to_elements %[[ARG]] : vector<2x2xi16>
+  %0, %1, %2, %3 = vector.to_elements %arg0 : vector<2x2xbf16>
+  // CHECK: return %[[E]]#0, %[[E]]#1, %[[E]]#2, %[[E]]#3 : i16, i16, i16, i16
+  return %0, %1, %2, %3 : bf16, bf16, bf16, bf16
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E5M2
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E5M2(%arg0 : f8E5M2, %arg1 : f8E5M2) -> vector<2xf8E5M2> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E5M2>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E5M2>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E4M3FN
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E4M3FN(%arg0 : f8E4M3FN, %arg1 : f8E4M3FN) -> vector<2xf8E4M3FN> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E4M3FN>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E4M3FN>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E5M2FNUZ
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E5M2FNUZ(%arg0 : f8E5M2FNUZ, %arg1 : f8E5M2FNUZ) -> vector<2xf8E5M2FNUZ> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E5M2FNUZ>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E5M2FNUZ>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E4M3FNUZ
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E4M3FNUZ(%arg0 : f8E4M3FNUZ, %arg1 : f8E4M3FNUZ) -> vector<2xf8E4M3FNUZ> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E4M3FNUZ>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E4M3FNUZ>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @from_elements_f8E8M0FNU
+// CHECK-SAME:    %[[ARG0:.+]]: i8, %[[ARG1:.+]]: i8
+func.func @from_elements_f8E8M0FNU(%arg0 : f8E8M0FNU, %arg1 : f8E8M0FNU) -> vector<2xf8E8M0FNU> {
+  // CHECK: %[[VEC:.+]] = vector.from_elements %[[ARG0]], %[[ARG1]] : vector<2xi8>
+  %0 = vector.from_elements %arg0, %arg1 : vector<2xf8E8M0FNU>
+  // CHECK: return %[[VEC]] : vector<2xi8>
+  return %0 : vector<2xf8E8M0FNU>
+}

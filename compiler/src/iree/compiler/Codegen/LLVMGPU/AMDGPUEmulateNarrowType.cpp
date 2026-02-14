@@ -70,7 +70,8 @@ struct AMDGPUEmulateNarrowTypePass final
           patterns.add<ConvertRawBufferCast>(typeConverter,
                                              patterns.getContext());
         };
-    if (failed(emulateNarrowType(getOperation(), populateAMDGPUPatterns))) {
+    if (failed(emulateNarrowType(getOperation(), /*disableAtomic=*/true,
+                                 populateAMDGPUPatterns))) {
       return signalPassFailure();
     }
   }

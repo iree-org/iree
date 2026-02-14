@@ -158,6 +158,29 @@
 #endif  // IREE_HAVE_ATTRIBUTE(cold)
 
 //===----------------------------------------------------------------------===//
+// Portable explicit prefetch hints
+//===----------------------------------------------------------------------===//
+
+#if IREE_HAVE_BUILTIN(__builtin_prefetch) || defined(__GNUC__)
+#define IREE_BUILTIN_PREFETCH_RO(ptr, hint) \
+  __builtin_prefetch((ptr), /*rw=*/0, hint)
+#define IREE_BUILTIN_PREFETCH_RW(ptr, hint) \
+  __builtin_prefetch((ptr), /*rw=*/1, hint)
+#else
+#define IREE_BUILTIN_PREFETCH_RO(ptr, hint)
+#define IREE_BUILTIN_PREFETCH_RW(ptr, hint)
+#endif  // IREE_HAVE_BUILTIN(__builtin_prefetch)
+
+// This is how the 0--3 locality hint is interpreted by both Clang and GCC on
+// both arm64 and x86-64.
+enum {
+  IREE_BUILTIN_PREFETCH_LOCALITY_NONE = 0,  // No locality. Data accessed once.
+  IREE_BUILTIN_PREFETCH_LOCALITY_L3 = 1,    // Some locality. Try to keep in L3.
+  IREE_BUILTIN_PREFETCH_LOCALITY_L2 = 2,    // More locality. Try to keep in L2.
+  IREE_BUILTIN_PREFETCH_LOCALITY_L1 = 3,    // Most locality. Try to keep in L1.
+};
+
+//===----------------------------------------------------------------------===//
 // IREE_LIKELY / IREE_UNLIKELY
 //===----------------------------------------------------------------------===//
 

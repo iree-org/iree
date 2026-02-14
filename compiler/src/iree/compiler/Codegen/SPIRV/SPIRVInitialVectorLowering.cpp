@@ -99,19 +99,18 @@ SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
 
 Operation *stripElementBitPatternPreservingParents(Value op) {
   while (Operation *parentOp = op.getDefiningOp()) {
-    Value source =
-        TypeSwitch<Operation *, Value>(parentOp)
-            .Case<vector::BroadcastOp>([](vector::BroadcastOp broadcast) {
-              return broadcast.getVector();
-            })
-            .Case<vector::ExtractOp, vector::ExtractStridedSliceOp>(
-                [](auto extract) { return extract.getSource(); })
-            .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
-                [](auto insert) { return insert.getValueToStore(); })
-            .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
-              return transpose.getVector();
-            })
-            .Default([](Operation *) { return nullptr; });
+    Value source = TypeSwitch<Operation *, Value>(parentOp)
+                       .Case([](vector::BroadcastOp broadcast) {
+                         return broadcast.getVector();
+                       })
+                       .Case<vector::ExtractOp, vector::ExtractStridedSliceOp>(
+                           [](auto extract) { return extract.getSource(); })
+                       .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
+                           [](auto insert) { return insert.getValueToStore(); })
+                       .Case([](vector::TransposeOp transpose) {
+                         return transpose.getVector();
+                       })
+                       .Default([](Operation *) { return nullptr; });
 
     if (!source) {
       break;
@@ -256,7 +255,7 @@ getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
       .Case<VectorTransferOpInterface, vector::MultiDimReductionOp,
             vector::ReductionOp, vector::TransposeOp, vector::GatherOp>(
           [](auto typedOp) { return getNativeVectorShapeImpl(typedOp); })
-      .Case<vector::ContractionOp>([=](auto contract) {
+      .Case([=](vector::ContractionOp contract) {
         return getNativeVectorShapeImpl(contract, targetSupportsDotProd);
       })
       .Default([](Operation *) { return std::nullopt; });

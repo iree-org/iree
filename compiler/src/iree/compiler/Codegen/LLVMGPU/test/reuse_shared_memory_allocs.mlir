@@ -57,11 +57,11 @@ func.func @shared_reuse_scf_for(%in0: memref<128x128xf16>, %in1: memref<1x4096x1
     %cst_0 = arith.constant dense<0.000000e+00> : vector<64x128xf16>
     %c4096 = arith.constant 4096 : index
     %c64 = arith.constant 64 : index
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %5 = vector.transfer_read %in0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16>, vector<128x128xf16>
     %alloc = memref.alloc() : memref<128x128xf16, #gpu.address_space<workgroup>>
     vector.transfer_write %5, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<128x128xf16>, memref<128x128xf16, #gpu.address_space<workgroup>>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     vector.transfer_read %alloc[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16, #gpu.address_space<workgroup>>, vector<128x128xf16>
 
     %11 = scf.for %arg0 = %c0 to %c4096 step %c64 iter_args(%arg1 = %cst_0) -> vector<64x128xf16> {
@@ -95,7 +95,7 @@ func.func @shared_no_reuse_scf_for(%in0: memref<128x128xf16>, %in1: memref<1x409
     %cst_0 = arith.constant dense<0.000000e+00> : vector<64x128xf16>
     %c4096 = arith.constant 4096 : index
     %c64 = arith.constant 64 : index
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     vector.transfer_read %in0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<128x128xf16>, vector<128x128xf16>
 
     scf.for %arg0 = %c0 to %c4096 step %c64 iter_args(%arg1 = %cst_0) -> vector<64x128xf16> {

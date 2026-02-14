@@ -40,7 +40,7 @@ using CombineRelayoutOpsControlFnRef = function_ref<bool(OpResult leaf)>;
 using CombineRelayoutOpsControlFn = std::function<bool(OpResult leaf)>;
 
 namespace IREE::Codegen {
-/// Enum defining the scope of the CombineLayoutTransformationPass.
+/// Enum defining the scope of the CombineResultLayoutTransformationPass.
 ///  - The `Dispatch` scope will combine layout transformation chains that are
 ///    consumed by an `iree_codegen.store_to_buffer` op.
 ///  - The `Workgroup` scope will combine layout transformation chains that are
@@ -55,8 +55,15 @@ CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
 
 /// Returns true if the `op` type has a folding pattern into
-/// iree_linalg_ext.map_scatter.
-bool isSupportedRelayoutOp(Operation *op);
+/// iree_linalg_ext.map_scatter or iree_linalg_ext.map_gather.
+bool isSupportedSingleInputRelayoutOp(Operation *op);
+
+/// Fold the `op` into the `mapGatherOp` and return the resulting map_gather,
+/// or failure if the transformation is not supported. The `op` should be a
+/// supported relayout op that produces the source of the map_gather.
+FailureOr<IREE::LinalgExt::MapGatherOp>
+foldIntoMapGather(RewriterBase &rewriter, Operation *op,
+                  IREE::LinalgExt::MapGatherOp mapGatherOp);
 
 /// Fold the `op` into the `mapScatterOp` and return the resulting map_scatter,
 /// or failure if the transformation is not supported. The `op` is should be a

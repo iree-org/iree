@@ -21,7 +21,6 @@ iree_cc_library(
     "Utils.cpp"
   DEPS
     LLVMSupport
-    MLIRAnalysis
     MLIRArithDialect
     MLIRIR
     MLIRInferTypeOpInterface

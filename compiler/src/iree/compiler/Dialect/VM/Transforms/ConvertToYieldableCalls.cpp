@@ -36,13 +36,13 @@ public:
     SmallVector<IREE::VM::CallVariadicOp> variadicCallsToConvert;
     moduleOp.walk([&](Operation *op) {
       llvm::TypeSwitch<Operation *>(op)
-          .Case<IREE::VM::CallOp>([&](auto callOp) {
+          .Case([&](IREE::VM::CallOp callOp) {
             Operation *calleeOp = symbolTable.lookup(callOp.getCallee());
             if (isCalleeYieldable(calleeOp)) {
               callsToConvert.push_back(callOp);
             }
           })
-          .Case<IREE::VM::CallVariadicOp>([&](auto callVariadicOp) {
+          .Case([&](IREE::VM::CallVariadicOp callVariadicOp) {
             Operation *calleeOp =
                 symbolTable.lookup(callVariadicOp.getCallee());
             if (isCalleeYieldable(calleeOp)) {

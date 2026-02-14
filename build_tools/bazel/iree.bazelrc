@@ -57,16 +57,15 @@ build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:t
 #
 # Combines several optimizations for faster local iteration:
 # - Skymeld (merged analysis/execution for faster multi-target builds)
-# - Ramdisk sandbox on Linux (reduces I/O bottleneck with many cores)
 #
-# Note: Disk cache is configured in user.bazelrc (created by iree-bazel-configure).
+# Note: Disk cache and platform-specific settings (e.g., Linux ramdisk sandbox)
+# are configured in user.bazelrc (created by iree-bazel-configure).
 ###############################################################################
 
-build:localdev --experimental_merged_skyframe_analysis_execution
+# Default (allows --config=localdev for consistency).
+query:localdev --output=label
 
-# Linux: use ramdisk for sandbox to reduce I/O with many cores.
-# This is a no-op on other platforms.
-build:localdev --sandbox_base=/dev/shm
+build:localdev --experimental_merged_skyframe_analysis_execution
 
 ###############################################################################
 # Options for "generic_gcc" builds
@@ -101,6 +100,9 @@ build:generic_clang --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 
 # Treat warnings as errors...
 build:generic_clang --copt=-Werror --host_copt=-Werror
+# ...except for unused command-line arguments, which fire spuriously during
+# LTO backend compilation when Bazel passes linkopts to the compiler.
+build:generic_clang --copt=-Wno-error=unused-command-line-argument
 # ...and silence them outside of the workspace.
 build:generic_clang --per_file_copt=external/.*@-w
 # ...and silence them on host builds. There is no host_per_file_copt and

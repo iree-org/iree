@@ -96,6 +96,7 @@ void LayoutInfo::propagateLayoutForward(Value val) {
       Operation *parentOp = cast<vector::MaskOp>(yieldOp->getParentOp());
       Value result = parentOp->getResult(operandIdx);
       setLayoutIfUnset(result, layout);
+      continue;
     }
 
     if (OpTrait::hasElementwiseMappableTraits(user)) {
@@ -139,7 +140,7 @@ void LayoutInfo::propagateLayoutForward(Value val) {
         continue;
       }
       if (contract.getLhs() == val || contract.getRhs() == val) {
-        if (contract->hasAttr("iree.amdgpu.mma")) {
+        if (contract->hasAttr("iree.gpu.mma")) {
           // Intrinsic ops have fixed layouts, do not try to infer them through
           // maps.
           // TODO: Move to iree_gpu.multi_mma ops.
@@ -183,6 +184,13 @@ void LayoutInfo::propagateLayoutForward(Value val) {
       AffineMap maskMap =
           inversePermutation(compressUnusedDims(write.getPermutationMap()));
       setLayoutOrClone(&mask, layout.apply(maskMap));
+      continue;
+    }
+
+    if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(user)) {
+      setLayoutIfUnset(
+          shapeCast.getResult(),
+          layout.reshape(shapeCast.getResultVectorType().getShape()));
       continue;
     }
   }
@@ -290,10 +298,21 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
     }
     return;
   }
+
+  if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(defOp)) {
+    setLayoutOrClone(
+        &shapeCast.getSourceMutable(),
+        layout.reshape(shapeCast.getSourceVectorType().getShape()));
+    return;
+  }
 }
 
 void LayoutInfo::setLayoutOrClone(OpOperand *val,
                                   VectorLayoutInterface layout) {
+  if (!layout) {
+    // No layout to set.
+    return;
+  }
   if (!isa<ShapedType>(val->get().getType())) {
     // Don't set layouts on non-shaped types. This would anyway be an empty
     // layout.
@@ -322,12 +341,15 @@ void LayoutInfo::setLayoutOrClone(OpOperand *val,
     return;
   }
 
-  // Otherwise, create a to_layout op to change the layout.
-  Value v = val->get();
-  Value layourtedV = ToLayoutOp::create(b, v.getLoc(), v, layout);
-  val->set(layourtedV);
-  layouts[layourtedV] = layout;
-  return;
+  if (getLayout(val->get()) != layout) {
+    // Create `to_layout` op to change layout if it's not the same as the
+    // existing.
+    Value v = val->get();
+    Value layourtedV = ToLayoutOp::create(b, v.getLoc(), v, layout);
+    val->set(layourtedV);
+    layouts[layourtedV] = layout;
+    return;
+  }
 }
 
 LogicalResult propagateVectorLayoutInfo(

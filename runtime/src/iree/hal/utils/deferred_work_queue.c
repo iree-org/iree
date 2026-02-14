@@ -11,8 +11,9 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"

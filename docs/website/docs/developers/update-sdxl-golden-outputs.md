@@ -68,13 +68,13 @@ iree-build/tools/iree-compile \
   --iree-opt-data-tiling=false \
   --iree-codegen-gpu-native-math-precision=true \
   --iree-codegen-llvmgpu-use-vector-distribution \
-  --iree-hip-waves-per-eu=2 \
+  --iree-rocm-waves-per-eu=2 \
   --iree-execution-model=async-external \
   --iree-scheduling-dump-statistics-format=json \
   --iree-scheduling-dump-statistics-file=compilation_info.json \
   --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)" \
   --iree-codegen-transform-dialect-library=/path/to/attention_and_matmul_spec_punet_mi300.mlir \
-  --iree-hip-target=gfx942
+  --iree-rocm-target=gfx942
 ```
 
 After compilation, run the module to produce the new outputs that will become

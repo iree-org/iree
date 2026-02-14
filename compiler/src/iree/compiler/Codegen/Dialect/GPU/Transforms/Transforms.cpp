@@ -103,7 +103,8 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
 
   // Skip swizzle hint ops.
   Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
-  if (auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination)) {
+  auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination);
+  if (swizzleOp) {
     destination = swizzleOp->getOperand(0).getDefiningOp();
   }
 
@@ -130,13 +131,9 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   // If the original `tensor.empty` has a swizzle hint, apply it to the new
   // allocation. Note that if there is a swizzle hint, it will be the only user
   // of the `tensor.empty` op.
-  if (auto swizzleHintOp =
-          dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
-    assert(empty->hasOneUse() &&
-           "a tensor.empty op with a swizzle hint applied, should have the "
-           "swizzle hint as its only user");
+  if (swizzleOp) {
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
+        rewriter, loc, allocTensor.getResult(), swizzleOp.getSwizzle());
     return newSwizzle.getResult();
   }
   return allocTensor.getResult();
@@ -1931,7 +1928,7 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
   if (insertBarrier) {
-    gpu::BarrierOp::create(rewriter, loc);
+    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
   rewriter.eraseOp(forallOp);
 }
@@ -2075,7 +2072,12 @@ struct LowerValueBarrierPattern
     if (barrier.hasTensorSemantics()) {
       return failure();
     }
-    gpu::BarrierOp::create(rewriter, barrier.getLoc());
+    // TODO(kdrewnia): We give this barrier workgroup fence semantics to mach
+    // the behavior it had from before we could be more precise about barrier
+    // addres spaces. Investigate if this could be a sync-only (`memfence []`)
+    // barrier
+    gpu::BarrierOp::create(rewriter, barrier.getLoc(),
+                           gpu::AddressSpace::Workgroup);
     for (auto [result, input] :
          llvm::zip_equal(barrier.getResults(), barrier.getInputs())) {
       rewriter.replaceAllUsesWith(result, input);

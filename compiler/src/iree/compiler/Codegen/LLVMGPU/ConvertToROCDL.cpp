@@ -27,6 +27,7 @@
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -46,32 +47,19 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 static llvm::cl::opt<int>
-    clROCMIndexingBits("iree-hip-index-bits",
+    clROCMIndexingBits("iree-rocm-index-bits",
                        llvm::cl::desc("Set the bit width of indices in ROCm."),
                        llvm::cl::init(64));
+static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
+    "iree-hip-index-bits",
+    llvm::cl::desc("Deprecated; use --iree-rocm-index-bits instead."),
+    llvm::cl::init(64), llvm::cl::cb<void, int>([](int value) {
+      llvm::errs() << "warning: --iree-hip-index-bits is deprecated; "
+                   << "use --iree-rocm-index-bits instead\n";
+      clROCMIndexingBits = value;
+    }));
 
 namespace {
-
-// Transform gpu.barrier -> amdgpu.lds_barrier
-// IREE code generation currently only ever needs to synchronize for
-// LDS operations. This conversion is to make the barrier operations
-// LDS specific because the gpu.barrier contains global memory
-// operations as well.
-struct ReplaceGPUBarrierWithLDSBarrier
-    : public OpRewritePattern<gpu::BarrierOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(gpu::BarrierOp op,
-                                PatternRewriter &rewriter) const override {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.replaceOpWithNewOp<amdgpu::LDSBarrierOp>(op);
-    return success();
-  }
-};
-
-static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
-  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
-}
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
@@ -143,20 +131,31 @@ static bool containsAPred(Type type) {
   return isa<Floats...>(type);
 }
 
-// Function to check valid data types on the ROCm backend.
-// Note to readers: different chips take different FP8 formats but re-use the
-// same instruction and intrinsic names, so we must filter out the "wrong" FP8
-// here.
+// Validates that arith.extf/truncf operations use fp8 types supported by the
+// chipset. Storage in fp8 memrefs is always allowed; only conversion operations
+// require hardware support or software emulation.
+//
+// Note: different chips take different FP8 formats but re-use the same
+// instruction and intrinsic names, so we must filter out the "wrong" FP8 here.
 static LogicalResult validateDataTypes(Operation *op,
                                        const amdgpu::Chipset &chipset) {
+  // Only validate arith.extf and arith.truncf - these are the operations that
+  // need hardware or software conversion support. Other ops (memrefs, etc.)
+  // just store fp8 data and don't need special handling.
+  if (!isa<arith::ExtFOp, arith::TruncFOp>(op)) {
+    return success();
+  }
+
   constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
   if (!amdgpu::hasOcpFp8(chipset)) {
     auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
-      return op->emitOpError("F8E5M2 and F8E4M3FN types are not supported on "
-                             "gfx942 (MI-300) or older chipsets; try "
-                             "F8E5M2FNUZ or F8E4M3FNUZ instead.");
+      return op->emitOpError(
+          "F8E5M2 and F8E4M3FN types are not supported on "
+          "gfx942 (MI-300) or older chipsets; try F8E5M2FNUZ or F8E4M3FNUZ "
+          "instead, or use --iree-llvmgpu-enable-small-float-emulation "
+          "to enable software emulation.");
     }
   }
 
@@ -166,7 +165,9 @@ static LogicalResult validateDataTypes(Operation *op,
         llvm::any_of(op->getResultTypes(), pred)) {
       return op->emitOpError(
           "F8E5M2FNUZ and F8E4M3FNUZ types are not supported on non-gfx942 "
-          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead.");
+          "(MI-300) chipsets; try F8E5M2 or F8E4M3FN instead, or use "
+          "--iree-llvmgpu-enable-small-float-emulation "
+          "to enable software emulation.");
     }
   }
   return success();
@@ -253,7 +254,6 @@ struct ConvertToROCDLPass final
           /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
-      populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);

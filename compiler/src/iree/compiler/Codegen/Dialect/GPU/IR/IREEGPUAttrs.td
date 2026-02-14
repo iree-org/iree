@@ -260,6 +260,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -320,6 +321,7 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
+        "getOperandIteratorTypes",
       ]>,
       DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
         "getTileSwizzle",
@@ -389,6 +391,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -527,6 +530,7 @@ def IREEGPU_VirtualMMAAttr :
     "getDistributedTileTypes",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
@@ -593,6 +597,7 @@ def IREEGPU_ScaledMMAAttr :
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -754,6 +759,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
     // Available bit-widths for direct load from global to LDS memory.
     OptionalParameter<"DenseI64ArrayAttr">:$dma_sizes,
+    // Number of banks in LDS.
+    OptionalParameter<"std::optional<int32_t>">:$workgroup_memory_bank_count,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
@@ -1106,6 +1113,36 @@ def IREEGPU_LaneIncrementAttr : AttrDef<IREEGPU_Dialect, "LaneIncrement"> {
     DefaultValuedParameter<"bool", "false">:$aligned
   );
   let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU PCF Scope Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SubgroupScopeAttr : AttrDef<IREEGPU_Dialect, "SubgroupScope"> {
+  let mnemonic = "subgroup_scope";
+  let summary = [{Attribute representing execution across subgroups.}];
+  let description = [{
+    Scope for subgroup level parallelism. Memory allocated at this scope is
+    all shared memory, and standard gpu barriers are used to synchronize all
+    subgroups.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+def IREEGPU_LaneScopeAttr : AttrDef<IREEGPU_Dialect, "LaneScope"> {
+  let mnemonic = "lane_scope";
+  let summary = [{Attribute representing execution across lanes.}];
+  let description = [{
+    Scope for lane level parallelism. Currently allocating memory is
+    unsupported due to required interface changes.
+
+    Barriers don't need to do any synchronization and only fence memory at this
+    scope (though is also currently unimplemented).
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

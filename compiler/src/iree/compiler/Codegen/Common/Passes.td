@@ -91,9 +91,31 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
 
-def ConvertBf16ToUInt16BuffersPass :
-    Pass<"iree-codegen-convert-bf16-to-uint16-buffers", ""> {
-  let summary = "Convert BF16 buffer ops and conversions to simulated behavior with uint16.";
+def ConvertUnsupportedFloatToIntBuffersPass :
+    Pass<"iree-codegen-convert-unsupported-float-to-int-buffers", ""> {
+  let summary = "Convert unsupported float buffer types to integer types of same bit width.";
+  let description = [{
+    Converts buffer operations with unsupported float element types to use
+    integer types of the same bit width. This is used for backends that don't
+    support certain float types natively (e.g., SPIR-V without fp8 extensions).
+
+    The actual float arithmetic should already be emulated by
+    ConvertUnsupportedFloatArithPass before this pass runs.
+  }];
+  let options = [
+    Option<"includeBf16", "include-bf16", "bool", /*default=*/"true",
+           "Convert BF16 buffers to i16">,
+    Option<"includeF8E5M2", "include-f8e5m2", "bool", /*default=*/"true",
+           "Convert F8E5M2 buffers to i8">,
+    Option<"includeF8E4M3FN", "include-f8e4m3fn", "bool", /*default=*/"true",
+           "Convert F8E4M3FN buffers to i8">,
+    Option<"includeF8E5M2FNUZ", "include-f8e5m2fnuz", "bool", /*default=*/"true",
+           "Convert F8E5M2FNUZ buffers to i8">,
+    Option<"includeF8E4M3FNUZ", "include-f8e4m3fnuz", "bool", /*default=*/"true",
+           "Convert F8E4M3FNUZ buffers to i8">,
+    Option<"includeF8E8M0FNU", "include-f8e8m0fnu", "bool", /*default=*/"true",
+           "Convert F8E8M0FNU (MX scale) buffers to i8">,
+  ];
 }
 
 def ConvertUnsupportedFloatArithPass
@@ -107,13 +129,23 @@ def ConvertUnsupportedFloatArithPass
     1. Wraps unsupported float operations with extf/truncf pairs to perform
        arithmetic in a supported type (e.g., f32).
 
-    2. For CPU targets, emulates extf/truncf operations themselves using integer
-       bit manipulation, since LLVM doesn't support fpext/fptrunc for fp8 types.
+    2. Emulates extf/truncf operations using integer bit manipulation, if the
+       backend doesn't natively support fpext/fptrunc for fp4/fp8 types.
 
     The emulation follows IREE's runtime/src/iree/base/internal/math.h, including
     IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
     NaN, Inf, and special encodings (FNUZ types).
+
+    Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
+    preserved and handled by separate expansion patterns in later passes.
   }];
+  let options = [
+    Option<"enableExtTruncEmulation", "enable-ext-trunc-emulation",
+           "bool", /*default=*/"true",
+           "Enable software emulation for extf/truncf of fp4/fp8 types "
+           "without hardware support. When disabled, types requiring emulation "
+           "will be left unconverted and may cause errors in later passes.">
+  ];
 }
 
 def ConvertToDestinationPassingStylePass :
@@ -155,8 +187,8 @@ def ConvertWorkgroupForallToPCFPass
   let dependentDialects = ["iree_compiler::IREE::PCF::PCFDialect"];
 }
 
-def CombineLayoutTransformationPass :
-    InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+def CombineResultLayoutTransformationPass :
+    InterfacePass<"iree-codegen-combine-result-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
@@ -185,6 +217,25 @@ def CombineLayoutTransformationPass :
     "iree_compiler::IREE::Util::UtilDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
+  ];
+}
+
+def CombineSourceLayoutTransformationPass :
+    InterfacePass<"iree-codegen-combine-source-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_gather operation.";
+  let description = [{
+    Starting from `iree_codegen.load_from_buffer` ops, iteratively combine
+    consumer layout/indexing transformation ops (linalg.transpose,
+    tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
+    tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "tensor::TensorDialect",
+    "ub::UBDialect"
   ];
 }
 
@@ -445,6 +496,13 @@ def EmulateNarrowTypePass :
     A pass to emulate memref load operations that use narrow integer types
     with equivalent operations on supported wide integer types.
   }];
+  let options = [
+    Option<"disableAtomicRMW", "disable-atomic-rmw",
+           "bool", /*default=*/"false",
+           "Indicates that atomic ops are not allowed in the emulation. It can "
+           "be enabled if the target can guarantee no concurrent accesses to "
+           "the same memory location.">
+  ];
 }
 
 def EraseDeadAllocAndStoresPass :
@@ -793,6 +851,12 @@ def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "
     This attribute is expected to be short-lived and removed by
     `iree-codegen-materialize-user-configs`.
   }];
+  let options = [
+    Option<"tuningSpecPath", "tuning-spec-path", "std::string",
+           /*default=*/"\"\"",
+           "Path to a module containing a tuning spec (transform dialect library). "
+           "Accepts both MLIR text (.mlir) and bytecode (.mlirbc) formats.">,
+  ];
 }
 
 def MaterializeUserConfigsPass : Pass<"iree-codegen-materialize-user-configs", "ModuleOp"> {

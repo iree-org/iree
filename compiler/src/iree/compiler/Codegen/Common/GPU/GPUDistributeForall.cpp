@@ -129,9 +129,9 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   // We need to add barriers before and after the distributed loop because the
   // loop might have reads/writes to shared memory that can have a different
   // layout compared to rest of the program.
-  gpu::BarrierOp::create(rewriter, loc);
+  gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   auto forLoop = scf::ForOp::create(rewriter, loc, lb, ub, step, ValueRange{});
-  gpu::BarrierOp::create(rewriter, loc);
+  gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   Block *loopBody = forLoop.getBody();
 
   // Get the replacement IDs for the forall iterator ids.

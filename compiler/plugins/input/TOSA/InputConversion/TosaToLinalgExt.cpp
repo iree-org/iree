@@ -136,8 +136,8 @@ public:
 
     // Create the LinalgExt scatter operation.
     auto scatter = IREE::LinalgExt::ScatterOp::create(
-        builder, TypeRange{values.getType()}, ValueRange{updates, indices},
-        ValueRange{values}, builder.getDenseI64ArrayAttr({0, 1}),
+        builder, TypeRange{values.getType()}, updates, indices,
+        /*original=*/values, builder.getDenseI64ArrayAttr({0, 1}),
         builder.getBoolAttr(true));
 
     llvm::SmallVector<Type> args(2, valuesTy.getElementType());

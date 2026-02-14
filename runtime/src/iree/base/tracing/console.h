@@ -182,6 +182,10 @@ void iree_tracing_memory_free(const char* name, size_t name_length, void* ptr);
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_AND_EVAL_IF_ERROR(IREE_TRACE_ZONE_END(zone_id), __VA_ARGS__)
 
+#define IREE_RETURN_AND_END_ZONE(zone_id, ...) \
+  IREE_TRACE_ZONE_END(zone_id);                \
+  return (__VA_ARGS__)
+
 // TODO(benvanik): move zone color to BEGIN macro so that we can print the line
 // with it initially.
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xbgr)

@@ -36,6 +36,13 @@ struct TorchToIREELoweringPipelineOptions
   Option<bool> decompose{*this, "decompose",
                          llvm::cl::desc("Decompose complex torch operations."),
                          llvm::cl::init(true)};
+  Option<bool> externalizeTransients{
+      *this, "externalize-transients",
+      llvm::cl::desc(
+          "If enabled, this option will append an external hal buffer to "
+          "program inputs. This buffer will be used for storing transient "
+          "memory and must be provided by the user."),
+      llvm::cl::init(false)};
 };
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.

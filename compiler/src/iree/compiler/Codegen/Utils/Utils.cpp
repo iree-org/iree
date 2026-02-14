@@ -300,19 +300,17 @@ bool isReadOnly(Value v) {
     return false;
   }
   return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
+      .Case([&](arith::ConstantOp constantOp) { return true; })
       .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
-      .Case<IREE::TensorExt::DispatchTensorLoadOp>(
-          [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
-            return cast<IREE::TensorExt::DispatchTensorType>(
-                       loadOp.getSource().getType())
-                       .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
+      .Case([&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
+        return cast<IREE::TensorExt::DispatchTensorType>(
+                   loadOp.getSource().getType())
+                   .getAccess() == IREE::TensorExt::TensorAccess::ReadOnly;
+      })
+      .Default(false);
 }
 
 LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
@@ -1430,84 +1428,152 @@ void addConfigDenormalFpMathF32(MLIRContext *context,
 // Replace Memref users (transitively)
 //===---------------------------------------------------------------------===//
 
+/// Computes the result types for a non-trivial use replacement. This function
+/// determines what the new result types should be when replacing a memref
+/// operand with one of a different type.
+///
+/// Returns nullopt if:
+/// - The operation is not one of the supported types (CastOp, SubViewOp,
+///   ExpandShapeOp, CollapseShapeOp)
+/// - The replacement type computation fails (e.g., for ExpandShapeOp or
+///   CollapseShapeOp with incompatible layouts)
+static std::optional<SmallVector<Type>>
+computeNonTrivialReplacementResultTypes(OpOperand &use, Type replacementType) {
+  Operation *user = use.getOwner();
+  auto newSourceType = cast<MemRefType>(replacementType);
+  return llvm::TypeSwitch<Operation *, std::optional<SmallVector<Type>>>(user)
+      .Case([&](memref::CastOp castOp) {
+        auto currentResultType = cast<MemRefType>(castOp.getResult().getType());
+        auto newResultType = MemRefType::get(
+            currentResultType.getShape(), currentResultType.getElementType(),
+            newSourceType.getLayout(), newSourceType.getMemorySpace());
+        return SmallVector<Type>{newResultType};
+      })
+      .Case([&](memref::SubViewOp subviewOp) {
+        auto currResultType = cast<MemRefType>(subviewOp.getResult().getType());
+        SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
+        SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
+        SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
+        // Use rank-reduced inference if the result rank differs from source,
+        // otherwise use regular inference.
+        MemRefType newResultType =
+            (currResultType.getRank() != newSourceType.getRank()
+                 ? cast<MemRefType>(
+                       memref::SubViewOp::inferRankReducedResultType(
+                           currResultType.getShape(), newSourceType, offsets,
+                           sizes, strides))
+                 : cast<MemRefType>(memref::SubViewOp::inferResultType(
+                       newSourceType, offsets, sizes, strides)));
+        return SmallVector<Type>{newResultType};
+      })
+      .Case([&](memref::ExpandShapeOp expandOp)
+                -> std::optional<SmallVector<Type>> {
+        auto currResultType = cast<MemRefType>(expandOp.getResult().getType());
+        FailureOr<MemRefType> newResultType =
+            memref::ExpandShapeOp::computeExpandedType(
+                newSourceType, currResultType.getShape(),
+                expandOp.getReassociationIndices());
+        if (failed(newResultType)) {
+          return std::nullopt;
+        }
+        return SmallVector<Type>{*newResultType};
+      })
+      .Case([&](memref::CollapseShapeOp collapseOp)
+                -> std::optional<SmallVector<Type>> {
+        // Check if the collapse would be valid before computing the type.
+        // computeCollapsedType has an internal assertion that fires on invalid
+        // layouts, so we must check validity first.
+        if (!memref::CollapseShapeOp::isGuaranteedCollapsible(
+                newSourceType, collapseOp.getReassociationIndices())) {
+          return std::nullopt;
+        }
+        MemRefType newResultType =
+            memref::CollapseShapeOp::computeCollapsedType(
+                newSourceType, collapseOp.getReassociationIndices());
+        return SmallVector<Type>{newResultType};
+      })
+      .Default([](Operation *) { return std::nullopt; });
+}
+
+/// Checks whether a non-trivial replacement would be needed for this operation.
+/// Returns true if the operation is one of the known memref reshaping
+/// operations (CastOp, SubViewOp, ExpandShapeOp, CollapseShapeOp) that requires
+/// result type propagation when the source type changes.
+static bool isNonTrivialMemrefReshapeOp(Operation *op) {
+  return isa<memref::CastOp, memref::SubViewOp, memref::ExpandShapeOp,
+             memref::CollapseShapeOp>(op);
+}
+
 /// Replaces a `use` with the `replacement` for cases where a simple
-/// substition might lead to verification errors.
+/// substitution might lead to verification errors. Clones the operation
+/// with the new operand and computed result types.
 static std::optional<SmallVector<Value>>
-replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
+replaceNonTrivialUse(RewriterBase &rewriter, OpOperand &use,
                      Value replacement) {
   Operation *user = use.getOwner();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(user);
+  std::optional<SmallVector<Type>> resultTypes =
+      computeNonTrivialReplacementResultTypes(use, replacement.getType());
+  if (!resultTypes) {
+    return std::nullopt;
+  }
+
+  // For memref.cast, we can fold the operation if the types now match, since
+  // the cast would become trivial.
+  if (llvm::equal(user->getResultTypes(), *resultTypes) &&
+      isa<memref::CastOp>(user)) {
+    LDBG() << "\t\tReplacing no-op memref.cast : " << *user;
+    return SmallVector<Value>({replacement});
+  }
 
   LDBG() << "\tReplacing in user by creating new user : " << *user;
-  if (auto castOp = dyn_cast<memref::CastOp>(user)) {
-    auto replacementType = cast<MemRefType>(replacement.getType());
-    auto currentResultType = cast<MemRefType>(castOp.getResult().getType());
-    if (replacementType == currentResultType) {
-      // Cast is a no op, just return the replacement.
-      return SmallVector<Value>{replacement};
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(user);
+  SmallVector<Value> newOperands = llvm::to_vector(user->getOperands());
+  newOperands[use.getOperandNumber()] = replacement;
+  Operation *newOp =
+      mlir::clone(rewriter, user, llvm::to_vector(*resultTypes), newOperands);
+  LDBG() << "\t\tNew user : " << *newOp;
+  return llvm::to_vector_of<Value>(newOp->getResults());
+}
+
+LogicalResult canReplaceMemrefUsesAndPropagateType(Value origValue,
+                                                   Type replacementType) {
+  SmallVector<std::pair<Value, Type>> worklist = {{origValue, replacementType}};
+  while (!worklist.empty()) {
+    auto [original, newType] = worklist.pop_back_val();
+    if (original.getType() == newType) {
+      continue;
     }
-    auto newResultType = MemRefType::get(
-        currentResultType.getShape(), currentResultType.getElementType(),
-        replacementType.getLayout(), replacementType.getMemorySpace());
-    auto newCastOp =
-        memref::CastOp::create(rewriter, loc, newResultType, replacement);
-    LDBG() << "\t\tNew user : " << *newCastOp;
-    return SmallVector<Value>(newCastOp->result_begin(),
-                              newCastOp->result_end());
-  }
-  if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
-    auto currResultType = cast<MemRefType>(subviewOp.getResult().getType());
-    auto newSourceType = cast<MemRefType>(replacement.getType());
-    SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
-    SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
-    SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
-    MemRefType newResultType =
-        (currResultType.getRank() != newSourceType.getRank()
-             ? cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
-                   currResultType.getShape(), newSourceType, offsets, sizes,
-                   strides))
-             : nullptr);
-    auto newSubviewOp = memref::SubViewOp::create(
-        rewriter, loc, newResultType, replacement, offsets, sizes, strides);
+    for (OpOperand &use : original.getUses()) {
+      // ReturnLike operations cannot have their operand types changed.
+      // If we can't replace the user, we can't cleanly propagate the type.
+      Operation *user = use.getOwner();
+      if (user->hasTrait<OpTrait::ReturnLike>()) {
+        LDBG() << "canReplaceMemrefUsesAndPropagateType: cannot replace "
+                  "return-like op: "
+               << *user;
+        return failure();
+      }
+      // Non-reshape operations can accept the new operand type directly.
+      if (!isNonTrivialMemrefReshapeOp(user)) {
+        continue;
+      }
 
-    LDBG() << "\t\tNew user : " << *newSubviewOp;
-    return llvm::to_vector_of<Value>(newSubviewOp->getResults());
-  }
-  if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
-    auto currResultType = cast<MemRefType>(expandOp.getResult().getType());
-    auto newSourceType = cast<MemRefType>(replacement.getType());
-
-    FailureOr<MemRefType> newResultType =
-        memref::ExpandShapeOp::computeExpandedType(
-            newSourceType, currResultType.getShape(),
-            expandOp.getReassociationIndices());
-    if (failed(newResultType)) {
-      return std::nullopt;
+      std::optional<SmallVector<Type>> resultTypes =
+          computeNonTrivialReplacementResultTypes(use, newType);
+      if (!resultTypes) {
+        LDBG() << "canReplaceMemrefUsesAndPropagateType: failed to compute "
+                  "result types for: "
+               << *user;
+        return failure();
+      }
+      for (auto [result, resultType] :
+           llvm::zip_equal(user->getResults(), *resultTypes)) {
+        worklist.push_back({result, resultType});
+      }
     }
-
-    auto newExpandOp = memref::ExpandShapeOp::create(
-        rewriter, loc, *newResultType, replacement, expandOp.getReassociation(),
-        expandOp.getOutputShape(), expandOp.getStaticOutputShape());
-    LDBG() << "\t\tNew user : " << *newExpandOp;
-    return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
-  if (auto collapseOp = dyn_cast<memref::CollapseShapeOp>(user)) {
-    auto newSourceType = cast<MemRefType>(replacement.getType());
-    FailureOr<MemRefType> newResultType =
-        memref::CollapseShapeOp::computeCollapsedType(
-            newSourceType, collapseOp.getReassociationIndices());
-    if (failed(newResultType)) {
-      return std::nullopt;
-    }
-
-    auto newCollapseOp = memref::CollapseShapeOp::create(
-        rewriter, loc, *newResultType, replacement,
-        collapseOp.getReassociation());
-    LDBG() << "\t\tNew user : " << *newCollapseOp;
-    return llvm::to_vector_of<Value>(newCollapseOp->getResults());
-  }
-  return std::nullopt;
+  return success();
 }
 
 void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
@@ -1536,7 +1602,7 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
         // Some uses might be replace-able but require creating new versions
         // of the users to pass verification.
         std::optional<SmallVector<Value>> nonTrivialUse =
-            replaceNonTrivialUse(rewriter, loc, use, replacement);
+            replaceNonTrivialUse(rewriter, use, replacement);
         if (nonTrivialUse) {
           // Add the results of the new users created as replacements
           // for the old users. Push this back on the to worklist.
@@ -2083,18 +2149,21 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   std::optional<VectorizationTileSizes> result;
   LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
-      .Case<linalg::LinalgOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
-      .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
-      .Case<scf::ForOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case([&](linalg::LinalgOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
+      .Case([&](linalg::PackOp op) { result = inferSizesFromIR(op); })
+      .Case([&](scf::ForOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
       .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
         result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
-      .Case<IREE::Codegen::UKernelGenericOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case([&](IREE::Codegen::UKernelGenericOp op) {
+        result = inferSizesFromIR(op, cast<OpResult>(val));
+      })
       .Default([&](Operation *) {});
 
   return result;

@@ -62,11 +62,11 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
   )
 endif()
 
-if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHIP)
+if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP)
   set(COMMON_ARGS
     "--target_backend=rocm"
     "--driver=hip"
-    "--iree_compiler_args=--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+    "--iree_compiler_args=--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
   )
 
   set(COMMON_LABELS

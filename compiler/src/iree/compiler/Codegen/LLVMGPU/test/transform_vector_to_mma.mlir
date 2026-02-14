@@ -117,7 +117,7 @@ func.func @gathered_matmul() {
     %13 = arith.addi %12, %cst_2 : vector<4x4xindex>
     %14 = vector.gather %0[%c0, %c0] [%13], %cst_mask, %cst_pt : memref<32x32xf32>, vector<4x4xindex>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
     vector.transfer_write %14, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<4x4xf32>, memref<32x32xf32>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %15 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%5]
     %16 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%arg0]
     %17 = vector.transfer_read %alloc[%15, %16], %cst_0 {in_bounds = [true, true]} : memref<32x32xf32>, vector<16x16xf32>

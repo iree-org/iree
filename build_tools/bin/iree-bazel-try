@@ -47,8 +47,9 @@ LANGUAGE
 
 COMPILATION
     --config=NAME         Bazel config (debug, asan, msan, tsan)
-    --copt=FLAG           Add compiler flag (repeatable)
-    --linkopt=FLAG        Add linker flag (repeatable)
+    --features=NAME       Bazel feature (thin_lto, etc; repeatable)
+    --copt=FLAG           Compiler flag for all targets (repeatable)
+    --linkopt=FLAG        Linker flag for all targets (repeatable)
     --dep=LABEL           Add explicit Bazel dependency (repeatable)
     --no_infer            Disable automatic dependency inference
     --retry=N             Max build retries for dep fixing (default: 3)
@@ -59,6 +60,10 @@ OUTPUT
 
 DEBUG
     --keep              Keep temp directory for inspection
+
+CACHE MANAGEMENT
+    --clean             Remove all cached data and exit
+    --cache_status      Show cache usage statistics and exit
 
 EXIT CODES
     0                   Success (build/run completed)
@@ -114,7 +119,7 @@ EXAMPLE: Pass arguments to program
       for (int i = 0; i < argc; i++) printf("%d: %s\n", i, argv[i]);
       return 0;
     }' -- --flag value
-    0: bazel-bin/.iree-bazel-try/.../snippet
+    0: /path/to/.../snippet
     1: --flag
     2: value
 
@@ -256,16 +261,120 @@ EOF
 # Maximum number of cache slots to keep (LRU eviction beyond this).
 MAX_CACHE_SLOTS=8
 
+# Portable hash command: use md5sum on Linux, md5 on macOS/BSD.
+_portable_hash() {
+    if command -v md5sum &>/dev/null; then
+        md5sum | cut -c1-12
+    else
+        md5 -r | cut -c1-12
+    fi
+}
+
+# Portable file locking using mkdir (atomic on all POSIX systems).
+# flock is Linux-specific; mkdir-based locking works everywhere.
+#
+# Stale lock detection: if the process that created the lock is dead,
+# we reclaim the lock immediately rather than waiting forever.
+_acquire_lock() {
+    local lock_dir="${1}.d"
+    local timeout="${2:-60}"
+    local waited=0
+
+    while true; do
+        # Try to atomically create lock directory.
+        if mkdir "${lock_dir}" 2>/dev/null; then
+            # Successfully acquired lock - write our PID.
+            echo $$ > "${lock_dir}/pid"
+            return 0
+        fi
+
+        # Lock exists - check if holder is still alive.
+        if [[ -f "${lock_dir}/pid" ]]; then
+            local holder_pid
+            holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+            if [[ -n "${holder_pid}" ]]; then
+                # kill -0 checks if process exists without sending signal.
+                if ! kill -0 "${holder_pid}" 2>/dev/null; then
+                    # Holder process is dead - reclaim the stale lock.
+                    iree_debug "Reclaiming stale lock from dead process ${holder_pid}"
+                    rm -rf "${lock_dir}"
+                    continue  # Retry acquisition immediately.
+                fi
+            fi
+        elif [[ -d "${lock_dir}" ]]; then
+            # Lock directory exists but no PID file - likely a very old stale lock
+            # or mid-creation crash. Give it a moment, then reclaim.
+            if [[ "${waited}" -gt 2 ]]; then
+                iree_debug "Reclaiming orphaned lock directory (no PID file)"
+                rm -rf "${lock_dir}"
+                continue
+            fi
+        fi
+
+        # Lock is held by a live process (or we're giving it a grace period).
+        sleep 1
+        waited=$((waited + 1))
+        if [[ "${waited}" -ge "${timeout}" ]]; then
+            # Provide actionable error message.
+            local msg="Timeout waiting for lock on cache slot"
+            if [[ -f "${lock_dir}/pid" ]]; then
+                local holder_pid
+                holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+                msg="${msg} (held by PID ${holder_pid})"
+            fi
+            iree_warn "${msg}"
+            return 1
+        fi
+    done
+}
+
+_release_lock() {
+    local lock_dir="${1}.d"
+    rm -rf "${lock_dir}"
+}
+
+# Clean up any stale lock directories in the cache.
+# Called during cache maintenance to prevent lock accumulation.
+_cleanup_stale_locks() {
+    local cache_dir="${1}"
+    if [[ ! -d "${cache_dir}" ]]; then
+        return
+    fi
+
+    # Find all .lock.d directories.
+    while IFS= read -r lock_dir; do
+        [[ -z "${lock_dir}" ]] && continue
+        if [[ -f "${lock_dir}/pid" ]]; then
+            local holder_pid
+            holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+            if [[ -n "${holder_pid}" ]] && ! kill -0 "${holder_pid}" 2>/dev/null; then
+                iree_debug "Cleaning stale lock from dead process ${holder_pid}"
+                rm -rf "${lock_dir}"
+            fi
+        elif [[ -d "${lock_dir}" ]]; then
+            # No PID file - orphaned lock.
+            iree_debug "Cleaning orphaned lock directory: ${lock_dir}"
+            rm -rf "${lock_dir}"
+        fi
+    done < <(find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null)
+}
+
 # Compute a hash for cache slot naming based on deps-affecting inputs.
-# Hash is based on #includes + explicit deps + build options + language (NOT source content).
+# Hash is based on #includes + explicit deps + build options + language.
+# File inputs also include content hash to avoid stale builds.
 # This allows multiple runs with same deps config to share the cached BUILD.bazel.
-# Args: source_files array (via nameref), extra_deps array, copts array, linkopts array, language
+# Different build flags (copts, linkopts, features) get separate cache slots so Bazel's
+# action cache doesn't thrash when alternating between flag combinations.
+# Args: source_files array, extra_deps array, copts array, linkopts array, language,
+#       bazel_user_flags array, include_contents(0/1)
 compute_cache_hash() {
     local -n _source_files=${1}
     local -n _extra_deps=${2}
     local -n _copts=${3}
     local -n _linkopts=${4}
     local _language=${5:-c}
+    local -n _bazel_user_flags=${6}
+    local _include_contents=${7:-0}
     {
         # Hash language (determines file extension and compilation mode).
         printf 'language:%s\n' "${_language}"
@@ -279,34 +388,197 @@ compute_cache_hash() {
         # Hash explicit deps (user-provided --dep flags).
         printf 'extra_deps:\n'
         printf '%s\n' "${_extra_deps[@]}" | sort -u
-        # Hash build options that affect BUILD.bazel.
+        # Hash build flags that affect compilation output.
         printf 'copts:\n'
         printf '%s\n' "${_copts[@]}" | sort -u
         printf 'linkopts:\n'
         printf '%s\n' "${_linkopts[@]}" | sort -u
-    } | md5sum | cut -c1-12
+        printf 'bazel_flags:\n'
+        printf '%s\n' "${_bazel_user_flags[@]}" | sort -u
+        if [[ "${_include_contents}" == "1" ]]; then
+            printf 'contents:\n'
+            for src in "${_source_files[@]}"; do
+                if [[ -f "${src}" ]]; then
+                    printf '%s:%s\n' "$(basename "${src}")" "$(cat "${src}" | _portable_hash)"
+                fi
+            done | sort -u
+        fi
+    } | _portable_hash
 }
 
 # Ensure cache doesn't exceed MAX_CACHE_SLOTS by evicting oldest slots.
 # Uses mtime for LRU ordering (we touch slots on use).
+# Also cleans up any stale locks from crashed processes.
 enforce_cache_limit() {
     local cache_dir="${1}"
     if [[ ! -d "${cache_dir}" ]]; then
         return
     fi
+
+    # First, clean up any stale lock directories.
+    _cleanup_stale_locks "${cache_dir}"
+
+    # Count only actual cache slot directories (not .lock.d directories).
     local slot_count
-    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" 2>/dev/null | wc -l)
     if [[ "${slot_count}" -gt "${MAX_CACHE_SLOTS}" ]]; then
         local excess=$((slot_count - MAX_CACHE_SLOTS))
         iree_debug "Cache has ${slot_count} slots, evicting ${excess} oldest"
-        # Find oldest directories by mtime and remove them.
-        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | \
+        # Find oldest directories by mtime and remove them (exclude lock dirs).
+        find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" -printf '%T@ %p\n' 2>/dev/null | \
             sort -n | head -n "${excess}" | cut -d' ' -f2- | \
             while read -r old_slot; do
                 rm -rf "${old_slot}"
                 iree_debug "Evicted cache slot: ${old_slot}"
             done
     fi
+}
+
+# Show cache usage statistics.
+show_cache_status() {
+    local base_dir="${1}"
+    local cache_dir="${base_dir}/cache"
+    local output_base="${base_dir}/output_base"
+
+    echo "iree-bazel-try cache status"
+    echo "==========================="
+    echo ""
+    echo "Base directory: ${base_dir}"
+    echo ""
+
+    # Cache slots.
+    if [[ -d "${cache_dir}" ]]; then
+        local slot_count
+        slot_count=$(find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" 2>/dev/null | wc -l)
+        local slot_size
+        slot_size=$(du -sh "${cache_dir}" 2>/dev/null | cut -f1)
+        echo "Cache slots: ${slot_count}/${MAX_CACHE_SLOTS} (${slot_size})"
+
+        # List slots with age.
+        if [[ "${slot_count}" -gt 0 ]]; then
+            echo ""
+            echo "Slots (newest first):"
+            local now
+            now=$(date +%s)
+            find "${cache_dir}" -mindepth 1 -maxdepth 1 -type d ! -name "*.lock.d" -printf '%T@ %f\n' 2>/dev/null | \
+                sort -rn | \
+                while read -r mtime slot; do
+                    local age_seconds=$((now - ${mtime%.*}))
+                    local age_str
+                    if [[ "${age_seconds}" -lt 60 ]]; then
+                        age_str="${age_seconds}s ago"
+                    elif [[ "${age_seconds}" -lt 3600 ]]; then
+                        age_str="$((age_seconds / 60))m ago"
+                    elif [[ "${age_seconds}" -lt 86400 ]]; then
+                        age_str="$((age_seconds / 3600))h ago"
+                    else
+                        age_str="$((age_seconds / 86400))d ago"
+                    fi
+                    local slot_size
+                    slot_size=$(du -sh "${cache_dir}/${slot}" 2>/dev/null | cut -f1)
+                    echo "  ${slot} (${slot_size}, ${age_str})"
+                done
+        fi
+
+        # Stale locks.
+        local lock_count
+        lock_count=$(find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null | wc -l)
+        if [[ "${lock_count}" -gt 0 ]]; then
+            echo ""
+            echo "Lock directories: ${lock_count}"
+            find "${cache_dir}" -maxdepth 1 -name "*.lock.d" -type d 2>/dev/null | \
+                while read -r lock_dir; do
+                    local status="active"
+                    if [[ -f "${lock_dir}/pid" ]]; then
+                        local holder_pid
+                        holder_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
+                        if [[ -n "${holder_pid}" ]] && ! kill -0 "${holder_pid}" 2>/dev/null; then
+                            status="STALE (PID ${holder_pid} dead)"
+                        else
+                            status="held by PID ${holder_pid}"
+                        fi
+                    else
+                        status="ORPHANED (no PID)"
+                    fi
+                    echo "  $(basename "${lock_dir}"): ${status}"
+                done
+        fi
+    else
+        echo "Cache slots: 0/${MAX_CACHE_SLOTS} (not created yet)"
+    fi
+
+    echo ""
+
+    # Bazel output_base (can be large).
+    if [[ -d "${output_base}" ]]; then
+        local output_size
+        output_size=$(du -sh "${output_base}" 2>/dev/null | cut -f1)
+        echo "Bazel output_base: ${output_size}"
+        echo "  (This is used when --copt/--features are specified)"
+    else
+        echo "Bazel output_base: not created"
+    fi
+
+    echo ""
+
+    # Total size.
+    if [[ -d "${base_dir}" ]]; then
+        local total_size
+        total_size=$(du -sh "${base_dir}" 2>/dev/null | cut -f1)
+        echo "Total: ${total_size}"
+    fi
+}
+
+# Clean all cached data.
+clean_cache() {
+    local base_dir="${1}"
+
+    if [[ ! -d "${base_dir}" ]]; then
+        echo "No cache directory to clean."
+        return 0
+    fi
+
+    echo "Cleaning iree-bazel-try cache..."
+
+    # Show what we're about to clean.
+    local total_size
+    total_size=$(du -sh "${base_dir}" 2>/dev/null | cut -f1)
+    echo "  Directory: ${base_dir}"
+    echo "  Size: ${total_size}"
+
+    # Clean staging directories (from any crashed processes).
+    local staging_count
+    staging_count=$(find "${base_dir}" -maxdepth 1 -name "staging_*" -type d 2>/dev/null | wc -l)
+    if [[ "${staging_count}" -gt 0 ]]; then
+        echo "  Removing ${staging_count} staging directories..."
+        find "${base_dir}" -maxdepth 1 -name "staging_*" -type d -exec rm -rf {} \; 2>/dev/null
+    fi
+
+    # Clean cache slots (includes stale locks).
+    if [[ -d "${base_dir}/cache" ]]; then
+        local slot_count
+        slot_count=$(find "${base_dir}/cache" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+        echo "  Removing ${slot_count} cache entries..."
+        rm -rf "${base_dir}/cache"
+    fi
+
+    # Clean Bazel output_base.
+    if [[ -d "${base_dir}/output_base" ]]; then
+        local output_size
+        output_size=$(du -sh "${base_dir}/output_base" 2>/dev/null | cut -f1)
+        echo "  Removing Bazel output_base (${output_size})..."
+        rm -rf "${base_dir}/output_base"
+    fi
+
+    # Clean bazel-* symlinks.
+    for symlink in "${base_dir}"/bazel-*; do
+        if [[ -L "${symlink}" ]]; then
+            echo "  Removing symlink: $(basename "${symlink}")"
+            rm -f "${symlink}"
+        fi
+    done
+
+    echo "Done."
 }
 
 # Infer Bazel deps from #include directives in source files.
@@ -364,7 +636,7 @@ infer_deps_from_sources() {
         pattern=$(printf '%s\n' "${runtime_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
             [[ -n "${dep}" ]] && all_deps+=("${dep}")
-        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //runtime/src/iree/...)" 2>/dev/null)
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //runtime/src/iree/...)" 2>/dev/null 9>&-)
     fi
 
     if [[ ${#compiler_patterns[@]} -gt 0 ]]; then
@@ -373,7 +645,7 @@ infer_deps_from_sources() {
         pattern=$(printf '%s\n' "${compiler_patterns[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
             [[ -n "${dep}" ]] && all_deps+=("${dep}")
-        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //compiler/src/iree/compiler/...)" 2>/dev/null)
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', //compiler/src/iree/compiler/...)" 2>/dev/null 9>&-)
     fi
 
     if [[ ${#llvm_files[@]} -gt 0 ]]; then
@@ -382,7 +654,7 @@ infer_deps_from_sources() {
         pattern=$(printf '%s\n' "${llvm_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
             [[ -n "${dep}" ]] && all_deps+=("${dep}")
-        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//llvm/...)" 2>/dev/null)
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//llvm/...)" 2>/dev/null 9>&-)
     fi
 
     if [[ ${#mlir_files[@]} -gt 0 ]]; then
@@ -391,7 +663,7 @@ infer_deps_from_sources() {
         pattern=$(printf '%s\n' "${mlir_files[@]}" | sed 's/\./\\./g' | sort -u | paste -sd'|' -)
         while IFS= read -r dep; do
             [[ -n "${dep}" ]] && all_deps+=("${dep}")
-        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//mlir/...)" 2>/dev/null)
+        done < <("${BAZEL_BIN}" query "attr(hdrs, '(${pattern})', @llvm-project//mlir/...)" 2>/dev/null 9>&-)
     fi
 
     # Output unique deps.
@@ -471,6 +743,7 @@ declare -a EXTRA_DEPS=()
 declare -a COPTS=()
 declare -a LINKOPTS=()
 declare -a BAZEL_ARGS=()
+declare -a BAZEL_USER_FLAGS=()
 declare -a PROGRAM_ARGS=()
 
 # Parse arguments.
@@ -506,6 +779,18 @@ while [[ $# -gt 0 ]]; do
         --keep)
             KEEP_TEMP=1
             shift
+            ;;
+        --clean)
+            # Find worktree root first.
+            iree_require_worktree
+            clean_cache "${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+            exit 0
+            ;;
+        --cache-status|--cache_status)
+            # Find worktree root first.
+            iree_require_worktree
+            show_cache_status "${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try"
+            exit 0
             ;;
         --no_infer|--no_infer)
             INFER_DEPS=0
@@ -563,8 +848,14 @@ while [[ $# -gt 0 ]]; do
             LINKOPTS+=("${1#--linkopt=}")
             shift
             ;;
-        --config=*)
+        --features)
+            BAZEL_ARGS+=("--features=${2}")
+            BAZEL_USER_FLAGS+=("--features=${2}")
+            shift 2
+            ;;
+        --config=*|--features=*)
             BAZEL_ARGS+=("${1}")
+            BAZEL_USER_FLAGS+=("${1}")
             shift
             ;;
         --)
@@ -592,6 +883,45 @@ iree_ensure_configured
 iree_bazel_build_default_configs
 BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
 
+# Propagate copts and linkopts to bazel command line so they apply to all
+# transitive dependencies, not just the snippet target.
+for opt in "${COPTS[@]}"; do
+    BAZEL_ARGS+=("--copt=${opt}")
+done
+for opt in "${LINKOPTS[@]}"; do
+    BAZEL_ARGS+=("--linkopt=${opt}")
+done
+
+# Auto-fix ThinLTO backend compile issue: Bazel passes linker flags to the
+# compiler during LTO backend compile, causing -Werror to fire on unused
+# linker arguments. Suppress this automatically.
+declare -a BAZEL_STARTUP_ARGS=()
+HAS_CUSTOM_FLAGS=0
+for flag in "${BAZEL_USER_FLAGS[@]}"; do
+    if [[ "${flag}" == "--features=thin_lto" ]]; then
+        BAZEL_ARGS+=("--copt=-Wno-unused-command-line-argument")
+        break
+    fi
+done
+if [[ ${#COPTS[@]} -gt 0 || ${#LINKOPTS[@]} -gt 0 || ${#BAZEL_USER_FLAGS[@]} -gt 0 ]]; then
+    HAS_CUSTOM_FLAGS=1
+fi
+
+# Use a separate output_base when custom flags are present to avoid polluting
+# the main Bazel server's analysis cache. This ensures that running
+# iree-bazel-try with --copt/--features doesn't cause config invalidation
+# for subsequent iree-bazel-build/test/run invocations.
+# Also redirect workspace symlinks to avoid overwriting the main bazel-bin.
+if [[ "${HAS_CUSTOM_FLAGS}" == "1" ]]; then
+    BAZEL_TRY_OUTPUT_BASE="${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try/output_base"
+    mkdir -p "${BAZEL_TRY_OUTPUT_BASE}"
+    BAZEL_STARTUP_ARGS+=("--output_base=${BAZEL_TRY_OUTPUT_BASE}")
+    BAZEL_ARGS+=("--symlink_prefix=${IREE_BAZEL_WORKTREE_DIR}/.iree-bazel-try/bazel-")
+    iree_debug "Using separate output_base for custom flags: ${BAZEL_TRY_OUTPUT_BASE}"
+fi
+# Ensure helper functions use the same Bazel startup args (output_base, etc.).
+iree_bazel_set_startup_args "${BAZEL_STARTUP_ARGS[@]}"
+
 # Determine input source.
 HAS_STDIN=0
 if [[ -z "${INLINE_CODE}" ]] && [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
@@ -613,16 +943,18 @@ STAGING_DIR="${TRY_BASE}/staging_$$"
 mkdir -p "${STAGING_DIR}"
 
 # Cleanup staging on exit (cache slots are kept).
+# Note: trap is set later, after lock acquisition, to include lock release.
 cleanup_staging() {
     if [[ -n "${STAGING_DIR}" ]] && [[ -d "${STAGING_DIR}" ]]; then
         rm -rf "${STAGING_DIR}"
     fi
 }
-trap cleanup_staging EXIT
 
 # Collect source files in staging directory.
 declare -a BUILD_SRCS=()
 declare -a STAGED_SOURCE_PATHS=()
+declare -a HASH_SOURCE_PATHS=()
+HAS_FILE_INPUT=0
 
 # Read stdin into variable if needed (so we can scan it for auto-detection).
 STDIN_CONTENT=""
@@ -653,6 +985,7 @@ if [[ -n "${INLINE_CODE}" ]]; then
     printf '%s' "${INLINE_CODE}" > "${INLINE_FILE}"
     BUILD_SRCS+=("$(basename "${INLINE_FILE}")")
     STAGED_SOURCE_PATHS+=("${INLINE_FILE}")
+    HASH_SOURCE_PATHS+=("${INLINE_FILE}")
     iree_debug "Wrote inline code to ${INLINE_FILE}"
 fi
 
@@ -666,20 +999,30 @@ if [[ -n "${STDIN_CONTENT}" ]]; then
     printf '%s' "${STDIN_CONTENT}" > "${STDIN_FILE}"
     BUILD_SRCS+=("$(basename "${STDIN_FILE}")")
     STAGED_SOURCE_PATHS+=("${STDIN_FILE}")
+    HASH_SOURCE_PATHS+=("${STDIN_FILE}")
     iree_debug "Wrote stdin to ${STDIN_FILE}"
 fi
 
-# Handle source files.
+if [[ ${#SOURCE_FILES[@]} -gt 0 ]]; then
+    HAS_FILE_INPUT=1
+fi
 for src in "${SOURCE_FILES[@]}"; do
     if [[ ! -f "${src}" ]]; then
         iree_error "Source file not found: ${src}"
         exit 1
     fi
-    # Copy to staging dir.
-    cp "${src}" "${STAGING_DIR}/"
+    # Copy to staging dir with #line for accurate diagnostics.
+    staged_path="${STAGING_DIR}/$(basename "${src}")"
+    escaped_src="${src//\\/\\\\}"
+    escaped_src="${escaped_src//\"/\\\"}"
+    {
+        printf '#line 1 "%s"\n' "${escaped_src}"
+        cat "${src}"
+    } > "${staged_path}"
     BUILD_SRCS+=("$(basename "${src}")")
-    STAGED_SOURCE_PATHS+=("${STAGING_DIR}/$(basename "${src}")")
-    iree_debug "Staged ${src}"
+    STAGED_SOURCE_PATHS+=("${staged_path}")
+    HASH_SOURCE_PATHS+=("${src}")
+    iree_debug "Staged ${src} -> ${staged_path}"
 done
 
 # Determine if this is C++.
@@ -698,9 +1041,10 @@ else
 fi
 
 # Compute cache hash BEFORE deps inference.
-# Hash is based on #includes + explicit deps + build options + language (NOT source content).
+# Hash is based on #includes + explicit deps + build options + language.
+# File inputs also include content hash to avoid stale builds.
 # This allows runs with same deps config to share BUILD.bazel analysis cache.
-CACHE_HASH=$(compute_cache_hash STAGED_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "${LANGUAGE}")
+CACHE_HASH=$(compute_cache_hash HASH_SOURCE_PATHS EXTRA_DEPS COPTS LINKOPTS "${LANGUAGE}" BAZEL_USER_FLAGS "${HAS_FILE_INPUT}")
 SLOT_DIR="${CACHE_DIR}/${CACHE_HASH}"
 LOCK_FILE="${CACHE_DIR}/${CACHE_HASH}.lock"
 
@@ -708,12 +1052,12 @@ LOCK_FILE="${CACHE_DIR}/${CACHE_HASH}.lock"
 mkdir -p "${CACHE_DIR}"
 
 # Acquire exclusive lock on this slot to prevent parallel runs from clobbering.
-# Lock is released automatically when the script exits.
-exec 9>"${LOCK_FILE}"
-if ! flock -w 60 9; then
+# Uses portable mkdir-based locking (flock is Linux-specific).
+if ! _acquire_lock "${LOCK_FILE}" 60; then
     iree_error "Timeout waiting for lock on cache slot ${CACHE_HASH}"
     exit 1
 fi
+trap "_release_lock '${LOCK_FILE}'; cleanup_staging" EXIT
 iree_debug "Acquired lock on slot ${CACHE_HASH}"
 
 # Check cache AFTER acquiring lock (another process may have created it while we waited).
@@ -791,32 +1135,6 @@ generate_build_file() {
             printf '        "%s",\n' "${dep}"
         done
         printf '    ],\n'
-        if [[ ${#COPTS[@]} -gt 0 ]]; then
-            printf '    copts = ['
-            first=1
-            for opt in "${COPTS[@]}"; do
-                if [[ "${first}" == "1" ]]; then
-                    first=0
-                else
-                    printf ', '
-                fi
-                printf '"%s"' "${opt}"
-            done
-            printf '],\n'
-        fi
-        if [[ ${#LINKOPTS[@]} -gt 0 ]]; then
-            printf '    linkopts = ['
-            first=1
-            for opt in "${LINKOPTS[@]}"; do
-                if [[ "${first}" == "1" ]]; then
-                    first=0
-                else
-                    printf ', '
-                fi
-                printf '"%s"' "${opt}"
-            done
-            printf '],\n'
-        fi
         echo ')'
     } > "${build_file}"
 }
@@ -860,12 +1178,12 @@ do_build() {
     BAZEL_BIN=$(iree_get_bazel_command)
     if iree_is_verbose; then
         # Verbose mode: show everything, also save to log for retry logic.
-        "${BAZEL_BIN}" build "${TARGET}" "${BAZEL_ARGS[@]}" 2>&1 | tee "${BUILD_LOG}"
+        "${BAZEL_BIN}" "${BAZEL_STARTUP_ARGS[@]}" build "${TARGET}" "${BAZEL_ARGS[@]}" 9>&- 2>&1 | tee "${BUILD_LOG}"
         return "${PIPESTATUS[0]}"
     else
         # Quiet mode: capture output, only show on failure.
         # Force colors since we'll display to terminal on failure.
-        if "${BAZEL_BIN}" build --color=yes "${TARGET}" "${BAZEL_ARGS[@]}" >"${BUILD_LOG}" 2>&1; then
+        if "${BAZEL_BIN}" "${BAZEL_STARTUP_ARGS[@]}" build --color=yes "${TARGET}" "${BAZEL_ARGS[@]}" 9>&- >"${BUILD_LOG}" 2>&1; then
             return 0
         else
             local exit_code=$?
@@ -935,8 +1253,8 @@ if [[ "${COMPILE_ONLY}" == "1" ]] || [[ -n "${OUTPUT_PATH}" ]]; then
 
     # Copy output if requested.
     if [[ -n "${OUTPUT_PATH}" ]]; then
-        BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
-        if [[ -f "${BINARY_PATH}" ]]; then
+        BINARY_PATH=$(iree_bazel_get_binary_path "${TARGET}" "${BAZEL_ARGS[@]}")
+        if [[ -n "${BINARY_PATH}" ]] && [[ -f "${BINARY_PATH}" ]]; then
             cp "${BINARY_PATH}" "${OUTPUT_PATH}"
             chmod +x "${OUTPUT_PATH}"
             iree_info "Binary saved to: ${OUTPUT_PATH}"
@@ -973,10 +1291,8 @@ if ! build_with_retry; then
 fi
 
 # Get the binary path and run from original directory.
-# We know the exact structure since we generate the BUILD file, so we can
-# compute the path directly instead of calling bazel cquery (saves ~500ms).
-BINARY_PATH="${IREE_BAZEL_WORKTREE_DIR}/bazel-bin/.iree-bazel-try/cache/${CACHE_HASH}/snippet"
-if [[ ! -x "${BINARY_PATH}" ]]; then
+BINARY_PATH=$(iree_bazel_get_binary_path "${TARGET}" "${BAZEL_ARGS[@]}")
+if [[ -z "${BINARY_PATH}" ]] || [[ ! -x "${BINARY_PATH}" ]]; then
     iree_error "Could not find built binary at ${BINARY_PATH}"
     exit 1
 fi

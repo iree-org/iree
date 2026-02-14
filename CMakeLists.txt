@@ -48,6 +48,7 @@ option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
@@ -423,7 +424,7 @@ endif()
 # chip because that would rely too much on guessing what the target chip is.
 # But silently continuing with ROCm testing disabled by default has also been
 # surprising.
-if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_ROCM_TEST_TARGET_CHIP} AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
   find_program(_ROCMINFO_COMMAND rocminfo)
   if (_ROCMINFO_COMMAND)
     execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
@@ -438,14 +439,21 @@ if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_H
       # be conservative.
       message(FATAL_ERROR "At least one ROCm device detected, with architecture: ${_ROCMINFO_GFX_NAME}.\n"
                       "Explicitly either enable or disable ROCm testing.\n"
-                      "To enable ROCm testing for ${_ROCMINFO_GFX_NAME}:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=${_ROCMINFO_GFX_NAME}\n"
-                      "To disable ROCm testing:\n    cmake -DIREE_HIP_TEST_TARGET_CHIP=\n" )
+                      "To enable ROCm testing for ${_ROCMINFO_GFX_NAME}:\n    cmake -DIREE_ROCM_TEST_TARGET_CHIP=${_ROCMINFO_GFX_NAME}\n"
+                      "To disable ROCm testing:\n    cmake -DIREE_ROCM_TEST_TARGET_CHIP=\n" )
     endif()
   endif()
 endif()
-set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
-  "Target chip for HIP tests that need to compile device code. \
+set(IREE_ROCM_TEST_TARGET_CHIP "" CACHE STRING
+  "Target chip for ROCm tests that need to compile device code. \
    Defaults to empty string to disable tests.")
+# Backward compatibility: accept the old IREE_HIP_TEST_TARGET_CHIP name.
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
+  "Deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
+if(IREE_HIP_TEST_TARGET_CHIP AND NOT IREE_ROCM_TEST_TARGET_CHIP)
+  message(WARNING "IREE_HIP_TEST_TARGET_CHIP is deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
+  set(IREE_ROCM_TEST_TARGET_CHIP "${IREE_HIP_TEST_TARGET_CHIP}" CACHE STRING "" FORCE)
+endif()
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options

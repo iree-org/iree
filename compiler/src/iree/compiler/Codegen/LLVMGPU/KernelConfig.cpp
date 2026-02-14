@@ -94,29 +94,12 @@ static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
         "enable the tile and fuse pipeline for supported convolutions"),
     llvm::cl::init(true));
 
-/// Flag to force using WMMA tensorcore operations.
-static llvm::cl::opt<bool>
-    clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
-                 llvm::cl::desc("force use of wmma operations for tensorcore"),
-                 llvm::cl::init(false));
-
-/// Flag used to toggle using mma.sync vs wmma when targeting tensorcore.
-static llvm::cl::opt<bool>
-    clGPUUseMMASync("iree-codegen-llvmgpu-use-mma-sync",
-                    llvm::cl::desc("force use mma sync instead of wmma ops"),
-                    llvm::cl::init(false));
-
 static llvm::cl::opt<int> clGPUMatmulCThreshold(
     "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
     llvm::cl::desc("matmul c matrix element count threshold to be considered "
                    "as small vs. large when deciding MMA schedule"),
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
-
-static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
-    "iree-llvmgpu-enable-prefetch",
-    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
     clLLVMGPUUseIgemm("iree-codegen-llvmgpu-use-igemm",
@@ -220,10 +203,9 @@ static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
   return projectedBasis;
 }
 
-static LogicalResult
-setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                       mlir::FunctionOpInterface entryPoint,
-                                       linalg::LinalgOp op) {
+static LogicalResult setConvolutionVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::LinalgOp op, const GPUCodegenOptions &gpuOpts) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -304,6 +286,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -406,7 +392,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
 
   // Prefetch shared memory if requested.
-  if (clLLVMGPUEnablePrefetch) {
+  if (gpuOpts.enablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetch_num_stages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
@@ -441,10 +427,9 @@ debugPrintContractionInfo(StringRef label, unsigned numLoops,
   DBGS() << label << ": " << llvm::interleaved_array(sizes) << "\n";
 }
 
-static LogicalResult
-setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  linalg::LinalgOp op) {
+static LogicalResult setMatmulVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    linalg::LinalgOp op, const GPUCodegenOptions &gpuOpts) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -540,6 +525,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -675,7 +664,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<NamedAttribute, 1> pipelineAttrs;
 
   // Prefetch shared memory if requested.
-  if (clLLVMGPUEnablePrefetch) {
+  if (gpuOpts.enablePrefetch) {
     auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
         context, /*prefetch_num_stages=*/2,
         /*no_reduce_shared_memory_bank_conflicts=*/false,
@@ -791,6 +780,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   MLIRContext *context = op.getContext();
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    // Intrinsics without distribution mapping cannot be distributed.
+    if (!mma.getDistributionMappingKind()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -1344,16 +1337,9 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   return setAttentionReductionConfig(seeds, target, entryPoint, op);
 }
 
-static LogicalResult
-setVectorDistributionConfig(IREE::GPU::TargetAttr target,
-                            mlir::FunctionOpInterface entryPoint,
-                            Operation *computeOp) {
-  // We haven't properly plumbed through MMA op layouts and conversions for CUDA
-  // to target NVIDIA GPUs. So disable the vector distribution pass for it.
-  if (!isROCmBackend(target)) {
-    return failure();
-  }
-
+static LogicalResult setVectorDistributionConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *computeOp, const GPUCodegenOptions &gpuOpts) {
   if (!clGPUEnableVectorDistribution) {
     LDBG() << "Vector Distribution not enabled, skipping...";
     return failure();
@@ -1366,13 +1352,14 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
         IREE::LinalgExt::isaHorizontallyFusedContraction(linalgOp)) {
       LDBG()
           << "VectorDistribution: trying to find a suitable contraction config";
-      return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
+      return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp,
+                                               gpuOpts);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
       LDBG()
           << "VectorDistribution: trying to find a suitable convolution config";
       return setConvolutionVectorDistributionConfig(target, entryPoint,
-                                                    linalgOp);
+                                                    linalgOp, gpuOpts);
     }
   }
 
@@ -2260,7 +2247,8 @@ static LogicalResult setConvolutionConfig(
 
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
-                                   Operation *computeOp) {
+                                   Operation *computeOp,
+                                   const GPUCodegenOptions &gpuOpts) {
   IREE::Codegen::UKernelDescriptorAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
@@ -2301,7 +2289,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
   }
-  if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
+  if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp,
+                                            gpuOpts))) {
     return success();
   }
 
@@ -2344,11 +2333,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
-      .Case<IREE::LinalgExt::FftOp>([&](auto fftOp) {
+      .Case([&](IREE::LinalgExt::FftOp fftOp) {
         LDBG() << "FFT Config";
         return setFftConfig(target, entryPointFn, fftOp);
       })
-      .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
+      .Case([&](IREE::LinalgExt::SortOp sortOp) {
         LDBG() << "Sort Config";
         return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
       })
@@ -2358,12 +2347,14 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG() << "Winograd Config";
         return setWinogradOpConfig(target, entryPointFn, winogradOp);
       })
-      .Case<IREE::LinalgExt::CustomOp>([&](auto customOp) {
+      .Case([&](IREE::LinalgExt::CustomOp customOp) {
         LDBG() << "CustomOp Config";
-        return setDefaultCustomOpLoweringConfig(entryPointFn, customOp,
-                                                initGPULaunchConfig);
+        return setDefaultCustomOpLoweringConfig(
+            entryPointFn, customOp, [&](FunctionOpInterface funcOp) {
+              return initGPULaunchConfig(funcOp, gpuOpts);
+            });
       })
-      .Case<IREE::LinalgExt::ScatterOp>([&](auto scatterOp) {
+      .Case([&](IREE::LinalgExt::ScatterOp scatterOp) {
         LDBG() << "ScatterOp Config";
         if (failed(IREE::GPU::setScatterLoweringConfig(target, entryPointFn,
                                                        scatterOp))) {
@@ -2408,7 +2399,8 @@ propagateLoweringConfig(Operation *rootOperation,
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
-LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp,
+                                  const GPUCodegenOptions &gpuOpts) {
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target) {
     return funcOp.emitError("missing GPU target in #hal.executable.target");
@@ -2535,7 +2527,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
     return success();
   }
 
-  if (failed(setRootConfig(target, funcOp, rootOperation))) {
+  if (failed(setRootConfig(target, funcOp, rootOperation, gpuOpts))) {
     return funcOp.emitOpError("failed to set root config");
   }
 

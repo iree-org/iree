@@ -36,11 +36,8 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalgInterfacesIncGenLib
-    MLIRPDLDialect
-    MLIRSupport
     MLIRTransformDialect
     MLIRTransformDialectInterfaces
-    MLIRTransformUtils
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils

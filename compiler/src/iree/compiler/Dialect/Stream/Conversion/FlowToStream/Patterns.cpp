@@ -523,6 +523,55 @@ struct ConvertTensorTraceOp
   }
 };
 
+struct ConvertParameterLoadOp
+    : public AffinityOpConversionPattern<IREE::Flow::ParameterLoadOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  LogicalResult matchAndRewriteOnAffinity(
+      IREE::Flow::ParameterLoadOp op, OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          executionAffinityAttr, rewriter);
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
+    auto loadOp = IREE::Stream::TensorParameterLoadOp::create(
+        rewriter, op.getLoc(), unknownType,
+        adaptor.getSourceScope().empty() ? Value{}
+                                         : adaptor.getSourceScope().front(),
+        adaptor.getSourceKey().front(), adaptor.getSourceOffset().front(),
+        TypeAttr::get(op.getResult().getType()),
+        flattenValues(adaptor.getResultDims()), resultSize,
+        executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(op, {{loadOp.getResult(), resultSize}});
+    return success();
+  }
+};
+
+struct ConvertParameterWriteOp
+    : public AffinityOpConversionPattern<IREE::Flow::ParameterWriteOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
+  LogicalResult matchAndRewriteOnAffinity(
+      IREE::Flow::ParameterWriteOp op, OneToNOpAdaptor adaptor,
+      IREE::Stream::AffinityAttr executionAffinityAttr,
+      ConversionPatternRewriter &rewriter) const override {
+    auto source =
+        transferTensorOperands(op.getLoc(), op.getSource(), adaptor.getSource(),
+                               executionAffinityAttr, rewriter);
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
+    auto writeOp = IREE::Stream::TensorParameterWriteOp::create(
+        rewriter, op.getLoc(), unknownType, source.resource,
+        TypeAttr::get(op.getSource().getType()),
+        flattenValues(adaptor.getSourceDims()), source.resourceSize,
+        adaptor.getTargetScope().empty() ? Value{}
+                                         : adaptor.getTargetScope().front(),
+        adaptor.getTargetKey().front(), adaptor.getTargetOffset().front(),
+        executionAffinityAttr);
+    rewriter.replaceOpWithMultiple(
+        op, {{writeOp.getResult(), source.resourceSize}});
+    return success();
+  }
+};
+
 struct ConvertChannelDefaultOp
     : public AffinityOpConversionPattern<IREE::Flow::ChannelDefaultOp> {
   using AffinityOpConversionPattern::AffinityOpConversionPattern;
@@ -1176,17 +1225,17 @@ struct ConvertExecutableOp
       // and rely only the patterns.
       moduleOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
-            .Case<IREE::Flow::DispatchWorkgroupIDOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupIDOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupIDOp,
                   IREE::Stream::DispatchWorkgroupIDOp>(op, rewriter);
             })
-            .Case<IREE::Flow::DispatchWorkgroupCountOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupCountOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupCountOp,
                   IREE::Stream::DispatchWorkgroupCountOp>(op, rewriter);
             })
-            .Case<IREE::Flow::DispatchWorkgroupSizeOp>([&](auto op) {
+            .Case([&](IREE::Flow::DispatchWorkgroupSizeOp op) {
               replaceDispatchWorkgroupInfoOp<
                   IREE::Flow::DispatchWorkgroupSizeOp,
                   IREE::Stream::DispatchWorkgroupSizeOp>(op, rewriter);
@@ -1224,8 +1273,9 @@ void populateFlowToStreamConversionPatterns(
       ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
       ConvertTensorCloneOp, ConvertTensorEncodeOp, ConvertTensorBarrierOp,
       ConvertTensorTransferOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
-      ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp>(
-      typeConverter, context, affinityAnalysis);
+      ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp,
+      ConvertParameterLoadOp, ConvertParameterWriteOp>(typeConverter, context,
+                                                       affinityAnalysis);
   patterns.insert<ConvertChannelDefaultOp>(typeConverter, context,
                                            affinityAnalysis);
   patterns.insert<ConvertChannelSplitOp, ConvertChannelRankOp,

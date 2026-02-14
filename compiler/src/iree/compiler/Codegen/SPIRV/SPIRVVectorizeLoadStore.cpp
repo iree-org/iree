@@ -273,7 +273,7 @@ private:
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<mlir::FunctionOpInterface>([this](auto funcOp) {
+        .Case([this](mlir::FunctionOpInterface funcOp) {
           for (Value arg : funcOp.getArguments()) {
             analyzeMemRefValue(arg);
           }

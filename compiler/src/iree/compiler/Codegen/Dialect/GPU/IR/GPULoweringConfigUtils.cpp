@@ -158,4 +158,15 @@ DimensionExpansionAttr getDimensionExpansion(LoweringConfigAttr config) {
       kDimensionExpansionName);
 }
 
+constexpr StringLiteral kConvertAccGemmName = "convert_acc_gemm";
+
+bool shouldConvertAccGemm(LoweringConfigAttr config) {
+  return config.getAttributes().get(kConvertAccGemmName) != nullptr;
+}
+
+void appendConvertAccGemm(MLIRContext *context,
+                          SmallVectorImpl<NamedAttribute> &attrs) {
+  attrs.emplace_back(kConvertAccGemmName, UnitAttr::get(context));
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

@@ -1,17 +1,17 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx942 --iree-hip-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
+// RUN:   --iree-rocm-target=gfx942 --iree-rocm-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
 
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
+// RUN:   --iree-rocm-target=gfx90a --iree-rocm-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
 
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=data-tiling %s | FileCheck %s --check-prefix=DATA-TILING
+// RUN:   --iree-rocm-target=gfx90a --iree-rocm-encoding-layout-resolver=data-tiling %s | FileCheck %s --check-prefix=DATA-TILING
 
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=none %s | FileCheck %s --check-prefix=NONE
+// RUN:   --iree-rocm-target=gfx90a --iree-rocm-encoding-layout-resolver=none %s | FileCheck %s --check-prefix=NONE
 
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
-// RUN:   --iree-hip-target=gfx90a %s | FileCheck %s --check-prefix=DEFAULT
+// RUN:   --iree-rocm-target=gfx90a %s | FileCheck %s --check-prefix=DEFAULT
 
 // PAD:      #hal.executable.target<"rocm"
 // PAD-SAME:   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>

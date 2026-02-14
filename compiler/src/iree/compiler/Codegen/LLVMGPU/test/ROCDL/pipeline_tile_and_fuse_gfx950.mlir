@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target{for-rocdl=true})))))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -92,13 +92,13 @@ hal.executable public @main {
 // CHECK-DAG:  %[[BUFFER_C:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_BINDING_C]]
 // CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x1x8x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
 // CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x1x4x2x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
-// CHECK:      gpu.barrier
+// CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG:  scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args(%[[C_LOOP_INIT:.+]] = %[[C_INIT]]) -> (vector<1x1x1x8x2x1x1x4xf32>)
 // CHECK-DAG:    %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_A]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    %[[B_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_B]]{{.*}} vector<32xf4E2M1FN>
 // CHECK-DAG:    vector.transfer_write %[[A_GLOBAL_LOAD]], %[[A_ALLOC]]
 // CHECK-DAG:    vector.transfer_write %[[B_GLOBAL_LOAD]], %[[B_ALLOC]]
-// CHECK:        gpu.barrier
+// CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK-DAG:    %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x4x1x1x32xf4E2M1FN>
 // CHECK-DAG:    %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x4x1x1x32xf4E2M1FN>
 // CHECK-DAG:    %[[A_SCALE_READ:.+]] = vector.transfer_read %[[BUFFER_A_SCALE]]{{.*}} vector<8x1x1x4xf8E8M0FNU>
@@ -150,3 +150,273 @@ hal.executable public @main {
 // CHECK:      vector.transfer_read %[[BUFFER_C]]
 // CHECK:      arith.addf
 // CHECK:      vector.transfer_write
+
+// -----
+
+#pipeline_layout_f16_transb = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config_f16_transb = #iree_gpu.lowering_config<{
+  workgroup = [128, 128, 0],
+  reduction = [0, 0, 1],
+  subgroup = [4, 4, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>,
+  promote_operands = [0, 1]
+}>
+hal.executable public @matmul_transpose_b_f16 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @matmul_transpose_b_f16 ordinal(0) layout(#pipeline_layout_f16_transb) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_transpose_b_f16()
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_f16_transb) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_f16_transb) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10240x1280xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_f16_transb) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xf32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>> -> tensor<2048x1280xf16>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [10240, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10240x1280xf16>> -> tensor<10240x1280xf16>
+        %5 = tensor.empty() : tensor<2048x10240xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
+        %7 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {lowering_config = #config_f16_transb}
+          ins(%3, %4 : tensor<2048x1280xf16>, tensor<10240x1280xf16>)
+          outs(%6 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 10240], strides = [1, 1] : tensor<2048x10240xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xf32>>
+        return
+      }
+    }
+  }
+}
+
+//    CHECK-LABEL: func @matmul_transpose_b_f16
+//      CHECK-DAG:   %[[ALLOC_A:.+]] = memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[ALLOC_B:.+]] = memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[GLOBAL_A:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<2048x1280xf16{{.*}}> to memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<10240x1280xf16{{.*}}> to memref<10240x1280xf16, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xf32{{.*}}> to memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   scf.forall ({{.*}}) in (16, 80) {
+//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xf32>) {
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<10240x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
+//          CHECK:       gpu.barrier
+//      CHECK-DAG:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x8xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x8xf16>
+// CHECK-COUNT-16:       amdgpu.mfma 16x16x32
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_A]]{{.*}} : vector<8xf16>, memref<128x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_B]]{{.*}} : vector<8xf16>, memref<128x36xf16, #gpu.address_space<workgroup>>
+//          CHECK:       scf.yield
+//          CHECK:     }
+//          CHECK:     vector.transfer_write {{.*}} %[[GLOBAL_C]]{{.*}} : vector<{{.*}}xf32>, memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+#pipeline_layout_i8_transb = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config_i8_transb = #iree_gpu.lowering_config<{
+  workgroup = [128, 128, 0],
+  reduction = [0, 0, 1],
+  subgroup = [4, 4, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>,
+  promote_operands = [0, 1]
+}>
+
+hal.executable public @matmul_transpose_b_i8 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @matmul_transpose_b_i8 ordinal(0) layout(#pipeline_layout_i8_transb) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_transpose_b_i8()
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+        %cst = arith.constant 0 : i32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_i8_transb) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xi8>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_i8_transb) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10240x1280xi8>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_i8_transb) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xi32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xi8>> -> tensor<2048x1280xi8>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [10240, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10240x1280xi8>> -> tensor<10240x1280xi8>
+        %5 = tensor.empty() : tensor<2048x10240xi32>
+        %6 = linalg.fill ins(%cst : i32) outs(%5 : tensor<2048x10240xi32>) -> tensor<2048x10240xi32>
+        %7 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {lowering_config = #config_i8_transb}
+          ins(%3, %4 : tensor<2048x1280xi8>, tensor<10240x1280xi8>)
+          outs(%6 : tensor<2048x10240xi32>) -> tensor<2048x10240xi32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 10240], strides = [1, 1] : tensor<2048x10240xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xi32>>
+        return
+      }
+    }
+  }
+}
+
+//    CHECK-LABEL: func @matmul_transpose_b_i8
+//      CHECK-DAG:   %[[ALLOC_A:.+]] = memref.alloc() : memref<128x72xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[ALLOC_B:.+]] = memref.alloc() : memref<128x72xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[GLOBAL_A:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<2048x1280xi8{{.*}}> to memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<10240x1280xi8{{.*}}> to memref<10240x1280xi8, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xi32{{.*}}> to memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   scf.forall ({{.*}}) in (16, 80) {
+//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xi32>) {
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<10240x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
+//          CHECK:       gpu.barrier
+//      CHECK-DAG:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x16xi8>
+//      CHECK-DAG:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x16xi8>
+// CHECK-COUNT-16:       amdgpu.mfma 16x16x64
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_A]]{{.*}} : vector<16xi8>, memref<128x72xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_B]]{{.*}} : vector<16xi8>, memref<128x72xi8, #gpu.address_space<workgroup>>
+//          CHECK:       scf.yield
+//          CHECK:     }
+//          CHECK:     vector.transfer_write {{.*}} %[[GLOBAL_C]]{{.*}} : vector<{{.*}}xi32>, memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+// regular matmul (non-transpose-b) with f16 using gfx950 config
+#pipeline_layout_f16 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config_f16 = #iree_gpu.lowering_config<{
+  workgroup = [128, 128, 0],
+  reduction = [0, 0, 1],
+  subgroup = [4, 4, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>,
+  promote_operands = [0, 1]
+}>
+
+hal.executable public @matmul_f16 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @matmul_f16 ordinal(0) layout(#pipeline_layout_f16) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_f16()
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_f16) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_f16) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x10240xf16>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_f16) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xf32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>> -> tensor<2048x1280xf16>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1280, 10240], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x10240xf16>> -> tensor<1280x10240xf16>
+        %5 = tensor.empty() : tensor<2048x10240xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
+        %7 = linalg.matmul
+          {lowering_config = #config_f16}
+          ins(%3, %4 : tensor<2048x1280xf16>, tensor<1280x10240xf16>)
+          outs(%6 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 10240], strides = [1, 1] : tensor<2048x10240xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xf32>>
+        return
+      }
+    }
+  }
+}
+
+//    CHECK-LABEL: func @matmul_f16
+//      CHECK-DAG:   %[[ALLOC_B:.+]] = memref.alloc() : memref<32x132xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[ALLOC_A:.+]] = memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[GLOBAL_A:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<2048x1280xf16{{.*}}> to memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<1280x10240xf16{{.*}}> to memref<1280x10240xf16, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xf32{{.*}}> to memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   scf.forall ({{.*}}) in (16, 80) {
+//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xf32>) {
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<1280x10240xf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xf16>
+//          CHECK:       gpu.barrier
+//          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x8xf16>
+//  CHECK-COUNT-8:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>{{.*}} -> vector<4xf16>
+// CHECK-COUNT-16:       amdgpu.mfma 16x16x32
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_A]]{{.*}} : vector<8xf16>, memref<128x36xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_B]]{{.*}} : vector<8xf16>, memref<32x132xf16, #gpu.address_space<workgroup>>
+//          CHECK:       scf.yield
+//          CHECK:     }
+//          CHECK:     vector.transfer_write {{.*}} %[[GLOBAL_C]]{{.*}} : vector<{{.*}}xf32>, memref<{{.*}}xf32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// -----
+
+#pipeline_layout_i8 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#config_i8 = #iree_gpu.lowering_config<{
+  workgroup = [128, 128, 0],
+  reduction = [0, 0, 1],
+  subgroup = [4, 4, 0],
+  mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8>,
+  promote_operands = [0, 1]
+}>
+
+hal.executable public @matmul_i8 {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @matmul_i8 ordinal(0) layout(#pipeline_layout_i8) count(%arg0: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_i8()
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>} {
+        %cst = arith.constant 0 : i32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_i8) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xi8>>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_i8) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x10240xi8>>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_i8) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xi32>>
+        %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xi8>> -> tensor<2048x1280xi8>
+        %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1280, 10240], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x10240xi8>> -> tensor<1280x10240xi8>
+        %5 = tensor.empty() : tensor<2048x10240xi32>
+        %6 = linalg.fill ins(%cst : i32) outs(%5 : tensor<2048x10240xi32>) -> tensor<2048x10240xi32>
+        %7 = linalg.matmul
+          {lowering_config = #config_i8}
+          ins(%3, %4 : tensor<2048x1280xi8>, tensor<1280x10240xi8>)
+          outs(%6 : tensor<2048x10240xi32>) -> tensor<2048x10240xi32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 10240], strides = [1, 1] : tensor<2048x10240xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xi32>>
+        return
+      }
+    }
+  }
+}
+
+//    CHECK-LABEL: func @matmul_i8
+//      CHECK-DAG:   %[[ALLOC_B:.+]] = memref.alloc() : memref<64x136xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[ALLOC_A:.+]] = memref.alloc() : memref<128x72xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   %[[GLOBAL_A:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<2048x1280xi8{{.*}}> to memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_B:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<1280x10240xi8{{.*}}> to memref<1280x10240xi8, #amdgpu.address_space<fat_raw_buffer>>
+//      CHECK-DAG:   %[[GLOBAL_C:.+]] = amdgpu.fat_raw_buffer_cast {{.*}} : memref<{{.*}}xi32{{.*}}> to memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   scf.forall ({{.*}}) in (16, 80) {
+//          CHECK:     scf.for {{.*}} -> (vector<4x4x4x1xi32>) {
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_A]]{{.*}} : memref<2048x1280xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
+//      CHECK-DAG:       vector.transfer_read %[[GLOBAL_B]]{{.*}} : memref<1280x10240xi8, #amdgpu.address_space<fat_raw_buffer>>, vector<16xi8>
+//          CHECK:       gpu.barrier
+//          CHECK:       vector.transfer_read {{.*}}#gpu.address_space<workgroup>{{.*}} vector<4x1x1x16xi8>
+//  CHECK-COUNT-8:       amdgpu.transpose_load {{.*}}#gpu.address_space<workgroup>{{.*}} -> vector<8xi8>
+// CHECK-COUNT-16:       amdgpu.mfma 16x16x64
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_A]]{{.*}} : vector<16xi8>, memref<128x72xi8, #gpu.address_space<workgroup>>
+//      CHECK-DAG:       vector.transfer_write {{.*}} %[[ALLOC_B]]{{.*}} : vector<16xi8>, memref<64x136xi8, #gpu.address_space<workgroup>>
+//          CHECK:       scf.yield
+//          CHECK:     }
+//          CHECK:     vector.transfer_write {{.*}} %[[GLOBAL_C]]{{.*}} : vector<{{.*}}xi32>, memref<{{.*}}xi32, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

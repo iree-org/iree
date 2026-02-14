@@ -35,6 +35,7 @@ iree_lit_test_suite(
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
+            "lowering_strategy_from_tuning_spec.mlir",
             "peel.mlir",
             "pipeline_arm_sme_streaming_mode_tests.mlir",
             "pipeline_disable_distribution_tests.mlir",
@@ -53,7 +54,6 @@ iree_lit_test_suite(
             "select_aarch64_sme_lowering_strategy.mlir",
             "select_aarch64_sve_lowering_strategy.mlir",
             "select_aarch64_sve_lowering_strategy_peeling.mlir",
-            "select_lowering_strategy_without_distribution.mlir",
             "select_riscv_lowering_strategy.mlir",
             "select_x86_64_lowering_strategy.mlir",
             "split_reduction.mlir",
@@ -72,8 +72,12 @@ iree_lit_test_suite(
             "verify_vector_size_legality.mlir",
         ],
         include = ["*.mlir"],
+        exclude = ["tuning_spec_matmul.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = [
+        "tuning_spec_matmul.mlir",
+    ],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",

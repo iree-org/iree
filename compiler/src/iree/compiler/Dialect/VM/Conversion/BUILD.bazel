@@ -15,12 +15,14 @@ package(
 iree_compiler_cc_library(
     name = "Conversion",
     srcs = [
+        "BuiltinRegistry.cpp",
         "ConversionTarget.cpp",
         "ImportUtils.cpp",
         "TargetOptions.cpp",
         "TypeConverter.cpp",
     ],
     hdrs = [
+        "BuiltinRegistry.h",
         "ConversionDialectInterface.h",
         "ConversionTarget.h",
         "ImportUtils.h",

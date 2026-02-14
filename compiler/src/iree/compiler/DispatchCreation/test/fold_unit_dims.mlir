@@ -276,8 +276,8 @@ util.func @collapse_of_expand_fully_dynamic(%arg0: tensor<?x?xf16>, %arg1: index
 
 // -----
 
-util.func @collapse_of_expand_all_unit_dim_groups(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: index) -> tensor<1xf16> {
-  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [%arg1, 1, 1, %arg2] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
+util.func @collapse_of_expand_all_unit_dim_groups(%arg0: tensor<1x1xf16>) -> tensor<1xf16> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [1, 1, 1, 1] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
   %collapsed = tensor.collapse_shape %expanded [[0, 1, 2, 3]] : tensor<1x1x1x1xf16> into tensor<1xf16>
   util.return %collapsed : tensor<1xf16>
 }
@@ -302,8 +302,8 @@ util.func @collapse_of_expand_to_collapse(%arg0: tensor<1x?x4x32xf16>, %arg1: in
 
 // -----
 
-util.func @collapse_of_expand_to_scalar(%arg0: tensor<1x1xf16>, %arg1: index, %arg2: index) -> tensor<f16> {
-  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [%arg1, 1, 1, %arg2] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
+util.func @collapse_of_expand_to_scalar(%arg0: tensor<1x1xf16>) -> tensor<f16> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2], [3]] output_shape [1, 1, 1, 1] : tensor<1x1xf16> into tensor<1x1x1x1xf16>
   %collapsed = tensor.collapse_shape %expanded [] : tensor<1x1x1x1xf16> into tensor<f16>
   util.return %collapsed : tensor<f16>
 }

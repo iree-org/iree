@@ -12,7 +12,7 @@ module {
     %sm0 = memref.get_global @__shared_memory__ : memref<64x16xf32, 3>
     %sm1 = memref.get_global @__shared_memory___0 : memref<256x4xf32, 3>
     %sm2 = memref.get_global @__shared_memory___1 : memref<3x512xf32, 3>
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
 
     linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
     iterator_types = ["parallel", "parallel"]}
@@ -40,7 +40,7 @@ module {
       ^bb0(%arg4: f32, %s: f32):
         linalg.yield %arg4 : f32
     }
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     return
   }
 }

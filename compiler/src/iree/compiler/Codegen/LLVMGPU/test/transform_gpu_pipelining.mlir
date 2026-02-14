@@ -27,7 +27,7 @@ func.func @matmul_pipelining() {
   %9 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 16 + s2 * 32 + s0 floordiv 4)>()[%1, %2, %3]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 8 - (s0 floordiv 4) * 32)>()[%1]
   %11 = scf.for %arg0 = %c0 to %c2048 step %c32 iter_args(%arg1 = %0) -> (!gpu.mma_matrix<16x16xf16, "COp">) {
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %14 = affine.apply affine_map<()[s0, s1] -> (s0 + s1 * 8 - (s1 floordiv 4) * 32)>()[%arg0, %1]
     %15 = affine.apply affine_map<()[s0, s1, s2, s3] -> (s1 * 16 + s2 * 32 + s3 * 32 + s0 floordiv 4)>()[%1, %2, %3, %workgroup_id_y]
     %16 = affine.apply affine_map<(d0) -> ((d0 floordiv 32) mod 4)>(%arg0)
@@ -37,7 +37,7 @@ func.func @matmul_pipelining() {
     %20 = nvgpu.device_async_copy %7[%18, %19], %5[%16, %9, %10], 8 : memref<2048x1024xf16> to memref<4x32x40xf16, 3>
     %21 = nvgpu.device_async_create_group %17, %20
     nvgpu.device_async_wait %21
-    gpu.barrier
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
     %22 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%2]
     %23 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c0] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
     %24 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c16] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">

@@ -86,10 +86,10 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
   FailureOr<LoopLikeOpInterface> wrappedLoop =
       TypeSwitch<Operation *, FailureOr<LoopLikeOpInterface>>(
           loopOp.getOperation())
-          .Case<scf::WhileOp>([&](scf::WhileOp op) {
+          .Case([&](scf::WhileOp op) {
             return scf::wrapWhileLoopInZeroTripCheck(op, rewriter);
           })
-          .Default([&](Operation *op) { return failure(); });
+          .Default(failure());
   if (failed(wrappedLoop)) {
     return failure();
   }

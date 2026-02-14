@@ -423,7 +423,7 @@ hal.executable private @matvec_fp16 {
 //     CHECK-SAME:      vector<1x1x4xf16>, vector<1x1x1x1x1x4xf16> into vector<1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
-//          CHECK:        gpu.barrier
+//          CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
                        /// Second round of reduction i.e., across subgroups.
 //          CHECK:      gpu.subgroup_reduce add {{.*}} cluster(size = 2)
 //          CHECK:      scf.yield

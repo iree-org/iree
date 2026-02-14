@@ -134,5 +134,33 @@ TEST_F(DynamicLibraryTest, GetSymbolFailure) {
   iree_dynamic_library_release(library);
 }
 
+TEST_F(DynamicLibraryTest, TryLookupSymbolSuccess) {
+  iree_dynamic_library_t* library = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library));
+
+  void* symbol = iree_dynamic_library_try_lookup_symbol(library, "times_two");
+  EXPECT_NE(nullptr, symbol);
+
+  // Verify the symbol works.
+  auto fn_ptr = reinterpret_cast<int (*)(int)>(symbol);
+  EXPECT_EQ(246, fn_ptr(123));
+
+  iree_dynamic_library_release(library);
+}
+
+TEST_F(DynamicLibraryTest, TryLookupSymbolNotFound) {
+  iree_dynamic_library_t* library = NULL;
+  IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
+      library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_allocator_system(), &library));
+
+  void* symbol = iree_dynamic_library_try_lookup_symbol(library, "unknown");
+  EXPECT_EQ(nullptr, symbol);
+
+  iree_dynamic_library_release(library);
+}
+
 }  // namespace
 }  // namespace iree

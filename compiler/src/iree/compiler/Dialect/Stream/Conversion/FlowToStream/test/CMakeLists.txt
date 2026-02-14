@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "collective_ops.mlir"
     "dispatch_ops.mlir"
     "executable_ops.mlir"
+    "parameter_ops.mlir"
     "tensor_ops.mlir"
   TOOLS
     FileCheck

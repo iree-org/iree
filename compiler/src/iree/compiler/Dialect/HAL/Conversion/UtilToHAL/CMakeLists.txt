@@ -18,8 +18,6 @@ iree_cc_library(
   SRCS
     "Patterns.cpp"
   DEPS
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
     MLIRIR
     MLIRTransformUtils
     MLIRTransforms

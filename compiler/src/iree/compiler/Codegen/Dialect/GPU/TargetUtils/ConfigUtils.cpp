@@ -129,40 +129,38 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
 
 static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
   return llvm::TypeSwitch<Type, std::optional<ComputeBitwidths>>(type)
-      .Case<FloatType>(
-          [](FloatType floatType) -> std::optional<ComputeBitwidths> {
-            switch (floatType.getIntOrFloatBitWidth()) {
-            case 64:
-              return ComputeBitwidths::FP64;
-            case 32:
-              return ComputeBitwidths::FP32;
-            case 16:
-              return ComputeBitwidths::FP16;
-            case 8:
-              return ComputeBitwidths::FP8;
-            case 6:
-              return ComputeBitwidths::FP6;
-            case 4:
-              return ComputeBitwidths::FP4;
-            default:
-              return std::nullopt;
-            }
-          })
-      .Case<IntegerType>(
-          [](IntegerType intType) -> std::optional<ComputeBitwidths> {
-            switch (intType.getWidth()) {
-            case 64:
-              return ComputeBitwidths::Int64;
-            case 32:
-              return ComputeBitwidths::Int32;
-            case 16:
-              return ComputeBitwidths::Int16;
-            case 8:
-              return ComputeBitwidths::Int8;
-            default:
-              return std::nullopt;
-            }
-          })
+      .Case([](FloatType floatType) -> std::optional<ComputeBitwidths> {
+        switch (floatType.getIntOrFloatBitWidth()) {
+        case 64:
+          return ComputeBitwidths::FP64;
+        case 32:
+          return ComputeBitwidths::FP32;
+        case 16:
+          return ComputeBitwidths::FP16;
+        case 8:
+          return ComputeBitwidths::FP8;
+        case 6:
+          return ComputeBitwidths::FP6;
+        case 4:
+          return ComputeBitwidths::FP4;
+        default:
+          return std::nullopt;
+        }
+      })
+      .Case([](IntegerType intType) -> std::optional<ComputeBitwidths> {
+        switch (intType.getWidth()) {
+        case 64:
+          return ComputeBitwidths::Int64;
+        case 32:
+          return ComputeBitwidths::Int32;
+        case 16:
+          return ComputeBitwidths::Int16;
+        case 8:
+          return ComputeBitwidths::Int8;
+        default:
+          return std::nullopt;
+        }
+      })
       .Default(std::optional<ComputeBitwidths>());
 }
 
@@ -196,20 +194,22 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   TargetChipAttr chip = target.getChip();
   DictionaryAttr peakPerfTlopsAttr = chip.getPerfTflops();
   llvm::DenseMap<ComputeBitwidths, float> peakPerfTflops;
-  for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
-    StringRef bitwidthStr = namedAttr.getName().strref();
-    auto floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
-    if (!floatAttr) {
-      continue;
-    }
+  if (peakPerfTlopsAttr) {
+    for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
+      StringRef bitwidthStr = namedAttr.getName().strref();
+      auto floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
+      if (!floatAttr) {
+        continue;
+      }
 
-    std::optional<ComputeBitwidths> bitwidth =
-        symbolizeComputeBitwidths(bitwidthStr);
-    if (!bitwidth) {
-      continue;
-    }
+      std::optional<ComputeBitwidths> bitwidth =
+          symbolizeComputeBitwidths(bitwidthStr);
+      if (!bitwidth) {
+        continue;
+      }
 
-    peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+      peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+    }
   }
 
   bool peakPerfTflopsFound = false;
@@ -926,6 +926,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       {"subgroup", b.getI64ArrayAttr(subgroupTileSizes)},
       {"mma_kind", kind}};
 
+  // TODO(#23370): At the moment we always have to convert
+  // accumulating gemms when using NV_MMA_SYNC intrinsics.
+  if (auto mmaAttr = dyn_cast<GPU::MMAAttr>(kind)) {
+    if (GPU::isNvMmaSync(mmaAttr.getIntrinsic())) {
+      GPU::appendConvertAccGemm(context, attrs);
+    }
+  }
+
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
@@ -935,8 +943,21 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // TODO(#22119): We don't use global load DMA for scaled matmuls, because
     // compilation doesn't support it. Once this is fixed, we should use global
     // load DMA here when possible.
-    promotionArray = {};
     promotionList.append({2, 3});
+    auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
+    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+    FailureOr<Attribute> lhsSwizzleAttr =
+        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                          schedule->kTileSizes, kMMAOperandLhs);
+    FailureOr<Attribute> rhsSwizzleAttr =
+        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                          schedule->kTileSizes, kMMAOperandRhs);
+    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+      promotionArray = {};
+    } else {
+      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                        defaultConfigAttr};
+    }
   }
   if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
     // If needed then add C operand which would be operand 2 or 4 for unscaled

@@ -58,13 +58,17 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "conv2d.mlir"
+    "fp4_f32_conversion.mlir"
+    "fp_to_subbyte.mlir"
     "gather_like_ops.mlir"
     "index.mlir"
     "narrow_n_matmuls.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "small_float_arith.mlir"
     "softmax.mlir"
+    "subbyte_to_fp.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -168,6 +172,7 @@ iree_check_single_backend_test_suite(
     "index.mlir"
     "narrow_n_matmuls.mlir"
     "pack_i8.mlir"
+    "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
@@ -175,6 +180,8 @@ iree_check_single_backend_test_suite(
     "rocm"
   DRIVER
     "hip"
+  COMPILER_FLAGS
+    "--iree-llvmgpu-enable-small-float-emulation"
   TIMEOUT
     300
 )

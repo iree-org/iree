@@ -27,7 +27,6 @@
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 struct MetalSPIRVOptions {
   MetalTargetPlatform targetPlatform = MetalTargetPlatform::macOS;
@@ -51,16 +50,15 @@ struct MetalSPIRVOptions {
                        "otherwise stop at and embed MSL source code"));
   }
 };
-} // namespace
 
 // TODO: MetalOptions for choosing the Metal version.
-class MetalTargetDevice : public TargetDevice {
+class MetalTargetDevice final : public TargetDevice {
 public:
   MetalTargetDevice(const MetalSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto configAttr = b.getDictionaryAttr({});
 
@@ -76,17 +74,17 @@ public:
   }
 };
 
-class MetalSPIRVTargetBackend : public TargetBackend {
+class MetalSPIRVTargetBackend final : public TargetBackend {
 public:
   MetalSPIRVTargetBackend(const MetalSPIRVOptions &options)
       : options(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "metal"; }
+  std::string getLegacyDefaultDeviceID() const final { return "metal"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(getExecutableTarget(context));
   }
 
@@ -103,7 +101,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     registry.insert<gpu::GPUDialect, IREE::Codegen::IREECodegenDialect,
                     IREE::Flow::FlowDialect, spirv::SPIRVDialect,
                     IREE::GPU::IREEGPUDialect>();
@@ -111,18 +109,18 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     buildSPIRVCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     buildSPIRVCodegenPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
 
     // TODO: rework this to compile all modules into the same metallib and
@@ -322,15 +320,15 @@ private:
   const MetalSPIRVOptions &options;
 };
 
-struct MetalSPIRVSession
+struct MetalSPIRVSession final
     : public PluginSession<MetalSPIRVSession, MetalSPIRVOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"metal", ...
     targets.add("metal",
                 [=]() { return std::make_shared<MetalTargetDevice>(options); });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"metal-spirv", ...
     targets.add("metal-spirv", [=]() {
       return std::make_shared<MetalSPIRVTargetBackend>(options);
@@ -338,6 +336,7 @@ struct MetalSPIRVSession
   }
 };
 
+} // namespace
 } // namespace mlir::iree_compiler::IREE::HAL
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(

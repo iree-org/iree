@@ -7,7 +7,8 @@
 #ifndef IREE_HAL_DRIVERS_HIP_PER_DEVICE_INFORMATION_H_
 #define IREE_HAL_DRIVERS_HIP_PER_DEVICE_INFORMATION_H_
 
-#include "iree/base/internal/synchronization.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
 #include "iree/hal/drivers/hip/dispatch_thread.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
 #include "iree/hal/drivers/hip/memory_pools.h"

@@ -13,7 +13,7 @@ namespace mlir::iree_compiler {
 using NarrowTypeConversionPopulationFn =
     std::function<void(arith::NarrowTypeEmulationConverter &,
                        RewritePatternSet &, ConversionTarget &)>;
-LogicalResult emulateNarrowType(Operation *root,
+LogicalResult emulateNarrowType(Operation *root, bool disableAtomic,
                                 std::optional<NarrowTypeConversionPopulationFn>
                                     populateCallback = std::nullopt);
 } // namespace mlir::iree_compiler

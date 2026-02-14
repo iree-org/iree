@@ -298,17 +298,17 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
-      .Case<IREE::LinalgExt::AttentionOp>([&](auto attentionOp) {
+      .Case([&](IREE::LinalgExt::AttentionOp attentionOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
                                       attentionOp);
       })
-      .Case<linalg::LinalgOp>([&](auto linalgOp) {
+      .Case([&](linalg::LinalgOp linalgOp) {
         if (clEnableBlockedMatmuls) {
           return blockDynamicDimensions(rewriter, dynamicDimAnalysis, linalgOp);
         }
         return success();
       })
-      .Default([&](Operation *op) { return success(); });
+      .Default(success());
 }
 
 void BlockDynamicDimensionsPass::runOnOperation() {

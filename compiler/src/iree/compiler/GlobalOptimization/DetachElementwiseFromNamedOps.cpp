@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -47,9 +48,9 @@ struct DetachElementwisePattern
     // Nothing to do if the output tensor operand is already a fill op.
     SmallVector<OpOperand *> outputOperands;
     if (!linalgOp.hasPureBufferSemantics()) {
-      outputOperands = llvm::to_vector(
-          llvm::map_range(linalgOp.getDpsInitsMutable(),
-                          [](OpOperand &opOperand) { return &opOperand; }));
+      outputOperands =
+          llvm::map_to_vector(linalgOp.getDpsInitsMutable(),
+                              [](OpOperand &opOperand) { return &opOperand; });
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.

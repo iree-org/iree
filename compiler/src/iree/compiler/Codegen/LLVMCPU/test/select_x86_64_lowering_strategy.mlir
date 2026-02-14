@@ -1,4 +1,8 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s
+// Test the same lowering strategy selection on generic convolution ops by first
+// generalizing the named ops. This ensures convolution pipeline selection works
+// on both named and generic convs.
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(linalg-generalize-named-ops),iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s --check-prefix=GENERIC
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -268,6 +272,12 @@ func.func @conv_dynamic(%0: index, %1: index, %2: index, %3: index, %4: index, %
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
 //      CHECK:         lowering_config = #[[CONFIG]]
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 64, 64, 0, 0, 0], vector_common_parallel = [1, 1, 1, 1, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 1, 1]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @conv_dynamic(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:         lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -284,6 +294,12 @@ func.func @conv_static(%3: tensor<1x225x225x3xf32>, %4: tensor<3x3x3x16xf32>) ->
 //      CHECK: func.func @conv_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 16, 56, 16, 0, 0, 0], vector_common_parallel = [1, 1, 4, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 1, 3]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @conv_static(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:         lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -300,6 +316,12 @@ func.func @conv_nchw_static(%3: tensor<1x128x30x30xf32>, %4: tensor<128x128x3x3x
 //      CHECK: func.func @conv_nchw_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nchw_fchw
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 28, 4, 0, 0, 0], vector_common_parallel = [1, 4, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 8, 1, 1]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @conv_nchw_static(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:         lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -317,6 +339,12 @@ func.func @depthwise_conv_static(%3: tensor<1x161x161x240xf32>, %4: tensor<3x3x2
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 40, 40, 16, 0, 0], vector_common_parallel = [1, 1, 4, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @depthwise_conv_static(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -334,6 +362,12 @@ func.func @thin_depthwise_conv_static(%3: tensor<1x57x57x72xf32>, %4: tensor<3x3
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 4, 28, 36, 0, 0], vector_common_parallel = [1, 1, 7, 12, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @thin_depthwise_conv_static(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -352,6 +386,12 @@ func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.pooling_nchw_max
 // CHECK-SAME:       lowering_config  = #[[CONFIG]]
+//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 32, 56, 8, 0, 0], vector_common_parallel = [1, 8, 1, 8, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
+//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>
+//      GENERIC: func.func @pooling_nchw_max(
+// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
+//      GENERIC:     linalg.generic
+//      GENERIC:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1511,3 +1551,17 @@ func.func @batch_mmt4d_generic_form(%lhs: tensor<128x10x32x8x1xf32>, %rhs: tenso
 // CHECK-LABEL: func.func @batch_mmt4d_generic_form(
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG]]}
+
+// -----
+
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+func.func @gather(%source: tensor<16x8x32x128xf16>, %indices: tensor<4xi64>, %out: tensor<4x8x32x128xf16>) -> tensor<4x8x32x128xf16> attributes {hal.executable.target = #executable_target_system_elf_x86_64_} {
+  %0 = iree_linalg_ext.gather dimension_map = [0] ins(%source, %indices : tensor<16x8x32x128xf16>, tensor<4xi64>) outs(%out : tensor<4x8x32x128xf16>) -> tensor<4x8x32x128xf16>
+  return %0 : tensor<4x8x32x128xf16>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 4, 32, 64], vector_common_parallel = [1, 1, 1, 8]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
+//       CHECK: func.func @gather(
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   iree_linalg_ext.gather
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]

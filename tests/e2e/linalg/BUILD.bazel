@@ -76,22 +76,22 @@ VMVX_SRCS = enforce_glob(
     [
         "argmax.mlir",
         "conv2d.mlir",
+        "fp4_f32_conversion.mlir",
+        "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
         "index.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
+        "subbyte_to_fp.mlir",
         "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
-        "fp_to_subbyte.mlir",
-        "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
-        "small_float_arith.mlir",
-        "subbyte_to_fp.mlir",
     ],
 )
 
@@ -232,6 +232,7 @@ ROCM_SRCS = enforce_glob(
         "index.mlir",
         "narrow_n_matmuls.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
@@ -243,7 +244,6 @@ ROCM_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "small_float_arith.mlir",
     ],
 )
 
@@ -252,6 +252,7 @@ iree_check_single_backend_test_suite(
     # TODO(kuhar): Drop the timeout after we switch to testing on the actual gfx1250 chip.
     timeout = "moderate",
     srcs = ROCM_SRCS,
+    compiler_flags = ["--iree-llvmgpu-enable-small-float-emulation"],
     driver = "hip",
     target_backend = "rocm",
 )

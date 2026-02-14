@@ -554,3 +554,185 @@ util.func public @transients_external_result(%size: index, %storage_size: index)
   // CHECK: util.return {{.+}} !stream.resource<external>
   util.return %awaited : !stream.resource<*>
 }
+
+// -----
+
+// Tests that a clone of an external resource whose result is never mutated
+// (no tied uses) inherits the source's lifetime. ResourceUsageAnalysis
+// propagates source usage through immutable clones, causing both sides to
+// resolve to the same lifetime. The second ElideAsyncCopies pass then elides
+// the now-same-type clone.
+
+// CHECK-LABEL: @clone_external_immutable_inherits_source
+util.func private @clone_external_immutable_inherits_source(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // Clone result inherits External from source (no tied uses → source
+  // propagation). Both sides become external.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads from clone (not tied), produces a new transient allocation.
+  // CHECK: stream.async.dispatch {{.*}}(%[[CLONE]]{{.*}}) : (!stream.resource<external>{{.*}}) -> !stream.resource<transient>
+  %result = stream.async.dispatch on(#hal.device.affinity<@device>)
+      @ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return {{.*}} : !stream.resource<transient>
+  util.return %result : !stream.resource<*>
+}
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}
+
+// -----
+
+// Tests that a clone of an external resource whose result IS mutated (tied
+// use from dispatch) gets its own lifetime determined by the result's uses,
+// not the source's lifetime. This is the data-isolation case where the clone
+// genuinely allocates a fresh buffer.
+
+// CHECK-LABEL: @clone_external_mutated_becomes_transient
+util.func private @clone_external_mutated_becomes_transient(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // Clone result has a tied use (dispatch mutates in-place), so it gets its
+  // own lifetime from backward propagation: transient (internal use only).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<transient>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // Dispatch mutates clone in-place (tied result), producing transient.
+  // CHECK: stream.async.dispatch {{.*}}(%[[CLONE]]{{.*}}) : (!stream.resource<transient>{{.*}}) -> %[[CLONE]]{%{{.*}}}
+  %result = stream.async.dispatch on(#hal.device.affinity<@device>)
+      @ex::@dispatch(%clone[%c0 to %size for %size])
+      : (!stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return {{.*}} : !stream.resource<transient>
+  util.return %result : !stream.resource<*>
+}
+
+stream.executable private @ex2 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%binding: !stream.binding) {
+      return
+    }
+  }
+}
+
+// -----
+
+// Tests that a clone of an external resource whose only tied use is a
+// timepoint.barrier (a scheduling passthrough, not a mutation) inherits the
+// source's external lifetime. This is the pattern produced by in-place update
+// dispatch results that are exported through a timepoint barrier.
+
+// CHECK-LABEL: @clone_external_timepoint_barrier_inherits_source
+util.func private @clone_external_timepoint_barrier_inherits_source(%external: !stream.resource<external>, %size: index, %fence: !hal.fence) {
+  // Clone result only flows to timepoint.barrier (passthrough, not mutation).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.timepoint.barrier {{.*}} %[[CLONE]] : !stream.resource<external>
+  %result, %result_timepoint = stream.timepoint.barrier on(#hal.device.affinity<@device>)
+      %clone : !stream.resource<*>{%size} => !stream.timepoint
+  stream.timepoint.chain_external on(#hal.device.affinity<@device>) %result_timepoint => (%fence : !hal.fence)
+  util.return
+}
+
+// -----
+
+// Tests that a clone of an external resource whose only tied use is a
+// timepoint.await (a scheduling passthrough, not a mutation) inherits the
+// source's external lifetime.
+
+// CHECK-LABEL: @clone_external_timepoint_await_inherits_source
+util.func private @clone_external_timepoint_await_inherits_source(%external: !stream.resource<external>, %size: index, %timepoint: !stream.timepoint) -> !stream.resource<*> {
+  // Clone result only flows to timepoint.await (passthrough, not mutation).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.timepoint.await %{{.+}} => %[[CLONE]] : !stream.resource<external>
+  %awaited = stream.timepoint.await %timepoint => %clone : !stream.resource<*>{%size}
+  util.return %awaited : !stream.resource<*>
+}
+
+// -----
+
+// Tests that a clone of an external resource whose only tied use is an
+// async.barrier (a scheduling passthrough via isMetadata) inherits the
+// source's external lifetime.
+
+// CHECK-LABEL: @clone_external_async_barrier_inherits_source
+util.func private @clone_external_async_barrier_inherits_source(%external: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.async.barrier {{.*}} %[[CLONE]] : !stream.resource<external>
+  %barrier = stream.async.barrier on(#hal.device.affinity<@device>)
+      %clone : !stream.resource<*>{%size}
+  util.return %barrier : !stream.resource<*>
+}
+
+// -----
+
+// Tests that a clone of an external resource whose only tied use is a
+// resource.transients op (an annotation passthrough) inherits the source's
+// external lifetime rather than becoming transient.
+
+// CHECK-LABEL: @clone_external_resource_transients_inherits_source
+util.func private @clone_external_resource_transients_inherits_source(%external: !stream.resource<external>, %size: index, %storage: !stream.resource<transient>, %storage_size: index) -> !stream.resource<*> {
+  %immediate = stream.timepoint.immediate => !stream.timepoint
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.resource.transients {{.*}} %[[CLONE]] : !stream.resource<external>
+  %result, %result_tp = stream.resource.transients await(%immediate) => %clone : !stream.resource<*>{%size}
+      from %storage : !stream.resource<transient>{%storage_size}
+      => !stream.timepoint
+  %awaited = stream.timepoint.await %result_tp => %result : !stream.resource<*>{%size}
+  util.return %awaited : !stream.resource<*>
+}
+
+// -----
+
+// Tests that a clone of an external resource whose only tied use is an
+// async.parameter.write (read-only access via AsyncAccessOpInterface) inherits
+// the source's external lifetime. The parameter.write reads the resource to
+// write to a parameter archive but does not modify the resource data.
+
+// CHECK-LABEL: @clone_external_parameter_write_inherits_source
+util.func private @clone_external_parameter_write_inherits_source(%external: !stream.resource<external>, %size: index, %scope: !util.buffer, %key: !util.buffer) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c0_i64 = arith.constant 0 : i64
+  // CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<external>{{.*}} -> !stream.resource<external>
+  %clone = stream.async.clone on(#hal.device.affinity<@device>)
+      %external : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  // CHECK: stream.async.parameter.write {{.*}} !stream.resource<external>
+  %result, %result_tp = stream.async.parameter.write
+      %clone[%c0 to %c128 for %c128] -> %scope::%key[%c0_i64]
+      : !stream.resource<*>{%size} => !stream.timepoint
+  %awaited = stream.timepoint.await %result_tp => %result : !stream.resource<*>{%size}
+  util.return %awaited : !stream.resource<*>
+}
+
+// -----
+
+// Tests that async.parameter.load with unknown lifetime is refined to constant.
+// Parameter loads produce freshly allocated constant resources.
+
+// CHECK-LABEL: @parameter_load_refines_to_constant
+util.func private @parameter_load_refines_to_constant(%scope: !util.buffer, %key: !util.buffer) -> !stream.resource<*> {
+  %c0_i64 = arith.constant 0 : i64
+  %c1024 = arith.constant 1024 : index
+  // CHECK: stream.async.parameter.load {{.*}} : !stream.resource<constant>{%c1024}
+  %loaded, %load_tp = stream.async.parameter.load %scope::%key[%c0_i64]
+      : !stream.resource<*>{%c1024} => !stream.timepoint
+  // CHECK: stream.timepoint.await {{.*}} !stream.resource<constant>
+  %ready = stream.timepoint.await %load_tp => %loaded : !stream.resource<*>{%c1024}
+  // CHECK: util.return {{.*}} : !stream.resource<constant>
+  util.return %ready : !stream.resource<*>
+}

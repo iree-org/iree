@@ -4,7 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Enable C11 Annex K (memset_s) on Apple platforms. Must precede any inclusion
+// of <string.h>, including transitive includes through IREE headers.
+#if !defined(__STDC_WANT_LIB_EXT1__)
+#define __STDC_WANT_LIB_EXT1__ 1
+#endif  // __STDC_WANT_LIB_EXT1__
+
 #include "iree/base/internal/memory.h"
+
+#include <string.h>
+
+#include "iree/base/internal/atomics.h"
 
 //===----------------------------------------------------------------------===//
 // Memory subsystem information and control
@@ -159,3 +169,190 @@ void iree_memory_flush_icache(void* base_address, iree_host_size_t length) {
 }
 
 #endif  // IREE_PLATFORM_*
+
+//===----------------------------------------------------------------------===//
+// Secure memory operations
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_PLATFORM_WINDOWS)
+
+iree_status_t iree_memory_lock(void* ptr, iree_host_size_t size) {
+  if (size == 0) return iree_ok_status();
+  if (!VirtualLock(ptr, size)) {
+    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                            "VirtualLock failed: %lu", GetLastError());
+  }
+  return iree_ok_status();
+}
+
+void iree_memory_unlock(void* ptr, iree_host_size_t size) {
+  if (size == 0) return;
+  VirtualUnlock(ptr, size);
+}
+
+void iree_memory_protect_sensitive(void* ptr, iree_host_size_t size) {
+  // Windows doesn't have a direct equivalent to MADV_DONTDUMP.
+  // MiniDumpWriteDump can be configured to exclude certain regions, but
+  // there's no per-allocation flag we can set. No-op for now.
+  (void)ptr;
+  (void)size;
+}
+
+#elif defined(IREE_PLATFORM_APPLE) || defined(IREE_PLATFORM_BSD) || \
+    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+
+#include <sys/mman.h>
+
+iree_status_t iree_memory_lock(void* ptr, iree_host_size_t size) {
+  if (size == 0) return iree_ok_status();
+  if (mlock(ptr, size) != 0) {
+    return iree_make_status(iree_status_code_from_errno(errno), "mlock failed");
+  }
+  return iree_ok_status();
+}
+
+void iree_memory_unlock(void* ptr, iree_host_size_t size) {
+  if (size == 0) return;
+  munlock(ptr, size);
+}
+
+void iree_memory_protect_sensitive(void* ptr, iree_host_size_t size) {
+  if (size == 0) return;
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+#if defined(MADV_DONTDUMP)
+  madvise(ptr, size, MADV_DONTDUMP);
+#endif  // MADV_DONTDUMP
+#else
+  // macOS and BSD don't have MADV_DONTDUMP.
+  (void)ptr;
+  (void)size;
+#endif  // IREE_PLATFORM_LINUX
+}
+
+#else
+
+iree_status_t iree_memory_lock(void* ptr, iree_host_size_t size) {
+  (void)ptr;
+  (void)size;
+  return iree_ok_status();  // Best-effort no-op.
+}
+
+void iree_memory_unlock(void* ptr, iree_host_size_t size) {
+  (void)ptr;
+  (void)size;
+}
+
+void iree_memory_protect_sensitive(void* ptr, iree_host_size_t size) {
+  (void)ptr;
+  (void)size;
+}
+
+#endif  // IREE_PLATFORM_*
+
+void iree_memory_wipe(void* ptr, iree_host_size_t size) {
+  if (size == 0) return;
+#if defined(IREE_PLATFORM_WINDOWS)
+  // SecureZeroMemory is guaranteed not to be optimized away.
+  SecureZeroMemory(ptr, size);
+#elif defined(__STDC_LIB_EXT1__) || defined(IREE_PLATFORM_APPLE)
+  // memset_s (C11 Annex K) is guaranteed by the standard not to be optimized
+  // away. Conforming implementations advertise support via __STDC_LIB_EXT1__.
+  // Apple provides memset_s (since macOS 10.9) but does not define that macro,
+  // so we check for Apple explicitly.
+  memset_s(ptr, size, 0, size);
+#elif (defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_ANDROID)) || \
+    defined(IREE_PLATFORM_BSD)
+  // explicit_bzero is guaranteed not to be optimized away.
+  // Available on glibc 2.25+ (2017), musl, FreeBSD 11+, and OpenBSD.
+  // Android's Bionic never provided explicit_bzero despite man page claims.
+  explicit_bzero(ptr, size);
+#elif (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L) || \
+    (defined(__ANDROID_API__) && __ANDROID_API__ >= 34)
+  // memset_explicit (C23) is the standardized non-optimizable memset.
+  // Android's Bionic provides it since API 34.
+  memset_explicit(ptr, 0, size);
+#else
+  // Fallback: volatile writes prevent compiler optimization. The C standard
+  // guarantees that volatile accesses are observable side effects that cannot
+  // be elided.
+  volatile uint8_t* volatile_ptr = (volatile uint8_t*)ptr;
+  for (iree_host_size_t i = 0; i < size; ++i) {
+    volatile_ptr[i] = 0;
+  }
+  // Memory barrier to ensure wipe completes before any subsequent operations.
+  iree_atomic_thread_fence(iree_memory_order_seq_cst);
+#endif  // IREE_PLATFORM_*
+}
+
+//===----------------------------------------------------------------------===//
+// C11 aligned_alloc shim
+//===----------------------------------------------------------------------===//
+
+iree_status_t iree_aligned_alloc(iree_host_size_t alignment,
+                                 iree_host_size_t size, void** out_ptr) {
+  IREE_ASSERT_ARGUMENT(out_ptr);
+  *out_ptr = NULL;
+
+  // C11 aligned_alloc and POSIX posix_memalign require alignment to be at least
+  // sizeof(void*). Smaller alignments are valid for the caller to request but
+  // we must bump them up to satisfy the underlying allocator.
+  if (alignment < sizeof(void*)) {
+    alignment = sizeof(void*);
+  }
+
+  void* ptr = NULL;
+#if defined(IREE_PLATFORM_WINDOWS)
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
+  ptr = _aligned_malloc(size, alignment);
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  // https://en.cppreference.com/w/c/memory/aligned_alloc
+  // C11 requires size be a multiple of alignment; round up.
+  ptr = aligned_alloc(alignment, iree_host_align(size, alignment));
+#elif _POSIX_C_SOURCE >= 200112L
+  // https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
+  if (posix_memalign(&ptr, alignment, size) != 0) ptr = NULL;
+#else
+  // Emulates alignment with normal malloc. We overallocate by at least the
+  // alignment + the size of a pointer, store the base pointer at ptr[-1], and
+  // return the aligned pointer.
+  iree_host_size_t alloc_size = 0;
+  if (iree_host_size_checked_add(size, alignment, &alloc_size) &&
+      iree_host_size_checked_add(alloc_size, sizeof(uintptr_t), &alloc_size)) {
+    void* base_ptr = malloc(alloc_size);
+    if (base_ptr) {
+      uintptr_t* aligned_ptr = (uintptr_t*)iree_host_align(
+          (uintptr_t)base_ptr + sizeof(uintptr_t), alignment);
+      aligned_ptr[-1] = (uintptr_t)base_ptr;
+      ptr = aligned_ptr;
+    }
+  }
+#endif  // IREE_PLATFORM_*
+
+  if (IREE_UNLIKELY(!ptr)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "failed to allocate %" PRIhsz
+                            " bytes aligned to %" PRIhsz,
+                            size, alignment);
+  }
+  IREE_TRACE_ALLOC(ptr, size);
+  *out_ptr = ptr;
+  return iree_ok_status();
+}
+
+void iree_aligned_free(void* ptr) {
+  if (ptr) {
+    IREE_TRACE_FREE(ptr);
+  }
+#if defined(IREE_PLATFORM_WINDOWS)
+  _aligned_free(ptr);
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  free(ptr);
+#elif _POSIX_C_SOURCE >= 200112L
+  free(ptr);
+#else
+  if (ptr) {
+    void* base_ptr = (void*)((uintptr_t*)ptr)[-1];
+    free(base_ptr);
+  }
+#endif  // IREE_PLATFORM_*
+}

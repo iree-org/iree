@@ -20,10 +20,12 @@ iree_lit_test_suite(
     "libm_linking.mlir"
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
+    "transients_test.mlir"
     "unused_args.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
+    iree-compile
     iree-opt
     iree-run-mlir
   LABELS

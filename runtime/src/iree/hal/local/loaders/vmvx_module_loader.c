@@ -534,7 +534,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   memset(&call, 0, sizeof(call));
   call.function = entry_fn;
   call.arguments = iree_make_byte_span(&call_args, sizeof(call_args));
-  call.results = iree_make_byte_span(NULL, 0);
+  call.results = iree_byte_span_empty();
   status = entry_fn.module->begin_call(entry_fn.module->self, stack, call);
 
   // Clean up the stack if needed, such as when the call fails.

@@ -744,6 +744,7 @@ def Stream_ResourceTransientsOp : Stream_PureOp<"resource.transients", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "pinsValueAffinity",
   ]>,
+  Stream_TiedResourcePassthrough,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1793,6 +1794,138 @@ def Stream_TensorDispatchOp : Stream_PureOp<"tensor.dispatch", [
 } // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
+// Tensor parameter (stream.tensor.parameter.*) ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupTensorParameterOps : OpDocGroup {
+  let summary = "Tensor parameter ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorParameterOps in {
+
+def Stream_TensorParameterLoadOp : Stream_PureOp<"tensor.parameter.load", [
+  AttrSizedOperandSegments,
+  Stream_AffinityOp,
+  Stream_StreamableOp,
+  Stream_TensorPhaseOp,
+  Util_ShapeAwareOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{Loads a new resource from a parameter archive.}];
+  let description = [{
+    Allocates a new resource and populates it with data from a parameter archive
+    file (or in-memory buffer) at the specified byte offset. This is the
+    tensor-phase equivalent of `stream.async.parameter.load` and retains tensor
+    encoding metadata for proper size calculation during encoding.
+
+    Example:
+    ```mlir
+    %r = stream.tensor.parameter.load %key[%offset]
+        : tensor<4x8xf32> in !stream.resource<*>{%size}
+    %r = stream.tensor.parameter.load %scope::%key[%offset]
+        : tensor<?x8xf32>{%dim0} in !stream.resource<*>{%size}
+    ```
+  }];
+
+  let arguments = (ins
+    Optional<Util_BufferType>:$source_scope,
+    Util_BufferType:$source_key,
+    I64:$source_offset,
+    TypeAttr:$result_encoding,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    custom<ParameterReference>($source_scope, $source_key)
+    `` `[` $source_offset `]`
+    `:` $result_encoding (`` `{` $result_encoding_dims^ `}`)?
+    `in` type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return {}; }
+    Value getResultSize(unsigned idx) { return getResultSize(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
+def Stream_TensorParameterWriteOp : Stream_Op<"tensor.parameter.write", [
+  AllTypesMatch<["source", "result"]>,
+  AttrSizedOperandSegments,
+  Stream_AffinityOp,
+  Stream_TensorPhaseOp,
+  Util_ShapeAwareOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{Writes a resource to a parameter archive.}];
+  let description = [{
+    Writes data from a source resource to a parameter archive file (or in-memory
+    buffer) at the specified byte offset. The source resource is returned
+    unchanged to establish proper data flow dependencies. This is the
+    tensor-phase equivalent of `stream.async.parameter.write` and retains tensor
+    encoding metadata for proper size calculation during encoding.
+
+    Example:
+    ```mlir
+    %r = stream.tensor.parameter.write %source -> %key[%offset]
+        : tensor<4x8xf32> in !stream.resource<*>{%size}
+    %r = stream.tensor.parameter.write %source -> %scope::%key[%offset]
+        : tensor<?x8xf32>{%dim0} in !stream.resource<*>{%size}
+    ```
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    TypeAttr:$source_encoding,
+    Stream_ShapeDynamicDims:$source_encoding_dims,
+    Stream_Size:$source_size,
+    Optional<Util_BufferType>:$target_scope,
+    Util_BufferType:$target_key,
+    I64:$target_offset,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `->` custom<ParameterReference>($target_scope, $target_key)
+    `` `[` $target_offset `]`
+    `:` $source_encoding (`` `{` $source_encoding_dims^ `}`)?
+    `in` type($source) `` `{` $source_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getSourceEncodingDims(); }
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return getSourceSize(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
+} // OpGroupTensorParameterOps
+
+//===----------------------------------------------------------------------===//
 // Async (stream.async*) ops
 //===----------------------------------------------------------------------===//
 
@@ -2320,6 +2453,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  Stream_TiedResourcePassthrough,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
@@ -3016,6 +3150,7 @@ def OpGroupAsyncParameterOps : OpDocGroup {
 let opDocGroup = OpGroupAsyncParameterOps in {
 
 def Stream_AsyncParameterLoadOp : Stream_PureOp<"async.parameter.load", [
+  AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_TimelineOp,
@@ -3048,10 +3183,8 @@ def Stream_AsyncParameterLoadOp : Stream_PureOp<"async.parameter.load", [
 
   let arguments = (ins
     Optional<Stream_Timepoint>:$await_timepoint,
-    // TODO(benvanik): change this to an attribute interface so we can support
-    // dynamic parameter selection in the future.
-    OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
+    Optional<Util_BufferType>:$source_scope,
+    Util_BufferType:$source_key,
     I64:$source_offset,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3087,6 +3220,7 @@ def Stream_AsyncParameterLoadOp : Stream_PureOp<"async.parameter.load", [
 
 def Stream_AsyncParameterReadOp : Stream_Op<"async.parameter.read", [
   AllTypesMatch<["target", "result"]>,
+  AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_TimelineOp,
@@ -3124,8 +3258,8 @@ def Stream_AsyncParameterReadOp : Stream_Op<"async.parameter.read", [
     Stream_Offset:$target_offset,
     Stream_Offset:$target_end,
     Stream_Size:$target_length,
-    OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
+    Optional<Util_BufferType>:$source_scope,
+    Util_BufferType:$source_key,
     I64:$source_offset,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3162,6 +3296,7 @@ def Stream_AsyncParameterReadOp : Stream_Op<"async.parameter.read", [
 
 def Stream_AsyncParameterWriteOp : Stream_Op<"async.parameter.write", [
   AllTypesMatch<["source", "result"]>,
+  AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_TimelineOp,
@@ -3196,8 +3331,8 @@ def Stream_AsyncParameterWriteOp : Stream_Op<"async.parameter.write", [
     Stream_Offset:$source_offset,
     Stream_Offset:$source_end,
     Stream_Size:$source_length,
-    OptionalAttr<StrAttr>:$target_scope,
-    StrAttr:$target_key,
+    Optional<Util_BufferType>:$target_scope,
+    Util_BufferType:$target_key,
     I64:$target_offset,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3265,8 +3400,8 @@ def Stream_AsyncParameterGatherOp : Stream_Op<"async.parameter.gather", [
   }];
 
   let arguments = (ins
-    OptionalAttr<StrAttr>:$source_scope,
-    StrArrayAttr:$source_keys,
+    Optional<Util_BufferType>:$source_scope,
+    Variadic<Util_BufferType>:$source_keys,
     Variadic<I64>:$source_offsets,
     Stream_AnyStreamResource:$target,
     Stream_Size:$target_size,
@@ -3346,8 +3481,8 @@ def Stream_AsyncParameterScatterOp : Stream_Op<"async.parameter.scatter", [
     Variadic<Stream_Offset>:$source_offsets,
     Variadic<Stream_Offset>:$source_ends,
     Variadic<Stream_Size>:$source_lengths,
-    OptionalAttr<StrAttr>:$target_scope,
-    StrArrayAttr:$target_keys,
+    Optional<Util_BufferType>:$target_scope,
+    Variadic<Util_BufferType>:$target_keys,
     Variadic<I64>:$target_offsets,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -4098,8 +4233,8 @@ def Stream_CmdParameterLoadOp : Stream_PureOp<"cmd.parameter.load", [
   }];
 
   let arguments = (ins
-    OptionalAttr<StrAttr>:$source_scope,
-    StrArrayAttr:$source_keys,
+    Optional<Util_BufferType>:$source_scope,
+    Variadic<Util_BufferType>:$source_keys,
     Variadic<I64>:$source_offsets,
     Variadic<Stream_Size>:$result_sizes,
     Optional<Stream_Timepoint>:$await_timepoint,
@@ -4137,6 +4272,7 @@ def Stream_CmdParameterLoadOp : Stream_PureOp<"cmd.parameter.load", [
 }
 
 def Stream_CmdParameterReadOp : Stream_Op<"cmd.parameter.read", [
+  AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
@@ -4149,8 +4285,8 @@ def Stream_CmdParameterReadOp : Stream_Op<"cmd.parameter.read", [
   }];
 
   let arguments = (ins
-    OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
+    Optional<Util_BufferType>:$source_scope,
+    Util_BufferType:$source_key,
     I64:$source_offset,
     Stream_AnyStreamResource:$target,
     Stream_Size:$target_size,
@@ -4189,6 +4325,7 @@ def Stream_CmdParameterReadOp : Stream_Op<"cmd.parameter.read", [
 }
 
 def Stream_CmdParameterWriteOp : Stream_Op<"cmd.parameter.write", [
+  AttrSizedOperandSegments,
   Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
@@ -4205,8 +4342,8 @@ def Stream_CmdParameterWriteOp : Stream_Op<"cmd.parameter.write", [
     Stream_Size:$source_size,
     Stream_Offset:$source_offset,
     Stream_Size:$source_length,
-    OptionalAttr<StrAttr>:$target_scope,
-    StrAttr:$target_key,
+    Optional<Util_BufferType>:$target_scope,
+    Util_BufferType:$target_key,
     I64:$target_offset,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -4256,8 +4393,8 @@ def Stream_CmdParameterGatherOp : Stream_Op<"cmd.parameter.gather", [
   }];
 
   let arguments = (ins
-    OptionalAttr<StrAttr>:$source_scope,
-    StrArrayAttr:$source_keys,
+    Optional<Util_BufferType>:$source_scope,
+    Variadic<Util_BufferType>:$source_keys,
     Variadic<I64>:$source_offsets,
     Stream_AnyStreamResource:$target,
     Stream_Size:$target_size,
@@ -4316,8 +4453,8 @@ def Stream_CmdParameterScatterOp : Stream_Op<"cmd.parameter.scatter", [
     Stream_Size:$source_size,
     Variadic<Stream_Offset>:$source_offsets,
     Variadic<Stream_Size>:$source_lengths,
-    OptionalAttr<StrAttr>:$target_scope,
-    StrArrayAttr:$target_keys,
+    Optional<Util_BufferType>:$target_scope,
+    Variadic<Util_BufferType>:$target_keys,
     Variadic<I64>:$target_offsets,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -4522,6 +4659,7 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
 def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
   AllTypesMatch<["resource", "result"]>,
   Stream_AffinityOp,
+  Stream_TiedResourcePassthrough,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -4579,6 +4717,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
+  Stream_TiedResourcePassthrough,
   DeclareOpInterfaceMethods<Stream_TimelineOp, [
     "getAwaitTimepoints",
     "setAwaitTimepoint",

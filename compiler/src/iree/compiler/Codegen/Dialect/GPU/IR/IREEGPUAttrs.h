@@ -222,6 +222,9 @@ int64_t getKSize(MMAIntrinsic intrinsic);
 /// Returns the subgroup size used by the given MMA intrinsic.
 int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic);
 
+/// Returns true if the given MMA intrinsic is an NV_MMA_SYNC intrinsic.
+bool isNvMmaSync(MMAIntrinsic intrinsic);
+
 constexpr int kMMAOperandLhs = 0;
 constexpr int kMMAOperandRhs = 1;
 constexpr int kMMAOperandAcc = 2;
@@ -283,6 +286,10 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
                                                 int64_t operandIndex);
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex,
+                                                bool isAccColMajor);
 
 /// Returns the name of the tilling `level`, as used in the `lowering_config`
 /// attribute.

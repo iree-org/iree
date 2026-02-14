@@ -198,14 +198,15 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
   };
   rootOp->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<IREE::Stream::ExecutableExportOp>(
-            [&](auto exportOp) { (void)getExportInfo(exportOp); })
-        .Case<IREE::HAL::ExecutableExportOp>([&](auto exportOp) {
+        .Case([&](IREE::Stream::ExecutableExportOp exportOp) {
+          (void)getExportInfo(exportOp);
+        })
+        .Case([&](IREE::HAL::ExecutableExportOp exportOp) {
           auto &exportInfo = getExportInfo(exportOp);
           exportInfo.pipelineLayout =
               assumeExportLayout(exportOp.getLayoutAttr());
         })
-        .Case<IREE::Stream::CmdDispatchOp>([&](auto dispatchOp) {
+        .Case([&](IREE::Stream::CmdDispatchOp dispatchOp) {
           dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
             auto exportOp =
                 symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
@@ -219,7 +220,7 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
   // Derive the layouts for each export op.
   for (auto &it : exportInfos) {
     TypeSwitch<Operation *>(it.first)
-        .Case<IREE::Stream::ExecutableExportOp>([&](auto exportOp) {
+        .Case([&](IREE::Stream::ExecutableExportOp exportOp) {
           it.second->pipelineLayout =
               deriveStreamExportLayout(exportOp, it.second->dispatchOps);
         })

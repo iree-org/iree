@@ -254,7 +254,8 @@ struct GPUReuseSharedMemoryAllocsPass final
         // Add a barrier if the `otherLiveness` comes before `liveness`.
         if (dominanceInfo.dominates(otherLiveness.first, liveness.first)) {
           builder.setInsertionPoint(liveness.first);
-          gpu::BarrierOp::create(builder, liveness.first->getLoc());
+          gpu::BarrierOp::create(builder, liveness.first->getLoc(),
+                                 gpu::AddressSpace::Workgroup);
           break;
         }
       }

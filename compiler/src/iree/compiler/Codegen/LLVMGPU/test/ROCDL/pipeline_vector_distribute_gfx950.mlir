@@ -453,7 +453,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // read is hoisted out.
 // CHECK: transfer_read
 // CHECK: transfer_write
-// CHECK: gpu.barrier
+// CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK: transfer_read
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128

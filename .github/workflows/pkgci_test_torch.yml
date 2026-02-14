@@ -55,10 +55,10 @@ jobs:
       CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
@@ -74,11 +74,12 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
+          ref: c3b48ed923548e74b85329e201c12fe69cb1df2f
           path: iree-test-suites
+          lfs: false
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
@@ -125,11 +126,11 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: false
 
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v5.4.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v5.4.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
@@ -141,10 +142,10 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: 17ead09be6d84bf46d80e6192dc12e45ba776045
+          ref: c3b48ed923548e74b85329e201c12fe69cb1df2f
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false

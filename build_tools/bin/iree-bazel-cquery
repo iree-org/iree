@@ -1,0 +1,143 @@
+#!/bin/bash
+# Configuration-aware query of IREE build graph with Bazel cquery.
+#
+# Usage: iree-bazel-cquery [options] <query> [bazel-args...]
+#
+# Examples:
+#   iree-bazel-cquery 'deps(//tools:iree-compile)'
+#   iree-bazel-cquery --output=files //tools:iree-compile
+#   iree-bazel-cquery 'kind(cc_library, //runtime/...)'
+
+set -e
+
+# Source shared library.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/iree-bazel-lib"
+iree_bazel_init "iree-bazel-cquery"
+
+# Expand combined short flags (e.g., -nv -> -n -v).
+eval "set -- $(iree_expand_combined_flags "$@")"
+
+show_help() {
+    cat << 'EOF'
+iree-bazel-cquery - Configuration-aware query of IREE build graph
+
+USAGE
+    iree-bazel-cquery [options] <query> [bazel-args...]
+
+OPTIONS
+    -n, --dry_run    Show the bazel command without executing
+    -v, --verbose    Show the bazel command before executing
+    -h, --help       Show this help
+
+    NOTE: Short flags can be combined: -nv is equivalent to -n -v
+
+ARGUMENTS
+    query          Bazel query expression (required)
+    bazel-args     Additional arguments passed to bazel cquery
+
+DESCRIPTION
+    Unlike iree-bazel-query, cquery evaluates the build graph after
+    configuration resolution. This means:
+
+    - Results reflect actual build configuration (select() resolved)
+    - Only targets that would actually be built are shown
+    - Output paths include configuration-specific directory names
+    - Useful for understanding what will actually be compiled
+
+EXAMPLES
+    iree-bazel-cquery //tools:iree-compile           # Show configured target
+    iree-bazel-cquery 'deps(//tools:iree-compile)'   # Configured dependencies
+    iree-bazel-cquery 'kind(cc_library, //runtime/...)'
+    iree-bazel-cquery -n 'deps(//tools:iree-compile)'  # Show command only
+
+    # Show output files for a target
+    iree-bazel-cquery --output=files //tools:iree-compile
+
+    # Analyze configuration transitions
+    iree-bazel-cquery 'deps(//tools:iree-compile)' --transitions=full
+
+COMMON QUERY FUNCTIONS
+    deps(target)           All dependencies of target
+    rdeps(universe, target) Reverse dependencies within universe
+    kind(rule, pattern)    Targets of specific rule type
+    somepath(from, to)     Path between two targets
+    allpaths(from, to)     All paths between targets
+    config(target, config) Target in specific configuration
+
+OUTPUT OPTIONS
+    --output=label         Target labels only (default)
+    --output=files         Output file paths
+    --output=starlark      Custom output via Starlark
+    --transitions=full     Show configuration transitions
+
+SEE ALSO
+    iree-bazel-query, iree-bazel-build, iree-bazel-test, iree-bazel-run
+    https://bazel.build/query/cquery
+EOF
+}
+
+# Parse arguments.
+QUERY=""
+BAZEL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --agent-md|--agent_md)
+            iree_show_agent_md
+            exit 0
+            ;;
+        -n|--dry_run|--dry-run)
+            IREE_BAZEL_DRY_RUN=1
+            shift
+            ;;
+        -v|--verbose)
+            IREE_BAZEL_VERBOSE=1
+            shift
+            ;;
+        -*)
+            BAZEL_ARGS+=("${1}")
+            shift
+            ;;
+        *)
+            if [[ -z "${QUERY}" ]]; then
+                QUERY="${1}"
+            else
+                BAZEL_ARGS+=("${1}")
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Query is required.
+if [[ -z "${QUERY}" ]]; then
+    iree_error "Query expression is required"
+    echo ""
+    show_help
+    exit 1
+fi
+
+# Set up worktree (after arg parsing so --help works anywhere).
+iree_setup_worktree
+
+# Build the command with default configs (affects select() in build graph).
+iree_bazel_build_default_configs
+BAZEL_BIN=$(iree_get_bazel_command)
+CMD=("${BAZEL_BIN}" cquery "${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${QUERY}" "${BAZEL_ARGS[@]}")
+
+# Execute or show.
+if iree_is_verbose || iree_is_dry_run; then
+    iree_info "Command: ${CMD[*]}"
+fi
+
+if iree_is_dry_run; then
+    exit 0
+fi
+
+iree_info "Querying: ${QUERY}"
+exec "${CMD[@]}"

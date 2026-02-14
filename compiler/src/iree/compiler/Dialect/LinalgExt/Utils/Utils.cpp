@@ -74,10 +74,10 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
     return arith::ConstantIndexOp::create(builder, loc, type.getDimSize(dim));
   }
   return TypeSwitch<Type, Value>(v.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+      .Case([&](RankedTensorType t) -> Value {
         return builder.createOrFold<tensor::DimOp>(loc, v, dim);
       })
-      .Case<MemRefType>([&](MemRefType t) -> Value {
+      .Case([&](MemRefType t) -> Value {
         return builder.createOrFold<memref::DimOp>(loc, v, dim);
       });
 }
@@ -111,11 +111,11 @@ Operation *getSlice(OpBuilder &b, Location loc, Value src,
                     ArrayRef<OpFoldResult> sizes,
                     ArrayRef<OpFoldResult> strides) {
   return TypeSwitch<Type, Operation *>(src.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Operation * {
+      .Case([&](RankedTensorType t) -> Operation * {
         return tensor::ExtractSliceOp::create(b, loc, src, offsets, sizes,
                                               strides);
       })
-      .Case<MemRefType>([&](MemRefType type) -> Operation * {
+      .Case([&](MemRefType type) -> Operation * {
         return memref::SubViewOp::create(b, loc, src, offsets, sizes, strides);
       })
       .Default([&](Type t) -> Operation * {
@@ -126,11 +126,11 @@ Operation *getSlice(OpBuilder &b, Location loc, Value src,
 
 Value castValue(OpBuilder &b, Location loc, Value src, ShapedType type) {
   return TypeSwitch<Type, Value>(src.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+      .Case([&](RankedTensorType t) -> Value {
         assert(isa<RankedTensorType>(type) && "expected compatible type");
         return tensor::CastOp::create(b, loc, type, src)->getResult(0);
       })
-      .Case<MemRefType>([&](MemRefType type) -> Value {
+      .Case([&](MemRefType type) -> Value {
         assert(isa<MemRefType>(type) && "expected compatible type");
         return memref::CastOp::create(b, loc, type, src)->getResult(0);
       })
@@ -922,8 +922,8 @@ bool isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // TODO: Add better affine map checks.
-  auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity()) {
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  if (!indexingMaps[0].isIdentity()) {
     return false;
   }
 

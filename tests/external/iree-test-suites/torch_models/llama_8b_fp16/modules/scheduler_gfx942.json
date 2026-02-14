@@ -2,7 +2,7 @@
   "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp16/greedy_scheduler.mlir",
   "compiler_flags": [
       "--iree-hal-target-device=hip",
-      "--iree-hip-target=gfx942",
+      "--iree-rocm-target=gfx942",
       "--iree-opt-level=O3",
       "--iree-stream-resource-memory-model=discrete",
       "--iree-hal-indirect-command-buffers=true",

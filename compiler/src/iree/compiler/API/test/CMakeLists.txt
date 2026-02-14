@@ -21,6 +21,19 @@ iree_cc_test(
     iree::compiler::bindings::c::headers
 )
 
+iree_cc_test(
+  NAME
+    codegen-flags-test
+  SRCS
+    "codegen_flags_test.cc"
+  DEPS
+    gmock
+    gtest
+    iree::compiler::API::Impl
+    iree::compiler::bindings::c::headers
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Move to bin/ directory and systematically name more appropriately.

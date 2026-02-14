@@ -23,6 +23,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "LoopMappingUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "Transforms.h"
@@ -36,6 +37,7 @@ iree_cc_library(
     "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
     "FoldUnitExtentDims.cpp"
+    "LoopMappingUtils.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"
@@ -50,23 +52,18 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransforms
-    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
-    MLIRBufferizationDialect
     MLIRComplexDialect
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
-    MLIRLinalgStructuredOpsIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
-    MLIRParser
     MLIRPass
     MLIRSCFDialect
     MLIRSCFTransforms
@@ -75,7 +72,6 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTensorUtils
     MLIRTilingInterface
-    MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface

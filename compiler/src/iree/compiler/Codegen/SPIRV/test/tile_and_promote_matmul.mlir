@@ -84,12 +84,12 @@ func.func @matmul_f32_256x1024x128() attributes {translation_info = #translation
 //      CHECK:       %[[VIEW_A:.+]] = memref.subview %[[A]][0, %[[T_IV_Y]]] [128, 32]
 //      CHECK:       %[[VIEW_B:.+]] = memref.subview %[[B]][%[[T_IV_Y]], 0] [32, 128]
 
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK:       memref.copy %[[VIEW_A]], %[[MEM_A]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      CHECK:       memref.copy %[[VIEW_B]], %[[MEM_B]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 //      CHECK:       scf.for %[[T_IV_Y:.+]] =
 //      CHECK:         scf.for %[[T_IV_X:.+]] =
@@ -166,12 +166,12 @@ func.func @batch_matmul_16x1024x1024x80() attributes {translation_info = #transl
 //  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, #gpu.address_space<workgroup>>
 //  CHECK-NOT: memref.alloc
 
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-DAG:       memref.copy %{{.+}}, %[[LHS_MEM]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //  CHECK-DAG:       memref.copy %{{.+}}, %[[RHS_MEM]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 
 // -----
 
@@ -224,9 +224,9 @@ func.func @batch_matmul_f32_16x4096x40x4096() attributes {translation_info = #tr
 //  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, #gpu.address_space<workgroup>>
 //   CHECK-NOT: memref.alloc()
 
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //  CHECK-DAG:       memref.copy %{{.+}}, %[[MEM_A]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //  CHECK-DAG:       memref.copy %{{.+}}, %[[MEM_B]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
-//      CHECK:       gpu.barrier
+//      CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]

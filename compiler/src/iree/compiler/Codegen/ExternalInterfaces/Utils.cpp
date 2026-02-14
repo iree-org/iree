@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -189,8 +190,11 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims);
-  for (auto [dim, size] : llvm::zip_equal(encodingInfo.innerDimsPos,
-                                          encodingInfo.innerTileSizes)) {
+  auto scalableFlags = encodingInfo.scalableTiles.value_or(
+      Codegen::ScalableTileFlags(encodingInfo.innerTileSizes.size(), false));
+  for (auto [dim, size, scalable] :
+       llvm::zip_equal(encodingInfo.innerDimsPos, encodingInfo.innerTileSizes,
+                       scalableFlags)) {
     // Only VMVX backend has dynamic inner tile sizes when ukernel is enabled.
     // It assumes that the padding size is 16. Ideally, the logic should be
     // moved to VMVX implementation details. However, we cook the logic here to
@@ -201,6 +205,11 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       size = 16;
     }
 
+    // Host-side code does not support vscale ops yet - so we cannot create the
+    // runtime SSA value properly as of now. #21317
+    if (scalable) {
+      size *= getUserVscaleValue();
+    }
     // Do not create additional operations in the first place if the padding is
     // not needed.
     if (size == 1) {
@@ -212,8 +221,9 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       auto alignment = arith::ConstantIndexOp::create(builder, loc, size);
       paddedDynamicDims[dim] = arith::CeilDivSIOp::create(
           builder, loc, paddedDynamicDims[dim], alignment);
-      paddedDynamicDims[dim] = arith::MulIOp::create(
-          builder, loc, paddedDynamicDims[dim], alignment);
+      paddedDynamicDims[dim] =
+          arith::MulIOp::create(builder, loc, paddedDynamicDims[dim], alignment,
+                                arith::IntegerOverflowFlags::nsw);
     } else {
       paddedShape[dim] = llvm::alignTo(paddedShape[dim], size);
     }
@@ -236,7 +246,8 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
   Value result =
       arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : paddedDynamicDims) {
-    result = arith::MulIOp::create(builder, loc, result, dim);
+    result = arith::MulIOp::create(builder, loc, result, dim,
+                                   arith::IntegerOverflowFlags::nsw);
   }
 
   // Always pack the elements back-to-back for subtypes.

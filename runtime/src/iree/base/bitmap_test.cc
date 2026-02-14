@@ -1,0 +1,549 @@
+// Copyright 2025 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/base/api.h"
+#include "iree/testing/gtest.h"
+
+namespace iree {
+namespace {
+
+TEST(BitmapTest, CalculateWords) {
+  static_assert(IREE_BITMAP_BITS_PER_WORD == 64, "assumes 64-bit words");
+  EXPECT_EQ(iree_bitmap_calculate_words(0), 0);
+  EXPECT_EQ(iree_bitmap_calculate_words(1), 1);
+  EXPECT_EQ(iree_bitmap_calculate_words(63), 1);
+  EXPECT_EQ(iree_bitmap_calculate_words(64), 1);
+  EXPECT_EQ(iree_bitmap_calculate_words(65), 2);
+}
+
+// Tests that a NULL storage pointer is allowed (as we shouldn't touch it).
+TEST(BitmapTest, NoneSet) {
+  iree_bitmap_t bitmap = {0, NULL};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_set_all(bitmap);           // no-op
+  iree_bitmap_reset_all(bitmap);         // no-op
+  iree_bitmap_set_span(bitmap, 0, 0);    // no-op
+  iree_bitmap_reset_span(bitmap, 0, 0);  // no-op
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), 0);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 0), 0);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 0, 0), 0);
+}
+
+TEST(BitmapTest, CountEmpty) {
+  iree_bitmap_t bitmap = {0, NULL};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 0);
+}
+
+TEST(BitmapTest, CountZero) {
+  uint64_t words[] = {0ull, 0ull};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 0);
+}
+
+TEST(BitmapTest, CountAll) {
+  uint64_t words[] = {UINT64_MAX, UINT64_MAX};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 128);
+}
+
+TEST(BitmapTest, CountPartialWord) {
+  uint64_t words[] = {UINT64_MAX, UINT64_MAX};
+  // Only 74 bits (64 + 10), so count should be 74 not 128.
+  iree_bitmap_t bitmap = {74, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 74);
+}
+
+TEST(BitmapTest, CountSparse) {
+  uint64_t words[] = {
+      0b1010,  // 2 bits
+      0b1,     // 1 bit
+  };
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 3);
+}
+
+TEST(BitmapTest, CountSparseWithTailMask) {
+  uint64_t words[] = {
+      0b1010,                              // 2 bits set
+      0b11111111111111111111111111111111,  // many bits set, but only 10 valid
+  };
+  // 74 bits total = 64 full + 10 tail.
+  iree_bitmap_t bitmap = {74, words};
+  // First word: 2 bits, second word masked to 10 bits: 10 bits.
+  EXPECT_EQ(iree_bitmap_count(bitmap), 12);
+}
+
+TEST(BitmapTest, CountSingleBit) {
+  uint64_t words[] = {1ull << 31, 0ull};
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 1);
+}
+
+TEST(BitmapTest, CountCrossingWordBoundary) {
+  uint64_t words[] = {
+      0x8000000000000000ull,  // bit 63 set
+      0x0000000000000001ull,  // bit 0 (64 total) set
+  };
+  iree_bitmap_t bitmap = {128, words};
+  EXPECT_EQ(iree_bitmap_count(bitmap), 2);
+}
+
+TEST(BitmapTest, Test) {
+  uint64_t words[] = {
+      0ull | 0b1010,
+      0ull | 0b1,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 0));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 1));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 2));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 3));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 0));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 64 + 1));
+}
+
+TEST(BitmapTest, Set63) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 63));
+  iree_bitmap_set(bitmap, 63);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 63));
+  EXPECT_EQ(words[0], 0b1ull << 63);
+  EXPECT_EQ(words[1], 0ull);
+}
+
+TEST(BitmapTest, Set64) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 64));
+  iree_bitmap_set(bitmap, 64);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 1ull);
+}
+
+TEST(BitmapTest, Set65) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 65));
+  iree_bitmap_set(bitmap, 65);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 65));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 0b10ull);
+}
+
+TEST(BitmapTest, Set73) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 73));
+  iree_bitmap_set(bitmap, 73);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 73));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 1ull << (73 - 64));
+}
+
+TEST(BitmapTest, SetPreserve) {
+  uint64_t words[] = {
+      0ull | (1ull << 2),
+      0ull | (1ull << 3),
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 0));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 2));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 3));
+  iree_bitmap_set(bitmap, 0);
+  iree_bitmap_set(bitmap, 64 + 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 0));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 2));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 1));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 3));
+  EXPECT_EQ(words[0], 0b101ull);
+  EXPECT_EQ(words[1], 0b1010ull);
+}
+
+TEST(BitmapTest, SetSpanPrefix) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_set_span(bitmap, 0, 64 + 10 - 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], ~0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b0111111111ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, SetSpanSuffix) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_set_span(bitmap, 64 + 10 - 1, 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b1000000000ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, SetSpanSplit) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_set_span(bitmap, 63, 2);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], 0b1ull << 63);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b1ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, SetAll) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_set_all(bitmap);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], ~0x0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b1111111111ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, Reset0) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  iree_bitmap_set(bitmap, 0);
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 0));
+  iree_bitmap_reset(bitmap, 0);
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 0));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 0ull);
+}
+
+TEST(BitmapTest, Reset63) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  iree_bitmap_set(bitmap, 63);
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 63));
+  iree_bitmap_reset(bitmap, 63);
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 63));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 0ull);
+}
+
+TEST(BitmapTest, Reset64) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 64));
+  iree_bitmap_set(bitmap, 64);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 1ull);
+}
+
+TEST(BitmapTest, Reset65) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 65));
+  iree_bitmap_set(bitmap, 65);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 65));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 0b10ull);
+}
+
+TEST(BitmapTest, Reset73) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 73));
+  iree_bitmap_set(bitmap, 73);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 73));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1], 1ull << (73 - 64));
+}
+
+TEST(BitmapTest, ResetPreserve) {
+  uint64_t words[] = {
+      0b101ull,
+      0b1010ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 0));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 2));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 1));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 3));
+  iree_bitmap_reset(bitmap, 0);
+  iree_bitmap_reset(bitmap, 64 + 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 0));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 2));
+  EXPECT_FALSE(iree_bitmap_test(bitmap, 64 + 1));
+  EXPECT_TRUE(iree_bitmap_test(bitmap, 64 + 3));
+  EXPECT_EQ(words[0], 0b100ull);
+  EXPECT_EQ(words[1], 0b1000ull);
+}
+
+TEST(BitmapTest, ResetSpanPrefix) {
+  uint64_t words[] = {
+      ~0ull,
+      ~0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_reset_span(bitmap, 0, 64 + 10 - 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b1000000000ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, ResetSpanSuffix) {
+  uint64_t words[] = {
+      ~0ull,
+      ~0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_reset_span(bitmap, 64 + 10 - 1, 1);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], ~0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b0111111111ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, ResetSpanSplit) {
+  uint64_t words[] = {
+      ~0ull,
+      ~0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_reset_span(bitmap, 63, 2);
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], ~(0b1ull << 63));
+  EXPECT_EQ(words[1] & 0b1111111111ull,
+            0b1111111110ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, ResetSpanAll) {
+  uint64_t words[] = {
+      ~0ull,
+      ~0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_reset_span(bitmap, 0, bitmap.bit_count);
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull, 0ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, ResetAll) {
+  uint64_t words[] = {
+      ~0ull,
+      ~0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  iree_bitmap_reset_all(bitmap);
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(words[0], 0ull);
+  EXPECT_EQ(words[1] & 0b1111111111ull, 0ull);  // note tail bits are undefined
+}
+
+TEST(BitmapTest, FindEmpty) {
+  uint64_t words[] = {
+      0ull,
+      0ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 0), 0);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 10), 10);
+  EXPECT_EQ(
+      iree_bitmap_find_first_unset_span(bitmap, 10, bitmap.bit_count - 10), 10);
+}
+
+TEST(BitmapTest, FindFull) {
+  uint64_t words[] = {
+      UINT64_MAX,
+      UINT64_MAX,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), 0);
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 1), 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 0), bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 1), bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 0, 1), bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 1, 2), bitmap.bit_count);
+}
+
+TEST(BitmapTest, Find0) {
+  uint64_t words[] = {
+      0ull | 0b1,
+      0ull,
+  };
+  const int bit_index = 0;
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bit_index);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, bit_index), bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index,
+                                              bitmap.bit_count - bit_index - 1),
+            bit_index + 1);
+}
+
+TEST(BitmapTest, Find63) {
+  uint64_t words[] = {
+      0ull | (1ull << 63),
+      0ull,
+  };
+  const int bit_index = 63;
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bit_index);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, bit_index), bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index,
+                                              bitmap.bit_count - bit_index - 1),
+            bit_index + 1);
+}
+
+TEST(BitmapTest, Find64) {
+  uint64_t words[] = {
+      0ull,
+      0ull | 0b1,
+  };
+  const int bit_index = 64;
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bit_index);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, bit_index), bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index,
+                                              bitmap.bit_count - bit_index - 1),
+            bit_index + 1);
+}
+
+TEST(BitmapTest, Find67) {
+  uint64_t words[] = {
+      0ull,
+      0ull | (0b1 << 3),
+  };
+  const int bit_index = 64 + 3;
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bit_index);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, bit_index), bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index,
+                                              bitmap.bit_count - bit_index - 1),
+            bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 0),
+            bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 1),
+            bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 4),
+            bit_index + 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 60),
+            bitmap.bit_count);
+}
+
+TEST(BitmapTest, Find73) {
+  uint64_t words[] = {
+      0ull,
+      0ull | (0b1 << 10),
+  };
+  const int bit_index = 64 + 10;
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_TRUE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), bit_index);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, bit_index), bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 1),
+            bitmap.bit_count);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, bit_index, 2),
+            bitmap.bit_count);
+}
+
+TEST(BitmapTest, FindUnset1001) {
+  uint64_t words[] = {
+      // 0001100100011001 (repeating)
+      0x191919191919ull,
+      0x191919191919ull,
+  };
+  iree_bitmap_t bitmap = {64 + 10, words};
+  EXPECT_FALSE(iree_bitmap_none_set(bitmap));
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 0), 0);
+  EXPECT_EQ(iree_bitmap_find_first_set(bitmap, 1), 3);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 0), 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 1), 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 2), 2);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 3), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 4), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset(bitmap, 5), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 0, 2), 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 1, 2), 1);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 2, 2), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 0, 3), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 4, 3), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 5, 3), 5);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 6, 3), 13);
+  EXPECT_EQ(iree_bitmap_find_first_unset_span(bitmap, 7, 3), 13);
+}
+
+}  // namespace
+}  // namespace iree

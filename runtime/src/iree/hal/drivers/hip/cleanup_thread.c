@@ -6,8 +6,9 @@
 
 #include "iree/hal/drivers/hip/cleanup_thread.h"
 
-#include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/threading.h"
+#include "iree/base/threading/mutex.h"
+#include "iree/base/threading/notification.h"
+#include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/hip/event_pool.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/util/queue.h"

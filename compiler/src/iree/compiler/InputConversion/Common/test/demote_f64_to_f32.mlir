@@ -95,3 +95,13 @@ util.func public @complexTypesF64(%arg0 : complex<f64>) -> complex<f64> {
   // CHECK-NEXT: util.return %arg0 : complex<f32>
   util.return %arg0 : complex<f64>
 }
+
+// -----
+
+// LLVM dialect functions are not supported.
+
+// expected-error @+1 {{cannot determine function type of function}}
+llvm.func @unsupported_llvm_func() -> f32 {
+  %0 = llvm.mlir.constant(3.000000e+00 : f32) : f32
+  llvm.return %0 : f32
+}

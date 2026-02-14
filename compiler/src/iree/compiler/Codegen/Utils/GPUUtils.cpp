@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -377,12 +378,14 @@ void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
       Operation *prevOp = copyOp->getPrevNode();
       if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPoint(copyOp);
-        gpu::BarrierOp::create(builder, copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc(),
+                               gpu::AddressSpace::Workgroup);
       }
       Operation *nextOp = copyOp->getNextNode();
       if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPointAfter(copyOp);
-        gpu::BarrierOp::create(builder, copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc(),
+                               gpu::AddressSpace::Workgroup);
       }
     }
   });
@@ -646,7 +649,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       memref::StoreOp::create(b, l, laneVal, alloc, indices);
       scf::YieldOp::create(b, l);
     });
-    gpu::BarrierOp::create(builder, loc);
+    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
     // Further reduce the outputs from each warps with a single warp reduce.
     Value memrefSize =
         arith::ConstantIndexOp::create(builder, loc, numWarp - 1);
@@ -743,6 +746,240 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {
     }
   }
   return std::nullopt;
+}
+
+static FailureOr<int64_t>
+getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex) {
+  SmallVector<Type> elementTypes;
+  intrinsic.getElementTypes(elementTypes);
+  assert(operandIndex > 0 && "operand index must be positive");
+  return elementTypes[operandIndex].getIntOrFloatBitWidth();
+}
+
+/// Returns the number of elements along the K dimensions (all reduction
+/// dimensions) of the given intrinsic. For intrinsics with multiple K
+/// dimensions, returns the product of all K dimensions. This is determined by
+/// looking at all reduction dimensions in the undistributed tile shape.
+static FailureOr<int64_t>
+getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
+  int64_t kSize = 1;
+  int64_t lhsOperandIndex = 0;
+  SmallVector<VectorType> undistributedTypes;
+  intrinsic.getUndistributedTileTypes(undistributedTypes);
+  ArrayRef<int64_t> shape = undistributedTypes[lhsOperandIndex].getShape();
+  SmallVector<utils::IteratorType> lhsIteratorTypes =
+      intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
+  for (auto [dim, iteratorType] : llvm::zip_equal(shape, lhsIteratorTypes)) {
+    if (iteratorType == utils::IteratorType::reduction) {
+      kSize *= dim;
+    }
+  }
+  return kSize;
+}
+
+/// Returns the number of elements each thread accesses for the given intrinsic
+/// and operand index. This is determined by the `element` field of the
+/// subgroup layout.
+static FailureOr<int64_t>
+getNumAccessElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  int operandIndex) {
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  return llvm::product_of(layout.element);
+}
+
+/// Returns the total number of elements in the shape of the given intrinsic
+/// with the given operand index. This is the product of all dimensions in the
+/// distributed shape: outer × thread × element.
+static FailureOr<int64_t>
+getTotalTileElems(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  int operandIndex) {
+  IREE::GPU::MMASingleSubgroupLayout layout =
+      IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
+  return llvm::product_of(layout.outer) * llvm::product_of(layout.thread) *
+         llvm::product_of(layout.element);
+}
+
+static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
+  if (auto smma = dyn_cast<IREE::GPU::ScaledMMAAttr>(intrinsic)) {
+    switch (smma.getIntrinsic()) {
+    case IREE::GPU::ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+      return XorShuffleParams({/*rowElems=*/256,
+                               /*accessElems=*/32});
+    default:
+      // TODO(muzasyed): Add more intrinsics for gfx950.
+      return failure();
+    }
+  }
+  return failure();
+}
+
+/// Validate the XOR shuffle parameters for the given intrinsic and operand
+/// index. If the parameters produce an XOR Shuffle that is not valid, return
+/// failure. Else, return the swizzle parameters.
+static FailureOr<XorShuffleParams>
+validateXorShuffle(FailureOr<XorShuffleParams> swizzle,
+                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                   int operandIndex) {
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeTotalTileElems)) {
+    return failure();
+  }
+  int64_t totalTileElems = *maybeTotalTileElems;
+  if (!isXORShuffleValid(swizzle->rowElems, swizzle->accessElems,
+                         totalTileElems)) {
+    return failure();
+  }
+  return swizzle;
+}
+
+// Disabling clang-tidy for the following functions, as it will be externally
+// linked to the CAPI in a future PR.
+// NOLINTBEGIN(misc-use-internal-linkage)
+FailureOr<XorShuffleBounds>
+getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    int operandIndex) {
+  FailureOr<int64_t> maybeMinimumAccessElems =
+      getNumAccessElems(intrinsic, operandIndex);
+  FailureOr<int64_t> maybeTotalTileElems =
+      getTotalTileElems(intrinsic, operandIndex);
+  if (failed(maybeMinimumAccessElems) || failed(maybeTotalTileElems)) {
+    return failure();
+  }
+  return XorShuffleBounds{*maybeMinimumAccessElems, *maybeTotalTileElems};
+}
+
+bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+                       int64_t totalTileElems) {
+  // The number of total tile elements we want to swizzle must be greater than
+  // or equal to the number of elements in a row.
+  if (totalTileElems < numRowElems) {
+    LDBG()
+        << "The number of row elements exceed the total elements in the tile";
+    return false;
+  }
+  // We need at least one column of access elements to swizzle within a row.
+  if (numRowElems < numAccessElems) {
+    LDBG()
+        << "The number of access elements exceed the total elements in the row";
+    return false;
+  }
+  // The size of a row must evenly divide the total number of tile elements.
+  if (totalTileElems % numRowElems != 0) {
+    LDBG() << "The number of row elements does not evenly divide the total "
+              "elements in the tile";
+    return false;
+  }
+  // The number of access elements must evenly divide the number of row
+  // elements.
+  if (numRowElems % numAccessElems != 0) {
+    LDBG() << "The number of access elements does not evenly divide the number "
+              "of row elements";
+    return false;
+  }
+  // The number of columns in a row must evenly divide the total number of tile
+  // elements. This is to avoid incomplete rows at the end of the tile.
+  if (totalTileElems % (numRowElems / numAccessElems) != 0) {
+    LDBG() << "The number of columns in a row does not evenly divide the total "
+              "elements in the tile";
+    return false;
+  }
+  return true;
+}
+
+FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
+  FailureOr<amdgpu::Chipset> maybeChipset =
+      amdgpu::Chipset::parse(target.getArch());
+  if (failed(maybeChipset)) {
+    return failure();
+  }
+  if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
+    return validateXorShuffle(getXorShuffleParamsForGfx950(target, intrinsic),
+                              intrinsic, operandIndex);
+  }
+  return failure();
+}
+
+FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  // Compute XOR shuffle swizzle parameters for bank conflict avoidance.
+  // - rowElems: Select entirety of K Tile size, may not prevent bank
+  //              conflicts if the K tile size is too small.
+  // - accessElems: number of contiguous elements each thread accesses,
+  //                 derived from the MMA intrinsic's element layout.
+  int64_t numAccessElems = getNumAccessElems(intrinsic, operandIndex).value();
+
+  // Calculate K tile size (total K elements in shared memory) to use as row
+  // width. For small K tiles, this may not reduce bank conflicts effectively.
+  int64_t kTileSize =
+      llvm::product_of(reductionTileSizes) * getKSize(intrinsic).value();
+
+  // Figure out how many elements can fit across all banks of LDS.
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  FailureOr<int64_t> bitwidth = getOperandBitwidth(intrinsic, operandIndex);
+  if (failed(bitwidth)) {
+    return failure();
+  }
+  std::optional<int64_t> workgroupMemoryBankCount =
+      wgp.getWorkgroupMemoryBankCount();
+  if (!workgroupMemoryBankCount.has_value()) {
+    return failure();
+  }
+  // Assuming each bank is 4 bytes wide (32 bits).
+  int64_t ldsBankWidthBits =
+      (workgroupMemoryBankCount.value() * int64_t(32)) / *bitwidth;
+
+  // Row width must be less than or equal to the row size (in elements) of LDS
+  // bank width to prevent bank conflicts.
+  int64_t effectiverowElems = std::min(ldsBankWidthBits, kTileSize);
+
+  // Ensure row width is at least access width (minimum 1 column).
+  effectiverowElems = std::max(effectiverowElems, numAccessElems);
+  return validateXorShuffle(XorShuffleParams({/*rowElems=*/effectiverowElems,
+                                              /*accessElems=*/numAccessElems}),
+                            intrinsic, operandIndex);
+}
+
+FailureOr<XorShuffleParams>
+getXorShuffleParams(IREE::GPU::TargetAttr target,
+                    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                    ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  FailureOr<XorShuffleParams> xorShuffleAttr =
+      getXorShuffleParamsForTunedChipset(target, intrinsic, operandIndex);
+  if (failed(xorShuffleAttr)) {
+    xorShuffleAttr = getXorShuffleParamsForUntunedChipset(
+        target, intrinsic, reductionTileSizes, operandIndex);
+  }
+  return xorShuffleAttr;
+}
+// NOLINTEND(misc-use-internal-linkage)
+
+FailureOr<Attribute>
+getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
+                  IREE::GPU::TargetAttr target,
+                  IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                  ArrayRef<int64_t> reductionTileSizes, int operandIndex) {
+  FailureOr<XorShuffleParams> xorShuffleParams =
+      getXorShuffleParams(target, intrinsic, reductionTileSizes, operandIndex);
+  if (failed(xorShuffleParams)) {
+    return failure();
+  }
+  int64_t effectiverowElems = xorShuffleParams.value().rowElems;
+  int64_t numAccessElems = xorShuffleParams.value().accessElems;
+  auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
+      context, effectiverowElems, numAccessElems,
+      /*row_stride=*/int64_t(0),
+      /*per_phase=*/int64_t(0));
+  return IREE::GPU::SwizzleOperandAttr::get(context, baseConfigAttr,
+                                            swizzleAttr);
 }
 
 //===----------------------------------------------------------------------===//

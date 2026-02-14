@@ -74,11 +74,11 @@ iree_generated_e2e_runner_test(
 )
 
 # To distinguish between CDNA(gfx9) and RDNA3(gfx11)
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx9")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(

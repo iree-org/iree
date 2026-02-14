@@ -117,7 +117,7 @@ While compiling this graph with IREE, the flag
 the created dispatches.
 
 ```mlir
-// RUN: iree-compile --iree-hal-target-device=hip --iree-hip-target=gfx942 \
+// RUN: iree-compile --iree-hal-target-device=hip --iree-rocm-target=gfx942 \
             --mlir-print-ir-after=iree-codegen-materialize-user-configs \
             --iree-hal-dump-executable-files-to=<some directory> -o /dev/null
 hal.executable public @matmul_reduce_32_1024_2048_dispatch_0 {
@@ -253,8 +253,13 @@ flags:
 * `--iree-codegen-enable-default-tuning-specs` -- enables or disables the
   default tuning specs shipped with the compiler.
 * `--iree-codegen-tuning-spec-path` -- loads a user-specified tuning spec.
+  Accepts both MLIR text (`.mlir`) and bytecode (`.mlirbc`) formats.
 * `--iree-codegen-dump-tuning-specs-to` -- dumps final tuning specs to a
   directory or standard output.
+
+!!! note
+    The `--iree-codegen-tuning-spec-path` flag can be set programmatically via
+    the C API using `ireeCompilerSessionSetFlags()`.
 
 Note that both default and user-provided specs can be enabled at the same time.
 The compiler will link them together and invoke the user-provided spec before

@@ -75,7 +75,6 @@ iree_runtime_cc_library(
     deps = [
         ":atomic_slist",
         ":internal",
-        ":synchronization",
         "//runtime/src/iree/base",
     ],
 )
@@ -86,8 +85,8 @@ iree_runtime_cc_library(
     hdrs = ["atomic_slist.h"],
     deps = [
         ":internal",
-        ":synchronization",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -102,35 +101,34 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
-    name = "bitmap",
-    srcs = ["bitmap.c"],
-    hdrs = ["bitmap.h"],
+    name = "atomic_freelist",
+    hdrs = ["atomic_freelist.h"],
     deps = [
         ":internal",
         "//runtime/src/iree/base",
-    ],
-)
-
-cc_binary_benchmark(
-    name = "bitmap_benchmark",
-    srcs = ["bitmap_benchmark.cc"],
-    deps = [
-        ":bitmap",
-        ":internal",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:benchmark",
-        "//runtime/src/iree/testing:benchmark_main",
+        "//runtime/src/iree/base:core_headers",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "bitmap_test",
-    srcs = ["bitmap_test.cc"],
+    name = "atomic_freelist_test",
+    srcs = ["atomic_freelist_test.cc"],
     deps = [
-        ":bitmap",
-        "//runtime/src/iree/base",
+        ":atomic_freelist",
+        ":memory",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "atomic_freelist_benchmark",
+    srcs = ["atomic_freelist_benchmark.cc"],
+    deps = [
+        ":atomic_freelist",
+        ":memory",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
     ],
 )
 
@@ -146,6 +144,25 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "csprng",
+    srcs = ["csprng.c"],
+    hdrs = ["csprng.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "csprng_test",
+    srcs = ["csprng_test.cc"],
+    deps = [
+        ":csprng",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.c",
@@ -155,10 +172,10 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         ":path",
-        ":synchronization",
         "//build_tools:dl",
         "//build_tools:pthreads",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -257,6 +274,16 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "memory_test",
+    srcs = ["memory_test.cc"],
+    deps = [
+        ":memory",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "path",
     srcs = ["path.c"],
@@ -302,44 +329,6 @@ iree_runtime_cc_test(
 iree_runtime_cc_library(
     name = "span",
     hdrs = ["span.h"],
-)
-
-iree_runtime_cc_library(
-    name = "synchronization",
-    srcs = [
-        "synchronization.c",
-    ],
-    hdrs = [
-        "call_once.h",
-        "synchronization.h",
-    ],
-    deps = [
-        ":internal",
-        "//build_tools:pthreads",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-cc_binary_benchmark(
-    name = "synchronization_benchmark",
-    testonly = True,
-    srcs = ["synchronization_benchmark.cc"],
-    deps = [
-        ":synchronization",
-        "//runtime/src/iree/testing:benchmark_main",
-        "@com_google_benchmark//:benchmark",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "synchronization_test",
-    srcs = ["synchronization_test.cc"],
-    deps = [
-        ":synchronization",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
 )
 
 iree_runtime_cc_library(
@@ -402,9 +391,9 @@ iree_runtime_cc_library(
     ],
     hdrs = ["wait_handle.h"],
     deps = [
-        ":synchronization",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/threading",
     ],
 )
 
@@ -437,45 +426,9 @@ iree_runtime_cc_library(
     hdrs = ["event_pool.h"],
     deps = [
         ":internal",
-        ":synchronization",
         ":wait_handle",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "threading",
-    srcs = [
-        "threading.c",
-        "threading_darwin.c",
-        "threading_impl.h",
-        "threading_pthreads.c",
-        "threading_win32.c",
-    ],
-    hdrs = ["threading.h"],
-    deps = [
-        ":internal",
-        ":synchronization",
-        "//build_tools:dl",
-        "//build_tools:pthreads",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "threading_test",
-    srcs = [
-        "threading_impl.h",
-        "threading_test.cc",
-    ],
-    deps = [
-        ":internal",
-        ":synchronization",
-        ":threading",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/base/threading",
     ],
 )

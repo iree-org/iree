@@ -45,8 +45,7 @@ def OpGroupNonStructuredOps : OpDocGroup {
 let opDocGroup = OpGroupNonStructuredOps in {
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -99,8 +98,9 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRef>:$inputs,
-      Variadic<AnyRankedTensorOrMemRef>:$outputs,
+      AnyRankedTensorOrMemRef:$updates,
+      AnyRankedTensorOrMemRef:$indices,
+      AnyRankedTensorOrMemRef:$original,
       DenseI64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
@@ -109,37 +109,21 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $updates `,` $indices `:` type($updates) `,` type($indices) `)`
+    `outs` `(` $original `:` type($original) `)`
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    static constexpr unsigned kUpdatesOpNum = 0;
-    static constexpr unsigned kIndicesOpNum = 1;
-    static constexpr unsigned kOriginalOpNum = 2;
-
     int64_t getIndexDepth() {
       return getDimensionMap().size();
-    }
-
-    Value getUpdates() {
-      return getDpsInputOperand(0)->get();
     }
 
     ShapedType getUpdateType() {
       return cast<ShapedType>(getUpdates().getType());
     }
 
-    Value getIndices() {
-      return getDpsInputOperand(1)->get();
-    }
-
     ShapedType getIndicesType() {
       return cast<ShapedType>(getIndices().getType());
-    }
-
-    Value getOriginal() {
-      return getDpsInitOperand(0)->get();
     }
 
     ShapedType getOriginalType() {
@@ -147,7 +131,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     /// Utility to get the rank of the portion of `indices` that
-    /// represents the batch dimensions
+    /// represents the batch dimensions.
     int64_t getBatchRank() {
       return getUpdateType().getRank() - getUpdateSliceRank();
     }
@@ -171,14 +155,13 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOriginalMutable();
     }
   }];
 }
 
 def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
@@ -206,23 +189,20 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     semantics.
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRef>:$inputs,
-      Variadic<AnyRankedTensorOrMemRef>:$outputs,
+      AnyRankedTensorOrMemRef:$source,
+      AnyRankedTensorOrMemRef:$indices,
+      AnyRankedTensorOrMemRef:$output,
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $source `,` $indices `:` type($source) `,` type($indices) `)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    static constexpr unsigned kSourceOpNum = 0;
-    static constexpr unsigned kIndicesOpNum = 1;
-    static constexpr unsigned kResultOpNum = 2;
-
     /// Utility to get the number of indices used to index into `source`.
     int64_t getIndexDepth() {
       return getDimensionMap().size();
@@ -239,24 +219,12 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return getOutputType().getRank() - getOutputSliceRank();
     }
 
-    Value getSource(){
-      return getOperand(kSourceOpNum);
-    }
-
     ShapedType getSourceType(){
       return cast<ShapedType>(getSource().getType());
     }
 
-    Value getIndices(){
-      return getOperand(kIndicesOpNum);
-    }
-
     ShapedType getIndicesType(){
       return cast<ShapedType>(getIndices().getType());
-    }
-
-    Value getOutput(){
-      return getOperand(kResultOpNum);
     }
 
     ShapedType getOutputType(){
@@ -265,7 +233,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
 
     /// For DPS interface.
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOutputMutable();
     }
   }];
 
@@ -347,12 +315,35 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
       OpBuilder &b, Location loc, ValueRange transformBodyIndices,
       function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
+    // Return true if the mapGatherOp is an identity transformation, meaning
+    // it is just doing a copy from source to output. This is true if the
+    // padding is unused (source and output shapes match) and the mapping
+    // from output to source index is identity.
+    bool isIdentity();
+
+    // Return the padding value yielded by the transformation region.
+    // The padding value is the last operand of the yield op.
+    Value getPaddingValue();
+
+    // Return true if the map_gather op has vector semantics.
+    bool isVectorized() {
+      return isa<VectorType>(getSource().getType());
+    }
+
+    // Creates a MapGatherOp with an identity mapping in the transformation
+    // body. Expects the types of `source` and `output` to be the same.
+    static MapGatherOp createIdentityMapGather(OpBuilder &builder,
+                                               Location loc, Value source,
+                                               Value output);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
       return getOutputMutable();
     }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
@@ -544,32 +535,25 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
     context, they will be the second and third inputs.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs,
-                       Variadic<AnyShaped>:$outputs
+  let arguments = (ins AnyType:$stage,
+                       Optional<AnyShaped>:$real_coeff,
+                       Optional<AnyShaped>:$imag_coeff,
+                       AnyShaped:$real,
+                       AnyShaped:$imag
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
-    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    attr-dict
+    `ins` `(` $stage (`,` $real_coeff^ `,` $imag_coeff)? `:` type($stage) (`,` type($real_coeff)^ `,` type($imag_coeff))? `)`
+    `outs` `(` $real `,` $imag `:` type($real) `,` type($imag) `)`
     (`:` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getStage() { return getInputs()[0]; }
-    Value getReal() { return getOutputs()[0]; }
-    Value getImag() { return getOutputs()[1]; }
-    bool hasCoeff() { return getNumDpsInputs() > 1; }
+    bool hasCoeff() { return static_cast<bool>(getRealCoeff()); }
     void generateScalarImplWithoutCoeffBuf(
         OpBuilder & b, Location loc, ArrayRef<Value> operands, Value wholeSize);
     void generateScalarImplWithCoeffBuf(OpBuilder & b, Location loc,
                                         ArrayRef<Value> operands);
-    Value getRealCoeff() {
-      if (!hasCoeff()) return Value();
-      return getInputs()[1];
-    }
-    Value getImagCoeff() {
-      if (!hasCoeff()) return Value();
-      return getInputs()[2];
-    }
     ShapedType getOperandType() {
       return cast<ShapedType>(getReal().getType());
     }
@@ -585,15 +569,12 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
   }];
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -605,8 +586,9 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     Computes the inclusive/exclusive scan along a given dimension.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+                       AnyShaped:$output,
+                       AnyShaped:$accumulator,
                        I64Attr:$dimension,
                        BoolAttr:$inclusive
   );
@@ -618,21 +600,12 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     attr-dict
     `dimension` `(` $dimension `)`
     `inclusive` `(` $inclusive `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $output `,` $accumulator `:` type($output) `,` type($accumulator) `)`
     $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getAccumulator() {
-      return getDpsInitOperand(1)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
     ShapedType getOperandType() {
       return cast<ShapedType>(getInput().getType());
     }
@@ -642,14 +615,11 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
   }];
 }
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
-  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -679,8 +649,10 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
    Note: when the two values are equal, the first occurence is always selected.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$values,
+                       Optional<AnyShaped>:$indices,
+                       AnyShaped:$output_values,
+                       AnyShaped:$output_indices,
                        I64Attr:$dimension
   );
 
@@ -689,28 +661,12 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $values (`,` $indices^)? `:` type($values) (`,` type($indices)^)? `)`
+    `outs` `(` $output_values `,` $output_indices `:` type($output_values) `,` type($output_indices) `)`
     $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getValues() {
-      return getDpsInputOperand(0)->get();
-    }
-    std::optional<Value> getIndices() {
-      if (getNumDpsInputs() < 2) {
-        return {};
-      } else {
-        return getDpsInputOperand(1)->get();
-      }
-    }
-    Value outputValues() {
-      return getDpsInitOperand(0)->get();
-    }
-    Value outputIndices() {
-      return getDpsInitOperand(1)->get();
-    }
     ShapedType getInputType() {
       return cast<ShapedType>(getValues().getType());
     }
@@ -720,9 +676,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
   }];
 }
 
@@ -752,18 +706,20 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     returning both the selected value and its corresponding index. The selection
     logic is defined by a user-specified comparator region.
 
-    The operation supports two modes:
+    The operation supports three index modes for flexibility in tiling:
 
-    1. Implicit-index mode (single input): Computes (value, index) pairs from scratch.
-       Indices are implicitly computed from the reduction dimension's iteration index
-       (using linalg.index on the reduction dimension). The comparator
-       region receives two candidate values and returns a single `i1` result indicating
-       whether the first argument should be preferred.
+    1. Implicit-index without index_base (single input, no index_base):
+       Indices are computed from local position (linalg.index on reduction dimension).
+       Used for untiled operations or when global offset is not needed.
 
-    2. Explicit-index mode (two inputs): Reduces existing (value, index) pairs.
-       Indices are explicitly provided as input. The comparator region receives
-       two candidate values and returns `i1` to select the preferred value.
-       This mode is used to combine results from split-reduction operations.
+    2. Implicit-index with index_base (single input, with index_base):
+       Indices are computed as: index_base + local position.
+       Used in OuterParallel tiling where each parallel chunk has a fixed offset.
+
+    3. Explicit-index (two inputs: values + indices, no index_base):
+       Indices are provided as input tensor alongside values.
+       Used in OuterReduction tiling and merge operations where indices are
+       accumulated across iterations.
 
     The comparator region defines the sorting rule, e.g., "greater than" for argmax or
     "less than" for argmin, allowing for generalization beyond simple argmax-style
@@ -822,8 +778,10 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   }];
 
   let arguments = (ins
-    Variadic<AnyShaped>:$inputs,
-    Variadic<AnyShaped>:$outputs,
+    AnyShaped:$input_value,
+    Optional<AnyShaped>:$input_index,
+    AnyShaped:$output_value,
+    AnyShaped:$output_index,
     Optional<Index>:$index_base,
     I64Attr:$dimension
   );
@@ -835,37 +793,17 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
-    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input_value (`,` $input_index^)? `:` type($input_value) (`,` type($input_index)^)? `)`
+    `outs` `(` $output_value `,` $output_index `:` type($output_value) `,` type($output_index) `)`
     (`index_base` `(` $index_base^ `:` type($index_base) `)`)?
     $region (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInputValue() {
-      return getDpsInputOperand(0)->get();
-    }
-
     // Returns true when the operation is in explicit-index mode, which occurs
     // when a second input operand provides pre-computed indices.
     bool hasExplicitIndexInput() {
-      return getInputs().size() == 2;
-    }
-
-    // Returns the index input operand, or nullptr if not in explicit-index mode.
-    Value getInputIndex() {
-      if (!hasExplicitIndexInput()){
-        return nullptr;
-      }
-      return getDpsInputOperand(1)->get();
-    }
-
-    Value outputValue() {
-      return getDpsInitOperand(0)->get();
-    }
-
-    Value outputIndex() {
-      return getDpsInitOperand(1)->get();
+      return static_cast<bool>(getInputIndex());
     }
 
     ShapedType getInputType() {
@@ -873,11 +811,11 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     }
 
     ShapedType getOutputValueType() {
-      return cast<ShapedType>(outputValue().getType());
+      return cast<ShapedType>(getOutputValue().getType());
     }
 
     ShapedType getOutputIndexType() {
-      return cast<ShapedType>(outputIndex().getType());
+      return cast<ShapedType>(getOutputIndex().getType());
     }
 
     // Returns the ShapedType of the index input, or nullptr if not in
@@ -907,9 +845,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     }
 
     // For DPS interface.
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
 
     SmallVector<AffineMap> getIndexingMapsArray();
   }];
@@ -1616,8 +1552,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-    Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+    AnyShaped:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DenseI64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
@@ -1627,13 +1563,13 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
-    $inputs
+    $input
     (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
-    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
+    `into` $output `:` `(` type($input) type($output) `)`
      (`->` type($results)^)?
   }];
 
@@ -1646,16 +1582,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-
-    // Return the output operand.
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-
-    // Return the input operand.
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
 
     // Return the output rank.
     int64_t getOutputRank() {
@@ -1718,14 +1644,11 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
   }];
 }
 
 def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
-  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -1763,8 +1686,8 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     ```
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-    Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+    AnyShaped:$output,
     DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$outer_dims_perm,
     DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
@@ -1773,12 +1696,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
-    $inputs
+    $input
     (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles)
-    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
+    `into` $output `:` `(` type($input) type($output) `)`
      (`->` type($results)^)?
   }];
 
@@ -1790,16 +1713,6 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-
-    // Return the output operand.
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-
-    // Return the input operand.
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
 
     // Return the output rank.
     int64_t getOutputRank() {
@@ -1840,9 +1753,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
   }];
 }
 
@@ -1860,8 +1771,7 @@ def OpGroupWinogradOps : OpDocGroup {
 let opDocGroup = OpGroupWinogradOps in {
 
 def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_transform",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1881,8 +1791,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     of this operator is first collapsed and then fed to a batch matmul op.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+                       AnyShaped:$output,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$image_dimensions
@@ -1895,18 +1805,12 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `image_dimensions` `(` $image_dimensions `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($result)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
     Value getOriginalOperand() {
       return getInput();
     }
@@ -1960,14 +1864,13 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOutputMutable();
     }
   }];
 }
 
 def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -1987,8 +1890,8 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     and then fed to a batch matmul op.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+                       AnyShaped:$output,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$kernel_dimensions
@@ -2001,18 +1904,12 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `kernel_dimensions` `(` $kernel_dimensions `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($result)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
     ShapedType getInputType() {
       return cast<ShapedType>(getInput().getType());
     }
@@ -2071,14 +1968,13 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOutputMutable();
     }
   }];
 }
 
 def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_transform",
-    [AttrSizedOperandSegments,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -2102,8 +1998,8 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     only the non-padded part of the output.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$input,
+                       AnyShaped:$output,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$image_dimensions
@@ -2116,18 +2012,12 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `image_dimensions` `(` $image_dimensions `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($result)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
     ShapedType getInputType() {
       return cast<ShapedType>(getInput().getType());
     }
@@ -2181,7 +2071,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOutputMutable();
     }
   }];
 }

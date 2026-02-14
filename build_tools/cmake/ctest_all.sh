@@ -160,6 +160,12 @@ excluded_tests+=(
   "iree/samples/custom_dispatch/cpu/embedded/example_transform.mlir.test"
 )
 
+if [[ -n "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE:-}" ]]; then
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && excluded_tests+=("$line")
+  done <<< "${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE}"
+fi
+
 ctest_args=(
   "--test-dir ${BUILD_DIR}"
   "--timeout 900"

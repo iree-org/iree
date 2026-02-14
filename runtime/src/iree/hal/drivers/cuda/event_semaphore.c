@@ -6,8 +6,8 @@
 
 #include "iree/hal/drivers/cuda/event_semaphore.h"
 
-#include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/drivers/cuda/timepoint_pool.h"

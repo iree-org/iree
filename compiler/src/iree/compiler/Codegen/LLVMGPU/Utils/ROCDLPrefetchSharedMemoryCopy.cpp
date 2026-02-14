@@ -18,6 +18,8 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -27,6 +29,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
 
@@ -40,6 +43,226 @@ struct StageClassification {
   SmallVector<Operation *> computeStage;
 };
 } // namespace
+
+/// Checks if a loop contains gather_to_lds operations directly in the loop
+/// body (immediate children of the for loop's body block).
+static bool hasDirectGatherToLDS(scf::ForOp forOp) {
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    if (isa<amdgpu::GatherToLDSOp>(&op)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Checks if a loop contains gather_to_lds operations nested inside regions
+/// (e.g., inside scf.if). Such conditional async copies can't be reliably
+/// pipelined.
+static bool hasNestedGatherToLDS(scf::ForOp forOp) {
+  for (Operation &op : forOp.getBody()->getOperations()) {
+    if (op.getNumRegions() > 0) {
+      bool hasNested = false;
+      op.walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
+      if (hasNested) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/// Checks if a loop contains stream copy operations (global read + shared
+/// write). This is mutually exclusive with async copy mode.
+static bool hasStreamCopyOps(scf::ForOp forOp) {
+  bool hasGlobalRead = false;
+  bool hasSharedWrite = false;
+
+  forOp->walk([&](vector::TransferReadOp readOp) {
+    auto srcType = dyn_cast<MemRefType>(readOp.getBase().getType());
+    if (hasGlobalMemoryAddressSpace(srcType)) {
+      hasGlobalRead = true;
+    }
+  });
+
+  forOp->walk([&](vector::TransferWriteOp writeOp) {
+    auto dstType = dyn_cast<MemRefType>(writeOp.getBase().getType());
+    if (hasSharedMemoryAddressSpace(dstType)) {
+      hasSharedWrite = true;
+    }
+  });
+
+  return hasGlobalRead && hasSharedWrite;
+}
+
+/// Trace through view-like ops to find the root allocation.
+static memref::AllocOp traceToAllocation(Value base) {
+  while (base) {
+    if (auto alloc = base.getDefiningOp<memref::AllocOp>()) {
+      return alloc;
+    }
+    if (auto viewOp = base.getDefiningOp<ViewLikeOpInterface>()) {
+      base = viewOp.getViewSource();
+    } else {
+      break;
+    }
+  }
+  return nullptr;
+}
+
+/// Collect all view-like ops that need to be cloned inside the loop.
+/// Returns ops in topological order (dependencies first).
+/// Returns failure if any use escapes the target loop.
+static FailureOr<SmallVector<Operation *>>
+collectViewOpsToClone(memref::AllocOp alloc, scf::ForOp forOp) {
+  SetVector<Operation *> viewOpsToClone;
+  SmallVector<Value> worklist;
+
+  worklist.push_back(alloc.getResult());
+
+  // Collect all view-like ops outside the loop reachable from the allocation.
+  while (!worklist.empty()) {
+    Value val = worklist.pop_back_val();
+    for (Operation *user : val.getUsers()) {
+      if (forOp->isAncestor(user)) {
+        continue;
+      }
+      if (auto viewOp = dyn_cast<ViewLikeOpInterface>(user)) {
+        if (viewOpsToClone.insert(user)) {
+          worklist.push_back(viewOp.getViewDest());
+        }
+      }
+    }
+  }
+
+  auto validateUses = [&](Value val) -> LogicalResult {
+    for (Operation *user : val.getUsers()) {
+      if (forOp->isAncestor(user)) {
+        continue;
+      }
+      if (viewOpsToClone.contains(user)) {
+        continue;
+      }
+      LDBG() << "Cannot clone view ops: found use outside loop: " << *user;
+      return failure();
+    }
+    return success();
+  };
+
+  if (failed(validateUses(alloc.getResult()))) {
+    return failure();
+  }
+
+  for (Operation *op : viewOpsToClone) {
+    auto viewOp = cast<ViewLikeOpInterface>(op);
+    if (failed(validateUses(viewOp.getViewDest()))) {
+      return failure();
+    }
+  }
+
+  SmallVector<Operation *> result(viewOpsToClone.begin(), viewOpsToClone.end());
+
+  // Sort in topological order - ops must come after their dependencies
+  llvm::stable_sort(
+      result, [](Operation *a, Operation *b) { return a->isBeforeInBlock(b); });
+
+  return result;
+}
+
+/// Clone view-like operations inside the loop body.
+/// This is necessary for multi-buffering to work when view ops are defined
+/// outside the target loop but used inside it.
+static LogicalResult cloneViewOpsInsideLoop(memref::AllocOp alloc,
+                                            scf::ForOp forOp) {
+  auto viewOpsOr = collectViewOpsToClone(alloc, forOp);
+  if (failed(viewOpsOr)) {
+    return failure();
+  }
+
+  SmallVector<Operation *> &viewOps = *viewOpsOr;
+  if (viewOps.empty()) {
+    return success();
+  }
+
+  LDBG() << "Cloning " << viewOps.size()
+         << " view ops inside loop for allocation: " << *alloc;
+
+  // Create clones at the beginning of the loop body
+  Block *loopBody = forOp.getBody();
+  OpBuilder builder(forOp.getContext());
+  builder.setInsertionPointToStart(loopBody);
+
+  IRMapping mapping;
+  SmallVector<Operation *> opsToErase;
+  for (Operation *op : viewOps) {
+    Operation *clone = builder.clone(*op, mapping);
+    LDBG() << "  Cloned: " << *op << " -> " << *clone;
+
+    Value origResult = op->getResult(0);
+    Value cloneResult = clone->getResult(0);
+    // Only replace uses inside this loop
+    origResult.replaceUsesWithIf(cloneResult, [&](OpOperand &use) {
+      return forOp->isAncestor(use.getOwner());
+    });
+
+    // Add to mapping so dependent ops will use the cloned version
+    mapping.map(origResult, cloneResult);
+
+    opsToErase.push_back(op);
+  }
+
+  // Erase original ops (in reverse order to handle dependencies).
+  for (Operation *op : llvm::reverse(opsToErase)) {
+    assert(op->use_empty() && "expected all uses to be replaced");
+    op->erase();
+  }
+
+  return success();
+}
+
+/// Multi-buffer LDS allocations used by gather_to_lds operations.
+/// This enables double-buffering for pipelined async copies.
+static LogicalResult multiBufferLDSAllocations(scf::ForOp forOp,
+                                               unsigned numBuffers) {
+  SetVector<memref::AllocOp> sharedAllocs;
+
+  // Find all LDS allocations used by gather_to_lds
+  forOp->walk([&](amdgpu::GatherToLDSOp gatherOp) {
+    if (auto alloc = traceToAllocation(gatherOp.getDst())) {
+      if (hasSharedMemoryAddressSpace(alloc.getType())) {
+        sharedAllocs.insert(alloc);
+      }
+    }
+  });
+
+  if (sharedAllocs.empty()) {
+    LDBG() << "No LDS allocations found for multi-buffering";
+    return failure();
+  }
+
+  LDBG() << "Multi-buffering " << sharedAllocs.size() << " LDS allocations";
+
+  // First, clone view ops inside the loop for each allocation
+  for (memref::AllocOp alloc : sharedAllocs) {
+    if (failed(cloneViewOpsInsideLoop(alloc, forOp))) {
+      LDBG() << "Failed to clone view ops for: " << *alloc;
+      return failure();
+    }
+  }
+
+  // Now apply multi-buffering
+  for (memref::AllocOp alloc : sharedAllocs) {
+    Location loc = alloc.getLoc();
+    if (failed(memref::multiBuffer(alloc, numBuffers,
+                                   /*skipOverrideAnalysis=*/true))) {
+      LDBG() << "Failed to multi-buffer LDS allocation at " << loc;
+      return failure();
+    }
+    LDBG() << "Multi-buffered LDS allocation with " << numBuffers
+           << " buffers at " << loc;
+  }
+
+  return success();
+}
 
 // Helper function to check if a transfer_read is from global memory.
 static bool isGlobalMemoryRead(vector::TransferReadOp read) {
@@ -534,8 +757,21 @@ static bool hasSharedMemory(Value val) {
 // Helper to check if operation or its nested ops have shared memory reads.
 static bool hasNestedSharedRead(Operation *op) {
   bool found = false;
-  op->walk([&](vector::TransferReadOp readOp) {
-    if (hasSharedMemory(readOp.getBase())) {
+  op->walk([&](MemoryEffectOpInterface memoryEffectOp) {
+    SmallVector<MemoryEffects::EffectInstance> effects;
+    memoryEffectOp.getEffects(effects);
+    for (MemoryEffects::EffectInstance effect : effects) {
+      // Ignore non-read effects. We are just looking for read operations.
+      if (!isa<MemoryEffects::Read>(effect.getEffect())) {
+        continue;
+      }
+      // We also only care about shared memory reads.
+      Value readBuffer = effect.getValue();
+      // effect.getValue() could return nullptr, so we also need to check that
+      // readBuffer exists.
+      if (!readBuffer || !hasSharedMemory(readBuffer)) {
+        continue;
+      }
       found = true;
       return WalkResult::interrupt();
     }
@@ -584,13 +820,13 @@ static SharedBarrierState insertBarriersInRange(RewriterBase &rewriter,
 
     if (hasSharedRead && state.needBarrierBeforeRead) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, loc);
+      gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
       state.needBarrierBeforeRead = false;
     }
 
     if (hasSharedWrite && state.needBarrierBeforeWrite) {
       rewriter.setInsertionPoint(&op);
-      gpu::BarrierOp::create(rewriter, loc);
+      gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
       amdgpu::SchedBarrierOp::create(
           rewriter, loc,
           amdgpu::sched_barrier_opt_enumAttr::get(
@@ -690,8 +926,40 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
-  // For global->shared->register data flow, we have 3 operation groups (read,
-  // write, compute), so 3 stages is the maximum meaningful pipeline depth.
+  // Check for nested gather_to_lds (e.g., inside scf.if) - this is unsupported
+  // because conditional async copies can't be reliably pipelined.
+  if (hasNestedGatherToLDS(forOp)) {
+    LDBG() << "Loop has gather_to_lds inside nested region (e.g., scf.if) - "
+           << "cannot pipeline";
+    return failure();
+  }
+
+  // Check for mixed mode: both gather_to_lds and stream copy ops.
+  // This is unsupported - bail out entirely without any pipelining.
+  bool hasAsyncCopy = hasDirectGatherToLDS(forOp);
+  bool hasStreamCopy = hasStreamCopyOps(forOp);
+  if (hasAsyncCopy && hasStreamCopy) {
+    LDBG() << "Loop has both gather_to_lds and stream copy ops - "
+           << "skipping pipelining entirely";
+    return forOp;
+  }
+
+  if (hasAsyncCopy) {
+    LDBG() << "Async copy mode detected (gather_to_lds present)";
+
+    // Multi-buffer LDS allocations for double buffering.
+    // Use numStages as the buffer count to match pipeline depth.
+    if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
+      return failure();
+    }
+
+    // TODO: Full async copy pipelining will be added in a follow-up commit.
+    // For now, just perform multi-buffering without pipelining.
+    return forOp;
+  }
+
+  // Stream copy mode: global->shared->register data flow with 3 operation
+  // groups (read, write, compute), so 3 stages is the maximum pipeline depth.
   if (numStages > 3) {
     LDBG() << "numStages=" << numStages
            << " requested but capping to 3 (maximum for read, write, compute)";

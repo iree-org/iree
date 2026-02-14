@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -67,11 +68,6 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     llvm::cl::desc("number of threads that are used at runtime if codegen "
                    "thread distribution is enabled"),
     llvm::cl::init(8));
-
-static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-llvmcpu-disable-distribution",
-    llvm::cl::desc("disable thread distribution in codegen"),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<int>
     clDefaultDistTileSize("iree-llvmcpu-distribution-size",
@@ -541,12 +537,6 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
          "expected all vectors to be of equal size");
 
   size_t numDims = lbs.size();
-  // Set all the distribution tile sizes to zero if thread distribution is
-  // disabled.
-  if (clDisableDistribution) {
-    return SmallVector<int64_t>(numDims, 0);
-  }
-
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
   for (auto i : llvm::seq<size_t>(0, numDims)) {
@@ -1166,7 +1156,7 @@ private:
       // - For all other (unknown) operations, assume an identity mapping for
       // any value whose rank matches the operation’s loop count.
       TypeSwitch<Operation *>(op)
-          .Case<IndexingMapOpInterface>([&](auto op) {
+          .Case([&](IndexingMapOpInterface op) {
             propagateOnIndexingMapOp(op, indicesEquivalence,
                                      valueToGlobalDimMaps);
           })
@@ -1527,54 +1517,66 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   return inputAndOutputElementTypes[0];
 }
 
-/// Compute or adjust existing vector sizes using a generic heuristic that will
-/// aim to fill at least one full vector register for all the element types of
-/// the matmul. For now, the current heuristics only look at the N dimension but
-/// we would introduce logic to also consider unrolling trade-offs between the
-/// M, N and K.
-///
-/// Example: for an (i32 <- i8, i8) matmul and a 128-bit vector register, vector
-/// size N would be at least 128/8=16.
-///
-/// NOTE: This function should not contain target-specific conditional code.
-/// TODO: Currently it's only use on Aarch64. We should generalize it to other
-/// targets.
-static void getMatmulVectorSizesUsingFullVectorHeuristics(
+/// Compute vector tile sizes using a heuristic that aims to keep the entire
+/// ACC/OUT tile in registers, leave a few registers for LHS/RHS columns
+/// or rows, and all that while not exceeding the number of available registers.
+/// The rationale is that a matrix multiplication typically lowers to a loop
+/// nest in which the ACC/OUT tile remains live across all iterations of the
+/// innermost loop, whereas the LHS and RHS operands live for a single iteration
+/// and do not require the entire tiles to be simultaneously resident in
+/// registers.
+/// The base element type used is the element type of the output
+/// vector under the assumption the operand types with smaller bitwidths
+/// will be promoted to the output type and thus require more registers for the
+/// same number of elements.
+/// TODO: It might be worth extending the heuristic to consider target
+/// architecture features and operand types as well, e.g. for AArch64 FEAT_I8MM
+/// we might want to consider tile sizes that are multiples of 2x8.
+static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
     mlir::FunctionOpInterface entryPointFn, linalg::LinalgOp op,
     int64_t vectorSize, SmallVectorImpl<int64_t> &sizes,
     SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (sizes.empty()) {
-    getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+  assert(sizes.empty() && "Pre-condition enforced by caller");
+
+  // Check we have a (batch) matrix multiplication.
+  FailureOr<linalg::ContractionDimensions> cDims =
+      linalg::inferContractionDims(op);
+  if (failed(cDims) || cDims->m.size() != 1 || cDims->n.size() != 1 ||
+      cDims->k.size() != 1) {
+    return;
+  }
+  if ((cDims->batch.size() == 0 &&
+       (cDims->m[0] != 0 || cDims->n[0] != 1 || cDims->k[0] != 2)) ||
+      (cDims->batch.size() == 1 &&
+       (cDims->m[0] != 1 || cDims->n[0] != 2 || cDims->k[0] != 3))) {
+    return;
   }
 
-  // Find the smallest type size in the matmul.
-  SmallVector<Type> matmulTypes;
-  auto operandTypes = op->getOperandTypes();
-  matmulTypes.append(operandTypes.begin(), operandTypes.end());
-  auto resultTypes = op->getResultTypes();
-  matmulTypes.append(resultTypes.begin(), resultTypes.end());
-
-  int64_t minSize = std::numeric_limits<int64_t>::max();
-  for (Type mmType : matmulTypes) {
-    if (auto shType = dyn_cast<ShapedType>(mmType)) {
-      mmType = shType.getElementType();
-    }
-
-    if (mmType.isSignlessIntOrFloat()) {
-      minSize = std::min(minSize, int64_t{mmType.getIntOrFloatBitWidth()});
-    }
+  // Find the output element type of the matmul.
+  Type outputEltType = getElementTypeOrSelf(op->getResultTypes()[0]);
+  if (!outputEltType.isSignlessIntOrFloat()) {
+    return;
   }
 
-  LDBG() << "Smallest type found: " << minSize << " bits";
-  assert(minSize > 0 && minSize < std::numeric_limits<int64_t>::max() &&
-         "Min size couldn't be computed");
-
-  // Make sure that the smallest type can at least fill a full vector register
-  // given the tile size of the main vector dimension (N).
   constexpr int64_t byteSizeInBits = 8;
-  int64_t minNumElements =
-      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / minSize;
-  sizes[1] = std::max(sizes[1], minNumElements);
+  int64_t outBitWidth = outputEltType.getIntOrFloatBitWidth();
+  int64_t outNumElements =
+      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / outBitWidth;
+
+  // Numbers picked experimentally for a range of element types.
+  constexpr int64_t m = 8, n = 2, k = 1;
+
+  // Multiply "horizontal" extents by the number of elements that fit in a
+  // vector register.
+  sizes.append({m, n * outNumElements, k * outNumElements});
+
+  // Mark N dimension as scalable, if doing scalable vectorization.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  scalableSizeFlags.resize(3, false);
+  if (isScalableVectorizationEnabled() &&
+      hasAnySVEFeature(targetAttr.getConfiguration())) {
+    scalableSizeFlags[1] = true;
+  }
 }
 
 /// Utility to compute the tile sizes for RISC-V Vector.
@@ -1700,7 +1702,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     // Try to maximize the vector register utilization for all the matmul
     // element types.
     if (matmulTileSizes.empty()) {
-      getMatmulVectorSizesUsingFullVectorHeuristics(
+      getMatmulVectorSizesUsingFillRegisterFileHeuristic(
           entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
     }
   }
@@ -2510,6 +2512,31 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::GatherOp gatherOp) {
+  assert(!getLoweringConfig(gatherOp) && "expected lowering_config is not set");
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      gatherOp, DistributionHeuristicConfig{});
+  int64_t batchRank = gatherOp.getBatchRank();
+  int64_t sliceRank = gatherOp.getOutputSliceRank();
+  int64_t iterationRank = batchRank + sliceRank;
+
+  // Vectorize innermost slice dim.
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
+  if (sliceRank > 0) {
+    vecTileSizes.back() = getVectorSize(entryPointFn, gatherOp.getOutputType());
+  }
+
+  LoweringConfigGenerator generator(gatherOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, gatherOp, loweringConfig,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
 /// Sets the lowering configuration for dispatch region for winograd ops:
 ///   linalg_ext.winograd.filter_transform
 ///   linalg_ext.winograd.input_transform
@@ -2903,19 +2930,23 @@ setGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
   return failure();
 }
 
-static bool is2DConvOp(Operation *op) {
-  return isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(op);
+static bool is2DConvOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::Conv2DNhwcHwcfOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::Conv2DNchwFchwOp>(op);
 }
 
-static bool is2DDepthConvOp(Operation *op) {
-  return isa<linalg::DepthwiseConv2DNhwcHwcOp>(op);
+static bool is2DDepthConvOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::DepthwiseConv2DNhwcHwcOp>(op);
 }
 
-static bool is2DPoolingOp(Operation *op) {
-  return isa<linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-             linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-             linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-             linalg::PoolingNchwMaxOp>(op);
+static bool is2DPoolingOp(linalg::LinalgOp op) {
+  return linalg::isaConvolutionOpOfType<linalg::PoolingNhwcSumOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxUnsignedOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinUnsignedOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNchwSumOp>(op) ||
+         linalg::isaConvolutionOpOfType<linalg::PoolingNchwMaxOp>(op);
 }
 
 /// Helper enum to represent conv2d input traversal order.
@@ -2926,15 +2957,19 @@ enum class Conv2DDimOrder {
   Nhwc
 };
 
-static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
-  if (isa<linalg::Conv2DNchwFchwOp, linalg::PoolingNchwSumOp,
-          linalg::PoolingNchwMaxOp>(op)) {
+static Conv2DDimOrder getConv2DDimOrder(linalg::LinalgOp op) {
+  if (linalg::isaConvolutionOpOfType<linalg::Conv2DNchwFchwOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNchwSumOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNchwMaxOp>(op)) {
     return Conv2DDimOrder::Nchw;
   }
-  if (isa<linalg::Conv2DNhwcHwcfOp, linalg::PoolingNhwcSumOp,
-          linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMaxUnsignedOp,
-          linalg::PoolingNhwcMinOp, linalg::PoolingNhwcMinUnsignedOp,
-          linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
+  if (linalg::isaConvolutionOpOfType<linalg::Conv2DNhwcHwcfOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcSumOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMaxUnsignedOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::PoolingNhwcMinUnsignedOp>(op) ||
+      linalg::isaConvolutionOpOfType<linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
     return Conv2DDimOrder::Nhwc;
   }
   llvm::llvm_unreachable_internal("unsupported conv op");
@@ -3012,7 +3047,7 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
 /// convolutions, where the shape is [N, OH, OW, OC, KH, KW, (IC)].
 static SmallVector<int64_t>
 getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
-                       linalg::ConvolutionOpInterface op, int64_t vectorSize) {
+                       linalg::LinalgOp op, int64_t vectorSize) {
   bool isSupported = is2DConvOp(op) || is2DDepthConvOp(op) || is2DPoolingOp(op);
   (void)isSupported;
   assert(isSupported && "conv op is not supported");
@@ -3076,7 +3111,7 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult
 setConvInterfaceRootConfig(mlir::FunctionOpInterface entryPointFn,
-                           linalg::ConvolutionOpInterface convOp) {
+                           linalg::LinalgOp convOp) {
   int64_t vectorSize = getVectorSize(
       entryPointFn, cast<ShapedType>(convOp->getResultTypes()[0]));
   SmallVector<int64_t> targetTileSizes =
@@ -3174,32 +3209,31 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
   // These operations have their own logic of lowering config.
   auto result =
       TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+          .Case([&](IREE::LinalgExt::CustomOp op) {
             return setDefaultCustomOpLoweringConfig(entryPointFn, op,
                                                     initCPULaunchConfig);
           })
           .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-                linalg::PackOp, tensor::PadOp, linalg::UnPackOp,
-                linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+                IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
+                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,
                 IREE::LinalgExt::WinogradInputTransformOp,
                 IREE::LinalgExt::WinogradOutputTransformOp>(
               [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-                linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-              [&](auto op) {
-                return setConvInterfaceRootConfig(entryPointFn, op);
-              })
-          .Default([&](Operation *op) { return failure(); });
+          .Default(failure());
   if (succeeded(result)) {
     return result;
   }
 
+  // Check for linalg.generic ops that match convolution patterns using
+  // isaConvolutionOpOfType. This allows generalized conv ops to use the
+  // specialized CPUConvTileAndDecomposeExpert pipeline.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    if (is2DConvOp(linalgOp) || is2DDepthConvOp(linalgOp) ||
+        is2DPoolingOp(linalgOp)) {
+      return setConvInterfaceRootConfig(entryPointFn, linalgOp);
+    }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {
       return setContractionRootConfig(entryPointFn, linalgOp);
@@ -4122,8 +4156,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    auto prunedComputeOps = llvm::to_vector(
-        llvm::make_filter_range(computeOps, shouldSetLoweringConfig));
+    auto prunedComputeOps =
+        llvm::filter_to_vector(computeOps, shouldSetLoweringConfig);
     if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();

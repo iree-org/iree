@@ -15,6 +15,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -563,18 +564,18 @@ static void expandSwitchOp(mlir::cf::SwitchOp op,
     return;
   }
   OpBuilder builder(op);
-  auto caseOperands = llvm::to_vector(
-      llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
+  auto caseOperands =
+      llvm::map_to_vector(op.getCaseOperands(), [&](ValueRange operands) {
         return expandOperands(op.getLoc(), operands, resourceTimepointMap,
                               builder);
-      }));
+      });
   auto asValueRange = [](ArrayRef<Value> ref) -> ValueRange { return ref; };
   mlir::cf::SwitchOp::create(
       builder, op.getLoc(), op.getFlag(), op.getDefaultDestination(),
       expandOperands(op.getLoc(), op.getDefaultOperands(), resourceTimepointMap,
                      builder),
       op.getCaseValuesAttr(), op.getCaseDestinations(),
-      llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+      llvm::map_to_vector(caseOperands, asValueRange));
   op.erase();
 }
 
@@ -642,6 +643,52 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   op.getResourceOperandSizesMutable().assign(newOperandSizes);
   for (auto result : op.getResults()) {
     resourceTimepointMap.map(result, op.getResultTimepoint());
+  }
+}
+
+// Consumes timepoints from resource operands of a generic timeline op and folds
+// them into the op's await_timepoint. This handles timeline ops like
+// stream.async.parameter.write that take resource operands preceded by
+// stream.timepoint.await ops: the await's timepoint is extracted and set on
+// the timeline op, and the unawaited resource replaces the awaited one as the
+// operand.
+static void expandTimelineOp(IREE::Stream::TimelineOpInterface timelineOp,
+                             IRMapping &resourceTimepointMap) {
+  Operation *op = timelineOp.getOperation();
+  OpBuilder builder(op);
+  SetVector<Value> newTimepoints;
+
+  // Preserve existing await timepoints.
+  for (Value awaitTimepoint : timelineOp.getAwaitTimepoints()) {
+    newTimepoints.insert(awaitTimepoint);
+  }
+
+  // Consume timepoints from resource operands.
+  for (auto &operand : op->getOpOperands()) {
+    if (!isResourceType(operand.get().getType())) {
+      continue;
+    }
+    auto [timepoint, resource] = consumeTimepoint(
+        op->getLoc(), operand.get(), resourceTimepointMap, builder);
+    newTimepoints.insert(timepoint);
+    if (resource != operand.get()) {
+      operand.set(resource);
+    }
+  }
+
+  // Set the combined await timepoints.
+  if (newTimepoints.empty()) {
+    timelineOp.setAwaitTimepoint(nullptr);
+  } else {
+    timelineOp.setAwaitTimepoints(newTimepoints.takeVector(), builder);
+  }
+
+  // Map result resources to this op's result timepoint so downstream consumers
+  // can chain without host synchronization.
+  for (auto result : op->getResults()) {
+    if (isResourceType(result.getType())) {
+      resourceTimepointMap.map(result, timelineOp.getResultTimepoint());
+    }
   }
 }
 
@@ -754,6 +801,9 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
     expandAwaitOp(awaitOp, resourceTimepointMap);
   } else if (auto executeOp = dyn_cast<IREE::Stream::AsyncExecuteOp>(op)) {
     expandAsyncExecuteOp(executeOp, resourceTimepointMap);
+  } else if (auto timelineOp =
+                 dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
+    expandTimelineOp(timelineOp, resourceTimepointMap);
   } else if (auto regionBranchOp =
                  dyn_cast<IREE::Util::MutableRegionBranchOpInterface>(op)) {
     expandRegionBranchOp(regionBranchOp, symbolTable, globalMap,
