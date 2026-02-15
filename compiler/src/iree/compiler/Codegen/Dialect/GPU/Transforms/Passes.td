@@ -88,4 +88,4 @@ def ConvertForallToGenericNestGPUPass :
   ];
 }
 
-#endif // IREE_CODEGEN_DIALECt_GPU_TRANSFORMS_PASSES
+#endif // IREE_CODEGEN_DIALECT_GPU_TRANSFORMS_PASSES
