@@ -23,6 +23,8 @@ iree_lit_test_suite(
     "gpu_apply_padding_partial_reduction.mlir"
     "gpu_apply_tiling_level.mlir"
     "gpu_bubble_resource_casts.mlir"
+    "gpu_canonicalize_ids.mlir"
+    "gpu_canonicalize_ids_export.mlir"
     "gpu_check_resource_usage.mlir"
     "gpu_combine_layout_transformation.mlir"
     "gpu_combine_value_barriers.mlir"

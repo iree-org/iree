@@ -141,6 +141,22 @@ def GPUBubbleResourceCastsPass :
   ];
 }
 
+def GPUCanonicalizeIDsPass : InterfacePass<"iree-codegen-gpu-canonicalize-ids",
+                                           "mlir::FunctionOpInterface"> {
+  let summary =
+      "Canonicalize GPU ID ops using workgroup and subgroup size info.";
+  let description = [{
+    Rewrites gpu.subgroup_id, gpu.lane_id, gpu.subgroup_size, gpu.block_dim,
+    gpu.num_subgroups, and gpu.thread_id using known workgroup and subgroup
+    sizes from translation info. Subgroup ID and lane ID are rewritten using
+    thread ID linearization. Thread IDs for dimensions of size 1 are folded
+    to zero.
+  }];
+  let dependentDialects = ["::mlir::arith::ArithDialect",
+                           "::mlir::gpu::GPUDialect",
+  ];
+}
+
 def GPUFuseAndHoistParallelLoopsPass :
     InterfacePass<"iree-codegen-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
   let summary = "Greedily fuses and hoists parallel loops.";
