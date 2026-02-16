@@ -107,12 +107,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.mulf
 // S = Q @ K
-// CHECK: linalg.generic
-// CHECK:   arith.extf
-// CHECK:   arith.extf
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK:   linalg.yield
+// CHECK: linalg.batch_matmul
 // max = rowMax(S)
 // CHECK: linalg.generic
 // CHECK-NOT: arith.extf
@@ -139,13 +134,8 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK-NOT: arith.extf
 // CHECK:   arith.truncf
 // CHECK:   linalg.yield
-// newAcc = P @ V
-// CHECK: linalg.generic
-// CHECK:   arith.extf
-// CHECK:   arith.extf
-// CHECK:   arith.mulf
-// CHECK:   arith.addf
-// CHECK:   linalg.yield
+// result = P @ V
+// CHECK: linalg.batch_matmul
 
 // -----
 
