@@ -141,18 +141,21 @@ def GPUBubbleResourceCastsPass :
   ];
 }
 
-def GPUCanonicalizeIDsPass : InterfacePass<"iree-codegen-gpu-canonicalize-ids",
-                                           "mlir::FunctionOpInterface"> {
+def GPUConvertAllIDsToThreadIDsPass
+    : InterfacePass<"iree-codegen-gpu-convert-all-ids-to-thread-ids",
+                    "mlir::FunctionOpInterface"> {
   let summary =
-      "Canonicalize GPU ID ops using workgroup and subgroup size info.";
+      "Rewrite gpu.subgroup_id and gpu.lane_id to thread ID linearization.";
   let description = [{
-    Rewrites gpu.subgroup_id, gpu.lane_id, gpu.subgroup_size, gpu.block_dim,
-    gpu.num_subgroups, and gpu.thread_id using known workgroup and subgroup
-    sizes from translation info. Subgroup ID and lane ID are rewritten using
-    thread ID linearization. Thread IDs for dimensions of size 1 are folded
-    to zero.
+    Rewrites gpu.subgroup_id and gpu.lane_id to explicit thread ID
+    linearization using affine.linearize_index. Subgroup ID becomes
+    `linearize_index(thread_ids) / gpu.subgroup_size` and lane ID becomes
+    `linearize_index(thread_ids) % gpu.subgroup_size`. The generated
+    gpu.block_dim and gpu.subgroup_size ops are folded to constants by
+    PropagateDispatchSizeBounds later in the pipeline.
   }];
-  let dependentDialects = ["::mlir::arith::ArithDialect",
+  let dependentDialects = ["::mlir::affine::AffineDialect",
+                           "::mlir::arith::ArithDialect",
                            "::mlir::gpu::GPUDialect",
   ];
 }
