@@ -398,7 +398,7 @@ func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : 
 
 // -----
 
-func.func @block_dims_with_map_scatter(%size: index) -> tensor<?xf32> {
+func.func @block_dims_with_map_store(%size: index) -> tensor<?xf32> {
   %0 = util.assume.int %size<umin = 16, umax = 4080, udiv = 16> : index
   %cst = arith.constant 0.0 : f32
   %1 = tensor.empty(%0) : tensor<?xf32>
@@ -408,20 +408,20 @@ func.func @block_dims_with_map_scatter(%size: index) -> tensor<?xf32> {
   ^bb0(%out: f32):
     linalg.yield %cst : f32
   } -> tensor<?xf32>
-  %3 = iree_linalg_ext.map_scatter %2 into %1 {
+  %3 = iree_linalg_ext.map_store %2 into %1 {
   ^bb0(%arg0: index):
     %true = arith.constant true
     iree_linalg_ext.yield %arg0, %true : index, i1
   } : tensor<?xf32> into tensor<?xf32> -> tensor<?xf32>
   return %3 : tensor<?xf32>
 }
-// Check that the reshapes are able to be folded into the map_scatter op
+// Check that the reshapes are able to be folded into the map_store op
 //
-// CHECK-LABEL: func @block_dims_with_map_scatter(
+// CHECK-LABEL: func @block_dims_with_map_store(
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x16xf32>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x16xf32>)
-//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //       CHECK:   return %[[MAP_SCATTER]]
 
 // -----

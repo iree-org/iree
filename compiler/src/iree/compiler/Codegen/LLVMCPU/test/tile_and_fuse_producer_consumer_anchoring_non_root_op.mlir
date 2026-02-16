@@ -336,7 +336,7 @@ func.func @ukernel_generic_with_broadcast(%arg0: tensor<1x192x1x16xf32>, %arg1: 
 #config2 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, 16]>
 #config3 = #iree_cpu.lowering_config<distribution = [16, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 16, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 #map = affine_map<(d0, d1, d2) -> (d0 + d1 + d2)>
-func.func @unpack_pack_fill_mmt4d_map_scatter(%arg0: tensor<1x128x16x1xf32>, %arg1: tensor<1x128x16x1xf32>) -> tensor<16x128xf32> {
+func.func @unpack_pack_fill_mmt4d_map_store(%arg0: tensor<1x128x16x1xf32>, %arg1: tensor<1x128x16x1xf32>) -> tensor<16x128xf32> {
   %c128 = arith.constant 128 : index
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
@@ -352,7 +352,7 @@ func.func @unpack_pack_fill_mmt4d_map_scatter(%arg0: tensor<1x128x16x1xf32>, %ar
     %extracted_slice = tensor.extract_slice %pack[%arg2, 0, 0, 0] [1, 128, 1, 1] [1, 1, 1, 1] : tensor<16x128x1x1xf32> to tensor<1x128x1x1xf32>
     %7 = linalg.mmt4d {lowering_config = #config3} ins(%extracted_slice, %arg1 : tensor<1x128x1x1xf32>, tensor<1x128x16x1xf32>) outs(%6 : tensor<1x1x1x16xf32>) -> tensor<1x1x1x16xf32>
     %extracted_slice_0 = tensor.extract_slice %arg3[0, 0] [16, 128] [1, 1] : tensor<16x128xf32> to tensor<16x128xf32>
-    %8 = iree_linalg_ext.map_scatter {lowering_config = #config} %7 into %extracted_slice_0 {
+    %8 = iree_linalg_ext.map_store {lowering_config = #config} %7 into %extracted_slice_0 {
     ^bb0(%arg4: index, %arg5: index, %arg6: index, %arg7: index):
       %9 = affine.apply #map(%c0, %arg4, %arg2)
       %10 = arith.cmpi ult, %9, %c16 : index
@@ -366,7 +366,7 @@ func.func @unpack_pack_fill_mmt4d_map_scatter(%arg0: tensor<1x128x16x1xf32>, %ar
   }
   return %4 : tensor<16x128xf32>
 }
-// INNER-PARALLEL-LABEL: func.func @unpack_pack_fill_mmt4d_map_scatter
+// INNER-PARALLEL-LABEL: func.func @unpack_pack_fill_mmt4d_map_store
 // INNER-PARALLEL:         scf.forall
 // INNER-PARALLEL:           linalg.unpack
 // INNER-PARALLEL:           linalg.pack
@@ -374,4 +374,4 @@ func.func @unpack_pack_fill_mmt4d_map_scatter(%arg0: tensor<1x128x16x1xf32>, %ar
 // INNER-PARALLEL:         scf.forall
 // INNER-PARALLEL:           linalg.fill
 // INNER-PARALLEL:           linalg.mmt4d
-// INNER-PARALLEL:           iree_linalg_ext.map_scatter
+// INNER-PARALLEL:           iree_linalg_ext.map_store

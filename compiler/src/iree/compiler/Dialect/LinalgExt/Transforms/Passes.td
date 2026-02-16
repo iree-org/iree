@@ -72,10 +72,10 @@ def DecomposeIm2colPass :
   ];
 }
 
-def DecomposeMapScatterPass :
-    InterfacePass<"iree-linalg-ext-decompose-map-scatter", "mlir::FunctionOpInterface"> {
+def DecomposeMapStorePass :
+    InterfacePass<"iree-linalg-ext-decompose-map-store", "mlir::FunctionOpInterface"> {
   let summary =
-      "Decomposes vectorized map_scatter ops into vector ops";
+      "Decomposes vectorized map_store ops into vector ops";
   let dependentDialects = [
     "::mlir::scf::SCFDialect",
     "::mlir::tensor::TensorDialect",
@@ -85,7 +85,7 @@ def DecomposeMapScatterPass :
   let options = [
     Option<"testPreprocessingPatterns", "test-preprocessing-patterns", "bool",
            /*default=*/"false",
-           "Test only map_scatter decomposition preprocessing patterns.">,
+           "Test only map_store decomposition preprocessing patterns.">,
   ];
 }
 

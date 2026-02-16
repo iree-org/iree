@@ -4093,7 +4093,7 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 ///   - Ops inside a `CustomOp` that already have a lowering config.
 ///   - Ops with no loops (e.g., a `linalg.generic` with a scalar element type.
 ///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
-///     as they will be lowered together into a `map_scatter` later in the
+///     as they will be lowered together into a `map_store` later in the
 ///     pipeline.
 ///   - `linalg.pack` ops whose producer is a `linalg.unpack`. It is hard to
 ///     propagate lowering configs because the tile size is scaled with

@@ -742,33 +742,32 @@ struct DistributeTransferGather final
   int64_t subgroupSize;
 };
 
-/// Pattern to distribute `iree_linalg_ext.map_scatter` ops with nested layouts.
+/// Pattern to distribute `iree_linalg_ext.map_store` ops with nested layouts.
 /// Only the input is distributed, since the output is never a vector. The
 /// distribution of the input is similar to that of a vector.transfer_write.
-struct DistributeMapScatter final
-    : OpDistributionPattern<IREE::LinalgExt::MapScatterOp> {
+struct DistributeMapStore final
+    : OpDistributionPattern<IREE::LinalgExt::MapStoreOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeMapScatter(MLIRContext *context, Value threadId,
-                       int64_t subgroupSize)
+  DistributeMapStore(MLIRContext *context, Value threadId, int64_t subgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    auto input = dyn_cast<VectorValue>(mapScatterOp.getInput());
+    auto input = dyn_cast<VectorValue>(mapStoreOp.getInput());
     if (!input) {
-      return rewriter.notifyMatchFailure(mapScatterOp, "input is not a vector");
+      return rewriter.notifyMatchFailure(mapStoreOp, "input is not a vector");
     }
     NestedLayoutAttr vectorLayout =
         dyn_cast<NestedLayoutAttr>(signature[input]);
     if (!vectorLayout) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
-                                         "non-nested map_scatter layout");
+      return rewriter.notifyMatchFailure(mapStoreOp,
+                                         "non-nested map_store layout");
     }
-    if (!isa<MemRefType>(mapScatterOp.getOutput().getType())) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
+    if (!isa<MemRefType>(mapStoreOp.getOutput().getType())) {
+      return rewriter.notifyMatchFailure(mapStoreOp,
                                          "distribution expects memrefs");
     }
     SmallVector<Value> warpIndices, threadIndices;
@@ -776,12 +775,12 @@ struct DistributeMapScatter final
                                             vectorLayout, warpIndices,
                                             threadIndices))) {
       return rewriter.notifyMatchFailure(
-          mapScatterOp, "warp or thread tiles have overlapping strides");
+          mapStoreOp, "warp or thread tiles have overlapping strides");
     }
 
     Value distributedVector = getDistributed(rewriter, input, vectorLayout);
 
-    Location loc = mapScatterOp.getLoc();
+    Location loc = mapStoreOp.getLoc();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
@@ -795,7 +794,7 @@ struct DistributeMapScatter final
           rewriter, loc, distributedVector,
           offsetArray.take_front(vectorLayout.getRank() * 2));
 
-      // Clone the map_scatter op with the "element vector" as the input, and
+      // Clone the map_store op with the "element vector" as the input, and
       // adjust the transformation region to account for the distributed
       // offsets.
       AffineMap permutationMap =
@@ -805,17 +804,17 @@ struct DistributeMapScatter final
           getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
                                              vectorLayout, permutationMap,
                                              warpIndices, threadIndices);
-      IREE::LinalgExt::MapScatterOp distributedMapScatter =
-          clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
-                {distributedInput, mapScatterOp.getOutput()});
+      IREE::LinalgExt::MapStoreOp distributedMapStore =
+          clone(rewriter, mapStoreOp, mapStoreOp.getResultTypes(),
+                {distributedInput, mapStoreOp.getOutput()});
       int64_t sliceRank = distributedInput.getType().getRank();
       int64_t rankDiff = input.getType().getRank() - sliceRank;
-      // Add the distributed offsets in the map_scatter transformation body.
+      // Add the distributed offsets in the map_store transformation body.
       auto transformationBuilder = [&](ArrayRef<BlockArgument> newIndices) {
         SmallVector<Value> replacementIndices(distributedOffsets);
         for (auto [i, replacementIdx] : llvm::enumerate(replacementIndices)) {
           // Rank-reduced dimensions can be directly replaced by the distributed
-          // index, since their size is 1 in the new map_scatter input.
+          // index, since their size is 1 in the new map_store input.
           if (i < rankDiff) {
             continue;
           }
@@ -828,11 +827,11 @@ struct DistributeMapScatter final
         }
         return replacementIndices;
       };
-      distributedMapScatter.insertTransformationAtStart(
+      distributedMapStore.insertTransformationAtStart(
           rewriter, transformationBuilder, sliceRank);
     }
 
-    rewriter.eraseOp(mapScatterOp);
+    rewriter.eraseOp(mapStoreOp);
     return success();
   }
 
@@ -2226,8 +2225,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferGather,
-               DistributeMapScatter>(patterns.getContext(), threadId,
-                                     subgroupSize);
+               DistributeMapStore>(patterns.getContext(), threadId,
+                                   subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(

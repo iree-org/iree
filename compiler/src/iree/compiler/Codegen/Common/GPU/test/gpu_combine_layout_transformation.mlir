@@ -18,7 +18,7 @@ func.func @fold_pad_op(%source : tensor<250xf32>, %result : memref<256xf32>) {
 //   CHECK-DAG:   %[[TRUE:.+]] = arith.constant true
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<256xf32>
-//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  CHECK-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  CHECK-NEXT:   ^bb0(%[[IDX0:.+]]: index):
 //       CHECK:     iree_linalg_ext.yield %[[IDX0]], %[[TRUE]]
@@ -60,7 +60,7 @@ func.func @no_fold_simple_relayout_op_chain(%source : tensor<256x128xf32>, %resu
 }
 
 // CHECK-LABEL: @no_fold_simple_relayout_op_chain
-//   CHECK-NOT:   iree_linalg_ext.map_scatter
+//   CHECK-NOT:   iree_linalg_ext.map_store
 //       CHECK:   linalg.copy
 //       CHECK:   linalg.transpose
 //       CHECK:   tensor.extract_slice
@@ -79,7 +79,7 @@ func.func @fold_pack_op(%source : tensor<256x128xf32>, %result : memref<2x2x128x
 
 // CHECK-LABEL: @fold_pack_op
 //   CHECK-NOT:   linalg.pack
-//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:   iree_linalg_ext.map_store
 
 // -----
 
@@ -94,7 +94,7 @@ func.func @fold_unpack_op(%source : tensor<2x2x128x64xf32>, %result : memref<256
 
 // CHECK-LABEL: @fold_unpack_op
 //   CHECK-NOT:   linalg.unpack
-//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:   iree_linalg_ext.map_store
 
 // -----
 
@@ -106,7 +106,7 @@ func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4
 
 // CHECK-LABEL: @fold_expand_shape_op
 //   CHECK-NOT:   tensor.expand_shape
-//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:   iree_linalg_ext.map_store
 
 // -----
 
@@ -118,4 +118,4 @@ func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref
 
 // CHECK-LABEL: @fold_collapse_shape_op
 //   CHECK-NOT:   tensor.collapse_shape
-//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:   iree_linalg_ext.map_store
