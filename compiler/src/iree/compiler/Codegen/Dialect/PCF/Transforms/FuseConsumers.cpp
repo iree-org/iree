@@ -627,7 +627,8 @@ static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
                           newResultDests);
     }
   } else {
-    fuseIntoWriteSlices(rewriter, target, params.operands, params.slices,
+    SmallVector<PCF::WriteSliceOp> slices(params.slices);
+    fuseIntoWriteSlices(rewriter, target, params.operands, slices,
                         newResultDests);
   }
 
