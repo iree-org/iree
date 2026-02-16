@@ -45,9 +45,9 @@ namespace {
 
 // Lower iree_gpu.global_subgroup_barrier to just the hardware barrier
 // instruction, with NO memory fences. Fences are handled separately.
-struct LowerGlobalSubgroupBarrier
-    : public OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct LowerGlobalSubgroupBarrier final
+    : OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::GPU::GlobalSubgroupBarrierOp op,
                                 PatternRewriter &rewriter) const override {

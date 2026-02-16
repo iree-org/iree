@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-gpu-test-target=gfx1200 --iree-convert-to-rocdl %s | FileCheck %s
+// RUN: iree-opt --iree-gpu-test-target=gfx1201 --iree-convert-to-rocdl %s | FileCheck %s
 
 module {
   func.func @global_subgroup_barrier() {
