@@ -35,6 +35,7 @@
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/IO/Parameters/IR/IOParametersDialect.h"
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
+#include "iree/compiler/ThirdParty/buddy_gemmini/Gemmini/GemminiDialect.h"
 
 namespace mlir::iree_compiler {
 
@@ -69,6 +70,9 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // Register transform dialect extensions.
   registerTransformDialectPreprocessingExtension(registry);
   IREE::Util::registerTransformDialectExtension(registry);
+  
+  // Register Gemmini dialect.
+  registry.insert<::buddy::gemmini::GemminiDialect>();
 }
 
 } // namespace mlir::iree_compiler

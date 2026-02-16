@@ -68,6 +68,8 @@ iree_cc_library(
     iree::compiler::Pipelines
     iree::compiler::Preprocessing::Passes
     iree::compiler::Preprocessing::TransformExtensions::PreprocessingExtensions
+    BuddyGemmini
+    BuddyGemminiRegistration
   PUBLIC
 )
 
