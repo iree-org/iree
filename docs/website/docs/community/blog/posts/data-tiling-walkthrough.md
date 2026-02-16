@@ -1561,9 +1561,9 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
 #### Challenge: Code Generation for Index Remapping
 
 Index remapping is hard, because some ops do not implement `TilingInterface`.
-IREE develops [LinalgExt::MapScatterOp](https://github.com/iree-org/iree/blob/e6fb1e180438c4f78a1ea2bafd9a653fbe7a064b/compiler/src/iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.td#L334-L349)
+IREE develops [LinalgExt::MapStoreOp](https://github.com/iree-org/iree/blob/e6fb1e180438c4f78a1ea2bafd9a653fbe7a064b/compiler/src/iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.td#L334-L349)
 to represent the index remapping. Since unpack ops have slicing semantics, the
-`LinalgExt::MapScatterOp` yields an additional i1 value that represents the
+`LinalgExt::MapStoreOp` yields an additional i1 value that represents the
 `mask`.
 
 Furthermore, `linalg.pack` ops have padding semantics; it is really hard to
@@ -1730,7 +1730,7 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
 
 Starting from `iree_codegen.store_to_buffer` ops, iteratively combine producer
 layout/indexing transformation ops (`linalg.transpose`, `tensor.collapse_shape`,
-etc.) into a single `iree_linalg_ext.map_scatter` operation. For `tensor.pad`
+etc.) into a single `iree_linalg_ext.map_store` operation. For `tensor.pad`
 ops, the writing of pad values is distributed to workgroups and threads, and
 then the padding values are written directly to the output buffer of the
 `iree_codegen.store_to_buffer` op.
@@ -1813,7 +1813,7 @@ func.func @matmul_f32f32f32_dispatch_0_matmul_DxDxD_f32() {
   %dim_6 = tensor.dim %51, %c1 : tensor<?x?x4x8x2x4x16x4xf32>
   %53 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%dim_6]
   %54 = tensor.empty(%36, %39) : tensor<?x?xf32>
-  %55 = iree_linalg_ext.map_scatter %51 into %54 {
+  %55 = iree_linalg_ext.map_store %51 into %54 {
   ^bb0(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index):
     %56 = affine.linearize_index disjoint [%arg0, %arg1, %arg5, %arg3, %arg7, %arg2, %arg6, %arg4] by (%dim, %dim_0, 4, 8, 4, 4, 16, 2) : index
     %57:4 = affine.delinearize_index %56 into (%dim_1, %dim_2, 128, 128) : index, index, index, index
@@ -1880,7 +1880,7 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
   %30 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * 128 - s1 + s2)>()[%24, %15, %15]
   %31 = affine.apply affine_map<()[s0, s1, s2] -> (s0 * 16 - s1 + s2)>()[%25, %16, %16]
   %32 = tensor.empty(%24, %25) : tensor<?x?x8x4x4x4x4xf32>
-  %33 = iree_linalg_ext.map_scatter %23 into %32 {
+  %33 = iree_linalg_ext.map_store %23 into %32 {
   ^bb0(%arg0: index, %arg1: index):
     %36 = affine.linearize_index disjoint [%arg0, %arg1] by (%30, %31) : index
     %37:4 = affine.delinearize_index %36 into (%28, 128, %29, 16) : index, index, index, index

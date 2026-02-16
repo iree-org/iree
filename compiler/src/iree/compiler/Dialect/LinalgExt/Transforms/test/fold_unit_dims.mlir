@@ -139,60 +139,60 @@ util.func public @scatter_no_change_output(%slice: tensor<1x2xf16>, %indices: te
 
 // -----
 
-util.func public @map_scatter(%input: tensor<1x2x1x1xf16>) -> tensor<2x2x2x2xf16> {
+util.func public @map_store(%input: tensor<1x2x1x1xf16>) -> tensor<2x2x2x2xf16> {
   %empty = tensor.empty() : tensor<2x2x2x2xf16>
-  %0 = iree_linalg_ext.map_scatter %input into %empty {
+  %0 = iree_linalg_ext.map_store %input into %empty {
     ^bb0(%idx0: index, %idx1: index, %idx2: index, %idx3: index):
       %mask = arith.constant true
       iree_linalg_ext.yield %idx0, %idx1, %idx2, %idx3, %mask : index, index, index, index, i1
   } : tensor<1x2x1x1xf16> into tensor<2x2x2x2xf16> -> tensor<2x2x2x2xf16>
   util.return %0 : tensor<2x2x2x2xf16>
 }
-// RESHAPE-LABEL: util.func public @map_scatter
+// RESHAPE-LABEL: util.func public @map_store
 //  RESHAPE-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x2x1x1xf16>
 //   RESHAPE-DAG:   %[[DEST:.+]] = tensor.empty() : tensor<2x2x2x2xf16>
 //   RESHAPE-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   RESHAPE-DAG:   %[[INPUT_COLLAPSE:.+]] = tensor.collapse_shape %[[INPUT]]
 //  RESHAPE-SAME:     tensor<1x2x1x1xf16> into tensor<2xf16>
-//       RESHAPE:   iree_linalg_ext.map_scatter %[[INPUT_COLLAPSE]] into %[[DEST]]
+//       RESHAPE:   iree_linalg_ext.map_store %[[INPUT_COLLAPSE]] into %[[DEST]]
 //       RESHAPE:     ^bb0(%[[IDX:.+]]: index):
 //       RESHAPE:       iree_linalg_ext.yield  %[[C0]], %[[IDX]], %[[C0]], %[[C0]]
 
-// SLICE-LABEL: util.func public @map_scatter
+// SLICE-LABEL: util.func public @map_store
 //  SLICE-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x2x1x1xf16>
 //   SLICE-DAG:   %[[DEST:.+]] = tensor.empty() : tensor<2x2x2x2xf16>
 //   SLICE-DAG:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]]
 //  SLICE-SAME:     tensor<1x2x1x1xf16> to tensor<2xf16>
-//       SLICE:   iree_linalg_ext.map_scatter %[[INPUT_SLICE]] into %[[DEST]]
+//       SLICE:   iree_linalg_ext.map_store %[[INPUT_SLICE]] into %[[DEST]]
 //       SLICE:     ^bb0(%[[IDX:.+]]: index):
 //       SLICE:       %[[C0:.+]] = arith.constant 0 : index
 //       SLICE:       iree_linalg_ext.yield  %[[C0]], %[[IDX]], %[[C0]], %[[C0]]
 
 // -----
 
-util.func public @map_scatter_all_unit(%input: tensor<1x1xf16>) -> tensor<2x2xf16> {
+util.func public @map_store_all_unit(%input: tensor<1x1xf16>) -> tensor<2x2xf16> {
   %empty = tensor.empty() : tensor<2x2xf16>
-  %0 = iree_linalg_ext.map_scatter %input into %empty {
+  %0 = iree_linalg_ext.map_store %input into %empty {
     ^bb0(%idx0: index, %idx1: index):
       %mask = arith.constant true
       iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
   } : tensor<1x1xf16> into tensor<2x2xf16> -> tensor<2x2xf16>
   util.return %0 : tensor<2x2xf16>
 }
-// RESHAPE-LABEL: util.func public @map_scatter_all_unit
+// RESHAPE-LABEL: util.func public @map_store_all_unit
 //  RESHAPE-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x1xf16>
 //   RESHAPE-DAG:   %[[DEST:.+]] = tensor.empty() : tensor<2x2xf16>
 //   RESHAPE-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   RESHAPE-DAG:   %[[INPUT_COLLAPSE:.+]] = tensor.collapse_shape %[[INPUT]]
 //  RESHAPE-SAME:     tensor<1x1xf16> into tensor<1xf16>
-//       RESHAPE:   iree_linalg_ext.map_scatter %[[INPUT_COLLAPSE]] into %[[DEST]]
+//       RESHAPE:   iree_linalg_ext.map_store %[[INPUT_COLLAPSE]] into %[[DEST]]
 //       RESHAPE:       iree_linalg_ext.yield  %[[C0]], %[[C0]]
 
-// SLICE-LABEL: util.func public @map_scatter_all_unit
+// SLICE-LABEL: util.func public @map_store_all_unit
 //  SLICE-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x1xf16>
 //   SLICE-DAG:   %[[DEST:.+]] = tensor.empty() : tensor<2x2xf16>
 //   SLICE-DAG:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]]
 //  SLICE-SAME:     tensor<1x1xf16> to tensor<1xf16>
-//       SLICE:   iree_linalg_ext.map_scatter %[[INPUT_SLICE]] into %[[DEST]]
+//       SLICE:   iree_linalg_ext.map_store %[[INPUT_SLICE]] into %[[DEST]]
 //       SLICE:       %[[C0:.+]] = arith.constant 0 : index
 //       SLICE:       iree_linalg_ext.yield  %[[C0]], %[[C0]]

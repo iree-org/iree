@@ -457,16 +457,16 @@ LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
 }
 
 //===----------------------------------------------------------------------===//
-// MapGatherOp
+// MapLoadOp
 //===----------------------------------------------------------------------===//
 
-SmallVector<utils::IteratorType> MapGatherOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> MapLoadOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
-SmallVector<Range> MapGatherOp::getIterationDomain(OpBuilder &builder) {
+SmallVector<Range> MapLoadOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
@@ -479,9 +479,9 @@ SmallVector<Range> MapGatherOp::getIterationDomain(OpBuilder &builder) {
 }
 
 FailureOr<TilingResult>
-MapGatherOp::getTiledImplementation(OpBuilder &builder,
-                                    ArrayRef<OpFoldResult> offsets,
-                                    ArrayRef<OpFoldResult> sizes) {
+MapLoadOp::getTiledImplementation(OpBuilder &builder,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
 
   // Get a slice of the output (the dest/init operand).
@@ -492,7 +492,7 @@ MapGatherOp::getTiledImplementation(OpBuilder &builder,
 
   // Clone the operation with the full source but sliced output, and then
   // compose the tiling offsets with the index transformation of the
-  // map_gather op, because the space of the transformation output indices
+  // map_load op, because the space of the transformation output indices
   // is now local to the new output tile.
   Value tiledOutput = outputSlice->getResult(0);
   SmallVector<Type> resultTypes;
@@ -501,7 +501,7 @@ MapGatherOp::getTiledImplementation(OpBuilder &builder,
   }
   Operation *tiledOp = mlir::clone(builder, getOperation(), resultTypes,
                                    {getSource(), tiledOutput});
-  auto tiledMapGatherOp = cast<MapGatherOp>(tiledOp);
+  auto tiledMapLoadOp = cast<MapLoadOp>(tiledOp);
   auto indexTransformBuilder =
       [&](ArrayRef<BlockArgument> outputIndices) -> SmallVector<Value> {
     SmallVector<OpFoldResult> offsetIndices;
@@ -513,12 +513,12 @@ MapGatherOp::getTiledImplementation(OpBuilder &builder,
     }
     return getValueOrCreateConstantIndexOp(builder, loc, offsetIndices);
   };
-  tiledMapGatherOp.insertTransformationAtStart(builder, indexTransformBuilder,
-                                               offsets.size());
+  tiledMapLoadOp.insertTransformationAtStart(builder, indexTransformBuilder,
+                                             offsets.size());
   return TilingResult{{tiledOp}, {tiledOp->getResults()}, {outputSlice}};
 }
 
-LogicalResult MapGatherOp::getResultTilePosition(
+LogicalResult MapLoadOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
@@ -528,13 +528,13 @@ LogicalResult MapGatherOp::getResultTilePosition(
 }
 
 FailureOr<TilingResult>
-MapGatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
-                                     ArrayRef<OpFoldResult> offsets,
-                                     ArrayRef<OpFoldResult> sizes) {
+MapLoadOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                   ArrayRef<OpFoldResult> offsets,
+                                   ArrayRef<OpFoldResult> sizes) {
   return getTiledImplementation(builder, offsets, sizes);
 }
 
-LogicalResult MapGatherOp::getIterationDomainTileFromOperandTiles(
+LogicalResult MapLoadOp::getIterationDomainTileFromOperandTiles(
     OpBuilder &b, ArrayRef<unsigned> operandNumbers,
     ArrayRef<SmallVector<OpFoldResult>> allOffsets,
     ArrayRef<SmallVector<OpFoldResult>> allSizes,
@@ -554,7 +554,7 @@ LogicalResult MapGatherOp::getIterationDomainTileFromOperandTiles(
   return success();
 }
 
-FailureOr<TilingResult> MapGatherOp::getTiledImplementationFromOperandTiles(
+FailureOr<TilingResult> MapLoadOp::getTiledImplementationFromOperandTiles(
     OpBuilder &b, ArrayRef<unsigned> operandNumbers,
     ArrayRef<SmallVector<OpFoldResult>> allOffsets,
     ArrayRef<SmallVector<OpFoldResult>> allSizes) {
@@ -571,9 +571,9 @@ FailureOr<TilingResult> MapGatherOp::getTiledImplementationFromOperandTiles(
 /// are used to read values from the source and write to the output. Bounds
 /// checking is performed on the source indices, and the padding value is used
 /// if the indices are out of bounds.
-LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
-                                                        Location loc,
-                                                        ValueRange ivs) {
+LogicalResult MapLoadOp::generateScalarImplementation(OpBuilder &b,
+                                                      Location loc,
+                                                      ValueRange ivs) {
   // The scalar implementation is currently only implemented for buffer
   // semantics.
   if (!hasPureBufferSemantics()) {
@@ -628,21 +628,21 @@ LogicalResult MapGatherOp::generateScalarImplementation(OpBuilder &b,
     memref::StoreOp::create(nestedBuilder, nestedLoc, ifOp.getResult(0),
                             getOutput(), ivs);
   };
-  inlineMapGatherBody(b, loc, ivs, bodyBuilder);
+  inlineMapLoadBody(b, loc, ivs, bodyBuilder);
   return success();
 }
 
 //===----------------------------------------------------------------------===//
-// MapScatterOp
+// MapStoreOp
 //===----------------------------------------------------------------------===//
 
-SmallVector<utils::IteratorType> MapScatterOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> MapStoreOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
-SmallVector<Range> MapScatterOp::getIterationDomain(OpBuilder &builder) {
+SmallVector<Range> MapStoreOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
@@ -655,9 +655,9 @@ SmallVector<Range> MapScatterOp::getIterationDomain(OpBuilder &builder) {
 }
 
 FailureOr<TilingResult>
-MapScatterOp::getTiledImplementation(OpBuilder &builder,
-                                     ArrayRef<OpFoldResult> offsets,
-                                     ArrayRef<OpFoldResult> sizes) {
+MapStoreOp::getTiledImplementation(OpBuilder &builder,
+                                   ArrayRef<OpFoldResult> offsets,
+                                   ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
 
   // Get a slice of the input.
@@ -667,12 +667,12 @@ MapScatterOp::getTiledImplementation(OpBuilder &builder,
       getSlice(builder, loc, getInput(), offsets, sizes, inputStrides);
 
   // Clone the operation with the slice of the input, and then compose the
-  // tiling offsets with the index transformation of the map_scatter op,
+  // tiling offsets with the index transformation of the map_store op,
   // because the space of the transformation source indices is now local to
   // the new input tile.
   Operation *tiledOp = mlir::clone(builder, getOperation(), getResultTypes(),
                                    {inputSlice->getResult(0), getOutput()});
-  auto tiledMapScatterOp = cast<MapScatterOp>(tiledOp);
+  auto tiledMapStoreOp = cast<MapStoreOp>(tiledOp);
   auto indexTransformBuilder =
       [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
     SmallVector<OpFoldResult> offsetIndices;
@@ -684,12 +684,12 @@ MapScatterOp::getTiledImplementation(OpBuilder &builder,
     }
     return getValueOrCreateConstantIndexOp(builder, loc, offsetIndices);
   };
-  tiledMapScatterOp.insertTransformationAtStart(builder, indexTransformBuilder,
-                                                offsets.size());
+  tiledMapStoreOp.insertTransformationAtStart(builder, indexTransformBuilder,
+                                              offsets.size());
   return TilingResult{{tiledOp}, {tiledOp->getResults()}, {inputSlice}};
 }
 
-LogicalResult MapScatterOp::getResultTilePosition(
+LogicalResult MapStoreOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
@@ -701,7 +701,7 @@ LogicalResult MapScatterOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult MapScatterOp::getIterationDomainTileFromOperandTiles(
+LogicalResult MapStoreOp::getIterationDomainTileFromOperandTiles(
     OpBuilder &b, ArrayRef<unsigned> operandNumbers,
     ArrayRef<SmallVector<OpFoldResult>> allOffsets,
     ArrayRef<SmallVector<OpFoldResult>> allSizes,
@@ -721,7 +721,7 @@ LogicalResult MapScatterOp::getIterationDomainTileFromOperandTiles(
   return success();
 }
 
-FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTiles(
+FailureOr<TilingResult> MapStoreOp::getTiledImplementationFromOperandTiles(
     OpBuilder &b, ArrayRef<unsigned> operandNumbers,
     ArrayRef<SmallVector<OpFoldResult>> allOffsets,
     ArrayRef<SmallVector<OpFoldResult>> allSizes) {
@@ -738,12 +738,12 @@ FailureOr<TilingResult> MapScatterOp::getTiledImplementationFromOperandTiles(
 /// are used to write input values to the output. The reads and writes are
 /// wrapped in an scf.if, conditioned on the yielded mask value of the
 /// transformation body.
-LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
-                                                         Location loc,
-                                                         ValueRange ivs) {
+LogicalResult MapStoreOp::generateScalarImplementation(OpBuilder &b,
+                                                       Location loc,
+                                                       ValueRange ivs) {
   // The scalar implementation is currently only implemented for buffer
   // semantics, because we need to conditionally write values based on the
-  // mask. Vectorized map_scatter ops should be decomposed, not tiled to loops,
+  // mask. Vectorized map_store ops should be decomposed, not tiled to loops,
   // so vector types are not allowed.
   if (!hasPureBufferSemantics() || isa<VectorType>(getInputType())) {
     return failure();
@@ -763,7 +763,7 @@ LogicalResult MapScatterOp::generateScalarImplementation(OpBuilder &b,
     };
     scf::IfOp::create(nestedBuilder, nestedLoc, ifCond, thenBuilder);
   };
-  inlineMapScatterBody(b, loc, ivs, bodyBuilder);
+  inlineMapStoreBody(b, loc, ivs, bodyBuilder);
   return success();
 }
 

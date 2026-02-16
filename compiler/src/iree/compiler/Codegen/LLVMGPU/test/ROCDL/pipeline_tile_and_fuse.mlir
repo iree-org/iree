@@ -1363,7 +1363,7 @@ hal.executable public @main {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @map_scatter() attributes {translation_info = #translation_info} {
+      func.func @map_store() attributes {translation_info = #translation_info} {
         %c0 = arith.constant 0 : index
         %true = arith.constant true
         %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<2048x2048xf32, #hal.descriptor_type<storage_buffer>>
@@ -1372,7 +1372,7 @@ hal.executable public @main {
         %6 = amdgpu.fat_raw_buffer_cast %5 resetOffset : memref<16x16x128x128xf32, #hal.descriptor_type<storage_buffer>> to memref<16x16x128x128xf32, #amdgpu.address_space<fat_raw_buffer>>
         %7 = iree_codegen.load_from_buffer %4 : memref<2048x2048xf32, #amdgpu.address_space<fat_raw_buffer>> -> tensor<2048x2048xf32>
         %8 = tensor.empty() : tensor<16x16x128x128xf32>
-        %9 = iree_linalg_ext.map_scatter {lowering_config = #lowering_config} %7 into %8 {
+        %9 = iree_linalg_ext.map_store {lowering_config = #lowering_config} %7 into %8 {
         ^bb0(%arg0: index, %arg1: index):
           %10:2 = affine.delinearize_index %arg0 into (16, 128) : index, index
           %11:2 = affine.delinearize_index %arg1 into (16, 128) : index, index
@@ -1385,7 +1385,7 @@ hal.executable public @main {
   }
 }
 
-// CHECK-LABEL: func @map_scatter
+// CHECK-LABEL: func @map_store
 // CHECK-NOT:     memref.alloca
 // CHECK:         scf.forall {{.*}} in (2048, 8) {
 // CHECK:           %[[READ:.+]] = vector.transfer_read{{.*}}: memref<2048x2048xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
