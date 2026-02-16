@@ -389,7 +389,7 @@ LogicalResult CoalescedGatherDMAOp::verify() {
 // AllocationHintOpInterface implementations
 //===----------------------------------------------------------------------===//
 
-OpOperand &BankConflictPaddingHintOp::getHintedOperand() {
+OpOperand &BankConflictPaddingHintOp::getHintedOperandMutable() {
   return getOperandMutable();
 }
 

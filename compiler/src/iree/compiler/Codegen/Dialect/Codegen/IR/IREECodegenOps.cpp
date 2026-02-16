@@ -586,4 +586,6 @@ LogicalResult AssertOp::verify() {
 // AllocationHintOpInterface implementations
 //===----------------------------------------------------------------------===//
 
-OpOperand &SwizzleHintOp::getHintedOperand() { return getOperandMutable(); }
+OpOperand &SwizzleHintOp::getHintedOperandMutable() {
+  return getOperandMutable();
+}

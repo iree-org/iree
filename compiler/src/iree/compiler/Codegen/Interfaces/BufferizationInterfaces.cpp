@@ -272,13 +272,13 @@ struct AllocationHintBufferizableOpInterface final
                           bufferization::BufferizationState &state) const {
     auto hintOp = cast<IREE::Codegen::AllocationHintOpInterface>(op);
     FailureOr<Value> maybeBuffer =
-        getBuffer(rewriter, hintOp.getHintedOperand().get(), options, state);
+        getBuffer(rewriter, hintOp.getHintedOperand(), options, state);
     if (failed(maybeBuffer)) {
       return failure();
     }
     Operation *newOp = rewriter.clone(*op);
     cast<IREE::Codegen::AllocationHintOpInterface>(newOp)
-        .getHintedOperand()
+        .getHintedOperandMutable()
         .set(*maybeBuffer);
     newOp->getResult(0).setType(maybeBuffer->getType());
     bufferization::replaceOpWithBufferizedValues(rewriter, op,
