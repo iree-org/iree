@@ -919,6 +919,19 @@ LogicalResult WriteSliceOp::fold(FoldAdaptor adaptor,
   return success();
 }
 
+void WriteSliceOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (isa<MemRefType>(getSourceType())) {
+    // Source memrefs are read from.
+    effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+  // The dest operand is written to.
+  effects.emplace_back(MemoryEffects::Write::get(), &getDestMutable(),
+                       SideEffects::DefaultResource::get());
+}
+
 OpFoldResult ReadSliceOp::fold(FoldAdaptor adaptor) {
   SmallVector<OpFoldResult> mixedOffsets = getMixedOffsets();
   SmallVector<OpFoldResult> mixedStrides = getMixedStrides();
