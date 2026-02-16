@@ -90,11 +90,9 @@ LogicalResult matchTilableConsumer(RewriterBase &rewriter, PCF::LoopOp loopOp,
                                    ConsumerFusionParams &params);
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp genericOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params);
+                         TilingInterface target, ConsumerFusionParams &params);
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp loopOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params);
+                         TilingInterface target, ConsumerFusionParams &params);
 
 // Pattern set for dropping unused results from scoped ops. Due to memory
 // effects this requires cascading operation erasure and is unsuitable for

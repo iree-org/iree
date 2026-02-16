@@ -510,7 +510,7 @@ addResults(RewriterBase &rewriter, PCF::GenericOp genericOp,
 template <typename OpTy>
 static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
                                     TilingInterface target,
-                                    const ConsumerFusionParams &params) {
+                                    ConsumerFusionParams &params) {
   assert(!params.results.empty() && "unexpected empty number of results");
 
   Location loc = target.getLoc();
@@ -627,8 +627,7 @@ static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
                           newResultDests);
     }
   } else {
-    SmallVector<PCF::WriteSliceOp> slices(params.slices);
-    fuseIntoWriteSlices(rewriter, target, params.operands, slices,
+    fuseIntoWriteSlices(rewriter, target, params.operands, params.slices,
                         newResultDests);
   }
 
@@ -894,14 +893,12 @@ LogicalResult matchTilableConsumer(RewriterBase &rewriter,
 }
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp producerOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params) {
+                         TilingInterface target, ConsumerFusionParams &params) {
   return fuseTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp producerOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params) {
+                         TilingInterface target, ConsumerFusionParams &params) {
   return fuseTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 
