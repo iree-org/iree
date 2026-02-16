@@ -813,6 +813,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  // Convert convolutions to matmuls by tiling filter dimensions.
+  funcPassManager.addPass(createGPUTileAndConvertConvToMatmulPass());
+
   // Set anchors at tensor level for vector distribution later and hoist out
   // loop invariant anchors.
   funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
