@@ -86,6 +86,7 @@ def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
   }];
   let dependentDialects = ["::mlir::arith::ArithDialect",
                            "::mlir::affine::AffineDialect",
+                           "::mlir::scf::SCFDialect",
                            "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 

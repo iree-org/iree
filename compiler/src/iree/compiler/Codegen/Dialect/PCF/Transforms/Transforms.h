@@ -24,6 +24,7 @@ namespace mlir::scf {
 class ForallOp;
 } // namespace mlir::scf
 namespace mlir::tensor {
+class CollapseShapeOp;
 class ExtractSliceOp;
 } // namespace mlir::tensor
 
@@ -164,6 +165,31 @@ LogicalResult
 fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
                                     PCF::GenericOp genericOp,
                                     tensor::ExtractSliceOp extractSliceOp);
+
+// Fuse a tensor.collapse_shape consumer into a pcf.loop producer. This
+// changes the result to the collapsed shape and linearizes all write_slice
+// offsets/sizes accordingly. Supports both static and dynamic shapes.
+//
+// For each reassociation group, the innermost dimension is always kept as a
+// contiguous write. In the static case, consecutive inner dimensions that
+// fully cover the producer shape are folded into the contiguous chunk. Any
+// remaining outer dimensions are emitted as unmapped scf.forall loops.
+LogicalResult
+fuseCollapseShapeIntoProducerLoop(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                                  tensor::CollapseShapeOp collapseOp);
+
+// Fuse a tensor.collapse_shape consumer into a pcf.generic producer. This
+// changes the result to the collapsed shape and linearizes all write_slice
+// offsets/sizes accordingly. Supports both static and dynamic shapes.
+//
+// For each reassociation group, the innermost dimension is always kept as a
+// contiguous write. In the static case, consecutive inner dimensions that
+// fully cover the producer shape are folded into the contiguous chunk. Any
+// remaining outer dimensions are emitted as unmapped scf.forall loops.
+LogicalResult
+fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
+                                     PCF::GenericOp genericOp,
+                                     tensor::CollapseShapeOp collapseOp);
 
 // Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
 // scf.forall terminator. The write_slice's destination must be produced by the
