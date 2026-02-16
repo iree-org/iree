@@ -7,6 +7,8 @@
 #include <cstdint>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -2236,6 +2238,100 @@ struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
   }
 };
 
+struct DistributeInnerTiled final
+    : OpDistributionPattern<IREE::Codegen::InnerTiledOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    if (tiledOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(tiledOp, "requires vector semantics");
+    }
+
+    Location loc = tiledOp.getLoc();
+    MLIRContext *ctx = tiledOp.getContext();
+
+    // Get layouts, distributed forms, and unpacked forms for all inputs.
+    SmallVector<Value> unpackedInputs;
+    for (auto input : tiledOp.getInputs()) {
+      auto vec = dyn_cast<VectorValue>(input);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed input");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(
+            tiledOp, "missing nested layout for input");
+      }
+      VectorValue dist = getDistributed(rewriter, vec, layout);
+      unpackedInputs.push_back(
+          getDeinterleavedUnpackedForm(rewriter, dist, layout));
+    }
+
+    // Get layouts, distributed forms, and unpacked forms for all outputs.
+    SmallVector<Value> unpackedOutputs;
+    SmallVector<NestedLayoutAttr> resultLayouts;
+    for (auto output : tiledOp.getOutputs()) {
+      auto vec = dyn_cast<VectorValue>(output);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed output");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(
+            tiledOp, "missing nested layout for output");
+      }
+      VectorValue dist = getDistributed(rewriter, vec, layout);
+      unpackedOutputs.push_back(
+          getDeinterleavedUnpackedForm(rewriter, dist, layout));
+    }
+
+    // Collect result layouts.
+    for (auto result : tiledOp->getResults()) {
+      auto vec = dyn_cast<VectorValue>(result);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed result");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(
+            tiledOp, "missing nested layout for result");
+      }
+      resultLayouts.push_back(layout);
+    }
+
+    // Create distributed inner_tiled op.
+    auto oldSemantics = dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(
+        tiledOp.getSemantics());
+    if (!oldSemantics) {
+      return rewriter.notifyMatchFailure(
+          tiledOp, "expected GPU inner tiled semantics");
+    }
+    auto newSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
+        ctx, /*distributed=*/true, oldSemantics.getOpaque());
+
+    auto newOp = IREE::Codegen::InnerTiledOp::create(
+        rewriter, loc, unpackedInputs, unpackedOutputs,
+        tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
+        tiledOp.getKind(), newSemantics, tiledOp.getPermutations());
+
+    // Convert results back to interleaved distributed form.
+    SmallVector<Value> distributedResults;
+    for (auto [result, layout] :
+         llvm::zip_equal(newOp->getResults(), resultLayouts)) {
+      distributedResults.push_back(getInterleavedPackedForm(
+          rewriter, cast<VectorValue>(result), layout));
+    }
+
+    replaceOpWithDistributedValues(rewriter, tiledOp, distributedResults);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
@@ -2252,6 +2348,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
                                          maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
+  patterns.add<DistributeInnerTiled>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeCreateMask, DistributeConstantMask>(
       patterns.getContext(), threadId, subgroupSize);
