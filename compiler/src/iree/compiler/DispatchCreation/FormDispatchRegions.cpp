@@ -761,28 +761,26 @@ static bool isFusableWithProducer(OpOperand &operand,
 static bool hasUsesBetweenProducerAndRoot(Operation *producer, Operation *root,
                                           const FusionGroup &fusionGroup,
                                           const DominanceInfo &dominanceInfo) {
-  for (Value result : producer->getResults()) {
-    for (OpOperand &use : result.getUses()) {
-      Operation *user = use.getOwner();
-      // Walk up to the parent in the same block as the producer/root.
-      while (user->getBlock() != root->getBlock()) {
-        user = user->getParentOp();
-        if (!user) {
-          break;
-        }
-      }
+  for (OpOperand &use : producer->getUses()) {
+    Operation *user = use.getOwner();
+    // Walk up to the parent in the same block as the producer/root.
+    while (user->getBlock() != root->getBlock()) {
+      user = user->getParentOp();
       if (!user) {
-        continue;
+        break;
       }
-      // If the user is in the fusion group, it will be moved too.
-      if (fusionGroup.contains(user) || user == producer) {
-        continue;
-      }
-      // If the user does not come after the root, then moving the producer
-      // into the dispatch at root's position would break dominance.
-      if (!dominanceInfo.properlyDominates(root, user)) {
-        return true;
-      }
+    }
+    if (!user) {
+      continue;
+    }
+    // If the user is in the fusion group, it will be moved too.
+    if (fusionGroup.contains(user)) {
+      continue;
+    }
+    // If the user does not come after the root, then moving the producer
+    // into the dispatch at root's position would break dominance.
+    if (!dominanceInfo.properlyDominates(root, user)) {
+      return true;
     }
   }
   return false;
