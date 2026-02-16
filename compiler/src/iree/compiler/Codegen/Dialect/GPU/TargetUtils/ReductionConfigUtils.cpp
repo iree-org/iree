@@ -741,6 +741,9 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
         threadLoads /= 2;
       }
     }
+    if (threadLoads <= 1) {
+      break;
+    }
   }
 
   std::optional<int64_t> parallelSize = 1;
