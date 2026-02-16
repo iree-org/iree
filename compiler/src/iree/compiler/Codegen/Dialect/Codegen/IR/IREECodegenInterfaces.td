@@ -791,13 +791,21 @@ def IREECodegen_AllocationHintOpInterface :
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the operand that holds the source allocation being hinted.
+        Returns a mutable reference to the operand that holds the source
+        allocation being hinted.
       }],
       /*retTy=*/"::mlir::OpOperand &",
-      /*methodName=*/"getHintedOperand",
+      /*methodName=*/"getHintedOperandMutable",
       /*args=*/(ins)
     >
   ];
+
+  let extraSharedClassDeclaration = [{
+    /// Returns the value of the source allocation being hinted.
+    ::mlir::Value getHintedOperand() {
+      return $_op.getHintedOperandMutable().get();
+    }
+  }];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES

@@ -105,7 +105,7 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
   auto hintOp = dyn_cast<IREE::Codegen::AllocationHintOpInterface>(destination);
   if (hintOp) {
-    destination = hintOp.getHintedOperand().get().getDefiningOp();
+    destination = hintOp.getHintedOperand().getDefiningOp();
   }
 
   // Fail if the destination is not a `tensor.empty` op and cannot be trivially
@@ -133,7 +133,7 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   if (hintOp) {
     Operation *cloned = rewriter.clone(*hintOp.getOperation());
     auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
-    clonedHint.getHintedOperand().set(allocTensor.getResult());
+    clonedHint.getHintedOperandMutable().set(allocTensor.getResult());
     return cloned->getResult(0);
   }
   return allocTensor.getResult();
@@ -2113,8 +2113,7 @@ struct FoldAllocationHintOpWithExtractSliceOp final
     }
 
     // Check for tensor.empty source.
-    auto emptyOp =
-        hintOp.getHintedOperand().get().getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp = hintOp.getHintedOperand().getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
@@ -2136,7 +2135,7 @@ struct FoldAllocationHintOpWithExtractSliceOp final
     // Clone the hint op and point it at the new empty tensor.
     Operation *cloned = rewriter.clone(*hintOp.getOperation());
     auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
-    clonedHint.getHintedOperand().set(newEmptyOp);
+    clonedHint.getHintedOperandMutable().set(newEmptyOp);
     cloned->getResult(0).setType(sliceOp.getType());
     rewriter.replaceOp(sliceOp, cloned->getResults());
     return success();
@@ -2153,9 +2152,8 @@ struct FoldAllocationHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
     if (!hintOp) {
       return failure();
     }
-    auto emptyOp = hintOp.getHintedOperand()
-                       .get()
-                       .template getDefiningOp<tensor::EmptyOp>();
+    auto emptyOp =
+        hintOp.getHintedOperand().template getDefiningOp<tensor::EmptyOp>();
     if (!emptyOp) {
       return failure();
     }
@@ -2181,7 +2179,7 @@ struct FoldAllocationHintOpWithReshapeOp final : OpRewritePattern<ReshapeOp> {
     // Clone the hint op and point it at the new empty tensor.
     Operation *cloned = rewriter.clone(*hintOp.getOperation());
     auto clonedHint = cast<IREE::Codegen::AllocationHintOpInterface>(cloned);
-    clonedHint.getHintedOperand().set(emptyTensor);
+    clonedHint.getHintedOperandMutable().set(emptyTensor);
     cloned->getResult(0).setType(reshapeOp.getResultType());
     rewriter.replaceOp(reshapeOp, cloned->getResult(0));
     return success();
