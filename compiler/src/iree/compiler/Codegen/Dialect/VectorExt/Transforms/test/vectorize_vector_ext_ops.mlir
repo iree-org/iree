@@ -200,3 +200,56 @@ func.func @vectorize_to_layout(%A: tensor<64x64xf32>) -> tensor<64x64xf32> {
 // CHECK: %[[A_READ:.+]] = vector.transfer_read %[[AT]]
 // CHECK: %[[A:.+]] = iree_vector_ext.to_layout %[[A_READ]]
 // CHECK: %[[A_WRITE:.+]] = vector.transfer_write %[[A]], %[[AT]]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [64, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+// Verify that when a `to_layout` reads the result of a linalg op with dynamic
+// shapes, the output-side transfer_write -> transfer_read pair is folded by
+// FoldMaskedTransferRAW (mask SSA values match after reifyResultShapes + CSE).
+
+func.func @vectorize_dyn_output_layout(
+    %arg0: tensor<?x?xf32>,
+    %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %in = iree_vector_ext.to_layout %arg0 to layout(#layout) : tensor<?x?xf32>
+  %out = iree_vector_ext.to_layout %arg1 to layout(#layout) : tensor<?x?xf32>
+  %generic = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%in : tensor<?x?xf32>)
+      outs(%out : tensor<?x?xf32>)
+      attrs = {lowering_config = #iree_cpu.lowering_config<
+         vector_common_parallel = [64, 64]>} {
+    ^bb0(%a: f32, %b: f32):
+      %neg = arith.negf %a : f32
+      linalg.yield %neg : f32
+  } -> tensor<?x?xf32>
+  %result = iree_vector_ext.to_layout %generic to layout(#layout)
+      : tensor<?x?xf32>
+  return %result : tensor<?x?xf32>
+}
+
+// The output to_layout's mask must match the input mask (derived from %arg0
+// dims via reifyShapeOfResult) so FoldMaskedTransferRAW eliminates the
+// transfer_write -> transfer_read pair on the generic result.
+// CHECK-LABEL: func.func @vectorize_dyn_output_layout
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<?x?xf32>, %[[ARG1:.+]]: tensor<?x?xf32>
+// CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]]
+// CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]]
+// CHECK:       %[[MASK:.+]] = vector.create_mask %[[D0]], %[[D1]]
+// CHECK:       vector.transfer_read %[[ARG0]]{{.+}}, %[[MASK]]
+// CHECK:       %[[NEG:.+]] = arith.negf
+// CHECK:       %[[OUT_LAYOUT:.+]] = iree_vector_ext.to_layout %[[NEG]]
+// CHECK:       vector.transfer_write %[[OUT_LAYOUT]], %{{.+}}, %[[MASK]]
+// CHECK-NOT:   vector.transfer_read
