@@ -1,0 +1,111 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for event operations (create, signal, wait, reset).
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Event tests: creation, signaling, waiting, reset, cross-thread.
+iree_runtime_cc_library(
+    name = "event_test",
+    testonly = True,
+    srcs = ["event_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Event source tests: persistent fd monitoring with callbacks (POSIX-only).
+iree_runtime_cc_library(
+    name = "event_source_posix_test",
+    testonly = True,
+    srcs = ["event_source_posix_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All event tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":event_test",
+    ] + select({
+        "@platforms//os:linux": [":event_source_posix_test"],
+        "//conditions:default": [],
+    }),
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Event signal/wait benchmarks: latency, cross-thread, batch operations.
+iree_runtime_cc_library(
+    name = "event_benchmark",
+    testonly = True,
+    srcs = ["event_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:event_pool",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# Event pool benchmarks: acquire/release, growth, batch operations.
+iree_runtime_cc_library(
+    name = "event_pool_benchmark",
+    testonly = True,
+    srcs = ["event_pool_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:event_pool",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All event benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":event_benchmark",
+        ":event_pool_benchmark",
+    ],
+)

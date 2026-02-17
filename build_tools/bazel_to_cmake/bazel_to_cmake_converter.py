@@ -100,10 +100,12 @@ class BuildFileFunctions(object):
         converter: "Converter",
         targets: bazel_to_cmake_targets.TargetConverter,
         build_dir: str,
+        repo_root: str = "",
     ):
         self._converter = converter
         self._targets = targets
         self._build_dir = build_dir
+        self._repo_root = repo_root
         self._custom_initialize()
 
     def _custom_initialize(self):
@@ -344,7 +346,10 @@ class BuildFileFunctions(object):
         src = src.lstrip("/").lstrip(":").replace(":", "/")
         if not pkg_root_relative_label:
             return src
-        elif os.path.exists(os.path.join(self._build_dir, src)):
+        # Repo-root-relative labels (//pkg:file) resolve from the repo root,
+        # not from the current package directory.
+        check_dir = self._repo_root if self._repo_root else self._build_dir
+        if os.path.exists(os.path.join(check_dir, src)):
             return f"${{PROJECT_SOURCE_DIR}}/{src}"
         else:
             return f"${{PROJECT_BINARY_DIR}}/{src}"
@@ -1382,7 +1387,8 @@ def GetDict(obj):
 
 
 def convert_build_file(
-    build_file_code, repo_cfg, build_dir, allow_partial_conversion=False
+    build_file_code, repo_cfg, build_dir, allow_partial_conversion=False,
+    repo_root="",
 ):
     converter = Converter()
     # Allow overrides of TargetConverter and BuildFileFunctions from repo cfg.
@@ -1392,7 +1398,8 @@ def convert_build_file(
     )(repo_map=repo_map)
     build_file_functions = getattr(
         repo_cfg, "CustomBuildFileFunctions", BuildFileFunctions
-    )(converter=converter, targets=target_converter, build_dir=build_dir)
+    )(converter=converter, targets=target_converter, build_dir=build_dir,
+      repo_root=repo_root)
 
     exec(build_file_code, GetDict(build_file_functions))
     converted_text = converter.convert()

@@ -351,6 +351,14 @@ inline internal::IsOkMatcherGenerator IsOk() {
 #define IREE_ASSERT_OK(rexpr)                          \
   ASSERT_THAT(::iree::internal::ConsumeForTest(rexpr), \
               ::iree::testing::status::StatusIs(::iree::StatusCode::kOk))
+#define IREE_EXPECT_NOT_OK(rexpr)                      \
+  EXPECT_THAT(::iree::internal::ConsumeForTest(rexpr), \
+              ::testing::Not(                          \
+                  ::iree::testing::status::StatusIs(::iree::StatusCode::kOk)))
+#define IREE_ASSERT_NOT_OK(rexpr)                      \
+  ASSERT_THAT(::iree::internal::ConsumeForTest(rexpr), \
+              ::testing::Not(                          \
+                  ::iree::testing::status::StatusIs(::iree::StatusCode::kOk)))
 #define IREE_EXPECT_STATUS_IS(expected_code, expr)    \
   EXPECT_THAT(::iree::internal::ConsumeForTest(expr), \
               ::iree::testing::status::StatusIs(      \
