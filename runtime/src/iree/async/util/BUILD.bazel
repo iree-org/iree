@@ -1,0 +1,133 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Async I/O utilities (optional components, not part of core API).
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "completion_pool",
+    srcs = ["completion_pool.c"],
+    hdrs = ["completion_pool.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:atomic_slist",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "continuation",
+    srcs = ["continuation.c"],
+    hdrs = ["continuation.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "continuation_test",
+    srcs = ["continuation_test.cc"],
+    deps = [
+        ":continuation",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "intrusive_list",
+    hdrs = ["intrusive_list.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "message_pool",
+    srcs = ["message_pool.c"],
+    hdrs = ["message_pool.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:atomic_slist",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "operation_pool",
+    srcs = ["operation_pool.c"],
+    hdrs = ["operation_pool.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:atomic_slist",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "operation_pool_test",
+    srcs = ["operation_pool_test.cc"],
+    deps = [
+        ":operation_pool",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading:thread",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "proactor_thread",
+    srcs = ["proactor_thread.c"],
+    hdrs = ["proactor_thread.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading:thread",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "ready_pool",
+    srcs = ["ready_pool.c"],
+    hdrs = ["ready_pool.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:atomic_slist",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "sequence_emulation",
+    srcs = ["sequence_emulation.c"],
+    hdrs = ["sequence_emulation.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "signal",
+    srcs = ["signal.c"],
+    hdrs = ["signal.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
