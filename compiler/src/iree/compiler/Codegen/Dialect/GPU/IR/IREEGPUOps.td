@@ -355,6 +355,10 @@ def IREEGPU_GlobalSubgroupBarrierOp : Op<IREEGPU_Dialect,
     any can proceed past it. Unlike `gpu.barrier`, this op has no memory
     fence semantics - memory operations can be freely reordered with respect
     to it. Fences are handled separately.
+
+    This operation operates on a single, global workgroup-wide barrier object
+    that can implement such dynamic join and must not be used if such a barrier
+    isn't available.
   }];
 
   let arguments = (ins);
