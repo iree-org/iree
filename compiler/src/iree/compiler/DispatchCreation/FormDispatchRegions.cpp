@@ -819,13 +819,6 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      SmallVector<OpOperand *> fusableUses =
-          getFusableUses(context, producer, dominanceInfo,
-                         /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate) {
-        continue;
-      }
-
       tracker.appendToFusionGroup(producer, fusionGroup);
       worklist.push_back(producer);
     }
