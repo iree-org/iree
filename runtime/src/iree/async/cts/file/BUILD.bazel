@@ -1,0 +1,45 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for async file I/O operations (open, read, write, close).
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# File I/O tests: open, read, write, close, concurrent reads, large I/O.
+iree_runtime_cc_library(
+    name = "file_test",
+    testonly = True,
+    srcs = ["file_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All file tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":file_test",
+    ],
+)
