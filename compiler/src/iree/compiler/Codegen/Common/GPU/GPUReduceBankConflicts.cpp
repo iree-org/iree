@@ -128,8 +128,8 @@ static memref::AllocOp findUnderlyingAlloc(Value source) {
 
 /// Collect padding hints from BankConflictPaddingHintOp wrapping shared memory
 /// allocations. Returns a map from alloc to the desired padding in bits.
-/// Each alloc is expected to have at most one hint. If multiple hints map to
-/// the same alloc, the padding is set to 0 (no padding applied).
+/// If multiple hints map to the same alloc with conflicting padding values,
+/// the padding is set to 0 (no padding applied).
 static DenseMap<memref::AllocOp, unsigned>
 collectPaddingHints(FunctionOpInterface funcOp) {
   DenseMap<memref::AllocOp, unsigned> allocPaddingMap;
@@ -141,10 +141,13 @@ collectPaddingHints(FunctionOpInterface funcOp) {
       return;
     }
 
-    auto [it, inserted] =
-        allocPaddingMap.try_emplace(allocOp, hintOp.getPaddingBits());
-    if (!inserted) {
-      // Multiple hints for the same alloc — disable padding.
+    unsigned padding = hintOp.getPaddingBits();
+    auto [it, inserted] = allocPaddingMap.try_emplace(allocOp, padding);
+    if (!inserted && it->second != padding) {
+      // Conflicting hints for the same alloc — disable padding.
+      hintOp->emitWarning()
+          << "conflicting bank conflict padding hints for " << *allocOp << ": "
+          << it->second << " bits vs " << padding << " bits";
       it->second = 0;
     }
   });
@@ -194,7 +197,7 @@ static unsigned computeEffectiveExtraBytes(
       return;
     }
 
-    int outerProduct = 1;
+    int64_t outerProduct = 1;
     for (size_t i = 0; i < shape.size() - 1; ++i) {
       outerProduct *= shape[i];
     }
