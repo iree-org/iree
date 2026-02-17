@@ -145,7 +145,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: iree-org/iree-test-suites
-          ref: c3b48ed923548e74b85329e201c12fe69cb1df2f
+          ref: b74984467b15c9d743d7b4481eb19cf602a95e39
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
@@ -156,6 +156,7 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
+          pip install -e ${{ github.workspace }}/iree-test-suites
           pip install -r ${{ github.workspace }}/iree-test-suites/torch_models/requirements.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
