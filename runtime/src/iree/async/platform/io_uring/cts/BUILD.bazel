@@ -1,0 +1,198 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS binaries for the io_uring backend.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# CTS Backend Registration
+#===------------------------------------------------------------------------===#
+
+# Backend factory library. Registers io_uring with capability tags.
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/platform/io_uring",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Tests
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "buffer_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/buffer:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "core_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/core:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "event_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/event:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/file:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "futex_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/futex:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "socket_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/socket:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "sync_tests",
+    srcs = ["//runtime/src/iree/async/cts/util:test_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/sync:all_tests",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+cc_binary_benchmark(
+    name = "buffer_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/buffer:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "core_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/core:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "event_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/event:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "futex_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/futex:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "socket_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/socket:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "sync_benchmarks",
+    srcs = ["//runtime/src/iree/async/cts/util:benchmark_main.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/async/cts/sync:all_benchmarks",
+        "//runtime/src/iree/async/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
