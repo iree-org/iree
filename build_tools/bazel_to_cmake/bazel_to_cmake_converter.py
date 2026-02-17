@@ -152,6 +152,29 @@ class BuildFileFunctions(object):
         """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
         if not target_compatible_with:
             return
+
+        # Handle PlatformSelect from select() in target_compatible_with.
+        # Example: select({"@platforms//os:linux": [], "@platforms//os:macos": [],
+        #                  "//conditions:default": ["@platforms//:incompatible"]})
+        # Platforms with empty list are compatible; default with incompatible means
+        # "only build on the explicitly listed platforms".
+        if isinstance(target_compatible_with, PlatformSelect):
+            compatible_platforms = []
+            for label, value in target_compatible_with.conditions.items():
+                if label == "//conditions:default":
+                    continue
+                # Empty list means compatible on this platform.
+                if value == []:
+                    cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(label)
+                    if cmake_name:
+                        compatible_platforms.append(
+                            f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
+                        )
+            if compatible_platforms:
+                combined = " OR ".join(compatible_platforms)
+                self._converter.body += f"if({combined})\n"
+            return
+
         # target_compatible_with is a list of constraints (typically one).
         conditions = []
         for label in target_compatible_with:
@@ -169,6 +192,20 @@ class BuildFileFunctions(object):
         """Emits endif() to close a target_compatible_with guard."""
         if not target_compatible_with:
             return
+
+        # Handle PlatformSelect: check if any compatible platforms were found.
+        if isinstance(target_compatible_with, PlatformSelect):
+            has_compatible = any(
+                label != "//conditions:default"
+                and value == []
+                and label in _PLATFORM_CMAKE_SYSTEM_NAME
+                for label, value in target_compatible_with.conditions.items()
+            )
+            if has_compatible:
+                self._converter.body = self._converter.body.rstrip("\n") + "\n"
+                self._converter.body += f"endif()\n\n"
+            return
+
         # Only emit if all labels are recognized (same check as begin).
         if all(
             label in _PLATFORM_CMAKE_SYSTEM_NAME for label in target_compatible_with
