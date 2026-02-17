@@ -83,6 +83,7 @@ jobs:
       - name: Install Torch ops test suite requirements
         run: |
           source ${VENV_DIR}/bin/activate
+          pip install -e iree-test-suites
           python -m pip install -r iree-test-suites/torch_ops/requirements.txt
       - name: Run Torch ops test suite
         env:
@@ -156,6 +157,7 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
+          pip install -e ${{ github.workspace}}/iree-test-suites
           pip install -r ${{ github.workspace }}/iree-test-suites/torch_models/requirements.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
