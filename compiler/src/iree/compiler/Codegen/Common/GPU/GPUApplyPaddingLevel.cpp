@@ -141,9 +141,9 @@ void GPUApplyPaddingLevelPass::runOnOperation() {
   llvm::SmallDenseSet<TilingInterface> targetOps =
       getTiledOps(funcOp, tilingLevel);
 
+  MaskListener maskListener;
+  IRRewriter rewriter(funcOp, &maskListener);
   for (TilingInterface op : targetOps) {
-    MaskListener maskListener;
-    IRRewriter rewriter(funcOp, &maskListener);
     // If some op does not get padded, that is fine for now.
     (void)applyPaddingLevel(rewriter, op, tilingLevel);
     // Propagate padding up by padding producers if possible.
