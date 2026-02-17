@@ -1,0 +1,17 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Conformance Test Suite (CTS) for async proactor backends.
+#
+# Test suites in subdirectories (socket/, core/, etc.) self-register via
+# CTS_REGISTER_TEST_SUITE(). Backends register via CtsRegistry::RegisterBackend().
+# main.cc calls InstantiateAll() to create gtest parameterized test instances.
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
