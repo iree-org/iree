@@ -8,6 +8,8 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
@@ -84,6 +86,53 @@ struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
   }
 };
 
+/// Returns true if linalgOp is a broadcast. Handles both the named
+/// linalg.broadcast op and broadcast-like linalg.generic.
+static bool isBroadcastLinalgOp(linalg::LinalgOp linalgOp) {
+  if (isa<linalg::BroadcastOp>(linalgOp.getOperation())) {
+    return true;
+  }
+  auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+  return genericOp && linalg::isaBroadcastOpInterface(genericOp).has_value();
+}
+
+/// For a broadcast LinalgOp (named or generic), returns the single input and
+/// init values.
+static std::pair<Value, Value> getBroadcastInputAndInit(linalg::LinalgOp op) {
+  if (auto broadcastOp = dyn_cast<linalg::BroadcastOp>(op.getOperation())) {
+    return {broadcastOp.getInput(), broadcastOp.getInit()};
+  }
+  auto genericOp = cast<linalg::GenericOp>(op.getOperation());
+  return {genericOp.getDpsInputOperand(0)->get(),
+          genericOp.getDpsInitOperand(0)->get()};
+}
+
+/// Fold broadcast(tensor.empty()) -> tensor.empty() with the broadcast result
+/// shape. Handles both linalg.broadcast and broadcast-like linalg.generic.
+struct FoldBroadcastWithEmptyTensor
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::Base::Base;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!isBroadcastLinalgOp(linalgOp)) {
+      return rewriter.notifyMatchFailure(linalgOp, "not a broadcast op");
+    }
+    auto [input, init] = getBroadcastInputAndInit(linalgOp);
+    if (!input.getDefiningOp<tensor::EmptyOp>()) {
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "input not defined by tensor.empty");
+    }
+    SmallVector<OpFoldResult> resultSizes =
+        tensor::getMixedSizes(rewriter, linalgOp.getLoc(), init);
+    auto resultType = cast<RankedTensorType>(init.getType());
+    Value newEmpty = tensor::EmptyOp::create(
+        rewriter, linalgOp.getLoc(), resultSizes, resultType.getElementType());
+    rewriter.replaceOp(linalgOp.getOperation(), newEmpty);
+    return success();
+  }
+};
+
 /// Convert an "affine.apply" operation into a sequence of arith ops.
 class AffineApplyLowering : public OpRewritePattern<affine::AffineApplyOp> {
 public:
@@ -125,6 +174,7 @@ struct CanonicalizePass : public impl::CanonicalizePassBase<CanonicalizePass> {
     // compilation phase.
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(owningPatterns);
     owningPatterns.add<FoldFullInsertSlice>(context);
+    owningPatterns.add<FoldBroadcastWithEmptyTensor>(context);
     owningPatterns.add<AffineApplyLowering>(context);
 
     patterns =
