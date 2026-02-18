@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
@@ -615,6 +617,12 @@ struct LLVMGPUVectorLoweringPass final
           contractLoweringPatterns,
           vector::VectorMultiReductionLowering::InnerReduction);
       contractLoweringPatterns.add<UnrollElementwiseOps>(funcOp->getContext());
+      // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
+      // vector.transfer_read.
+      IREE::VectorExt::populateVectorTransferGatherLoweringPatterns(
+          contractLoweringPatterns);
+      IREE::VectorExt::TransferGatherOp::getCanonicalizationPatterns(
+          contractLoweringPatterns, ctx);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(contractLoweringPatterns)))) {
         return signalPassFailure();
