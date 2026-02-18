@@ -90,7 +90,11 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     vector::populateScalarVectorTransferLoweringPatterns(
         patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::populateVectorMultiReductionLoweringPatterns(
+    vector::populateVectorMultiReductionReorderAndExpandPatterns(
+        patterns, vectorMultiReductionLowering);
+    vector::populateVectorMultiReductionFlatteningPatterns(
+        patterns, vectorMultiReductionLowering);
+    vector::populateVectorMultiReductionUnrollingPatterns(
         patterns, vectorMultiReductionLowering);
     populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
