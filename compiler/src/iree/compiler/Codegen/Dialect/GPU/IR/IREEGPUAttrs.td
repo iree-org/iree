@@ -572,6 +572,12 @@ def IREEGPU_VirtualMMAAttr :
     // e.g MFMA_F32_16x16x16 has K of 16, while VMFMA_F32_16x16x32 has K of 32
     // in this example, intrinsicsK = 32/16 = 2.
     int64_t getIntrinsicsK() const;
+
+    // Returns the expanded accumulator type for VSMFMA variants.
+    // VSMFMA intrinsics use a collapsed 2-element ACC externally but require
+    // an expanded 4-element ACC for the smfmac hardware instruction.
+    // Returns std::nullopt for non-VSMFMA intrinsics.
+    std::optional<VectorType> getExpandedAccType() const;
   }];
 }
 

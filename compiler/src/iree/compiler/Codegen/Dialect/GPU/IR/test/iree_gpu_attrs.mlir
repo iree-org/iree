@@ -37,6 +37,24 @@ module {
 //  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16, col_major = true>
 
 module {
+  func.func @test_vsmfma_f16_16x16x32() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VSMFMA_F32_16x16x32_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vsmfma_f16_16x16x32
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VSMFMA_F32_16x16x32_F16>
+
+module {
+  func.func @test_vsmfma_i8_16x16x64() attributes {
+      mma_types = #iree_gpu.virtual_mma_layout<VSMFMA_I32_16x16x64_I8>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_vsmfma_i8_16x16x64
+//  CHECK-SAME:   mma_types = #iree_gpu.virtual_mma_layout<VSMFMA_I32_16x16x64_I8>
+
+module {
   func.func @test_WMMAR3_f16_16x16x16_f32() attributes {
       mma_types = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>} {
     return
