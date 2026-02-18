@@ -55,12 +55,44 @@ iree_cc_library(
 )
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 iree_cc_library(
   NAME
     relay_test
   SRCS
     "relay_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::test_base
+    iree::base::threading
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+iree_cc_library(
+  NAME
+    relay_posix_test
+  SRCS
+    "relay_posix_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::test_base
+    iree::base::threading
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+endif()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+iree_cc_library(
+  NAME
+    relay_windows_test
+  SRCS
+    "relay_windows_test.cc"
   DEPS
     iree::async
     iree::async::cts::util::registry
@@ -130,11 +162,13 @@ iree_cc_library(
 
 set(_all_tests_platform_deps "")
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  list(APPEND _all_tests_platform_deps ::relay_windows_test)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(APPEND _all_tests_platform_deps ::fence_posix_test)
-  list(APPEND _all_tests_platform_deps ::relay_test)
+  list(APPEND _all_tests_platform_deps ::relay_posix_test)
 else()
   list(APPEND _all_tests_platform_deps ::fence_posix_test)
+  list(APPEND _all_tests_platform_deps ::relay_posix_test)
 endif()
 iree_cc_library(
   NAME
@@ -142,6 +176,7 @@ iree_cc_library(
   DEPS
     ::cancellation_test
     ::notification_test
+    ::relay_test
     ::semaphore_async_test
     ::semaphore_linked_test
     ::semaphore_sync_test
@@ -151,7 +186,6 @@ iree_cc_library(
   PUBLIC
 )
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 iree_cc_library(
   NAME
     relay_benchmark
@@ -167,17 +201,12 @@ iree_cc_library(
   ALWAYSLINK
   PUBLIC
 )
-endif()
 
-set(_all_benchmarks_platform_deps "")
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  list(APPEND _all_benchmarks_platform_deps ::relay_benchmark)
-endif()
 iree_cc_library(
   NAME
     all_benchmarks
   DEPS
-    ${_all_benchmarks_platform_deps}
+    ::relay_benchmark
   TESTONLY
   PUBLIC
 )

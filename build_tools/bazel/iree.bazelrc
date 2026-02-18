@@ -133,6 +133,7 @@ build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impac
 build:generic_clang --copt=-Wno-invalid-offsetof # Technically UB but needed for intrusive ptrs
 build:generic_clang --copt=-Wno-unused-const-variable
 build:generic_clang --copt=-Wno-unused-function
+build:generic_clang --copt=-Wno-unused-lambda-capture
 build:generic_clang --copt=-Wno-unused-private-field
 build:generic_clang --copt=-Wno-pointer-sign
 build:generic_clang --copt=-Wno-char-subscripts

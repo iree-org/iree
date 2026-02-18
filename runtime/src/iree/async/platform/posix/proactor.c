@@ -648,7 +648,7 @@ static void iree_async_proactor_posix_drain_pending_queue(
     // Retained resources (sockets, events, notifications) are released via
     // release_operation_resources — either during drain_completion_queue
     // (normal path) or inline (fallback path).
-    if (iree_any_bit_set(operation->internal_flags,
+    if (iree_any_bit_set(iree_async_operation_load_internal_flags(operation),
                          IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
       // cancel() incremented the type-specific cancellation counter. Decrement
       // it here since the operation was never registered in its data structure
@@ -1232,7 +1232,7 @@ static iree_status_t iree_async_proactor_posix_execute_sendto(
 // or wake the poll thread — callers handle those.
 static iree_status_t iree_async_proactor_posix_submit_operation(
     iree_async_proactor_posix_t* proactor, iree_async_operation_t* operation) {
-  operation->internal_flags = 0;
+  iree_async_operation_clear_internal_flags(operation);
   switch (operation->type) {
     case IREE_ASYNC_OPERATION_TYPE_NOP:
       return iree_async_proactor_posix_complete_on_submit(
@@ -1569,7 +1569,7 @@ static iree_host_size_t iree_async_proactor_posix_process_expired_timers(
     // set by cancel() from another thread or by an earlier callback in this
     // loop.
     iree_status_t status = iree_ok_status();
-    if (iree_any_bit_set(timer->base.internal_flags,
+    if (iree_any_bit_set(iree_async_operation_load_internal_flags(&timer->base),
                          IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
       status = iree_status_from_code(IREE_STATUS_CANCELLED);
       // cancel() incremented the timer cancellation counter. Decrement it
@@ -2218,7 +2218,7 @@ static void iree_async_proactor_posix_process_operation_chain(
     }
 
     // Check for cancellation.
-    if (iree_any_bit_set(current->internal_flags,
+    if (iree_any_bit_set(iree_async_operation_load_internal_flags(current),
                          IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
       // Unlink from chain.
       if (prev == NULL) {
@@ -2401,8 +2401,9 @@ static void iree_async_proactor_posix_process_notification_waits(
     iree_async_notification_wait_operation_t* next =
         (iree_async_notification_wait_operation_t*)wait->base.next;
 
-    bool cancelled = iree_any_bit_set(wait->base.internal_flags,
-                                      IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED);
+    bool cancelled =
+        iree_any_bit_set(iree_async_operation_load_internal_flags(&wait->base),
+                         IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED);
     bool epoch_advanced = (wait->wait_token != current_epoch);
 
     if (epoch_advanced || cancelled) {
@@ -2473,8 +2474,9 @@ static void iree_async_proactor_posix_drain_pending_timer_cancellations(
     // Capture next before potential removal.
     iree_async_timer_operation_t* next = timer->platform.posix.next;
 
-    if (!iree_any_bit_set(timer->base.internal_flags,
-                          IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
+    if (!iree_any_bit_set(
+            iree_async_operation_load_internal_flags(&timer->base),
+            IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
       timer = next;
       continue;
     }
@@ -2561,7 +2563,7 @@ static void iree_async_proactor_posix_drain_pending_fd_cancellations(
 
       iree_async_operation_t* op = (iree_async_operation_t*)handler;
       while (op) {
-        if (!iree_any_bit_set(op->internal_flags,
+        if (!iree_any_bit_set(iree_async_operation_load_internal_flags(op),
                               IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED)) {
           op = op->next;
           continue;
@@ -2818,7 +2820,8 @@ static iree_status_t iree_async_proactor_posix_cancel(
       // The poll thread scans the timer_list when the counter is non-zero,
       // removing cancelled timers and pushing CANCELLED completions. Without
       // the scan, cancelled timers would linger until their original deadline.
-      operation->internal_flags |= IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED;
+      iree_async_operation_set_internal_flags(
+          operation, IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED);
       iree_atomic_fetch_add(&proactor->pending_timer_cancellation_count, 1,
                             iree_memory_order_release);
       iree_async_proactor_posix_wake_poll_thread(proactor);
@@ -2837,7 +2840,8 @@ static iree_status_t iree_async_proactor_posix_cancel(
       //   - ready-fd processing (if registered and fd fires)
       // Increment the cancellation counter so the poll thread knows to scan
       // the fd_map even when no fds are ready.
-      operation->internal_flags |= IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED;
+      iree_async_operation_set_internal_flags(
+          operation, IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED);
       iree_atomic_fetch_add(&proactor->pending_fd_cancellation_count, 1,
                             iree_memory_order_release);
       iree_async_proactor_posix_wake_poll_thread(proactor);
@@ -2848,7 +2852,8 @@ static iree_status_t iree_async_proactor_posix_cancel(
       // Set the cancelled flag. The poll thread checks this during:
       //   - pending_queue drain (if not yet registered)
       //   - notification epoch scan (processes all pending notification waits)
-      operation->internal_flags |= IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED;
+      iree_async_operation_set_internal_flags(
+          operation, IREE_ASYNC_POSIX_INTERNAL_FLAG_CANCELLED);
       iree_async_proactor_posix_wake_poll_thread(proactor);
       return iree_ok_status();
     }

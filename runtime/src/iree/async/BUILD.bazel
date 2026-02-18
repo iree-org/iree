@@ -6,7 +6,7 @@
 
 # Proactor-based async I/O system.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
@@ -113,10 +113,17 @@ iree_runtime_cc_library(
     hdrs = ["proactor_platform.h"],
     deps = [
         ":async",
-        "//runtime/src/iree/async/platform/posix",  # Always available for fallback.
     ] + select({
-        "//build_tools/bazel:iree_is_linux": ["//runtime/src/iree/async/platform/io_uring"],
-        "//conditions:default": [],
+        "//build_tools/bazel:iree_is_linux": [
+            "//runtime/src/iree/async/platform/io_uring",
+            "//runtime/src/iree/async/platform/posix",
+        ],
+        "//build_tools/bazel:iree_is_windows": [
+            "//runtime/src/iree/async/platform/iocp",
+        ],
+        "//conditions:default": [
+            "//runtime/src/iree/async/platform/posix",
+        ],
     }),
 )
 

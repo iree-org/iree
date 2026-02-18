@@ -82,6 +82,7 @@ typedef struct iree_async_timer_operation_t {
   // Platform-specific storage. Each proactor backend uses a different member:
   // - io_uring: timespec for kernel timeout (struct __kernel_timespec layout)
   // - POSIX (poll/epoll/kqueue): posix for intrusive timer list linkage
+  // - IOCP: iocp for intrusive timer list linkage
   // Callers should zero-initialize and not access these fields.
   union {
     // io_uring: timespec for kernel timeout. Pointed to by the SQE's addr
@@ -97,6 +98,12 @@ typedef struct iree_async_timer_operation_t {
       struct iree_async_timer_operation_t* next;
       struct iree_async_timer_operation_t* prev;
     } posix;
+    // IOCP proactor: intrusive doubly-linked list pointers for userspace
+    // timer management. Same algorithm as POSIX (sorted by deadline).
+    struct {
+      struct iree_async_timer_operation_t* next;
+      struct iree_async_timer_operation_t* prev;
+    } iocp;
   } platform;
 } iree_async_timer_operation_t;
 

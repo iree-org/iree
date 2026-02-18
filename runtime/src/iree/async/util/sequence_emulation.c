@@ -32,9 +32,11 @@ static void iree_async_sequence_link_trampoline(
   bool is_real_error = !iree_status_is_ok(status) &&
                        iree_status_code(status) != IREE_STATUS_CANCELLED;
   if (is_real_error) {
-    if (!iree_any_bit_set(sequence->base.internal_flags,
-                          IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
-      sequence->base.internal_flags |= IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR;
+    iree_async_operation_internal_flags_t seq_flags =
+        iree_async_operation_load_internal_flags(&sequence->base);
+    if (!iree_any_bit_set(seq_flags, IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
+      iree_async_operation_set_internal_flags(
+          &sequence->base, IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR);
       // Ownership of |status| transfers to the stash.
       sequence->internal.stashed_error = status;
       status = iree_ok_status();
@@ -49,14 +51,18 @@ static void iree_async_sequence_link_trampoline(
   // between the cancel thread's read of current_step and the cancel
   // submission), record CANCELLED as the final status. Subsequent steps in
   // the kernel chain may still execute, but the sequence result is correct.
-  if (iree_status_is_ok(status) &&
-      iree_any_bit_set(sequence->base.internal_flags,
-                       IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED) &&
-      !iree_any_bit_set(sequence->base.internal_flags,
-                        IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
-    sequence->base.internal_flags |= IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR;
-    sequence->internal.stashed_error =
-        iree_status_from_code(IREE_STATUS_CANCELLED);
+  if (iree_status_is_ok(status)) {
+    iree_async_operation_internal_flags_t cancel_check_flags =
+        iree_async_operation_load_internal_flags(&sequence->base);
+    if (iree_any_bit_set(cancel_check_flags,
+                         IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED) &&
+        !iree_any_bit_set(cancel_check_flags,
+                          IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
+      iree_async_operation_set_internal_flags(
+          &sequence->base, IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR);
+      sequence->internal.stashed_error =
+          iree_status_from_code(IREE_STATUS_CANCELLED);
+    }
   }
 
   ++sequence->current_step;
@@ -64,8 +70,9 @@ static void iree_async_sequence_link_trampoline(
   if (sequence->current_step == sequence->step_count) {
     // All step CQEs processed. Determine final status and fire base callback.
     iree_status_t final_status;
-    if (iree_any_bit_set(sequence->base.internal_flags,
-                         IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
+    if (iree_any_bit_set(
+            iree_async_operation_load_internal_flags(&sequence->base),
+            IREE_ASYNC_SEQUENCE_INTERNAL_SAW_ERROR)) {
       // Use the captured error. Discard the current status (OK or CANCELLED).
       iree_status_ignore(status);
       final_status = sequence->internal.stashed_error;
@@ -108,7 +115,7 @@ iree_status_t iree_async_sequence_submit_as_linked(
 
   // Reset sequence state.
   sequence->current_step = 0;
-  sequence->base.internal_flags = 0;
+  iree_async_operation_clear_internal_flags(&sequence->base);
   sequence->internal.stashed_error = NULL;
 
   // Save original step state before installing trampolines. On submit failure
@@ -216,7 +223,7 @@ iree_status_t iree_async_sequence_emulation_begin(
 
   // Reset sequence state and stash the emulator pointer.
   sequence->current_step = 0;
-  sequence->base.internal_flags = 0;
+  iree_async_operation_clear_internal_flags(&sequence->base);
   sequence->internal.emulator = emulator;
 
   // Submit step 0.
@@ -247,8 +254,9 @@ void iree_async_sequence_emulation_step_completed(
   ++sequence->current_step;
 
   // Check if cancel was requested between steps.
-  if (iree_any_bit_set(sequence->base.internal_flags,
-                       IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED)) {
+  if (iree_any_bit_set(
+          iree_async_operation_load_internal_flags(&sequence->base),
+          IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED)) {
     sequence->base.completion_fn(sequence->base.user_data, &sequence->base,
                                  iree_status_from_code(IREE_STATUS_CANCELLED),
                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
@@ -287,8 +295,9 @@ void iree_async_sequence_emulation_step_completed(
   // Re-check cancel after step_fn. Cancel may have arrived during step_fn
   // execution (which can take arbitrary time). Without this check, the next
   // step would be submitted despite the cancel request.
-  if (iree_any_bit_set(sequence->base.internal_flags,
-                       IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED)) {
+  if (iree_any_bit_set(
+          iree_async_operation_load_internal_flags(&sequence->base),
+          IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED)) {
     sequence->base.completion_fn(sequence->base.user_data, &sequence->base,
                                  iree_status_from_code(IREE_STATUS_CANCELLED),
                                  IREE_ASYNC_COMPLETION_FLAG_NONE);
@@ -313,8 +322,8 @@ void iree_async_sequence_emulation_step_completed(
 iree_status_t iree_async_sequence_cancel(
     iree_async_proactor_t* proactor,
     iree_async_sequence_operation_t* sequence) {
-  sequence->base.internal_flags |=
-      IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED;
+  iree_async_operation_set_internal_flags(
+      &sequence->base, IREE_ASYNC_SEQUENCE_INTERNAL_CANCEL_REQUESTED);
 
   // Best-effort cancel of the current in-flight step. If this fails (step
   // already completed due to a race between the cancel thread and the poll
