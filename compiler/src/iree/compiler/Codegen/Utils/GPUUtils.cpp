@@ -765,8 +765,8 @@ static FailureOr<int64_t>
 getKSize(IREE::Codegen::InnerTileDescAttrInterface intrinsic) {
   int64_t kSize = 1;
   int64_t lhsOperandIndex = 0;
-  SmallVector<VectorType> undistributedTypes;
-  intrinsic.getUndistributedTileTypes(undistributedTypes);
+  SmallVector<VectorType> undistributedTypes =
+      intrinsic.getUndistributedTileTypes();
   ArrayRef<int64_t> shape = undistributedTypes[lhsOperandIndex].getShape();
   SmallVector<utils::IteratorType> lhsIteratorTypes =
       intrinsic.getOperandIteratorTypes()[lhsOperandIndex];
