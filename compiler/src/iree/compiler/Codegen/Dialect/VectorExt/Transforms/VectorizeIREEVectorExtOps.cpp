@@ -220,114 +220,6 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
   return newOp;
 }
 
-/// Try to find a mapping from the memory space of tensor.extract to the loop
-/// iteration space, if possible.
-static AffineMap
-getIterationSpaceToMemorySpaceMap(linalg::GenericOp genericOp,
-                                  tensor::ExtractOp extractOp) {
-  // Try to find a mapping from the memory space to the input iteration space.
-  // Find backward slice for each index argument to tensor.extract.
-  MLIRContext *ctx = extractOp.getContext();
-  AffineMap map = AffineMap::get(genericOp.getNumLoops(), 0, ctx);
-  for (Value val : extractOp.getIndices()) {
-    Value trace = val;
-    bool found = false;
-    while (true) {
-      // If the index is a linalg.index op, this index maps to a loop iteration
-      // variable.
-      if (auto indexOp = trace.getDefiningOp<linalg::IndexOp>()) {
-        map = map.insertResult(getAffineDimExpr(indexOp.getDim(), ctx),
-                               map.getNumResults());
-        found = true;
-        break;
-      }
-
-      // If this index is a value defined outside the linalg.generic block, it
-      // is a constant value in the loop.
-      Operation *defOp = trace.getDefiningOp();
-      if (defOp && !genericOp.getBody()->findAncestorOpInBlock(*defOp)) {
-        map = map.insertResult(getAffineConstantExpr(0, ctx),
-                               map.getNumResults());
-        found = true;
-        break;
-      }
-
-      // If this index is a block argument, the index is a loop iterated
-      // variable, and the iteration space of the index is same as the loop
-      // iterated variable. However, we restrict to cases where the variable
-      // iteration space is 1-D or 0-D, otherwise the Memory -> Loop Iteration
-      // Space map will contain mods/floordivS.
-      if (auto blockArg = dyn_cast<BlockArgument>(trace)) {
-        // If this block argument isn't part of the linalg.generic body, then
-        // this is a constant value in the loop.
-        if (blockArg.getParentBlock() != genericOp.getBody()) {
-          map = map.insertResult(getAffineConstantExpr(0, ctx),
-                                 map.getNumResults());
-          found = true;
-        } else {
-          // Allow 0-D and 1-D maps.
-          AffineMap indexMap =
-              genericOp.getIndexingMapsArray()[blockArg.getArgNumber()];
-          if (indexMap.getNumResults() == 0) {
-            map = map.insertResult(getAffineConstantExpr(0, ctx),
-                                   map.getNumResults());
-            found = true;
-          } else if (indexMap.getNumResults() == 1) {
-            if (auto dimExpr = dyn_cast<AffineDimExpr>(indexMap.getResult(0))) {
-              map =
-                  map.insertResult(getAffineDimExpr(dimExpr.getPosition(), ctx),
-                                   map.getNumResults());
-              found = true;
-            }
-          }
-        }
-        break;
-      }
-
-      // Trace back arith.index_cast ops. This is a commonly occuring case,
-      // there may be other cases which we can trace back here (For example,
-      // addition with a loop invariant constant).
-      if (isa<arith::IndexCastOp>(defOp)) {
-        trace = defOp->getOperand(0);
-      } else {
-        break;
-      }
-    }
-
-    if (!found) {
-      return AffineMap();
-    }
-  }
-
-  return map;
-}
-
-static AffineMap inversePerm(AffineMap map) {
-  MLIRContext *context = map.getContext();
-  AffineExpr zero = mlir::getAffineConstantExpr(0, context);
-  // Start with all the results as 0.
-  SmallVector<AffineExpr, 4> exprs(map.getNumInputs(), zero);
-  for (unsigned i : llvm::seq(unsigned(0), map.getNumResults())) {
-    // Skip zeros from input map. 'exprs' is already initialized to zero.
-    if (auto constant = dyn_cast<AffineConstantExpr>(map.getResult(i))) {
-      if (constant.getValue() != 0) {
-        return AffineMap();
-      }
-      continue;
-    }
-
-    if (isa<AffineDimExpr>(map.getResult(i))) {
-      // Reverse each dimension existing in the original map result.
-      exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
-      continue;
-    }
-
-    // Fail if the expr is not a constant or a dim expr.
-    return AffineMap();
-  }
-  return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
-}
-
 } // namespace
 
 LogicalResult vectorizeGatherLikeGenericToTransferGather(
@@ -392,12 +284,6 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     }
   }
 
-  AffineMap itSpaceToExtract =
-      getIterationSpaceToMemorySpaceMap(linalgOp, extractOp);
-  if (!itSpaceToExtract) {
-    return failure();
-  }
-
   // Create a mapping from values used inside the linalg body to newly created
   // tensors.
   DenseMap<Value, std::pair<Value, AffineMap>> tmap;
@@ -414,17 +300,23 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
       rewriter, linalgOp, canonicalVectorSizes, preExtract, tmap);
 
   // Build the iree_vector_ext.transfer_gather operation.
-  SmallVector<Value> baseIndices;
+  SmallVector<Value> baseOffsets;
   SmallVector<Value> indexVecs;
-  SmallVector<bool> indexed;
-  SmallVector<AffineMap> indexedMaps;
+  SmallVector<AffineMap> indexVecMaps;
 
   Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
 
+  // Build the source indexing map. Every index is treated as gathered (symbol).
+  // Canonicalization (foldTransferGatherFromStep, FoldSingleElementIndexVec,
+  // etc.) will recover contiguous dims where possible.
+  MLIRContext *ctx = rewriter.getContext();
+  SmallVector<AffineExpr> sourceMapExprs;
+  int64_t numSymbols = 0;
   for (auto [i, index] : llvm::enumerate(extractOp.getIndices())) {
     if (!tmap.contains(index)) {
-      baseIndices.push_back(index);
-      indexed.push_back(false);
+      // Value defined outside the block — loop-invariant (constant/broadcast).
+      baseOffsets.push_back(index);
+      sourceMapExprs.push_back(getAffineConstantExpr(0, ctx));
       continue;
     }
 
@@ -443,24 +335,37 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
         rewriter, loc, readType, tensor, operandIndices,
         /*padding=*/std::nullopt, readMap);
 
-    baseIndices.push_back(zero);
-    indexed.push_back(true);
-    indexedMaps.push_back(inversePerm(itSpaceToExtract));
+    baseOffsets.push_back(zero);
+    // This source dim is gathered: use a symbol.
+    int64_t symIdx = numSymbols++;
+    sourceMapExprs.push_back(getAffineSymbolExpr(symIdx, ctx));
+    // The index vec map: the read result has shape canonicalVectorSizes, so
+    // it's indexed by all vector dims (identity map).
+    indexVecMaps.push_back(
+        rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size()));
     indexVecs.push_back(read.getResult());
+  }
+
+  AffineMap sourceMap = AffineMap::get(
+      /*dimCount=*/canonicalVectorSizes.size(), numSymbols, sourceMapExprs,
+      ctx);
+
+  // Build the full indexing_maps array: [sourceMap, indexVecMap0, ...]
+  SmallVector<AffineMap> indexingMaps;
+  indexingMaps.push_back(sourceMap);
+  for (AffineMap &m : indexVecMaps) {
+    // Add symbols to each index vec map to match the source map.
+    m = AffineMap::get(m.getNumDims(), numSymbols, m.getResults(), ctx);
+    indexingMaps.push_back(m);
   }
 
   auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
   Value padding = ub::PoisonOp::create(rewriter, loc, extractOp.getType());
-  // tensor.extract always produces in-bounds accesses.
-  SmallVector<Attribute> inBounds(gatherTy.getRank(),
-                                  rewriter.getBoolAttr(true));
 
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
-      rewriter, loc, gatherTy, extractOp.getTensor(), baseIndices, indexVecs,
-      rewriter.getBoolArrayAttr(indexed),
-      rewriter.getAffineMapArrayAttr(indexedMaps),
-      inversePerm(itSpaceToExtract), padding,
-      /*mask=*/Value(), rewriter.getArrayAttr(inBounds));
+      rewriter, loc, gatherTy, extractOp.getTensor(), baseOffsets, indexVecs,
+      rewriter.getAffineMapArrayAttr(indexingMaps), padding,
+      /*mask=*/Value());
 
   // Create a empty tensor to write to.
   auto emptyOp = tensor::EmptyOp::create(rewriter, loc, canonicalVectorSizes,
@@ -552,21 +457,38 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   indicesVec =
       arith::IndexCastOp::create(rewriter, loc, indicesVecTy, indicesVec);
 
-  SmallVector<Value> baseIndices(sourceTy.getRank(), zero);
-  SmallVector<bool> indexed(sourceTy.getRank(), false);
-  indexed[0] = true;
-  auto inBounds =
-      rewriter.getBoolArrayAttr(SmallVector<bool>(sourceTy.getRank(), true));
-  auto indexedMaps = rewriter.getAffineMapArrayAttr(SmallVector<AffineMap>(
-      1,
-      rewriter.getMultiDimIdentityMap(sourceTy.getRank()).getMajorSubMap(1)));
+  SmallVector<Value> baseOffsets(sourceTy.getRank(), zero);
   Value padding =
       ub::PoisonOp::create(rewriter, loc, gatherTy.getElementType());
+
+  // Build indexing_maps for the transfer_gather.
+  // Source map: (vector_dims)[s0] -> (s0, d_batch+1, ..., d_N)
+  // First source dim is gathered (s0), rest are contiguous.
+  MLIRContext *ctx = rewriter.getContext();
+  int64_t vectorRank = vectorSizes.size();
+  int64_t sourceRank = sourceTy.getRank();
+  SmallVector<AffineExpr> sourceMapExprs;
+  sourceMapExprs.push_back(getAffineSymbolExpr(0, ctx)); // gathered dim 0
+  for (int64_t i = 1; i < sourceRank; ++i) {
+    // Map remaining source dims to corresponding vector dims.
+    // The batch dims come first, so source dim i maps to vector dim
+    // (i - 1 + batchRank). For batchRank <= 1 and indexDepth == 1,
+    // source dim i maps to vector dim i.
+    sourceMapExprs.push_back(getAffineDimExpr(i, ctx));
+  }
+  AffineMap sourceMap =
+      AffineMap::get(vectorRank, /*symbolCount=*/1, sourceMapExprs, ctx);
+
+  // Index vec map: (vector_dims)[s0] -> (d0) for batch_rank == 1
+  AffineMap indexVecMap = AffineMap::get(vectorRank, /*symbolCount=*/1,
+                                         {getAffineDimExpr(0, ctx)}, ctx);
+
+  SmallVector<AffineMap> indexingMaps = {sourceMap, indexVecMap};
+
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
-      rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
-      ValueRange{indicesVec}, rewriter.getBoolArrayAttr(indexed), indexedMaps,
-      rewriter.getMultiDimIdentityMap(gatherTy.getRank()), padding,
-      /*mask=*/Value(), inBounds);
+      rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseOffsets,
+      ValueRange{indicesVec}, rewriter.getAffineMapArrayAttr(indexingMaps),
+      padding, /*mask=*/Value());
 
   VectorType gatherMaskType = gatherVectorTy.clone(rewriter.getI1Type());
   Value gatherMask =
@@ -604,11 +526,21 @@ public:
       return rewriter.notifyMatchFailure(
           maskOp, "can't lower passthru to transfer_gather");
     }
+    // Add a mask indexing map (identity) to the existing indexing_maps.
+    SmallVector<AffineMap> indexingMaps = gatherOp.getIndexingMapsArray();
+    int64_t vectorRank = gatherOp.getVector().getType().getRank();
+    int64_t numSymbols = gatherOp.getIndexVecs().size();
+    AffineMap maskMap =
+        AffineMap::getMultiDimIdentityMap(vectorRank, rewriter.getContext());
+    maskMap = AffineMap::get(vectorRank, numSymbols, maskMap.getResults(),
+                             rewriter.getContext());
+    indexingMaps.push_back(maskMap);
+
     rewriter.replaceOpWithNewOp<TransferGatherOp>(
-        maskOp, gatherOp.getVectorType(), gatherOp.getBase(),
-        gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),
-        gatherOp.getIndexedMaps(), gatherOp.getPermutationMap(),
-        gatherOp.getPadding(), maskOp.getMask(), gatherOp.getInBounds());
+        maskOp, gatherOp.getVector().getType(), gatherOp.getBase(),
+        gatherOp.getOffsets(), gatherOp.getIndexVecs(),
+        rewriter.getAffineMapArrayAttr(indexingMaps), gatherOp.getPadding(),
+        maskOp.getMask());
     return success();
   }
 };

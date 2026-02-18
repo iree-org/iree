@@ -283,18 +283,23 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
   }
 
   if (auto gather = dyn_cast<TransferGatherOp>(defOp)) {
-    AffineMap sourceMap =
-        inverseAndBroadcastProjectedPermutation(gather.getPermutationMap());
-    VectorLayoutInterface sourceLayout = layout.apply(sourceMap);
-    for (auto [map, operand] : llvm::zip_equal(gather.getIndexedMapsArray(),
-                                               gather.getIndexVecsMutable())) {
-      setLayoutOrClone(&operand, sourceLayout.apply(map));
+    SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
+    int64_t numIndexVecs = gather.getIndexVecs().size();
+    // Index vec maps are maps[1..numIndexVecs]. They only use dim exprs,
+    // so strip symbols before applying to layout.
+    for (auto [i, operand] : llvm::enumerate(gather.getIndexVecsMutable())) {
+      AffineMap indexVecMap = maps[1 + i];
+      AffineMap projected =
+          AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
+                         indexVecMap.getContext());
+      setLayoutOrClone(&operand, layout.apply(projected));
     }
     if (gather.getMask()) {
       OpOperand &mask = gather.getMaskMutable()[0];
-      AffineMap maskMap =
-          inversePermutation(compressUnusedDims(gather.getPermutationMap()));
-      setLayoutOrClone(&mask, layout.apply(maskMap));
+      AffineMap maskMap = maps[1 + numIndexVecs];
+      AffineMap projected = AffineMap::get(
+          maskMap.getNumDims(), 0, maskMap.getResults(), maskMap.getContext());
+      setLayoutOrClone(&mask, layout.apply(projected));
     }
     return;
   }

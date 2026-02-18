@@ -149,46 +149,53 @@ func.func @transfer_gather(%indices: vector<128xindex>,
 
   // inner dimension gather
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [None, %indices1: vector<64xindex>], %cst0 { indexed_maps = [
-                                             affine_map<(d0, d1) -> (d1)>]}
-  : tensor<4096x64xf16>, vector<128x64xf16>
+  [%indices1 : vector<64xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                     affine_map<(d0, d1)[s0] -> (d1)>]
+  } : tensor<4096x64xf16>, vector<128x64xf16>
 
   // outer dimension gather
   %out1 = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices: vector<128xindex>, None], %cst0 { indexed_maps = [
-                                                  affine_map<(d0, d1) -> (d0)>]}
-  : tensor<4096x64xf16>, vector<128x64xf16>
+  [%indices : vector<128xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : tensor<4096x64xf16>, vector<128x64xf16>
 
   // full gather
   %out2 = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices: vector<128xindex>, %indices1: vector<64xindex>], %cst0
-                                              { indexed_maps = [
-                                                  affine_map<(d0, d1) -> (d0)>,
-                                                  affine_map<(d0, d1) -> (d1)>]}
-  : tensor<4096x64xf16>, vector<128x64xf16>
+  [%indices, %indices1 : vector<128xindex>, vector<64xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d0)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d1)>]
+  } : tensor<4096x64xf16>, vector<128x64xf16>
 
   // sparse gather
   %out3 = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [None, %indices2: vector<128x64xindex>], %cst0
-                                              { indexed_maps = [
-                                                  affine_map<(d0, d1) -> (d0, d1)>]}
-  : tensor<4096x64xf16>, vector<128x64xf16>
+  [%indices2 : vector<128x64xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : tensor<4096x64xf16>, vector<128x64xf16>
 
   return %out, %out1, %out2, %out3 : vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>, vector<128x64xf16>
 }
 
-// CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK-DAG: #[[$MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[$SMAP_D0S0:.+]] = affine_map<(d0, d1)[s0] -> (d0, s0)>
+// CHECK-DAG: #[[$IVMAP_D1_1S:.+]] = affine_map<(d0, d1)[s0] -> (d1)>
+// CHECK-DAG: #[[$SMAP_S0D1:.+]] = affine_map<(d0, d1)[s0] -> (s0, d1)>
+// CHECK-DAG: #[[$IVMAP_D0_1S:.+]] = affine_map<(d0, d1)[s0] -> (d0)>
+// CHECK-DAG: #[[$SMAP_S0S1:.+]] = affine_map<(d0, d1)[s0, s1] -> (s0, s1)>
+// CHECK-DAG: #[[$IVMAP_D0_2S:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0)>
+// CHECK-DAG: #[[$IVMAP_D1_2S:.+]] = affine_map<(d0, d1)[s0, s1] -> (d1)>
+// CHECK-DAG: #[[$IVMAP_D0D1_1S:.+]] = affine_map<(d0, d1)[s0] -> (d0, d1)>
 
 // CHECK-LABEL: func.func @transfer_gather
 // CHECK-SAME:    %[[INDICES0:.+]]: vector<128xindex>, %[[INDICES1:.+]]: vector<64xindex>, %[[INDICES2:.+]]: vector<128x64xindex>, %[[SOURCE:.+]]: tensor<4096x64xf16>
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f16
-// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][None, %[[INDICES1]]: vector<64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP0]]]} : tensor<4096x64xf16>, vector<128x64xf16>
-// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, None], %[[PAD]] {indexed_maps = [#[[$MAP1]]]} : tensor<4096x64xf16>, vector<128x64xf16>
-// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][%[[INDICES0]]: vector<128xindex>, %[[INDICES1]]: vector<64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP1]], #[[$MAP0]]]} : tensor<4096x64xf16>, vector<128x64xf16>
-// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]][None, %[[INDICES2]]: vector<128x64xindex>], %[[PAD]] {indexed_maps = [#[[$MAP2]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]] [%[[INDICES1]] : vector<64xindex>], %[[PAD]] {indexing_maps = [#[[$SMAP_D0S0]], #[[$IVMAP_D1_1S]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]] [%[[INDICES0]] : vector<128xindex>], %[[PAD]] {indexing_maps = [#[[$SMAP_S0D1]], #[[$IVMAP_D0_1S]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]] [%[[INDICES0]], %[[INDICES1]] : vector<128xindex>, vector<64xindex>], %[[PAD]] {indexing_maps = [#[[$SMAP_S0S1]], #[[$IVMAP_D0_2S]], #[[$IVMAP_D1_2S]]]} : tensor<4096x64xf16>, vector<128x64xf16>
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]] [%[[INDICES2]] : vector<128x64xindex>], %[[PAD]] {indexing_maps = [#[[$SMAP_D0S0]], #[[$IVMAP_D0D1_1S]]]} : tensor<4096x64xf16>, vector<128x64xf16>
 
 // -----
 
