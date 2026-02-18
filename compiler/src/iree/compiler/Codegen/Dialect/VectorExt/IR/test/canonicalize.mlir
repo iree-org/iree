@@ -151,6 +151,32 @@ func.func @transfer_gather_fold_single_element(%scalar: vector<1xindex>,
 
 // -----
 
+func.func @transfer_gather_fold_add_broadcast(%indices: vector<64xindex>,
+  %source: tensor<4096x64xf16>, %offset: index)
+  -> vector<64x32xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+
+  %bcast = vector.broadcast %offset : index to vector<64xindex>
+  %added = arith.addi %indices, %bcast : vector<64xindex>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%added : vector<64xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : tensor<4096x64xf16>, vector<64x32xf16>
+
+  return %out : vector<64x32xf16>
+}
+
+// CHECK-LABEL: @transfer_gather_fold_add_broadcast
+// CHECK-SAME: %[[INDICES:.*]]: vector<64xindex>, %[[SOURCE:.*]]: tensor<4096x64xf16>, %[[OFFSET:.*]]: index
+// CHECK: transfer_gather %[[SOURCE]][%[[OFFSET]],
+// CHECK-SAME: [%[[INDICES]] : vector<64xindex>]
+
+// -----
+
 func.func @transfer_gather_fold_contiguous_load(
   %source: tensor<4096x64xf16>)
   -> vector<64x1xf16> {
