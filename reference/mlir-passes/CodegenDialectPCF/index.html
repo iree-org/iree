@@ -4642,6 +4642,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-pcf-fuse-producers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-pcf-fuse-producers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-pcf-lower-structural-pcf" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-pcf-lower-structural-pcf
@@ -4747,6 +4756,19 @@ body, composing the slice parameters:
 of the inner parallel loop rather than after the entire forall completes.</p>
 <p>The underlying pattern is exposed via <code>composeWriteSliceWithParallelInsert()</code>
 for use in custom pipelines.</p>
+<h3 id="-iree-pcf-fuse-producers"><code>-iree-pcf-fuse-producers</code><a class="headerlink" href="#-iree-pcf-fuse-producers" title="Permanent link">link</a></h3>
+<p><em>Fuses DPS producers into pcf.generic/loop ops through tied init args.</em></p>
+<p>Pass for fusing producer operations into <code>pcf.generic</code> and <code>pcf.loop</code> ops.</p>
+<p>The input is IR containing PCF parallel ops whose tied init values are
+produced by operations implementing <code>TilingInterface</code> and
+<code>DestinationStyleOpInterface</code> (e.g. <code>linalg.fill</code>).</p>
+<p>The pass matches each tied init that is the single result of a DPS producer.
+For each <code>pcf.read_slice</code> on the corresponding sref argument, it generates a
+tiled version of the producer via <code>generateResultTileValue</code> and replaces the
+read with the tiled result. The scoped op's init is updated to the producer's
+DPS init, and the original producer is erased if unused.</p>
+<p>The underlying fusion patterns are exposed via <code>matchTilableProducer()</code> and
+<code>fuseTilableProducer()</code> for use in custom pipelines.</p>
 <h3 id="-iree-pcf-lower-structural-pcf"><code>-iree-pcf-lower-structural-pcf</code><a class="headerlink" href="#-iree-pcf-lower-structural-pcf" title="Permanent link">link</a></h3>
 <p><em>Lowers pcf.generic/loop to scf.execute_region/forall</em></p>
 <p>Lowers structured PCF parallel ops to SCF and CF ops. This is the final
