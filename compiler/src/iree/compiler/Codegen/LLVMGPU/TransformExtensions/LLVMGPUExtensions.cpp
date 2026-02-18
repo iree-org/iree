@@ -499,7 +499,11 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
                                                    PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
 
-  vector::populateVectorMultiReductionLoweringPatterns(
+  vector::populateVectorMultiReductionReorderAndExpandPatterns(
+      patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
+  vector::populateVectorMultiReductionFlatteningPatterns(
+      patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
+  vector::populateVectorMultiReductionUnrollingPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
 }
 
