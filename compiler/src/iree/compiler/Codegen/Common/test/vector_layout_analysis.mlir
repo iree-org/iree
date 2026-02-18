@@ -808,3 +808,123 @@ func.func @propagate_1D_reshape_contract(%arg0: memref<4x32xf16>) -> vector<128x
   // expected-remark @above {{subgroup_tile = [2], batch_tile = [4], outer_tile = [1], thread_tile = [4], element_tile = [4], subgroup_strides = [1], thread_strides = [1]}}
   func.return %reshape : vector<128xf16>
 }
+
+// -----
+
+// Forward propagation through linalg.generic with a reduction.
+// Layout is anchored on the two inputs; the output layout should be inferred.
+
+#layoutLhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [32, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#layoutRhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [128, 64],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+#map0 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+func.func @generic_forward_reduction(%A : tensor<32x64xf16>, %B : tensor<128x64xf16>, %C : tensor<128x32xf32>) -> tensor<128x32xf32> {
+  %a = iree_vector_ext.to_layout %A to layout(#layoutLhs) : tensor<32x64xf16>
+  %b = iree_vector_ext.to_layout %B to layout(#layoutRhs) : tensor<128x64xf16>
+
+  // expected-remark @below {{element_tile = [128, 32]}}
+  %D = linalg.generic {
+    indexing_maps = [#map0, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%a, %b : tensor<32x64xf16>, tensor<128x64xf16>)
+    outs(%C : tensor<128x32xf32>) {
+  ^bb0(%in0: f16, %in1: f16, %out: f32):
+    linalg.yield %out : f32
+  } -> tensor<128x32xf32>
+
+  func.return %D : tensor<128x32xf32>
+}
+
+// -----
+
+// Backward propagation through linalg.generic.
+// Layout is anchored on the generic's result. Backward propagation should
+// set the layout on the DPS init.
+
+#layoutOut = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [16, 16],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+func.func @generic_backward_to_init(%A : tensor<32x32xf16>, %B : tensor<16x16xf16>) -> tensor<16x16xf16> {
+  // expected-remark @below {{element_tile = [16, 16]}}
+  %slice = tensor.extract_slice %A[0, 0] [16, 16] [1, 1] : tensor<32x32xf16> to tensor<16x16xf16>
+
+  // expected-remark @below {{element_tile = [16, 16]}}
+  %d = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%slice : tensor<16x16xf16>)
+    outs(%B : tensor<16x16xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<16x16xf16>
+
+  %dl = iree_vector_ext.to_layout %d to layout(#layoutOut) : tensor<16x16xf16>
+  func.return %dl : tensor<16x16xf16>
+}
+
+// -----
+
+// Forward propagation through linalg.generic with permuted maps.
+
+#layoutIn = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [4, 16],
+  element_tile = [4, 1],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [1, 4]
+>
+
+#map_transposed = affine_map<(d0, d1) -> (d1, d0)>
+#map_identity = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @generic_forward_permuted(%A : tensor<16x16xf16>, %b : tensor<16x16xf16>) -> tensor<16x16xf16> {
+  %a = iree_vector_ext.to_layout %A to layout(#layoutIn) : tensor<16x16xf16>
+
+  // The input has map (d1, d0) and the output has map (d0, d1), so the
+  // layout dimensions should be transposed: element_tile = [1, 4].
+  // expected-remark @below {{element_tile = [1, 4]}}
+  %c = linalg.generic {
+    indexing_maps = [#map_transposed, #map_identity],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%a : tensor<16x16xf16>)
+    outs(%b : tensor<16x16xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  } -> tensor<16x16xf16>
+
+  func.return %c : tensor<16x16xf16>
+}
