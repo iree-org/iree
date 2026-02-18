@@ -6939,8 +6939,8 @@ CCCC DDDD EEEE FFFF /// 0 1 2 3
 <p>is swizzled to
 <div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
 7777 4444 5555 6666 /// 3 0 1 2
-BBBB AAAA 8888 9999 /// 2 3 0 1
-FFFF EEEE DDDD CCCC /// 1 2 3 0
+AAAA BBBB 8888 9999 /// 2 3 0 1
+DDDD EEEE FFFF CCCC /// 1 2 3 0
 </code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
 <h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
@@ -7108,11 +7108,11 @@ CCCC DDDD EEEE FFFF /// 0 1 2 3
 </code></pre></div>
 <p>is swizzled to
 <div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
-7777 4444 5555 6666 /// 1 0 3 2
-BBBB AAAA 8888 9999 /// 2 3 0 1
+5555 4444 7777 6666 /// 1 0 3 2
+AAAA BBBB 8888 9999 /// 2 3 0 1
 FFFF EEEE DDDD CCCC /// 3 2 1 0
 </code></pre></div>
-|access_width| allows to keep the same shuffling accross multiple rows. For example,</p>
+|per_phase| allows to keep the same shuffling across multiple rows. For example,</p>
 <div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 2
 
 0000 1111 2222 3333 /// 0 1 2 3
@@ -7122,9 +7122,9 @@ CCCC DDDD EEEE FFFF /// 0 1 2 3
 </code></pre></div>
 <p>is swizzled to
 <div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
-7777 4444 5555 6666 /// 0 1 2 3
-BBBB AAAA 8888 9999 /// 1 0 3 2
-FFFF EEEE DDDD CCCC /// 1 0 3 2
+4444 5555 6666 7777 /// 0 1 2 3
+9999 8888 BBBB AAAA /// 1 0 3 2
+DDDD CCCC FFFF EEEE /// 1 0 3 2
 </code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
 <h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
