@@ -141,6 +141,25 @@ def GPUBubbleResourceCastsPass :
   ];
 }
 
+def GPUConvertAllIDsToThreadIDsPass
+    : InterfacePass<"iree-codegen-gpu-convert-all-ids-to-thread-ids",
+                    "mlir::FunctionOpInterface"> {
+  let summary =
+      "Rewrite gpu.subgroup_id and gpu.lane_id to thread ID linearization.";
+  let description = [{
+    Rewrites gpu.subgroup_id and gpu.lane_id to explicit thread ID
+    linearization using affine.linearize_index. Subgroup ID becomes
+    `linearize_index(thread_ids) / gpu.subgroup_size` and lane ID becomes
+    `linearize_index(thread_ids) % gpu.subgroup_size`. The generated
+    gpu.block_dim and gpu.subgroup_size ops are folded to constants by
+    PropagateDispatchSizeBounds later in the pipeline.
+  }];
+  let dependentDialects = ["::mlir::affine::AffineDialect",
+                           "::mlir::arith::ArithDialect",
+                           "::mlir::gpu::GPUDialect",
+  ];
+}
+
 def GPUFuseAndHoistParallelLoopsPass :
     InterfacePass<"iree-codegen-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
   let summary = "Greedily fuses and hoists parallel loops.";

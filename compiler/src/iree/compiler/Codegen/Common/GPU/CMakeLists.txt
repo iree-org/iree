@@ -56,6 +56,7 @@ iree_cc_library(
     "GPUApplyPaddingLevel.cpp"
     "GPUApplyTilingLevel.cpp"
     "GPUBubbleResourceCasts.cpp"
+    "GPUConvertAllIDsToThreadIDs.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineLayoutTransformation.cpp"
     "GPUCombineValueBarriers.cpp"

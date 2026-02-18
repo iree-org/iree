@@ -959,6 +959,8 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
       // full complexity.
       .addPass(createVectorTransferLoweringPass)
       .addPass(createIREECodegenFoldMemRefAliasOpsPass)
+      // Rewrite all gpu.*_id ops in terms of thread ids.
+      .addPass(createGPUConvertAllIDsToThreadIDsPass)
       // Propagate constants close to loads/stores to improve the ability for
       // swizzling to CSE.
       .addPass(createPropagateConstantOffsetsPass)
