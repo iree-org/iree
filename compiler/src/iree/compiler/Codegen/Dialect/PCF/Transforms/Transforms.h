@@ -24,19 +24,34 @@ namespace mlir::scf {
 class ForallOp;
 } // namespace mlir::scf
 namespace mlir::tensor {
+class CollapseShapeOp;
 class ExtractSliceOp;
 } // namespace mlir::tensor
 
 namespace mlir::iree_compiler::IREE::PCF {
 
-// Helper to convert scf.forall ops to pcf.loop by linearizing/delinearizing
-// ids beyond |numIds| into the slowest varying id. Uses
-// DeviceMappingAttrInterface to infer the order of ids from slowest to fastest
-// varying. If |numIds| <= 0, then no linearization/delinearization is done.
-FailureOr<PCF::LoopOp> convertForallToPCF(RewriterBase &rewriter,
-                                          scf::ForallOp forallOp,
-                                          PCF::ScopeAttrInterface scope,
-                                          int64_t numIds = -1);
+/// Converts scf.forall ops to pcf.loop by linearizing/delinearizing ids beyond
+/// |numIds| into the slowest varying id. Uses DeviceMappingAttrInterface to
+/// infer the order of ids from slowest to fastest varying. If |numIds| <= 0,
+/// then no linearization/delinearization is done.
+FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
+                                              scf::ForallOp forallOp,
+                                              PCF::ScopeAttrInterface scope,
+                                              int64_t numIds = -1);
+
+/// Converts an scf.forall operation to a nest of pcf.generic operations with
+/// an inner scf.forall handling spillover iterations.
+///
+/// Each scope in |scopes| generates one pcf.generic op (outermost first).
+/// Worker IDs are linearized, chunk bounds computed for work distribution,
+/// and delinearized back to multi-dimensional forall bounds. Uneven chunks
+/// are distributed greedily, with only the last worker lexicographically
+/// getting fewer loop iterations.
+///
+/// Returns the outermost pcf.generic op on success.
+FailureOr<PCF::GenericOp>
+convertForallToGenericNest(RewriterBase &rewriter, scf::ForallOp forallOp,
+                           ArrayRef<PCF::ScopeAttrInterface> scopes);
 
 struct ConsumerFusionParams {
   // List of operands in the consumer that are fused along.
@@ -94,6 +109,42 @@ void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp genericOp,
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp loopOp,
                          TilingInterface target, ConsumerFusionParams &params);
 
+struct ProducerFusionParams {
+  // Which result index of the scoped op has a fusable producer init.
+  unsigned resultIndex;
+  // The producer op to fuse (implements TilingInterface + DPS). Stored as
+  // Operation* to avoid requiring the full TilingInterface definition here.
+  Operation *producer;
+  // Read sites on the corresponding sref arg that consume the init value.
+  SmallVector<PCF::ReadSliceOp> readSlices;
+};
+
+// Helpers to match a DPS producer as fusable into a pcf.generic/loop op
+// through its tied init argument. The producer must:
+//   1. Implement TilingInterface and DestinationStyleOpInterface.
+//   2. Have a single result.
+//   3. Have all operands dominating the scoped op.
+//   4. Feed into a tied init of the scoped op whose corresponding sref arg
+//      has only read_slice and write_slice users.
+//
+// On success, |params| is populated with the result index, producer op, and
+// list of read_slice ops to replace with tiled producer computations.
+LogicalResult matchTilableProducer(RewriterBase &rewriter,
+                                   PCF::GenericOp genericOp,
+                                   ProducerFusionParams &params);
+LogicalResult matchTilableProducer(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                                   ProducerFusionParams &params);
+
+// Fuses the matched producer into the scoped op by:
+//   1. Replacing the tied init with the producer's DPS init.
+//   2. Generating tiled producer computations at each read_slice site via
+//      TilingInterface::generateResultTileValue.
+//   3. Erasing the original producer if it has no remaining uses.
+void fuseTilableProducer(RewriterBase &rewriter, PCF::GenericOp genericOp,
+                         const ProducerFusionParams &params);
+void fuseTilableProducer(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                         const ProducerFusionParams &params);
+
 // Pattern set for dropping unused results from scoped ops. Due to memory
 // effects this requires cascading operation erasure and is unsuitable for
 // a canonicalization pattern.
@@ -113,6 +164,31 @@ fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
                                     PCF::GenericOp genericOp,
                                     tensor::ExtractSliceOp extractSliceOp);
 
+// Fuse a tensor.collapse_shape consumer into a pcf.loop producer. This
+// changes the result to the collapsed shape and linearizes all write_slice
+// offsets/sizes accordingly. Supports both static and dynamic shapes.
+//
+// For each reassociation group, the innermost dimension is always kept as a
+// contiguous write. In the static case, consecutive inner dimensions that
+// fully cover the producer shape are folded into the contiguous chunk. Any
+// remaining outer dimensions are emitted as unmapped scf.forall loops.
+LogicalResult
+fuseCollapseShapeIntoProducerLoop(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                                  tensor::CollapseShapeOp collapseOp);
+
+// Fuse a tensor.collapse_shape consumer into a pcf.generic producer. This
+// changes the result to the collapsed shape and linearizes all write_slice
+// offsets/sizes accordingly. Supports both static and dynamic shapes.
+//
+// For each reassociation group, the innermost dimension is always kept as a
+// contiguous write. In the static case, consecutive inner dimensions that
+// fully cover the producer shape are folded into the contiguous chunk. Any
+// remaining outer dimensions are emitted as unmapped scf.forall loops.
+LogicalResult
+fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
+                                     PCF::GenericOp genericOp,
+                                     tensor::CollapseShapeOp collapseOp);
+
 // Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
 // scf.forall terminator. The write_slice's destination must be produced by the
 // forall op, and the parallel_insert_slice must be inserting into that result.
@@ -120,6 +196,24 @@ fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
 FailureOr<PCF::WriteSliceOp>
 composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
                                     PCF::WriteSliceOp writeSliceOp);
+
+/// Folds an scf.forall containing a pcf.loop into a single pcf.generic.
+///
+/// Validates structural requirements:
+/// - All ops in scf.forall.in_parallel are tensor.parallel_insert_slice.
+/// - All insert sources come from the same pcf.loop result.
+/// - All insert destinations are scf.forall shared_outs.
+/// - The pcf.loop is the last op before terminator in forall body.
+/// - The pcf.loop has single count argument (linearized).
+/// - All pcf.loop region ref arg users are pcf.write_slice ops.
+/// - Ref args have SyncOnReturnAttr sync scope.
+///
+/// Does NOT validate mapping or scope attributes (caller's responsibility).
+/// Does NOT create workgroup_count_hint (caller's responsibility).
+///
+/// On success, the forall and inner loop are replaced with a pcf.generic.
+FailureOr<PCF::GenericOp> foldForallIntoPCFLoop(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp);
 
 } // namespace mlir::iree_compiler::IREE::PCF
 

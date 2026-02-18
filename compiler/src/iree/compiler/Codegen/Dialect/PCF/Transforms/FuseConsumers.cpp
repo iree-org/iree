@@ -12,7 +12,9 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/ValueRange.h"
@@ -36,7 +38,7 @@ struct FuseConsumersPass final
   void runOnOperation() override;
 };
 
-struct FuseIntoGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
+struct FuseIntoGenericOp final : OpRewritePattern<IREE::PCF::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -61,7 +63,7 @@ struct FuseIntoGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
   }
 };
 
-struct FuseIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
+struct FuseIntoLoopOp final : OpRewritePattern<IREE::PCF::LoopOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::LoopOp loopOp,
                                 PatternRewriter &rewriter) const override {
@@ -86,8 +88,8 @@ struct FuseIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
   }
 };
 
-struct FuseExtractSliceIntoLoopOp
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct FuseExtractSliceIntoLoopOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -96,16 +98,12 @@ struct FuseExtractSliceIntoLoopOp
       return rewriter.notifyMatchFailure(extractSliceOp, "No loop op producer");
     }
 
-    if (failed(fuseExtractSliceIntoProducerLoop(rewriter, loopOp,
-                                                extractSliceOp))) {
-      return failure();
-    }
-    return success();
+    return fuseExtractSliceIntoProducerLoop(rewriter, loopOp, extractSliceOp);
   }
 };
 
-struct FuseExtractSliceIntoGenericOp
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct FuseExtractSliceIntoGenericOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -116,11 +114,35 @@ struct FuseExtractSliceIntoGenericOp
                                          "No generic op producer");
     }
 
-    if (failed(fuseExtractSliceIntoProducerGeneric(rewriter, genericOp,
-                                                   extractSliceOp))) {
-      return failure();
+    return fuseExtractSliceIntoProducerGeneric(rewriter, genericOp,
+                                               extractSliceOp);
+  }
+};
+
+struct FuseCollapseShapeIntoGenericOp final
+    : OpRewritePattern<tensor::CollapseShapeOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto genericOp = collapseOp.getSrc().getDefiningOp<IREE::PCF::GenericOp>();
+    if (!genericOp) {
+      return rewriter.notifyMatchFailure(collapseOp, "No generic op producer");
     }
-    return success();
+    return fuseCollapseShapeIntoProducerGeneric(rewriter, genericOp,
+                                                collapseOp);
+  }
+};
+
+struct FuseCollapseShapeIntoLoopOp final
+    : OpRewritePattern<tensor::CollapseShapeOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
+                                PatternRewriter &rewriter) const override {
+    auto loopOp = collapseOp.getSrc().getDefiningOp<IREE::PCF::LoopOp>();
+    if (!loopOp) {
+      return rewriter.notifyMatchFailure(collapseOp, "No loop op producer");
+    }
+    return fuseCollapseShapeIntoProducerLoop(rewriter, loopOp, collapseOp);
   }
 };
 
@@ -135,6 +157,8 @@ void FuseConsumersPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<FuseIntoGenericOp, FuseIntoLoopOp>(&getContext());
   patterns.add<FuseExtractSliceIntoLoopOp, FuseExtractSliceIntoGenericOp>(
+      &getContext());
+  patterns.add<FuseCollapseShapeIntoGenericOp, FuseCollapseShapeIntoLoopOp>(
       &getContext());
   populatePCFDropUnusedResultPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
@@ -161,7 +185,7 @@ lookupProducerSlices(OpResult result,
   if (!srefType.isReturnOnlySync()) {
     return failure();
   }
-  for (auto user : tiedArg.getUsers()) {
+  for (Operation *user : tiedArg.getUsers()) {
     // We can ignore memory reads.
     if (isa<PCF::ReadSliceOp>(user)) {
       continue;
@@ -200,7 +224,7 @@ matchTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
   assert(targetOperands.empty() && "unexpected non-empty operand list");
   assert(targetResults.empty() && "unexpected non-empty result set");
   assert(slices.empty() && "unexpected non-empty slice list");
-  mlir::DominanceInfo dominanceInfo(producerOp->getParentOp());
+  DominanceInfo dominanceInfo(producerOp->getParentOp());
   // First collect the set of operands/results fused along. Additionally verify
   // dominance for other operands.
   for (OpOperand &operand : target->getOpOperands()) {
@@ -267,7 +291,7 @@ matchTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
     // Case 2: Multiple results. We must find the most dominated slice to use
     // as the insertion point in this case.
     int64_t leader = -1;
-    for (auto operandIndex : targetOperands) {
+    for (unsigned operandIndex : targetOperands) {
       int64_t currNumSlices = slices.size();
       auto opResult = cast<OpResult>(target->getOperand(operandIndex));
       if (failed(lookupProducerSlices<OpTy>(opResult, slices))) {
@@ -400,7 +424,7 @@ static void fuseIntoWriteSlices(RewriterBase &rewriter, TilingInterface target,
   // `tensor.extract_slice` consumer. If this fails for any reason we leave the
   // unrealized cast in and fail later for better diagnostics as it is
   // unrecoverable.
-  for (auto unrealizedCast : unrealizedConversions) {
+  for (UnrealizedConversionCastOp unrealizedCast : unrealizedConversions) {
     SmallVector<Operation *> users(unrealizedCast->getUsers());
     for (Operation *user : users) {
       if (auto extract = dyn_cast<tensor::ExtractSliceOp>(user)) {
@@ -422,7 +446,7 @@ static void addSrefArguments(MLIRContext *context, Location loc,
                              PCF::ScopeAttrInterface scope) {
   // Add the new region arguments with parent sync scope.
   Attribute syncScope = PCF::SyncOnReturnAttr::get(context);
-  for (auto resultType : resultTypes) {
+  for (Type resultType : resultTypes) {
     auto tensorType = cast<RankedTensorType>(resultType);
     auto newSrefType =
         PCF::ShapedRefType::get(context, tensorType.getShape(),
@@ -439,13 +463,13 @@ static PCF::LoopOp addResults(RewriterBase &rewriter, PCF::LoopOp loopOp,
 
   // Append the parameters for the new results to the existing lists.
   SmallVector<Type> newResultTypes(loopOp->getResultTypes());
-  newResultTypes.append(resultTypes.begin(), resultTypes.end());
+  llvm::append_range(newResultTypes, resultTypes);
   SmallVector<bool> newIsTied(loopOp.getIsTied());
-  newIsTied.append(isTied.begin(), isTied.end());
+  llvm::append_range(newIsTied, isTied);
   SmallVector<Value> newDynamicSizes(loopOp.getDynamicSizes());
-  newDynamicSizes.append(dynamicSizes.begin(), dynamicSizes.end());
+  llvm::append_range(newDynamicSizes, dynamicSizes);
   SmallVector<Value> newTiedArgs(loopOp.getInits());
-  newTiedArgs.append(tiedArgs.begin(), tiedArgs.end());
+  llvm::append_range(newTiedArgs, tiedArgs);
 
   int64_t numOriginalResults = loopOp->getNumResults();
 
@@ -475,13 +499,13 @@ addResults(RewriterBase &rewriter, PCF::GenericOp genericOp,
 
   // Append the parameters for the new results to the existing lists.
   SmallVector<Type> newResultTypes(genericOp->getResultTypes());
-  newResultTypes.append(resultTypes.begin(), resultTypes.end());
+  llvm::append_range(newResultTypes, resultTypes);
   SmallVector<bool> newIsTied(genericOp.getIsTied());
-  newIsTied.append(isTied.begin(), isTied.end());
+  llvm::append_range(newIsTied, isTied);
   SmallVector<Value> newDynamicSizes(genericOp.getDynamicSizes());
-  newDynamicSizes.append(dynamicSizes.begin(), dynamicSizes.end());
+  llvm::append_range(newDynamicSizes, dynamicSizes);
   SmallVector<Value> newTiedArgs(genericOp.getInits());
-  newTiedArgs.append(tiedArgs.begin(), tiedArgs.end());
+  llvm::append_range(newTiedArgs, tiedArgs);
 
   int64_t numOriginalResults = genericOp->getNumResults();
 
@@ -526,9 +550,9 @@ static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
     if (OpOperand *tiedInit = producerOp.getTiedInit(resultNumber)) {
       return tiedInit->get();
     }
-    return mlir::tensor::EmptyOp::create(
-        rewriter, loc, producerOp.getResultType(resultNumber),
-        producerOp.getResultDims(resultNumber));
+    return tensor::EmptyOp::create(rewriter, loc,
+                                   producerOp.getResultType(resultNumber),
+                                   producerOp.getResultDims(resultNumber));
   };
 
   if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*target)) {
@@ -552,7 +576,7 @@ static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
           isTied.push_back(false);
           ValueRange resultDims =
               producerOp.getResultDims(result.getResultNumber());
-          dynamicSizes.append(resultDims.begin(), resultDims.end());
+          llvm::append_range(dynamicSizes, resultDims);
         }
       } else {
         // Otherwise we just use the init as the tied operand directly.
@@ -651,11 +675,11 @@ static void computeClampedOffsetsAndSizes(
   for (auto [sliceOffset, sliceSize, extractSize] :
        llvm::zip_equal(sliceOffsets, sliceSizes, extractSizes)) {
     // Compute min(sliceOffset + sliceSize, extractSize) - sliceOffset
-    // = min(sliceSize, extractSize - sliceOffset)
+    // = min(sliceSize, extractSize - sliceOffset).
     AffineExpr d0, d1, d2;
     bindDims(rewriter.getContext(), d0, d1, d2);
-    // d0 = sliceSize, d1 = extractSize, d2 = sliceOffset
-    // clampedSize = min(d0, d1 - d2)
+    // d0 = sliceSize, d1 = extractSize, d2 = sliceOffset.
+    // clampedSize = min(d0, d1 - d2).
     AffineMap minMap =
         AffineMap::get(3, 0, {d0, d1 - d2}, rewriter.getContext());
     OpFoldResult clampedSize = affine::makeComposedFoldedAffineMin(
@@ -684,7 +708,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   }
 
   // Rank-reducing extract_slice is not yet supported.
-  auto extractedType = extractSliceOp.getType();
+  RankedTensorType extractedType = extractSliceOp.getType();
   auto producerResultType = cast<RankedTensorType>(producerResult.getType());
   if (extractedType.getRank() != producerResultType.getRank()) {
     return rewriter.notifyMatchFailure(
@@ -733,7 +757,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   for (unsigned i = 0; i < resultIdx; ++i) {
     auto prevResultType =
         cast<RankedTensorType>(producerOp->getResult(i).getType());
-    for (int64_t j = 0; j < prevResultType.getRank(); ++j) {
+    for (int64_t j = 0, rank = prevResultType.getRank(); j < rank; ++j) {
       if (prevResultType.isDynamicDim(j)) {
         newDynamicSizes.push_back(
             producerOp.getDynamicSizes()[dynamicDimIdx++]);
@@ -742,7 +766,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   }
 
   // Skip dynamic sizes for the current result (we'll add new ones).
-  for (int64_t j = 0; j < producerResultType.getRank(); ++j) {
+  for (int64_t j = 0, rank = producerResultType.getRank(); j < rank; ++j) {
     if (producerResultType.isDynamicDim(j)) {
       dynamicDimIdx++;
     }
@@ -750,7 +774,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
 
   // Add new dynamic sizes from the extract_slice.
   rewriter.setInsertionPoint(producerOp);
-  for (int64_t j = 0; j < extractedType.getRank(); ++j) {
+  for (int64_t j = 0, rank = extractedType.getRank(); j < rank; ++j) {
     if (extractedType.isDynamicDim(j)) {
       OpFoldResult size = extractSliceOp.getMixedSizes()[j];
       newDynamicSizes.push_back(
@@ -775,7 +799,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
 
   // Create the new result types.
   SmallVector<Type> newResultTypes;
-  for (unsigned i = 0; i < producerOp->getNumResults(); ++i) {
+  for (unsigned i = 0, e = producerOp->getNumResults(); i < e; ++i) {
     if (i == resultIdx) {
       newResultTypes.push_back(extractedType);
     } else {
@@ -813,7 +837,7 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   // Get the write_slices in the new op's region (they were moved with the
   // body).
   SmallVector<PCF::WriteSliceOp> newSlices;
-  for (auto user : newRefArg.getUsers()) {
+  for (Operation *user : newRefArg.getUsers()) {
     if (auto writeSlice = dyn_cast<PCF::WriteSliceOp>(user)) {
       newSlices.push_back(writeSlice);
     }
@@ -859,6 +883,441 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   return success();
 }
 
+//===---------------------------------------------------------------------===//
+// Collapse shape consumer fusion
+//===---------------------------------------------------------------------===//
+
+/// For a reassociation group, determines the index within the group where
+/// "retention" begins. Dimensions from retainedStart to the end of the group
+/// form a contiguous chunk in the collapsed layout. Dimensions before
+/// retainedStart become loop iterations via scf.forall.
+///
+/// The innermost dimension is always retained. Each subsequent outer dimension
+/// can be folded into the contiguous chunk if the dimension just inside it is
+/// fully covered (offset == 0, size == dim_size). Dynamic dimensions stop the
+/// extension since we cannot statically verify full coverage.
+static int64_t computeRetainedStart(const ReassociationIndices &group,
+                                    ArrayRef<OpFoldResult> sliceOffsets,
+                                    ArrayRef<OpFoldResult> sliceSizes,
+                                    ArrayRef<int64_t> producerShape) {
+  if (group.size() <= 1) {
+    return 0;
+  }
+
+  int64_t retainedStart = group.size() - 1; // Innermost always retained.
+
+  // Extend retained range from innermost outward. To include group position j,
+  // the dim just inside (j+1) must be fully covered: offset == 0 and
+  // size == dim_size. Dynamic dimensions stop the extension since we cannot
+  // statically verify full coverage.
+  for (int64_t j = static_cast<int64_t>(group.size()) - 2; j >= 0; --j) {
+    int64_t innerDim = group[j + 1];
+    if (ShapedType::isDynamic(producerShape[innerDim])) {
+      break;
+    }
+    if (isConstantIntValue(sliceOffsets[innerDim], 0) &&
+        isConstantIntValue(sliceSizes[innerDim], producerShape[innerDim])) {
+      retainedStart = j;
+    } else {
+      break;
+    }
+  }
+
+  return retainedStart;
+}
+
+/// Gets OpFoldResult dim sizes for the producer result. Static dims become
+/// IntegerAttr, dynamic dims become Values from the tied init or the op's
+/// dynamic_sizes.
+template <typename OpTy>
+static SmallVector<OpFoldResult> getProducerResultDimSizes(
+    RewriterBase &rewriter, OpTy producerOp, unsigned resultIdx,
+    RankedTensorType producerResultType, OpOperand *tiedInit) {
+  if (tiedInit) {
+    return tensor::getMixedSizes(rewriter, producerOp.getLoc(),
+                                 tiedInit->get());
+  }
+  return getMixedValues(producerResultType.getShape(),
+                        producerOp.getResultDims(resultIdx), rewriter);
+}
+
+/// Computes the linearized offset and size for a single reassociation group.
+///
+/// For a group [d0, d1, ..., dN] with retainedStart = k:
+///   Loop dims: d0, ..., d_{k-1} (iterate with scf.forall)
+///   Retained dims: d_k, ..., d_N (form contiguous chunk)
+///
+/// Linearized offset = sum_{j=0}^{k} adj_offset_j * stride_j
+///   where adj_offset_j = O_j + i_j (loop dim, j < k)
+///                      = O_j       (first retained dim, j == k)
+///   and stride_j = product of producerDimSizes[group[j+1..N]]
+///
+/// Linearized size = sizes[group[k]] * stride_k
+static void computeGroupLinearizedOffsetAndSize(
+    RewriterBase &rewriter, Location loc, const ReassociationIndices &group,
+    int64_t retainedStart, ArrayRef<OpFoldResult> sliceOffsets,
+    ArrayRef<OpFoldResult> sliceSizes, ArrayRef<OpFoldResult> producerDimSizes,
+    ArrayRef<Value> groupLoopIndices, OpFoldResult &collapsedOffset,
+    OpFoldResult &collapsedSize) {
+  MLIRContext *ctx = rewriter.getContext();
+
+  // Compute strides within the group (from innermost to outermost).
+  // groupStrides[j] = product of producerDimSizes for group[j+1..N].
+  SmallVector<OpFoldResult> groupStrides(group.size());
+  groupStrides.back() = rewriter.getIndexAttr(1);
+  for (int64_t j = static_cast<int64_t>(group.size()) - 2; j >= 0; --j) {
+    AffineExpr d0, d1;
+    bindDims(ctx, d0, d1);
+    groupStrides[j] = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, d0 * d1,
+        {groupStrides[j + 1], producerDimSizes[group[j + 1]]});
+  }
+
+  // Compute linearized offset.
+  collapsedOffset = rewriter.getIndexAttr(0);
+  int64_t loopIdx = 0;
+  for (int64_t j = 0; j <= retainedStart; ++j) {
+    OpFoldResult adjOffset;
+    if (j < retainedStart) {
+      // Loop dim: adj_offset = O_j + i_j.
+      AffineExpr e0, e1;
+      bindDims(ctx, e0, e1);
+      adjOffset = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, e0 + e1,
+          {sliceOffsets[group[j]], groupLoopIndices[loopIdx++]});
+    } else {
+      // First retained dim: adj_offset = O_j.
+      adjOffset = sliceOffsets[group[j]];
+    }
+    // offset += adjOffset * stride_j.
+    AffineExpr e0, e1, e2;
+    bindDims(ctx, e0, e1, e2);
+    collapsedOffset = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, e0 + e1 * e2,
+        {collapsedOffset, adjOffset, groupStrides[j]});
+  }
+
+  // Linearized size = sizes[group[retainedStart]] * stride[retainedStart].
+  AffineExpr d0, d1;
+  bindDims(ctx, d0, d1);
+  collapsedSize = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, d0 * d1,
+      {sliceSizes[group[retainedStart]], groupStrides[retainedStart]});
+}
+
+/// Computes collapsed offsets and sizes for a write_slice given reassociation
+/// indices and per-group retained start analysis. For groups with loop dims,
+/// the provided loopIndices are consumed in order (group by group, inner loop
+/// dims first).
+static void computeCollapsedOffsetsAndSizes(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> sliceOffsets,
+    ArrayRef<OpFoldResult> sliceSizes, ArrayRef<OpFoldResult> producerDimSizes,
+    ArrayRef<ReassociationIndices> reassociation,
+    ArrayRef<int64_t> groupRetainedStarts, ArrayRef<Value> loopIndices,
+    SmallVectorImpl<OpFoldResult> &collapsedOffsets,
+    SmallVectorImpl<OpFoldResult> &collapsedSizes) {
+  int64_t loopIdxOffset = 0;
+  for (auto [groupIdx, group] : llvm::enumerate(reassociation)) {
+    if (group.size() == 1) {
+      // Singleton group: offset and size pass through.
+      collapsedOffsets.push_back(sliceOffsets[group[0]]);
+      collapsedSizes.push_back(sliceSizes[group[0]]);
+      continue;
+    }
+
+    int64_t retainedStart = groupRetainedStarts[groupIdx];
+    int64_t numLoopDims = retainedStart;
+    ArrayRef<Value> groupLoopIndices =
+        loopIndices.slice(loopIdxOffset, numLoopDims);
+    loopIdxOffset += numLoopDims;
+
+    OpFoldResult offset, size;
+    computeGroupLinearizedOffsetAndSize(
+        rewriter, loc, group, retainedStart, sliceOffsets, sliceSizes,
+        producerDimSizes, groupLoopIndices, offset, size);
+    collapsedOffsets.push_back(offset);
+    collapsedSizes.push_back(size);
+  }
+}
+
+template <typename OpTy>
+LogicalResult
+fuseCollapseShapeIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
+                                  tensor::CollapseShapeOp collapseOp) {
+  OpResult producerResult = cast<OpResult>(collapseOp.getSrc());
+  if (!producerResult.hasOneUse()) {
+    return rewriter.notifyMatchFailure(producerOp,
+                                       "producer result has multiple uses");
+  }
+
+  unsigned resultIdx = producerResult.getResultNumber();
+  auto producerResultType = cast<RankedTensorType>(producerResult.getType());
+  RankedTensorType collapsedType = collapseOp.getResultType();
+  ArrayRef<int64_t> producerShape = producerResultType.getShape();
+
+  SmallVector<ReassociationIndices> reassociation =
+      collapseOp.getReassociationIndices();
+
+  // Get the write_slice ops for this result.
+  SmallVector<PCF::WriteSliceOp> slices;
+  if (failed(lookupProducerSlices<OpTy>(producerResult, slices))) {
+    return rewriter.notifyMatchFailure(producerOp,
+                                       "failed to lookup producer slices");
+  }
+
+  if (slices.empty()) {
+    return rewriter.notifyMatchFailure(producerOp, "no write_slice producers");
+  }
+
+  // Verify all write_slices have unit stride.
+  for (PCF::WriteSliceOp slice : slices) {
+    if (!slice.hasUnitStride()) {
+      return rewriter.notifyMatchFailure(slice,
+                                         "write_slice has non-unit stride");
+    }
+  }
+
+  // Get the tied init for this result if it exists.
+  OpOperand *tiedInit = producerOp.getTiedInit(resultIdx);
+
+  // Compute producer dim sizes as OpFoldResult (handles dynamic dims).
+  rewriter.setInsertionPoint(producerOp);
+  SmallVector<OpFoldResult> producerDimSizes = getProducerResultDimSizes(
+      rewriter, producerOp, resultIdx, producerResultType, tiedInit);
+
+  // Collapse the init if it exists.
+  Value initValue;
+  if (tiedInit) {
+    rewriter.setInsertionPoint(producerOp);
+    initValue = tensor::CollapseShapeOp::create(rewriter, producerOp.getLoc(),
+                                                collapsedType, tiedInit->get(),
+                                                reassociation);
+  }
+
+  // Compute new dynamic sizes. getDynamicSizes() only contains entries for
+  // untied results; tied results get their dynamic sizes from the init.
+  bool isResultTied = (tiedInit != nullptr);
+  SmallVector<Value> newDynamicSizes;
+  int64_t dynamicDimIdx = 0;
+
+  // Copy dynamic sizes for untied results before this one.
+  for (unsigned i = 0; i < resultIdx; ++i) {
+    if (producerOp.getTiedInit(i)) {
+      continue; // Tied results don't have entries in getDynamicSizes().
+    }
+    auto prevResultType =
+        cast<RankedTensorType>(producerOp->getResult(i).getType());
+    for (int64_t j = 0, rank = prevResultType.getRank(); j < rank; ++j) {
+      if (prevResultType.isDynamicDim(j)) {
+        newDynamicSizes.push_back(
+            producerOp.getDynamicSizes()[dynamicDimIdx++]);
+      }
+    }
+  }
+
+  // Skip dynamic sizes for the current result (only if untied).
+  if (!isResultTied) {
+    for (int64_t j = 0, rank = producerResultType.getRank(); j < rank; ++j) {
+      if (producerResultType.isDynamicDim(j)) {
+        dynamicDimIdx++;
+      }
+    }
+  }
+
+  // Add dynamic sizes for the collapsed type (only if untied). For dynamic
+  // collapsed dims, compute the product of producer dim sizes in the group.
+  Location producerLoc = producerOp.getLoc();
+  if (!isResultTied) {
+    rewriter.setInsertionPoint(producerOp);
+    for (int64_t j = 0, rank = collapsedType.getRank(); j < rank; ++j) {
+      if (collapsedType.isDynamicDim(j)) {
+        const ReassociationIndices &group = reassociation[j];
+        OpFoldResult product = rewriter.getIndexAttr(1);
+        for (int64_t dim : group) {
+          AffineExpr d0, d1;
+          bindDims(rewriter.getContext(), d0, d1);
+          product = affine::makeComposedFoldedAffineApply(
+              rewriter, producerLoc, d0 * d1, {product, producerDimSizes[dim]});
+        }
+        newDynamicSizes.push_back(
+            getValueOrCreateConstantIndexOp(rewriter, producerLoc, product));
+      }
+    }
+  }
+
+  // Copy remaining dynamic sizes.
+  while (dynamicDimIdx <
+         static_cast<int64_t>(producerOp.getDynamicSizes().size())) {
+    newDynamicSizes.push_back(producerOp.getDynamicSizes()[dynamicDimIdx++]);
+  }
+
+  // Update tied init if present.
+  SmallVector<Value> newInits(producerOp.getInits());
+  if (tiedInit) {
+    int64_t initIdx =
+        llvm::count(producerOp.getIsTied().take_front(resultIdx), true);
+    newInits[initIdx] = initValue;
+  }
+
+  // Create the new result types with collapsed type for this result.
+  SmallVector<Type> newResultTypes;
+  for (unsigned i = 0, e = producerOp->getNumResults(); i < e; ++i) {
+    if (i == resultIdx) {
+      newResultTypes.push_back(collapsedType);
+    } else {
+      newResultTypes.push_back(producerOp->getResult(i).getType());
+    }
+  }
+
+  // Clone the producer op with updated result type.
+  OpTy newOp;
+  if constexpr (std::is_same_v<OpTy, PCF::LoopOp>) {
+    newOp = PCF::LoopOp::create(
+        rewriter, producerLoc, newResultTypes, producerOp.getScope(),
+        producerOp.getCount(), newInits, newDynamicSizes,
+        producerOp.getIsTied(), producerOp.getSyncOnReturn());
+    newOp.getRegion().takeBody(producerOp.getRegion());
+  } else {
+    newOp = PCF::GenericOp::create(
+        rewriter, producerLoc, newResultTypes, producerOp.getScope(), newInits,
+        newDynamicSizes, producerOp.getIsTied(), producerOp.getNumIterators(),
+        producerOp.getSyncOnReturn());
+    newOp.getRegion().takeBody(producerOp.getRegion());
+    newOp.getInitializer().takeBody(producerOp.getInitializer());
+    newOp.setNumLeadingArgs(producerOp.getNumLeadingArgs());
+  }
+
+  // Update the region ref arg type to match the collapsed shape.
+  Value newRefArg = newOp.getRegionRefArgs()[resultIdx];
+  auto oldSrefType = cast<PCF::ShapedRefType>(newRefArg.getType());
+  auto newSrefType = PCF::ShapedRefType::get(
+      rewriter.getContext(), collapsedType.getShape(),
+      collapsedType.getElementType(), producerOp.getScope(),
+      oldSrefType.getSyncScope());
+  newRefArg.setType(newSrefType);
+
+  // Get the write_slices in the new op's region.
+  SmallVector<PCF::WriteSliceOp> newSlices;
+  for (Operation *user : newRefArg.getUsers()) {
+    if (auto writeSlice = dyn_cast<PCF::WriteSliceOp>(user)) {
+      newSlices.push_back(writeSlice);
+    }
+  }
+
+  // Transform each write_slice to use collapsed offsets/sizes.
+  for (PCF::WriteSliceOp slice : newSlices) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(slice);
+    Location loc = slice.getLoc();
+
+    SmallVector<OpFoldResult> sliceOffsets = slice.getMixedOffsets();
+    SmallVector<OpFoldResult> sliceSizes = slice.getMixedSizes();
+    Value source = slice.getSource();
+    auto sourceType = cast<RankedTensorType>(source.getType());
+
+    // Per-group analysis: determine retained start and collect loop dims.
+    SmallVector<int64_t> groupRetainedStarts;
+    // Each entry is (global dim index, loop bound).
+    SmallVector<std::pair<int64_t, OpFoldResult>> loopDims;
+    for (const ReassociationIndices &group : reassociation) {
+      int64_t retainedStart =
+          computeRetainedStart(group, sliceOffsets, sliceSizes, producerShape);
+      groupRetainedStarts.push_back(retainedStart);
+      for (int64_t j = 0; j < retainedStart; ++j) {
+        loopDims.push_back({group[j], sliceSizes[group[j]]});
+      }
+    }
+
+    if (loopDims.empty()) {
+      // No loops needed. Directly collapse source and linearize offsets.
+      SmallVector<OpFoldResult> collapsedOffsets, collapsedSizes;
+      computeCollapsedOffsetsAndSizes(
+          rewriter, loc, sliceOffsets, sliceSizes, producerDimSizes,
+          reassociation, groupRetainedStarts,
+          /*loopIndices=*/{}, collapsedOffsets, collapsedSizes);
+
+      Value collapsedSource =
+          tensor::CollapseShapeOp::create(rewriter, loc, source, reassociation);
+
+      SmallVector<OpFoldResult> strides(collapsedOffsets.size(),
+                                        rewriter.getIndexAttr(1));
+      PCF::WriteSliceOp::create(rewriter, loc, collapsedSource, slice.getDest(),
+                                collapsedOffsets, collapsedSizes, strides);
+    } else {
+      // Emit scf.forall loop over the non-retained (loop) dimensions.
+      SmallVector<OpFoldResult> lbs(loopDims.size(), rewriter.getIndexAttr(0));
+      SmallVector<OpFoldResult> ubs;
+      SmallVector<OpFoldResult> steps(loopDims.size(),
+                                      rewriter.getIndexAttr(1));
+      for (auto &[dim, bound] : loopDims) {
+        ubs.push_back(bound);
+      }
+
+      auto forallOp = scf::ForallOp::create(rewriter, loc, lbs, ubs, steps,
+                                            /*outputs=*/ValueRange(),
+                                            /*mapping=*/std::nullopt);
+
+      // Build the forall body.
+      rewriter.setInsertionPointToStart(forallOp.getBody());
+      SmallVector<Value> inductionVars(forallOp.getInductionVars());
+
+      // Build a map from global dim index to forall induction variable index.
+      DenseMap<int64_t, int64_t> dimToLoopIdx;
+      for (auto [idx, dimAndBound] : llvm::enumerate(loopDims)) {
+        dimToLoopIdx[dimAndBound.first] = idx;
+      }
+
+      // Build extract_slice: loop dims get induction var offset with size 1,
+      // retained dims get offset 0 with original size.
+      SmallVector<OpFoldResult> extractOffsets(sourceType.getRank(),
+                                               rewriter.getIndexAttr(0));
+      SmallVector<OpFoldResult> extractSizes;
+      SmallVector<OpFoldResult> extractStrides(sourceType.getRank(),
+                                               rewriter.getIndexAttr(1));
+      for (int64_t dim = 0, rank = sourceType.getRank(); dim < rank; ++dim) {
+        auto it = dimToLoopIdx.find(dim);
+        if (it != dimToLoopIdx.end()) {
+          extractOffsets[dim] = inductionVars[it->second];
+          extractSizes.push_back(rewriter.getIndexAttr(1));
+        } else {
+          extractSizes.push_back(sliceSizes[dim]);
+        }
+      }
+
+      // Extract the sub-tensor for this loop iteration.
+      Value extractedSource = tensor::ExtractSliceOp::create(
+          rewriter, loc, source, extractOffsets, extractSizes, extractStrides);
+
+      // Collapse the extracted source according to the reassociation.
+      Value collapsedSource = tensor::CollapseShapeOp::create(
+          rewriter, loc, extractedSource, reassociation);
+
+      // Compute collapsed offsets and sizes.
+      SmallVector<Value> loopIndicesVec(inductionVars.begin(),
+                                        inductionVars.end());
+      SmallVector<OpFoldResult> collapsedOffsets, collapsedSizes;
+      computeCollapsedOffsetsAndSizes(rewriter, loc, sliceOffsets, sliceSizes,
+                                      producerDimSizes, reassociation,
+                                      groupRetainedStarts, loopIndicesVec,
+                                      collapsedOffsets, collapsedSizes);
+
+      SmallVector<OpFoldResult> strides(collapsedOffsets.size(),
+                                        rewriter.getIndexAttr(1));
+      PCF::WriteSliceOp::create(rewriter, loc, collapsedSource, slice.getDest(),
+                                collapsedOffsets, collapsedSizes, strides);
+    }
+
+    rewriter.eraseOp(slice);
+  }
+
+  // Replace the original producer and collapse_shape.
+  SmallVector<Value> replacements(newOp->getResults());
+  rewriter.replaceOp(producerOp, replacements);
+  rewriter.replaceOp(collapseOp, newOp->getResult(resultIdx));
+
+  return success();
+}
+
 } // namespace
 
 //===---------------------------------------------------------------------===//
@@ -876,6 +1335,19 @@ fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
                                     PCF::GenericOp genericOp,
                                     tensor::ExtractSliceOp extractSliceOp) {
   return fuseExtractSliceIntoProducerImpl(rewriter, genericOp, extractSliceOp);
+}
+
+LogicalResult
+fuseCollapseShapeIntoProducerLoop(RewriterBase &rewriter, PCF::LoopOp loopOp,
+                                  tensor::CollapseShapeOp collapseOp) {
+  return fuseCollapseShapeIntoProducerImpl(rewriter, loopOp, collapseOp);
+}
+
+LogicalResult
+fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
+                                     PCF::GenericOp genericOp,
+                                     tensor::CollapseShapeOp collapseOp) {
+  return fuseCollapseShapeIntoProducerImpl(rewriter, genericOp, collapseOp);
 }
 
 LogicalResult matchTilableConsumer(RewriterBase &rewriter,

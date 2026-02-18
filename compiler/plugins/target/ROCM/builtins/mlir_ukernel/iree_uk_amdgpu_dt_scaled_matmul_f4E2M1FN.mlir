@@ -57,6 +57,8 @@
 !store_ty = vector<1x1x1x1x4x8x1x1x4xf32>
 !tensor_store_ty = tensor<1x1x1x1x4x8x1x1x4xf32>
 
+!out_sref = !pcf.sref<1x1x2x2x4x8x4x16x4xf32, #iree_gpu.subgroup_scope>
+
 #contraction_accesses = [
   affine_map<(i, j, k, d) -> (i, d, k)>,
   affine_map<(i, j, k, d) -> (j, d, k)>,
@@ -237,86 +239,90 @@ util.func @pingpong_dt_medium_f4E2M1FN(
   } {mapping = [#gpu.thread<linear_dim_0>]}
 
 
-  %0 = tensor.empty() : !return_ty
-  %1 = scf.forall (%id) in (256) shared_outs(%out = %0) -> !return_ty {
-    %init = arith.constant dense<0.0> : !acc_ty
-    %ids:2 = affine.delinearize_index %id into (4, 64) : index, index
-    %subgroups:2 = affine.delinearize_index %ids#0 into (2, 2) : index, index
-    %threads:2 = affine.delinearize_index %ids#1 into (4, 16) : index, index
+  %result = pcf.generic scope(#iree_gpu.subgroup_scope)
+    execute(%out_ref = %unused_acc)[%sg_id: index, %num_sg: index]
+         : (!out_sref) -> (!return_ty) {
+    pcf.generic scope(#iree_gpu.lane_scope)
+      execute[%lane_id: index, %sg_size: index] {
+      %id = affine.linearize_index disjoint [%sg_id, %lane_id] by (%num_sg, %sg_size) : index
+      %init = arith.constant dense<0.0> : !acc_ty
+      %ids:2 = affine.delinearize_index %id into (4, 64) : index, index
+      %subgroups:2 = affine.delinearize_index %ids#0 into (2, 2) : index, index
+      %threads:2 = affine.delinearize_index %ids#1 into (4, 16) : index, index
 
-    // Misalign by one group.
-    rocdl.s.barrier
-
-    %loop = scf.for %i = %c0 to %k step %c1 iter_args(%iter = %init) -> !acc_ty {
-      // wait till available.
+      // Misalign by one group.
       rocdl.s.barrier
 
-      %buffer_num = arith.andi %i, %c1 : index
+      %loop = scf.for %i = %c0 to %k step %c1 iter_args(%iter = %init) -> !acc_ty {
+        // wait till available.
+        rocdl.s.barrier
 
-      %lhs_num = arith.muli %buffer_num, %c16 : index
-      %lhs_subgroup = arith.muli %subgroups#0, %c8 : index
-      %lhs_outer = arith.addi %lhs_num, %lhs_subgroup : index
-      %lhs_inner = arith.muli %ids#1, %c16 : index
+        %buffer_num = arith.andi %i, %c1 : index
 
-      %lhs_scale_num = arith.muli %buffer_num, %c2 : index
-      %lhs_scale_outer = arith.addi %lhs_scale_num, %subgroups#0 : index
-      %lhs_scale_inner = arith.muli %ids#1, %c8 : index
+        %lhs_num = arith.muli %buffer_num, %c16 : index
+        %lhs_subgroup = arith.muli %subgroups#0, %c8 : index
+        %lhs_outer = arith.addi %lhs_num, %lhs_subgroup : index
+        %lhs_inner = arith.muli %ids#1, %c16 : index
 
-      %rhs_num = arith.muli %buffer_num, %c32 : index
-      %rhs_subgroup = arith.muli %subgroups#1, %c16 : index
-      %rhs_outer = arith.addi %rhs_num, %rhs_subgroup : index
-      %rhs_inner = arith.muli %ids#1, %c16 : index
+        %lhs_scale_num = arith.muli %buffer_num, %c2 : index
+        %lhs_scale_outer = arith.addi %lhs_scale_num, %subgroups#0 : index
+        %lhs_scale_inner = arith.muli %ids#1, %c8 : index
 
-      %rhs_scale_num = arith.muli %buffer_num, %c2 : index
-      %rhs_scale_outer = arith.addi %rhs_scale_num, %subgroups#1 : index
-      %rhs_scale_inner = arith.muli %ids#1, %c16 : index
+        %rhs_num = arith.muli %buffer_num, %c32 : index
+        %rhs_subgroup = arith.muli %subgroups#1, %c16 : index
+        %rhs_outer = arith.addi %rhs_num, %rhs_subgroup : index
+        %rhs_inner = arith.muli %ids#1, %c16 : index
 
-      // Load inputs/scales from LDS.
-      %lhs_byte_vec = vector.transfer_read %lhs_shared_base[%lhs_outer, %lhs_inner],
-        %cst_lhs {in_bounds = [true, true]} : !lhs_shared_ty, vector<8x16xi8>
-      %lhs_byte_vec_t = vector.shape_cast %lhs_byte_vec : vector<8x16xi8> to !lhs_byte_vec_ty
-      %lhs_vec = vector.bitcast %lhs_byte_vec_t : !lhs_byte_vec_ty to !lhs_vec_ty
+        %rhs_scale_num = arith.muli %buffer_num, %c2 : index
+        %rhs_scale_outer = arith.addi %rhs_scale_num, %subgroups#1 : index
+        %rhs_scale_inner = arith.muli %ids#1, %c16 : index
 
-      %lhs_scale_byte_vec = vector.transfer_read %lhs_scale_shared[%lhs_scale_outer, %lhs_scale_inner],
-        %cst_scale {in_bounds = [true, true]} : !lhs_scale_shared_ty, vector<1x8xi8>
-      %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x8xi8> to !lhs_scale_byte_vec_ty
-      %lhs_scale_vec = vector.bitcast %lhs_scale_byte_vec_t : !lhs_scale_byte_vec_ty to !lhs_scale_vec_ty
+        // Load inputs/scales from LDS.
+        %lhs_byte_vec = vector.transfer_read %lhs_shared_base[%lhs_outer, %lhs_inner],
+          %cst_lhs {in_bounds = [true, true]} : !lhs_shared_ty, vector<8x16xi8>
+        %lhs_byte_vec_t = vector.shape_cast %lhs_byte_vec : vector<8x16xi8> to !lhs_byte_vec_ty
+        %lhs_vec = vector.bitcast %lhs_byte_vec_t : !lhs_byte_vec_ty to !lhs_vec_ty
 
-      rocdl.sched.barrier 0
+        %lhs_scale_byte_vec = vector.transfer_read %lhs_scale_shared[%lhs_scale_outer, %lhs_scale_inner],
+          %cst_scale {in_bounds = [true, true]} : !lhs_scale_shared_ty, vector<1x8xi8>
+        %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x8xi8> to !lhs_scale_byte_vec_ty
+        %lhs_scale_vec = vector.bitcast %lhs_scale_byte_vec_t : !lhs_scale_byte_vec_ty to !lhs_scale_vec_ty
 
-      %rhs_byte_vec = vector.transfer_read %rhs_shared_base[%rhs_outer, %rhs_inner],
-        %cst_rhs {in_bounds = [true, true]} : !rhs_shared_ty, vector<16x16xi8>
-      %rhs_byte_vec_t = vector.shape_cast %rhs_byte_vec : vector<16x16xi8> to !rhs_byte_vec_ty
-      %rhs_vec = vector.bitcast %rhs_byte_vec_t : !rhs_byte_vec_ty to !rhs_vec_ty
+        rocdl.sched.barrier 0
 
-      %rhs_scale_byte_vec = vector.transfer_read %rhs_scale_shared[%rhs_scale_outer, %rhs_scale_inner],
-        %cst_scale {in_bounds = [true, true]} : !rhs_scale_shared_ty, vector<1x16xi8>
-      %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x16xi8> to !rhs_scale_byte_vec_ty
-      %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
+        %rhs_byte_vec = vector.transfer_read %rhs_shared_base[%rhs_outer, %rhs_inner],
+          %cst_rhs {in_bounds = [true, true]} : !rhs_shared_ty, vector<16x16xi8>
+        %rhs_byte_vec_t = vector.shape_cast %rhs_byte_vec : vector<16x16xi8> to !rhs_byte_vec_ty
+        %rhs_vec = vector.bitcast %rhs_byte_vec_t : !rhs_byte_vec_ty to !rhs_vec_ty
 
-      amdgpu.lds_barrier
-      rocdl.sched.barrier 0
+        %rhs_scale_byte_vec = vector.transfer_read %rhs_scale_shared[%rhs_scale_outer, %rhs_scale_inner],
+          %cst_scale {in_bounds = [true, true]} : !rhs_scale_shared_ty, vector<1x16xi8>
+        %rhs_scale_byte_vec_t = vector.shape_cast %rhs_scale_byte_vec : vector<1x16xi8> to !rhs_scale_byte_vec_ty
+        %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
-      %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
-        indexing_maps = #contraction_accesses,
-        iterator_types = #iterator_types,
-        kind = #mfma_type,
-        semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-      } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
+        amdgpu.lds_barrier
+        rocdl.sched.barrier 0
 
-      scf.yield %dot : !acc_ty
+        %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
+          indexing_maps = #contraction_accesses,
+          iterator_types = #iterator_types,
+          kind = #mfma_type,
+          semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
+        } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
+
+        scf.yield %dot : !acc_ty
+      }
+
+      %t = vector.shape_cast %loop : !acc_ty to !store_ty
+
+      %empty = tensor.empty() : !tensor_store_ty
+      %to_tensor = vector.transfer_write %t, %empty[%c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0]
+        {in_bounds = [true, true, true, true, true, true, true, true, true]} : !store_ty, !tensor_store_ty
+
+      pcf.write_slice %to_tensor into %out_ref[%c0, %c0, %subgroups#0, %subgroups#1, %c0, %c0, %threads#0, %threads#1, %c0] [1, 1, 1, 1, 4, 8, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1, 1, 1] : !tensor_store_ty into !out_sref
+      pcf.return
     }
-
-    %t = vector.shape_cast %loop : !acc_ty to !store_ty
-
-    %empty = tensor.empty() : !tensor_store_ty
-    %to_tensor = vector.transfer_write %t, %empty[%c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0, %c0]
-      {in_bounds = [true, true, true, true, true, true, true, true, true]} : !store_ty, !tensor_store_ty
-
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %to_tensor into %out[%c0, %c0, %subgroups#0, %subgroups#1, %c0, %c0, %threads#0, %threads#1, %c0] [1, 1, 1, 1, 4, 8, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1, 1, 1]
-        : !tensor_store_ty into !return_ty
-    }
-  } {mapping = [#gpu.thread<linear_dim_0>]}
-  util.return %1 : !return_ty
+    pcf.return
+  }
+  util.return %result : !return_ty
 }

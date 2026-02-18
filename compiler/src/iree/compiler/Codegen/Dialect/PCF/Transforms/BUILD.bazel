@@ -35,10 +35,12 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "ConvertForallToLoops.cpp",
+        "ConvertForallToPCF.cpp",
         "ConvertSRefToMemRef.cpp",
+        "FoldForallIntoPCFLoop.cpp",
         "FuseConsumers.cpp",
         "FusePCFWrites.cpp",
+        "FuseProducers.cpp",
         "LowerStructuralPCF.cpp",
         "Passes.cpp",
         "ResolveTokens.cpp",

@@ -36,6 +36,7 @@ iree_lit_test_suite(
     "gpu_expand_dimensions.mlir"
     "gpu_fold_swizzle_hint_ops.mlir"
     "gpu_fuse_and_hoist_forall.mlir"
+    "gpu_fuse_subgroup_consumers.mlir"
     "gpu_generalize_named_ops.mlir"
     "gpu_greedily_distribute_to_threads.mlir"
     "gpu_infer_memory_space.mlir"

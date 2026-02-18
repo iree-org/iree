@@ -71,4 +71,21 @@ def VectorizeIREEGPUOpsPass :
   ];
 }
 
-#endif // IREE_CODEGEN_DIALECt_GPU_TRANSFORMS_PASSES
+def ConvertForallToGenericNestGPUPass :
+    InterfacePass<"iree-gpu-convert-forall-to-generic-nest",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Converts scf.forall ops with GPU mapping to pcf.generic";
+  let description = [{
+    Converts scf.forall ops with gpu.thread mapping to nested pcf.generic ops
+    using subgroup (outer) and lane (inner) scopes.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect",
+  ];
+}
+
+#endif // IREE_CODEGEN_DIALECT_GPU_TRANSFORMS_PASSES

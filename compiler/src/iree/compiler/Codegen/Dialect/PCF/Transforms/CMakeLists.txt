@@ -28,10 +28,12 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
-    "ConvertForallToLoops.cpp"
+    "ConvertForallToPCF.cpp"
     "ConvertSRefToMemRef.cpp"
+    "FoldForallIntoPCFLoop.cpp"
     "FuseConsumers.cpp"
     "FusePCFWrites.cpp"
+    "FuseProducers.cpp"
     "LowerStructuralPCF.cpp"
     "Passes.cpp"
     "ResolveTokens.cpp"

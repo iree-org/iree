@@ -9,27 +9,58 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertForallToLoopsPass : Pass<"iree-pcf-convert-forall-to-loops", ""> {
-  let summary = "Converts scf.forall ops to pcf.loop";
+def TestConvertForallToLoopsPass : Pass<"iree-pcf-test-convert-forall-to-loops", ""> {
+  let summary = "Test pass for convertForallToPCFLoop transform";
   let description = [{
-    Test pass for converting `scf.forall` ops without mapping attributes to
-    `pcf.loop` ops with sequential scope.
+    Test pass for converting `scf.forall` ops without mapping attributes or
+    with `iree_codegen.local_mapping` attributes to `pcf.loop` ops with
+    sequential scope.
 
     The input is IR containing `scf.forall` ops with tensor results and
     `tensor.parallel_insert_slice` terminators. Only forall ops without
-    mapping attributes are converted.
+    mapping attributes or with local_mapping attributes are converted.
 
     The output replaces each matching `scf.forall` with a `pcf.loop`:
-    - Iteration bounds come from the forall's upper/lower bounds and steps
-    - `tensor.parallel_insert_slice` ops become `pcf.write_slice` ops
-    - Shared output tensors become tied `pcf.sref` region arguments
-    - The scope is set to `#pcf.sequential` for sequential execution
+    - Iteration bounds come from the forall's upper/lower bounds and steps.
+    - `tensor.parallel_insert_slice` ops become `pcf.write_slice` ops.
+    - Shared output tensors become tied `pcf.sref` region arguments.
+    - The scope is set to `#pcf.sequential` for sequential execution.
 
     The underlying conversion pattern is exposed separately via
-    `convertForallToPCF()` with callbacks for mapping processor IDs to custom
+    `convertForallToPCFLoop()` with callbacks for mapping processor IDs to custom
     execution scopes.
   }];
   let dependentDialects = ["::mlir::iree_compiler::IREE::PCF::PCFDialect"];
+}
+
+def TestFoldForallIntoPCFLoopPass : Pass<"iree-pcf-test-fold-forall-into-pcf-loop", ""> {
+  let summary = "Test pass for foldForallIntoPCFLoop transform";
+  let description = [{
+    Test pass for folding `scf.forall` ops containing `pcf.loop` ops into a
+    single `pcf.generic` operation.
+
+    The input is IR containing `scf.forall` ops with `iree_codegen.local_mapping`
+    attributes that contain a `pcf.loop` with `#pcf.sequential` scope as the
+    last operation before the terminator.
+
+    Structural requirements validated:
+    - All ops in `scf.forall.in_parallel` are `tensor.parallel_insert_slice`.
+    - All insert sources come from the same `pcf.loop` result.
+    - All insert destinations are `scf.forall` shared_outs.
+    - The `pcf.loop` is the last op before terminator in forall body.
+    - The `pcf.loop` has a single count argument (linearized).
+    - All `pcf.loop` region ref arg users are `pcf.write_slice` ops.
+    - Ref args have `SyncOnReturnAttr` sync scope.
+
+    The underlying transform is exposed via `foldForallIntoPCFLoop()` for use
+    in custom pipelines with different matching criteria.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect"
+  ];
 }
 
 def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
@@ -55,6 +86,31 @@ def FuseConsumersPass : Pass<"iree-pcf-fuse-consumers", ""> {
   }];
   let dependentDialects = ["::mlir::arith::ArithDialect",
                            "::mlir::affine::AffineDialect",
+                           "::mlir::scf::SCFDialect",
+                           "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
+}
+
+def FuseProducersPass : Pass<"iree-pcf-fuse-producers", ""> {
+  let summary = "Fuses DPS producers into pcf.generic/loop ops through tied init args.";
+  let description = [{
+    Pass for fusing producer operations into `pcf.generic` and `pcf.loop` ops.
+
+    The input is IR containing PCF parallel ops whose tied init values are
+    produced by operations implementing `TilingInterface` and
+    `DestinationStyleOpInterface` (e.g. `linalg.fill`).
+
+    The pass matches each tied init that is the single result of a DPS producer.
+    For each `pcf.read_slice` on the corresponding sref argument, it generates a
+    tiled version of the producer via `generateResultTileValue` and replaces the
+    read with the tiled result. The scoped op's init is updated to the producer's
+    DPS init, and the original producer is erased if unused.
+
+    The underlying fusion patterns are exposed via `matchTilableProducer()` and
+    `fuseTilableProducer()` for use in custom pipelines.
+  }];
+  let dependentDialects = ["::mlir::arith::ArithDialect",
+                           "::mlir::affine::AffineDialect",
+                           "::mlir::vector::VectorDialect",
                            "::mlir::iree_compiler::IREE::PCF::PCFDialect"];
 }
 
@@ -152,6 +208,29 @@ def ResolveTokensPass : Pass<"iree-pcf-resolve-tokens", ""> {
     Write operations (`pcf.write_slice`) are updated to enqueue writes through
     the sync scope's interface methods.
   }];
+}
+
+def TestConvertForallToGenericNestPass :
+    InterfacePass<"iree-pcf-test-convert-forall-to-generic-nest", "mlir::FunctionOpInterface"> {
+  let summary = "Test pass for convertForallToGenericNest transform";
+  let description = [{
+    Test pass that converts `scf.forall` ops to a nest of `pcf.generic` ops
+    with an inner `scf.forall` handling spillover iterations. Each scope
+    generates one `pcf.generic` op (outermost first). Worker IDs are
+    linearized, chunk bounds computed for work distribution, and
+    delinearized back to multi-dimensional forall bounds.
+  }];
+  let options = [
+    Option<"numSequentialScopes", "num-sequential-scopes", "int64_t",
+           /*default=*/"1",
+           "Number of pcf.sequential scopes to use">
+  ];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::scf::SCFDialect"
+  ];
 }
 
 #endif // IREE_CODEGEN_DIALECT_PCF_TRANSFORMS_PASSES
