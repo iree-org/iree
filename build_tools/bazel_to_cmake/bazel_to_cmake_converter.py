@@ -581,6 +581,7 @@ class BuildFileFunctions(object):
         linkopts=None,
         includes=None,
         system_includes=None,
+        alwayslink=None,
         target_compatible_with=None,
         **kwargs,
     ):
@@ -599,6 +600,7 @@ class BuildFileFunctions(object):
         data_block = self._convert_target_list_block("DATA", data)
         deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
+        alwayslink_block = self._convert_option_block("ALWAYSLINK", alwayslink)
         includes_block = self._convert_includes_block(includes)
         system_includes_block = self._convert_string_list_block(
             "SYSTEM_INCLUDES", system_includes
@@ -618,6 +620,7 @@ class BuildFileFunctions(object):
             f"{deps_block}"
             f"{defines_block}"
             f"{testonly_block}"
+            f"{alwayslink_block}"
             f"{includes_block}"
             f"{system_includes_block}"
             f"  PUBLIC\n)\n\n"
