@@ -19,6 +19,7 @@
 #endif  // WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 
 // Windows uses SOCKET (unsigned) and closesocket.
 typedef SOCKET iree_socket_t;
@@ -154,6 +155,51 @@ IREE_API_EXPORT iree_status_t iree_async_socket_listen(
   }
 
   iree_socket_t sock = iree_socket_from_primitive(socket->primitive);
+
+#if defined(IREE_PLATFORM_WINDOWS)
+  // Windows requires explicit bind before listen. POSIX implicitly binds to
+  // an ephemeral port when listen() is called on an unbound socket. Replicate
+  // that behavior by detecting the unbound state (getsockname returns
+  // WSAEINVAL) and binding to INADDR_ANY:0 or in6addr_any:0.
+  {
+    struct sockaddr_storage probe_address;
+    int probe_length = sizeof(probe_address);
+    if (getsockname(sock, (struct sockaddr*)&probe_address, &probe_length) ==
+        SOCKET_ERROR) {
+      // getsockname fails with WSAEINVAL on an unbound socket.
+      struct sockaddr_storage bind_addr;
+      int bind_addr_length = 0;
+      memset(&bind_addr, 0, sizeof(bind_addr));
+      switch (socket->type) {
+        case IREE_ASYNC_SOCKET_TYPE_TCP:
+        case IREE_ASYNC_SOCKET_TYPE_UDP: {
+          struct sockaddr_in* addr4 = (struct sockaddr_in*)&bind_addr;
+          addr4->sin_family = AF_INET;
+          addr4->sin_addr.s_addr = INADDR_ANY;
+          addr4->sin_port = 0;
+          bind_addr_length = sizeof(struct sockaddr_in);
+          break;
+        }
+        case IREE_ASYNC_SOCKET_TYPE_TCP6:
+        case IREE_ASYNC_SOCKET_TYPE_UDP6: {
+          struct sockaddr_in6* addr6 = (struct sockaddr_in6*)&bind_addr;
+          addr6->sin6_family = AF_INET6;
+          addr6->sin6_addr = in6addr_any;
+          addr6->sin6_port = 0;
+          bind_addr_length = sizeof(struct sockaddr_in6);
+          break;
+        }
+        default:
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "implicit bind not supported for socket type %d", socket->type);
+      }
+      if (bind(sock, (struct sockaddr*)&bind_addr, bind_addr_length) != 0) {
+        return iree_status_from_socket_error();
+      }
+    }
+  }
+#endif  // IREE_PLATFORM_WINDOWS
 
   // Use SOMAXCONN as default if backlog is 0.
   int backlog_int = (backlog == 0) ? SOMAXCONN : (int)backlog;

@@ -27,6 +27,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/atomics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -169,7 +170,10 @@ typedef uint8_t iree_async_wait_mode_t;
 // These are not part of the public API; callers should not read or write them.
 // Flag values are defined per-backend as enums (e.g.,
 // iree_async_posix_operation_internal_flags_e in the POSIX proactor).
-typedef uint16_t iree_async_operation_internal_flags_t;
+//
+// The value type is used for flag constants; the struct field is atomic because
+// cancel (any thread) sets CANCELLED while poll (single thread) reads it.
+typedef uint32_t iree_async_operation_internal_flags_t;
 
 //===----------------------------------------------------------------------===//
 // Base operation
@@ -195,7 +199,8 @@ typedef struct iree_async_operation_t {
 
   // Proactor-private flags for cancellation, iteration safety, etc.
   // Initialized to 0; callers must not access this field.
-  iree_async_operation_internal_flags_t internal_flags;
+  // Atomic: cancel (any thread) writes CANCELLED, poll thread reads.
+  iree_atomic_int32_t internal_flags;
 
   // Behavioral flags (MULTISHOT, etc.) set by caller before submit.
   iree_async_operation_flags_t flags;
@@ -269,13 +274,36 @@ static inline void iree_async_operation_initialize(
     iree_async_completion_fn_t completion_fn, void* user_data) {
   operation->next = NULL;
   operation->type = type;
-  operation->internal_flags = 0;
+  iree_atomic_store(&operation->internal_flags, 0, iree_memory_order_relaxed);
   operation->flags = flags;
   operation->completion_fn = completion_fn;
   operation->user_data = user_data;
   operation->pool = NULL;
   operation->linked_next = NULL;
   IREE_TRACE({ operation->submit_time_ns = 0; });
+}
+
+// Atomically loads the internal flags of an operation (acquire ordering).
+static inline iree_async_operation_internal_flags_t
+iree_async_operation_load_internal_flags(iree_async_operation_t* operation) {
+  return (iree_async_operation_internal_flags_t)iree_atomic_load(
+      &operation->internal_flags, iree_memory_order_acquire);
+}
+
+// Atomically sets (ORs) internal flags on an operation (release ordering).
+// Used by cancel (any thread) to set CANCELLED, by poll thread to set state.
+static inline void iree_async_operation_set_internal_flags(
+    iree_async_operation_t* operation,
+    iree_async_operation_internal_flags_t flags_to_set) {
+  iree_atomic_fetch_or(&operation->internal_flags, (int32_t)flags_to_set,
+                       iree_memory_order_release);
+}
+
+// Atomically clears (resets to 0) the internal flags of an operation.
+// Used at submission time to prepare an operation for a fresh execution cycle.
+static inline void iree_async_operation_clear_internal_flags(
+    iree_async_operation_t* operation) {
+  iree_atomic_store(&operation->internal_flags, 0, iree_memory_order_release);
 }
 
 // Creates an operation list from a pointer and count.

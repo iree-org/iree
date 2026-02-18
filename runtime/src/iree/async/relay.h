@@ -249,6 +249,12 @@ struct iree_async_relay_t {
       // into the source notification's relay_list.
       struct iree_async_relay_t* notification_relay_next;
     } posix;
+    struct {
+      // Per-notification relay chain linkage (poll thread only).
+      // Same pattern as POSIX — singly-linked through the source
+      // notification's relay_list.
+      struct iree_async_relay_t* notification_relay_next;
+    } iocp;
   } platform;
 };
 

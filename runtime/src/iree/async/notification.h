@@ -130,6 +130,27 @@ typedef struct iree_async_notification_t {
       iree_notification_t sync_notification;
 #endif  // !IREE_ASYNC_POSIX_NOTIFICATION_USE_FUTEX
     } posix;
+
+    // IOCP backend (Windows).
+    // No fd/primitive needed. Sync waiters use WaitOnAddress on &epoch
+    // (functionally identical to Linux futex). Async waits are tracked in
+    // an intrusive list processed by the poll thread on each iteration.
+    struct {
+      // Intrusive list of pending async wait operations (poll thread only).
+      // Uses iree_async_operation_t::next for linkage.
+      iree_async_notification_wait_operation_t* pending_waits;
+      // Intrusive linkage for proactor's notifications_with_waits list.
+      // Only valid when in_wait_list is true.
+      struct iree_async_notification_t* next_with_waits;
+      // Whether this notification is currently in the proactor's
+      // notifications_with_waits list. Avoids duplicate insertion.
+      bool in_wait_list;
+      // Intrusive list of relays with this notification as their source
+      // (poll thread only). Walked alongside pending_waits during poll
+      // to fire relay sinks when the epoch advances.
+      // Uses iree_async_relay_t::platform.iocp.notification_relay_next.
+      struct iree_async_relay_t* relay_list;
+    } iocp;
   } platform;
 } iree_async_notification_t;
 

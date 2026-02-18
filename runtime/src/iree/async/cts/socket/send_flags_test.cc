@@ -435,14 +435,8 @@ TEST_P(SendFlagsTest, ZeroCopySendRegisteredLargeTransfer) {
       iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
 
   iree_async_region_t* region = nullptr;
-  iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region);
-  if (iree_status_is_failed_precondition(status)) {
-    iree_status_ignore(status);
-    iree_async_slab_release(slab);
-    GTEST_SKIP() << "Cannot register additional READ region on this backend";
-  }
-  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_register_slab(
+      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
 
   iree_async_buffer_pool_t* pool = nullptr;
   IREE_ASSERT_OK(
@@ -521,14 +515,8 @@ TEST_P(SendFlagsTest, ZeroCopySendPartialBuffer) {
       iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
 
   iree_async_region_t* region = nullptr;
-  iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region);
-  if (iree_status_is_failed_precondition(status)) {
-    iree_status_ignore(status);
-    iree_async_slab_release(slab);
-    GTEST_SKIP() << "Cannot register additional READ region on this backend";
-  }
-  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_register_slab(
+      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
 
   iree_async_buffer_pool_t* pool = nullptr;
   IREE_ASSERT_OK(
@@ -613,14 +601,8 @@ TEST_P(SendFlagsTest, ScatterGatherFromRegistered) {
       iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
 
   iree_async_region_t* region = nullptr;
-  iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region);
-  if (iree_status_is_failed_precondition(status)) {
-    iree_status_ignore(status);
-    iree_async_slab_release(slab);
-    GTEST_SKIP() << "Cannot register additional READ region on this backend";
-  }
-  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_register_slab(
+      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
 
   iree_async_buffer_pool_t* pool = nullptr;
   IREE_ASSERT_OK(
@@ -706,14 +688,8 @@ TEST_P(SendFlagsTest, ConcurrentRegisteredSends) {
       iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
 
   iree_async_region_t* region = nullptr;
-  iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region);
-  if (iree_status_is_failed_precondition(status)) {
-    iree_status_ignore(status);
-    iree_async_slab_release(slab);
-    GTEST_SKIP() << "Cannot register additional READ region on this backend";
-  }
-  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_register_slab(
+      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
 
   iree_async_buffer_pool_t* pool = nullptr;
   IREE_ASSERT_OK(
@@ -883,14 +859,8 @@ TEST_P(SendFlagsTest, ScatterGatherMixedRegistration) {
       iree_async_slab_create(slab_options, iree_allocator_system(), &slab));
 
   iree_async_region_t* region = nullptr;
-  iree_status_t status = iree_async_proactor_register_slab(
-      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region);
-  if (iree_status_is_failed_precondition(status)) {
-    iree_status_ignore(status);
-    iree_async_slab_release(slab);
-    GTEST_SKIP() << "Cannot register additional READ region on this backend";
-  }
-  IREE_ASSERT_OK(status);
+  IREE_ASSERT_OK(iree_async_proactor_register_slab(
+      proactor_, slab, IREE_ASYNC_BUFFER_ACCESS_FLAG_READ, &region));
 
   iree_async_buffer_pool_t* pool = nullptr;
   IREE_ASSERT_OK(

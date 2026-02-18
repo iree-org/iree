@@ -95,6 +95,11 @@ iree_cc_library(
 set(_platform_platform_deps "")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(APPEND _platform_platform_deps iree::async::platform::io_uring)
+  list(APPEND _platform_platform_deps iree::async::platform::posix)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  list(APPEND _platform_platform_deps iree::async::platform::iocp)
+else()
+  list(APPEND _platform_platform_deps iree::async::platform::posix)
 endif()
 iree_cc_library(
   NAME
@@ -105,7 +110,6 @@ iree_cc_library(
     "proactor_platform.c"
   DEPS
     ::async
-    iree::async::platform::posix
     ${_platform_platform_deps}
   PUBLIC
 )
