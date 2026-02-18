@@ -648,9 +648,9 @@ void IREE::GPU::InnerTiledSemanticsAttr::getTileTypes(
     IREE::Codegen::InnerTileDescAttrInterface kind,
     llvm::SmallVectorImpl<mlir::VectorType> &result) const {
   if (getDistributed()) {
-    kind.getDistributedTileTypes(result);
+    llvm::append_range(result, kind.getDistributedTileTypes());
   } else {
-    kind.getUndistributedTileTypes(result);
+    llvm::append_range(result, kind.getUndistributedTileTypes());
   }
 }
 
@@ -670,13 +670,12 @@ LogicalResult MMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
 }
 
-void MMAAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
+SmallVector<VectorType, 4> MMAAttr::getUndistributedTileTypes() const {
   MLIRContext *ctx = getContext();
   OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
-  result.assign({VectorType::get({o.mSize, o.kSize}, o.aType),
-                 VectorType::get({o.kSize, o.nSize}, o.bType),
-                 VectorType::get({o.mSize, o.nSize}, o.cType)});
+  return {VectorType::get({o.mSize, o.kSize}, o.aType),
+          VectorType::get({o.kSize, o.nSize}, o.bType),
+          VectorType::get({o.mSize, o.nSize}, o.cType)};
 }
 
 template <typename MMAIntrinsicType>
@@ -698,13 +697,12 @@ static VectorType getThreadVectorType(MLIRContext *context,
       {s.element[0] * s.element[1] * s.outer[0] * s.outer[1]}, elemType);
 }
 
-void MMAAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
+SmallVector<VectorType, 4> MMAAttr::getDistributedTileTypes() const {
   MLIRContext *context = getContext();
   MMAIntrinsic intrinsic = getIntrinsic();
-  result.assign({getThreadVectorType(context, intrinsic, kMMAOperandLhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandRhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandAcc)});
+  return {getThreadVectorType(context, intrinsic, kMMAOperandLhs),
+          getThreadVectorType(context, intrinsic, kMMAOperandRhs),
+          getThreadVectorType(context, intrinsic, kMMAOperandAcc)};
 }
 
 std::optional<SmallVector<int64_t, 2>>
@@ -834,8 +832,7 @@ MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
   if (outputs.size() != 1) {
     return failure();
   }
-  SmallVector<VectorType> threadTypes;
-  getDistributedTileTypes(threadTypes);
+  SmallVector<VectorType> threadTypes = getDistributedTileTypes();
   if (!llvm::equal(threadTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
@@ -1098,8 +1095,7 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   if (outputs.size() != 1) {
     return failure();
   }
-  SmallVector<VectorType> regTypes;
-  getDistributedTileTypes(regTypes);
+  SmallVector<VectorType> regTypes = getDistributedTileTypes();
   if (!llvm::equal(regTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
@@ -1187,9 +1183,9 @@ IREE::Codegen::TileMxNxKxKb DataTiledMMAAttr::getTileMNKKb() const {
   return innerTile;
 }
 
-void DataTiledMMAAttr::getElementTypes(SmallVectorImpl<Type> &result) const {
+SmallVector<Type, 8> DataTiledMMAAttr::getElementTypes() const {
   auto [a, b, c] = IREE::GPU::getABCElementTypes(getContext(), getIntrinsic());
-  result.assign({a, b, c});
+  return {a, b, c};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1260,22 +1256,20 @@ VirtualMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
 }
 
-void VirtualMMAAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
+SmallVector<VectorType, 4> VirtualMMAAttr::getUndistributedTileTypes() const {
   MLIRContext *ctx = getContext();
   OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
-  result.assign({VectorType::get({o.mSize, o.kSize}, o.aType),
-                 VectorType::get({o.kSize, o.nSize}, o.bType),
-                 VectorType::get({o.mSize, o.nSize}, o.cType)});
+  return {VectorType::get({o.mSize, o.kSize}, o.aType),
+          VectorType::get({o.kSize, o.nSize}, o.bType),
+          VectorType::get({o.mSize, o.nSize}, o.cType)};
 }
 
-void VirtualMMAAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
+SmallVector<VectorType, 4> VirtualMMAAttr::getDistributedTileTypes() const {
   MLIRContext *context = getContext();
   VirtualMMAIntrinsic intrinsic = getIntrinsic();
-  result.assign({getThreadVectorType(context, intrinsic, kMMAOperandLhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandRhs),
-                 getThreadVectorType(context, intrinsic, kMMAOperandAcc)});
+  return {getThreadVectorType(context, intrinsic, kMMAOperandLhs),
+          getThreadVectorType(context, intrinsic, kMMAOperandRhs),
+          getThreadVectorType(context, intrinsic, kMMAOperandAcc)};
 }
 
 int64_t VirtualMMAAttr::getSubgroupSize() const {
@@ -1348,8 +1342,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
   if (outputs.size() != 1) {
     return failure();
   }
-  SmallVector<VectorType> threadTypes;
-  getDistributedTileTypes(threadTypes);
+  SmallVector<VectorType> threadTypes = getDistributedTileTypes();
   if (!llvm::equal(threadTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
@@ -1603,8 +1596,7 @@ ScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return success();
 }
 
-void ScaledMMAAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &results) const {
+SmallVector<VectorType, 4> ScaledMMAAttr::getUndistributedTileTypes() const {
   MMASingleSubgroupLayout lhsLayout =
       getSingleSubgroupLayout(getIntrinsic(), kScaledMMAOperandLhs);
   MMASingleSubgroupLayout rhsLayout =
@@ -1625,20 +1617,22 @@ void ScaledMMAAttr::getUndistributedTileTypes(
   Type accType = getAccElemType();
   Type scaleType = Float8E8M0FNUType::get(getContext());
 
+  SmallVector<VectorType, 4> results;
   results.push_back(VectorType::get({m, kScale, blockSize}, lhsType));
   results.push_back(VectorType::get({kScale, blockSize, n}, rhsType));
   results.push_back(VectorType::get({m, kScale}, scaleType));
   results.push_back(VectorType::get({kScale, n}, scaleType));
   results.push_back(VectorType::get({m, n}, accType));
+  return results;
 }
 
-void ScaledMMAAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &results) const {
+SmallVector<VectorType, 4> ScaledMMAAttr::getDistributedTileTypes() const {
   Type lhsType = getLhsElemType();
   Type rhsType = getRhsElemType();
   Type accType = getAccElemType();
   Type scaleType = Float8E8M0FNUType::get(getContext());
 
+  SmallVector<VectorType, 4> results;
   std::array<Type, 5> argTypes = {lhsType, rhsType, scaleType, scaleType,
                                   accType};
   for (auto [opIndex, type] : llvm::enumerate(argTypes)) {
@@ -1648,6 +1642,7 @@ void ScaledMMAAttr::getDistributedTileTypes(
     int64_t element = ShapedType::getNumElements(layout.element);
     results.push_back(VectorType::get({outer * element}, type));
   }
+  return results;
 }
 
 std::optional<SmallVector<int64_t, 2>>
@@ -1704,15 +1699,13 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   if (outputs.size() != 1) {
     return failure();
   }
-  SmallVector<VectorType> threadTypes;
-  getDistributedTileTypes(threadTypes);
+  SmallVector<VectorType> threadTypes = getDistributedTileTypes();
   if (!llvm::equal(threadTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
   }
 
-  SmallVector<VectorType> subgroupTypes;
-  getUndistributedTileTypes(subgroupTypes);
+  SmallVector<VectorType> subgroupTypes = getUndistributedTileTypes();
 
   // Note: the scales argument is given as a vector of 4
   // scales + a constant selector to say which byte in the vector is to be used.
@@ -1817,14 +1810,10 @@ IREE::Codegen::TileMxNxKxKb DataTiledScaledMMAAttr::getTileMNKKb() const {
   return innerTile;
 }
 
-void DataTiledScaledMMAAttr::getElementTypes(
-    SmallVectorImpl<Type> &result) const {
-  result.push_back(getLhsElemType());
-  result.push_back(getRhsElemType());
-  result.push_back(Float8E8M0FNUType::get(getContext()));
-  result.push_back(Float8E8M0FNUType::get(getContext()));
-  result.push_back(getAccElemType());
-  return;
+SmallVector<Type, 8> DataTiledScaledMMAAttr::getElementTypes() const {
+  return {getLhsElemType(), getRhsElemType(),
+          Float8E8M0FNUType::get(getContext()),
+          Float8E8M0FNUType::get(getContext()), getAccElemType()};
 }
 
 static Value createScaledMmaOp(OpBuilder &builder, Location loc,
@@ -1867,8 +1856,7 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   if (outputs.size() != 1) {
     return failure();
   }
-  SmallVector<VectorType> regTypes;
-  getDistributedTileTypes(regTypes);
+  SmallVector<VectorType> regTypes = getDistributedTileTypes();
   if (!llvm::equal(regTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();

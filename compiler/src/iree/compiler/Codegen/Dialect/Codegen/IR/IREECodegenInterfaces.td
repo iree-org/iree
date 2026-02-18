@@ -117,26 +117,20 @@ def IREECodegen_InnerTileDescAttrInterface :
         ```
         where `tA`, `tB`, and `tC` are the element types of matrices A, B, and C,
         respectively.
-
-        The returned values are placed into the `result` vector, which will have
-        its existing contents overwritten if there is any.
       }],
-      /*retType=*/"void",
+      /*retType=*/"::llvm::SmallVector<::mlir::VectorType, 4>",
       /*methodName=*/"getUndistributedTileTypes",
-      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+      /*args=*/(ins)
     >,
     InterfaceMethod<
       /*desc=*/[{
         For each operand, return the vector type of the inner tile after the operation
         is distributed to threads. Vectors of this type will be stored into or
         loaded from registers by individual threads.
-
-        The returned values are placed into the `result` vector, which will have
-        its existing contents overwritten if there is any.
       }],
-      /*retType=*/"void",
+      /*retType=*/"::llvm::SmallVector<::mlir::VectorType, 4>",
       /*methodName=*/"getDistributedTileTypes",
-      /*args=*/(ins "::llvm::SmallVectorImpl<::mlir::VectorType>&":$result)
+      /*args=*/(ins)
     >,
     InterfaceMethod<
       /*desc=*/[{
@@ -279,8 +273,8 @@ def IREECodegen_InnerTileDescAttrInterface :
     /// operand into `results`.
     void getUndistributedOperandSize(::llvm::SmallVectorImpl<int64_t>& result) const {
       result.clear();
-      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
-      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes =
+          $_attr.getUndistributedTileTypes();
       ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
         [](auto vt) { return vt.getNumElements(); }));
     }
@@ -288,8 +282,8 @@ def IREECodegen_InnerTileDescAttrInterface :
     /// Return the element element type of each operand into `results`.
     void getElementTypes(::llvm::SmallVectorImpl<::mlir::Type>& result) const {
       result.clear();
-      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes;
-      $_attr.getUndistributedTileTypes(undistributedTypes);
+      ::llvm::SmallVector<::mlir::VectorType> undistributedTypes =
+          $_attr.getUndistributedTileTypes();
       ::llvm::append_range(result, ::llvm::map_range(undistributedTypes,
         [](auto vt) { return vt.getElementType(); }));
     }

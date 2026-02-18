@@ -44,10 +44,10 @@ getSwizzledDistributionShape(const TileSwizzle &swizzle) {
   return shape;
 }
 
-void DataTiledMMAInterfaceAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) {
-  SmallVector<Type> elementTypes;
-  getElementTypes(elementTypes);
+SmallVector<VectorType, 4>
+DataTiledMMAInterfaceAttr::getUndistributedTileTypes() {
+  SmallVector<VectorType, 4> result;
+  SmallVector<Type> elementTypes = getElementTypes();
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
     TileSwizzle swizzle = getTileSwizzle(i);
     SmallVector<int64_t> shape;
@@ -59,12 +59,13 @@ void DataTiledMMAInterfaceAttr::getUndistributedTileTypes(
     applyPermutationToVector(shape, swizzle.permutation);
     result.push_back(VectorType::get(shape, elementType));
   }
+  return result;
 }
 
-void DataTiledMMAInterfaceAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) {
-  SmallVector<Type> elementTypes;
-  getElementTypes(elementTypes);
+SmallVector<VectorType, 4>
+DataTiledMMAInterfaceAttr::getDistributedTileTypes() {
+  SmallVector<VectorType, 4> result;
+  SmallVector<Type> elementTypes = getElementTypes();
   auto getShape = [=](unsigned operandIndex) {
     return sliceSwizzledShape(
         getTileSwizzle(operandIndex), [](TileSwizzle::Dim d) {
@@ -74,6 +75,7 @@ void DataTiledMMAInterfaceAttr::getDistributedTileTypes(
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
     result.push_back(VectorType::get(getShape(i), elementType));
   }
+  return result;
 }
 
 std::optional<::mlir::SmallVector<int64_t, 2>>

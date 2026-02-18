@@ -46,8 +46,8 @@ def IREEGPU_MmaInterfaceAttr
     /// `<K, N>`, and `C` has shape `<M, N>`.
     ::std::tuple<int64_t, int64_t, int64_t>
     getMNKShape() const {
-      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
-      $_attr.getUndistributedTileTypes(preThreadTypes);
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes =
+          $_attr.getUndistributedTileTypes();
       ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
       return {accShape[0], accShape[1], lhsShape[1]};
@@ -72,8 +72,8 @@ def IREEGPU_MmaInterfaceAttr
     /// storing such shaped vectors in the registers.
     ::std::tuple<::mlir::VectorType, ::mlir::VectorType, ::mlir::VectorType>
     getABCVectorTypes() const {
-      ::llvm::SmallVector<::mlir::VectorType> threadTypes;
-      $_attr.getDistributedTileTypes(threadTypes);
+      ::llvm::SmallVector<::mlir::VectorType> threadTypes =
+          $_attr.getDistributedTileTypes();
       return {threadTypes[0], threadTypes[1], threadTypes[2]};
     }
   }];
@@ -153,9 +153,9 @@ def IREEGPU_DataTiledMMAInterfaceAttr
         Returns the element types of the data tiled operation corresponding to
         the DataTiledMMAInterfaceAttr.
       }],
-      /*retType=*/"void",
+      /*retType=*/"::llvm::SmallVector<::mlir::Type, 8>",
       /*methodName=*/"getElementTypes",
-      /*args=*/(ins "SmallVectorImpl<Type>&":$result)
+      /*args=*/(ins)
     >,
     InterfaceMethod<
       /*desc=*/[{
@@ -183,9 +183,9 @@ def IREEGPU_DataTiledMMAInterfaceAttr
     // implementation among DataTiledMMAInterfaceAttr.
     //========================================================================//
 
-    void getUndistributedTileTypes(SmallVectorImpl<VectorType>& result);
+    SmallVector<VectorType, 4> getUndistributedTileTypes();
 
-    void getDistributedTileTypes(SmallVectorImpl<VectorType>& result);
+    SmallVector<VectorType, 4> getDistributedTileTypes();
 
     std::optional<::mlir::SmallVector<int64_t, 2>>
     getUndistributedTileDimExpansion(int64_t operandIndex, int64_t logicalDim);

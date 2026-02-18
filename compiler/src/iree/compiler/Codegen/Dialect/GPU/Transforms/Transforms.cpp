@@ -1123,8 +1123,8 @@ struct LowerInnerTiledPattern
     }
 
     SmallVector<Value> operands = tiledOp.getOperands();
-    SmallVector<VectorType> regTypes;
-    tiledOp.getKind().getDistributedTileTypes(regTypes);
+    SmallVector<VectorType> regTypes =
+        tiledOp.getKind().getDistributedTileTypes();
 
     for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
       if (operand.getType() != regType) {

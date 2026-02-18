@@ -339,16 +339,12 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
     // are defined in IREEGPUInterfaces.cpp.
     //========================================================================//
 
-    void $cppClass::getUndistributedTileTypes(
-        SmallVectorImpl<VectorType>& result) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .getUndistributedTileTypes(result);
+    SmallVector<VectorType, 4> $cppClass::getUndistributedTileTypes() const {
+      return cast<DataTiledMMAInterfaceAttr>(*this).getUndistributedTileTypes();
     }
 
-    void $cppClass::getDistributedTileTypes(
-        SmallVectorImpl<VectorType>& result) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .getDistributedTileTypes(result);
+    SmallVector<VectorType, 4> $cppClass::getDistributedTileTypes() const {
+      return cast<DataTiledMMAInterfaceAttr>(*this).getDistributedTileTypes();
     }
 
     std::optional<::mlir::SmallVector<int64_t, 2>>
@@ -653,8 +649,8 @@ def IREEGPU_ScaledMMAAttr :
     /// has shape `<K, KB, N>`, and `C` has shape `<M, N>`.
     ::std::tuple<int64_t, int64_t, int64_t, int64_t>
     getScaledMNKShape() const {
-      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
-      getUndistributedTileTypes(preThreadTypes);
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes =
+          getUndistributedTileTypes();
       ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
       ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
       return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};

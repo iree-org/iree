@@ -143,8 +143,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       newPermutations = llvm::to_vector(*permutationsAttr);
     }
 
-    SmallVector<VectorType> unexpandedLogicalTypes;
-    tiledOp.getKind().getUndistributedTileTypes(unexpandedLogicalTypes);
+    SmallVector<VectorType> unexpandedLogicalTypes =
+        tiledOp.getKind().getUndistributedTileTypes();
     for (int64_t opIndex : llvm::seq(firstOperand, lastOperand)) {
       Value operand = newOperands[opIndex];
       std::optional<ArrayRef<int64_t>> permutation;

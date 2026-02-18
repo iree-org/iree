@@ -166,8 +166,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     if (!intrinsicScaledMma) {
       return {};
     }
-    SmallVector<VectorType> vectorTypes;
-    intrinsicScaledMma.getDistributedTileTypes(vectorTypes);
+    SmallVector<VectorType> vectorTypes =
+        intrinsicScaledMma.getDistributedTileTypes();
     // For scaled_matmul, the size of the LHS scales and RHS scales are added
     // to the total LHS and RHS sizes, because we use these sizes to select the
     // unrolling factors for M, N, and K, which affect both the input and the
