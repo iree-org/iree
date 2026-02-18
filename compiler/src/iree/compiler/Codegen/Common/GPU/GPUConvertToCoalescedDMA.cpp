@@ -97,6 +97,47 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
+/// Returns the subgroup size if the available elements are aligned to DMA
+/// transfer sizes, std::nullopt otherwise.
+static std::optional<int64_t>
+getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
+                          int64_t availableElements) {
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
+    return std::nullopt;
+  }
+
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+      availableElements % minElementsPerTransfer != 0) {
+    return std::nullopt;
+  }
+
+  return subgroupSize;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -108,52 +149,15 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Get the function containing this operation.
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
     return {};
   }
 
-  // Get subgroup size from translation_info.
-  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-  if (!subgroupSize) {
-    return {};
-  }
-
-  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-  // transfer size. The minimum transfer size is subgroupSize *
-  // minElementsPerLane.
   int64_t rank = outputType.getRank();
   int64_t innermostDim = outputType.getShape()[rank - 1];
   if (ShapedType::isDynamic(innermostDim)) {
     return {};
-  }
-
-  // Get element type bit width.
-  Type elementType = outputType.getElementType();
-  int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-  // Get DMA sizes from target to compute minimum transfer size.
-  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!target) {
-    return {};
-  }
-
-  ArrayRef<int64_t> dmaSizes;
-  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
-    dmaSizes = dmaSizesAttr.asArrayRef();
-  }
-
-  // Find minimum elements per transfer across all DMA sizes.
-  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-  for (int64_t dmaSize : dmaSizes) {
-    if (dmaSize % elementBits != 0) {
-      continue;
-    }
-    int64_t elementsPerLane = dmaSize / elementBits;
-    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-    minElementsPerTransfer =
-        std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
   // Determine how many elements are available for coalesced access.
@@ -168,13 +172,48 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     }
   }
 
-  // If no valid DMA size found or elements not aligned to transfer size, skip.
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      availableElements % minElementsPerTransfer != 0) {
+  auto subgroupSize = getDMAAlignedSubgroupSize(
+      funcOp, outputType.getElementType(), availableElements);
+  if (!subgroupSize) {
     return {};
   }
 
   return {builder.getIndexAttr(*subgroupSize)};
+}
+
+/// Check if a linalg.copy is viable for DMA conversion based on alignment and
+/// size constraints. This does NOT modify the IR.
+static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
+  auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
+  if (!funcOp) {
+    return false;
+  }
+
+  auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
+  int64_t rank = outputType.getRank();
+  ArrayRef<int64_t> shape = outputType.getShape();
+  int64_t innermostDim = shape[rank - 1];
+  if (ShapedType::isDynamic(innermostDim)) {
+    return false;
+  }
+
+  // The pre-check runs before tiling, so the output is directly a
+  // tensor.empty() (not yet inside forall block args). A simple defining op
+  // check suffices here, unlike tracesToTensorEmpty used post-tiling.
+  // TODO: If the pass pipeline changes such that copies are already inside
+  // forall ops at pre-check time, switch to tracesToTensorEmpty here to avoid
+  // undercounting availableElements (currently safe but conservative).
+  int64_t availableElements = innermostDim;
+  Value output = copyOp.getOutputs()[0];
+  if (output.getDefiningOp<tensor::EmptyOp>()) {
+    if (llvm::none_of(shape, ShapedType::isDynamic)) {
+      availableElements = ShapedType::getNumElements(shape);
+    }
+  }
+
+  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   availableElements)
+      .has_value();
 }
 
 /// Check if the given forall op has warp mapping.
@@ -597,6 +636,48 @@ struct GPUConvertToCoalescedDMAPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
+
+    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
+    // Only activate when at least one copy already has use_global_load_dma
+    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
+    // direct-load). Collect all promoted copies (use_global_load_dma or
+    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
+    // use_global_load_dma. If ANY fails, downgrade them all to
+    // derived_thread_config.
+    // Note: GatherOps are excluded — they come from input IR (not from
+    // GPUPromoteMatmulOperands) and are handled independently by
+    // ConvertGatherToCoalescedDMA.
+    SmallVector<linalg::CopyOp> promotedCopies;
+    bool hasDMAIntent = false;
+    funcOp->walk([&](linalg::CopyOp copyOp) {
+      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+        hasDMAIntent = true;
+        promotedCopies.push_back(copyOp);
+      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
+                     copyOp)) {
+        promotedCopies.push_back(copyOp);
+      }
+    });
+
+    if (hasDMAIntent) {
+      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+      LLVM_DEBUG({
+        if (!allConvertible) {
+          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                       << "downgrading " << promotedCopies.size()
+                       << " copies to derived_thread_config\n";
+        }
+      });
+      for (linalg::CopyOp copyOp : promotedCopies) {
+        if (allConvertible) {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
+        } else {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::DerivedThreadConfigAttr::get(context));
+        }
+      }
+    }
 
     // Preprocessing: apply subgroup-level tiling.
     if (failed(applySubgroupTiling(funcOp))) {
