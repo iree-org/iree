@@ -104,9 +104,8 @@ struct GenericOpInterface
     for (int64_t i = 0, e = genericOp->getNumResults(); i < e; ++i) {
       OpOperand *tiedInit = genericOp.getTiedInit(i);
       if (tiedInit) {
-        int64_t initIdx =
-            llvm::count(genericOp.getIsTied().take_front(i), true);
-        replacements.push_back(newInits[initIdx]);
+        replacements.push_back(
+            newGenericOp->getOperand(tiedInit->getOperandNumber()));
       } else {
         replacements.push_back(newGenericOp->getResult(i));
       }
@@ -218,8 +217,8 @@ struct LoopOpInterface
     for (int64_t i = 0, e = loopOp->getNumResults(); i < e; ++i) {
       OpOperand *tiedInit = loopOp.getTiedInit(i);
       if (tiedInit) {
-        int64_t initIdx = llvm::count(loopOp.getIsTied().take_front(i), true);
-        replacements.push_back(newInits[initIdx]);
+        replacements.push_back(
+            newLoopOp->getOperand(tiedInit->getOperandNumber()));
       } else {
         replacements.push_back(newLoopOp->getResult(i));
       }
