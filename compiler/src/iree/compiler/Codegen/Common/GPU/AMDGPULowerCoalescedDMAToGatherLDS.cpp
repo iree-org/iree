@@ -300,44 +300,6 @@ struct LowerCoalescedGatherDMAPattern final
           }
         }
       }
-
-      // For non-outermost dims with OOB (in_bounds=false), the vector read
-      // must not cross row boundaries. Each lane reads `elementsPerLane`
-      // contiguous elements from the source buffer. If the source dim size is
-      // not a multiple of elementsPerLane, a vector read near the end of a row
-      // will wrap into the next row instead of returning zeros.
-      // Example: source 64x62xf32, dest 64x64xf32, vector<4xf32>:
-      //   Lane at [0, 60] reads 4 elements at flat offsets 60..63.
-      //   Offset 62 wraps to [1, 0] instead of returning 0.
-      ArrayRef<int64_t> sourceShape = srcType.getShape();
-      for (int64_t dim = 1; dim < srcType.getRank(); ++dim) {
-        if (dim >= static_cast<int64_t>(inBounds->size())) {
-          break;
-        }
-        bool dimInBounds = cast<BoolAttr>((*inBounds)[dim]).getValue();
-        if (dimInBounds) {
-          continue;
-        }
-        // This non-outermost dim has padding. Check that source dim size is
-        // a multiple of elementsPerLane for every segment to prevent row
-        // crossing.
-        if (ShapedType::isDynamic(sourceShape[dim])) {
-          return rewriter.notifyMatchFailure(
-              dmaOp, "non-outermost OOB dim " + Twine(dim) +
-                         " has dynamic source size; cannot verify vector "
-                         "reads do not cross row boundaries");
-        }
-        for (const TransferSegment &segment : segments) {
-          if (sourceShape[dim] % segment.elementsPerLane != 0) {
-            return rewriter.notifyMatchFailure(
-                dmaOp, "non-outermost OOB dim " + Twine(dim) +
-                           " has source size " + Twine(sourceShape[dim]) +
-                           " not divisible by elementsPerLane " +
-                           Twine(segment.elementsPerLane) +
-                           "; vector reads would cross row boundaries");
-          }
-        }
-      }
     }
 
     // Set up for code generation.

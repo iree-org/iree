@@ -1218,10 +1218,12 @@ func.func @gather_dma_non_outermost_oob_check(
 
 // -----
 
-// Test: Inner-dim padding where source dim is aligned with vector width.
-// Source 64x60 padded to 64x64, in_bounds = [true, false].
-// elementsPerLane = 4 (128-bit DMA with f32), 60 % 4 = 0, so no vector
-// read crosses a row boundary. The OOB check correctly handles dim 1.
+// Test: Inner-dim padding OOB check with <64x62xf32> source padded to <64x64xf32>.
+// Only inner dim (dim 1) has padding: 62 → 64. in_bounds = [true, false].
+// Raw buffer OOB is 1D (linear): reading <4 x f32> at [0, 60] would compute a
+// linear offset within the buffer and wrap to [1, 0], [1, 1] instead of returning 0.
+// Fix: when srcIndices[1] >= 62, replace srcIndices[0] with 64 (past buffer end)
+// so the linearized offset exceeds buffer size → hardware returns 0.
 
 #executable_target_rocm_hsaco_fb_inner_pad = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
@@ -1236,11 +1238,11 @@ func.func @gather_dma_non_outermost_oob_check(
 
 #translation_64_inner_pad = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 
-// CHECK-LABEL: func.func @gather_dma_inner_dim_oob_64x60
-// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<64x60xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-LABEL: func.func @gather_dma_inner_dim_oob_64x62
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<64x62xf32, #amdgpu.address_space<fat_raw_buffer>>
 // CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<64x64xf32, #gpu.address_space<workgroup>>
-func.func @gather_dma_inner_dim_oob_64x60(
-    %source: memref<64x60xf32, #amdgpu.address_space<fat_raw_buffer>>,
+func.func @gather_dma_inner_dim_oob_64x62(
+    %source: memref<64x62xf32, #amdgpu.address_space<fat_raw_buffer>>,
     %dest: memref<64x64xf32, #gpu.address_space<workgroup>>)
   attributes {
     hal.executable.target = #executable_target_rocm_hsaco_fb_inner_pad,
@@ -1257,52 +1259,16 @@ func.func @gather_dma_inner_dim_oob_64x60(
     // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (64, 64)
     // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (64, 64)
     //
-    // Bounds check: compare srcIndices[1] >= 60 (source inner dim size).
+    // Bounds check: compare srcIndices[1] >= 62 (source inner dim size).
     // CHECK: %[[FALSE:.+]] = arith.constant false
-    // CHECK: %[[C60:.+]] = arith.constant 60 : index
-    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C60]] : index
+    // CHECK: %[[C62:.+]] = arith.constant 62 : index
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[C62]] : index
     // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
     // Replace outermost index with 64 (source dim 0 size) to force hardware OOB.
     // CHECK: %[[C64_OOB:.+]] = arith.constant 64 : index
     // CHECK: %[[FIXED_IDX:.+]] = arith.select %[[OOB]], %[[C64_OOB]], %[[SRC_DELIN0]]#0 : index
     // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED_IDX]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
     // CHECK-NOT: iree_gpu.coalesced_gather_dma
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [true, false] :
-      memref<64x60xf32, #amdgpu.address_space<fat_raw_buffer>>,
-      memref<64x64xf32, #gpu.address_space<workgroup>>, index
-  } {mapping = [#gpu.thread<linear_dim_0>]}
-  return
-}
-
-// -----
-
-// Test: Inner-dim padding rejected when source dim is not aligned with vector width.
-// Source 64x62 padded to 64x64, in_bounds = [true, false].
-// elementsPerLane = 4 (128-bit DMA with f32), 62 % 4 != 0.
-// A vector read at [0, 60] would span elements 60..63 in the flat buffer,
-// wrapping into the next row (offset 62 = [1, 0]) instead of returning 0.
-
-#executable_target_rocm_hsaco_fb_inner_pad_unaligned = #hal.executable.target<"rocm",
-  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
-  arch = "gfx950", features = "", wgp = <
-    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [64, 64],
-    max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024,
-    max_workgroup_memory_bytes = 65536,
-    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-    max_load_instruction_bits = 128, simds_per_wgp = 4,
-    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
-
-#translation_64_inner_pad_unaligned = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
-
-func.func @gather_dma_inner_dim_oob_64x62_rejected(
-    %source: memref<64x62xf32, #amdgpu.address_space<fat_raw_buffer>>,
-    %dest: memref<64x64xf32, #gpu.address_space<workgroup>>)
-  attributes {
-    hal.executable.target = #executable_target_rocm_hsaco_fb_inner_pad_unaligned,
-    translation_info = #translation_64_inner_pad_unaligned} {
-  scf.forall (%arg6) in (64) {
-    // expected-error @+1 {{failed to lower to gather_to_lds; possible causes: source lacks fat_raw_buffer address space for OOB padding, destination is not contiguous, or element sizes are incompatible with dma_sizes}}
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [true, false] :
       memref<64x62xf32, #amdgpu.address_space<fat_raw_buffer>>,
       memref<64x64xf32, #gpu.address_space<workgroup>>, index

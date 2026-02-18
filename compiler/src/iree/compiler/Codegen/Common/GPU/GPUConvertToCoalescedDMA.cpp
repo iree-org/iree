@@ -150,8 +150,7 @@ static bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
   if (!target) {
     return false;
   }
-  FailureOr<amdgpu::Chipset> chipset =
-      amdgpu::Chipset::parse(target.getArch());
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
   if (failed(chipset)) {
     return false;
   }
