@@ -676,9 +676,28 @@ struct DistributeTransferGather final
           gatherOp, "warp or thread tiles have overlapping strides");
     }
 
-    ValueRange indices = gatherOp.getIndices();
-    AffineMap permMap = gatherOp.getPermutationMap();
+    ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
+
+    // Derive the permutation map from the source indexing map.
+    // The source map is (vector_dims)[symbols] -> (source_dims).
+    // We need to build a permutation map (source_dims) -> (vector_dims)
+    // for getTransferIndicesFromNestedLayout.
+    AffineMap sourceMap = gatherOp.getIndexingMapsArray().front();
+    int64_t sourceRank =
+        cast<ShapedType>(gatherOp.getBase().getType()).getRank();
+    MLIRContext *ctx = rewriter.getContext();
+    SmallVector<AffineExpr> permExprs(rank, getAffineConstantExpr(0, ctx));
+    SmallVector<bool> isGatheredSourceDim(sourceRank, false);
+    for (auto [j, expr] : llvm::enumerate(sourceMap.getResults())) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        unsigned vecDim = dimExpr.getPosition();
+        permExprs[vecDim] = getAffineDimExpr(j, ctx);
+      } else if (isa<AffineSymbolExpr>(expr)) {
+        isGatheredSourceDim[j] = true;
+      }
+    }
+    AffineMap permMap = AffineMap::get(sourceRank, 0, permExprs, ctx);
 
     SmallVector<SmallVector<int64_t>> allMaskOffsets;
     std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
@@ -696,19 +715,16 @@ struct DistributeTransferGather final
           StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
     }
 
-    SmallVector<bool> indexed =
-        llvm::to_vector(gatherOp.getIndexed().getAsValueRange<BoolAttr>());
-
     for (auto [idx, offsets] :
          llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
 
-      // Only take the sliced indices for the non-indexed values.
+      // Only take the sliced indices for the non-indexed (non-gathered) values.
       for (auto [dim, slicedIndex, index] :
            llvm::enumerate(slicedIndices, indices)) {
-        if (indexed[dim]) {
+        if (isGatheredSourceDim[dim]) {
           slicedIndex = index;
         }
       }
@@ -737,9 +753,8 @@ struct DistributeTransferGather final
 
       VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
           rewriter, gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
-          slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
-          gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
-          gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
+          slicedIndices, slicedIndexVecs, gatherOp.getIndexingMapsAttr(),
+          gatherOp.getPadding(), slicedMask);
 
       if (acc.getType().getRank() == 0) {
         // TODO: This should really be a folding pattern in

@@ -51,7 +51,7 @@ struct TransferGatherOpInterface
                           const BufferizationOptions &options,
                           BufferizationState &state) const {
     auto gatherOp = cast<IREE::VectorExt::TransferGatherOp>(op);
-    assert(isa<TensorType>(gatherOp.getShapedType()) &&
+    assert(isa<TensorType>(gatherOp.getBase().getType()) &&
            "only tensor types expected");
     FailureOr<Value> buffer =
         getBuffer(rewriter, gatherOp.getBase(), options, state);
@@ -59,10 +59,10 @@ struct TransferGatherOpInterface
       return failure();
     }
     replaceOpWithNewBufferizedOp<IREE::VectorExt::TransferGatherOp>(
-        rewriter, gatherOp, gatherOp.getVectorType(), *buffer,
-        gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),
-        gatherOp.getIndexedMaps(), gatherOp.getPermutationMap(),
-        gatherOp.getPadding(), gatherOp.getMask(), gatherOp.getInBoundsAttr());
+        rewriter, gatherOp, cast<VectorType>(gatherOp.getVector().getType()),
+        *buffer, gatherOp.getOffsets(), gatherOp.getIndexVecs(),
+        gatherOp.getIndexingMapsAttr(), gatherOp.getPadding(),
+        gatherOp.getMask());
     return success();
   }
 };
