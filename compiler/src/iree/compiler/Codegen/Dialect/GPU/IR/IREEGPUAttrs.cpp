@@ -1405,6 +1405,7 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
   return 0;
 }
 
+// Expand collapsed ACC [c0, c1] -> [c0, 0, c1, 0].
 Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
   // acc = [a, b] -> result = [a, 0, b, 0].
   auto accType = cast<VectorType>(acc.getType());
@@ -1416,6 +1417,7 @@ Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
                                    ArrayRef<int64_t>{0, 2, 1, 3});
 }
 
+// Collapse expanded ACC [d0, d1, d2, d3] -> [d0+d1, d2+d3].
 Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
   // acc = [a, b, c, d] -> result = [a+b, c+d].
   auto accType = cast<VectorType>(acc.getType());
@@ -1433,7 +1435,6 @@ Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
   return arith::AddIOp::create(builder, loc, evens, odds);
 }
 
-// Configuration for a VSMFMA (sparse-trick) intrinsic variant.
 struct VSMFMAConfig {
   int64_t m, n, k;
   VectorType sparseIndexVectorType;
@@ -1443,7 +1444,6 @@ struct VSMFMAConfig {
   ArrayRef<int64_t> oddLaneLhsIndices;
 };
 
-// Shared implementation for all VSMFMA intrinsic variants.
 // Uses the sparse trick for skinny GEMMs: lane pairs (even/odd) share
 // the same M-row; each provides half the K-elements as "sparse" data,
 // and the sparsity index selects which half.

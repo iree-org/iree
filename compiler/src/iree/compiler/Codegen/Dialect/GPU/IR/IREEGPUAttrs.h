@@ -306,10 +306,9 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle);
 
-// Expand collapsed ACC [c0, c1] -> [c0, 0, c1, 0].
+// Add
 Value expandAccumulator(OpBuilder &builder, Location loc, Value acc);
 
-// Collapse expanded ACC [d0, d1, d2, d3] -> [d0+d1, d2+d3].
 Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc);
 
 } // namespace mlir::iree_compiler::IREE::GPU
