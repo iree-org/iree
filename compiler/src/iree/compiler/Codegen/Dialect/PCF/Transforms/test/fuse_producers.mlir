@@ -251,7 +251,34 @@ func.func @fuse_fill_vector_read(%dest: tensor<8x16xf32>) -> tensor<8x16xf32> {
 // -----
 
 // Negative Tests:
+//  - Sref without sync(scope) (no return-only sync guarantee)
 //  - No read_slice on the sref
+
+// Negative: sref has no sync scope, so isReturnOnlySync() is false. The pass
+// cannot assume reads see the init value and must not fuse.
+func.func @no_fuse_no_sync_scope(%dest: tensor<8x16xf32>) -> tensor<8x16xf32> {
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%dest : tensor<8x16xf32>) -> tensor<8x16xf32>
+  %0 = pcf.generic scope(#pcf.test_scope)
+    execute(%ref = %fill)[%id0: index, %id1: index, %n0: index, %n1: index]
+         : (!pcf.sref<8x16xf32, #pcf.test_scope>)
+        -> (tensor<8x16xf32>) {
+    %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, #pcf.test_scope> to tensor<4x8xf32>
+    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, #pcf.test_scope>
+    pcf.return
+  }
+  return %0 : tensor<8x16xf32>
+}
+
+// CHECK-LABEL: @no_fuse_no_sync_scope
+//       CHECK:  %[[FILL:.+]] = linalg.fill
+//       CHECK:  %[[GENERIC:.+]] = pcf.generic
+//  CHECK-NEXT:    execute(%{{.+}} = %[[FILL]])
+//       CHECK:    pcf.read_slice
+//       CHECK:  return %[[GENERIC]]
+
+// -----
 
 // Negative: no read_slice on the sref (only writes).
 func.func @no_fuse_no_reads(%dest: tensor<8x16xf32>) -> tensor<8x16xf32> {

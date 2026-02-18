@@ -110,9 +110,9 @@ struct ProducerFusionParams {
 // through its tied init argument. The producer must:
 //   1. Implement TilingInterface and DestinationStyleOpInterface.
 //   2. Have a single result.
-//   3. Have all operands dominating the scoped op.
-//   4. Feed into a tied init of the scoped op whose corresponding sref arg
-//      has only read_slice and write_slice users.
+//   3. Have all operands dominating the generic/loop op.
+//   4. Feed into a tied init of the generic/loop op whose corresponding sref
+//      arg has only read_slice and write_slice users.
 //
 // On success, |params| is populated with the result index, producer op, and
 // list of read_slice ops to replace with tiled producer computations.
@@ -122,7 +122,7 @@ LogicalResult matchTilableProducer(RewriterBase &rewriter,
 LogicalResult matchTilableProducer(RewriterBase &rewriter, PCF::LoopOp loopOp,
                                    ProducerFusionParams &params);
 
-// Fuses the matched producer into the scoped op by:
+// Fuses the matched producer into the pcf.generic/loop op by:
 //   1. Replacing the tied init with the producer's DPS init.
 //   2. Generating tiled producer computations at each read_slice site via
 //      TilingInterface::generateResultTileValue.
