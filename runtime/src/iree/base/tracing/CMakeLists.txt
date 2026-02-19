@@ -45,7 +45,7 @@ else()
   # Add the dep so that the user-provided provider is linked in.
   # The user will also need to have set a header to include via
   # IREE_TRACING_PROVIDER_H.
-  if(NOT ${IREE_TRACING_PROVIDER_H})
+  if(NOT IREE_TRACING_PROVIDER_H)
     message(FATAL_ERROR "Custom tracing providers require a header file be set in IREE_TRACING_PROVIDER_H")
   endif()
   iree_cc_library(
