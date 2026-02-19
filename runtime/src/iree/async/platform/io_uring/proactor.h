@@ -139,6 +139,17 @@ typedef struct iree_async_proactor_io_uring_t {
   // the LINK path is used instead (no emulator involvement).
   iree_async_sequence_emulator_t sequence_emulator;
 
+  // MPSC queue of software operation completions (SEMAPHORE_SIGNAL, etc.)
+  // ready for callback delivery. Submit threads push completed operations
+  // here; poll() drains and fires callbacks. This allows software ops to
+  // execute their side effects on the submit thread while deferring callback
+  // delivery to the poll thread.
+  //
+  // Operations use base.next (offset 0) as the slist entry and base.linked_next
+  // (repurposed after continuation chain is consumed) to carry the completion
+  // status through the queue.
+  iree_atomic_slist_t pending_software_completions;
+
   // MPSC queue of semaphore wait operations ready to complete.
   // Timepoint callbacks push trackers here, poll() drains and completes them.
   iree_atomic_slist_t pending_semaphore_waits;
@@ -218,10 +229,6 @@ typedef enum iree_io_uring_internal_tag_e {
   // cancellation), the linked READ subordinate is never started by the kernel
   // and produces no CQE, so this handler dispatches the user callback.
   IREE_IO_URING_TAG_LINKED_POLL = 9,
-  // Placeholder NOP for software-emulated operations (SEMAPHORE_WAIT).
-  // The NOP completes immediately; its CQE is expected and discarded. The
-  // actual operation completes through the MPSC pending_semaphore_waits queue.
-  IREE_IO_URING_TAG_NOP_PLACEHOLDER = 10,
 } iree_io_uring_internal_tag_t;
 
 // Helpers for encoding/decoding internal user_data.
@@ -341,6 +348,32 @@ iree_status_t iree_async_proactor_io_uring_register_slab(
     iree_async_proactor_t* base_proactor, iree_async_slab_t* slab,
     iree_async_buffer_access_flags_t access_flags,
     iree_async_region_t** out_region);
+
+// Continuation dispatch helpers (in proactor.c, used by proactor_submit.c).
+void iree_async_proactor_io_uring_submit_continuation_chain(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* chain_head);
+
+// Pushes a completed software operation to the MPSC queue for callback
+// delivery on the poll thread (in proactor.c, used by proactor_submit.c).
+void iree_async_proactor_io_uring_push_software_completion(
+    iree_async_proactor_io_uring_t* proactor, iree_async_operation_t* operation,
+    iree_status_t status);
+
+// Iteratively dispatches a continuation chain containing software operations.
+// Software ops execute inline (side effects only) with completions pushed to
+// MPSC for poll-thread callback delivery. Kernel ops are submitted to the ring
+// for CQE-driven completion. (In proactor_submit.c, used by proactor.c.)
+void iree_async_proactor_io_uring_dispatch_continuation_chain(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* chain_head);
+
+// Cancels a continuation chain by pushing CANCELLED completions to the MPSC
+// queue. Resources are retained before pushing so the drain's release is
+// balanced. (In proactor_submit.c, used by proactor.c.)
+void iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* chain_head);
 
 // Submit vtable implementation (in proactor_submit.c).
 iree_status_t iree_async_proactor_io_uring_submit(
