@@ -39,6 +39,15 @@ iree_status_t iree_async_posix_socket_import(
     iree_async_socket_type_t type, iree_async_socket_flags_t flags,
     iree_async_socket_t** out_socket);
 
+// Allocates and initializes a socket struct for an accepted connection.
+// The socket is set to CONNECTED state with the given |type| (inherited from
+// the listening socket). On success, the socket takes ownership of
+// |accepted_fd|. On failure, |accepted_fd| is NOT closed — the caller is
+// responsible for cleanup.
+iree_status_t iree_async_posix_socket_create_accepted(
+    iree_async_proactor_posix_t* proactor, int accepted_fd,
+    iree_async_socket_type_t type, iree_async_socket_t** out_socket);
+
 // Destroys a socket created or imported by this proactor.
 // Closes the underlying platform handle and frees the socket struct.
 void iree_async_posix_socket_destroy(iree_async_proactor_posix_t* proactor,

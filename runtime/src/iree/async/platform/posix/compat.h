@@ -47,6 +47,7 @@ extern "C" {
 
 // Creates a socket with SOCK_NONBLOCK and SOCK_CLOEXEC flags.
 // On Linux this is atomic; on other platforms fcntl() is used after socket().
+// Returns the fd on success, or -1 with errno set on failure.
 static inline int iree_posix_socket(int domain, int type, int protocol) {
 #if defined(IREE_PLATFORM_LINUX)
   return socket(domain, type | SOCK_NONBLOCK | SOCK_CLOEXEC, protocol);
@@ -54,14 +55,22 @@ static inline int iree_posix_socket(int domain, int type, int protocol) {
   int fd = socket(domain, type, protocol);
   if (fd < 0) return fd;
 
-  // Set nonblocking.
+  // Set nonblocking. Failure would cause the poll thread to block on I/O.
   int flags = fcntl(fd, F_GETFL, 0);
-  if (flags >= 0) {
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+  if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    int saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
   }
 
-  // Set close-on-exec.
-  fcntl(fd, F_SETFD, FD_CLOEXEC);
+  // Set close-on-exec for fd hygiene across exec.
+  if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+    int saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
+  }
 
   return fd;
 #endif  // IREE_PLATFORM_LINUX
@@ -73,6 +82,7 @@ static inline int iree_posix_socket(int domain, int type, int protocol) {
 
 // Accepts a connection with SOCK_NONBLOCK and SOCK_CLOEXEC flags on the new fd.
 // On Linux this uses accept4(); on other platforms uses accept() + fcntl().
+// Returns the fd on success, or -1 with errno set on failure.
 static inline int iree_posix_accept(int sockfd, struct sockaddr* addr,
                                     socklen_t* addrlen) {
 #if defined(IREE_PLATFORM_LINUX)
@@ -81,14 +91,22 @@ static inline int iree_posix_accept(int sockfd, struct sockaddr* addr,
   int fd = accept(sockfd, addr, addrlen);
   if (fd < 0) return fd;
 
-  // Set nonblocking.
+  // Set nonblocking. Failure would cause the poll thread to block on I/O.
   int flags = fcntl(fd, F_GETFL, 0);
-  if (flags >= 0) {
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+  if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    int saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
   }
 
-  // Set close-on-exec.
-  fcntl(fd, F_SETFD, FD_CLOEXEC);
+  // Set close-on-exec for fd hygiene across exec.
+  if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+    int saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return -1;
+  }
 
   return fd;
 #endif  // IREE_PLATFORM_LINUX

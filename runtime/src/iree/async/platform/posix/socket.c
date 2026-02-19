@@ -226,6 +226,24 @@ iree_status_t iree_async_posix_socket_create(
   return status;
 }
 
+iree_status_t iree_async_posix_socket_create_accepted(
+    iree_async_proactor_posix_t* proactor, int accepted_fd,
+    iree_async_socket_type_t type, iree_async_socket_t** out_socket) {
+  IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_socket);
+  *out_socket = NULL;
+
+  iree_async_socket_t* socket = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(proactor->base.allocator,
+                                             sizeof(*socket), (void**)&socket));
+
+  iree_async_socket_initialize(socket, proactor, accepted_fd, type,
+                               IREE_ASYNC_SOCKET_FLAG_NONE);
+  socket->state = IREE_ASYNC_SOCKET_STATE_CONNECTED;
+  *out_socket = socket;
+  return iree_ok_status();
+}
+
 iree_status_t iree_async_posix_socket_import(
     iree_async_proactor_posix_t* proactor, iree_async_primitive_t primitive,
     iree_async_socket_type_t type, iree_async_socket_flags_t flags,
