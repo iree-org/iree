@@ -52,6 +52,10 @@ struct LayoutInfo {
   }
   bool hasLayout(Value val) const { return layouts.contains(val); }
 
+  /// Given a linalg::GenericOp, use known operand layouts to infer and set
+  /// layouts on operands that don't have one yet.
+  void propagateGenericOpLayouts(linalg::GenericOp genericOp);
+
   llvm::MapVector<Value, VectorLayoutInterface> layouts;
   std::queue<Value> forward;
   std::queue<Value> backward;
@@ -193,6 +197,21 @@ void LayoutInfo::propagateLayoutForward(Value val) {
           layout.reshape(shapeCast.getResultVectorType().getShape()));
       continue;
     }
+
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(user)) {
+      // Propagate layout information from operands with known layout to the
+      // remaining operands.
+      propagateGenericOpLayouts(genericOp);
+      // Propagate DPS init layouts to corresponding results.
+      for (auto [init, result] :
+           llvm::zip_equal(genericOp.getDpsInits(), genericOp.getResults())) {
+        VectorLayoutInterface initLayout = getLayout(init);
+        if (initLayout) {
+          setLayoutIfUnset(result, initLayout);
+        }
+      }
+      continue;
+    }
   }
 }
 
@@ -304,6 +323,54 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
         &shapeCast.getSourceMutable(),
         layout.reshape(shapeCast.getSourceVectorType().getShape()));
     return;
+  }
+
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(defOp)) {
+    // Propagate this result's layout to its corresponding DPS init operand.
+    unsigned resultIdx = cast<OpResult>(val).getResultNumber();
+    setLayoutOrClone(genericOp.getDpsInitOperand(resultIdx), layout);
+    // Use all known operand layouts to infer the remaining ones.
+    propagateGenericOpLayouts(genericOp);
+    return;
+  }
+}
+
+void LayoutInfo::propagateGenericOpLayouts(linalg::GenericOp genericOp) {
+  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+
+  // Collect known operand layouts and their indexing maps.
+  SmallVector<VectorLayoutInterface> knownLayouts;
+  SmallVector<AffineMap> knownMaps;
+  for (OpOperand &operand : genericOp->getOpOperands()) {
+    if (!isa<ShapedType>(operand.get().getType())) {
+      continue;
+    }
+    VectorLayoutInterface operandLayout = getLayout(operand.get());
+    if (!operandLayout) {
+      continue;
+    }
+    knownLayouts.push_back(operandLayout);
+    knownMaps.push_back(indexingMaps[operand.getOperandNumber()]);
+  }
+
+  if (knownLayouts.empty()) {
+    return;
+  }
+
+  // Try to infer layouts for operands without one.
+  for (OpOperand &operand : genericOp->getOpOperands()) {
+    if (!isa<ShapedType>(operand.get().getType())) {
+      continue;
+    }
+    if (hasLayout(operand.get())) {
+      continue;
+    }
+    AffineMap targetMap = indexingMaps[operand.getOperandNumber()];
+    VectorLayoutInterface inferred =
+        knownLayouts[0].getRecombinedLayout(knownLayouts, knownMaps, targetMap);
+    if (inferred) {
+      setLayoutOrClone(&operand, inferred);
+    }
   }
 }
 
