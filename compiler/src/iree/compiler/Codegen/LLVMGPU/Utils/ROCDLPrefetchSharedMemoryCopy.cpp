@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -1043,6 +1044,134 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                         state);
 }
 
+/// Find the first operation with shared memory reads in a block range.
+static std::optional<Block::iterator> findFirstSharedRead(Block::iterator begin,
+                                                          Block::iterator end) {
+  for (auto it = begin; it != end; ++it) {
+    if (hasNestedSharedRead(&*it)) {
+      return it;
+    }
+  }
+  return std::nullopt;
+}
+
+/// Find the last gather_to_lds operation in a block range.
+static std::optional<Block::iterator> findLastGatherToLDS(Block::iterator begin,
+                                                          Block::iterator end) {
+  std::optional<Block::iterator> last;
+  for (auto it = begin; it != end; ++it) {
+    if (isa<amdgpu::GatherToLDSOp>(&*it)) {
+      last = it;
+    }
+  }
+  return last;
+}
+
+/// Sets the async flag on all gather_to_lds ops in the parent block so they
+/// lower to rocdl.load.async.to.lds instead of rocdl.load.to.lds.
+static void enableAsyncOnGatherOps(Block *parentBlock) {
+  parentBlock->walk(
+      [](amdgpu::GatherToLDSOp gatherOp) { gatherOp.setAsync(true); });
+}
+
+/// Inserts asyncmark ops in the prologue to delineate DMA groups.
+///
+/// The prologue contains (numStages - 1) unrolled iterations of DMA writes.
+/// Each iteration group gets one asyncmark after its last gather_to_lds.
+/// Groups are identified by evenly dividing the total prologue gather ops.
+static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
+                                     Block *parentBlock,
+                                     Block::iterator loopStart,
+                                     unsigned numStages) {
+  SmallVector<Operation *> prologueGathers;
+  for (auto it = parentBlock->begin(); it != loopStart; ++it) {
+    if (isa<amdgpu::GatherToLDSOp>(&*it)) {
+      prologueGathers.push_back(&*it);
+    }
+  }
+
+  if (prologueGathers.empty()) {
+    return;
+  }
+
+  unsigned numPrologueIters = numStages - 1;
+  unsigned opsPerGroup = prologueGathers.size() / numPrologueIters;
+  assert(opsPerGroup > 0 && "fewer gather ops than prologue iterations");
+
+  for (unsigned i = 0; i < prologueGathers.size(); i += opsPerGroup) {
+    unsigned lastInGroup =
+        std::min(i + opsPerGroup, (unsigned)prologueGathers.size()) - 1;
+    rewriter.setInsertionPointAfter(prologueGathers[lastInGroup]);
+    ROCDL::AsyncmarkOp::create(rewriter, loc);
+  }
+}
+
+/// Inserts asyncmark and wait.asyncmark in the loop body.
+///
+/// An asyncmark is placed after the last gather_to_lds to delineate the DMA
+/// group for this iteration. A wait.asyncmark is placed before the first
+/// shared memory read to maximize overlap between the wait and independent
+/// index computation that may precede the read.
+static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
+                                       scf::ForOp forOp, int16_t waitCount) {
+  Block *body = forOp.getBody();
+  auto bodyEnd = std::prev(body->end()); // exclude yield
+
+  auto lastGather = findLastGatherToLDS(body->begin(), bodyEnd);
+  if (lastGather) {
+    rewriter.setInsertionPointAfter(&**lastGather);
+    ROCDL::AsyncmarkOp::create(rewriter, loc);
+  }
+
+  auto firstRead = findFirstSharedRead(body->begin(), bodyEnd);
+  if (firstRead) {
+    rewriter.setInsertionPoint(&**firstRead);
+    ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
+                                   rewriter.getI16IntegerAttr(waitCount));
+  }
+}
+
+/// Inserts wait.asyncmark in the epilogue to drain all in-flight DMA groups.
+///
+/// Placed before the first shared memory read rather than at the epilogue
+/// start to allow independent index computation to overlap with the wait.
+static void insertEpilogueAsyncWait(RewriterBase &rewriter, Location loc,
+                                    Block::iterator epilogueStart,
+                                    Block::iterator epilogueEnd) {
+  auto firstRead = findFirstSharedRead(epilogueStart, epilogueEnd);
+  if (firstRead) {
+    rewriter.setInsertionPoint(&**firstRead);
+    ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
+                                   rewriter.getI16IntegerAttr(0));
+  }
+}
+
+/// Converts gather_to_lds ops to async mode and inserts explicit async markers
+/// for multi-buffered pipelining.
+///
+/// After pipelining with multi-buffering, the IR structure is:
+///   Prologue: gather_to_lds groups (one per prologue iteration, N-1 total)
+///   Loop body: gather_to_lds (new iteration) + ds_reads/compute (old
+///   iteration) Epilogue: ds_reads/compute (last iterations)
+///
+/// The wait count is (numStages - 1): with N-stage pipelining, after issuing a
+/// new DMA group we wait until only (N-1) groups are in flight, ensuring the
+/// oldest group's data is ready for reading.
+static void insertExplicitAsyncMarkers(RewriterBase &rewriter,
+                                       scf::ForOp newForOp,
+                                       unsigned numStages) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+  int16_t waitCount = static_cast<int16_t>(numStages - 1);
+
+  enableAsyncOnGatherOps(parentBlock);
+  insertPrologueAsyncMarks(rewriter, loc, parentBlock, newForOp->getIterator(),
+                           numStages);
+  insertLoopBodyAsyncMarkers(rewriter, loc, newForOp, waitCount);
+  insertEpilogueAsyncWait(rewriter, loc, std::next(newForOp->getIterator()),
+                          parentBlock->end());
+}
+
 // Dispatches to the appropriate barrier insertion strategy based on mode.
 static void insertPipelineBarriers(RewriterBase &rewriter, scf::ForOp newForOp,
                                    PipelineMode mode) {
@@ -1175,6 +1304,15 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Insert barriers using the appropriate strategy for each mode.
   insertPipelineBarriers(rewriter, newForOp, mode);
+
+  // For async copy mode, convert gather_to_lds to async and insert explicit
+  // async markers (asyncmark + wait.asyncmark). This replaces the backend's
+  // alias-analysis-based vmcnt insertion with precise explicit synchronization,
+  // allowing DMA writes to a new buffer slot to overlap with ds_reads from the
+  // previous slot.
+  if (mode == PipelineMode::AsyncCopy) {
+    insertExplicitAsyncMarkers(rewriter, newForOp, numStages);
+  }
 
   return newForOp;
 }
