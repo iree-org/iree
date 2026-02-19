@@ -181,12 +181,29 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     std::iota(resBatchOrder.begin(), resBatchOrder.end(), 0);
     resBatchOrder = applyPermutationMap(resMap, ArrayRef(resBatchOrder));
 
+    // Check if deferred accumulator collapse is applicable.
+    // For VSMFMA intrinsics with kBatch > 1, we expand the ACC once before
+    // the K-loop and collapse once after, avoiding redundant expand/collapse
+    // on every iteration.
+    auto virtualMmaAttr = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind);
+    bool canDeferCollapse =
+        virtualMmaAttr && virtualMmaAttr.getExpandedAccType().has_value();
+    auto [aVectorType, bVectorType, cVectorType] = mmaKind.getABCVectorTypes();
+
+    std::optional<int64_t> kBatch =
+        getKBatchSize(opDetail, lhsLayout, rhsLayout);
+    LLVM_DEBUG(llvm::dbgs() << "k batch size = " << kBatch << "\n");
+    if (!kBatch) {
+      return rewriter.notifyMatchFailure(contractOp,
+                                         "A/B vector k batch mismatch");
+    }
+    bool expanded = canDeferCollapse && kBatch > 1;
+
     // Iterate over all result batches and unroll computation to direct MFMA
     // intrinsic ops.
     Location loc = contractOp.getLoc();
     auto resultTiles = StaticTileOffsetRange(
         resultBatches, resultBatchTileSizes, resBatchOrder);
-    SmallVector<int64_t, 2> resultBatchOffsets;
     for (SmallVector<int64_t, 2> resultBatchOffsets : resultTiles) {
       LLVM_DEBUG({
         llvm::dbgs() << "current result batch offsets: [";
@@ -197,14 +214,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       // Get the slice of the accumulator in this batch.
       Value accSlice =
           vector::ExtractOp::create(rewriter, loc, acc, resultBatchOffsets);
-
-      // Get the k batch size for LHS and RHS vector.
-      std::optional<int64_t> kBatch =
-          getKBatchSize(opDetail, lhsLayout, rhsLayout);
-      LLVM_DEBUG(llvm::dbgs() << "k batch size = " << kBatch << "\n");
-      if (!kBatch) {
-        return rewriter.notifyMatchFailure(contractOp,
-                                           "A/B vector k batch mismatch");
+      Value currentAcc =
+          vector::ShapeCastOp::create(rewriter, loc, cVectorType, accSlice);
+      if (expanded) {
+        currentAcc = IREE::GPU::expandAccumulator(rewriter, loc, currentAcc);
       }
 
       // Perform contraction by doing separate outer product with amdgpu.mfma
@@ -225,9 +238,23 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             vector::ExtractOp::create(rewriter, loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             vector::ExtractOp::create(rewriter, loc, rhs, rhsBatchOffsets);
-        accSlice =
-            computeMMA(rewriter, loc, mmaKind, lhsSlice, rhsSlice, accSlice);
+        Value aCast =
+            vector::ShapeCastOp::create(rewriter, loc, aVectorType, lhsSlice);
+        Value bCast =
+            vector::ShapeCastOp::create(rewriter, loc, bVectorType, rhsSlice);
+        SmallVector<Value> results;
+        [[maybe_unused]] LogicalResult createdMMAOp =
+            mmaKind.buildUnderlyingOperations(rewriter, loc, {aCast, bCast},
+                                              {currentAcc}, results);
+        assert(succeeded(createdMMAOp) && "Failed to construct mma op");
+        currentAcc = results.front();
       }
+
+      if (expanded) {
+        currentAcc = IREE::GPU::collapseAccumulator(rewriter, loc, currentAcc);
+      }
+      accSlice = vector::ShapeCastOp::create(rewriter, loc, accSlice.getType(),
+                                             currentAcc);
       finalTile = vector::InsertOp::create(rewriter, loc, accSlice, finalTile,
                                            resultBatchOffsets);
     }
@@ -278,28 +305,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     lhsOffsets[lhsK] = kOffset;
     rhsOffsets[rhsK] = kOffset;
-  }
-
-  // Generates amdgpu.mfma operation on the given inputs for the given MFMA
-  // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc,
-                   IREE::GPU::MmaInterfaceAttr mmaKind, Value a, Value b,
-                   Value c) const {
-    // Get the storage vector types that each thread is in charge of.
-    auto [aVectorType, bVectorType, cVectorType] = mmaKind.getABCVectorTypes();
-    Value aCast =
-        vector::ShapeCastOp::create(builder, a.getLoc(), aVectorType, a);
-    Value bCast =
-        vector::ShapeCastOp::create(builder, b.getLoc(), bVectorType, b);
-    Value cCast =
-        vector::ShapeCastOp::create(builder, c.getLoc(), cVectorType, c);
-    SmallVector<Value> results;
-    [[maybe_unused]] LogicalResult createdMmaOp =
-        mmaKind.buildUnderlyingOperations(builder, loc, {aCast, bCast}, {cCast},
-                                          results);
-    assert(succeeded(createdMmaOp) && "Should never fail to construct mma op");
-    return vector::ShapeCastOp::create(builder, c.getLoc(), c.getType(),
-                                       results[0]);
   }
 };
 
