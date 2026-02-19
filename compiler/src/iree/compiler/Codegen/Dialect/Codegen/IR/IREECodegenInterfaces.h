@@ -19,7 +19,8 @@
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrInterfaces.h.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOpInterfaces.h.inc"
 // clang-format on
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES_H_

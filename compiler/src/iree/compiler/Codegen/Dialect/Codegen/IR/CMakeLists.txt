@@ -22,14 +22,16 @@ iree_cc_library(
     "IREECodegenTypes.h"
     "UKernelOps.h"
   TEXTUAL_HDRS
+    "IREECodegenAttrInterfaces.cpp.inc"
+    "IREECodegenAttrInterfaces.h.inc"
     "IREECodegenAttrs.cpp.inc"
     "IREECodegenAttrs.h.inc"
     "IREECodegenDialect.cpp.inc"
     "IREECodegenDialect.h.inc"
     "IREECodegenEnums.cpp.inc"
     "IREECodegenEnums.h.inc"
-    "IREECodegenInterfaces.cpp.inc"
-    "IREECodegenInterfaces.h.inc"
+    "IREECodegenOpInterfaces.cpp.inc"
+    "IREECodegenOpInterfaces.h.inc"
     "IREECodegenOps.cpp.inc"
     "IREECodegenOps.h.inc"
     "IREECodegenTypes.cpp.inc"
@@ -48,10 +50,10 @@ iree_cc_library(
     "UKernelOps.cpp"
   DEPS
     ::IREECodegenDialectGen
+    ::IREECodegenInterfacesGen
     ::IREECodegenOpsGen
     ::IREECodegenTypesGen
     ::LoweringConfigGen
-    ::LoweringConfigInterfaceGen
     ::UKernelOpsGen
     LLVMSupport
     MLIRAffineDialect
@@ -104,12 +106,14 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
-    LoweringConfigInterfaceGen
+    IREECodegenInterfacesGen
   TD_FILE
     "IREECodegenInterfaces.td"
   OUTS
-    --gen-attr-interface-decls IREECodegenInterfaces.h.inc
-    --gen-attr-interface-defs IREECodegenInterfaces.cpp.inc
+    --gen-attr-interface-decls IREECodegenAttrInterfaces.h.inc
+    --gen-attr-interface-defs IREECodegenAttrInterfaces.cpp.inc
+    --gen-op-interface-decls IREECodegenOpInterfaces.h.inc
+    --gen-op-interface-defs IREECodegenOpInterfaces.cpp.inc
 )
 
 iree_tablegen_library(

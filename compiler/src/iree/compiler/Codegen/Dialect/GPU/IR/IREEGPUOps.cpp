@@ -313,4 +313,12 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// AllocationHintOpInterface implementations
+//===----------------------------------------------------------------------===//
+
+OpOperand &BankConflictPaddingHintOp::getHintedOperandMutable() {
+  return getOperandMutable();
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

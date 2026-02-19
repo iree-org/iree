@@ -79,8 +79,10 @@ iree_compiler_cc_library(
         "IREECodegenDialect.h.inc",
         "IREECodegenEnums.cpp.inc",
         "IREECodegenEnums.h.inc",
-        "IREECodegenInterfaces.cpp.inc",
-        "IREECodegenInterfaces.h.inc",
+        "IREECodegenAttrInterfaces.cpp.inc",
+        "IREECodegenAttrInterfaces.h.inc",
+        "IREECodegenOpInterfaces.cpp.inc",
+        "IREECodegenOpInterfaces.h.inc",
         "IREECodegenOps.cpp.inc",
         "IREECodegenOps.h.inc",
         "IREECodegenTypes.h",
@@ -91,10 +93,10 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":IREECodegenDialectGen",
+        ":IREECodegenInterfacesGen",
         ":IREECodegenOpsGen",
         ":IREECodegenTypesGen",
         ":LoweringConfigGen",
-        ":LoweringConfigInterfaceGen",
         ":UKernelOpsGen",
         "//compiler/src/iree/compiler/Codegen/Dialect/PCF/IR",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
@@ -164,15 +166,23 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "LoweringConfigInterfaceGen",
+    name = "IREECodegenInterfacesGen",
     tbl_outs = [
         (
             ["--gen-attr-interface-decls"],
-            "IREECodegenInterfaces.h.inc",
+            "IREECodegenAttrInterfaces.h.inc",
         ),
         (
             ["--gen-attr-interface-defs"],
-            "IREECodegenInterfaces.cpp.inc",
+            "IREECodegenAttrInterfaces.cpp.inc",
+        ),
+        (
+            ["--gen-op-interface-decls"],
+            "IREECodegenOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "IREECodegenOpInterfaces.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
