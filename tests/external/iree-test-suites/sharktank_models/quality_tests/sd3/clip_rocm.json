@@ -45,7 +45,7 @@
         "--iree-rocm-waves-per-eu=2",
         "--iree-llvmgpu-enable-prefetch",
         "--iree-execution-model=async-external",
-        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
+        "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline)"
     ],
     "threshold_args": [
         "--expected_f32_threshold=0.15f"
