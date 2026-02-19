@@ -764,17 +764,11 @@ static bool hasUsesBetweenProducerAndRoot(Operation *producer, Operation *root,
   for (OpOperand &use : producer->getUses()) {
     Operation *user = use.getOwner();
     // Walk up to the parent in the same block as the producer/root.
-    while (user->getBlock() != root->getBlock()) {
+    while (user && user->getBlock() != root->getBlock()) {
       user = user->getParentOp();
-      if (!user) {
-        break;
-      }
-    }
-    if (!user) {
-      continue;
     }
     // If the user is in the fusion group, it will be moved too.
-    if (fusionGroup.contains(user)) {
+    if (!user || fusionGroup.contains(user)) {
       continue;
     }
     // If the user does not come after the root, then moving the producer
