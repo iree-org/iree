@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -41,6 +42,24 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
+
+// Lower iree_gpu.global_subgroup_barrier to just the hardware barrier
+// instruction, with NO memory fences. Fences are handled separately.
+struct LowerGlobalSubgroupBarrier final
+    : OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::GPU::GlobalSubgroupBarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<NVVM::Barrier0Op>(op);
+    return success();
+  }
+};
+
+static void
+populateLowerGlobalSubgroupBarrierPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerGlobalSubgroupBarrier>(patterns.getContext());
+}
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
@@ -97,6 +116,7 @@ struct ConvertToNVVMPass final
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
+      populateLowerGlobalSubgroupBarrierPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(

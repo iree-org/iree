@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -60,6 +61,58 @@ static llvm::cl::opt<int> clROCMIndexingBitsDeprecated(
     }));
 
 namespace {
+
+// Lower iree_gpu.global_subgroup_barrier to just the hardware barrier
+// instruction, with NO memory fences. Fences are handled separately.
+//
+// Based on LDSBarrierOpLowering but without the release/acquire fences.
+// Chipset handling:
+//   pre-gfx90a: inline asm s_barrier
+//   gfx90a-gfx11: rocdl.s.barrier
+//   gfx12+: rocdl.s.barrier.signal + rocdl.s.barrier.wait
+struct LowerGlobalSubgroupBarrier
+    : public OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
+  LowerGlobalSubgroupBarrier(MLIRContext *context, amdgpu::Chipset chipset)
+      : OpRewritePattern(context), chipset(chipset) {}
+
+  LogicalResult matchAndRewrite(IREE::GPU::GlobalSubgroupBarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    constexpr amdgpu::Chipset kGfx90a(9, 0, 0x0a);
+
+    if (chipset < kGfx90a) {
+      // Pre-gfx90a: use inline asm.
+      auto asmDialectAttr = LLVM::AsmDialectAttr::get(rewriter.getContext(),
+                                                      LLVM::AsmDialect::AD_ATT);
+      const char *asmStr = ";;;WARNING: BREAKS DEBUG WATCHES\ns_barrier";
+      rewriter.replaceOpWithNewOp<LLVM::InlineAsmOp>(
+          op, /*resultTypes=*/TypeRange(), /*operands=*/ValueRange(),
+          /*asm_string=*/asmStr, /*constraints=*/"",
+          /*has_side_effects=*/true,
+          /*is_align_stack=*/false, LLVM::TailCallKind::None,
+          /*asm_dialect=*/asmDialectAttr,
+          /*operand_attrs=*/ArrayAttr());
+    } else if (chipset.majorVersion < 12) {
+      // gfx90a-gfx11: use rocdl.s.barrier.
+      rewriter.replaceOpWithNewOp<ROCDL::SBarrierOp>(op);
+    } else {
+      // gfx12+: use rocdl.s.barrier.signal + rocdl.s.barrier.wait.
+      ROCDL::BarrierSignalOp::create(rewriter, loc, -1);
+      rewriter.replaceOpWithNewOp<ROCDL::BarrierWaitOp>(
+          op, static_cast<int16_t>(-1));
+    }
+    return success();
+  }
+
+private:
+  amdgpu::Chipset chipset;
+};
+
+static void
+populateLowerGlobalSubgroupBarrierPatterns(RewritePatternSet &patterns,
+                                           const amdgpu::Chipset &chipset) {
+  patterns.add<LowerGlobalSubgroupBarrier>(patterns.getContext(), chipset);
+}
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
@@ -254,6 +307,7 @@ struct ConvertToROCDLPass final
           /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
+      populateLowerGlobalSubgroupBarrierPatterns(patterns, *maybeChipset);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
