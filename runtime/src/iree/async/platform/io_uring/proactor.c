@@ -1123,6 +1123,36 @@ iree_async_proactor_io_uring_socket_from_io_operation(
 // CQE of a zero-copy send waiting for NOTIF).
 static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
     iree_async_proactor_io_uring_t* proactor, const iree_io_uring_cqe_t* cqe) {
+  // Linked POLL_ADD head CQE for EVENT_WAIT or NOTIFICATION_WAIT (event mode).
+  //
+  // On success, CQE_SKIP_SUCCESS suppresses this CQE and the linked READ
+  // fires the user callback. On error (bad fd, cancellation, etc.), the kernel
+  // never starts the linked READ and generates no CQE for it, so we must
+  // dispatch the user callback from the POLL_ADD's error CQE here.
+  if (iree_io_uring_is_internal_cqe(cqe) &&
+      iree_io_uring_internal_tag(cqe->user_data) ==
+          IREE_IO_URING_TAG_LINKED_POLL) {
+    if (cqe->res < 0) {
+      iree_async_operation_t* operation =
+          (iree_async_operation_t*)(uintptr_t)iree_io_uring_internal_payload(
+              cqe->user_data);
+      iree_status_t status =
+          iree_make_status(iree_status_code_from_errno(-cqe->res),
+                           "linked poll head failed (%d)", -cqe->res);
+      iree_host_size_t extra_completions =
+          iree_async_proactor_io_uring_dispatch_linked_continuation(
+              proactor, operation, status);
+      iree_async_operation_release_resources(operation);
+      operation->completion_fn(operation->user_data, operation, status,
+                               IREE_ASYNC_COMPLETION_FLAG_NONE);
+      return 1 + extra_completions;
+    }
+    // Success CQE should be suppressed by CQE_SKIP_SUCCESS. If it arrives
+    // (kernel doesn't support CQE_SKIP_SUCCESS), ignore it — the linked READ
+    // CQE will fire the user callback.
+    return 0;
+  }
+
   // Handle internal operations (wake poll, cancel, fence import, message).
   if (iree_io_uring_is_internal_cqe(cqe)) {
     return iree_async_proactor_io_uring_process_internal_cqe(proactor, cqe) ? 0
@@ -1416,20 +1446,38 @@ static iree_status_t iree_async_proactor_io_uring_cancel(
   }
 
   // Fill the cancel SQE.
-  // ASYNC_CANCEL targets operations by their user_data, which is the operation
-  // pointer. The cancel SQE uses an internal token so its CQE is handled
-  // silently (the target operation's CQE delivers the actual result).
+  // ASYNC_CANCEL targets operations by their user_data. The cancel SQE uses an
+  // internal token so its CQE is handled silently (the target operation's CQE
+  // delivers the actual result).
+  //
+  // EVENT_WAIT and NOTIFICATION_WAIT use linked POLL_ADD+READ pairs where:
+  //   POLL_ADD user_data = TAG_LINKED_POLL encoded with operation pointer
+  //   READ user_data = operation pointer
+  //
+  // Cancel must target the POLL_ADD because the linked READ hasn't been started
+  // by the kernel (it waits behind the POLL_ADD link). The kernel does not
+  // generate a CQE for the unstarted linked READ, so the TAG_LINKED_POLL
+  // handler dispatches the user callback from the POLL_ADD's error CQE.
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_ASYNC_CANCEL;
   sqe->fd = -1;
-  sqe->addr = (uint64_t)(uintptr_t)operation;  // Target operation's user_data.
+  if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT ||
+      operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
+    sqe->addr = iree_io_uring_internal_encode(IREE_IO_URING_TAG_LINKED_POLL,
+                                              (uintptr_t)operation);
+  } else {
+    sqe->addr = (uint64_t)(uintptr_t)operation;
+  }
   sqe->user_data = iree_io_uring_internal_encode(IREE_IO_URING_TAG_CANCEL, 0);
   iree_io_uring_ring_sq_unlock(&proactor->ring);
 
-  // Submit immediately. Cancel requests should take effect as soon as possible
-  // to avoid races where the operation completes before the cancel is seen.
-  return iree_io_uring_ring_submit(&proactor->ring, /*min_complete=*/0,
-                                   /*flags=*/0);
+  // Wake the poll thread to submit the pending ASYNC_CANCEL SQE.
+  // Only the poll thread may call io_uring_enter (SINGLE_ISSUER constraint),
+  // and cancel() can be called from any thread. The SQE is fully prepared in
+  // the ring; the next io_uring_enter (from poll or from the same thread's
+  // PollUntil) will submit it.
+  iree_async_proactor_wake(&proactor->base);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

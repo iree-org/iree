@@ -12,8 +12,11 @@
 // - Double-cancel is harmless (second cancel silently succeeds)
 // - Cancel of already-completed operation is harmless
 
+#include <thread>
+
 #include "iree/async/cts/util/registry.h"
 #include "iree/async/cts/util/socket_test_base.h"
+#include "iree/async/event.h"
 #include "iree/async/operations/net.h"
 #include "iree/async/operations/scheduling.h"
 #include "iree/async/socket.h"
@@ -117,6 +120,241 @@ TEST_P(CancellationTest, DoubleCancelTimer) {
   // Exactly one callback should have fired.
   EXPECT_EQ(tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, tracker.ConsumeStatus());
+}
+
+//===----------------------------------------------------------------------===//
+// Event wait cancellation tests
+//===----------------------------------------------------------------------===//
+
+// Cancel a pending event wait before the event is signaled.
+TEST_P(CancellationTest, CancelPendingEventWait) {
+  iree_async_event_t* event = nullptr;
+  IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+  iree_async_event_wait_operation_t wait_op;
+  memset(&wait_op, 0, sizeof(wait_op));
+  wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+  wait_op.event = event;
+
+  CompletionTracker tracker;
+  wait_op.base.completion_fn = CompletionTracker::Callback;
+  wait_op.base.user_data = &tracker;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+  // Cancel immediately (event never signaled).
+  IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+  // Poll to receive the cancellation callback.
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(1000));
+
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, tracker.ConsumeStatus());
+
+  iree_async_event_release(event);
+}
+
+// Cancel an already-completed event wait is harmless.
+TEST_P(CancellationTest, CancelCompletedEventWait) {
+  iree_async_event_t* event = nullptr;
+  IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+  // Signal before submitting the wait — it will complete immediately.
+  IREE_ASSERT_OK(iree_async_event_set(event));
+
+  iree_async_event_wait_operation_t wait_op;
+  memset(&wait_op, 0, sizeof(wait_op));
+  wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+  wait_op.event = event;
+
+  CompletionTracker tracker;
+  wait_op.base.completion_fn = CompletionTracker::Callback;
+  wait_op.base.user_data = &tracker;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+  // Wait for completion.
+  PollUntil(/*min_completions=*/1, /*total_budget=*/iree_make_duration_ms(500));
+  ASSERT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_OK(tracker.ConsumeStatus());
+
+  // Cancel after completion — should be harmless.
+  IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+  // Drain any pending CQEs from the cancel.
+  DrainPending(iree_make_duration_ms(100));
+
+  // No additional callbacks should have occurred.
+  EXPECT_EQ(tracker.call_count, 1);
+
+  iree_async_event_release(event);
+}
+
+// Double-cancel an event wait — second cancel is harmless.
+TEST_P(CancellationTest, DoubleCancelEventWait) {
+  iree_async_event_t* event = nullptr;
+  IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+  iree_async_event_wait_operation_t wait_op;
+  memset(&wait_op, 0, sizeof(wait_op));
+  wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+  wait_op.event = event;
+
+  CompletionTracker tracker;
+  wait_op.base.completion_fn = CompletionTracker::Callback;
+  wait_op.base.user_data = &tracker;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+  // First cancel.
+  IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+  // Second cancel — should succeed harmlessly.
+  IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+  // Poll to receive the cancellation callback.
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(1000));
+
+  // Drain any remaining CQEs.
+  DrainPending(iree_make_duration_ms(100));
+
+  // Exactly one callback should have fired.
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, tracker.ConsumeStatus());
+
+  iree_async_event_release(event);
+}
+
+// Cancel an event wait, then verify the event is still usable for a new wait.
+TEST_P(CancellationTest, CancelEventWaitEventStillUsable) {
+  iree_async_event_t* event = nullptr;
+  IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+  // First wait — cancel it.
+  {
+    iree_async_event_wait_operation_t wait_op;
+    memset(&wait_op, 0, sizeof(wait_op));
+    wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+    wait_op.event = event;
+
+    CompletionTracker tracker;
+    wait_op.base.completion_fn = CompletionTracker::Callback;
+    wait_op.base.user_data = &tracker;
+
+    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+    IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(1000));
+    ASSERT_EQ(tracker.call_count, 1);
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, tracker.ConsumeStatus());
+  }
+
+  // Second wait on the same event — should complete normally when signaled.
+  {
+    iree_async_event_wait_operation_t wait_op;
+    memset(&wait_op, 0, sizeof(wait_op));
+    wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+    wait_op.event = event;
+
+    CompletionTracker tracker;
+    wait_op.base.completion_fn = CompletionTracker::Callback;
+    wait_op.base.user_data = &tracker;
+
+    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+    IREE_ASSERT_OK(iree_async_event_set(event));
+
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(500));
+    EXPECT_EQ(tracker.call_count, 1);
+    IREE_EXPECT_OK(tracker.ConsumeStatus());
+  }
+
+  iree_async_event_release(event);
+}
+
+// Cancel races with event signal — either outcome is valid.
+TEST_P(CancellationTest, CancelEventWaitRacesWithSignal) {
+  static constexpr int kIterations = 10;
+
+  for (int iter = 0; iter < kIterations; ++iter) {
+    iree_async_event_t* event = nullptr;
+    IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+    iree_async_event_wait_operation_t wait_op;
+    memset(&wait_op, 0, sizeof(wait_op));
+    wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+    wait_op.event = event;
+
+    CompletionTracker tracker;
+    wait_op.base.completion_fn = CompletionTracker::Callback;
+    wait_op.base.user_data = &tracker;
+
+    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+    // Signal and cancel back-to-back — race between completion and cancel.
+    IREE_ASSERT_OK(iree_async_event_set(event));
+    IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait_op.base));
+
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(500));
+    DrainPending(iree_make_duration_ms(100));
+
+    // Exactly one callback, either CANCELLED or OK.
+    EXPECT_EQ(tracker.call_count, 1) << "Iteration " << iter;
+    {
+      iree_status_t status = tracker.ConsumeStatus();
+      if (!iree_status_is_ok(status) && !iree_status_is_cancelled(status)) {
+        IREE_EXPECT_OK(status) << "Iteration " << iter;
+      } else {
+        iree_status_ignore(status);
+      }
+    }
+
+    iree_async_event_release(event);
+  }
+}
+
+// Cancel from a background thread while the main thread is polling.
+// This tests that cancel() wakes a blocking poll() and that the cancelled
+// operation callback fires promptly.
+TEST_P(CancellationTest, CancelEventWaitFromBackgroundThread) {
+  iree_async_event_t* event = nullptr;
+  IREE_ASSERT_OK(iree_async_event_create(proactor_, &event));
+
+  iree_async_event_wait_operation_t wait_op;
+  memset(&wait_op, 0, sizeof(wait_op));
+  wait_op.base.type = IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT;
+  wait_op.event = event;
+
+  CompletionTracker tracker;
+  wait_op.base.completion_fn = CompletionTracker::Callback;
+  wait_op.base.user_data = &tracker;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
+
+  // Poll once to register the wait (drain the pending queue).
+  PollOnce();
+
+  // Cancel from a background thread while the main thread polls.
+  std::thread canceler([this, &wait_op]() {
+    // Brief delay to let the main thread enter poll().
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    iree_status_ignore(iree_async_proactor_cancel(proactor_, &wait_op.base));
+  });
+
+  // This will block until the background cancel wakes us.
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(2000));
+
+  canceler.join();
+
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, tracker.ConsumeStatus());
+
+  iree_async_event_release(event);
 }
 
 //===----------------------------------------------------------------------===//

@@ -213,6 +213,11 @@ typedef enum iree_io_uring_internal_tag_e {
   IREE_IO_URING_TAG_EVENT_SOURCE = 6,  // Event source multishot poll.
   IREE_IO_URING_TAG_RELAY = 7,         // Relay source completion.
   IREE_IO_URING_TAG_SIGNAL = 8,        // Signal fd multishot poll.
+  // Linked POLL_ADD head for EVENT_WAIT and NOTIFICATION_WAIT (event mode).
+  // CQE_SKIP_SUCCESS suppresses the success CQE. On error (including
+  // cancellation), the linked READ subordinate is never started by the kernel
+  // and produces no CQE, so this handler dispatches the user callback.
+  IREE_IO_URING_TAG_LINKED_POLL = 9,
 } iree_io_uring_internal_tag_t;
 
 // Helpers for encoding/decoding internal user_data.

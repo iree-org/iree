@@ -661,9 +661,20 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
     entry = entry->next;
     operation->next = NULL;
 
-    // Check for cancellation before registering.
+    // Check for cancellation before registering. If cancel() was called
+    // before the operation was drained from the pending queue, dispatch
+    // CANCELLED immediately without registering. Decrement the type-specific
+    // cancellation counter since the drain scan will never find this
+    // operation (it was never registered).
     if (iree_any_bit_set(iree_async_operation_load_internal_flags(operation),
                          IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
+      if (operation->type == IREE_ASYNC_OPERATION_TYPE_TIMER) {
+        iree_atomic_fetch_sub(&proactor->pending_timer_cancellation_count, 1,
+                              iree_memory_order_release);
+      } else if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
+        iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count,
+                              1, iree_memory_order_release);
+      }
       iree_async_proactor_iocp_dispatch_completion(
           proactor, operation, iree_status_from_code(IREE_STATUS_CANCELLED),
           IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
@@ -817,6 +828,78 @@ static iree_host_size_t iree_async_proactor_iocp_drain_timer_cancellations(
           IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
     }
     timer = next;
+  }
+
+  return direct_completions;
+}
+
+//===----------------------------------------------------------------------===//
+// Poll: event wait cancellation drain
+//===----------------------------------------------------------------------===//
+
+// Scans the active_carriers list for cancelled event wait carriers and
+// dispatches CANCELLED completions. Called when
+// pending_event_wait_cancellation_count > 0.
+//
+// For each cancelled carrier:
+//   - UnregisterWaitEx(wait_handle, NULL) attempts a non-blocking unregister.
+//     If it returns TRUE, the wait was successfully unregistered before the
+//     callback fired. If FALSE with ERROR_IO_PENDING, the callback is currently
+//     executing or already posted to IOCP — the carrier dispatch (Phase 6) will
+//     check the CANCELLED flag and handle it.
+static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
+    iree_async_proactor_iocp_t* proactor) {
+  int32_t cancellation_count =
+      iree_atomic_load(&proactor->pending_event_wait_cancellation_count,
+                       iree_memory_order_acquire);
+  if (cancellation_count == 0) return 0;
+
+  iree_host_size_t direct_completions = 0;
+
+  iree_async_iocp_carrier_t** prev_ptr = &proactor->active_carriers;
+  iree_async_iocp_carrier_t* carrier = *prev_ptr;
+  while (carrier && cancellation_count > 0) {
+    iree_async_iocp_carrier_t* next = carrier->next;
+
+    if (carrier->type != IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT ||
+        !iree_any_bit_set(
+            iree_async_operation_load_internal_flags(carrier->operation),
+            IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
+      prev_ptr = &carrier->next;
+      carrier = next;
+      continue;
+    }
+
+    // Try to unregister the wait. NULL means non-blocking: don't wait for
+    // an in-progress callback to finish.
+    BOOL unregistered =
+        UnregisterWaitEx(carrier->data.event_wait.wait_handle, NULL);
+    if (unregistered) {
+      // Successfully unregistered before the callback fired.
+      // Unlink from active list, free carrier, dispatch CANCELLED.
+      *prev_ptr = next;
+      iree_async_operation_t* operation = carrier->operation;
+      operation->next = NULL;
+      iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
+                            iree_memory_order_relaxed);
+      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
+                            iree_memory_order_release);
+      --cancellation_count;
+      iree_async_proactor_iocp_dispatch_completion(
+          proactor, operation, iree_status_from_code(IREE_STATUS_CANCELLED),
+          IREE_ASYNC_COMPLETION_FLAG_NONE, &direct_completions);
+    } else {
+      // ERROR_IO_PENDING: the callback is executing or already posted to IOCP.
+      // The carrier dispatch (Phase 6) will check the CANCELLED flag.
+      // Decrement the counter since we've "handled" this cancellation request
+      // — the carrier dispatch will do the actual CANCELLED delivery.
+      iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
+                            iree_memory_order_release);
+      --cancellation_count;
+      prev_ptr = &carrier->next;
+    }
+    carrier = next;
   }
 
   return direct_completions;
@@ -1155,6 +1238,10 @@ static iree_status_t iree_async_proactor_iocp_poll(
   completed_count +=
       iree_async_proactor_iocp_drain_timer_cancellations(proactor);
 
+  // Phase 2.5: Drain event wait cancellations.
+  completed_count +=
+      iree_async_proactor_iocp_drain_event_wait_cancellations(proactor);
+
   // Phase 3: Calculate effective timeout considering timer deadlines.
   DWORD timeout_ms =
       iree_async_proactor_iocp_calculate_timeout_ms(proactor, timeout);
@@ -1254,9 +1341,19 @@ static iree_status_t iree_async_proactor_iocp_poll(
                                 iree_memory_order_relaxed);
           iree_allocator_free(proactor->base.allocator, carrier);
 
+          // Check CANCELLED flag — cancel() may have been called between the
+          // RegisterWaitForSingleObject callback posting to IOCP and this
+          // dispatch. The drain function decremented the cancellation counter
+          // for this case, so we don't need to touch it here.
+          iree_status_t status = iree_ok_status();
+          if (iree_any_bit_set(
+                  iree_async_operation_load_internal_flags(operation),
+                  IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
+            status = iree_status_from_code(IREE_STATUS_CANCELLED);
+          }
           iree_async_proactor_iocp_dispatch_completion(
-              proactor, operation, iree_ok_status(),
-              IREE_ASYNC_COMPLETION_FLAG_NONE, &completed_count);
+              proactor, operation, status, IREE_ASYNC_COMPLETION_FLAG_NONE,
+              &completed_count);
           break;
         }
 
@@ -1885,10 +1982,16 @@ static iree_status_t iree_async_proactor_iocp_cancel(
 
     case IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT: {
       // Event waits use RegisterWaitForSingleObject. Set the cancelled flag
-      // so that when the wait callback fires (or the poll thread processes
-      // the completion), it dispatches as CANCELLED.
+      // and increment the cancellation counter so the poll thread scans
+      // active_carriers to unregister the wait and dispatch CANCELLED.
+      // Without the active scan, if the event is never signaled, the
+      // RegisterWaitForSingleObject callback never fires and the operation
+      // callback is never invoked — violating the "callback always fires"
+      // invariant.
       iree_async_operation_set_internal_flags(
           operation, IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED);
+      iree_atomic_fetch_add(&proactor->pending_event_wait_cancellation_count, 1,
+                            iree_memory_order_release);
       iree_async_proactor_iocp_wake(&proactor->base);
       return iree_ok_status();
     }
