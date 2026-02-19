@@ -983,7 +983,6 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
 
   // Check for immediate satisfaction before allocating a tracker.
   bool all_satisfied = true;
-  iree_host_size_t satisfied_index = 0;
   for (iree_host_size_t i = 0; i < wait_op->count; ++i) {
     uint64_t current = iree_async_semaphore_query(wait_op->semaphores[i]);
     if (current >= wait_op->values[i]) {
@@ -995,12 +994,10 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
         sqe->user_data = (uint64_t)(uintptr_t)base_operation;
         return iree_ok_status();
       }
-      satisfied_index = i;
     } else {
       all_satisfied = false;
     }
   }
-  (void)satisfied_index;  // May be used in future for tracking partial state.
   if (all_satisfied) {
     // ALL mode: all satisfied, complete immediately.
     sqe->opcode = IREE_IORING_OP_NOP;
@@ -1048,9 +1045,12 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
   for (iree_host_size_t i = 0; i < wait_op->count; ++i) {
     iree_async_semaphore_timepoint_t* timepoint = &tracker->timepoints[i];
     timepoint->callback = iree_async_io_uring_semaphore_wait_timepoint_callback;
-    // Encode the index in user_data so the callback knows which semaphore
-    // fired.
-    timepoint->user_data = (void*)((uintptr_t)tracker | ((uintptr_t)i << 48));
+    // Encode the tracker pointer and semaphore index in user_data.
+    // Uses the same 56-bit/8-bit split as the internal tag encoding
+    // (proactor.h) for LA57 (5-level paging) safety: userspace pointers use
+    // at most 56 bits on x86-64, leaving 8 bits for the index (max 255).
+    IREE_ASSERT(i < 256);
+    timepoint->user_data = (void*)((uintptr_t)tracker | ((uintptr_t)i << 56));
 
     iree_status_t status = iree_async_semaphore_acquire_timepoint(
         wait_op->semaphores[i], wait_op->values[i], timepoint);
@@ -1066,15 +1066,15 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
     }
   }
 
-  // Use a NOP SQE to create a slot in the ring for this operation.
-  // The operation will actually be completed when the timepoints fire.
-  // We mark the SQE as linked-hardlink so that if this is part of a chain,
-  // the chain will wait for this operation's completion.
+  // Submit a NOP SQE as a placeholder that completes immediately. The NOP's
+  // CQE is consumed and discarded by the TAG_NOP_PLACEHOLDER handler. The
+  // actual wait is driven by the software timepoints registered above; linked
+  // continuations are held in tracker->continuation_head and dispatched when
+  // the timepoints fire (via drain_pending_semaphore_waits).
   sqe->opcode = IREE_IORING_OP_NOP;
   sqe->fd = -1;
-  // Tag with internal marker so poll knows to handle this specially.
-  sqe->user_data = iree_io_uring_internal_encode(IREE_IO_URING_TAG_CANCEL,
-                                                 (uintptr_t)tracker);
+  sqe->user_data = iree_io_uring_internal_encode(
+      IREE_IO_URING_TAG_NOP_PLACEHOLDER, (uintptr_t)tracker);
 
   return iree_ok_status();
 }
@@ -1102,12 +1102,13 @@ static void iree_async_io_uring_semaphore_wait_enqueue_completion(
 static void iree_async_io_uring_semaphore_wait_timepoint_callback(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
     iree_status_t status) {
-  // Decode tracker and index from user_data.
+  // Decode tracker and index from user_data. The encoding uses a 56-bit/8-bit
+  // split matching the internal tag encoding for LA57 safety (see encode site).
   uintptr_t encoded = (uintptr_t)user_data;
   iree_async_io_uring_semaphore_wait_tracker_t* tracker =
       (iree_async_io_uring_semaphore_wait_tracker_t*)(encoded &
-                                                      0x0000FFFFFFFFFFFFull);
-  iree_host_size_t index = (iree_host_size_t)(encoded >> 48);
+                                                      0x00FFFFFFFFFFFFFFull);
+  iree_host_size_t index = (iree_host_size_t)(encoded >> 56);
 
   if (!iree_status_is_ok(status)) {
     // Failure or cancellation. Store the error status (first one wins).
@@ -1474,9 +1475,12 @@ iree_status_t iree_async_proactor_io_uring_submit(
       iree_io_uring_sqe_t* read_sqe =
           iree_io_uring_ring_get_sqe(&proactor->ring);
       if (!poll_sqe || !read_sqe) {
-        // Should not happen since we pre-checked capacity.
-        iree_io_uring_ring_sq_rollback(&proactor->ring,
-                                       (uint32_t)sqes_prepared);
+        // Should not happen since we pre-checked capacity. Include any
+        // partially-allocated SQEs in the rollback count: if poll_sqe
+        // succeeded but read_sqe failed, sq_local_tail advanced by 1.
+        iree_host_size_t partial_sqes = (poll_sqe ? 1 : 0) + (read_sqe ? 1 : 0);
+        iree_io_uring_ring_sq_rollback(
+            &proactor->ring, (uint32_t)(sqes_prepared + partial_sqes));
         iree_io_uring_ring_sq_unlock(&proactor->ring);
         iree_async_proactor_io_uring_release_prepared(operations, i + 1);
         return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,

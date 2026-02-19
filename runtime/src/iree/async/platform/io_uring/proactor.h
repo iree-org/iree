@@ -218,6 +218,10 @@ typedef enum iree_io_uring_internal_tag_e {
   // cancellation), the linked READ subordinate is never started by the kernel
   // and produces no CQE, so this handler dispatches the user callback.
   IREE_IO_URING_TAG_LINKED_POLL = 9,
+  // Placeholder NOP for software-emulated operations (SEMAPHORE_WAIT).
+  // The NOP completes immediately; its CQE is expected and discarded. The
+  // actual operation completes through the MPSC pending_semaphore_waits queue.
+  IREE_IO_URING_TAG_NOP_PLACEHOLDER = 10,
 } iree_io_uring_internal_tag_t;
 
 // Helpers for encoding/decoding internal user_data.

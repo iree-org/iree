@@ -127,7 +127,11 @@ void iree_async_io_uring_notification_signal(
   uint64_t value = (wake_count > 0) ? (uint64_t)wake_count : UINT32_MAX;
   ssize_t result = write(notification->platform.io_uring.primitive.value.fd,
                          &value, sizeof(value));
-  (void)result;
+  // The vtable signature returns void so we cannot propagate errors, but an
+  // eventfd write failure means waiters will not be woken — assert in debug.
+  IREE_ASSERT(result == sizeof(value),
+              "eventfd write failed during notification signal: %zd (errno=%d)",
+              result, errno);
 }
 
 bool iree_async_io_uring_notification_wait(
