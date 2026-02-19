@@ -13,6 +13,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
@@ -535,9 +536,46 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
 }
 
 bool isSupportedSingleInputRelayoutOp(Operation *op) {
-  return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
-             tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
-             linalg::TransposeOp>(op);
+  if (isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
+          tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
+          linalg::TransposeOp>(op)) {
+    return true;
+  }
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  return genericOp && linalg::isaBroadcastOpInterface(genericOp).has_value();
+}
+
+/// Returns true if the relayout op starts a "complex" chain.
+/// A "complex" chain is :-
+/// - a chain of relayout ops with length >= 2,
+/// - or a chain of length 1 with one of the supported linalg relayout ops.
+static bool isComplexRelayoutChain(Operation *relayoutOp) {
+  assert(isSupportedSingleInputRelayoutOp(relayoutOp) &&
+         "expected a supported relayout op");
+  Value result = relayoutOp->getResult(0);
+  bool hasRelayoutUser = llvm::any_of(result.getUsers(), [](Operation *user) {
+    return isSupportedSingleInputRelayoutOp(user);
+  });
+  // Chain length >= 2 -> complex.
+  if (hasRelayoutUser) {
+    return true;
+  }
+  // Chain length 1: complex only if the op is a linalg op.
+  return isa<linalg::LinalgOp>(relayoutOp);
+}
+
+/// Collects direct relayout op users of `loadResult` that start a complex
+/// relayout chain.
+static SmallPtrSet<Operation *, 4>
+getComplexChainRelayoutUsers(Value loadResult) {
+  SmallPtrSet<Operation *, 4> complexUsers;
+  for (Operation *user : loadResult.getUsers()) {
+    if (isSupportedSingleInputRelayoutOp(user) &&
+        user->getOperand(0) == loadResult && isComplexRelayoutChain(user)) {
+      complexUsers.insert(user);
+    }
+  }
+  return complexUsers;
 }
 
 // This is only desirable in the dispatch scope but not in the workgroup scope.
@@ -987,6 +1025,32 @@ foldExtractSliceIntoMapGather(RewriterBase &rewriter,
                                        indexTransformBuilder);
 }
 
+/// Fold a consumer broadcast `linalg.generic` into a producer `mapGatherOp`.
+static FailureOr<MapGatherOp>
+foldBroadcastGenericIntoMapGather(RewriterBase &rewriter,
+                                  linalg::GenericOp genericOp,
+                                  MapGatherOp mapGatherOp) {
+  assert(genericOp.getDpsInputs()[0] == mapGatherOp.getResult(0) &&
+         "expected mapGatherOp to be the producer of genericOp input");
+  if (!linalg::isaBroadcastOpInterface(genericOp).has_value()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "generic op is not a broadcast");
+  }
+
+  AffineMap inputMap = genericOp.getIndexingMapsArray()[0];
+  return foldConsumerIntoMapGatherImpl(
+      rewriter, genericOp, mapGatherOp,
+      [inputMap](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+        SmallVector<Value> sourceIndices;
+        sourceIndices.reserve(inputMap.getNumResults());
+        for (AffineExpr expr : inputMap.getResults()) {
+          unsigned pos = cast<AffineDimExpr>(expr).getPosition();
+          sourceIndices.push_back(indices[pos]);
+        }
+        return sourceIndices;
+      });
+}
+
 /// Fold a consumer `padOp` into a producer `mapGatherOp`.
 /// Index transformation: source_idx = new_idx - low_pad
 /// Fill value is set to the pad value.
@@ -1056,6 +1120,10 @@ FailureOr<MapGatherOp> foldIntoMapGather(RewriterBase &rewriter, Operation *op,
       .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
         return foldPadIntoMapGather(rewriter, padOp, mapGatherOp);
       })
+      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
+        return foldBroadcastGenericIntoMapGather(rewriter, genericOp,
+                                                 mapGatherOp);
+      })
       .Default([](Operation *) { return failure(); });
 }
 
@@ -1084,13 +1152,18 @@ struct FoldConsumerRelayoutIntoMapGatherPattern
   }
 };
 
-// Insert identity map_gather op after the root and replace uses.
-static MapGatherOp insertIdentityMapGather(RewriterBase &rewriter,
-                                           OpResult root) {
+// Insert identity map_gather op after the root and replace only uses whose
+// owner is in `complexChainUsers` (i.e. uses that are part of a complex
+// relayout chain). Other uses keep using the load/root directly.
+static MapGatherOp
+insertIdentityMapGather(RewriterBase &rewriter, OpResult root,
+                        const SmallPtrSetImpl<Operation *> &complexChainUsers) {
   Location loc = root.getLoc();
   SetVector<OpOperand *> originalUses;
   for (OpOperand &use : root.getUses()) {
-    originalUses.insert(&use);
+    if (complexChainUsers.contains(use.getOwner())) {
+      originalUses.insert(&use);
+    }
   }
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfterValue(root);
@@ -1107,21 +1180,19 @@ static MapGatherOp insertIdentityMapGather(RewriterBase &rewriter,
   return mapGatherOp;
 }
 
-/// Insert identity map_gather op after a LoadFromBufferOp if it has relayout
-/// op consumers. The identity map_gather can then be used to fold consumer
-/// relayout ops into it iteratively.
+/// Insert identity map_gather op after a LoadFromBufferOp only when there is
+/// at least one "complex" relayout chain.
 struct InsertMapGatherOpPattern
     : public OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if the load has at least one relayout op user.
-    bool hasRelayoutUser =
-        llvm::any_of(loadOp->getUsers(), [](Operation *user) {
-          return isSupportedSingleInputRelayoutOp(user);
-        });
-    if (!hasRelayoutUser) {
+    Value loadResult = loadOp.getResult();
+    SmallPtrSet<Operation *, 4> complexChainUsers =
+        getComplexChainRelayoutUsers(loadResult);
+    // Only introduce map_gather when there is at least one complex chain.
+    if (complexChainUsers.empty()) {
       return failure();
     }
     // Check that the load doesn't already have a map_gather user (avoid
@@ -1133,7 +1204,8 @@ struct InsertMapGatherOpPattern
     if (hasMapGatherUser) {
       return failure();
     }
-    (void)insertIdentityMapGather(rewriter, loadOp->getResult(0));
+    (void)insertIdentityMapGather(rewriter, cast<OpResult>(loadResult),
+                                  complexChainUsers);
     return success();
   }
 };
