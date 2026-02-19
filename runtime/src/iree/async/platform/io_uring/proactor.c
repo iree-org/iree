@@ -100,6 +100,7 @@ iree_status_t iree_async_proactor_create_io_uring(
   proactor->wake_poll_armed = false;
   proactor->defer_submissions = false;
   proactor->capabilities = IREE_ASYNC_PROACTOR_CAPABILITY_NONE;
+  iree_atomic_slist_initialize(&proactor->pending_software_completions);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
   proactor->event_sources = NULL;
   proactor->relays = NULL;
@@ -314,7 +315,7 @@ static void iree_async_proactor_io_uring_drain_pending_messages(
 // Submits a continuation chain from an operation's linked_next pointer.
 // Builds a temporary array from the linked list and submits as a batch.
 // On submit failure, invokes callbacks directly with the error.
-static void iree_async_proactor_io_uring_submit_continuation_chain(
+void iree_async_proactor_io_uring_submit_continuation_chain(
     iree_async_proactor_io_uring_t* proactor,
     iree_async_operation_t* chain_head) {
   if (!chain_head) return;
@@ -374,81 +375,71 @@ static void iree_async_proactor_io_uring_submit_continuation_chain(
   }
 }
 
-// Cancels a continuation chain by directly invoking each operation's callback
-// with CANCELLED status. Returns the number of callbacks invoked (for
-// completion counting by the poll loop).
+//===----------------------------------------------------------------------===//
+// Software operation completion delivery
+//===----------------------------------------------------------------------===//
+
+// Pushes a completed software operation to the MPSC queue for callback delivery
+// on the poll thread. The operation's side effects (e.g., semaphore signal)
+// have already been executed; this only defers the callback.
 //
-// We do NOT submit-then-cancel via io_uring because operations like NOP
-// complete inline during io_uring_enter, making it impossible to cancel them
-// before their CQE is posted with success status.
-static iree_host_size_t iree_async_proactor_io_uring_cancel_continuation_chain(
-    iree_async_proactor_io_uring_t* proactor,
-    iree_async_operation_t* chain_head) {
-  if (!chain_head) return 0;
-
-  iree_host_size_t cancelled_count = 0;
-  iree_async_operation_t* op = chain_head;
-  while (op) {
-    iree_async_operation_t* next = op->linked_next;
-    op->linked_next = NULL;
-    if (op->completion_fn) {
-      op->completion_fn(op->user_data, op,
-                        iree_status_from_code(IREE_STATUS_CANCELLED),
-                        IREE_ASYNC_COMPLETION_FLAG_NONE);
-      ++cancelled_count;
-    }
-    op = next;
-  }
-  return cancelled_count;
-}
-
-// Dispatches a linked_next continuation chain based on the trigger's status.
-// On success: submits the chain for execution (completions counted via CQEs).
-// On failure: cancels the chain by directly invoking callbacks with CANCELLED.
-// Returns the number of directly-invoked callbacks (for completion counting).
-static iree_host_size_t
-iree_async_proactor_io_uring_dispatch_linked_continuation(
+// The completion status is carried in base.linked_next (repurposed after the
+// continuation chain is consumed). The operation's base.next (offset 0) is used
+// as the iree_atomic_slist_entry_t for the MPSC push.
+void iree_async_proactor_io_uring_push_software_completion(
     iree_async_proactor_io_uring_t* proactor, iree_async_operation_t* operation,
-    iree_status_t trigger_status) {
-  iree_async_operation_t* continuation = operation->linked_next;
-  if (!continuation) return 0;
-
-  // Detach the chain before potentially recursive submit.
-  operation->linked_next = NULL;
-
-  if (iree_status_is_ok(trigger_status)) {
-    iree_async_proactor_io_uring_submit_continuation_chain(proactor,
-                                                           continuation);
-    return 0;  // Submitted ops produce CQEs counted by the CQE loop.
-  } else {
-    return iree_async_proactor_io_uring_cancel_continuation_chain(proactor,
-                                                                  continuation);
-  }
+    iree_status_t status) {
+  // Stash the completion status in linked_next (reinterpreted as
+  // iree_status_t).
+  operation->linked_next = (iree_async_operation_t*)(uintptr_t)status;
+  iree_atomic_slist_push(&proactor->pending_software_completions,
+                         (iree_atomic_slist_entry_t*)operation);
 }
 
-// Dispatches a linked_next continuation chain from a semaphore wait tracker.
-// On success: submits the chain for execution (completions counted via CQEs).
-// On failure: cancels the chain by directly invoking callbacks with CANCELLED.
-// Returns the number of directly-invoked callbacks (for completion counting).
+// Drains pending software operation completions and invokes callbacks.
+// Called from poll() BEFORE CQE processing to preserve callback ordering for
+// chains where a software operation precedes a kernel operation (e.g.,
+// SIGNAL(LINKED) → RECV: SIGNAL callback must fire before RECV CQE callback).
+//
+// Returns the number of completions drained (for inclusion in poll's
+// completion count).
 static iree_host_size_t
-iree_async_proactor_io_uring_dispatch_tracker_continuation(
-    iree_async_proactor_io_uring_t* proactor,
-    iree_async_io_uring_semaphore_wait_tracker_t* tracker,
-    iree_status_t trigger_status) {
-  iree_async_operation_t* continuation = tracker->continuation_head;
-  if (!continuation) return 0;
-
-  // Detach the chain before potentially recursive submit.
-  tracker->continuation_head = NULL;
-
-  if (iree_status_is_ok(trigger_status)) {
-    iree_async_proactor_io_uring_submit_continuation_chain(proactor,
-                                                           continuation);
-    return 0;  // Submitted ops produce CQEs counted by the CQE loop.
-  } else {
-    return iree_async_proactor_io_uring_cancel_continuation_chain(proactor,
-                                                                  continuation);
+iree_async_proactor_io_uring_drain_pending_software_completions(
+    iree_async_proactor_io_uring_t* proactor) {
+  iree_atomic_slist_entry_t* head = NULL;
+  iree_atomic_slist_entry_t* tail = NULL;
+  if (!iree_atomic_slist_flush(&proactor->pending_software_completions,
+                               IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO,
+                               &head, &tail)) {
+    return 0;
   }
+
+  iree_host_size_t drained_count = 0;
+  iree_atomic_slist_entry_t* entry = head;
+  while (entry != NULL) {
+    iree_async_operation_t* operation = (iree_async_operation_t*)entry;
+    iree_atomic_slist_entry_t* next = entry->next;
+
+    // Extract the completion status from linked_next.
+    iree_status_t status = (iree_status_t)(uintptr_t)operation->linked_next;
+    operation->linked_next = NULL;
+
+    // Release resources retained at submit time.
+    iree_async_operation_release_resources(operation);
+
+    // Invoke the user callback.
+    if (operation->completion_fn) {
+      operation->completion_fn(operation->user_data, operation, status,
+                               IREE_ASYNC_COMPLETION_FLAG_NONE);
+      ++drained_count;
+    } else {
+      iree_status_ignore(status);
+    }
+
+    entry = next;
+  }
+
+  return drained_count;
 }
 
 //===----------------------------------------------------------------------===//
@@ -503,11 +494,10 @@ iree_async_proactor_io_uring_drain_pending_semaphore_waits(
                                             &tracker->timepoints[i]);
     }
 
-    // Dispatch LINKED continuation chain (if any).
-    // On success: submits the continuation chain for execution.
-    // On failure: cancels the chain (submit-then-cancel for proper CQEs).
-    drained_count += iree_async_proactor_io_uring_dispatch_tracker_continuation(
-        proactor, tracker, status);
+    // Detach continuation chain before callback (callback may free operation).
+    // Continuations are dispatched AFTER the trigger's callback.
+    iree_async_operation_t* continuation = tracker->continuation_head;
+    tracker->continuation_head = NULL;
 
     // Invoke the operation's callback.
     if (wait_op->base.completion_fn) {
@@ -515,6 +505,18 @@ iree_async_proactor_io_uring_drain_pending_semaphore_waits(
                                   (iree_async_operation_t*)wait_op, status,
                                   IREE_ASYNC_COMPLETION_FLAG_NONE);
       ++drained_count;
+    }
+
+    // Dispatch continuation chain after the trigger's callback. Software
+    // completions are pushed to MPSC (counted by the post-CQE drain).
+    if (continuation) {
+      if (iree_status_is_ok(status)) {
+        iree_async_proactor_io_uring_dispatch_continuation_chain(proactor,
+                                                                 continuation);
+      } else {
+        iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+            proactor, continuation);
+      }
     }
 
     // Clear the tracker reference from the operation.
@@ -1107,11 +1109,6 @@ static inline bool iree_async_proactor_io_uring_process_internal_cqe(
     case IREE_IO_URING_TAG_SIGNAL:
       iree_async_proactor_io_uring_handle_signal_cqe(proactor, cqe);
       break;
-    case IREE_IO_URING_TAG_NOP_PLACEHOLDER:
-      // Placeholder NOP for software-emulated operations (SEMAPHORE_WAIT).
-      // The CQE is expected and discarded; the actual operation completes
-      // through the MPSC pending_semaphore_waits queue.
-      break;
     default:
       IREE_ASSERT(false,
                   "unrecognized internal tag %d in CQE (user_data=0x%" PRIx64
@@ -1174,13 +1171,18 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
       iree_status_t status =
           iree_make_status(iree_status_code_from_errno(-cqe->res),
                            "linked poll head failed (%d)", -cqe->res);
-      iree_host_size_t extra_completions =
-          iree_async_proactor_io_uring_dispatch_linked_continuation(
-              proactor, operation, status);
+      // Detach continuation before callback (callback may free operation).
+      iree_async_operation_t* continuation = operation->linked_next;
+      operation->linked_next = NULL;
       iree_async_operation_release_resources(operation);
       operation->completion_fn(operation->user_data, operation, status,
                                IREE_ASYNC_COMPLETION_FLAG_NONE);
-      return 1 + extra_completions;
+      // Cancel continuation via MPSC (counted by post-CQE MPSC drain).
+      if (continuation) {
+        iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+            proactor, continuation);
+      }
+      return 1;
     }
     // Success CQE should be suppressed by CQE_SKIP_SUCCESS. If it arrives
     // (kernel doesn't support CQE_SKIP_SUCCESS), ignore it — the linked READ
@@ -1208,17 +1210,6 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
         iree_async_proactor_io_uring_populate_result(proactor, cqe, operation);
   }
 
-  // For semaphore signals, check for inline execution error stored in
-  // base.next. The actual signal was executed during submit; errors are
-  // deferred to the callback to maintain standard async operation semantics.
-  if (iree_status_is_ok(status) &&
-      operation->type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL) {
-    if (operation->next != NULL) {
-      status = (iree_status_t)(uintptr_t)operation->next;
-      operation->next = NULL;  // Clear after retrieval.
-    }
-  }
-
   // Propagate error to socket's sticky failure status.
   if (!iree_status_is_ok(status)) {
     iree_async_socket_t* socket =
@@ -1234,12 +1225,11 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
     return 0;
   }
 
-  // Dispatch LINKED continuation chain (if any).
-  // For operations with linked_next set, the completion triggers submission
-  // (on success) or cancellation (on failure) of the continuation chain.
-  iree_host_size_t extra_completions =
-      iree_async_proactor_io_uring_dispatch_linked_continuation(
-          proactor, operation, status);
+  // Detach LINKED continuation chain before callback (callback may free the
+  // operation). Continuations are dispatched AFTER the trigger's callback to
+  // preserve callback ordering: trigger first, then its continuations.
+  iree_async_operation_t* continuation = operation->linked_next;
+  operation->linked_next = NULL;
 
   // Compute completion flags.
   iree_async_completion_flags_t flags =
@@ -1255,7 +1245,21 @@ static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
   // operation is allowed after this point.
   operation->completion_fn(operation->user_data, operation, status, flags);
 
-  return 1 + extra_completions;
+  // Dispatch continuation chain after the trigger's callback. Software
+  // completions in the chain are pushed to the MPSC queue (counted by the
+  // post-CQE MPSC drain in the poll loop). Kernel ops are submitted and
+  // produce their own CQEs.
+  if (continuation) {
+    if (iree_status_is_ok(status)) {
+      iree_async_proactor_io_uring_dispatch_continuation_chain(proactor,
+                                                               continuation);
+    } else {
+      iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+          proactor, continuation);
+    }
+  }
+
+  return 1;
 }
 
 static iree_status_t iree_async_proactor_io_uring_poll(
@@ -1297,6 +1301,16 @@ static iree_status_t iree_async_proactor_io_uring_poll(
     IREE_RETURN_IF_ERROR(wait_status);
   }
 
+  // First MPSC drain: software completions from submit threads.
+  // Software ops pushed to the MPSC by submit threads have their side effects
+  // already done; only callback delivery is deferred. Draining these first
+  // preserves callback ordering for chains like SIGNAL(LINKED) → RECV: the
+  // SIGNAL callback fires before the RECV CQE callback.
+  // A second drain occurs after CQE processing and semaphore wait dispatch
+  // to catch software completions pushed during those phases.
+  iree_host_size_t completed =
+      iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
+
   // Defer kernel entry during CQE processing. Operations submitted by CQE
   // callbacks (e.g., multishot recv re-arm on ENOBUFS) fill SQEs in the
   // submission ring but skip io_uring_enter. Without this, a synchronous
@@ -1307,7 +1321,6 @@ static iree_status_t iree_async_proactor_io_uring_poll(
 
   // Process all available CQEs. peek_cqe returns NULL when the CQ is empty,
   // combining the readiness check and CQE retrieval in a single atomic load.
-  iree_host_size_t completed = 0;
   iree_io_uring_cqe_t* cqe;
   while ((cqe = iree_io_uring_ring_peek_cqe(&proactor->ring)) != NULL) {
     // Process the CQE and add user completions to count.
@@ -1319,6 +1332,15 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   }
 
   proactor->defer_submissions = false;
+
+  // Second MPSC drain: software completions pushed during the main CQE loop.
+  // CQE processing dispatches continuation chains that push software
+  // completions to the MPSC. These must fire BEFORE the CQE drain loop flushes
+  // deferred SQEs, because the deferred SQEs (submitted by continuation
+  // dispatch) are later in the chain. Example: [RECV → SIGNAL → SEND] —
+  // SIGNAL's callback must fire before SEND's CQE is processed.
+  completed +=
+      iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
 
   // Flush SQEs deferred during CQE processing and process any resulting CQEs.
   // Each flush may generate CQEs (inline from SQE processing, or deferred
@@ -1363,6 +1385,13 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   // values. Count them as completions since they invoke user callbacks.
   completed +=
       iree_async_proactor_io_uring_drain_pending_semaphore_waits(proactor);
+
+  // Third MPSC drain: software completions pushed during the CQE drain loop
+  // and semaphore wait dispatch. Each drain pass in the CQE drain loop may
+  // dispatch continuations that push software completions. Semaphore wait
+  // dispatch similarly pushes continuation completions.
+  completed +=
+      iree_async_proactor_io_uring_drain_pending_software_completions(proactor);
 
   // Retry re-arming relays that failed due to SQ backpressure.
   // Now that we've processed CQEs, there may be SQ space available.

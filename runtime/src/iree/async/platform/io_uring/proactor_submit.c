@@ -927,36 +927,26 @@ static void iree_async_proactor_io_uring_fill_notification_signal_event(
 // Semaphore operation helpers
 //===----------------------------------------------------------------------===//
 
-// Executes a SEMAPHORE_SIGNAL operation synchronously.
-// Signal operations execute inline during submit - no actual kernel operation
-// is needed. We use a NOP to trigger the completion callback.
-//
-// Errors are stored in base.next (repurposed as status storage) rather than
-// returned, so that submit succeeds and errors are delivered via callback.
-// This maintains standard async operation semantics.
-static void iree_async_proactor_io_uring_execute_semaphore_signal(
-    iree_async_semaphore_signal_operation_t* signal_op) {
-  // Signal each semaphore in turn.
-  for (iree_host_size_t i = 0; i < signal_op->count; ++i) {
-    iree_status_t status = iree_async_semaphore_signal(
-        signal_op->semaphores[i], signal_op->values[i], signal_op->frontier);
-    if (!iree_status_is_ok(status)) {
-      // Store error in base.next for retrieval when CQE is processed.
-      signal_op->base.next = (iree_async_operation_t*)(uintptr_t)status;
-      return;
-    }
-  }
-  // Success - clear any previous error storage.
-  signal_op->base.next = NULL;
+// Returns true if the operation type is a "software operation" — one that
+// executes entirely in userspace with no kernel SQE. Software ops run their
+// side effects (e.g., semaphore signal) during Phase 3 of submit, outside the
+// SQ lock, with callback delivery deferred to the poll thread via MPSC.
+static inline bool iree_async_proactor_io_uring_is_software_op(
+    iree_async_operation_type_t type) {
+  return type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL ||
+         type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_WAIT;
 }
 
-// Fills an SQE for a SEMAPHORE_SIGNAL operation.
-// The actual signal has already been executed; this NOP triggers the callback.
-static void iree_async_proactor_io_uring_fill_semaphore_signal(
-    iree_io_uring_sqe_t* sqe, iree_async_operation_t* operation) {
-  sqe->opcode = IREE_IORING_OP_NOP;
-  sqe->fd = -1;
-  sqe->user_data = (uint64_t)(uintptr_t)operation;
+// Executes a SEMAPHORE_SIGNAL operation synchronously. Returns OK on success,
+// or the first signal failure status. The caller delivers the completion
+// (via MPSC push to the poll thread for callback dispatch).
+static iree_status_t iree_async_proactor_io_uring_execute_semaphore_signal(
+    iree_async_semaphore_signal_operation_t* signal_op) {
+  for (iree_host_size_t i = 0; i < signal_op->count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_async_semaphore_signal(
+        signal_op->semaphores[i], signal_op->values[i], signal_op->frontier));
+  }
+  return iree_ok_status();
 }
 
 // Computes the allocation size for a semaphore wait tracker with |count|
@@ -972,14 +962,33 @@ static void iree_async_io_uring_semaphore_wait_timepoint_callback(
     void* user_data, iree_async_semaphore_timepoint_t* timepoint,
     iree_status_t status);
 
-// Submits a SEMAPHORE_WAIT operation by registering timepoints.
-// For single-semaphore waits, registers one timepoint.
-// For multi-semaphore waits, registers one per semaphore and tracks progress.
-static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
-    iree_async_proactor_io_uring_t* proactor, iree_io_uring_sqe_t* sqe,
-    iree_async_operation_t* base_operation) {
+// Executes a SEMAPHORE_WAIT operation. Checks for immediate satisfaction
+// first; if not immediately satisfied, allocates a tracker, transfers the
+// continuation chain, and registers timepoints.
+//
+// On return:
+//   *out_deferred == false: wait completed immediately (OK or error).
+//     The caller handles continuation dispatch and completion delivery.
+//   *out_deferred == true: timepoints registered, completion arrives later
+//     via pending_semaphore_waits. The tracker holds the continuation chain.
+static iree_status_t iree_async_proactor_io_uring_execute_semaphore_wait(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* base_operation, bool* out_deferred) {
+  *out_deferred = false;
+
   iree_async_semaphore_wait_operation_t* wait_op =
       (iree_async_semaphore_wait_operation_t*)base_operation;
+
+  // The timepoint callback encodes {tracker_pointer, semaphore_index} in a
+  // single pointer using a 56-bit/8-bit split. The 8-bit index field limits
+  // the maximum number of semaphores per wait to 255.
+  if (IREE_UNLIKELY(wait_op->count > 255)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "semaphore wait count %" PRIhsz
+        " exceeds the maximum of 255 (limited by timepoint user_data encoding)",
+        wait_op->count);
+  }
 
   // Check for immediate satisfaction before allocating a tracker.
   bool all_satisfied = true;
@@ -987,24 +996,14 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
     uint64_t current = iree_async_semaphore_query(wait_op->semaphores[i]);
     if (current >= wait_op->values[i]) {
       if (wait_op->mode == IREE_ASYNC_WAIT_MODE_ANY) {
-        // ANY mode: any satisfied semaphore completes immediately.
         wait_op->satisfied_index = i;
-        sqe->opcode = IREE_IORING_OP_NOP;
-        sqe->fd = -1;
-        sqe->user_data = (uint64_t)(uintptr_t)base_operation;
         return iree_ok_status();
       }
     } else {
       all_satisfied = false;
     }
   }
-  if (all_satisfied) {
-    // ALL mode: all satisfied, complete immediately.
-    sqe->opcode = IREE_IORING_OP_NOP;
-    sqe->fd = -1;
-    sqe->user_data = (uint64_t)(uintptr_t)base_operation;
-    return iree_ok_status();
-  }
+  if (all_satisfied) return iree_ok_status();
 
   // Allocate tracker with embedded timepoints.
   iree_host_size_t tracker_size = 0;
@@ -1022,9 +1021,9 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
   iree_atomic_store(&tracker->completion_status, (intptr_t)iree_ok_status(),
                     iree_memory_order_release);
 
-  // Transfer linked_next chain from operation to tracker.
-  // The pre-scan built the chain via linked_next pointers; we move the head
-  // to the tracker so it survives until the wait completes.
+  // Transfer linked_next chain from operation to tracker. The chain building
+  // phase set linked_next pointers; we move the head to the tracker so it
+  // survives until the wait completes.
   tracker->continuation_head = wait_op->base.linked_next;
   wait_op->base.linked_next = NULL;
 
@@ -1049,7 +1048,7 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
     // Uses the same 56-bit/8-bit split as the internal tag encoding
     // (proactor.h) for LA57 (5-level paging) safety: userspace pointers use
     // at most 56 bits on x86-64, leaving 8 bits for the index (max 255).
-    IREE_ASSERT(i < 256);
+    // The count <= 255 check above guarantees this shift is safe.
     timepoint->user_data = (void*)((uintptr_t)tracker | ((uintptr_t)i << 56));
 
     iree_status_t status = iree_async_semaphore_acquire_timepoint(
@@ -1066,17 +1065,106 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
     }
   }
 
-  // Submit a NOP SQE as a placeholder that completes immediately. The NOP's
-  // CQE is consumed and discarded by the TAG_NOP_PLACEHOLDER handler. The
-  // actual wait is driven by the software timepoints registered above; linked
-  // continuations are held in tracker->continuation_head and dispatched when
-  // the timepoints fire (via drain_pending_semaphore_waits).
-  sqe->opcode = IREE_IORING_OP_NOP;
-  sqe->fd = -1;
-  sqe->user_data = iree_io_uring_internal_encode(
-      IREE_IO_URING_TAG_NOP_PLACEHOLDER, (uintptr_t)tracker);
-
+  *out_deferred = true;
   return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Iterative continuation chain dispatch
+//===----------------------------------------------------------------------===//
+
+// Iteratively dispatches a LINKED continuation chain that may contain software
+// operations. Walks the chain in order:
+//
+//   - Software ops (SEMAPHORE_SIGNAL, SEMAPHORE_WAIT): execute side effects
+//     inline, push completion to MPSC for poll-thread callback delivery.
+//   - Kernel ops: submit the remaining chain via submit_continuation_chain
+//     (produces CQEs counted by the CQE processing loop).
+//   - Deferred WAIT: the tracker takes ownership of the remaining chain.
+//
+// Iterative (not recursive) dispatch ensures software completions are pushed
+// to MPSC in chain order. Recursive dispatch via submit_continuation_chain
+// pushes in depth-first (reverse) order.
+//
+// On error: the failing software op's error completion is pushed, and the
+// remaining chain is cancelled with CANCELLED completions via MPSC.
+void iree_async_proactor_io_uring_dispatch_continuation_chain(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* chain_head) {
+  iree_async_operation_t* op = chain_head;
+  while (op) {
+    if (!iree_async_proactor_io_uring_is_software_op(op->type)) {
+      // Kernel op: submit the remaining chain (op + its linked_next tail).
+      // Kernel ops produce CQEs; their completions are counted by the CQE
+      // processing loop. If the remaining chain contains more software ops
+      // after this kernel op, they will be dispatched when the kernel op's
+      // CQE triggers another continuation dispatch.
+      iree_async_proactor_io_uring_submit_continuation_chain(proactor, op);
+      return;
+    }
+
+    iree_async_operation_retain_resources(op);
+
+    iree_status_t op_status = iree_ok_status();
+    bool deferred = false;
+    if (op->type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL) {
+      op_status = iree_async_proactor_io_uring_execute_semaphore_signal(
+          (iree_async_semaphore_signal_operation_t*)op);
+    } else {
+      // SEMAPHORE_WAIT: may transfer linked_next to the tracker if deferred.
+      op_status = iree_async_proactor_io_uring_execute_semaphore_wait(
+          proactor, op, &deferred);
+    }
+
+    if (deferred) {
+      // Tracker holds the continuation chain (transferred from linked_next
+      // by execute_semaphore_wait). The WAIT completion arrives later via
+      // pending_semaphore_waits, and the tracker dispatches its continuation
+      // chain when the WAIT completes.
+      //
+      // Don't push a completion for this op — the tracker pathway handles it.
+      return;
+    }
+
+    // Extract next in chain before push (push repurposes linked_next for the
+    // completion status).
+    iree_async_operation_t* next = op->linked_next;
+    op->linked_next = NULL;
+
+    // Push this op's completion to MPSC.
+    iree_async_proactor_io_uring_push_software_completion(proactor, op,
+                                                          op_status);
+
+    if (!iree_status_is_ok(op_status)) {
+      // Software op failed. Cancel remaining chain via MPSC.
+      if (next) {
+        iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(proactor,
+                                                                       next);
+      }
+      return;
+    }
+
+    op = next;
+  }
+}
+
+// Cancels a continuation chain by pushing CANCELLED completions to the MPSC
+// queue. Each operation is retained before pushing so that the drain function's
+// release_resources call is balanced. All cancellation completions flow through
+// the MPSC for uniform counting by the poll loop's drain passes.
+void iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+    iree_async_proactor_io_uring_t* proactor,
+    iree_async_operation_t* chain_head) {
+  iree_async_operation_t* op = chain_head;
+  while (op) {
+    iree_async_operation_t* next = op->linked_next;
+    op->linked_next = NULL;
+    // Retain so the drain's release_resources is balanced.
+    iree_async_operation_retain_resources(op);
+    iree_async_proactor_io_uring_push_software_completion(
+        proactor, op, iree_status_from_code(IREE_STATUS_CANCELLED));
+    op = next;
+  }
 }
 
 // Helper to enqueue a tracker for completion and wake the proactor.
@@ -1318,20 +1406,25 @@ iree_status_t iree_async_proactor_io_uring_submit(
   IREE_RETURN_IF_ERROR(iree_async_proactor_io_uring_submit_sequences(
       proactor, base_proactor, operations));
 
-  // Calculate total SQEs needed.
-  // EVENT_WAIT: always 2 SQEs (linked POLL_ADD+READ).
-  // NOTIFICATION_WAIT: 2 SQEs in event mode, 1 SQE in futex mode.
+  //=========================================================================
+  // Phase 1: Analyze the batch.
+  //=========================================================================
+
+  // Count kernel SQEs needed. Software operations (SEMAPHORE_SIGNAL,
+  // SEMAPHORE_WAIT) execute in userspace with no kernel SQE — they are handled
+  // in Phase 3. SEQUENCE operations were dispatched in the pre-scan above.
   iree_host_size_t sqes_needed = 0;
+  bool has_software_ops = false;
   for (iree_host_size_t i = 0; i < operations.count; ++i) {
     iree_async_operation_type_t type = operations.values[i]->type;
-    // Standalone SEQUENCE operations were handled in the pre-scan above.
-    // SEQUENCE continuations (in linked_next chains past the split point)
-    // don't consume SQEs either — they're dispatched on predecessor completion.
     if (type == IREE_ASYNC_OPERATION_TYPE_SEQUENCE) continue;
+    if (iree_async_proactor_io_uring_is_software_op(type)) {
+      has_software_ops = true;
+      continue;
+    }
     if (type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
       sqes_needed += 2;
     } else if (type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
-      // Check the notification's mode to determine SQE count.
       iree_async_notification_wait_operation_t* wait =
           (iree_async_notification_wait_operation_t*)operations.values[i];
       sqes_needed +=
@@ -1342,33 +1435,18 @@ iree_status_t iree_async_proactor_io_uring_submit(
     }
   }
 
-  // All operations were SEQUENCE (handled in pre-scan). Nothing left to submit.
-  if (sqes_needed == 0) return iree_ok_status();
-
-  // Acquire the SQ lock for the duration of SQE preparation and capacity check.
-  // All sq_local_tail reads/writes must happen under this lock to prevent a
-  // concurrent thread from seeing a partially-filled SQE during flush.
-  iree_io_uring_ring_sq_lock(&proactor->ring);
-
-  // Check SQ capacity.
-  uint32_t available = iree_io_uring_ring_sq_space_left(&proactor->ring);
-  if (available < sqes_needed) {
-    iree_io_uring_ring_sq_unlock(&proactor->ring);
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "SQ has %u slots but %zu SQEs needed for %zu "
-                            "operations",
-                            available, sqes_needed, operations.count);
-  }
+  // If all operations were SEQUENCE (handled in pre-scan) with no software
+  // ops and no kernel ops, there is nothing left to do.
+  if (sqes_needed == 0 && !has_software_ops) return iree_ok_status();
 
   // Validate LINKED flag usage: the last operation must not have LINKED set.
-  // LINKED means "link to next operation" - there is no next for the last one.
+  // LINKED means "link to next operation" — there is no next for the last one.
   // io_uring would treat this as linking to the next submit batch, which could
   // cause unrelated future operations to be spuriously cancelled.
   iree_async_operation_t* last_operation =
       operations.values[operations.count - 1];
   if (iree_any_bit_set(last_operation->flags,
                        IREE_ASYNC_OPERATION_FLAG_LINKED)) {
-    iree_io_uring_ring_sq_unlock(&proactor->ring);
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "LINKED flag set on last operation in batch; LINKED means 'link to "
@@ -1389,17 +1467,14 @@ iree_status_t iree_async_proactor_io_uring_submit(
   //   the kernel doesn't reliably post CQEs for not-yet-issued linked ops,
   //   so C in "A->B->C" may never complete if B is cancelled.
   //
-  // Semaphore WAIT:
-  //   Uses software timepoints, not kernel operations. The kernel NOP completes
-  //   immediately, but the actual wait may take longer.
+  // Software operations (SEMAPHORE_SIGNAL, SEMAPHORE_WAIT):
+  //   Execute entirely in userspace with no kernel SQE, so kernel LINK
+  //   chains cannot span them. Signals execute their side effects
+  //   synchronously; waits may register timepoints for deferred completion.
   //
-  // Semaphore SIGNAL:
-  //   Executes inline during submit with errors stored in base.next. The kernel
-  //   NOP always succeeds, so LINK would continue the chain on signal failure.
-  //
-  // For these operations, we split the batch: only submit SQEs up to the
-  // emulated operation, and the rest are held in the linked_next chain for
-  // submission on completion.
+  // For these operations, we split the batch: only submit kernel SQEs up to
+  // the emulated operation, and the rest are held in the linked_next chain
+  // for submission on completion.
   iree_host_size_t effective_count = operations.count;
 
   for (iree_host_size_t i = 0; i < operations.count; ++i) {
@@ -1422,16 +1497,17 @@ iree_status_t iree_async_proactor_io_uring_submit(
     operation->linked_next = operations.values[i + 1];
 
     // Split the batch at the first operation requiring userspace emulation.
-    // Also split when the successor is a SEQUENCE operation — SEQUENCE can't
-    // be represented as a kernel SQE. The SEQUENCE continuation is held in
-    // linked_next and dispatched on predecessor completion (without SQ lock).
+    // Also split when the successor cannot be represented as a kernel SQE
+    // (SEQUENCE or software op). The continuation is held in linked_next and
+    // dispatched on predecessor completion.
     if (effective_count == operations.count) {
       bool needs_userspace_emulation =
           (operation->type == IREE_ASYNC_OPERATION_TYPE_TIMER) ||
-          (operation->type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_WAIT) ||
-          (operation->type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL) ||
+          iree_async_proactor_io_uring_is_software_op(operation->type) ||
           (operations.values[i + 1]->type ==
-           IREE_ASYNC_OPERATION_TYPE_SEQUENCE);
+           IREE_ASYNC_OPERATION_TYPE_SEQUENCE) ||
+          iree_async_proactor_io_uring_is_software_op(
+              operations.values[i + 1]->type);
       if (needs_userspace_emulation) {
         effective_count = i + 1;
         // Continue building linked_next for remaining operations in the chain.
@@ -1439,263 +1515,341 @@ iree_status_t iree_async_proactor_io_uring_submit(
     }
   }
 
-  // Fill SQEs for each operation. Track count for rollback on failure.
-  // Use effective_count (may be less than operations.count if timer emulation
-  // split the batch).
-  iree_host_size_t sqes_prepared = 0;
-  for (iree_host_size_t i = 0; i < effective_count; ++i) {
-    iree_async_operation_t* operation = operations.values[i];
+  //=========================================================================
+  // Phase 2: Fill kernel SQEs (under SQ lock).
+  //=========================================================================
 
-    // Standalone SEQUENCE operations were handled in the pre-scan (before the
-    // SQ lock). Skip them here — they don't consume SQEs.
-    if (operation->type == IREE_ASYNC_OPERATION_TYPE_SEQUENCE) continue;
+  if (sqes_needed > 0) {
+    // Acquire the SQ lock for the duration of SQE preparation.
+    // All sq_local_tail reads/writes must happen under this lock to prevent a
+    // concurrent thread from seeing a partially-filled SQE during flush.
+    iree_io_uring_ring_sq_lock(&proactor->ring);
 
-    // Retain resources referenced by this operation to prevent premature
-    // destruction while the SQE is in flight. On rollback, release_prepared
-    // will undo these retains for all operations [0, i+1).
-    iree_async_operation_retain_resources(operation);
-
-    iree_status_t status = iree_ok_status();
-
-    // EVENT_WAIT always uses linked POLL_ADD+READ (2 SQEs).
-    // NOTIFICATION_WAIT uses 2 SQEs in event mode, 1 SQE in futex mode.
-    bool needs_two_sqes = false;
-    if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
-      needs_two_sqes = true;
-    } else if (operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
-      iree_async_notification_wait_operation_t* wait =
-          (iree_async_notification_wait_operation_t*)operation;
-      needs_two_sqes =
-          (wait->notification->mode == IREE_ASYNC_NOTIFICATION_MODE_EVENT);
+    // Check SQ capacity.
+    uint32_t available = iree_io_uring_ring_sq_space_left(&proactor->ring);
+    if (available < sqes_needed) {
+      iree_io_uring_ring_sq_unlock(&proactor->ring);
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "SQ has %u slots but %zu SQEs needed for %zu "
+                              "operations",
+                              available, sqes_needed, operations.count);
     }
 
-    if (needs_two_sqes) {
-      iree_io_uring_sqe_t* poll_sqe =
-          iree_io_uring_ring_get_sqe(&proactor->ring);
-      iree_io_uring_sqe_t* read_sqe =
-          iree_io_uring_ring_get_sqe(&proactor->ring);
-      if (!poll_sqe || !read_sqe) {
-        // Should not happen since we pre-checked capacity. Include any
-        // partially-allocated SQEs in the rollback count: if poll_sqe
-        // succeeded but read_sqe failed, sq_local_tail advanced by 1.
-        iree_host_size_t partial_sqes = (poll_sqe ? 1 : 0) + (read_sqe ? 1 : 0);
-        iree_io_uring_ring_sq_rollback(
-            &proactor->ring, (uint32_t)(sqes_prepared + partial_sqes));
-        iree_io_uring_ring_sq_unlock(&proactor->ring);
-        iree_async_proactor_io_uring_release_prepared(operations, i + 1);
-        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                "failed to get SQEs for 2-SQE op %zu", i);
-      }
-      sqes_prepared += 2;
+    // Fill SQEs for kernel operations. Software ops are skipped here and
+    // executed in Phase 3 (no lock held). Track SQE count for rollback.
+    iree_host_size_t sqes_prepared = 0;
+    for (iree_host_size_t i = 0; i < effective_count; ++i) {
+      iree_async_operation_t* operation = operations.values[i];
 
+      // SEQUENCE and software ops don't consume SQEs.
+      if (operation->type == IREE_ASYNC_OPERATION_TYPE_SEQUENCE) continue;
+      if (iree_async_proactor_io_uring_is_software_op(operation->type)) {
+        continue;
+      }
+
+      // Retain resources referenced by this operation to prevent premature
+      // destruction while the SQE is in flight. On rollback, release_prepared
+      // undoes these retains (release is a no-op for skipped software/SEQUENCE
+      // types, so passing i+1 as count is safe).
+      iree_async_operation_retain_resources(operation);
+
+      iree_status_t status = iree_ok_status();
+
+      // EVENT_WAIT always uses linked POLL_ADD+READ (2 SQEs).
+      // NOTIFICATION_WAIT uses 2 SQEs in event mode, 1 SQE in futex mode.
+      bool needs_two_sqes = false;
       if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
-        iree_async_proactor_io_uring_fill_event_wait(poll_sqe, read_sqe,
-                                                     operation);
-      } else {
-        iree_async_proactor_io_uring_fill_notification_wait_event(
-            poll_sqe, read_sqe, operation);
+        needs_two_sqes = true;
+      } else if (operation->type ==
+                 IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
+        iree_async_notification_wait_operation_t* wait =
+            (iree_async_notification_wait_operation_t*)operation;
+        needs_two_sqes =
+            (wait->notification->mode == IREE_ASYNC_NOTIFICATION_MODE_EVENT);
       }
 
-      // Apply kernel LINK to the terminal SQE of the internal chain.
-      // Only if the next operation will also be submitted in this batch
-      // (otherwise the chain continues in userspace via linked_next).
-      if (iree_any_bit_set(operation->flags,
-                           IREE_ASYNC_OPERATION_FLAG_LINKED) &&
-          (i + 1 < effective_count)) {
-        read_sqe->flags |= IREE_IOSQE_IO_LINK;
-        // Kernel handles chaining — clear userspace continuation pointer
-        // to prevent double-dispatch on CQE processing.
-        operation->linked_next = NULL;
+      if (needs_two_sqes) {
+        iree_io_uring_sqe_t* poll_sqe =
+            iree_io_uring_ring_get_sqe(&proactor->ring);
+        iree_io_uring_sqe_t* read_sqe =
+            iree_io_uring_ring_get_sqe(&proactor->ring);
+        if (!poll_sqe || !read_sqe) {
+          iree_host_size_t partial_sqes =
+              (poll_sqe ? 1 : 0) + (read_sqe ? 1 : 0);
+          iree_io_uring_ring_sq_rollback(
+              &proactor->ring, (uint32_t)(sqes_prepared + partial_sqes));
+          iree_io_uring_ring_sq_unlock(&proactor->ring);
+          iree_async_proactor_io_uring_release_prepared(operations, i + 1);
+          return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                  "failed to get SQEs for 2-SQE op %zu", i);
+        }
+        sqes_prepared += 2;
+
+        if (operation->type == IREE_ASYNC_OPERATION_TYPE_EVENT_WAIT) {
+          iree_async_proactor_io_uring_fill_event_wait(poll_sqe, read_sqe,
+                                                       operation);
+        } else {
+          iree_async_proactor_io_uring_fill_notification_wait_event(
+              poll_sqe, read_sqe, operation);
+        }
+
+        // Apply kernel LINK to the terminal SQE of the internal pair.
+        // The split detection ensures that within [0, effective_count), a
+        // LINKED kernel op's successor is always another kernel op.
+        if (iree_any_bit_set(operation->flags,
+                             IREE_ASYNC_OPERATION_FLAG_LINKED) &&
+            (i + 1 < effective_count) &&
+            !iree_async_proactor_io_uring_is_software_op(
+                operations.values[i + 1]->type)) {
+          read_sqe->flags |= IREE_IOSQE_IO_LINK;
+          operation->linked_next = NULL;
+        }
+      } else {
+        // All other kernel operations use 1 SQE.
+        iree_io_uring_sqe_t* sqe = iree_io_uring_ring_get_sqe(&proactor->ring);
+        if (!sqe) {
+          iree_io_uring_ring_sq_rollback(&proactor->ring,
+                                         (uint32_t)sqes_prepared);
+          iree_io_uring_ring_sq_unlock(&proactor->ring);
+          iree_async_proactor_io_uring_release_prepared(operations, i + 1);
+          return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                  "failed to get SQE for operation %zu", i);
+        }
+        ++sqes_prepared;
+
+        switch (operation->type) {
+          case IREE_ASYNC_OPERATION_TYPE_NOP:
+            iree_async_proactor_io_uring_fill_nop(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_TIMER:
+            iree_async_proactor_io_uring_fill_timer(proactor, sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
+            iree_async_proactor_io_uring_fill_socket_connect(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT:
+            iree_async_proactor_io_uring_fill_socket_accept(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
+            status =
+                iree_async_proactor_io_uring_fill_socket_recv(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
+            status = iree_async_proactor_io_uring_fill_socket_recv_pool(
+                proactor, sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
+            status = iree_async_proactor_io_uring_fill_socket_send(
+                proactor, sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_SENDTO:
+            status = iree_async_proactor_io_uring_fill_socket_sendto(
+                sqe, operation, proactor->capabilities);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
+            status = iree_async_proactor_io_uring_fill_socket_recvfrom(
+                sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_SOCKET_CLOSE:
+            iree_async_proactor_io_uring_fill_socket_close(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_FUTEX_WAIT:
+            if (!iree_any_bit_set(
+                    proactor->capabilities,
+                    IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
+              status = iree_make_status(
+                  IREE_STATUS_UNAVAILABLE,
+                  "FUTEX_WAIT requires kernel 6.7+ with io_uring futex "
+                  "support");
+            } else {
+              iree_async_proactor_io_uring_fill_futex_wait(sqe, operation);
+            }
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_FUTEX_WAKE:
+            if (!iree_any_bit_set(
+                    proactor->capabilities,
+                    IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
+              status = iree_make_status(
+                  IREE_STATUS_UNAVAILABLE,
+                  "FUTEX_WAKE requires kernel 6.7+ with io_uring futex "
+                  "support");
+            } else {
+              iree_async_proactor_io_uring_fill_futex_wake(sqe, operation);
+            }
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
+            // Futex mode only — event mode uses 2 SQEs and is handled above.
+            iree_async_proactor_io_uring_fill_notification_wait_futex(
+                sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL: {
+            iree_async_notification_signal_operation_t* signal_op =
+                (iree_async_notification_signal_operation_t*)operation;
+            if (signal_op->notification->mode ==
+                IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
+              iree_async_proactor_io_uring_fill_notification_signal_futex(
+                  sqe, operation);
+            } else {
+              iree_async_proactor_io_uring_fill_notification_signal_event(
+                  sqe, operation);
+            }
+            break;
+          }
+          case IREE_ASYNC_OPERATION_TYPE_MESSAGE: {
+            iree_async_message_operation_t* message_op =
+                (iree_async_message_operation_t*)operation;
+            if (!message_op->target ||
+                message_op->target->vtable !=
+                    &iree_async_proactor_io_uring_vtable) {
+              status = iree_make_status(
+                  IREE_STATUS_INVALID_ARGUMENT,
+                  "MESSAGE target must be an io_uring proactor from the same "
+                  "backend; cross-backend messaging is not supported");
+              break;
+            }
+            if (iree_any_bit_set(
+                    proactor->capabilities,
+                    IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING)) {
+              iree_async_proactor_io_uring_fill_message(proactor, sqe,
+                                                        operation);
+            } else {
+              status = iree_async_proactor_io_uring_fill_message_fallback(
+                  proactor, sqe, operation);
+            }
+            break;
+          }
+          case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
+            iree_async_proactor_io_uring_fill_file_open(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_FILE_READ:
+            iree_async_proactor_io_uring_fill_file_read(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_FILE_WRITE:
+            iree_async_proactor_io_uring_fill_file_write(sqe, operation);
+            break;
+          case IREE_ASYNC_OPERATION_TYPE_FILE_CLOSE:
+            iree_async_proactor_io_uring_fill_file_close(sqe, operation);
+            break;
+          default:
+            status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "operation type %d not yet implemented",
+                                      (int)operation->type);
+            break;
+        }
+
+        // Apply kernel LINK to create kernel-enforced operation chains.
+        // The split detection ensures kernel LINK targets within
+        // [0, effective_count) are always kernel operations.
+        if (iree_any_bit_set(operation->flags,
+                             IREE_ASYNC_OPERATION_FLAG_LINKED) &&
+            (i + 1 < effective_count) &&
+            !iree_async_proactor_io_uring_is_software_op(
+                operations.values[i + 1]->type)) {
+          sqe->flags |= IREE_IOSQE_IO_LINK;
+          operation->linked_next = NULL;
+        }
       }
-    } else {
-      // All other operations use 1 SQE.
-      iree_io_uring_sqe_t* sqe = iree_io_uring_ring_get_sqe(&proactor->ring);
-      if (!sqe) {
+
+      if (!iree_status_is_ok(status)) {
         iree_io_uring_ring_sq_rollback(&proactor->ring,
                                        (uint32_t)sqes_prepared);
         iree_io_uring_ring_sq_unlock(&proactor->ring);
         iree_async_proactor_io_uring_release_prepared(operations, i + 1);
-        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                "failed to get SQE for operation %zu", i);
-      }
-      ++sqes_prepared;
-
-      switch (operation->type) {
-        case IREE_ASYNC_OPERATION_TYPE_NOP:
-          iree_async_proactor_io_uring_fill_nop(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_TIMER:
-          iree_async_proactor_io_uring_fill_timer(proactor, sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_WAIT:
-          status = iree_async_proactor_io_uring_submit_semaphore_wait(
-              proactor, sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL: {
-          // Execute the signal synchronously, then use a NOP for the callback.
-          // Any errors are stored in base.next and delivered via callback.
-          iree_async_semaphore_signal_operation_t* signal_op =
-              (iree_async_semaphore_signal_operation_t*)operation;
-          iree_async_proactor_io_uring_execute_semaphore_signal(signal_op);
-          iree_async_proactor_io_uring_fill_semaphore_signal(sqe, operation);
-          break;
-        }
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_CONNECT:
-          iree_async_proactor_io_uring_fill_socket_connect(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT:
-          iree_async_proactor_io_uring_fill_socket_accept(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV:
-          status =
-              iree_async_proactor_io_uring_fill_socket_recv(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECV_POOL:
-          status = iree_async_proactor_io_uring_fill_socket_recv_pool(
-              proactor, sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND:
-          status = iree_async_proactor_io_uring_fill_socket_send(proactor, sqe,
-                                                                 operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_SENDTO:
-          status = iree_async_proactor_io_uring_fill_socket_sendto(
-              sqe, operation, proactor->capabilities);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_RECVFROM:
-          status =
-              iree_async_proactor_io_uring_fill_socket_recvfrom(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_SOCKET_CLOSE:
-          iree_async_proactor_io_uring_fill_socket_close(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_FUTEX_WAIT:
-          if (!iree_any_bit_set(
-                  proactor->capabilities,
-                  IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
-            status = iree_make_status(
-                IREE_STATUS_UNAVAILABLE,
-                "FUTEX_WAIT requires kernel 6.7+ with io_uring futex support");
-          } else {
-            iree_async_proactor_io_uring_fill_futex_wait(sqe, operation);
-          }
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_FUTEX_WAKE:
-          if (!iree_any_bit_set(
-                  proactor->capabilities,
-                  IREE_ASYNC_PROACTOR_CAPABILITY_FUTEX_OPERATIONS)) {
-            status = iree_make_status(
-                IREE_STATUS_UNAVAILABLE,
-                "FUTEX_WAKE requires kernel 6.7+ with io_uring futex support");
-          } else {
-            iree_async_proactor_io_uring_fill_futex_wake(sqe, operation);
-          }
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
-          // Futex mode only here - event mode uses 2 SQEs and is handled above.
-          iree_async_proactor_io_uring_fill_notification_wait_futex(sqe,
-                                                                    operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL: {
-          iree_async_notification_signal_operation_t* signal_op =
-              (iree_async_notification_signal_operation_t*)operation;
-          if (signal_op->notification->mode ==
-              IREE_ASYNC_NOTIFICATION_MODE_FUTEX) {
-            iree_async_proactor_io_uring_fill_notification_signal_futex(
-                sqe, operation);
-          } else {
-            iree_async_proactor_io_uring_fill_notification_signal_event(
-                sqe, operation);
-          }
-          break;
-        }
-        case IREE_ASYNC_OPERATION_TYPE_MESSAGE: {
-          // Validate that target is an io_uring proactor. Cross-backend
-          // messaging is not supported since each backend has different
-          // internal structures for message delivery.
-          iree_async_message_operation_t* message_op =
-              (iree_async_message_operation_t*)operation;
-          if (!message_op->target || message_op->target->vtable !=
-                                         &iree_async_proactor_io_uring_vtable) {
-            status = iree_make_status(
-                IREE_STATUS_INVALID_ARGUMENT,
-                "MESSAGE target must be an io_uring proactor from the same "
-                "backend; cross-backend messaging is not supported");
-            break;
-          }
-
-          if (iree_any_bit_set(
-                  proactor->capabilities,
-                  IREE_ASYNC_PROACTOR_CAPABILITY_PROACTOR_MESSAGING)) {
-            // Fast path: kernel-mediated MSG_RING (5.18+).
-            iree_async_proactor_io_uring_fill_message(proactor, sqe, operation);
-          } else {
-            // Fallback path: MPSC queue + eventfd WRITE.
-            status = iree_async_proactor_io_uring_fill_message_fallback(
-                proactor, sqe, operation);
-          }
-          break;
-        }
-        case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
-          iree_async_proactor_io_uring_fill_file_open(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_FILE_READ:
-          iree_async_proactor_io_uring_fill_file_read(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_FILE_WRITE:
-          iree_async_proactor_io_uring_fill_file_write(sqe, operation);
-          break;
-        case IREE_ASYNC_OPERATION_TYPE_FILE_CLOSE:
-          iree_async_proactor_io_uring_fill_file_close(sqe, operation);
-          break;
-        default:
-          status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                    "operation type %d not yet implemented",
-                                    (int)operation->type);
-          break;
+        return status;
       }
 
-      // Apply kernel LINK to create kernel-enforced operation chains.
-      // Only if the next operation will also be submitted in this batch
-      // (otherwise the chain continues in userspace via linked_next).
-      if (iree_any_bit_set(operation->flags,
-                           IREE_ASYNC_OPERATION_FLAG_LINKED) &&
-          (i + 1 < effective_count)) {
-        sqe->flags |= IREE_IOSQE_IO_LINK;
-        // Kernel handles chaining — clear userspace continuation pointer
-        // to prevent double-dispatch on CQE processing.
-        operation->linked_next = NULL;
-      }
+      IREE_TRACE({ operation->submit_time_ns = iree_time_now(); });
     }
 
-    if (!iree_status_is_ok(status)) {
-      // Rollback all SQEs and release retained resources for all operations
-      // that were retained, including the current one (i) whose fill failed.
-      iree_io_uring_ring_sq_rollback(&proactor->ring, (uint32_t)sqes_prepared);
-      iree_io_uring_ring_sq_unlock(&proactor->ring);
-      iree_async_proactor_io_uring_release_prepared(operations, i + 1);
-      return status;
-    }
-
-    IREE_TRACE({ operation->submit_time_ns = iree_time_now(); });
+    // Release the SQ lock. All SQEs are fully filled; sq_local_tail is
+    // advanced. The SQEs are not yet visible to the kernel.
+    iree_io_uring_ring_sq_unlock(&proactor->ring);
   }
 
-  // Release the SQ lock. All SQEs are fully filled; sq_local_tail is advanced.
-  // The SQEs are not yet visible to the kernel (*sq_tail is unchanged).
-  iree_io_uring_ring_sq_unlock(&proactor->ring);
+  //=========================================================================
+  // Phase 3: Execute software operations (no lock held).
+  //=========================================================================
+  //
+  // Software ops (SEMAPHORE_SIGNAL, SEMAPHORE_WAIT) execute their side effects
+  // here, outside the SQ lock. This fixes bd-2vq8 (allocator under SQ lock)
+  // and the eager-signal ordering bug (signal executing before predecessor
+  // kernel op is submitted).
+  //
+  // All completions are pushed to the MPSC queue for callback delivery on the
+  // poll thread. The poll thread drains pending_software_completions both
+  // before and after CQE processing.
+  //
+  // Completions are pushed BEFORE dispatching continuation chains to preserve
+  // callback ordering: the trigger's callback fires before its continuations.
 
-  // During CQE processing, the poll function sets defer_submissions to prevent
-  // io_uring_enter from generating synchronous CQEs that the CQE loop would
-  // pick up (creating infinite re-submission loops). The SQEs remain in the
-  // submission ring and are flushed after CQE processing completes.
+  for (iree_host_size_t i = 0; i < effective_count; ++i) {
+    iree_async_operation_t* operation = operations.values[i];
+    if (!iree_async_proactor_io_uring_is_software_op(operation->type)) {
+      continue;
+    }
+
+    iree_async_operation_retain_resources(operation);
+
+    iree_status_t op_status = iree_ok_status();
+    bool deferred = false;
+
+    if (operation->type == IREE_ASYNC_OPERATION_TYPE_SEMAPHORE_SIGNAL) {
+      iree_async_semaphore_signal_operation_t* signal_op =
+          (iree_async_semaphore_signal_operation_t*)operation;
+      op_status =
+          iree_async_proactor_io_uring_execute_semaphore_signal(signal_op);
+    } else {
+      // SEMAPHORE_WAIT: check immediate satisfaction or register timepoints.
+      op_status = iree_async_proactor_io_uring_execute_semaphore_wait(
+          proactor, operation, &deferred);
+    }
+
+    if (deferred) {
+      // Timepoints registered. Completion arrives later via
+      // pending_semaphore_waits. The tracker holds the continuation chain
+      // (transferred from linked_next in execute_semaphore_wait).
+      continue;
+    }
+
+    // Extract continuation before pushing completion (push repurposes
+    // linked_next to carry the completion status through the MPSC queue).
+    iree_async_operation_t* continuation = operation->linked_next;
+    operation->linked_next = NULL;
+
+    // Push this op's completion to MPSC BEFORE dispatching its continuation.
+    // This preserves callback ordering: trigger fires first, then
+    // continuations. The iterative dispatch also pushes in chain order.
+    iree_async_proactor_io_uring_push_software_completion(proactor, operation,
+                                                          op_status);
+
+    // Dispatch linked continuation chain (if any).
+    if (continuation) {
+      if (iree_status_is_ok(op_status)) {
+        iree_async_proactor_io_uring_dispatch_continuation_chain(proactor,
+                                                                 continuation);
+      } else {
+        iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
+            proactor, continuation);
+      }
+    }
+  }
+
+  //=========================================================================
+  // Phase 4: Flush or wake.
+  //=========================================================================
+
+  // During CQE processing, defer_submissions prevents io_uring_enter from
+  // generating synchronous CQEs that the CQE loop would pick up (creating
+  // infinite re-submission loops). The SQEs remain in the submission ring
+  // and are flushed after CQE processing completes.
   if (proactor->defer_submissions) {
     return iree_ok_status();
   }
 
   // Only the poll thread may call io_uring_enter (SINGLE_ISSUER constraint).
   // Wake the poll thread so its next ring_submit flushes *sq_tail and enters
-  // the kernel. The eventfd write causes the poll thread's blocking
-  // io_uring_enter to return via the wake POLL_ADD completion.
+  // the kernel. For pure-software batches (sqes_needed == 0), the wake causes
+  // poll() to drain pending_software_completions and fire callbacks.
   iree_async_proactor_wake(&proactor->base);
   return iree_ok_status();
 }
