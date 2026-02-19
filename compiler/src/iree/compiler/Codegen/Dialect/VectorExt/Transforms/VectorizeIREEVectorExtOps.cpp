@@ -683,17 +683,18 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
 
   rewriter.setInsertionPointToStart(dstBlock);
   for (Operation &op : srcBlock->getOperations()) {
-    // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
-    if (auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(op)) {
-      SmallVector<Value> mappedOperands;
-      for (const auto &operand : yieldOp.getOperands()) {
-        mappedOperands.push_back(mapper.lookup(operand));
-      }
-      IREE::VectorExt::YieldOp::create(rewriter, yieldOp.getLoc(),
-                                       mappedOperands);
+    auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(op);
+    if (!yieldOp) {
+      rewriter.clone(op, mapper);
       continue;
     }
-    rewriter.clone(op, mapper);
+    // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
+    SmallVector<Value> mappedOperands;
+    for (const auto &operand : yieldOp.getOperands()) {
+      mappedOperands.push_back(mapper.lookup(operand));
+    }
+    IREE::VectorExt::YieldOp::create(rewriter, yieldOp.getLoc(),
+                                     mappedOperands);
   }
 
   // Set insertion point to after the vectorArgCompareOp for subsequent

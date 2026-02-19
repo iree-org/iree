@@ -208,25 +208,25 @@ void GenericVectorizationPass::runOnOperation() {
 
     // Try to vectorize to transfer_gather, if possible.
     llvm::TypeSwitch<Operation *>(op)
-        .Case<linalg::GenericOp>([&](auto genericOp) {
+        .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
             (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
                 rewriter, genericOp, vectorSizes, scalableVecDims,
                 /*vectorizeNDExtract=*/true);
-          } else {
-            FailureOr<linalg::VectorizationResult> result =
-                linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                                  /*vectorizeNDExtract=*/true);
-            if (succeeded(result)) {
-              rewriter.replaceOp(op, result->replacements);
-            }
+            return;
+          }
+          FailureOr<linalg::VectorizationResult> result =
+              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                                /*vectorizeNDExtract=*/true);
+          if (succeeded(result)) {
+            rewriter.replaceOp(op, result->replacements);
           }
         })
-        .Case<IREE::LinalgExt::GatherOp>([&](auto gatherOp) {
+        .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
           (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
               rewriter, gatherOp, vectorSizes);
         })
-        .Case<IREE::LinalgExt::ArgCompareOp>([&](auto argCompareOp) {
+        .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
           (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
               rewriter, argCompareOp, vectorSizes);
         })
