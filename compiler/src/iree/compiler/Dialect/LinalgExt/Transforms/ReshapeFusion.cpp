@@ -649,24 +649,24 @@ Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
   }
 }
 
-struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
+struct DropMapStoreUnitDims final : public OpRewritePattern<MapStoreOp> {
   using Base::Base;
-  DropMapScatterUnitDims(MLIRContext *context,
-                         linalg::ControlDropUnitDims options,
-                         PatternBenefit benefit = 1)
-      : OpRewritePattern<MapScatterOp>(context, benefit),
+  DropMapStoreUnitDims(MLIRContext *context,
+                       linalg::ControlDropUnitDims options,
+                       PatternBenefit benefit = 1)
+      : OpRewritePattern<MapStoreOp>(context, benefit),
         options(std::move(options)) {}
 
-  LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(MapStoreOp mapStoreOp,
                                 PatternRewriter &rewriter) const override {
-    auto inputType = dyn_cast<RankedTensorType>(mapScatterOp.getInputType());
+    auto inputType = dyn_cast<RankedTensorType>(mapStoreOp.getInputType());
     if (!inputType) {
       return failure();
     }
-    Location loc = mapScatterOp.getLoc();
+    Location loc = mapStoreOp.getLoc();
     FailureOr<Value> newInput = rankReduceOperand(
-        rewriter, loc, /*startDim=*/0, /*numDims=*/mapScatterOp.getInputRank(),
-        mapScatterOp.getInput(), mapScatterOp.getInputType(), options);
+        rewriter, loc, /*startDim=*/0, /*numDims=*/mapStoreOp.getInputRank(),
+        mapStoreOp.getInput(), mapStoreOp.getInputType(), options);
     if (failed(newInput)) {
       return failure();
     }
@@ -682,12 +682,12 @@ struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
                        : cast<Value>(nonUnitIndices[nonUnitArgIdx++]);
           });
     };
-    // The map_scatter op is generally only used in Codegen, where it is the
+    // The map_store op is generally only used in Codegen, where it is the
     // last op in the dispatch, so for now, we don't bother collapsing the
     // result shape and inserting an expansion after the op.
-    rewriter.modifyOpInPlace(mapScatterOp, [&]() {
-      mapScatterOp.getInputMutable().assign(newInput.value());
-      mapScatterOp.insertTransformationAtStart(
+    rewriter.modifyOpInPlace(mapStoreOp, [&]() {
+      mapStoreOp.getInputMutable().assign(newInput.value());
+      mapStoreOp.insertTransformationAtStart(
           rewriter, unitFoldingBuilder,
           /*numSourceIndices=*/newInputType.getRank());
     });
@@ -1192,7 +1192,7 @@ void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
   patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims,
-               DropMapScatterUnitDims>(patterns.getContext(), options);
+               DropMapStoreUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

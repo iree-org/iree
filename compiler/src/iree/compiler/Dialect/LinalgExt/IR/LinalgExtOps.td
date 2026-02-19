@@ -240,7 +240,7 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
   let hasCanonicalizer = 1;
 }
 
-def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
+def IREELinalgExt_MapLoadOp : IREELinalgExt_Op<"map_load",
     [DeclareOpInterfaceMethods<TilingInterface,
         ["getIterationDomain",
          "getLoopIteratorTypes",
@@ -250,7 +250,7 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
          "getIterationDomainTileFromOperandTiles",
          "getTiledImplementationFromOperandTiles",
          "generateScalarImplementation"]>]> {
-  let summary = [{Gather with a mapping from result indices to source indices.}];
+  let summary = [{Load with a mapping from result indices to source indices.}];
   let description = [{
     Takes two operands, `source` and `output`, and reads every element from
     the `source` based on a computed index mapping to store into the `output`.
@@ -306,16 +306,16 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
             transformationBuilder,
         int64_t numOutputIndices);
 
-    // Inline the transformation region of the map_gather op without its
+    // Inline the transformation region of the map_load op without its
     // terminator, replacing the block arguments with the passed
     // `transformBodyIndices`. The `bodyBuilder` function is called with the
     // cloned `Value`s that would have been yielded by the terminator of
     // the inlined transformation body (source indices and padding value).
-    void inlineMapGatherBody(
+    void inlineMapLoadBody(
       OpBuilder &b, Location loc, ValueRange transformBodyIndices,
       function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
-    // Return true if the mapGatherOp is an identity transformation, meaning
+    // Return true if the mapLoadOp is an identity transformation, meaning
     // it is just doing a copy from source to output. This is true if the
     // padding is unused (source and output shapes match) and the mapping
     // from output to source index is identity.
@@ -325,14 +325,14 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
     // The padding value is the last operand of the yield op.
     Value getPaddingValue();
 
-    // Return true if the map_gather op has vector semantics.
+    // Return true if the map_load op has vector semantics.
     bool isVectorized() {
       return isa<VectorType>(getSource().getType());
     }
 
-    // Creates a MapGatherOp with an identity mapping in the transformation
+    // Creates a MapLoadOp with an identity mapping in the transformation
     // body. Expects the types of `source` and `output` to be the same.
-    static MapGatherOp createIdentityMapGather(OpBuilder &builder,
+    static MapLoadOp createIdentityMapLoad(OpBuilder &builder,
                                                Location loc, Value source,
                                                Value output);
 
@@ -346,7 +346,7 @@ def IREELinalgExt_MapGatherOp : IREELinalgExt_Op<"map_gather",
   let hasCanonicalizer = 1;
 }
 
-def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
+def IREELinalgExt_MapStoreOp : IREELinalgExt_Op<"map_store",
     [DeclareOpInterfaceMethods<TilingInterface,
         ["getIterationDomain",
          "getLoopIteratorTypes",
@@ -355,7 +355,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
          "getIterationDomainTileFromOperandTiles",
          "getTiledImplementationFromOperandTiles",
          "generateScalarImplementation"]>]> {
-  let summary = [{Scatter with a mapping from source indices to result indices.}];
+  let summary = [{Store with a mapping from source indices to result indices.}];
   let description = [{
     Takes two operands, `input` and `output`, and stores every element of
     `input` to a unique location in `output`. If the operands are tensors, the
@@ -410,7 +410,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
     // Returns the mask value.
     Value getMask();
 
-    // Return true if the map_scatter op has vector semantics.
+    // Return true if the map_store op has vector semantics.
     bool isVectorized() {
       return isa<VectorType>(getInputType());
     }
@@ -428,24 +428,24 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_Op<"map_scatter",
             transformationBuilder,
         int64_t numSourceIndices);
 
-    // Inline the transformation region of the map_scatter op without its
+    // Inline the transformation region of the map_store op without its
     // terminator, replacing the block arguments with the passed
     // `transformBodyIndices`. The `bodyBuilder` function is called with the
     // cloned index `Value`s that would have been yielded by the terminator of
     // the inlined transformation body.
-    void inlineMapScatterBody(
+    void inlineMapStoreBody(
       OpBuilder &b, Location loc, ValueRange transformBodyIndices,
       function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
-    // Return true if the mapScatterOp is an identity transformation, meaning
+    // Return true if the mapStoreOp is an identity transformation, meaning
     // it is just doing a copy from input to output. This is true if the mask
     // always evaluates to true, and the mapping from input to output index is
     // identity.
     bool isIdentity();
 
-    // Creates a MapScatterOp with an identity mapping in the transforamtion
+    // Creates a MapStoreOp with an identity mapping in the transforamtion
     // body. Expects the types of `input` and `output` to be the same.
-    static MapScatterOp createIdentityMapScatter(OpBuilder &builder,
+    static MapStoreOp createIdentityMapStore(OpBuilder &builder,
                                                  Location loc, Value input,
                                                  Value output);
 

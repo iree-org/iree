@@ -203,7 +203,7 @@ void populateFoldExtractSliceOfBroadcastPattern(RewritePatternSet &patterns);
 /// `tensor.collapse_shape(tensor.extract_slice)`.
 void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
 
-/// Populate patterns to fold relayout operations into map_scatter ops. If a
+/// Populate patterns to fold relayout operations into map_store ops. If a
 /// `padDistributionConfigFn` is passed, then the tensor.pad folding pattern
 /// will be added, using the padDistributionConfigFn for distribution.
 void populateCombineRelayoutOpPatterns(

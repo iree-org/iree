@@ -55,44 +55,44 @@ CombineRelayoutOpsControlFn
 getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
 
 /// Returns true if the `op` type has a folding pattern into
-/// iree_linalg_ext.map_scatter or iree_linalg_ext.map_gather.
+/// iree_linalg_ext.map_store or iree_linalg_ext.map_load.
 bool isSupportedSingleInputRelayoutOp(Operation *op);
 
-/// Fold the `op` into the `mapGatherOp` and return the resulting map_gather,
+/// Fold the `op` into the `mapLoadOp` and return the resulting map_load,
 /// or failure if the transformation is not supported. The `op` should be a
-/// supported relayout op that produces the source of the map_gather.
-FailureOr<IREE::LinalgExt::MapGatherOp>
-foldIntoMapGather(RewriterBase &rewriter, Operation *op,
-                  IREE::LinalgExt::MapGatherOp mapGatherOp);
+/// supported relayout op that produces the source of the map_load.
+FailureOr<IREE::LinalgExt::MapLoadOp>
+foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
+                IREE::LinalgExt::MapLoadOp mapLoadOp);
 
-/// Fold the `op` into the `mapScatterOp` and return the resulting map_scatter,
+/// Fold the `op` into the `mapStoreOp` and return the resulting map_store,
 /// or failure if the transformation is not supported. The `op` is should be a
 /// supported relayout op, and not a tensor.pad. For tensor.pad, the folding is
-/// handled by `foldPadIntoMapScatter`, because it requires a
+/// handled by `foldPadIntoMapStore`, because it requires a
 /// `PadDistributionConfigFn`.
-FailureOr<IREE::LinalgExt::MapScatterOp>
-foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
-                   IREE::LinalgExt::MapScatterOp mapScatterOp);
+FailureOr<IREE::LinalgExt::MapStoreOp>
+foldIntoMapStore(RewriterBase &rewriter, Operation *op,
+                 IREE::LinalgExt::MapStoreOp mapStoreOp);
 
-/// Fold a tensor.pad op into a iree_linalg_ext.map_scatter op, and separate
+/// Fold a tensor.pad op into a iree_linalg_ext.map_store op, and separate
 /// the writing of padding values into a separate operation on the buffer that
-/// the map_scatter op is ultimately written into. The result buffer is taken
-/// from the direct consumer of the `mapScatterOp`, which is expected to be an
+/// the map_store op is ultimately written into. The result buffer is taken
+/// from the direct consumer of the `mapStoreOp`, which is expected to be an
 /// `iree_codegen.store_to_buffer` op. Return failure if the result buffer is
 /// not found. The `padDistributionConfigFn` provides distribution configs for
 /// the writing of padding values to the corresponding output buffer.
-FailureOr<IREE::LinalgExt::MapScatterOp>
-foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
-                      IREE::LinalgExt::MapScatterOp mapScatterOp,
-                      PadDistributionConfigFn padDistributionConfigFn);
+FailureOr<IREE::LinalgExt::MapStoreOp>
+foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
+                    IREE::LinalgExt::MapStoreOp mapStoreOp,
+                    PadDistributionConfigFn padDistributionConfigFn);
 
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any
 /// layout transformation ops (like expand_shape, transpose, pack, etc.) that
-/// produce the tensor being stored into a single `iree_linalg_ext.map_scatter`
+/// produce the tensor being stored into a single `iree_linalg_ext.map_store`
 /// op.
 ///
-/// This transformation will also combine `tensor.pad` ops into the map_scatter
+/// This transformation will also combine `tensor.pad` ops into the map_store
 /// op, by moving the writing of the padding values to after the store_to_buffer
 /// op, and writing the padding values directly to the output buffer of the
 /// store_to_buffer. The writes of the pad values will be distributed based on

@@ -13,7 +13,7 @@ func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
 //   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<8x16xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
 //       DISPATCH-SCOPE:     %[[LINEARIZE:.+]] = affine.linearize_index
@@ -34,7 +34,7 @@ func.func @fold_expand_shape_op(%source : tensor<8x16xf32>, %result : memref<2x4
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
 //   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<2x4x16xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
 //       DISPATCH-SCOPE:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX0]] into (2, 4)
@@ -55,7 +55,7 @@ func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
 //   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<4x16x2xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
 //       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[IDX1]], %[[IDX2]], %[[IDX0]], %[[TRUE]]
@@ -74,7 +74,7 @@ func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
 //   DISPATCH-SCOPE-DAG:   %[[C63:.+]] = arith.constant 63 : index
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<63xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index):
 //       DISPATCH-SCOPE:     %[[MASK:.+]] = arith.cmpi ult, %[[IDX0]], %[[C63]]
@@ -91,7 +91,7 @@ func.func @no_fold_offset_extract_slice_op(%source : tensor<64xf32>, %result : m
 }
 // DISPATCH-SCOPE-LABEL: @no_fold_offset_extract_slice_op
 //       DISPATCH-SCOPE:   tensor.extract_slice
-//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_store
 
 // -----
 
@@ -102,7 +102,7 @@ func.func @no_fold_strided_extract_slice_op(%source : tensor<64xf32>, %result : 
 }
 // DISPATCH-SCOPE-LABEL: @no_fold_strided_extract_slice_op
 //       DISPATCH-SCOPE:   tensor.extract_slice
-//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_store
 
 // -----
 
@@ -128,7 +128,7 @@ func.func @fold_pad_op(%source : tensor<120x250xf32>, %result : memref<128x256xf
 //   DISPATCH-SCOPE-DAG:   %[[C252:.+]] = arith.constant 252 : index
 //   DISPATCH-SCOPE-DAG:   %[[C256:.+]] = arith.constant 256 : index
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<128x256xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
 //       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[TRUE]]
@@ -204,7 +204,7 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
 //   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE0:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D0]]]
 //   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE1:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D1]]]
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty(%[[RES_D0]], %[[RES_D1]]) : tensor<?x?xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index):
 //       DISPATCH-SCOPE:     %[[LINEARIZE:.+]] = affine.linearize_index
@@ -241,7 +241,7 @@ func.func @fold_pack_op(%source : tensor<250x250xf32>, %result : memref<2x2x128x
 //   DISPATCH-SCOPE-DAG:   %[[C250:.+]] = arith.constant 250 : index
 //   DISPATCH-SCOPE-DAG:   %[[C256:.+]] = arith.constant 256 : index
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<2x2x128x128xf32>
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
 //       DISPATCH-SCOPE:     %[[DELINEARIZE0:.+]]:2 = affine.delinearize_index %[[IDX0]]
@@ -314,7 +314,7 @@ func.func @propagate_relayout_ops(%source : tensor<?x?x128x128xf32>,
 //       DISPATCH-SCOPE:   %[[COMPUTE_OP:.+]] = linalg.generic
 //  DISPATCH-SCOPE-SAME:     ins(%[[SOURCE]] : tensor<?x?x128x128xf32>)
 //  DISPATCH-SCOPE-SAME:     outs(%[[INIT]] : tensor<?x?x128x128xf16>)
-//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter %[[COMPUTE_OP]]
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store %[[COMPUTE_OP]]
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]]
 
 // WORKGROUP-SCOPE-LABEL: @propagate_relayout_ops
@@ -336,7 +336,7 @@ func.func @insert_in_workgroup_forall(%2 : tensor<32xbf16>, %3 : tensor<32xbf16>
 
 //   WORKGROUP-SCOPE-LABEL: @insert_in_workgroup_forall
 //         WORKGROUP-SCOPE:   scf.forall
-// WORKGROUP-SCOPE-COUNT-2:     iree_linalg_ext.map_scatter
+// WORKGROUP-SCOPE-COUNT-2:     iree_linalg_ext.map_store
 //         WORKGROUP-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 
 // -----
@@ -352,7 +352,7 @@ func.func @no_insert_reshape_only(%2 : tensor<196608x35xbf16>, %9 : tensor<8x16x
 }
 
 // WORKGROUP-SCOPE-LABEL: @no_insert_reshape_only
-//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_store
 
 // -----
 
@@ -366,7 +366,7 @@ func.func @no_insert_in_non_workgroup_forall(%2 : tensor<32xbf16>, %9 : tensor<1
   return %6 : tensor<32xbf16>
 }
 // WORKGROUP-SCOPE-LABEL: @no_insert_in_non_workgroup_forall
-//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_store
 
 // -----
 
@@ -388,13 +388,13 @@ func.func @workgroup_and_dispatch_scope(%arg0 : tensor<32xbf16>, %arg1 : tensor<
 //       DISPATCH-SCOPE:   scf.forall
 //       DISPATCH-SCOPE:     tensor.extract_slice
 //       DISPATCH-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
-//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_store
 
 // WORKGROUP-SCOPE-LABEL: @workgroup_and_dispatch_scope
 //       WORKGROUP-SCOPE:   scf.forall
-//       WORKGROUP-SCOPE:     iree_linalg_ext.map_scatter
+//       WORKGROUP-SCOPE:     iree_linalg_ext.map_store
 //       WORKGROUP-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
-//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_store
 //       WORKGROUP-SCOPE:   tensor.extract_slice
 
 // -----
@@ -435,7 +435,7 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 
 // -----
 
-// Test that unpack without padding, so map_scatter doesn't need masking.
+// Test that unpack without padding, so map_store doesn't need masking.
 func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf32>) {
   %assumed = util.assume.int %dim<umin = 1024, umax = 16384, udiv = 128> : index
   %workload = iree_tensor_ext.dispatch.workload.ordinal %assumed, 0 : index
@@ -447,7 +447,7 @@ func.func @unpack_no_padding_no_masking(%dim : index, %result : memref<?x16384xf
   return
 }
 // DISPATCH-SCOPE-LABEL: func @unpack_no_padding_no_masking
-// DISPATCH-SCOPE: iree_linalg_ext.map_scatter
+// DISPATCH-SCOPE: iree_linalg_ext.map_store
 // DISPATCH-SCOPE-NOT: arith.cmpi ult
 
 // -----
@@ -469,7 +469,7 @@ func.func @pack_dynamic_dim_tile_size_1_no_pad_loop(%source : tensor<16x?x128xf1
   return
 }
 // DISPATCH-SCOPE-LABEL: @pack_dynamic_dim_tile_size_1_no_pad_loop
-//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_store
 // Verify no padding loops are generated.
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
@@ -489,7 +489,7 @@ func.func @pack_divisible_static_dim_tile_size_8_no_pad_loop(%source : tensor<16
   return
 }
 // DISPATCH-SCOPE-LABEL: @pack_divisible_static_dim_tile_size_8_no_pad_loop
-//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_store
 // Verify no padding loops are generated.
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer

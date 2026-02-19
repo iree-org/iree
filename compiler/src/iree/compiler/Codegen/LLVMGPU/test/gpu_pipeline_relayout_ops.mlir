@@ -50,7 +50,7 @@ func.func @relayout_ops_with_compute_between() {
 // CHECK:        %[[COMPUTE_OP:.+]] = linalg.generic{{.*}} ins(%[[SRC]]
 // CHECK-NEXT:   ^bb0
 // CHECK-NEXT:     arith.truncf
-// CHECK:        %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter %[[COMPUTE_OP]]
+// CHECK:        %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store %[[COMPUTE_OP]]
 // CHECK:        iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[DEST_BUFFER]]
 // CHECK:        scf.forall
 // CHECK:          scf.forall

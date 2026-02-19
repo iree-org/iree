@@ -199,14 +199,14 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         continue;
       }
 
-      // map_scatter creates a lot of register pressure because it carries an
+      // map_store creates a lot of register pressure because it carries an
       // index for every element in the input. It is better to use a smaller
-      // vector size for map_scatter to avoid register spills, because there is
+      // vector size for map_store to avoid register spills, because there is
       // not much benefit in using a larger vector size anyway. For now, keep
       // the heuristic simple and just use a quarter of the maxVectorSize.
-      if (auto mapScatterOp = dyn_cast<IREE::LinalgExt::MapScatterOp>(op)) {
-        ArrayRef<int64_t> bounds = mapScatterOp.getInputType().getShape();
-        tileToMaxVectorSize(rewriter, mapScatterOp, bounds,
+      if (auto mapStoreOp = dyn_cast<IREE::LinalgExt::MapStoreOp>(op)) {
+        ArrayRef<int64_t> bounds = mapStoreOp.getInputType().getShape();
+        tileToMaxVectorSize(rewriter, mapStoreOp, bounds,
                             std::max<int64_t>(maxVectorSize / 4, 1));
         continue;
       }

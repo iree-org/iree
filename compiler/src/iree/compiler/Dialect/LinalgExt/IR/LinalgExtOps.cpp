@@ -583,10 +583,10 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 namespace {
-/// Convert an identity map_gather or map_scatter to a copy operation.
+/// Convert an identity map_load or map_store to a copy operation.
 /// We keep the copy to preserve DPS semantics.
 template <typename OpTy>
-struct ConvertIdentityMapGatherScatterToCopy : public OpRewritePattern<OpTy> {
+struct ConvertIdentityMapLoadStoreToCopy : public OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(OpTy op,
@@ -601,7 +601,7 @@ struct ConvertIdentityMapGatherScatterToCopy : public OpRewritePattern<OpTy> {
       return failure();
     }
     Value source;
-    if constexpr (std::is_same_v<OpTy, MapGatherOp>) {
+    if constexpr (std::is_same_v<OpTy, MapLoadOp>) {
       source = op.getSource();
     } else {
       source = op.getInput();
@@ -613,10 +613,10 @@ struct ConvertIdentityMapGatherScatterToCopy : public OpRewritePattern<OpTy> {
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// MapGatherOp
+// MapLoadOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult MapGatherOp::verify() {
+LogicalResult MapLoadOp::verify() {
   if (getSourceType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected source and output element types to match");
   }
@@ -650,7 +650,7 @@ LogicalResult MapGatherOp::verify() {
   return success();
 }
 
-void MapGatherOp::insertTransformationAtStart(
+void MapLoadOp::insertTransformationAtStart(
     OpBuilder &builder,
     function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
         transformationBuilder,
@@ -681,9 +681,9 @@ void MapGatherOp::insertTransformationAtStart(
   transformBody.eraseArguments(0, oldOutputIndices.size());
 }
 
-/// Shared implementation for inlining the transformation body of map_gather
-/// and map_scatter ops.
-static void inlineMapGatherScatterBodyImpl(
+/// Shared implementation for inlining the transformation body of map_load
+/// and map_store ops.
+static void inlineMapLoadStoreBodyImpl(
     OpBuilder &b, Location loc, Region &transformRegion,
     ValueRange transformBodyIndices,
     function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
@@ -713,14 +713,14 @@ static void inlineMapGatherScatterBodyImpl(
   bodyBuilder(b, loc, mappedYieldedValues);
 }
 
-void MapGatherOp::inlineMapGatherBody(
+void MapLoadOp::inlineMapLoadBody(
     OpBuilder &b, Location loc, ValueRange transformBodyIndices,
     function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
-  inlineMapGatherScatterBodyImpl(b, loc, getTransformationRegion(),
-                                 transformBodyIndices, bodyBuilder);
+  inlineMapLoadStoreBodyImpl(b, loc, getTransformationRegion(),
+                             transformBodyIndices, bodyBuilder);
 }
 
-bool MapGatherOp::isIdentity() {
+bool MapLoadOp::isIdentity() {
   if (getSourceType() != getOutputType()) {
     return false;
   }
@@ -741,31 +741,29 @@ bool MapGatherOp::isIdentity() {
   return true;
 }
 
-Value MapGatherOp::getPaddingValue() {
+Value MapLoadOp::getPaddingValue() {
   Block &transformBody = getTransformationRegion().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
   return yieldOp.getOperand(yieldOp.getNumOperands() - 1);
 }
 
-void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                              MLIRContext *ctx) {
-  results.add<ConvertIdentityMapGatherScatterToCopy<MapGatherOp>>(ctx);
+void MapLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                            MLIRContext *ctx) {
+  results.add<ConvertIdentityMapLoadStoreToCopy<MapLoadOp>>(ctx);
 }
 
-MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
-                                                 Location loc, Value source,
-                                                 Value output) {
+MapLoadOp MapLoadOp::createIdentityMapLoad(OpBuilder &builder, Location loc,
+                                           Value source, Value output) {
   assert(source.getType() == output.getType() &&
          "expected source and output types to match");
   SmallVector<Type> resultType;
   if (isa<RankedTensorType>(output.getType())) {
     resultType.push_back(output.getType());
   }
-  auto mapGatherOp =
-      MapGatherOp::create(builder, loc, resultType, source, output);
+  auto mapLoadOp = MapLoadOp::create(builder, loc, resultType, source, output);
 
   // Add the transformation block with an identity transformation.
-  Region &region = mapGatherOp.getTransformationRegion();
+  Region &region = mapLoadOp.getTransformationRegion();
   auto outputType = cast<ShapedType>(output.getType());
   SmallVector<Location> blockArgLocs(outputType.getRank(), loc);
   SmallVector<Type> indexTypes(outputType.getRank(), builder.getIndexType());
@@ -776,33 +774,31 @@ MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
 
   // Add a poison padding value. The identity transformation shouldn't need it
   // since source and output have the same shape. Using poison indicates that
-  // no real padding is needed, and allows foldPadIntoMapGather to detect
+  // no real padding is needed, and allows foldPadIntoMapLoad to detect
   // whether it's safe to set a new padding value.
   Type elementType = outputType.getElementType();
   Value padding = ub::PoisonOp::create(builder, loc, elementType);
   yieldedValues.push_back(padding);
   IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
-  return mapGatherOp;
+  return mapLoadOp;
 }
 
 //===----------------------------------------------------------------------===//
-// MapScatterOp
+// MapStoreOp
 //===----------------------------------------------------------------------===//
 
-MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
-                                                    Location loc, Value input,
-                                                    Value output) {
+MapStoreOp MapStoreOp::createIdentityMapStore(OpBuilder &builder, Location loc,
+                                              Value input, Value output) {
   assert(input.getType() == output.getType() &&
          "expected input and output types to match");
   SmallVector<Type> resultType;
   if (isa<RankedTensorType>(output.getType())) {
     resultType.push_back(output.getType());
   }
-  auto mapScatterOp =
-      MapScatterOp::create(builder, loc, resultType, input, output);
+  auto mapStoreOp = MapStoreOp::create(builder, loc, resultType, input, output);
 
   // Add the transformation block with an identity transformation.
-  Region &region = mapScatterOp.getTransformationRegion();
+  Region &region = mapStoreOp.getTransformationRegion();
   auto inputType = cast<ShapedType>(input.getType());
   SmallVector<Location> blockArgLocs(inputType.getRank(), loc);
   SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
@@ -814,10 +810,10 @@ MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
                                             /*width=*/1);
   yieldedValues.push_back(mask);
   IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
-  return mapScatterOp;
+  return mapStoreOp;
 }
 
-LogicalResult MapScatterOp::verify() {
+LogicalResult MapStoreOp::verify() {
   if (getInputType().getElementType() != getOutputType().getElementType()) {
     return emitOpError("expected input and output element types to match");
   }
@@ -837,7 +833,7 @@ LogicalResult MapScatterOp::verify() {
   return success();
 }
 
-LogicalResult MapScatterOp::verifyRegions() {
+LogicalResult MapStoreOp::verifyRegions() {
   Block &transformBody = getTransformationRegion().getBlocks().front();
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
   if (yieldOp->getNumOperands() != getOutputRank() + 1) {
@@ -857,12 +853,12 @@ LogicalResult MapScatterOp::verifyRegions() {
   return success();
 }
 
-Value MapScatterOp::getInputIndex(int64_t position) {
+Value MapStoreOp::getInputIndex(int64_t position) {
   Block &body = getTransformationRegion().front();
   return body.getArguments()[position];
 }
 
-Value MapScatterOp::getOutputIndex(int64_t position) {
+Value MapStoreOp::getOutputIndex(int64_t position) {
   // It shouldn't be possible to return the mask, the last operand of the yield,
   // through this function as that's not an index. Therefore, this assert here.
   assert(position < getOutputRank() &&
@@ -873,13 +869,13 @@ Value MapScatterOp::getOutputIndex(int64_t position) {
   return yield.getOperand(position);
 }
 
-Value MapScatterOp::getMask() {
+Value MapStoreOp::getMask() {
   Block &body = getTransformationRegion().front();
   auto yield = cast<IREE::LinalgExt::YieldOp>(body.getTerminator());
   return yield.getOperand(yield.getNumOperands() - 1);
 }
 
-void MapScatterOp::insertTransformationAtStart(
+void MapStoreOp::insertTransformationAtStart(
     OpBuilder &builder,
     function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
         transformationBuilder,
@@ -913,14 +909,14 @@ void MapScatterOp::insertTransformationAtStart(
   transformBody.eraseArguments(0, oldSourceIndices.size());
 }
 
-void MapScatterOp::inlineMapScatterBody(
+void MapStoreOp::inlineMapStoreBody(
     OpBuilder &b, Location loc, ValueRange transformBodyIndices,
     function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
-  inlineMapGatherScatterBodyImpl(b, loc, getTransformationRegion(),
-                                 transformBodyIndices, bodyBuilder);
+  inlineMapLoadStoreBodyImpl(b, loc, getTransformationRegion(),
+                             transformBodyIndices, bodyBuilder);
 }
 
-bool MapScatterOp::isIdentity() {
+bool MapStoreOp::isIdentity() {
   if (getInputType() != getOutputType()) {
     return false;
   }
@@ -945,9 +941,9 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 
-void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                               MLIRContext *ctx) {
-  results.add<ConvertIdentityMapGatherScatterToCopy<MapScatterOp>>(ctx);
+void MapStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                             MLIRContext *ctx) {
+  results.add<ConvertIdentityMapLoadStoreToCopy<MapStoreOp>>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3024,8 +3020,8 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
-DEFINE_OP_GET_EFFECTS(MapScatterOp)
-DEFINE_OP_GET_EFFECTS(MapGatherOp)
+DEFINE_OP_GET_EFFECTS(MapStoreOp)
+DEFINE_OP_GET_EFFECTS(MapLoadOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)

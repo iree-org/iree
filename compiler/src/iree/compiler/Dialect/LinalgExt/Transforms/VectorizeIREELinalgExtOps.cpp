@@ -20,25 +20,25 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
 
-struct VectorizeStaticMapScatterOpPattern final
-    : OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+struct VectorizeStaticMapStoreOpPattern final
+    : OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
   using Base::Base;
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
                                 PatternRewriter &rewriter) const override {
-    if (mapScatterOp.isVectorized()) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
-                                         "map_scatter is already vectorized");
+    if (mapStoreOp.isVectorized()) {
+      return rewriter.notifyMatchFailure(mapStoreOp,
+                                         "map_store is already vectorized");
     }
-    ShapedType inputType = mapScatterOp.getInputType();
+    ShapedType inputType = mapStoreOp.getInputType();
     if (!inputType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
-                                         "map_scatter has non-static shape");
+      return rewriter.notifyMatchFailure(mapStoreOp,
+                                         "map_store has non-static shape");
     }
     const int64_t innerSize = inputType.getShape()[inputType.getRank() - 1];
     const int64_t bitWidth = inputType.getElementTypeBitWidth();
     if ((innerSize * bitWidth % 8) != 0) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
-                                         "map_scatter on sub-byte type");
+      return rewriter.notifyMatchFailure(mapStoreOp,
+                                         "map_store on sub-byte type");
     }
     // In case of a sub-byte bitwidth, we check that there is a contiguous copy
     // on the inner dimension that is a multiple of a byte. Note that the mask
@@ -46,39 +46,39 @@ struct VectorizeStaticMapScatterOpPattern final
     if (bitWidth < 8) {
       // First check that the mask is not the forward slice of the inner index.
       Value innermostInputIdx =
-          mapScatterOp.getInputIndex(mapScatterOp.getInputRank() - 1);
+          mapStoreOp.getInputIndex(mapStoreOp.getInputRank() - 1);
       SetVector<Operation *> slice;
       getForwardSlice(innermostInputIdx, &slice);
-      Operation *maskOp = mapScatterOp.getMask().getDefiningOp();
+      Operation *maskOp = mapStoreOp.getMask().getDefiningOp();
       if (maskOp && slice.contains(maskOp)) {
         return rewriter.notifyMatchFailure(
-            mapScatterOp, "map_scatter on sub-byte type with potentially non "
-                          "byte aligned transformation");
+            mapStoreOp, "map_store on sub-byte type with potentially non "
+                        "byte aligned transformation");
       }
       // Next check that the inner index of the yield is a unit function of
       // the inner input index.
       Value innermostOutputIdx =
-          mapScatterOp.getOutputIndex(mapScatterOp.getOutputRank() - 1);
+          mapStoreOp.getOutputIndex(mapStoreOp.getOutputRank() - 1);
       if (!isUnitFunctionOf(innermostOutputIdx, innermostInputIdx)) {
         return rewriter.notifyMatchFailure(
-            mapScatterOp, "map_scatter on sub-byte type with potentially non "
-                          "byte aligned transformation");
+            mapStoreOp, "map_store on sub-byte type with potentially non "
+                        "byte aligned transformation");
       }
     }
-    Location loc = mapScatterOp.getLoc();
-    rewriter.setInsertionPoint(mapScatterOp);
+    Location loc = mapStoreOp.getLoc();
+    rewriter.setInsertionPoint(mapStoreOp);
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> zeros(inputType.getRank(), zero);
     auto inputVectorType =
         VectorType::get(inputType.getShape(), inputType.getElementType());
     Value inputVector = vector::TransferReadOp::create(
-        rewriter, loc, inputVectorType, mapScatterOp.getInput(),
+        rewriter, loc, inputVectorType, mapStoreOp.getInput(),
         /*indices=*/zeros,
         /*padding=*/std::nullopt);
-    auto vectorizedMapScatterOp =
-        clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
-              {inputVector, mapScatterOp.getOutput()});
-    rewriter.replaceOp(mapScatterOp, vectorizedMapScatterOp);
+    auto vectorizedMapStoreOp =
+        clone(rewriter, mapStoreOp, mapStoreOp.getResultTypes(),
+              {inputVector, mapStoreOp.getOutput()});
+    rewriter.replaceOp(mapStoreOp, vectorizedMapStoreOp);
     return success();
   }
 };
@@ -88,7 +88,7 @@ struct VectorizeIREELinalgExtOpsPass final
   void runOnOperation() {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<VectorizeStaticMapScatterOpPattern>(context);
+    patterns.add<VectorizeStaticMapStoreOpPattern>(context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

@@ -818,9 +818,9 @@ module {
 
 // -----
 
-func.func @map_scatter(%arg0: tensor<100x250xi32>) -> tensor<100x250xi32> {
+func.func @map_store(%arg0: tensor<100x250xi32>) -> tensor<100x250xi32> {
   %0 = tensor.empty() : tensor<100x250xi32>
-  %1 = iree_linalg_ext.map_scatter %arg0 into %0 {
+  %1 = iree_linalg_ext.map_store %arg0 into %0 {
   ^bb0(%arg1: index, %arg2: index):
     %true = arith.constant true
     iree_linalg_ext.yield %arg1, %arg2, %true : index, index, i1
@@ -828,9 +828,9 @@ func.func @map_scatter(%arg0: tensor<100x250xi32>) -> tensor<100x250xi32> {
   return %1 : tensor<100x250xi32>
 }
 
-// CHECK-LABEL: func.func @map_scatter(
+// CHECK-LABEL: func.func @map_store(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK:   iree_linalg_ext.map_scatter {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:   iree_linalg_ext.map_store {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     thread = [1, 1]
 //  CHECK-SAME:     workgroup = [1, 64]
 

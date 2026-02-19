@@ -1756,14 +1756,14 @@ func.func @gather_inline_region(%arg0 : memref<2x2xi32>, %arg1 : memref<2x2xi32>
 
 // -----
 
-func.func @map_scatter_memref(
+func.func @map_store_memref(
   %input: memref<?xf32>, %output: memref<?x?xf32>, %bound: index
 ) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = memref.dim %output, %c0 : memref<?x?xf32>
   %dim1 = memref.dim %output, %c1 : memref<?x?xf32>
-  iree_linalg_ext.map_scatter %input into %output {
+  iree_linalg_ext.map_store %input into %output {
     ^bb0(%idx0: index):
       %mask = arith.cmpi uge, %idx0, %bound : index
       %out_idx:2 = affine.delinearize_index %idx0 into (%dim0, %dim1) : index, index
@@ -1771,7 +1771,7 @@ func.func @map_scatter_memref(
   } : memref<?xf32> into memref<?x?xf32>
   return
 }
-//      CHECK: func @map_scatter_memref
+//      CHECK: func @map_store_memref
 // CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BOUND:[a-zA-Z0-9]+]]
@@ -1790,14 +1790,14 @@ func.func @map_scatter_memref(
 
 // -----
 
-func.func @map_gather_memref(
+func.func @map_load_memref(
   %source: memref<?x?xf32>, %output: memref<?xf32>
 ) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = memref.dim %source, %c0 : memref<?x?xf32>
   %dim1 = memref.dim %source, %c1 : memref<?x?xf32>
-  iree_linalg_ext.map_gather %source into %output {
+  iree_linalg_ext.map_load %source into %output {
     ^bb0(%idx0: index):
       %src_idx:2 = affine.delinearize_index %idx0 into (%dim0, %dim1) : index, index
       %pad = arith.constant 0.0 : f32
@@ -1805,7 +1805,7 @@ func.func @map_gather_memref(
   } : memref<?x?xf32> into memref<?xf32>
   return
 }
-//      CHECK: func @map_gather_memref
+//      CHECK: func @map_load_memref
 // CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]
 //  CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.{{0+}}e+00 : f32
