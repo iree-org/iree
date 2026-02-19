@@ -590,18 +590,18 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   rewriter.setInsertionPoint(argCompareOp);
 
   auto inputValTy = cast<ShapedType>(argCompareOp.getInputValue().getType());
-  ShapedType outValTy = argCompareOp.getOutputValueType();
-  ShapedType outIdxTy = argCompareOp.getOutputIndexType();
-
-  if (vectorSizes.empty()) {
-    vectorSizes = outValTy.getShape();
-  }
-
   // Only static shapes are supported. Dynamic shapes would require masking.
   // Check input shape (includes reduction dimension) to catch dynamic reduction
   // dimensions that wouldn't appear in the static output shape.
   if (!inputValTy.hasStaticShape()) {
     return failure();
+  }
+
+  ShapedType outValTy = argCompareOp.getOutputValueType();
+  ShapedType outIdxTy = argCompareOp.getOutputIndexType();
+
+  if (vectorSizes.empty()) {
+    vectorSizes = outValTy.getShape();
   }
 
   // Ensure full tiles - partial tiles would require masking support.
@@ -667,7 +667,8 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   Region &dstRegion = vectorArgCompareOp.getRegion();
   Block *srcBlock = &srcRegion.front();
 
-  dstRegion.getBlocks().clear(); // Clear untracked auto-created block.
+  // Block auto-created by SingleBlockImplicitTerminator isn't rewriter-tracked.
+  dstRegion.getBlocks().clear();
 
   // Create a new block with arguments using the rewriter.
   SmallVector<Location> argLocs(srcBlock->getNumArguments(), loc);
@@ -690,7 +691,7 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
     }
     // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
     SmallVector<Value> mappedOperands;
-    for (const auto &operand : yieldOp.getOperands()) {
+    for (Value operand : yieldOp.getOperands()) {
       mappedOperands.push_back(mapper.lookup(operand));
     }
     IREE::VectorExt::YieldOp::create(rewriter, yieldOp.getLoc(),
