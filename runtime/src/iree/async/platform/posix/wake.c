@@ -8,6 +8,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 #if defined(IREE_PLATFORM_LINUX)
@@ -41,13 +42,20 @@ iree_status_t iree_async_posix_wake_initialize(
                             "pipe() failed: %s", strerror(errno));
   }
 
-  // Set non-blocking and close-on-exec.
+  // Set non-blocking and close-on-exec. Failure to set O_NONBLOCK would cause
+  // the wake drain loop to block the poll thread.
   for (int i = 0; i < 2; ++i) {
     int flags = fcntl(pipe_fds[i], F_GETFL);
-    if (flags >= 0) {
-      fcntl(pipe_fds[i], F_SETFL, flags | O_NONBLOCK);
+    if (flags < 0 || fcntl(pipe_fds[i], F_SETFL, flags | O_NONBLOCK) < 0 ||
+        fcntl(pipe_fds[i], F_SETFD, FD_CLOEXEC) < 0) {
+      int saved_errno = errno;
+      close(pipe_fds[0]);
+      close(pipe_fds[1]);
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(iree_status_code_from_errno(saved_errno),
+                              "fcntl() on wake pipe failed: %s",
+                              strerror(saved_errno));
     }
-    fcntl(pipe_fds[i], F_SETFD, FD_CLOEXEC);
   }
 
   out_wake->read_fd = pipe_fds[0];
