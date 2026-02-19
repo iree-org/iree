@@ -338,7 +338,6 @@ static iree_status_t iree_hal_cuda_semaphore_wait(
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   iree_status_t status =
       iree_wait_one(&timepoint->timepoint.host_wait, deadline_ns);
-  status = iree_wait_one(&timepoint->timepoint.host_wait, deadline_ns);
   if (!iree_status_is_ok(status)) {
     iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint->base);
   }
