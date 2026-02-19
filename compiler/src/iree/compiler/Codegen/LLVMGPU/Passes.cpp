@@ -1069,6 +1069,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass([]() {
         IREEExpandStridedMetadataPassOptions options;
         options.allowSubviewExpansion = true;
+        options.allowUnresolved = true;
         return createIREEExpandStridedMetadataPass(options);
       })
       .addPass([&forROCDL]() {

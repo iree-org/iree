@@ -423,17 +423,25 @@ func.func @prefetch_gather_to_lds_two_operands(
   %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
-  // 2-stage: 1 prologue iteration
-  // CHECK-COUNT-2: amdgpu.gather_to_lds
-  // 3-stage: 2 prologue iterations (N-1 for N stages)
-  // CHECK-3STAGE-COUNT-4: amdgpu.gather_to_lds
+  // 2-stage: 1 prologue iteration with async markers
+  // CHECK-COUNT-2: amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // 3-stage: 2 prologue iterations (N-1 for N stages), each with asyncmark
+  // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds async
+  // CHECK-3STAGE: rocdl.asyncmark
+  // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds async
+  // CHECK-3STAGE: rocdl.asyncmark
   // CHECK: scf.for
   // CHECK-3STAGE: scf.for
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
     // CHECK: gpu.barrier
+    // CHECK-COUNT-2: amdgpu.gather_to_lds async
+    // CHECK: rocdl.asyncmark
+    // CHECK: rocdl.wait.asyncmark 1
     // CHECK-3STAGE: gpu.barrier
-    // CHECK-COUNT-2: amdgpu.gather_to_lds
-    // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds
+    // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds async
+    // CHECK-3STAGE: rocdl.asyncmark
+    // CHECK-3STAGE: rocdl.wait.asyncmark 2
     amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
 
@@ -452,10 +460,14 @@ func.func @prefetch_gather_to_lds_two_operands(
     // CHECK-3STAGE: scf.yield
     scf.yield %sum : vector<1xf32>
   }
-  // 2-stage: 1 epilogue compute iteration
+  // 2-stage epilogue: wait for all async groups, then compute
+  // CHECK: gpu.barrier
+  // CHECK: rocdl.wait.asyncmark 0
   // CHECK: vector.transfer_read
   // CHECK: arith.mulf
-  // 3-stage: 2 epilogue compute iterations
+  // 3-stage epilogue: wait for pending groups, then compute
+  // CHECK-3STAGE: gpu.barrier
+  // CHECK-3STAGE: rocdl.wait.asyncmark 0
   // CHECK-3STAGE: vector.transfer_read
   // CHECK-3STAGE: arith.mulf
   // CHECK-3STAGE: vector.transfer_read

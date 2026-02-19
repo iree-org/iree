@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -1078,6 +1079,123 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
   }
 }
 
+/// Converts gather_to_lds ops to async mode and inserts explicit async markers
+/// for multi-buffered pipelining.
+///
+/// After pipelining with multi-buffering, the IR structure is:
+///   Prologue: gather_to_lds groups (one per prologue iteration, N-1 total)
+///   Loop body: gather_to_lds (new iteration) + ds_reads/compute (old
+///   iteration) Epilogue: ds_reads/compute (last iterations)
+///
+/// This function:
+/// 1. Sets the `async` flag on all gather_to_lds ops (so they lower to
+///    rocdl.load.async.to.lds instead of rocdl.load.to.lds)
+/// 2. Inserts rocdl.asyncmark after each group of DMA writes (one per
+///    prologue iteration and one in the loop body)
+/// 3. Inserts rocdl.wait.asyncmark before LDS reads to ensure the target
+///    group's DMAs have completed
+///
+/// The wait count is (numStages - 1): with N-stage pipelining, after issuing a
+/// new DMA group we wait until only (N-1) groups are in flight, ensuring the
+/// oldest group's data is ready for reading.
+static void insertExplicitAsyncMarkers(RewriterBase &rewriter,
+                                       scf::ForOp newForOp,
+                                       unsigned numStages) {
+  Block *parentBlock = newForOp->getBlock();
+  Location loc = newForOp.getLoc();
+  int16_t waitCount = static_cast<int16_t>(numStages - 1);
+
+  // Set async flag on ALL gather_to_lds ops (prologue, loop body, epilogue).
+  parentBlock->walk(
+      [](amdgpu::GatherToLDSOp gatherOp) { gatherOp.setAsync(true); });
+
+  // Helper: find the first shared memory read in a range.
+  auto findFirstSharedRead =
+      [](Block::iterator begin,
+         Block::iterator end) -> std::optional<Block::iterator> {
+    for (auto it = begin; it != end; ++it) {
+      if (hasNestedSharedRead(&*it)) {
+        return it;
+      }
+    }
+    return std::nullopt;
+  };
+
+  // Helper: find the last gather_to_lds in a range.
+  auto findLastGatherToLDS =
+      [](Block::iterator begin,
+         Block::iterator end) -> std::optional<Block::iterator> {
+    std::optional<Block::iterator> last;
+    for (auto it = begin; it != end; ++it) {
+      if (isa<amdgpu::GatherToLDSOp>(&*it)) {
+        last = it;
+      }
+    }
+    return last;
+  };
+
+  // --- Prologue ---
+  // The prologue contains (numStages - 1) unrolled iterations of DMA writes.
+  // We need one asyncmark per iteration group. Each group's last gather_to_lds
+  // is followed by non-gather_to_lds ops (subview setup for next iteration)
+  // or by the loop itself.
+  //
+  // Strategy: find the first shared-memory read (or use the loop start as end
+  // boundary). In the prologue, we know there are exactly (numStages - 1)
+  // iteration groups, each with the same number of gather_to_lds ops. We count
+  // total gather_to_lds ops in the prologue, compute opsPerGroup, and insert
+  // asyncmarks accordingly.
+  {
+    SmallVector<Operation *> prologueGathers;
+    for (auto it = parentBlock->begin(); it != newForOp->getIterator(); ++it) {
+      if (isa<amdgpu::GatherToLDSOp>(&*it)) {
+        prologueGathers.push_back(&*it);
+      }
+    }
+    unsigned numPrologueIters = numStages - 1;
+    if (!prologueGathers.empty() && numPrologueIters > 0) {
+      unsigned opsPerGroup = prologueGathers.size() / numPrologueIters;
+      if (opsPerGroup == 0) {
+        opsPerGroup = 1;
+      }
+      for (unsigned i = 0; i < prologueGathers.size(); i += opsPerGroup) {
+        unsigned lastInGroup =
+            std::min(i + opsPerGroup, (unsigned)prologueGathers.size()) - 1;
+        rewriter.setInsertionPointAfter(prologueGathers[lastInGroup]);
+        ROCDL::AsyncmarkOp::create(rewriter, loc);
+      }
+    }
+  }
+
+  // --- Loop body: all gather_to_lds ops are a single group ---
+  Block *body = newForOp.getBody();
+  auto bodyEnd = std::prev(body->end()); // exclude yield
+
+  auto bodyLastGather = findLastGatherToLDS(body->begin(), bodyEnd);
+  if (bodyLastGather) {
+    rewriter.setInsertionPointAfter(&**bodyLastGather);
+    ROCDL::AsyncmarkOp::create(rewriter, loc);
+  }
+
+  // Insert wait.asyncmark before the first shared memory read in the loop body.
+  auto bodyFirstRead = findFirstSharedRead(body->begin(), bodyEnd);
+  if (bodyFirstRead) {
+    rewriter.setInsertionPoint(&**bodyFirstRead);
+    ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
+                                   rewriter.getI16IntegerAttr(waitCount));
+  }
+
+  // --- Epilogue: insert wait.asyncmark before the first shared read ---
+  Block::iterator epilogueStart = std::next(newForOp->getIterator());
+  auto epilogueFirstRead =
+      findFirstSharedRead(epilogueStart, parentBlock->end());
+  if (epilogueFirstRead) {
+    rewriter.setInsertionPoint(&**epilogueFirstRead);
+    ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
+                                   rewriter.getI16IntegerAttr(0));
+  }
+}
+
 // Dispatches to the appropriate barrier insertion strategy based on mode.
 static void insertPipelineBarriers(RewriterBase &rewriter, scf::ForOp newForOp,
                                    PipelineMode mode) {
@@ -1210,6 +1328,15 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   // Insert barriers using the appropriate strategy for each mode.
   insertPipelineBarriers(rewriter, newForOp, mode);
+
+  // For async copy mode, convert gather_to_lds to async and insert explicit
+  // async markers (asyncmark + wait.asyncmark). This replaces the backend's
+  // alias-analysis-based vmcnt insertion with precise explicit synchronization,
+  // allowing DMA writes to a new buffer slot to overlap with ds_reads from the
+  // previous slot.
+  if (mode == PipelineMode::AsyncCopy) {
+    insertExplicitAsyncMarkers(rewriter, newForOp, numStages);
+  }
 
   return newForOp;
 }
