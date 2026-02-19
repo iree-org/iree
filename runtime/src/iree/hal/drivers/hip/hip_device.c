@@ -743,6 +743,17 @@ static iree_status_t iree_hal_hip_device_query_i64(
       *out_value = (int64_t)prop.totalGlobalMem;
       return iree_ok_status();
     }
+    if (iree_string_view_equal(key, IREE_SV("warp_size"))) {
+      // Query warp/wavefront size from the device.
+      // AMD GPUs typically use 64, NVIDIA uses 32.
+      hipDeviceProp_tR0000 prop;
+      IREE_HIP_RETURN_IF_ERROR(
+          device->hip_symbols,
+          hipGetDeviceProperties(&prop, device->devices[0].hip_device),
+          "hipGetDeviceProperties");
+      *out_value = (int64_t)prop.warpSize;
+      return iree_ok_status();
+    }
   }
 
   return iree_make_status(

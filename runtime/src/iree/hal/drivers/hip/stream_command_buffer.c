@@ -664,6 +664,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
         HIP_LAUNCH_PARAM_END,
     };
 #if 0  // Debug output disabled
+    // Sync to catch any async errors from previous kernels
+    command_buffer->hip_symbols->hipStreamSynchronize(command_buffer->hip_stream);
     fprintf(stderr, "[IREE_HIP_DISPATCH] DIRECT function=%p '%.*s' grid=(%u,%u,%u) block=(%u,%u,%u) stream=%p kernarg=%p size=%zu\n",
             (void*)kernel_params->function,
             (int)kernel_params->function_name.size, 
