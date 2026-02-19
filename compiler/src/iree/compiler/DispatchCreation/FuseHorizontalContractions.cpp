@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -93,26 +94,30 @@ permuteIndexingMapsToMatchSeedLhs(MLIRContext *context,
       getResultDimsRange(seedLhsIndexingMap.getResults());
   auto lhsResultDimsRange = getResultDimsRange(lhsIndexingMap.getResults());
 
-  // Start with an identity permutations. For now try to only swap dimensions
-  // which is not a general solution.
-  SmallVector<int64_t> interchangeVector =
-      llvm::to_vector(llvm::seq<int64_t>(0, lhsIndexingMap.getNumDims()));
+  SmallVector<int64_t> interchangeVector(lhsIndexingMap.getNumDims(), -1);
+  SmallVector<bool> targetUsed(lhsIndexingMap.getNumDims(), false);
   for (auto [seedDimPos, lhsDimPos] :
        llvm::zip_equal(seedLhsResultDimsRange, lhsResultDimsRange)) {
-    if (seedDimPos == lhsDimPos) {
+    interchangeVector[lhsDimPos] = seedDimPos;
+    targetUsed[seedDimPos] = true;
+  }
+
+  // Fill in dimensions not used in the lhs.
+  for (auto [i, value] : llvm::enumerate(interchangeVector)) {
+    if (value != -1) {
       continue;
     }
-    // If the current positions are what we started with, swap the positions.
-    if (interchangeVector[lhsDimPos] == lhsDimPos &&
-        interchangeVector[seedDimPos] == seedDimPos) {
-      std::swap(interchangeVector[lhsDimPos], interchangeVector[seedDimPos]);
-      continue;
+
+    // Prefer to keep the original position.
+    int64_t target = targetUsed[i] ? 0 : i;
+    while (target < targetUsed.size() && targetUsed[target]) {
+      ++target;
     }
-    // If this was a changed dimension, check that it is consistent.
-    if (interchangeVector[lhsDimPos] != seedDimPos ||
-        interchangeVector[seedDimPos] != lhsDimPos) {
+    if (target >= targetUsed.size()) {
       return std::nullopt;
     }
+    interchangeVector[i] = target;
+    targetUsed[target] = true;
   }
 
   // Check that the iterator types remain the same
@@ -183,7 +188,8 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
   SmallVector<int64_t> aStaticDims = aLinalgOp.getStaticLoopRanges();
   SmallVector<int64_t> bStaticDims = bLinalgOp.getStaticLoopRanges();
   if (bPermutationVector) {
-    applyPermutationToVector(bStaticDims, bPermutationVector.value());
+    applyPermutationToVector(
+        bStaticDims, invertPermutationVector(bPermutationVector.value()));
   }
   for (auto nDim : aContractionDims->n) {
     if (aStaticDims[nDim] != bStaticDims[nDim] ||
