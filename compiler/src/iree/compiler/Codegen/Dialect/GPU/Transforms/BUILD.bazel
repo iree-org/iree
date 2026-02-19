@@ -59,7 +59,6 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "GPUTransforms",
     srcs = [
-        "CombineBarrierRegions.cpp",
         "DistributeInnerTiledToLanes.cpp",
         "ExpandUndistributedInnerTiles.cpp",
         "LowerIREEGPUOps.cpp",

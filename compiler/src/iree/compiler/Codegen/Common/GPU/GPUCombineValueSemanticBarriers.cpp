@@ -6,7 +6,7 @@
 
 //===----------------------------------------------------------------------===//
 // This file implements the pass to combine multiple `iree_gpu.value_barrier`
-// ops.
+// and `iree_gpu.barrier_region` ops.
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -15,11 +15,11 @@
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-combine-value-barriers"
+#define DEBUG_TYPE "iree-codegen-gpu-combine-value-semantic-barriers"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_GPUCOMBINEVALUEBARRIERSPASS
+#define GEN_PASS_DEF_GPUCOMBINEVALUESEMANTICBARRIERSPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
@@ -68,52 +68,20 @@ static void moveForwardSliceAfterBarrier(RewriterBase &rewriter,
   }
 }
 
-/// Combine all value barriers into a single value barrier.
-static LogicalResult
-combineValueBarrierOps(RewriterBase &rewriter, Location loc,
-                       ArrayRef<IREE::GPU::ValueBarrierOp> valueBarriers) {
-  if (valueBarriers.size() <= 1) {
-    return success();
-  }
-  SmallVector<Value> barrierOperands;
-  for (auto barrierOp : valueBarriers) {
-    barrierOperands.append(barrierOp.getInputs().begin(),
-                           barrierOp.getInputs().end());
-  }
-  auto combinedBarrierOp =
-      IREE::GPU::ValueBarrierOp::create(rewriter, loc, barrierOperands);
-
-  // Replace all uses of the previous barrier with new barrier.
-  int resultNumber = 0;
-  for (auto barrierOp : valueBarriers) {
-    int numResults = barrierOp.getNumResults();
-    rewriter.replaceOp(barrierOp, combinedBarrierOp->getResults().slice(
-                                      resultNumber, numResults));
-    resultNumber += numResults;
-  }
-  return success();
-}
-
-/// Given two barriers, barrierA and barrierB, combine them into a single
-/// barrier.
-static FailureOr<IREE::GPU::ValueBarrierOp>
-combineValueBarrierPair(RewriterBase &rewriter,
-                        IREE::GPU::ValueBarrierOp barrierA,
-                        IREE::GPU::ValueBarrierOp barrierB) {
-  // Both barriers need to have either tensor semantics or vector semantics.
-  if (barrierA.hasTensorSemantics() && !barrierB.hasTensorSemantics()) {
-    return failure();
-  }
-  if (!barrierA.hasTensorSemantics() && barrierB.hasTensorSemantics()) {
-    return failure();
-  }
-
-  // We assume barrierA is always before barrierB.
+/// Given two barriers in the same block, use backward/forward slice analysis
+/// to move their dependencies before the leading barrier and their consumers
+/// after the trailing barrier, making them safe to combine. Returns failure if
+/// the barriers form a dependency chain.
+///
+/// On entry, barrierA may be before or after barrierB; on exit, barrierA is
+/// guaranteed to be before barrierB (swapped if necessary).
+static LogicalResult enforceBarrierOrdering(RewriterBase &rewriter,
+                                            Operation *&barrierA,
+                                            Operation *&barrierB) {
   if (barrierB->isBeforeInBlock(barrierA)) {
     std::swap(barrierA, barrierB);
   }
 
-  // barrierA and barrierB are in the same block.
   assert(barrierA->getBlock() == barrierB->getBlock());
   Block *block = barrierA->getBlock();
 
@@ -122,7 +90,6 @@ combineValueBarrierPair(RewriterBase &rewriter,
       return false;
     }
     if (candidate == block->getTerminator()) {
-      // Do not move the terminator.
       return false;
     }
     if (candidate->isBeforeInBlock(barrierA)) {
@@ -134,6 +101,7 @@ combineValueBarrierPair(RewriterBase &rewriter,
   // Find the combined backward slice of barrierA and barrierB and try
   // to move it before barrierA (before both the barriers).
   BackwardSliceOptions bOptions;
+  bOptions.omitUsesFromAbove = false;
   bOptions.filter = sliceFilterBackward;
   SetVector<Operation *> backwardSliceA;
   SetVector<Operation *> backwardSliceB;
@@ -149,7 +117,6 @@ combineValueBarrierPair(RewriterBase &rewriter,
   if (backwardSliceA.contains(barrierA)) {
     return failure();
   }
-  // Move the backward slice before barrierA.
   moveBackwardSliceBeforeBarrier(rewriter, backwardSliceA, barrierA);
 
   auto sliceFilterForward = [&block, &barrierB](Operation *candidate) -> bool {
@@ -157,7 +124,6 @@ combineValueBarrierPair(RewriterBase &rewriter,
       return false;
     }
     if (candidate == block->getTerminator()) {
-      // Do not move the terminator.
       return false;
     }
     if (barrierB->isBeforeInBlock(candidate)) {
@@ -180,8 +146,28 @@ combineValueBarrierPair(RewriterBase &rewriter,
   if (forwardSliceA.contains(barrierA)) {
     return failure();
   }
-  // Move the forward slice after barrierB.
   moveForwardSliceAfterBarrier(rewriter, forwardSliceA, barrierB);
+
+  return success();
+}
+
+/// Given two value_barrier ops, combine them into a single value_barrier.
+static FailureOr<IREE::GPU::ValueBarrierOp>
+combineValueBarrierPair(RewriterBase &rewriter,
+                        IREE::GPU::ValueBarrierOp barrierA,
+                        IREE::GPU::ValueBarrierOp barrierB) {
+  // Both barriers need to have either tensor semantics or vector semantics.
+  if (barrierA.hasTensorSemantics() != barrierB.hasTensorSemantics()) {
+    return failure();
+  }
+
+  Operation *opA = barrierA;
+  Operation *opB = barrierB;
+  if (failed(enforceBarrierOrdering(rewriter, opA, opB))) {
+    return failure();
+  }
+  barrierA = cast<IREE::GPU::ValueBarrierOp>(opA);
+  barrierB = cast<IREE::GPU::ValueBarrierOp>(opB);
 
   // We add the new barrier after both the barriers (it is always better
   // to sink barriers).
@@ -207,10 +193,83 @@ combineValueBarrierPair(RewriterBase &rewriter,
   return combinedBarrierOp;
 }
 
-static void combineValueBarriersInBlock(RewriterBase &rewriter, Block *block) {
-  SmallVector<IREE::GPU::ValueBarrierOp> barriers;
+/// Given two barrier_region ops, combine them into a single barrier_region.
+static FailureOr<IREE::GPU::BarrierRegionOp>
+combineBarrierRegionPair(RewriterBase &rewriter,
+                         IREE::GPU::BarrierRegionOp barrierA,
+                         IREE::GPU::BarrierRegionOp barrierB) {
+  Operation *opA = barrierA;
+  Operation *opB = barrierB;
+  if (failed(enforceBarrierOrdering(rewriter, opA, opB))) {
+    return failure();
+  }
+  barrierA = cast<IREE::GPU::BarrierRegionOp>(opA);
+  barrierB = cast<IREE::GPU::BarrierRegionOp>(opB);
+
+  Location fusedLoc =
+      rewriter.getFusedLoc({barrierA.getLoc(), barrierB.getLoc()});
+
+  // Get the combined operands, result types, and yielded values.
+  SmallVector<Value> combinedOperands = barrierA.getInputs();
+  combinedOperands.append(barrierB.getInputs().begin(),
+                          barrierB.getInputs().end());
+  SmallVector<Type> combinedTypes(barrierA->getResultTypes());
+  combinedTypes.append(barrierB->getResultTypes().begin(),
+                       barrierB->getResultTypes().end());
+
+  auto aYield = cast<IREE::GPU::YieldOp>(barrierA.getBody()->getTerminator());
+  auto bYield = cast<IREE::GPU::YieldOp>(barrierB.getBody()->getTerminator());
+  SmallVector<Value> combinedYields = aYield.getValues();
+  combinedYields.append(bYield.getValues().begin(), bYield.getValues().end());
+
+  // Create the combined barrier after barrierB (it is always better to sink
+  // barriers).
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointAfter(barrierB);
+
+  auto combinedBarrierOp = IREE::GPU::BarrierRegionOp::create(
+      rewriter, fusedLoc, combinedTypes, combinedOperands);
+
+  MutableArrayRef<BlockArgument> barrierABbArgReplacements =
+      combinedBarrierOp.getBody()->getArguments().take_front(
+          barrierA->getNumOperands());
+  MutableArrayRef<BlockArgument> barrierBBbArgReplacements =
+      combinedBarrierOp.getBody()->getArguments().take_back(
+          barrierB->getNumOperands());
+
+  // Merge the bodies of the old barriers into the new one.
+  rewriter.mergeBlocks(barrierA.getBody(), combinedBarrierOp.getBody(),
+                       barrierABbArgReplacements);
+  rewriter.mergeBlocks(barrierB.getBody(), combinedBarrierOp.getBody(),
+                       barrierBBbArgReplacements);
+
+  // Erase the old terminators and create a new one with the concatenated
+  // yielded values.
+  rewriter.eraseOp(aYield);
+  rewriter.eraseOp(bYield);
+
+  rewriter.setInsertionPointToEnd(combinedBarrierOp.getBody());
+  IREE::GPU::YieldOp::create(rewriter, fusedLoc, combinedYields);
+
+  // Replace all uses of the previous barriers with the new combined barrier.
+  int numResultsA = barrierA.getNumResults();
+  int numResultsB = barrierB.getNumResults();
+  rewriter.replaceOp(barrierA,
+                     combinedBarrierOp->getResults().slice(0, numResultsA));
+  rewriter.replaceOp(barrierB, combinedBarrierOp->getResults().slice(
+                                   numResultsA, numResultsB));
+
+  return combinedBarrierOp;
+}
+
+/// Try to combine all same-type barriers in a block using O(n^2) pairwise
+/// iteration.
+template <typename BarrierOp, typename CombineFn>
+static void combineBarriersInBlock(RewriterBase &rewriter, Block *block,
+                                   CombineFn combineFn) {
+  SmallVector<BarrierOp> barriers;
   for (Operation &op : block->getOperations()) {
-    if (auto barrier = dyn_cast<IREE::GPU::ValueBarrierOp>(op)) {
+    if (auto barrier = dyn_cast<BarrierOp>(op)) {
       barriers.push_back(barrier);
     }
   }
@@ -228,8 +287,7 @@ static void combineValueBarriersInBlock(RewriterBase &rewriter, Block *block) {
         continue;
       }
 
-      FailureOr<IREE::GPU::ValueBarrierOp> combined =
-          combineValueBarrierPair(rewriter, barriers[i], barriers[j]);
+      auto combined = combineFn(rewriter, barriers[i], barriers[j]);
       if (succeeded(combined)) {
         barriers[i] = combined.value();
         barriers[j] = nullptr;
@@ -238,27 +296,31 @@ static void combineValueBarriersInBlock(RewriterBase &rewriter, Block *block) {
   }
 }
 
-struct GPUCombineValueBarriersPass final
-    : impl::GPUCombineValueBarriersPassBase<GPUCombineValueBarriersPass> {
+struct GPUCombineValueSemanticBarriersPass final
+    : impl::GPUCombineValueSemanticBarriersPassBase<
+          GPUCombineValueSemanticBarriersPass> {
 
   void runOnOperation() override {
-    // Walk the operation to get all blocks that have value barriers. We
-    // restrict ourselves to blocks, because the order of operations in a block
-    // is easy to determine.
+    // Walk the operation to get all blocks that have barriers. We restrict
+    // ourselves to blocks, because the order of operations in a block is easy
+    // to determine.
     SmallVector<Block *> blocks;
     getOperation()->walk([&blocks](Block *block) {
-      if (llvm::any_of(block->getOperations(),
-                       llvm::IsaPred<IREE::GPU::ValueBarrierOp>)) {
+      if (llvm::any_of(block->getOperations(), [](Operation &op) {
+            return isa<IREE::GPU::ValueBarrierOp, IREE::GPU::BarrierRegionOp>(
+                op);
+          })) {
         blocks.push_back(block);
       }
     });
 
     IRRewriter rewriter(&getContext());
     for (auto *block : blocks) {
-      combineValueBarriersInBlock(rewriter, block);
+      combineBarriersInBlock<IREE::GPU::ValueBarrierOp>(
+          rewriter, block, combineValueBarrierPair);
+      combineBarriersInBlock<IREE::GPU::BarrierRegionOp>(
+          rewriter, block, combineBarrierRegionPair);
     }
-
-    return;
   }
 };
 
