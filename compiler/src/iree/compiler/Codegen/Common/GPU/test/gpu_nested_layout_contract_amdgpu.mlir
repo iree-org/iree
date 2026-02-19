@@ -1149,3 +1149,199 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[R1]]#0, %[[R1]]#1, %[[R1]]#2, %[[R1]]#3
 // CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[B_OUT]] : vector<1x2x1x1x4x1xf32> -> vector<32x32xf32>
 // CHECK:       return %[[R_SIMD]]
+
+// -----
+
+// Sparse-trick VSMFMA_F32_16x16x32_F16 (M=8 skinny GEMM via smfmac)
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [8, 4],
+  element_tile     = [1, 8],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [2, 16]
+>
+
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [2, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+func.func @contract_to_vsmfma_f16_8x16x32_mm(%a : vector<8x32xf16>, %b : vector<32x16xf16>, %c : vector<8x16xf32>) -> vector<8x16xf32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<8x32xf16>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<32x16xf16>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<8x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.gpu.mma = #iree_gpu.virtual_mma_layout<VSMFMA_F32_16x16x32_F16>
+  } %A, %B, %C : vector<8x32xf16>, vector<32x16xf16> into vector<8x16xf32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<8x16xf32>
+  return %O : vector<8x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// Key checks:
+// 1. Lane parity computation.
+// 2. vector.shuffle to select sparse A elements (even/odd halves).
+// 3. arith.select to choose between even/odd paths based on lane parity.
+// 4. Acc expand (vector.interleave) and collapse (vector.shuffle + pairwise addf).
+// 5. amdgpu.sparse_mfma 16x16x32 as the underlying instruction.
+
+// CHECK-LABEL: func @contract_to_vsmfma_f16_8x16x32_mm
+// CHECK-SAME: (%[[A:.+]]: vector<8x32xf16>, %[[B:.+]]: vector<32x16xf16>, %[[C:.+]]: vector<8x16xf32>)
+// CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<8x32xf16> -> vector<1x1x1x1x1x8xf16>
+// CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<32x16xf16> -> vector<1x1x1x1x8x1xf16>
+// CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<8x16xf32> -> vector<1x1x1x1x2x1xf32>
+// CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x2x1xf32> to vector<2xf32>
+// CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x8xf16> to vector<8xf16>
+// CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x8x1xf16> to vector<8xf16>
+//
+// CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<2xf32>
+// CHECK:       %[[ACC_EXP:.+]] = vector.interleave %[[C_CAST]], %[[ZERO]] : vector<2xf32> -> vector<4xf32>
+//
+// CHECK:       %[[LANE_ID:.+]] = gpu.lane_id
+// CHECK:       %[[AND:.+]] = arith.andi %[[LANE_ID]]
+// CHECK:       %[[IS_ODD:.+]] = arith.cmpi ne, %[[AND]]
+//
+// CHECK:       %[[EVEN_A:.+]] = vector.shuffle %[[A_CAST]], %[[A_CAST]] [0, 1, 4, 5] : vector<8xf16>, vector<8xf16>
+// CHECK:       %[[ODD_A:.+]] = vector.shuffle %[[A_CAST]], %[[A_CAST]] [2, 3, 6, 7] : vector<8xf16>, vector<8xf16>
+// CHECK:       %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]] : vector<4xf16>
+//
+// CHECK:       %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]], %{{.+}}, %{{.+}} : vector<4xi8>
+//
+// CHECK:       %[[SMFMA:.+]] = amdgpu.sparse_mfma 16x16x32 %[[SPARSE_A]] * %[[B_CAST]] + %[[ACC_EXP]] sparse(%[[SPARSE_IDX]] : vector<4xi8>) : vector<4xf16>, vector<8xf16>, vector<4xf32>
+//
+// CHECK:       %[[SHUF_02:.+]] = vector.shuffle %[[SMFMA]], %[[SMFMA]] [0, 2] : vector<4xf32>, vector<4xf32>
+// CHECK:       %[[SHUF_13:.+]] = vector.shuffle %[[SMFMA]], %[[SMFMA]] [1, 3] : vector<4xf32>, vector<4xf32>
+// CHECK:       %[[COL:.+]] = arith.addf %[[SHUF_02]], %[[SHUF_13]] : vector<2xf32>
+// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[COL]] : vector<2xf32> to vector<1x1x1x1x2x1xf32>
+// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x2x1xf32> -> vector<8x16xf32>
+// CHECK:       return %[[R_SIMD]]
+
+// -----
+
+// Sparse-trick VSMFMA_I32_16x16x64_I8 (M=8 skinny GEMM via smfmac)
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [8, 4],
+  element_tile     = [1, 16],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [2, 16]
+>
+
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [16, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [2, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+func.func @contract_to_vsmfma_i8_8x16x64_mm(%a : vector<8x64xi8>, %b : vector<64x16xi8>, %c : vector<8x16xi32>) -> vector<8x16xi32> {
+  %A = iree_vector_ext.to_layout %a to layout(#layout_a) : vector<8x64xi8>
+  %B = iree_vector_ext.to_layout %b to layout(#layout_b) : vector<64x16xi8>
+  %C = iree_vector_ext.to_layout %c to layout(#layout_c) : vector<8x16xi32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.gpu.mma = #iree_gpu.virtual_mma_layout<VSMFMA_I32_16x16x64_I8>
+  } %A, %B, %C : vector<8x64xi8>, vector<64x16xi8> into vector<8x16xi32>
+
+  %O = iree_vector_ext.to_layout %output to layout(#layout_c) : vector<8x16xi32>
+  return %O : vector<8x16xi32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @contract_to_vsmfma_i8_8x16x64_mm
+// CHECK-SAME: (%[[A:.+]]: vector<8x64xi8>, %[[B:.+]]: vector<64x16xi8>, %[[C:.+]]: vector<8x16xi32>)
+// CHECK-DAG:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<8x64xi8> -> vector<1x1x1x1x1x16xi8>
+// CHECK-DAG:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<64x16xi8> -> vector<1x1x1x1x16x1xi8>
+// CHECK-DAG:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<8x16xi32> -> vector<1x1x1x1x2x1xi32>
+// CHECK-DAG:   %[[C_CAST:.+]] = vector.shape_cast %[[C_SIMT]] : vector<1x1x1x1x2x1xi32> to vector<2xi32>
+// CHECK-DAG:   %[[A_CAST:.+]] = vector.shape_cast %[[A_SIMT]] : vector<1x1x1x1x1x16xi8> to vector<16xi8>
+// CHECK-DAG:   %[[B_CAST:.+]] = vector.shape_cast %[[B_SIMT]] : vector<1x1x1x1x16x1xi8> to vector<16xi8>
+//
+// CHECK-DAG:   %[[ZERO:.+]] = arith.constant dense<0> : vector<2xi32>
+// CHECK:       %[[ACC_EXP:.+]] = vector.interleave %[[C_CAST]], %[[ZERO]] : vector<2xi32> -> vector<4xi32>
+//
+// CHECK:       %[[LANE_ID:.+]] = gpu.lane_id
+// CHECK:       %[[IS_ODD:.+]] = arith.cmpi ne
+// CHECK:       %[[EVEN_A:.+]] = vector.shuffle %[[A_CAST]], %[[A_CAST]] [0, 1, 4, 5, 8, 9, 12, 13]
+// CHECK:       %[[ODD_A:.+]] = vector.shuffle %[[A_CAST]], %[[A_CAST]] [2, 3, 6, 7, 10, 11, 14, 15]
+// CHECK:       %[[SPARSE_A:.+]] = arith.select %[[IS_ODD]], %[[ODD_A]], %[[EVEN_A]] : vector<8xi8>
+//
+// CHECK:       %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]], %{{.+}}, %{{.+}} : vector<2xi16>
+// CHECK:       %[[SMFMA:.+]] = amdgpu.sparse_mfma 16x16x64 %[[SPARSE_A]] * %[[B_CAST]] + %[[ACC_EXP]] sparse(%[[SPARSE_IDX]] : vector<2xi16>) : vector<8xi8>, vector<16xi8>, vector<4xi32>
+//
+// CHECK:       %[[SHUF_02:.+]] = vector.shuffle %[[SMFMA]], %[[SMFMA]] [0, 2] : vector<4xi32>, vector<4xi32>
+// CHECK:       %[[SHUF_13:.+]] = vector.shuffle %[[SMFMA]], %[[SMFMA]] [1, 3] : vector<4xi32>, vector<4xi32>
+// CHECK:       %[[COL:.+]] = arith.addi %[[SHUF_02]], %[[SHUF_13]] : vector<2xi32>
+// CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[COL]] : vector<2xi32> to vector<1x1x1x1x2x1xi32>
+// CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x2x1xi32> -> vector<8x16xi32>
+// CHECK:       return %[[R_SIMD]]
