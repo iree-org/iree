@@ -56,8 +56,8 @@ void iree_io_uring_sparse_table_unlock(iree_io_uring_sparse_table_t* table) {
   iree_slim_mutex_unlock(&table->mutex);
 }
 
-int32_t iree_io_uring_sparse_table_acquire(
-    iree_io_uring_sparse_table_t* table, uint16_t count) {
+int32_t iree_io_uring_sparse_table_acquire(iree_io_uring_sparse_table_t* table,
+                                           uint16_t count) {
   if (count == 0) return -1;
   iree_host_size_t start =
       iree_bitmap_find_first_unset_span(table->bitmap, 0, count);
@@ -66,7 +66,8 @@ int32_t iree_io_uring_sparse_table_acquire(
   return (int32_t)start;
 }
 
-void iree_io_uring_sparse_table_release(
-    iree_io_uring_sparse_table_t* table, uint16_t start, uint16_t count) {
+void iree_io_uring_sparse_table_release(iree_io_uring_sparse_table_t* table,
+                                        uint16_t start, uint16_t count) {
+  IREE_ASSERT(start + count <= table->bitmap.bit_count);
   iree_bitmap_reset_span(table->bitmap, start, count);
 }

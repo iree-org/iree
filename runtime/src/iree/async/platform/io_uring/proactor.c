@@ -235,7 +235,8 @@ static void iree_async_proactor_io_uring_destroy(
     iree_async_relay_t* relay = proactor->relays;
     proactor->relays = relay->next;
     // Close source fd if owned.
-    if ((relay->flags & IREE_ASYNC_RELAY_FLAG_OWN_SOURCE_PRIMITIVE) &&
+    if (iree_any_bit_set(relay->flags,
+                         IREE_ASYNC_RELAY_FLAG_OWN_SOURCE_PRIMITIVE) &&
         relay->source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_PRIMITIVE) {
       close(relay->source.primitive.value.fd);
     }
