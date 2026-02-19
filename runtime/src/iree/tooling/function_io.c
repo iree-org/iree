@@ -632,8 +632,33 @@ static iree_status_t iree_tooling_parse_file_into(
 
 static iree_status_t iree_tooling_parse_variant_into(
     iree_string_view_t* cconv, iree_string_view_t string, iree_vm_list_t* list,
-    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_device_list_t* device_list, iree_hal_allocator_t* device_allocator,
     iree_io_stream_list_t* stream_list, iree_allocator_t host_allocator) {
+  iree_hal_device_t* device = NULL;
+
+  int32_t device_id = 0;
+  size_t found = iree_string_view_find_first_of(string, IREE_SV(":"), 0);
+  if (found != IREE_STRING_VIEW_NPOS) {
+    iree_string_view_t device_id_str =
+        iree_string_view_substr(string, 0, found);
+    string = iree_string_view_remove_prefix(string, found + 1);
+
+    bool valid = iree_string_view_atoi_int32(device_id_str, &device_id);
+    if (!valid) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "device id is not a valid integer");
+    }
+  }
+
+  if (device_list) {
+    if (device_id >= device_list->count) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "device id is not in valid range");
+    }
+    device = iree_hal_device_list_at(device_list, device_id);
+    device_allocator = iree_hal_device_allocator(device);
+  }
+
   if (iree_string_view_is_empty(string)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no value specified for input");
@@ -664,7 +689,7 @@ static iree_status_t iree_tooling_parse_variant_into(
 
 static iree_status_t iree_tooling_parse_variants_into(
     iree_string_view_t cconv, iree_string_view_list_t specs,
-    iree_vm_list_t* list, iree_hal_device_t* device,
+    iree_vm_list_t* list, iree_hal_device_list_t* device_list,
     iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(list);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -682,7 +707,7 @@ static iree_status_t iree_tooling_parse_variants_into(
   for (iree_host_size_t i = 0; i < specs.count; ++i) {
     iree_string_view_t string = iree_string_view_trim(specs.values[i]);
     status = iree_status_annotate_f(
-        iree_tooling_parse_variant_into(&cconv, string, list, device,
+        iree_tooling_parse_variant_into(&cconv, string, list, device_list,
                                         device_allocator, stream_list,
                                         host_allocator),
         "parsing input `%.*s`", (int)string.size, string.data);
@@ -696,7 +721,7 @@ static iree_status_t iree_tooling_parse_variants_into(
 
 iree_status_t iree_tooling_parse_variants(
     iree_string_view_t cconv, iree_string_view_list_t specs,
-    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_device_list_t* device_list, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_vm_list_t** out_list) {
   IREE_ASSERT_ARGUMENT(out_list);
   *out_list = NULL;
@@ -710,7 +735,7 @@ iree_status_t iree_tooling_parse_variants(
 
   // Parse into the argument list.
   iree_status_t status = iree_tooling_parse_variants_into(
-      cconv, specs, list, device, device_allocator, host_allocator);
+      cconv, specs, list, device_list, device_allocator, host_allocator);
 
   if (iree_status_is_ok(status)) {
     *out_list = list;

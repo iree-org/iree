@@ -207,20 +207,17 @@ static iree_hal_module_device_policy_t iree_hal_module_device_policy_from_flags(
 static iree_status_t iree_tooling_load_hal_async_module(
     iree_vm_instance_t* instance, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_vm_module_t** out_module,
-    iree_hal_device_t** out_device,
-    iree_hal_allocator_t** out_device_allocator) {
+    iree_hal_device_list_t** out_device_list) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_module);
-  IREE_ASSERT_ARGUMENT(out_device);
-  IREE_ASSERT_ARGUMENT(out_device_allocator);
-  if (*out_device || *out_device_allocator) {
+  IREE_ASSERT_ARGUMENT(out_device_list);
+  if (*out_device_list) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "async HAL module can not be used with other primary HAL module types");
   }
   *out_module = NULL;
-  *out_device = NULL;
-  *out_device_allocator = NULL;
+  *out_device_list = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Register required types before creating the module.
@@ -240,11 +237,6 @@ static iree_status_t iree_tooling_load_hal_async_module(
   // Pick a lead device we'll use for bookkeeping.
   iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
   IREE_ASSERT(device, "require at least one device");
-  iree_hal_device_retain(device);
-
-  // Fetch the allocator from the device to pass back to the caller.
-  iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
-  iree_hal_allocator_retain(device_allocator);
 
   // Create HAL module wrapping the device created above.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
@@ -254,15 +246,11 @@ static iree_status_t iree_tooling_load_hal_async_module(
       device_list->count, device_list->devices, flags,
       iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
 
-  iree_hal_device_list_free(device_list);
-
   if (iree_status_is_ok(status)) {
     *out_module = module;
-    *out_device = device;
-    *out_device_allocator = device_allocator;
+    *out_device_list = device_list;
   } else {
-    iree_hal_allocator_release(device_allocator);
-    iree_hal_device_release(device);
+    iree_hal_device_list_free(device_list);
     iree_vm_module_release(module);
   }
   IREE_TRACE_ZONE_END(z0);
@@ -438,7 +426,7 @@ typedef struct {
   iree_allocator_t host_allocator;
   iree_tooling_module_list_t* resolved_list;
   iree_string_view_t default_device_uri;
-  iree_hal_device_t* device;
+  iree_hal_device_list_t* device_list;
   iree_hal_allocator_t* device_allocator;
 } iree_tooling_resolve_state_t;
 static iree_status_t iree_tooling_resolve_module_dependency_callback(
@@ -457,7 +445,7 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
   if (iree_string_view_equal(dependency->name, IREE_SV("hal"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_async_module(
         state->instance, state->default_device_uri, state->host_allocator,
-        &module, &state->device, &state->device_allocator));
+        &module, &state->device_list));
   } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_inline"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_inline_module(
         state->instance, state->host_allocator, &module,
@@ -496,12 +484,12 @@ iree_status_t iree_tooling_resolve_modules(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_tooling_module_list_t* resolved_list,
-    iree_hal_device_t** out_device,
+    iree_hal_device_list_t** out_device_list,
     iree_hal_allocator_t** out_device_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(!user_module_count || user_modules);
   IREE_ASSERT_ARGUMENT(resolved_list);
-  if (out_device) *out_device = NULL;
+  if (out_device_list) *out_device_list = NULL;
   if (out_device_allocator) *out_device_allocator = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -510,7 +498,7 @@ iree_status_t iree_tooling_resolve_modules(
       .host_allocator = host_allocator,
       .resolved_list = resolved_list,
       .default_device_uri = default_device_uri,
-      .device = NULL,
+      .device_list = NULL,
       .device_allocator = NULL,
   };
   iree_status_t status = iree_ok_status();
@@ -535,16 +523,18 @@ iree_status_t iree_tooling_resolve_modules(
     if (out_device_allocator) {
       *out_device_allocator = resolve_state.device_allocator;
     } else {
-      iree_hal_allocator_release(resolve_state.device_allocator);
+      if (resolve_state.device_allocator) {
+        iree_hal_allocator_release(resolve_state.device_allocator);
+      }
     }
-    if (out_device) {
-      *out_device = resolve_state.device;
+    if (out_device_list) {
+      *out_device_list = resolve_state.device_list;
     } else {
-      iree_hal_device_release(resolve_state.device);
+      iree_hal_device_list_free(resolve_state.device_list);
     }
   } else {
     iree_hal_allocator_release(resolve_state.device_allocator);
-    iree_hal_device_release(resolve_state.device);
+    iree_hal_device_list_free(resolve_state.device_list);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -625,13 +615,13 @@ iree_status_t iree_tooling_create_context_from_flags(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
     iree_allocator_t host_allocator, iree_vm_context_t** out_context,
-    iree_hal_device_t** out_device,
+    iree_hal_device_list_t** out_device_list,
     iree_hal_allocator_t** out_device_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(!user_module_count || user_modules);
   IREE_ASSERT_ARGUMENT(out_context);
   *out_context = NULL;
-  if (out_device) *out_device = NULL;
+  if (out_device_list) *out_device_list = NULL;
   if (out_device_allocator) *out_device_allocator = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -639,12 +629,12 @@ iree_status_t iree_tooling_create_context_from_flags(
   // All modules are retained in the list.
   iree_tooling_module_list_t resolved_list;
   iree_tooling_module_list_initialize(&resolved_list);
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_tooling_resolve_modules(
               instance, user_module_count, user_modules, default_device_uri,
-              host_allocator, &resolved_list, &device, &device_allocator));
+              host_allocator, &resolved_list, &device_list, &device_allocator));
 
   iree_vm_context_flags_t flags = IREE_VM_CONTEXT_FLAG_NONE;
   if (FLAG_trace_execution) {
@@ -677,14 +667,14 @@ iree_status_t iree_tooling_create_context_from_flags(
     } else {
       iree_hal_allocator_release(device_allocator);
     }
-    if (out_device) {
-      *out_device = device;
+    if (out_device_list) {
+      *out_device_list = device_list;
     } else {
-      iree_hal_device_release(device);
+      iree_hal_device_list_free(device_list);
     }
   } else {
     iree_hal_allocator_release(device_allocator);
-    iree_hal_device_release(device);
+    iree_hal_device_list_free(device_list);
     iree_vm_context_release(context);
   }
   IREE_TRACE_ZONE_END(z0);

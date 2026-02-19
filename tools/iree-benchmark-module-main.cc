@@ -483,9 +483,11 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
         instance_.get(), module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context_, &device_, &device_allocator_));
+        &context_, &device_list_, &device_allocator_));
 
-    IREE_TRACE_FRAME_MARK_END_NAMED("init");
+    device_ = iree_hal_device_list_at(device_list_, 0)
+
+        IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree_ok_status();
   }
 
@@ -507,7 +509,7 @@ class IREEBenchmark {
         &signature, &arguments_cconv, &results_cconv));
 
     IREE_CHECK_OK(iree_tooling_parse_variants(
-        arguments_cconv, FLAG_input_list(), device_.get(),
+        arguments_cconv, FLAG_input_list(), device_list_,
         device_allocator_.get(), iree_vm_instance_allocator(instance_.get()),
         &inputs_));
 
@@ -599,6 +601,7 @@ class IREEBenchmark {
   iree::vm::ref<iree_vm_instance_t> instance_;
   iree::vm::ref<iree_vm_context_t> context_;
   iree::vm::ref<iree_hal_device_t> device_;
+  iree_hal_device_list_t* device_list_;
   iree::vm::ref<iree_hal_allocator_t> device_allocator_;
   iree_tooling_module_list_t module_list_;
   iree::vm::ref<iree_vm_list_t> inputs_;

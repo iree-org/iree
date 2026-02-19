@@ -564,12 +564,17 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
 
   // Create the context with our support module and all --module= flags.
   iree_vm_context_t* context = NULL;
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_tooling_create_context_from_flags(
         instance, module_list.count, module_list.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context, &device, /*out_device_allocator=*/NULL);
+        &context, &device_list, /*out_device_allocator=*/NULL);
+  }
+
+  iree_hal_device_t* device = NULL;
+  if (iree_status_is_ok(status)) {
+    device = iree_hal_device_list_at(device_list, 0);
   }
 
   // Ensure the test module is possible to run.
