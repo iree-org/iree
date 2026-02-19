@@ -64,6 +64,29 @@ class FencePosixTest : public CtsTestBase<> {
 #endif
   }
 
+  // Creates a test fence with a separate signaler fd.
+  // The fence_fd is suitable for import_fence (proactor takes ownership and
+  // closes it). The signaler_fd is a distinct fd that the caller can use to
+  // signal the fence via SignalTestFence() and must close after use.
+  //
+  // On Linux (eventfd): dup()s the eventfd so proactor and signaler each own
+  // a separate fd to the same underlying counter.
+  // On other POSIX (pipe): fence_fd is the read end, signaler_fd is the
+  // write end — already distinct, no dup needed.
+  void CreateTestFenceWithSignaler(int* out_fence_fd, int* out_signaler_fd) {
+    int fence_fd = -1;
+    int signal_fd = -1;
+    CreateTestFence(&fence_fd, &signal_fd);
+#if defined(IREE_CTS_HAVE_EVENTFD)
+    *out_fence_fd = fence_fd;
+    *out_signaler_fd = dup(signal_fd);
+    ASSERT_GE(*out_signaler_fd, 0) << "dup failed: " << strerror(errno);
+#else
+    *out_fence_fd = fence_fd;
+    *out_signaler_fd = signal_fd;
+#endif
+  }
+
   // Signals the test fence (makes it readable/pollable).
   void SignalTestFence(int signal_fd) {
 #if defined(IREE_CTS_HAVE_EVENTFD)
@@ -94,23 +117,12 @@ class FencePosixTest : public CtsTestBase<> {
 
 // Import a fence fd and verify semaphore advances when fence signals.
 TEST_P(FencePosixTest, ImportFence_SignalAdvancesSemaphore) {
-  // Create test fence.
+  // Create test fence with a separate signaler fd. Proactor takes ownership
+  // of fence_fd; signaler_fd is distinct so the signaler thread can write
+  // after proactor closes the original.
   int fence_fd = -1;
-  int signal_fd = -1;
-  CreateTestFence(&fence_fd, &signal_fd);
-
-  // For eventfd, fence_fd == signal_fd. The proactor takes ownership and closes
-  // fence_fd on completion. To avoid racing close() with the signaler thread's
-  // write(), we dup() the fd: proactor owns the original, signaler writes to
-  // the dup.
-#if defined(IREE_CTS_HAVE_EVENTFD)
-  int signaler_fd = dup(signal_fd);
-  ASSERT_GE(signaler_fd, 0) << "dup failed: " << strerror(errno);
-#else
-  // For pipes, signal_fd (write end) is already distinct from fence_fd (read
-  // end), so no dup needed.
-  int signaler_fd = signal_fd;
-#endif
+  int signaler_fd = -1;
+  CreateTestFenceWithSignaler(&fence_fd, &signaler_fd);
 
   // Create software semaphore starting at 0.
   iree_async_semaphore_t* semaphore = nullptr;
@@ -131,14 +143,20 @@ TEST_P(FencePosixTest, ImportFence_SignalAdvancesSemaphore) {
   // The import is synchronous, so we can signal immediately.
   std::thread signaler([this, signaler_fd]() { SignalTestFence(signaler_fd); });
 
-  // Poll until semaphore advances.
+  // Poll until semaphore advances. Deferred import registration means the first
+  // poll iteration may time out before the signaler thread writes.
   iree_time_t deadline = iree_time_now() + iree_make_duration_ms(1000);  // 1s
   while (iree_async_semaphore_query(semaphore) < 1 &&
          iree_time_now() < deadline) {
     iree_host_size_t completed = 0;
-    IREE_ASSERT_OK(iree_async_proactor_poll(
+    iree_status_t status = iree_async_proactor_poll(
         proactor_, iree_make_deadline(iree_time_now() + 50000000LL),
-        &completed));
+        &completed);
+    if (iree_status_is_deadline_exceeded(status)) {
+      iree_status_ignore(status);
+    } else {
+      IREE_ASSERT_OK(status);
+    }
   }
 
   signaler.join();
@@ -173,19 +191,20 @@ TEST_P(FencePosixTest, ImportFence_AlreadySignaled) {
   IREE_ASSERT_OK(iree_async_semaphore_import_fence(proactor_, fence_primitive,
                                                    semaphore, 1));
 
-  // Poll once to process the already-signaled fence.
+  // Poll until semaphore advances. The first poll drains the pending import
+  // and registers the already-readable fd; subsequent polls dispatch it.
   iree_host_size_t completed = 0;
-  IREE_ASSERT_OK(iree_async_proactor_poll(
-      proactor_, iree_make_deadline(iree_time_now() + 100000000LL),
-      &completed));
-
-  // Semaphore should advance quickly (may need a few polls).
   iree_time_t deadline = iree_time_now() + iree_make_duration_ms(500);
   while (iree_async_semaphore_query(semaphore) < 1 &&
          iree_time_now() < deadline) {
-    IREE_ASSERT_OK(iree_async_proactor_poll(
-        proactor_, iree_make_deadline(iree_time_now() + 10000000LL),
-        &completed));
+    iree_status_t status = iree_async_proactor_poll(
+        proactor_, iree_make_deadline(iree_time_now() + 50000000LL),
+        &completed);
+    if (iree_status_is_deadline_exceeded(status)) {
+      iree_status_ignore(status);
+    } else {
+      IREE_ASSERT_OK(status);
+    }
   }
 
   EXPECT_EQ(iree_async_semaphore_query(semaphore), 1u);
@@ -342,14 +361,20 @@ TEST_P(FencePosixTest, ImportExportRoundTrip) {
   // Signal input fence (GPU completion).
   SignalTestFence(input_signal_fd);
 
-  // Poll until output fence becomes readable.
+  // Poll until output fence becomes readable. Deferred import registration
+  // means the first poll iteration may time out before it fires.
   iree_time_t deadline = iree_time_now() + iree_make_duration_ms(1000);
   while (!IsFdReadable(output_fence.value.fd, 0) &&
          iree_time_now() < deadline) {
     iree_host_size_t completed = 0;
-    IREE_ASSERT_OK(iree_async_proactor_poll(
+    iree_status_t status = iree_async_proactor_poll(
         proactor_, iree_make_deadline(iree_time_now() + 50000000LL),
-        &completed));
+        &completed);
+    if (iree_status_is_deadline_exceeded(status)) {
+      iree_status_ignore(status);
+    } else {
+      IREE_ASSERT_OK(status);
+    }
   }
 
   // Output fence should now be readable.
@@ -495,6 +520,136 @@ TEST_P(FencePosixTest, ExportFence_MultipleExportsDifferentValues) {
   close(fence_at_1.value.fd);
   close(fence_at_2.value.fd);
   close(fence_at_3.value.fd);
+  iree_async_semaphore_release(semaphore);
+}
+
+//===----------------------------------------------------------------------===//
+// Cross-thread import fence tests
+//===----------------------------------------------------------------------===//
+//
+// These tests exercise the thread-safety of import_fence by calling it from a
+// background thread while poll() runs on the main thread. This is the real
+// use case: a GPU driver completion callback imports a fence from a
+// driver-internal thread.
+
+// Import fence from a background thread while the main thread polls.
+// Under TSAN, this catches data races in fd_map/event_set access (POSIX) or
+// concurrent io_uring_enter calls (io_uring).
+TEST_P(FencePosixTest, ImportFence_CrossThreadImportDuringPoll) {
+  // Create semaphore starting at 0.
+  iree_async_semaphore_t* semaphore = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &semaphore));
+
+  // Background thread: import fence + signal it.
+  int signaler_fd = -1;
+  std::thread importer([this, semaphore, &signaler_fd]() {
+    // Brief delay to let the main thread enter poll().
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    // Create test fence with separate signaler fd. Proactor takes ownership
+    // of fence_fd; signaler_fd survives for writing after proactor closes it.
+    int fence_fd = -1;
+    CreateTestFenceWithSignaler(&fence_fd, &signaler_fd);
+
+    // Import fence from THIS thread (not the poll thread).
+    iree_async_primitive_t fence_primitive =
+        iree_async_primitive_from_fd(fence_fd);
+    IREE_ASSERT_OK(iree_async_semaphore_import_fence(proactor_, fence_primitive,
+                                                     semaphore, 1));
+
+    // Signal the fence so the semaphore advances.
+    SignalTestFence(signaler_fd);
+  });
+
+  // Main thread polls. The import_fence + signal happen concurrently.
+  iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
+  while (iree_async_semaphore_query(semaphore) < 1 &&
+         iree_time_now() < deadline) {
+    iree_host_size_t completed = 0;
+    iree_status_t status = iree_async_proactor_poll(
+        proactor_, iree_make_deadline(iree_time_now() + 50000000LL),
+        &completed);
+    if (iree_status_is_deadline_exceeded(status)) {
+      iree_status_ignore(status);
+    } else {
+      IREE_ASSERT_OK(status);
+    }
+  }
+
+  importer.join();
+
+  EXPECT_EQ(iree_async_semaphore_query(semaphore), 1u);
+
+  close(signaler_fd);
+  iree_async_semaphore_release(semaphore);
+}
+
+// Multiple threads importing fences concurrently while poll runs.
+// Exercises concurrent import_fence calls racing with each other AND with poll.
+TEST_P(FencePosixTest, ImportFence_MultipleCrossThreadImports) {
+  static constexpr int kThreadCount = 4;
+
+  // Create semaphore starting at 0.
+  iree_async_semaphore_t* semaphore = nullptr;
+  IREE_ASSERT_OK(iree_async_semaphore_create_software(
+      0, IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY,
+      iree_allocator_system(), &semaphore));
+
+  // Each thread gets its own signaler fd to close after join.
+  int signaler_fds[kThreadCount];
+  memset(signaler_fds, -1, sizeof(signaler_fds));
+
+  std::thread threads[kThreadCount];
+  for (int i = 0; i < kThreadCount; ++i) {
+    threads[i] = std::thread(
+        [this, semaphore, &signaler_fds, i]() {
+          // Stagger starts slightly so threads overlap with poll.
+          std::this_thread::sleep_for(std::chrono::milliseconds(5 + i * 5));
+
+          int fence_fd = -1;
+          CreateTestFenceWithSignaler(&fence_fd, &signaler_fds[i]);
+
+          // Import fence from this thread. Each thread signals a different
+          // value so we can verify all imports completed.
+          iree_async_primitive_t fence_primitive =
+              iree_async_primitive_from_fd(fence_fd);
+          IREE_ASSERT_OK(iree_async_semaphore_import_fence(
+              proactor_, fence_primitive, semaphore,
+              static_cast<uint64_t>(i + 1)));
+
+          SignalTestFence(signaler_fds[i]);
+        });
+  }
+
+  // Main thread polls until semaphore reaches the highest value.
+  iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
+  while (iree_async_semaphore_query(semaphore) < kThreadCount &&
+         iree_time_now() < deadline) {
+    iree_host_size_t completed = 0;
+    iree_status_t status = iree_async_proactor_poll(
+        proactor_, iree_make_deadline(iree_time_now() + 50000000LL),
+        &completed);
+    if (iree_status_is_deadline_exceeded(status)) {
+      iree_status_ignore(status);
+    } else {
+      IREE_ASSERT_OK(status);
+    }
+  }
+
+  for (int i = 0; i < kThreadCount; ++i) {
+    threads[i].join();
+  }
+
+  // All fences should have signaled. The semaphore value is the maximum of
+  // all signaled values (1, 2, 3, 4), so it should be kThreadCount.
+  EXPECT_GE(iree_async_semaphore_query(semaphore),
+            static_cast<uint64_t>(kThreadCount));
+
+  for (int i = 0; i < kThreadCount; ++i) {
+    if (signaler_fds[i] >= 0) close(signaler_fds[i]);
+  }
   iree_async_semaphore_release(semaphore);
 }
 

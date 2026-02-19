@@ -61,38 +61,53 @@ iree_status_t iree_async_proactor_posix_import_fence(
   tracker->fence_fd = fence.value.fd;
   tracker->allocator = base_proactor->allocator;
 
-  // Register fd in fd_map as FENCE_IMPORT handler.
-  // NOTE: This has a potential race with the poll thread, but the window is
-  // tiny (poll() syscall is blocking). Matches relay registration pattern.
-  iree_status_t status = iree_async_posix_fd_map_insert(
-      &proactor->fd_map, fence.value.fd,
-      IREE_ASYNC_POSIX_FD_HANDLER_FENCE_IMPORT, tracker);
-  if (!iree_status_is_ok(status)) {
-    iree_async_semaphore_release(semaphore);
-    iree_allocator_free(base_proactor->allocator, tracker);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
-
-  // Add fd to event_set for POLLIN monitoring.
-  status = iree_async_posix_event_set_add(proactor->event_set, fence.value.fd,
-                                          POLLIN | POLLPRI);
-  if (!iree_status_is_ok(status)) {
-    // Rollback: remove from fd_map, release semaphore, free tracker.
-    iree_async_posix_fd_map_remove(&proactor->fd_map, fence.value.fd);
-    iree_async_semaphore_release(semaphore);
-    iree_allocator_free(base_proactor->allocator, tracker);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
-
-  // NOTE: We do NOT wake the poll thread here. The fd will be detected on the
-  // next poll() call (either from a timeout or when other activity occurs).
-  // Waking immediately would cause a race: poll() might return before the
-  // external source (GPU, test thread, etc.) signals the fd.
+  // Defer fd_map/event_set registration to the poll thread. The tracker is
+  // pushed to the pending_fence_imports MPSC queue and the poll thread drains
+  // it at the top of each poll() iteration, performing the actual fd_map
+  // insert and event_set add. This is thread-safe: any thread may call
+  // import_fence without synchronizing with poll().
+  iree_atomic_slist_push(&proactor->pending_fence_imports,
+                         &tracker->slist_entry);
+  iree_async_proactor_posix_wake_poll_thread(proactor);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
+}
+
+void iree_async_proactor_posix_drain_pending_fence_imports(
+    iree_async_proactor_posix_t* proactor) {
+  iree_atomic_slist_entry_t* head = NULL;
+  if (!iree_atomic_slist_flush(&proactor->pending_fence_imports,
+                               IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO,
+                               &head, /*out_tail=*/NULL)) {
+    return;
+  }
+
+  while (head) {
+    iree_async_posix_fence_import_tracker_t* tracker =
+        (iree_async_posix_fence_import_tracker_t*)head;
+    head = head->next;
+
+    // Register fd in fd_map. This runs on the poll thread, so no race.
+    iree_status_t status = iree_async_posix_fd_map_insert(
+        &proactor->fd_map, tracker->fence_fd,
+        IREE_ASYNC_POSIX_FD_HANDLER_FENCE_IMPORT, tracker);
+    if (iree_status_is_ok(status)) {
+      status = iree_async_posix_event_set_add(
+          proactor->event_set, tracker->fence_fd, POLLIN | POLLPRI);
+      if (!iree_status_is_ok(status)) {
+        iree_async_posix_fd_map_remove(&proactor->fd_map, tracker->fence_fd);
+      }
+    }
+
+    if (!iree_status_is_ok(status)) {
+      // Registration failed. Clean up: close fd, release semaphore, free.
+      iree_status_ignore(status);
+      close(tracker->fence_fd);
+      iree_async_semaphore_release(tracker->semaphore);
+      iree_allocator_free(tracker->allocator, tracker);
+    }
+  }
 }
 
 void iree_async_proactor_posix_handle_fence_import(

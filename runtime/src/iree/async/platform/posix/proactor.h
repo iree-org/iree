@@ -99,6 +99,8 @@ typedef struct iree_async_proactor_posix_t {
   iree_atomic_slist_t completion_queue;  // workers → poll thread.
   // Timepoint callbacks funneled to poll thread.
   iree_atomic_slist_t pending_semaphore_waits;
+  // Fence imports deferred from arbitrary threads to poll thread.
+  iree_atomic_slist_t pending_fence_imports;
 
   // Pre-allocated pools for hot-path queue entries.
   iree_async_posix_ready_pool_t ready_pool;

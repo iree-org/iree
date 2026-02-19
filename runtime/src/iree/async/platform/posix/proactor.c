@@ -176,6 +176,7 @@ iree_status_t iree_async_proactor_create_posix_with_backend(
   iree_notification_initialize(&proactor->ready_notification);
   iree_atomic_slist_initialize(&proactor->completion_queue);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_initialize(&proactor->pending_fence_imports);
 
   // Initialize pools with external storage.
   iree_async_posix_ready_op_t* ready_entries =
@@ -285,6 +286,23 @@ static void iree_async_proactor_posix_destroy(
   // Clean up relays before event_set (relays may have fds registered there).
   iree_async_proactor_posix_destroy_all_relays(proactor);
 
+  // Drain any pending fence imports that were never registered (import_fence
+  // called but poll() never ran to drain them). Close fds, release semaphores.
+  {
+    iree_atomic_slist_entry_t* head = NULL;
+    iree_atomic_slist_flush(&proactor->pending_fence_imports,
+                            IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO,
+                            &head, /*out_tail=*/NULL);
+    while (head) {
+      iree_async_posix_fence_import_tracker_t* tracker =
+          (iree_async_posix_fence_import_tracker_t*)head;
+      head = head->next;
+      close(tracker->fence_fd);
+      iree_async_semaphore_release(tracker->semaphore);
+      iree_allocator_free(tracker->allocator, tracker);
+    }
+  }
+
   // Clean up components in reverse initialization order.
   iree_async_posix_wake_deinitialize(&proactor->wake);
   iree_async_posix_fd_map_deinitialize(&proactor->fd_map);
@@ -297,6 +315,7 @@ static void iree_async_proactor_posix_destroy(
   // Deinitialize notifications and queues.
   iree_notification_deinitialize(&proactor->ready_notification);
   iree_atomic_slist_deinitialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_deinitialize(&proactor->pending_fence_imports);
   iree_async_message_pool_deinitialize(&proactor->message_pool);
   iree_atomic_slist_deinitialize(&proactor->completion_queue);
   iree_atomic_slist_deinitialize(&proactor->ready_queue);
@@ -2654,6 +2673,7 @@ static iree_status_t iree_async_proactor_posix_poll(
   // structures are mutated, ensuring thread-safety since poll() runs on
   // a single thread.
   iree_async_proactor_posix_drain_pending_queue(proactor);
+  iree_async_proactor_posix_drain_pending_fence_imports(proactor);
 
   // Process pending cancellations — both timers (which would otherwise linger
   // until their deadline) and fd operations (whose fds may never fire).
@@ -2689,6 +2709,7 @@ static iree_status_t iree_async_proactor_posix_poll(
     // Drain pending_queue again -- new operations may have arrived while
     // we were in event_set_wait.
     iree_async_proactor_posix_drain_pending_queue(proactor);
+    iree_async_proactor_posix_drain_pending_fence_imports(proactor);
 
     // Process pending cancellations (cancel() called during wait).
     iree_async_proactor_posix_drain_pending_timer_cancellations(proactor);
@@ -2789,6 +2810,7 @@ static iree_status_t iree_async_proactor_posix_poll(
   // Drain pending_queue again — new operations may have arrived during fd
   // processing (e.g., LINKED continuations resubmitted from callbacks).
   iree_async_proactor_posix_drain_pending_queue(proactor);
+  iree_async_proactor_posix_drain_pending_fence_imports(proactor);
 
   // Process pending cancellations not handled during ready-fd or timer dispatch
   // (e.g., cancelled operations on fds that didn't fire, or timers whose

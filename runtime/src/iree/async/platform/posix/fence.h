@@ -18,6 +18,7 @@
 
 #include "iree/async/semaphore.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/atomic_slist.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +33,18 @@ typedef struct iree_async_proactor_posix_t iree_async_proactor_posix_t;
 // Tracker for import fence: bridges external fd → semaphore signal.
 // The tracker owns the fence fd and is responsible for closing it on
 // completion. The semaphore is retained for the lifetime of the tracker.
+//
+// Lifecycle: import_fence() allocates and pushes to the pending_fence_imports
+// MPSC queue. The poll thread pops, registers in fd_map/event_set, and the
+// tracker lives in the fd_map until the fd fires. On completion,
+// handle_fence_import() removes from fd_map/event_set and frees.
 typedef struct iree_async_posix_fence_import_tracker_t {
+  // Intrusive MPSC list link for deferred registration.
+  // Used by import_fence() to push to pending_fence_imports and by the poll
+  // thread to drain. Not used after registration (fd_map stores the tracker
+  // pointer directly).
+  iree_atomic_slist_entry_t slist_entry;
+
   iree_async_semaphore_t* semaphore;  // Retained; released on completion.
   uint64_t signal_value;              // Target value to signal.
   int fence_fd;                       // Owned; closed on completion.
@@ -77,11 +89,16 @@ void iree_async_posix_fence_export_callback(
 //===----------------------------------------------------------------------===//
 
 // Import fence vtable implementation.
-// Bridges external fd → semaphore signal. The proactor takes ownership of the
-// fd and closes it on completion.
+// Thread-safe: defers fd_map/event_set registration to the poll thread via the
+// pending_fence_imports MPSC queue. The caller may invoke this from any thread.
 iree_status_t iree_async_proactor_posix_import_fence(
     iree_async_proactor_t* base_proactor, iree_async_primitive_t fence,
     iree_async_semaphore_t* semaphore, uint64_t signal_value);
+
+// Drains the pending_fence_imports MPSC queue, registering deferred fence
+// imports in fd_map and event_set. Must be called from the poll thread.
+void iree_async_proactor_posix_drain_pending_fence_imports(
+    iree_async_proactor_posix_t* proactor);
 
 // Export fence vtable implementation.
 // Bridges semaphore timepoint → external fd. Returns a caller-owned fd that
