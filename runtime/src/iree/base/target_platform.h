@@ -43,13 +43,17 @@
 // IREE_PLATFORM_ANDROID
 // IREE_PLATFORM_ANDROID_EMULATOR
 // IREE_PLATFORM_APPLE (IOS | MACOS)
-// IREE_PLATFORM_BSD (FreeBSD | NetBSD | OpenBSD | DragonFlyBSD)
+// IREE_PLATFORM_BSD (FREEBSD | NETBSD | OPENBSD | DRAGONFLYBSD)
+// IREE_PLATFORM_DRAGONFLYBSD
 // IREE_PLATFORM_EMSCRIPTEN
+// IREE_PLATFORM_FREEBSD
 // IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
 // IREE_PLATFORM_IOS_SIMULATOR
 // IREE_PLATFORM_LINUX
 // IREE_PLATFORM_MACOS
+// IREE_PLATFORM_NETBSD
+// IREE_PLATFORM_OPENBSD
 // IREE_PLATFORM_WINDOWS
 
 //==============================================================================
@@ -298,8 +302,21 @@ enum iree_arch_enum_e {
 // These share the POSIX socket API with Apple-style sockaddr length fields.
 //==============================================================================
 
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
-    defined(__DragonFly__)
+#if defined(__FreeBSD__)
+#define IREE_PLATFORM_FREEBSD 1
+#endif  // __FreeBSD__
+#if defined(__NetBSD__)
+#define IREE_PLATFORM_NETBSD 1
+#endif  // __NetBSD__
+#if defined(__OpenBSD__)
+#define IREE_PLATFORM_OPENBSD 1
+#endif  // __OpenBSD__
+#if defined(__DragonFly__)
+#define IREE_PLATFORM_DRAGONFLYBSD 1
+#endif  // __DragonFly__
+
+#if defined(IREE_PLATFORM_FREEBSD) || defined(IREE_PLATFORM_NETBSD) || \
+    defined(IREE_PLATFORM_OPENBSD) || defined(IREE_PLATFORM_DRAGONFLYBSD)
 #define IREE_PLATFORM_BSD 1
 #endif  // BSD variants
 
