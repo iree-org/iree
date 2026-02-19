@@ -508,6 +508,18 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(config, "+i8mm")) {
+#if 0
+// The 8x16x8 kernel has the higher performance potential, however it does not work
+// when invoked by IREE, since IREE slices the 8xK LHS tiles into 4xK ones, such that
+// the kernel receives tiles, which are not memory adjacent along the K dimension.
+      if (hasFeature(config, "+sve") || hasFeature(config, "+sve2"))
+        return {
+            TileMxNxK{8, 16, 8},
+            TileMxNxK{4, 16, 8},
+            TileMxNxK{2, 16, 8},
+            TileMxNxK{1, 16, 8},
+        };
+#endif
       return {
           TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
           TileMxNxK{4, 8, 8}, // Truncation of the above.
