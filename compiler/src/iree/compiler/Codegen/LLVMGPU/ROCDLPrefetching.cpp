@@ -4,11 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdlib>
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/PatternMatch.h"
@@ -43,7 +46,12 @@ struct ROCDLPrefetchSharedMemoryPass final
 
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-    prefetchSharedMemory(funcOp, numStages);
+    unsigned stages = numStages;
+    if (const char *env = std::getenv("IREE_PREFETCH_NUM_STAGES")) {
+      stages = std::atoi(env);
+      llvm::dbgs() << "IREE_PREFETCH_NUM_STAGES override: " << stages << "\n";
+    }
+    prefetchSharedMemory(funcOp, stages);
   }
 };
 
