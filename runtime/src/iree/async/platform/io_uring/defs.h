@@ -147,7 +147,7 @@ extern "C" {
 // Private flag - futex is process-private (faster).
 #define IREE_FUTEX_PRIVATE_FLAG 128
 
-// Command types for msg_ring_flags (mutually exclusive, lower bits):
+// MSG_RING command types (stored in sqe->addr, mutually exclusive):
 // Post arbitrary data to target ring (kernel 5.18+).
 // sqe->len becomes target cqe->res, sqe->off becomes target cqe->user_data.
 #define IREE_IORING_MSG_DATA 0
@@ -155,7 +155,7 @@ extern "C" {
 // Send a registered file descriptor to target ring.
 #define IREE_IORING_MSG_SEND_FD 1
 
-// Additional flags (can be OR-ed with command type):
+// MSG_RING flags (stored in sqe->msg_ring_flags, separate from command type):
 // Skip generating a CQE on the source ring (kernel 5.19+).
 // Only the target ring receives a CQE for the message.
 #define IREE_IORING_MSG_RING_CQE_SKIP (1u << 0)
@@ -506,9 +506,10 @@ typedef struct iree_io_uring_probe {
 // Use CLOCK_BOOTTIME instead of CLOCK_MONOTONIC. Available since kernel 5.11.
 #define IREE_IORING_TIMEOUT_BOOTTIME (1u << 2)
 
-// Use CLOCK_REALTIME instead of CLOCK_MONOTONIC. Available since kernel 5.11.
-// Required when using iree_time_now() (which uses CLOCK_REALTIME) as the
-// deadline source for absolute timeouts.
+// Use CLOCK_REALTIME instead of the default CLOCK_MONOTONIC for timeout
+// interpretation. Available since kernel 5.11. The default CLOCK_MONOTONIC
+// matches iree_time_now() — only use REALTIME when the deadline source is
+// wall-clock time (e.g., from gettimeofday).
 #define IREE_IORING_TIMEOUT_REALTIME (1u << 3)
 
 // Update existing linked timeout. Since kernel 5.15.
