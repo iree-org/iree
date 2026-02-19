@@ -496,6 +496,7 @@ cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU_SPIRV "Enables the 'webgpu' co
 cmake_dependent_option(IREE_INPUT_STABLEHLO "Builds support for compiling StableHLO programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_INPUT_SHARDY "Builds support for Shardy dialect (tensor sharding)" ON ${IREE_BUILD_COMPILER} OFF)
 
 if(IREE_BUILD_COMPILER)
   message(STATUS "IREE compiler input dialects:")
@@ -507,6 +508,9 @@ if(IREE_BUILD_COMPILER)
   endif()
   if(IREE_INPUT_TOSA)
     message(STATUS "  - TOSA")
+  endif()
+  if(IREE_INPUT_SHARDY)
+    message(STATUS "  - Shardy")
   endif()
 endif()
 
@@ -1083,6 +1087,10 @@ endif()
 
 if(IREE_BUILD_COMPILER)
   add_subdirectory(build_tools/third_party/stablehlo EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_INPUT_SHARDY)
+  add_subdirectory(build_tools/third_party/shardy EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_BUILD_TESTS)
