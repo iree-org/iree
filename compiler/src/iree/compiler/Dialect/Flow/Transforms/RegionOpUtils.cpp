@@ -837,17 +837,6 @@ static bool isAttentionMaskGenerator(Operation *op) {
   return false;
 }
 
-static bool isScatterIndicesGenerator(Operation *op) {
-  for (OpOperand &use : op->getUses()) {
-    if (auto scatter = dyn_cast<IREE::LinalgExt::ScatterOp>(use.getOwner())) {
-      if (scatter.getIndices() == use.get()) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op,
@@ -872,12 +861,6 @@ bool isClonableIntoDispatchOp(Operation *op,
   // clone it. The Attention mask is usually big, and is always generated
   // from a small tensor, so it's always good to clone it.
   if (options.aggressive && isAttentionMaskGenerator(op)) {
-    return true;
-  }
-
-  // If the operation is used for the indices computation of a scatter op, it
-  // should be cloned into the dispatch.
-  if (options.aggressive && isScatterIndicesGenerator(op)) {
     return true;
   }
 
