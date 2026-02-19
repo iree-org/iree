@@ -225,7 +225,8 @@ getConvolutionReductionSizes(PartialReductionOpInterface op,
   // effect.
   bool isBatchFirstLayout = batchPos.front() == 0;
   int64_t mainDistributedSize = isBatchFirstLayout ? imageSize : batchSize;
-  if (outputChannelSize * mainDistributedSize >= largeParallelSize) {
+  int64_t parallelSize = outputChannelSize * mainDistributedSize;
+  if (parallelSize >= largeParallelSize) {
     LDBG() << "skipping op; large parallel dimension sizes";
     return std::nullopt;
   }
@@ -234,7 +235,7 @@ getConvolutionReductionSizes(PartialReductionOpInterface op,
   // reduction often has no effect or even degrades performance.
   SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
   int64_t reductionSize = llvm::product_of(tileSizes);
-  int64_t ratio = reductionSize / std::sqrt(outputChannelSize * batchSize);
+  int64_t ratio = reductionSize / std::sqrt(parallelSize);
   if (ratio <= ratioThreshold && reductionSize < largeReductionSize) {
     LDBG() << "skipping op; small reduction size";
     return std::nullopt;
