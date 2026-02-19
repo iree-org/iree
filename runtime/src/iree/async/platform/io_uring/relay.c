@@ -326,24 +326,12 @@ iree_status_t iree_async_io_uring_register_relay(
     return status;
   }
 
-  // Submit immediately so monitoring begins.
-  status = iree_io_uring_ring_submit(&proactor->ring, /*min_complete=*/0,
-                                     /*flags=*/0);
-  if (!iree_status_is_ok(status)) {
-    // Rollback SQE, release notifications, free relay.
-    iree_io_uring_ring_sq_lock(&proactor->ring);
-    iree_io_uring_ring_sq_rollback(&proactor->ring, 1);
-    iree_io_uring_ring_sq_unlock(&proactor->ring);
-    if (source.type == IREE_ASYNC_RELAY_SOURCE_TYPE_NOTIFICATION) {
-      iree_async_notification_release(source.notification);
-    }
-    if (sink.type == IREE_ASYNC_RELAY_SINK_TYPE_SIGNAL_NOTIFICATION) {
-      iree_async_notification_release(sink.signal_notification.notification);
-    }
-    iree_allocator_free(proactor->base.allocator, relay);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
+  // Flush the SQE to the kernel so monitoring begins and the SQ slot is
+  // reclaimed. ring_submit errors are ignored because the SQE is already
+  // committed via *sq_tail (see register_event_source for full rationale).
+  iree_status_ignore(iree_io_uring_ring_submit(&proactor->ring,
+                                               /*min_complete=*/0,
+                                               /*flags=*/0));
 
   // The FUTEX_WAIT (or POLL_ADD) is now in-flight. Track it so the
   // notification signal path wakes the precise number of futex waiters.

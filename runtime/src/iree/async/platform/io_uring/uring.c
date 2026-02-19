@@ -403,47 +403,66 @@ iree_status_t iree_io_uring_ring_wait_cqe(iree_io_uring_ring_t* ring,
     iree_io_uring_ring_sq_unlock(ring);
   }
 
-  // Build flags and args for io_uring_enter.
-  uint32_t flags = IREE_IORING_ENTER_GETEVENTS;
-
-  iree_kernel_timespec_t ts;
-  iree_io_uring_getevents_arg_t arg;
-  void* arg_ptr = NULL;
-  size_t arg_sz = 0;
-
-  if (timeout_ns > 0 && timeout_ns != IREE_DURATION_INFINITE) {
-    // Use extended argument for timeout.
-    flags |= IREE_IORING_ENTER_EXT_ARG;
-    ts.tv_sec = timeout_ns / 1000000000LL;
-    ts.tv_nsec = timeout_ns % 1000000000LL;
-    memset(&arg, 0, sizeof(arg));
-    arg.ts = (uint64_t)&ts;
-    arg_ptr = &arg;
-    arg_sz = sizeof(arg);
+  // Compute absolute deadline so EINTR retries use the remaining time rather
+  // than restarting the full timeout duration. Without this, frequent signals
+  // (profiler sampling, etc.) cause the effective wait to grow unboundedly.
+  const bool has_timeout =
+      timeout_ns > 0 && timeout_ns != IREE_DURATION_INFINITE;
+  iree_time_t deadline = IREE_TIME_INFINITE_FUTURE;
+  if (has_timeout) {
+    deadline = iree_time_now() + timeout_ns;
   }
 
-  int ret = iree_io_uring_enter(ring->ring_fd, to_submit, min_complete, flags,
-                                arg_ptr, arg_sz);
-  if (ret < 0) {
+  for (;;) {
+    // Build flags and args for io_uring_enter.
+    uint32_t flags = IREE_IORING_ENTER_GETEVENTS;
+
+    iree_kernel_timespec_t ts;
+    iree_io_uring_getevents_arg_t arg;
+    void* arg_ptr = NULL;
+    size_t arg_sz = 0;
+
+    if (has_timeout) {
+      iree_duration_t remaining = deadline - iree_time_now();
+      if (remaining <= 0) {
+        if (iree_io_uring_ring_cq_count(ring) > 0) {
+          return iree_ok_status();
+        }
+        return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED, "poll timeout");
+      }
+      flags |= IREE_IORING_ENTER_EXT_ARG;
+      ts.tv_sec = remaining / 1000000000LL;
+      ts.tv_nsec = remaining % 1000000000LL;
+      memset(&arg, 0, sizeof(arg));
+      arg.ts = (uint64_t)&ts;
+      arg_ptr = &arg;
+      arg_sz = sizeof(arg);
+    }
+
+    int ret = iree_io_uring_enter(ring->ring_fd, to_submit, min_complete, flags,
+                                  arg_ptr, arg_sz);
+    // Only flush SQEs on the first iteration; subsequent retries have nothing
+    // new to submit.
+    to_submit = 0;
+
+    if (ret >= 0) {
+      return iree_ok_status();
+    }
+
     if (errno == ETIME) {
-      // Timeout expired - check if we got anything.
       if (iree_io_uring_ring_cq_count(ring) > 0) {
         return iree_ok_status();
       }
       return iree_make_status(IREE_STATUS_DEADLINE_EXCEEDED, "poll timeout");
     }
     if (errno == EINTR) {
-      // Interrupted by signal - not a timeout, but check for completions.
       if (iree_io_uring_ring_cq_count(ring) > 0) {
         return iree_ok_status();
       }
-      // Retry the wait (signal interruption is transient).
-      return iree_io_uring_ring_wait_cqe(ring, min_complete,
-                                         /*flush_pending=*/false, timeout_ns);
+      // Loop retries with remaining time computed from the deadline.
+      continue;
     }
     return iree_make_status(iree_status_code_from_errno(errno),
                             "io_uring_enter failed (%d)", errno);
   }
-
-  return iree_ok_status();
 }

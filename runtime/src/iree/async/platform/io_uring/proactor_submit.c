@@ -167,7 +167,7 @@ static void iree_async_proactor_io_uring_fill_socket_accept(
   sqe->fd = accept->listen_socket->primitive.value.fd;
   sqe->addr = (uint64_t)(uintptr_t)accept->peer_address.storage;
   sqe->off = (uint64_t)(uintptr_t)&accept->peer_address.length;
-  sqe->accept_flags = 0;  // Could add SOCK_NONBLOCK | SOCK_CLOEXEC if needed.
+  sqe->accept_flags = SOCK_NONBLOCK | SOCK_CLOEXEC;
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 
   // Enable multishot mode if requested (kernel 5.19+).
@@ -1631,7 +1631,7 @@ iree_status_t iree_async_proactor_io_uring_submit(
                 proactor, sqe, operation);
           }
           break;
-        } break;
+        }
         case IREE_ASYNC_OPERATION_TYPE_FILE_OPEN:
           iree_async_proactor_io_uring_fill_file_open(sqe, operation);
           break;
