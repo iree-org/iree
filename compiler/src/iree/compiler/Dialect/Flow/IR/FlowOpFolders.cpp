@@ -652,6 +652,57 @@ OpFoldResult TensorBitCastOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+namespace {
+struct StaticizeTensorBitcastOp final
+    : public OpRewritePattern<Flow::TensorBitCastOp> {
+  using OpRewritePattern<Flow::TensorBitCastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Flow::TensorBitCastOp bitcastOp,
+                                PatternRewriter &rewriter) const override {
+    MLIRContext *context = rewriter.getContext();
+    Location loc = bitcastOp.getLoc();
+
+    auto staticizeShape = [&](ArrayRef<int64_t> shape, ValueRange dynValues) {
+      return decomposeMixedValues(llvm::map_to_vector(
+          getMixedValues(shape, dynValues, context), [&](OpFoldResult ofr) {
+            std::optional<int64_t> size = getConstantIntValue(ofr);
+            return size ? IntegerAttr::get(IntegerType::get(context, 64),
+                                           size.value())
+                        : ofr;
+          }));
+    };
+
+    auto [newInputShape, newInputValues] = staticizeShape(
+        bitcastOp.getSource().getType().getShape(), bitcastOp.getSourceDims());
+    auto [newOutputShape, newOutputValues] = staticizeShape(
+        bitcastOp.getResult().getType().getShape(), bitcastOp.getResultDims());
+
+    bool didInputChange =
+        newInputValues.size() != bitcastOp.getSourceDims().size();
+    bool didOutputChange =
+        newOutputValues.size() != bitcastOp.getResultDims().size();
+    if (!didInputChange && !didOutputChange) {
+      return failure();
+    }
+
+    Value result = bitcastOp.getSource();
+    RankedTensorType inType =
+        bitcastOp.getSource().getType().clone(newInputShape);
+    if (didInputChange) {
+      result = rewriter.create<tensor::CastOp>(loc, inType, result);
+    }
+    result = rewriter.create<Flow::TensorBitCastOp>(
+        loc, bitcastOp.getType().clone(newOutputShape), result, newInputValues,
+        newOutputValues);
+    if (didOutputChange) {
+      result =
+          rewriter.create<tensor::CastOp>(loc, bitcastOp.getType(), result);
+    }
+    rewriter.replaceOp(bitcastOp, result);
+    return success();
+  }
+};
+} // namespace
+
 void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<ReplaceOpIfTensorOperandZeroElements<TensorBitCastOp, 0>>(
@@ -660,6 +711,7 @@ void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   results.insert<ReplaceOpIfTensorOperandEmpty<TensorBitCastOp, 0, 0>>(context);
   results.insert<FlattenTensorCastLikeChain<TensorBitCastOp>>(context);
+  results.insert<StaticizeTensorBitcastOp>(context);
 }
 
 //===----------------------------------------------------------------------===//
