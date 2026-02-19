@@ -62,7 +62,7 @@ from ._binding import (
 
 # Debug imports
 from ._binding import HalModuleDebugSink
-from .typing import HalModuleBufferViewTraceCallback
+from ._typing import HalModuleBufferViewTraceCallback
 
 from .array_interop import *
 from .benchmark import *
