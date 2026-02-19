@@ -1451,3 +1451,70 @@ hal.executable public @multi_result_index_generic_with_scatter_fusion {
 // CHECK:           vector.transfer_write
 // CHECK:           vector.transfer_write
 // CHECK:           iree_linalg_ext.scatter
+
+// -----
+
+// Test dynamic matmul with util.assume.int providing bounds for range analysis.
+// The getLoopBoundsWithRangeAnalysis function uses IntegerRangeAnalysis to infer
+// the upper bound from util.assume.int and select appropriate tile sizes.
+
+  #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<storage_buffer>,
+    #hal.pipeline.binding<storage_buffer>
+  ]>
+  #config = #iree_gpu.lowering_config<{
+    workgroup = [128, 128, 0],
+    reduction = [0, 0, 4],
+    subgroup = [4, 4],
+    mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+    promote_operands = [0, 1],
+    padding = [128, 128, 16]
+  }>
+  hal.executable public @main {
+    hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+      hal.executable.export public @matmul_dynamic_m_with_assume ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) ->
+  (index, index, index) {
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+        hal.return %x, %y, %z : index, index, index
+      }
+      builtin.module {
+        func.func @matmul_dynamic_m_with_assume()
+          attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1]
+  subgroup_size = 64>} {
+          %cst = arith.constant 0.000000e+00 : f32
+          %c0 = arith.constant 0 : index
+          %dim = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+          %m = util.assume.int %dim<umin = 0, umax = 1024, udiv = 16> : index
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf32>>{%m}
+          %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x4096xf32>>
+          %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%m}
+          %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%m, 2048], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf32>>{%m} -> tensor<?x2048xf32>
+          %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2048, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x4096xf32>> -> tensor<2048x4096xf32>
+          %5 = tensor.empty(%m) : tensor<?x4096xf32>
+          %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+          %7 = linalg.matmul {lowering_config = #config}
+            ins(%3, %4 : tensor<?x2048xf32>, tensor<2048x4096xf32>)
+            outs(%6 : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+          iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [%m, 4096], strides = [1, 1] : tensor<?x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%m}
+          return
+        }
+      }
+    }
+  }
+
+  // CHECK-LABEL: func @matmul_dynamic_m_with_assume
+  //   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+  //   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+  //   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+  //   CHECK-DAG:   memref.alloc() : memref<16x130xf32, #gpu.address_space<workgroup>>
+  //   CHECK-DAG:   memref.alloc() : memref<128x18xf32, #gpu.address_space<workgroup>>
+  //       CHECK:   scf.forall ({{.*}}) in (%{{.+}}, 32) {
+  //       CHECK:     scf.for {{.*}} = %c0 to %c512 step %c4 {{.*}} -> (vector<4x4x4x1xf32>)
+  //       CHECK:       gpu.barrier
+  //       CHECK:       vector.transfer_read
+  //       CHECK:       vector.transfer_write
+  //       CHECK:       gpu.barrier
+  // CHECK-COUNT-64:    amdgpu.mfma 16x16x4
+  //       CHECK:       scf.yield
+  //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}

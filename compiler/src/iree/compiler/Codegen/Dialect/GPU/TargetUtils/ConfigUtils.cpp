@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
+#include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
 #include "iree/compiler/Codegen/Common/TileInferenceUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -20,10 +21,15 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -44,6 +50,14 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
+
+// Sentinel value used by IntegerRangeAnalysis when bounds are unknown.
+static constexpr uint64_t MAX_DIM_VALUE = (static_cast<uint64_t>(1) << 53) - 1;
+
+// Fallback bound when IntegerRangeAnalysis cannot determine the actual value.
+// Kept small (2^14) to avoid int64_t overflow when dimensions are multiplied
+// together in heuristic calculations.
+static constexpr uint64_t MAX_BOUND_VALUE = static_cast<uint64_t>(1) << 14;
 
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
@@ -653,7 +667,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool isGemm, bool scaled, int64_t splitReductionTripCnt,
-    bool cPromoteIfPadding, bool hasExistingAccumulator = false,
+    bool cPromoteIfPadding, bool boundsUsingAnalysis,
+    bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -969,7 +984,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                                            : ArrayRef<Attribute>{};
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionTypes);
-  if (!mustBeAligned || couldNeedPadding) {
+  if (!mustBeAligned || couldNeedPadding || boundsUsingAnalysis) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
@@ -1085,7 +1100,8 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           useDirectLoad, /*isGemm=*/false,
           /*scaled=*/false, splitReductionTripCnt,
-          /*cPromoteIfPadding=*/cPromoteIfPadding, hasExistingAccumulator,
+          /*cPromoteIfPadding=*/cPromoteIfPadding,
+          /*boundsUsingAnalysis=*/false, hasExistingAccumulator,
           convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
@@ -1112,6 +1128,71 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+static std::pair<SmallVector<int64_t>, bool>
+getLoopBoundsWithRangeAnalysis(linalg::LinalgOp linalgOp,
+                               mlir::FunctionOpInterface entryPoint) {
+  // Use TensorDynamicDimAnalysis for cleaner range queries.
+  TensorDynamicDimAnalysis dynamicDimAnalysis(entryPoint);
+  if (failed(dynamicDimAnalysis.run())) {
+    return std::make_pair(linalgOp.getStaticLoopRanges(), false);
+  }
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  bool anyBoundRefined = false;
+
+  for (auto [loopIdx, bound] : llvm::enumerate(bounds)) {
+    if (!ShapedType::isDynamic(bound)) {
+      continue;
+    }
+
+    bool boundRefined = false;
+
+    // Find operand and dimension that corresponds to this loop.
+    for (auto [operandIdx, operand] :
+         llvm::enumerate(linalgOp->getOperands())) {
+      auto shapedType = dyn_cast<ShapedType>(operand.getType());
+      if (!shapedType) {
+        continue;
+      }
+
+      AffineMap map = indexingMaps[operandIdx];
+      for (auto [dimIdx, expr] : llvm::enumerate(map.getResults())) {
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr || dimExpr.getPosition() != loopIdx) {
+          continue;
+        }
+        if (!ShapedType::isDynamic(shapedType.getDimSize(dimIdx))) {
+          continue;
+        }
+
+        // Use TensorDynamicDimAnalysis to get range info directly.
+        if (auto range = dynamicDimAnalysis.getRangeInfo(operand, dimIdx)) {
+          int64_t ub = range->smax().getSExtValue();
+          if (ub > 0 && ub < MAX_DIM_VALUE) {
+            bounds[loopIdx] = ub;
+            boundRefined = true;
+            break;
+          }
+        }
+      }
+
+      if (boundRefined) {
+        break;
+      }
+    }
+
+    // If we couldn't refine the bound, set it to a large value.
+    if (!boundRefined && ShapedType::isDynamic(bounds[loopIdx])) {
+      bounds[loopIdx] = MAX_BOUND_VALUE;
+      boundRefined = true;
+    }
+    anyBoundRefined = anyBoundRefined || boundRefined;
+  }
+
+  return std::make_pair(bounds, anyBoundRefined);
+}
+
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op, bool useDirectLoad) {
@@ -1122,7 +1203,11 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  // Use IntegerRangeAnalysis to get better bounds for dynamic shapes.
+  std::pair<SmallVector<int64_t>, bool> inferredBounds =
+      getLoopBoundsWithRangeAnalysis(linalgOp, entryPoint);
+  SmallVector<int64_t> bounds = inferredBounds.first;
+  bool boundsUsingAnalysis = inferredBounds.second;
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<Value> operands(linalgOp->getOperands());
 
@@ -1144,7 +1229,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
           /*scaled=*/false, splitReductionTripCnt, cPromoteIfPadding,
-          hasExistingAccumulator);
+          boundsUsingAnalysis, hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -1155,7 +1240,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
         /*scaled=*/true, splitReductionTripCnt, cPromoteIfPadding,
-        hasExistingAccumulator);
+        boundsUsingAnalysis, hasExistingAccumulator);
   }
 
   if (failed(configAndWgSize)) {
