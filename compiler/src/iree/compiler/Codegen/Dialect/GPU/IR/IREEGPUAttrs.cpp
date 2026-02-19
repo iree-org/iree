@@ -1450,12 +1450,9 @@ struct VSMFMAConfig {
 // Sparse MFMA (V_SMFMAC) instructions perform MMA on an imbalanced pair of
 // operands: a 4:2 structured-sparse matrix A and a dense matrix B. The
 // instruction also takes a sparsity index that encodes which 2 of every 4
-// elements along K are non-zero. The sparse trick exploits this by pairing
-// even/odd lanes to jointly describe a full dense row. Each lane provides half
-// the K-elements and uses a complementary sparsity index so that the hardware
-// reconstructs the complete row.
-//
-// For example, with i8 and K=16:
+// elements along K are non-zero within the sparse matrix A. The trick exploits
+// this by pairing even/odd lanes to jointly describe a full dense row. For
+// example, with i8 (K=64, 16 elements per thread along K):
 //
 //   Logical row 0 (16 elements along K):
 //   K0 K1 K2 K3 | K4 K5 K6 K7 | K8 K9 K10 K11 | K12 K13 K14 K15
@@ -1466,11 +1463,14 @@ struct VSMFMAConfig {
 //   Lane 1 (odd,  sparse index 0xEEEE -> positions {2,3} per group of 4):
 //    _  _ K2 K3 |  _  _ K6 K7 |  _   _  K10 K11 |  _   _  K14 K15
 //
-// Since each lane pair shares the same logical M-row but feeds into two
-// distinct hardware rows, the v_smfmac instruction computes two partial dot
-// products. These are stored as adjacent accumulator VGPRs and collapsed
-// (summed) to form the full result. This gives us a semantic M=8 tile from a
-// physical M=16 hardware instruction.
+// The lane-pairing layout maps each of the 8 logical M-rows to a pair of
+// adjacent physical rows (row 2i and 2i+1 for logical row i). Within each pair,
+// the even lane supplies positions {0,1} from each K-group of 4 and the odd
+// lane supplies positions {2,3}. The hardware interprets each physical row as
+// having 2:4 structured sparsity and computes a partial dot product over only
+// its non-zero elements. Summing the two physical rows' results reconstructs
+// the full dense dot product for the logical row. This yields a semantic M=8
+// matmul from a physical 16×16 instruction.
 //
 // === Operand packing ===
 //
