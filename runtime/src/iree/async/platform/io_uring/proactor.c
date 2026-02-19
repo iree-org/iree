@@ -1714,21 +1714,14 @@ static iree_status_t iree_async_proactor_io_uring_import_fence(
                                                  (uintptr_t)tracker);
   iree_io_uring_ring_sq_unlock(&proactor->ring);
 
-  // Submit immediately so the kernel begins polling the fd.
-  iree_status_t status = iree_io_uring_ring_submit(&proactor->ring,
-                                                   /*min_complete=*/0,
-                                                   /*flags=*/0);
-  if (!iree_status_is_ok(status)) {
-    // Submit failed. Rollback the SQE and clean up.
-    // Caller retains fd ownership since we never handed it to the kernel.
-    iree_io_uring_ring_sq_lock(&proactor->ring);
-    iree_io_uring_ring_sq_rollback(&proactor->ring, 1);
-    iree_io_uring_ring_sq_unlock(&proactor->ring);
-    iree_async_semaphore_release(semaphore);
-    iree_allocator_free(proactor->base.allocator, tracker);
-  }
+  // Wake the poll thread to flush the SQE. Do NOT call ring_submit()
+  // directly — only the poll thread may call io_uring_enter (SINGLE_ISSUER).
+  // The SQE is already committed to sq_local_tail and will be included in
+  // the next ring_submit() call during poll().
+  iree_async_proactor_wake(&proactor->base);
+
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_async_proactor_io_uring_export_fence(

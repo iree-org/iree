@@ -471,6 +471,12 @@ IREE_API_EXPORT void iree_async_semaphore_dispatch_timepoints_failed(
 //   IOCP: Thread pool wait on the HANDLE (native, no polling).
 //   generic: select/poll on the fd.
 //
+// Threading:
+//   Thread-safe. May be called from any thread, including GPU driver
+//   completion callbacks and worker threads. The proactor defers internal
+//   registration to its poll thread; the caller does not need to synchronize
+//   with poll().
+//
 // Returns:
 //   IREE_STATUS_OK: Fence imported; semaphore will signal when ready.
 //   IREE_STATUS_UNAVAILABLE: Platform doesn't support fence import.
@@ -504,6 +510,11 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_import_fence(
 //   The proactor creates an eventfd (or platform equivalent), watches the
 //   semaphore internally, and signals the eventfd when the value is reached.
 //   On IOCP, uses native Windows event objects that D3D12 can wait on directly.
+//
+// Threading:
+//   Thread-safe. May be called from any thread. The implementation only
+//   touches the semaphore's internal lock and creates new file descriptors;
+//   no proactor poll-thread state is accessed.
 //
 // Returns:
 //   IREE_STATUS_OK: Fence exported successfully.

@@ -21,7 +21,8 @@
 //   Only that thread may call poll(); calling from any other thread is
 //   undefined behavior. This enables lock-free fast paths in high-performance
 //   backends (e.g., io_uring's DEFER_TASKRUN mode). Other operations like
-//   submit() and wake() are thread-safe and may be called from any thread.
+//   submit(), cancel(), wake(), import_fence(), and export_fence() are
+//   thread-safe and may be called from any thread.
 //
 // Lifecycle: backend-specific _create functions → _retain/_release.
 // Destroy is at vtable offset 0 for toll-free bridging to iree_vm_ref_t.
