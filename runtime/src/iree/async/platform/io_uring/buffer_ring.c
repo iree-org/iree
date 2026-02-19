@@ -156,7 +156,8 @@ iree_status_t iree_io_uring_buffer_ring_allocate(
     uint32_t buffer_size = ring->buffer_size;
     for (uint32_t i = 0; i < buffer_count; ++i) {
       ring->kernel_ring->bufs[i].addr =
-          (uint64_t)(uintptr_t)(buffer_base + i * buffer_size);
+          (uint64_t)(uintptr_t)(buffer_base +
+                                (iree_host_size_t)i * buffer_size);
       ring->kernel_ring->bufs[i].len = buffer_size;
       ring->kernel_ring->bufs[i].bid = (uint16_t)i;
     }
@@ -220,7 +221,7 @@ void iree_io_uring_buffer_ring_recycle(iree_io_uring_buffer_ring_t* ring,
   // io_uring_buf_ring_add which only writes addr/len/bid.
   ring->kernel_ring->bufs[slot].addr =
       (uint64_t)(uintptr_t)(ring->buffer_base +
-                            (uint32_t)buffer_index * ring->buffer_size);
+                            (iree_host_size_t)buffer_index * ring->buffer_size);
   ring->kernel_ring->bufs[slot].len = ring->buffer_size;
   ring->kernel_ring->bufs[slot].bid = buffer_index;
 

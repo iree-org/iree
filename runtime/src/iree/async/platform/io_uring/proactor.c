@@ -806,16 +806,11 @@ static iree_status_t iree_async_proactor_io_uring_cqe_to_status(
   }
 
   // NOTIFICATION_WAIT (event mode): -EAGAIN means another waiter drained the
-  // eventfd before us. Check if epoch advanced (signal occurred).
+  // eventfd before us (the linked READ got nothing). Treat as success: the
+  // epoch may or may not have advanced, and the caller will re-check or
+  // re-wait as appropriate.
   if (cqe->res == -EAGAIN &&
       operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
-    iree_async_notification_wait_operation_t* wait =
-        (iree_async_notification_wait_operation_t*)operation;
-    uint32_t current_epoch =
-        iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
-    // Whether epoch advanced or not, treat as success (caller can re-wait).
-    (void)current_epoch;
-    (void)wait;
     return iree_ok_status();
   }
 
@@ -880,6 +875,7 @@ static inline void iree_async_proactor_io_uring_complete_socket_recv_pool(
 
     iree_async_region_t* region =
         iree_async_buffer_pool_region(recv_pool->pool);
+    IREE_ASSERT(buffer_index < region->buffer_count);
     recv_pool->lease.span = iree_async_span_make(
         region, (iree_host_size_t)buffer_index * region->buffer_size,
         region->buffer_size);
@@ -1111,9 +1107,17 @@ static inline bool iree_async_proactor_io_uring_process_internal_cqe(
     case IREE_IO_URING_TAG_SIGNAL:
       iree_async_proactor_io_uring_handle_signal_cqe(proactor, cqe);
       break;
+    case IREE_IO_URING_TAG_NOP_PLACEHOLDER:
+      // Placeholder NOP for software-emulated operations (SEMAPHORE_WAIT).
+      // The CQE is expected and discarded; the actual operation completes
+      // through the MPSC pending_semaphore_waits queue.
+      break;
     default:
-      // Unrecognized internal tag - this indicates a bug in our CQE routing.
-      // In production this should never happen if our code is correct.
+      IREE_ASSERT(false,
+                  "unrecognized internal tag %d in CQE (user_data=0x%" PRIx64
+                  ", res=%d, flags=0x%x)",
+                  (int)iree_io_uring_internal_tag(cqe->user_data),
+                  cqe->user_data, cqe->res, cqe->flags);
       break;
   }
   return false;  // Internal ops don't count as user completions.
