@@ -259,6 +259,12 @@ typedef struct iree_async_proactor_iocp_t {
   // scans the timer_list for cancelled entries.
   iree_atomic_int32_t pending_timer_cancellation_count;
 
+  // Number of event wait carriers with CANCELLED flag set that haven't been
+  // unregistered yet. cancel() increments from any thread; the poll thread
+  // decrements after unregistering cancelled waits. When non-zero, the poll
+  // loop scans the active_carriers list for cancelled entries.
+  iree_atomic_int32_t pending_event_wait_cancellation_count;
+
   // Active event wait carriers (poll thread only). Singly-linked list of
   // carriers with outstanding RegisterWaitForSingleObject registrations.
   // Walked during proactor destroy to unregister outstanding waits.

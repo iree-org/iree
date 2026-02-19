@@ -74,19 +74,21 @@ static void iree_async_proactor_io_uring_fill_event_wait(
   int fd = event_wait->event->primitive.value.fd;
 
   // SQE 1: POLL_ADD with link to next SQE.
-  // CQE_SKIP_SUCCESS suppresses the CQE on success - we only care about READ.
-  // The internal marker on user_data ensures any error CQE is handled
-  // internally (POLL_ADD failures are rare: bad fd, etc).
+  // CQE_SKIP_SUCCESS suppresses the CQE on success — only the READ CQE fires
+  // the user callback. On error (bad fd, cancellation), the linked READ is
+  // never started by the kernel and produces no CQE. The TAG_LINKED_POLL tag
+  // in user_data routes the error CQE to a handler that dispatches the user
+  // callback directly.
   memset(poll_sqe, 0, sizeof(*poll_sqe));
   poll_sqe->opcode = IREE_IORING_OP_POLL_ADD;
   poll_sqe->flags = IREE_IOSQE_IO_LINK | IREE_IOSQE_CQE_SKIP_SUCCESS;
   poll_sqe->fd = fd;
   poll_sqe->poll32_events = POLLIN;
-  poll_sqe->user_data =
-      IREE_IO_URING_INTERNAL_MARKER | (uint64_t)(uintptr_t)base_operation;
+  poll_sqe->user_data = iree_io_uring_internal_encode(
+      IREE_IO_URING_TAG_LINKED_POLL, (uintptr_t)base_operation);
 
   // SQE 2: READ to drain the eventfd counter.
-  // This is the user-visible operation - its CQE fires the callback.
+  // This is the user-visible operation — its CQE fires the callback.
   // The eventfd stores an 8-byte counter; reading resets it to 0.
   memset(read_sqe, 0, sizeof(*read_sqe));
   read_sqe->opcode = IREE_IORING_OP_READ;
@@ -853,13 +855,14 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   int fd = wait->notification->platform.io_uring.primitive.value.fd;
 
   // SQE 1: POLL_ADD with link to next SQE.
+  // Same TAG_LINKED_POLL pattern as EVENT_WAIT — see fill_event_wait comments.
   memset(poll_sqe, 0, sizeof(*poll_sqe));
   poll_sqe->opcode = IREE_IORING_OP_POLL_ADD;
   poll_sqe->flags = IREE_IOSQE_IO_LINK | IREE_IOSQE_CQE_SKIP_SUCCESS;
   poll_sqe->fd = fd;
   poll_sqe->poll32_events = POLLIN;
-  poll_sqe->user_data =
-      IREE_IO_URING_INTERNAL_MARKER | (uint64_t)(uintptr_t)base_operation;
+  poll_sqe->user_data = iree_io_uring_internal_encode(
+      IREE_IO_URING_TAG_LINKED_POLL, (uintptr_t)base_operation);
 
   // SQE 2: READ to drain the eventfd counter.
   memset(read_sqe, 0, sizeof(*read_sqe));
