@@ -14,9 +14,13 @@
 // - kqueue is level-triggered by default, matching poll() semantics.
 // - kevent() combines registration and waiting in a single syscall.
 // - Closing an fd automatically removes it from the kqueue.
-// - kqueue returns separate events for READ and WRITE on the same fd, but
-//   poll() returns a combined bitmask. We coalesce events in next_ready()
-//   to maintain poll() semantics.
+// - kqueue returns separate events for READ and WRITE on the same fd.
+//   Unlike poll(), which returns a combined bitmask, the proactor may see the
+//   same fd multiple times per poll iteration. The proactor's dispatch loop
+//   handles this correctly by filtering operations against per-event revents.
+// - Filter add/modify/remove operations are batched into a single kevent()
+//   call to ensure atomicity: either all filters for an fd are registered or
+//   none are (no orphaned filters on partial failure).
 //
 // References:
 // - https://man.openbsd.org/kqueue.2
@@ -76,37 +80,61 @@ static short iree_kevent_to_poll_events(const struct kevent* event) {
   return poll_events;
 }
 
-// Deletes a single filter from the kqueue. Returns OK if deleted or if the
-// filter wasn't registered (ENOENT) or fd was closed (EBADF).
-static iree_status_t iree_kqueue_delete_filter(int kqueue_fd, int fd,
-                                               int16_t filter) {
-  struct kevent kev;
-  EV_SET(&kev, fd, filter, EV_DELETE, 0, 0, NULL);
-  if (kevent(kqueue_fd, &kev, 1, NULL, 0, NULL) < 0) {
-    int error = errno;
-    // ENOENT: filter not registered - already removed, success.
-    // EBADF: fd closed - automatically removed from kqueue, success.
-    if (error == ENOENT || error == EBADF) {
-      return iree_ok_status();
-    }
-    return iree_make_status(iree_status_code_from_errno(error),
-                            "kevent(DELETE) failed for fd %d filter %d: %s", fd,
-                            filter, strerror(error));
-  }
-  return iree_ok_status();
-}
+// Submits a batch of changelist entries to the kqueue atomically.
+// On failure, individual entries report EV_ERROR with the errno in |data|.
+// For DELETE operations, ENOENT (not registered) and EBADF (fd closed) are
+// silently ignored since the filter is already gone.
+static iree_status_t iree_kqueue_submit_changes(int kqueue_fd, int fd,
+                                                struct kevent* changelist,
+                                                int change_count) {
+  // kevent() with a zero timeout applies all changelist entries and returns
+  // immediately. The eventlist receives EV_ERROR entries for any changelist
+  // items that failed, plus any already-ready events. We size the eventlist
+  // to the changelist length — we only care about error events.
+  struct kevent eventlist[4];  // max 4 changes (2 deletes + 2 adds in modify)
+  IREE_ASSERT(change_count <= 4);
 
-// Adds or updates a filter on the kqueue. EV_ADD updates existing filters.
-static iree_status_t iree_kqueue_add_filter(int kqueue_fd, int fd,
-                                            int16_t filter) {
-  struct kevent kev;
-  EV_SET(&kev, fd, filter, EV_ADD, 0, 0, NULL);
-  if (kevent(kqueue_fd, &kev, 1, NULL, 0, NULL) < 0) {
+  struct timespec zero_timeout = {0, 0};
+  int result = kevent(kqueue_fd, changelist, change_count, eventlist,
+                      change_count, &zero_timeout);
+  if (result < 0) {
     int error = errno;
     return iree_make_status(iree_status_code_from_errno(error),
-                            "kevent(ADD) failed for fd %d filter %d: %s", fd,
-                            filter, strerror(error));
+                            "kevent() changelist submission failed for fd %d: "
+                            "%s",
+                            fd, strerror(error));
   }
+
+  // The returned eventlist is a mix of EV_ERROR entries (for failed changelist
+  // items) and normal ready events (for already-monitored fds). We only care
+  // about EV_ERROR entries. Each EV_ERROR event carries the filter and flags
+  // from the original changelist entry that failed.
+  for (int i = 0; i < result; ++i) {
+    if (!(eventlist[i].flags & EV_ERROR)) continue;
+    int error = (int)eventlist[i].data;
+    // For DELETE operations, ENOENT (filter not registered) and EBADF (fd
+    // already closed) are expected and harmless — the filter is already gone.
+    // We identify delete operations by matching the error event back to the
+    // changelist: the event's ident and filter correspond to the failed entry.
+    bool is_delete = false;
+    for (int j = 0; j < change_count; ++j) {
+      if (changelist[j].ident == eventlist[i].ident &&
+          changelist[j].filter == eventlist[i].filter &&
+          (changelist[j].flags & EV_DELETE)) {
+        is_delete = true;
+        break;
+      }
+    }
+    if (is_delete && (error == ENOENT || error == EBADF)) {
+      continue;
+    }
+    const char* action_name = is_delete ? "DELETE" : "ADD";
+    return iree_make_status(iree_status_code_from_errno(error),
+                            "kevent(%s) failed for fd %d filter %d: %s",
+                            action_name, fd, (int)eventlist[i].filter,
+                            strerror(error));
+  }
+
   return iree_ok_status();
 }
 
@@ -132,14 +160,19 @@ static iree_status_t iree_async_posix_event_set_kqueue_add(
   iree_async_posix_event_set_kqueue_t* event_set =
       iree_async_posix_event_set_kqueue_cast(base_event_set);
 
-  iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(status) && (events & POLLIN)) {
-    status = iree_kqueue_add_filter(event_set->kqueue_fd, fd, EVFILT_READ);
+  // Batch all filter additions into a single kevent() call so that either
+  // both READ and WRITE are registered or neither is (no orphaned filters).
+  struct kevent changelist[2];
+  int change_count = 0;
+  if (events & POLLIN) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
   }
-  if (iree_status_is_ok(status) && (events & POLLOUT)) {
-    status = iree_kqueue_add_filter(event_set->kqueue_fd, fd, EVFILT_WRITE);
+  if (events & POLLOUT) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
   }
-  return status;
+  if (change_count == 0) return iree_ok_status();
+  return iree_kqueue_submit_changes(event_set->kqueue_fd, fd, changelist,
+                                    change_count);
 }
 
 static iree_status_t iree_async_posix_event_set_kqueue_modify(
@@ -147,28 +180,31 @@ static iree_status_t iree_async_posix_event_set_kqueue_modify(
   iree_async_posix_event_set_kqueue_t* event_set =
       iree_async_posix_event_set_kqueue_cast(base_event_set);
 
-  // EV_ADD updates existing filters, so we just need to:
-  // 1. Delete filters that are NOT in the new mask
-  // 2. Add filters that ARE in the new mask (EV_ADD handles updates)
-  iree_status_t status = iree_ok_status();
+  // Batch all filter changes into a single kevent() call.
+  // EV_ADD updates existing filters, EV_DELETE removes unwanted ones.
+  // Deletions are listed first so that any stale filters are cleaned up
+  // before new ones are applied within the same atomic submission.
+  struct kevent changelist[4];
+  int change_count = 0;
 
-  // Delete READ if not wanted.
-  if (iree_status_is_ok(status) && !(events & POLLIN)) {
-    status = iree_kqueue_delete_filter(event_set->kqueue_fd, fd, EVFILT_READ);
+  // Delete filters that are NOT in the new mask.
+  if (!(events & POLLIN)) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
   }
-  // Delete WRITE if not wanted.
-  if (iree_status_is_ok(status) && !(events & POLLOUT)) {
-    status = iree_kqueue_delete_filter(event_set->kqueue_fd, fd, EVFILT_WRITE);
+  if (!(events & POLLOUT)) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_WRITE, EV_DELETE, 0, 0,
+           NULL);
   }
-  // Add/update READ if wanted.
-  if (iree_status_is_ok(status) && (events & POLLIN)) {
-    status = iree_kqueue_add_filter(event_set->kqueue_fd, fd, EVFILT_READ);
+  // Add/update filters that ARE in the new mask.
+  if (events & POLLIN) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
   }
-  // Add/update WRITE if wanted.
-  if (iree_status_is_ok(status) && (events & POLLOUT)) {
-    status = iree_kqueue_add_filter(event_set->kqueue_fd, fd, EVFILT_WRITE);
+  if (events & POLLOUT) {
+    EV_SET(&changelist[change_count++], fd, EVFILT_WRITE, EV_ADD, 0, 0, NULL);
   }
-  return status;
+  if (change_count == 0) return iree_ok_status();
+  return iree_kqueue_submit_changes(event_set->kqueue_fd, fd, changelist,
+                                    change_count);
 }
 
 static iree_status_t iree_async_posix_event_set_kqueue_remove(
@@ -176,15 +212,13 @@ static iree_status_t iree_async_posix_event_set_kqueue_remove(
   iree_async_posix_event_set_kqueue_t* event_set =
       iree_async_posix_event_set_kqueue_cast(base_event_set);
 
-  // Delete both filters individually to avoid batch failure.
-  iree_status_t status = iree_ok_status();
-  if (iree_status_is_ok(status)) {
-    status = iree_kqueue_delete_filter(event_set->kqueue_fd, fd, EVFILT_READ);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_kqueue_delete_filter(event_set->kqueue_fd, fd, EVFILT_WRITE);
-  }
-  return status;
+  // Delete both filters in a single batched kevent() call.
+  // ENOENT/EBADF on individual filters is silently ignored (the filter
+  // was already gone or the fd was already closed).
+  struct kevent changelist[2];
+  EV_SET(&changelist[0], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+  EV_SET(&changelist[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+  return iree_kqueue_submit_changes(event_set->kqueue_fd, fd, changelist, 2);
 }
 
 static iree_status_t iree_async_posix_event_set_kqueue_wait(
@@ -245,24 +279,14 @@ static bool iree_async_posix_event_set_kqueue_next_ready(
     return false;
   }
 
-  // Coalesce events for the same fd to match poll() semantics.
-  // kqueue returns separate events for READ and WRITE, but poll returns
-  // a combined bitmask per fd.
+  // Return each kevent individually. kqueue returns separate events for
+  // EVFILT_READ and EVFILT_WRITE, so the same fd may appear multiple times.
+  // The proactor's dispatch loop handles this correctly: each handler filters
+  // operations against the per-event revents bitmask.
   iree_host_size_t index = event_set->iteration_index++;
   const struct kevent* event = &event_set->events[index];
-  int fd = (int)event->ident;
-  short revents = iree_kevent_to_poll_events(event);
-
-  // Look ahead for additional events on the same fd and coalesce them.
-  while (event_set->iteration_index < event_set->ready_count) {
-    const struct kevent* next = &event_set->events[event_set->iteration_index];
-    if ((int)next->ident != fd) break;
-    revents |= iree_kevent_to_poll_events(next);
-    event_set->iteration_index++;
-  }
-
-  *out_fd = fd;
-  *out_revents = revents;
+  *out_fd = (int)event->ident;
+  *out_revents = iree_kevent_to_poll_events(event);
   return true;
 }
 
@@ -297,7 +321,17 @@ iree_status_t iree_async_posix_event_set_allocate_kqueue(
   event_set->allocator = allocator;
   event_set->kqueue_fd = -1;
 
+  // Create the kqueue fd with close-on-exec where possible.
+#if defined(IREE_PLATFORM_FREEBSD) || defined(IREE_PLATFORM_NETBSD)
+  // FreeBSD 12+ and NetBSD 10+ provide kqueue1() for atomic CLOEXEC.
+  event_set->kqueue_fd = kqueue1(O_CLOEXEC);
+#else
+  // macOS and OpenBSD lack kqueue1(). We use kqueue() + fcntl() which has
+  // a theoretical TOCTOU race if another thread forks between the two calls.
+  // This is acceptable: IREE processes do not fork, and the fcntl is a
+  // defense-in-depth measure for fd hygiene across exec.
   event_set->kqueue_fd = kqueue();
+#endif  // IREE_PLATFORM_FREEBSD || IREE_PLATFORM_NETBSD
   if (event_set->kqueue_fd < 0) {
     int error = errno;
     iree_allocator_free(allocator, event_set);
@@ -305,9 +339,9 @@ iree_status_t iree_async_posix_event_set_allocate_kqueue(
     return iree_make_status(iree_status_code_from_errno(error),
                             "kqueue() failed: %s", strerror(error));
   }
-
-  // Set close-on-exec to prevent fd leakage across fork/exec.
+#if !defined(IREE_PLATFORM_FREEBSD) && !defined(IREE_PLATFORM_NETBSD)
   fcntl(event_set->kqueue_fd, F_SETFD, FD_CLOEXEC);
+#endif  // !IREE_PLATFORM_FREEBSD && !IREE_PLATFORM_NETBSD
 
   *out_event_set = &event_set->base;
   IREE_TRACE_ZONE_END(z0);

@@ -349,6 +349,11 @@ typedef struct iree_async_posix_semaphore_wait_tracker_t {
   // CAS: first non-OK status wins.
   iree_atomic_intptr_t completion_status;
 
+  // Guard against double-enqueue: success callbacks (remaining_or_satisfied),
+  // error callbacks, and cancel all independently decide to enqueue. Only the
+  // first to CAS this from 0→1 actually pushes to the MPSC slist.
+  iree_atomic_int32_t enqueued;
+
   // LINKED chain continuation head. When the wait has LINKED flag, the
   // chain is transferred here during submit and dispatched on completion.
   iree_async_operation_t* continuation_head;
@@ -1003,6 +1008,15 @@ static iree_status_t iree_async_proactor_posix_submit_semaphore_signal(
 // Called from timepoint callbacks running on arbitrary threads.
 static void iree_async_proactor_posix_semaphore_wait_enqueue_completion(
     iree_async_posix_semaphore_wait_tracker_t* tracker) {
+  // Guard against double-enqueue: success callbacks (remaining_or_satisfied),
+  // error callbacks, and cancel all independently decide to enqueue. Only the
+  // first to set the flag actually pushes.
+  int32_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(&tracker->enqueued, &expected, 1,
+                                           iree_memory_order_acq_rel,
+                                           iree_memory_order_relaxed)) {
+    return;
+  }
   iree_atomic_slist_push(&tracker->proactor->pending_semaphore_waits,
                          &tracker->slist_entry);
   iree_async_proactor_posix_wake_poll_thread(tracker->proactor);
@@ -1590,9 +1604,10 @@ static iree_host_size_t iree_async_proactor_posix_process_expired_timers(
                              &completion->slist_entry);
       ++timer_count;
     } else {
-      // Pool exhausted - dispatch LINKED chain and invoke callback directly.
+      // Pool exhausted — dispatch directly (same as drain_completion_queue).
       iree_async_proactor_posix_dispatch_linked_continuation(
           proactor, &timer->base, status);
+      iree_async_operation_release_resources(&timer->base);
       if (timer->base.completion_fn) {
         timer->base.completion_fn(timer->base.user_data, &timer->base, status,
                                   IREE_ASYNC_COMPLETION_FLAG_NONE);
@@ -2313,7 +2328,16 @@ static void iree_async_proactor_posix_process_operation_chain(
         iree_atomic_slist_push(&proactor->completion_queue,
                                &completion->slist_entry);
       } else {
-        iree_status_ignore(op_status);
+        // Pool exhausted — dispatch directly. Multishot operations keep their
+        // retained resources (no release_resources) and don't dispatch linked
+        // continuations (those are for final completion only).
+        if (completed_operation->completion_fn) {
+          completed_operation->completion_fn(completed_operation->user_data,
+                                             completed_operation, op_status,
+                                             completion_flags);
+        } else {
+          iree_status_ignore(op_status);
+        }
       }
       continue;
     }
@@ -2328,7 +2352,16 @@ static void iree_async_proactor_posix_process_operation_chain(
       iree_atomic_slist_push(&proactor->completion_queue,
                              &completion->slist_entry);
     } else {
-      iree_status_ignore(op_status);
+      // Pool exhausted — dispatch directly (same pattern as cancel fallback).
+      iree_async_proactor_posix_dispatch_linked_continuation(proactor, current,
+                                                             op_status);
+      iree_async_operation_release_resources(current);
+      if (current->completion_fn) {
+        current->completion_fn(current->user_data, current, op_status,
+                               completion_flags);
+      } else {
+        iree_status_ignore(op_status);
+      }
     }
 
     // Don't update prev - we removed current, so prev stays the same.
@@ -2494,9 +2527,10 @@ static void iree_async_proactor_posix_drain_pending_timer_cancellations(
       iree_atomic_slist_push(&proactor->completion_queue,
                              &completion->slist_entry);
     } else {
-      // Pool exhausted — dispatch directly.
+      // Pool exhausted — dispatch directly (same as drain_completion_queue).
       iree_async_proactor_posix_dispatch_linked_continuation(
           proactor, &timer->base, iree_status_from_code(IREE_STATUS_CANCELLED));
+      iree_async_operation_release_resources(&timer->base);
       if (timer->base.completion_fn) {
         timer->base.completion_fn(timer->base.user_data, &timer->base,
                                   iree_status_from_code(IREE_STATUS_CANCELLED),
