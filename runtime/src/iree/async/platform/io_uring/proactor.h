@@ -288,6 +288,11 @@ typedef struct iree_async_io_uring_semaphore_wait_tracker_t {
   // Completion status. Written by timepoint callback if failure occurs.
   iree_atomic_intptr_t completion_status;
 
+  // Guard against double-enqueue: success callbacks (remaining_or_satisfied),
+  // error callbacks, and cancel all independently decide to enqueue. Only the
+  // first to CAS this from 0->1 actually pushes to the MPSC slist.
+  iree_atomic_int32_t enqueued;
+
   // LINKED chain continuation head (for userspace chain emulation).
   // When the wait operation has LINKED flag, points to the first operation
   // in the continuation chain (linked via linked_next pointers).

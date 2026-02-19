@@ -1080,8 +1080,17 @@ static iree_status_t iree_async_proactor_io_uring_submit_semaphore_wait(
 }
 
 // Helper to enqueue a tracker for completion and wake the proactor.
+// Multiple callbacks may race to enqueue (error callbacks in ALL mode, success
+// callbacks, cancel). The enqueued CAS ensures exactly one push to the MPSC
+// slist — a duplicate push would create a self-loop and hang the drain.
 static void iree_async_io_uring_semaphore_wait_enqueue_completion(
     iree_async_io_uring_semaphore_wait_tracker_t* tracker) {
+  int32_t expected = 0;
+  if (!iree_atomic_compare_exchange_strong(&tracker->enqueued, &expected, 1,
+                                           iree_memory_order_acq_rel,
+                                           iree_memory_order_relaxed)) {
+    return;
+  }
   iree_atomic_slist_push(&tracker->proactor->pending_semaphore_waits,
                          &tracker->slist_entry);
   uint64_t wake_value = 1;
@@ -1110,8 +1119,8 @@ static void iree_async_io_uring_semaphore_wait_timepoint_callback(
       iree_status_ignore(status);
     }
     // Enqueue for completion regardless of whether we won the status race.
-    // The first callback to push wins; subsequent pushes are no-ops because
-    // the tracker is already in the list.
+    // The enqueued CAS guard inside enqueue_completion ensures exactly one
+    // push.
     iree_async_io_uring_semaphore_wait_enqueue_completion(tracker);
     return;
   }

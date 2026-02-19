@@ -318,20 +318,46 @@ static void iree_async_proactor_io_uring_submit_continuation_chain(
     iree_async_operation_t* chain_head) {
   if (!chain_head) return;
 
-  // Build array from linked_next chain. Chains are typically 1-5 operations.
-  iree_async_operation_t* chain_array[16];
+  // Count operations in the chain (must happen before submit, which rebuilds
+  // linked_next from LINKED flags and destroys the incoming chain).
   iree_host_size_t chain_count = 0;
   for (iree_async_operation_t* op = chain_head; op; op = op->linked_next) {
-    if (chain_count < IREE_ARRAYSIZE(chain_array)) {
-      chain_array[chain_count++] = op;
+    ++chain_count;
+  }
+
+  // Build array from linked_next chain. Use stack for the common case (chains
+  // are typically 1-5 operations), heap-allocate for longer chains.
+  iree_async_operation_t* stack_array[16];
+  iree_async_operation_t** chain_array = stack_array;
+  if (chain_count > IREE_ARRAYSIZE(stack_array)) {
+    iree_status_t alloc_status = iree_allocator_malloc(
+        proactor->base.allocator, chain_count * sizeof(iree_async_operation_t*),
+        (void**)&chain_array);
+    if (!iree_status_is_ok(alloc_status)) {
+      // Allocation failed — complete all operations with the error.
+      for (iree_async_operation_t* op = chain_head; op;) {
+        iree_async_operation_t* next = op->linked_next;
+        if (op->completion_fn) {
+          op->completion_fn(op->user_data, op, iree_status_clone(alloc_status),
+                            IREE_ASYNC_COMPLETION_FLAG_NONE);
+        }
+        op = next;
+      }
+      iree_status_ignore(alloc_status);
+      return;
     }
+  }
+
+  iree_host_size_t index = 0;
+  for (iree_async_operation_t* op = chain_head; op; op = op->linked_next) {
+    chain_array[index++] = op;
   }
 
   iree_async_operation_list_t chain_list = {chain_array, chain_count};
   iree_status_t submit_status =
       iree_async_proactor_io_uring_submit(&proactor->base, chain_list);
   if (!iree_status_is_ok(submit_status)) {
-    // Submit failed - invoke callbacks directly with the error.
+    // Submit failed — invoke callbacks directly with the error.
     for (iree_host_size_t i = 0; i < chain_count; ++i) {
       if (chain_array[i]->completion_fn) {
         chain_array[i]->completion_fn(chain_array[i]->user_data, chain_array[i],
@@ -340,6 +366,10 @@ static void iree_async_proactor_io_uring_submit_continuation_chain(
       }
     }
     iree_status_ignore(submit_status);
+  }
+
+  if (chain_array != stack_array) {
+    iree_allocator_free(proactor->base.allocator, chain_array);
   }
 }
 
