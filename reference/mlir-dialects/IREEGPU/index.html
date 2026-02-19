@@ -2014,6 +2014,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-bounds-attribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      In-Bounds Attribute
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" class="md-nav__link">
     <span class="md-ellipsis">
       Example of a single subgroup using coalesced_gather_dma in copy mode
@@ -2047,7 +2056,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
+  <a href="#attributes_1" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5389,6 +5398,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-bounds-attribute" class="md-nav__link">
+    <span class="md-ellipsis">
+      In-Bounds Attribute
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" class="md-nav__link">
     <span class="md-ellipsis">
       Example of a single subgroup using coalesced_gather_dma in copy mode
@@ -5422,7 +5440,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
+  <a href="#attributes_1" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -6030,12 +6048,13 @@ SPIR-V/LLVM are handled separately.</p>
 </li>
 <li><a href="#lowering-paths">Lowering Paths</a></li>
 <li><a href="#operands-and-results">Operands and Results</a></li>
+<li><a href="#in-bounds-attribute">In-Bounds Attribute</a></li>
 <li><a href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode</a><ul>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
 </ul>
 </li>
-<li><a href="#attributes">Attributes</a><ul>
+<li><a href="#attributes_1">Attributes</a><ul>
 <li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
 <li><a href="#conditionaltransposeattr">ConditionalTransposeAttr</a></li>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
@@ -6266,6 +6285,7 @@ effort and has no verification or failure modes.</p>
 <p><em>Coalesced gather DMA operation for efficient GPU memory access</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+              (`in_bounds` $in_bounds^)?
               attr-dict `:` type(operands) ( `-&gt;` type($result)^ )?
 </code></pre></div>
 <p>Performs a coalesced gather operation.
@@ -6325,6 +6345,16 @@ ParallelCombiningOpInterface and must live inside an op implementing
 <li><code>lane</code>: The lane that specifies the coalescing store's offset within the
   workgroup/shared memory.</li>
 </ul>
+<h2 id="in-bounds-attribute">In-Bounds Attribute<a class="headerlink" href="#in-bounds-attribute" title="Permanent link">link</a></h2>
+<p>The optional <code>in_bounds</code> attribute is a boolean array with one entry per
+dimension of <code>init</code>. When not present, all dimensions are treated as
+in-bounds (source and init must have matching sizes for non-indexed dims).</p>
+<p>When present, <code>in_bounds[i] = false</code> indicates that the source may be
+smaller than init along dimension <code>i</code>. Reads beyond the source extent
+return zero (padding semantics). This enables fusion of <code>tensor.pad</code>
+with zero padding into the DMA operation.</p>
+<p><code>in_bounds[i] = true</code> means the source and init sizes match along that
+dimension, and no padding is needed.</p>
 <h2 id="example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode">Example of a single subgroup using coalesced_gather_dma in copy mode<a class="headerlink" href="#example-of-a-single-subgroup-using-coalesced_gather_dma-in-copy-mode" title="Permanent link">link</a></h2>
 <p>for transferring tensor&lt;4x128xf32&gt;, with an intended DMA width of 128 bits
    (4 x f32), with subgroup size 32:
@@ -6337,7 +6367,13 @@ ParallelCombiningOpInterface and must live inside an op implementing
     }
   } {mapping = [#gpu.lane_id&lt;linear_dim_0&gt;]}
 </code></pre></div></p>
-<p>Interfaces: <code>ParallelCombiningOpInterface</code></p>
+<p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>ParallelCombiningOpInterface</code></p>
+<h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>in_bounds</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
+</table>
+
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6451,7 +6487,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">link</a></h2>
+<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
 <h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
 <p><em>Supported bitwidths for compute</em></p>
 <p>Syntax:</p>
