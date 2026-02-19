@@ -2156,3 +2156,65 @@ util.func public @reduction_elementwise_broadcast_fusion_with_unit_dims(
 //  CHECK-SAME:         ins(%[[DISPATCH0]], %[[ARG1]] :
 //       CHECK:     flow.return %[[BROADCAST]]
 //       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+// Verify that producer fusion does not pull an elementwise op into a dispatch
+// when the op has a "use from above" inside an intervening
+// flow.dispatch.region. %sub is used both by the existing dispatch.region
+// (from above in its body) and by %mul. Fusing %sub as a producer into %mul's
+// dispatch would break dominance for the dispatch.region's use of %sub.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> ()>
+util.func public @no_producer_fusion_with_use_from_above(
+    %arg0: tensor<4x8xf32>, %arg1: tensor<f32>)
+    -> (tensor<4x8xf32>, tensor<4x8xf32>) {
+  %empty = tensor.empty() : tensor<4x8xf32>
+  %sub = linalg.generic {
+      indexing_maps = [#map, #map1, #map],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<4x8xf32>, tensor<f32>)
+      outs(%empty : tensor<4x8xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.subf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  } -> tensor<4x8xf32>
+  // Pre-existing dispatch.region that uses %sub "from above".
+  %dispatch = flow.dispatch.region -> (tensor<4x8xf32>) {
+    %inner = linalg.generic {
+        indexing_maps = [#map, #map],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%sub : tensor<4x8xf32>) outs(%empty : tensor<4x8xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %0 = arith.negf %in : f32
+        linalg.yield %0 : f32
+    } -> tensor<4x8xf32>
+    flow.return %inner : tensor<4x8xf32>
+  }
+  // %mul also uses %sub. The pass must NOT fuse %sub as a producer here.
+  %mul = linalg.generic {
+      indexing_maps = [#map, #map1, #map],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%sub, %arg1 : tensor<4x8xf32>, tensor<f32>)
+      outs(%empty : tensor<4x8xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %0 = arith.mulf %in, %in_1 : f32
+      linalg.yield %0 : f32
+  } -> tensor<4x8xf32>
+  util.return %dispatch, %mul : tensor<4x8xf32>, tensor<4x8xf32>
+}
+// CHECK-LABEL: util.func public @no_producer_fusion_with_use_from_above
+//       CHECK:   %[[SUB_DISP:.+]] = flow.dispatch.region
+//       CHECK:     %[[SUB:.+]] = linalg.generic
+//       CHECK:       arith.subf
+//       CHECK:     flow.return %[[SUB]]
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins(%[[SUB_DISP]]
+//       CHECK:     flow.return
+//       CHECK:   %[[MUL_DISP:.+]] = flow.dispatch.region
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins(%[[SUB_DISP]]
+//       CHECK:       arith.mulf
+//       CHECK:     flow.return
+//       CHECK:   util.return %{{.+}}, %[[MUL_DISP]]

@@ -754,6 +754,32 @@ static bool isFusableWithProducer(OpOperand &operand,
   return true;
 }
 
+/// Check if moving the producer into the dispatch at the root's position would
+/// break any existing uses. Returns true if there are uses between the producer
+/// and the root that are not in the fusion group, which would cause a dominance
+/// violation.
+static bool hasUsesBetweenProducerAndRoot(Operation *producer, Operation *root,
+                                          const FusionGroup &fusionGroup,
+                                          const DominanceInfo &dominanceInfo) {
+  for (OpOperand &use : producer->getUses()) {
+    Operation *user = use.getOwner();
+    // Walk up to the parent in the same block as the producer/root.
+    while (user && user->getBlock() != root->getBlock()) {
+      user = user->getParentOp();
+    }
+    // If the user is in the fusion group, it will be moved too.
+    if (!user || fusionGroup.contains(user)) {
+      continue;
+    }
+    // If the user does not come after the root, then moving the producer
+    // into the dispatch at root's position would break dominance.
+    if (!dominanceInfo.properlyDominates(root, user)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Starting from the `root` op, traverse the operand use-def chain
 /// in reverse to fuse with producers.
 static void
@@ -779,6 +805,11 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
       }
 
       if (!isFusableWithProducer(operand, tracker, options, fuseWithTruncate)) {
+        continue;
+      }
+
+      if (hasUsesBetweenProducerAndRoot(producer, root, fusionGroup,
+                                        dominanceInfo)) {
         continue;
       }
 
