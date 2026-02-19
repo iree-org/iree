@@ -3004,6 +3004,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-fuse-subgroup-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-fuse-subgroup-consumers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-generalize-named-ops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-generalize-named-ops
@@ -5389,6 +5398,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-gpu-fuse-subgroup-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-codegen-gpu-fuse-subgroup-consumers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-gpu-generalize-named-ops" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-codegen-gpu-generalize-named-ops
@@ -5770,6 +5788,10 @@ store_to_buffer op.</p>
 <p><em>Pass to expand tensor op dims based on <code>expand_dims</code> lowering_config</em></p>
 <h3 id="-iree-codegen-gpu-fuse-and-hoist-parallel-loops"><code>-iree-codegen-gpu-fuse-and-hoist-parallel-loops</code><a class="headerlink" href="#-iree-codegen-gpu-fuse-and-hoist-parallel-loops" title="Permanent link">link</a></h3>
 <p><em>Greedily fuses and hoists parallel loops.</em></p>
+<h3 id="-iree-codegen-gpu-fuse-subgroup-consumers"><code>-iree-codegen-gpu-fuse-subgroup-consumers</code><a class="headerlink" href="#-iree-codegen-gpu-fuse-subgroup-consumers" title="Permanent link">link</a></h3>
+<p><em>Fuses tilable consumers into subgroup-scoped pcf.generic ops</em></p>
+<p>Fuses tilable consumer operations into producer pcf loop-like ops with
+<code>iree_gpu.subgroup_scope</code> scope.</p>
 <h3 id="-iree-codegen-gpu-generalize-named-ops"><code>-iree-codegen-gpu-generalize-named-ops</code><a class="headerlink" href="#-iree-codegen-gpu-generalize-named-ops" title="Permanent link">link</a></h3>
 <p><em>Convert named Linalg ops to linalg.generic ops</em></p>
 <p>Convert a subset of named Linalg ops to linalg.generics. The subset does not
