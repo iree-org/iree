@@ -69,6 +69,7 @@ iree_cc_library(
     "GPUDistributionPatterns.cpp"
     "GPUExpandDimensions.cpp"
     "GPUFuseAndHoistParallelLoops.cpp"
+    "GPUFuseSubgroupConsumers.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
     "GPUInferMemorySpace.cpp"
@@ -150,6 +151,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
     iree::compiler::Codegen::Dialect::PCF::IR
+    iree::compiler::Codegen::Dialect::PCF::Transforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::TensorMaskingOpInterface
