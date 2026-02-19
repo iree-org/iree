@@ -188,7 +188,11 @@ void iree_io_uring_buffer_ring_free(iree_io_uring_buffer_ring_t* ring) {
     ret = syscall(IREE_IO_URING_SYSCALL_REGISTER, ring->ring_fd,
                   IREE_IORING_UNREGISTER_PBUF_RING, &reg, 1);
   } while (ret < 0 && errno == EINTR);
-  // Ignore errors — best effort cleanup.
+  // PBUF_RING unregister errors are safe to ignore: the ring memory is
+  // application-side metadata (buffer index + length pairs) that the kernel
+  // stops referencing immediately on unregister. Unlike fixed buffer
+  // unregistration, where the kernel holds DMA references to the actual buffer
+  // pages, PBUF_RING teardown has no data integrity risk.
 
   // Free kernel ring memory and structure.
   iree_allocator_t allocator = ring->allocator;

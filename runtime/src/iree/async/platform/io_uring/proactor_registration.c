@@ -697,6 +697,22 @@ iree_status_t iree_async_proactor_io_uring_register_slab(
   iree_io_uring_buffer_ring_t* buffer_ring = NULL;
   int16_t buffer_group_id = -1;
   if (create_recv_ring) {
+    // Group IDs are uint16_t and allocated monotonically. Reserve UINT16_MAX
+    // as the overflow sentinel — this still allows 65535 concurrent buffer ring
+    // registrations, which is unreachable in practice (each requires at least
+    // one page of kernel ring metadata plus actual buffer memory).
+    if (proactor->next_group_id >= UINT16_MAX) {
+      if (slab_region->registered_fixed_buffers) {
+        IREE_CHECK_OK(iree_async_io_uring_slab_region_unregister_fixed_buffers(
+            slab_region, proactor));
+      }
+      iree_allocator_free(base_proactor->allocator, slab_region);
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "io_uring buffer ring group ID space exhausted "
+                              "(maximum 65535 concurrent registrations)");
+    }
+
     iree_io_uring_buffer_ring_options_t ring_options =
         iree_io_uring_buffer_ring_options_default();
     ring_options.buffer_base = base_ptr;
