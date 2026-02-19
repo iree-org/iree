@@ -14,6 +14,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -62,6 +63,57 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
     assert(false && "Unhandled gemm size");
     return os << "NotSet";
   }
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const QuantizationInefficiency &inefficiency) {
+  os << "QuantizationInefficiency: ";
+  os << llvm::format("%.2f%%", inefficiency.inefficiency * 100);
+  os << " (WG=" << inefficiency.batch << "*" << inefficiency.numWGsM << "*"
+     << inefficiency.numWGsN << "=" << inefficiency.numWorkgroups;
+  os << ", WGP=" << inefficiency.numWGPs;
+  os << ", waves=" << inefficiency.numWaves << ")";
+  return os;
+}
+
+QuantizationInefficiency
+computeQuantizationInefficiency(const GPUMatmulShapeType &problem,
+                                const GPUMMASchedule &schedule,
+                                int64_t wgpCount) {
+  QuantizationInefficiency result;
+  result.numWGPs = wgpCount;
+
+  // Compute actual problem sizes
+  int64_t actualM = ShapedType::getNumElements(problem.mSizes);
+  int64_t actualN = ShapedType::getNumElements(problem.nSizes);
+  int64_t actualBatch = problem.batchSizes.empty()
+                            ? 1
+                            : ShapedType::getNumElements(problem.batchSizes);
+
+  // Compute workgroup tile sizes
+  int64_t tileSizeM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
+                      schedule.getTotalMSubgroupCount();
+  int64_t tileSizeN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
+                      schedule.getTotalNSubgroupCount();
+
+  // Number of workgroups = batch * ceil(M/tileM) * ceil(N/tileN)
+  result.batch = actualBatch;
+  result.numWGsM = llvm::divideCeil(actualM, tileSizeM);
+  result.numWGsN = llvm::divideCeil(actualN, tileSizeN);
+  result.numWorkgroups = result.batch * result.numWGsM * result.numWGsN;
+
+  // Number of waves = ceil(WG / WGP)
+  result.numWaves = llvm::divideCeil(result.numWorkgroups, wgpCount);
+
+  // Quantization inefficiency = (ceil(WG/WGP) - WG/WGP) / ceil(WG/WGP)
+  // Simplifies to: 1 - WG / (ceil(WG/WGP) * WGP)
+  int64_t totalWGPSlots = result.numWaves * wgpCount;
+  result.inefficiency =
+      (totalWGPSlots > 0)
+          ? 1.0f - static_cast<float>(result.numWorkgroups) / totalWGPSlots
+          : 0.0f;
+
+  return result;
 }
 
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
@@ -688,6 +740,10 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
     LDBG() << "Chosen MMA schedule:\n" << schedule;
+    if (wgpCount.has_value()) {
+      LDBG() << computeQuantizationInefficiency(problem, schedule,
+                                                wgpCount.value());
+    }
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
