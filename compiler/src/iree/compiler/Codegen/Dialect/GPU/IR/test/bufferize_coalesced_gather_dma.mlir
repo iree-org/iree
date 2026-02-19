@@ -73,3 +73,18 @@ func.func @bufferize_coalesced_gather_dma_multiple_indices(%idx0: tensor<4xi32>,
 
 // CHECK-LABEL: func @bufferize_coalesced_gather_dma_multiple_indices
 //       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}}[%{{.+}}, %{{.+}}] into %{{.+}} lane(%{{.+}}) : memref<64x128xf32{{.+}}>, memref<4xi32{{.+}}>, memref<4xi32{{.+}}>, memref<4x128xf32{{.+}}>, index
+
+// -----
+
+// Test bufferization with in_bounds attribute (for fused tensor.pad).
+func.func @bufferize_coalesced_gather_dma_in_bounds(%source: tensor<4x32xf32>,
+                                                     %dest: tensor<4x64xf32>,
+                                                     %lane: index) -> tensor<4x64xf32> {
+  %result = iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+    in_bounds [true, false]
+    : tensor<4x32xf32>, tensor<4x64xf32>, index -> tensor<4x64xf32>
+  return %result : tensor<4x64xf32>
+}
+
+// CHECK-LABEL: func @bufferize_coalesced_gather_dma_in_bounds
+//       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) in_bounds [true, false] : memref<4x32xf32{{.+}}>, memref<4x64xf32{{.+}}>, index

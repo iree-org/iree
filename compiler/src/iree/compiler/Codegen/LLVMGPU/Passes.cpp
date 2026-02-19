@@ -482,6 +482,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  // Convert global load DMAs after reduction tiling but before pack
+  // decomposition. DecomposePackUnPackOps introduces linalg.transpose which
+  // breaks the source tracing in the coalesced DMA conversion.
   funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
 
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
