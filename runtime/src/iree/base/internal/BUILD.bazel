@@ -407,6 +407,24 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_library(
+    name = "cpu_set",
+    hdrs = ["cpu_set.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "cpu_set_test",
+    srcs = ["cpu_set_test.cc"],
+    deps = [
+        ":cpu_set",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 #===------------------------------------------------------------------------===#
 # Utilities with thread dependencies
 #===------------------------------------------------------------------------===#
