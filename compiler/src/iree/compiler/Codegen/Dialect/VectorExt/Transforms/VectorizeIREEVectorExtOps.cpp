@@ -661,16 +661,10 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
       /*index_base=*/indexBase,
       /*dimension=*/argCompareOp.getDimension());
 
-  // Clone comparator region. Clear auto-created block from
-  // SingleBlockImplicitTerminator (not tracked by rewriter), then recreate and
-  // populate using rewriter.
-  Region &dstRegion = vectorArgCompareOp.getRegion();
   Block *srcBlock = &srcRegion.front();
-
-  // Block auto-created by SingleBlockImplicitTerminator isn't rewriter-tracked.
-  dstRegion.getBlocks().clear();
-
-  // Create a new block with arguments using the rewriter.
+  Region &dstRegion = vectorArgCompareOp.getRegion();
+  rewriter.modifyOpInPlace(vectorArgCompareOp,
+                           [&]() { dstRegion.getBlocks().clear(); });
   SmallVector<Location> argLocs(srcBlock->getNumArguments(), loc);
   Block *dstBlock = rewriter.createBlock(&dstRegion, dstRegion.end(),
                                          srcBlock->getArgumentTypes(), argLocs);
