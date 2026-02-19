@@ -585,12 +585,11 @@ LogicalResult
 vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
                              IREE::LinalgExt::ArgCompareOp argCompareOp,
                              ArrayRef<int64_t> vectorSizes) {
-  auto loc = argCompareOp.getLoc();
+  Location loc = argCompareOp.getLoc();
   RewriterBase::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(argCompareOp);
 
-  ShapedType inputValTy =
-      cast<ShapedType>(argCompareOp.getInputValue().getType());
+  auto inputValTy = cast<ShapedType>(argCompareOp.getInputValue().getType());
   ShapedType outValTy = argCompareOp.getOutputValueType();
   ShapedType outIdxTy = argCompareOp.getOutputIndexType();
 
@@ -678,24 +677,23 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   // Clone operations from source block to destination block using rewriter.
   IRMapping mapper;
   for (auto [srcArg, dstArg] :
-       llvm::zip(srcBlock->getArguments(), dstBlock->getArguments())) {
+       llvm::zip_equal(srcBlock->getArguments(), dstBlock->getArguments())) {
     mapper.map(srcArg, dstArg);
   }
 
   rewriter.setInsertionPointToStart(dstBlock);
   for (Operation &op : srcBlock->getOperations()) {
-    if (isa<IREE::LinalgExt::YieldOp>(op)) {
-      // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
-      auto yieldOp = cast<IREE::LinalgExt::YieldOp>(op);
+    // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
+    if (auto yieldOp = dyn_cast<IREE::LinalgExt::YieldOp>(op)) {
       SmallVector<Value> mappedOperands;
       for (const auto &operand : yieldOp.getOperands()) {
         mappedOperands.push_back(mapper.lookup(operand));
       }
       IREE::VectorExt::YieldOp::create(rewriter, yieldOp.getLoc(),
                                        mappedOperands);
-    } else {
-      rewriter.clone(op, mapper);
+      continue;
     }
+    rewriter.clone(op, mapper);
   }
 
   // Set insertion point to after the vectorArgCompareOp for subsequent
@@ -703,8 +701,8 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   rewriter.setInsertionPointAfter(vectorArgCompareOp);
 
   SmallVector<Value> results;
-  for (auto [idx, result] : llvm::enumerate(vectorArgCompareOp.getResults())) {
-    Value output = argCompareOp.getDpsInits()[idx];
+  for (auto [result, output] : llvm::zip_equal(vectorArgCompareOp.getResults(),
+                                               argCompareOp.getDpsInits())) {
     SmallVector<Value> writeIndices(vectorSizes.size(), zero);
     auto writeOp = vector::TransferWriteOp::create(rewriter, loc, result,
                                                    output, writeIndices);

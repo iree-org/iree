@@ -207,25 +207,37 @@ void GenericVectorizationPass::runOnOperation() {
     scalableVecDims.resize(vectorSizes.size());
 
     // Try to vectorize to transfer_gather, if possible.
-    if (isa<linalg::GenericOp>(op) && vectorizeToTransferGather) {
-      (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
-          rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
-          /*vectorizeNDExtract=*/true);
-    } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
-      (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
-          rewriter, gatherOp, vectorSizes);
-    } else if (auto argCompareOp =
-                   dyn_cast<IREE::LinalgExt::ArgCompareOp>(op)) {
-      (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
-          rewriter, argCompareOp, vectorSizes);
-    } else {
-      FailureOr<linalg::VectorizationResult> result =
-          linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                            /*vectorizeNDExtract=*/true);
-      if (succeeded(result)) {
-        rewriter.replaceOp(op, result->replacements);
-      }
-    }
+    llvm::TypeSwitch<Operation *>(op)
+        .Case<linalg::GenericOp>([&](auto genericOp) {
+          if (vectorizeToTransferGather) {
+            (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
+                rewriter, genericOp, vectorSizes, scalableVecDims,
+                /*vectorizeNDExtract=*/true);
+          } else {
+            FailureOr<linalg::VectorizationResult> result =
+                linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                                  /*vectorizeNDExtract=*/true);
+            if (succeeded(result)) {
+              rewriter.replaceOp(op, result->replacements);
+            }
+          }
+        })
+        .Case<IREE::LinalgExt::GatherOp>([&](auto gatherOp) {
+          (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
+              rewriter, gatherOp, vectorSizes);
+        })
+        .Case<IREE::LinalgExt::ArgCompareOp>([&](auto argCompareOp) {
+          (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
+              rewriter, argCompareOp, vectorSizes);
+        })
+        .Default([&](Operation *op) {
+          FailureOr<linalg::VectorizationResult> result =
+              linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                                /*vectorizeNDExtract=*/true);
+          if (succeeded(result)) {
+            rewriter.replaceOp(op, result->replacements);
+          }
+        });
   };
 
   {
