@@ -1305,12 +1305,11 @@ static iree_status_t iree_async_proactor_io_uring_poll(
   // submits another SQE, which generates another CQE, etc.
   proactor->defer_submissions = true;
 
-  // Process all available CQEs.
+  // Process all available CQEs. peek_cqe returns NULL when the CQ is empty,
+  // combining the readiness check and CQE retrieval in a single atomic load.
   iree_host_size_t completed = 0;
-  while (iree_io_uring_ring_cq_ready(&proactor->ring)) {
-    iree_io_uring_cqe_t* cqe = iree_io_uring_ring_peek_cqe(&proactor->ring);
-    if (!cqe) break;
-
+  iree_io_uring_cqe_t* cqe;
+  while ((cqe = iree_io_uring_ring_peek_cqe(&proactor->ring)) != NULL) {
     // Process the CQE and add user completions to count.
     // Includes this operation's callback plus any directly-invoked continuation
     // callbacks. Returns 0 for suppressed CQEs (e.g., ZC send waiting for
@@ -1342,17 +1341,16 @@ static iree_status_t iree_async_proactor_io_uring_poll(
         iree_io_uring_ring_submit(&proactor->ring,
                                   /*min_complete=*/0,
                                   /*flags=*/IREE_IORING_ENTER_GETEVENTS));
-    if (!iree_io_uring_ring_cq_ready(&proactor->ring)) break;
+    cqe = iree_io_uring_ring_peek_cqe(&proactor->ring);
+    if (!cqe) break;
     // Defer submissions during processing to prevent io_uring_enter from
     // generating synchronous CQEs that the loop would pick up immediately
     // (the same infinite-loop prevention as the primary CQE loop above).
     proactor->defer_submissions = true;
-    while (iree_io_uring_ring_cq_ready(&proactor->ring)) {
-      iree_io_uring_cqe_t* cqe = iree_io_uring_ring_peek_cqe(&proactor->ring);
-      if (!cqe) break;
+    do {
       completed += iree_async_proactor_io_uring_process_cqe(proactor, cqe);
       iree_io_uring_ring_cq_advance(&proactor->ring, 1);
-    }
+    } while ((cqe = iree_io_uring_ring_peek_cqe(&proactor->ring)) != NULL);
     proactor->defer_submissions = false;
   }
 
