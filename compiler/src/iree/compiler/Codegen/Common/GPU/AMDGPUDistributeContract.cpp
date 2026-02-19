@@ -181,13 +181,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     std::iota(resBatchOrder.begin(), resBatchOrder.end(), 0);
     resBatchOrder = applyPermutationMap(resMap, ArrayRef(resBatchOrder));
 
-    // Check if deferred accumulator collapse is applicable.
-    // For VSMFMA intrinsics with kBatch > 1, we expand the ACC once before
-    // the K-loop and collapse once after, avoiding redundant expand/collapse
-    // on every iteration.
-    auto virtualMmaAttr = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind);
-    bool canDeferCollapse =
-        virtualMmaAttr && virtualMmaAttr.getExpandedAccType().has_value();
     auto [aVectorType, bVectorType, cVectorType] = mmaKind.getABCVectorTypes();
 
     std::optional<int64_t> kBatch =
@@ -197,8 +190,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(contractOp,
                                          "A/B vector k batch mismatch");
     }
-    bool expanded = canDeferCollapse && kBatch > 1;
-
     // Iterate over all result batches and unroll computation to direct MFMA
     // intrinsic ops.
     Location loc = contractOp.getLoc();
@@ -216,9 +207,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
           vector::ExtractOp::create(rewriter, loc, acc, resultBatchOffsets);
       Value currentAcc =
           vector::ShapeCastOp::create(rewriter, loc, cVectorType, accSlice);
-      if (expanded) {
-        currentAcc = IREE::GPU::expandAccumulator(rewriter, loc, currentAcc);
-      }
 
       // Perform contraction by doing separate outer product with amdgpu.mfma
       // operation and accumulate to the same vector.
@@ -250,9 +238,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         currentAcc = results.front();
       }
 
-      if (expanded) {
-        currentAcc = IREE::GPU::collapseAccumulator(rewriter, loc, currentAcc);
-      }
       accSlice = vector::ShapeCastOp::create(rewriter, loc, accSlice.getType(),
                                              currentAcc);
       finalTile = vector::InsertOp::create(rewriter, loc, accSlice, finalTile,

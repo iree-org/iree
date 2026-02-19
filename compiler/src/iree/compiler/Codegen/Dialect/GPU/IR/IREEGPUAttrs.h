@@ -306,10 +306,6 @@ Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle);
 
-// Helpers for accumulator expand/collapse for VSMFMA.
-Value expandAccumulator(OpBuilder &builder, Location loc, Value acc);
-Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc);
-
 } // namespace mlir::iree_compiler::IREE::GPU
 
 // clang-format off

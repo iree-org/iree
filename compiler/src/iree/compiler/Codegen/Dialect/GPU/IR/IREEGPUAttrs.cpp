@@ -1406,7 +1406,7 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 }
 
 // Expand collapsed ACC [c0, c1] -> [c0, 0, c1, 0].
-Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
+static Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
   auto accType = cast<VectorType>(acc.getType());
   Value zero =
       arith::ConstantOp::create(builder, loc, builder.getZeroAttr(accType));
@@ -1416,7 +1416,7 @@ Value expandAccumulator(OpBuilder &builder, Location loc, Value acc) {
 }
 
 // Collapse expanded ACC [d0, d1, d2, d3] -> [d0+d1, d2+d3].
-Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
+static Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc) {
   auto accType = cast<VectorType>(acc.getType());
   Type elementType = accType.getElementType();
 
@@ -1494,18 +1494,13 @@ struct VSMFMAConfig {
 // The layout and distribution infrastructure operate on the collapsed vector
 // (e.g vector<2xf32>). buildVSMFMAOp handles the translation: it expands
 // a collapsed accumulator into the 4-element physical form before the smfmac,
-// then collapses the result back afterward. When kBatch > 1 (multiple
-// K-iterations in the distribution loop), intermediate expand/collapse pairs
-// are elided -- the accumulator stays in expanded form across iterations, and
-// only the final result is collapsed.
+// then collapses the result back afterward.
 static LogicalResult buildVSMFMAOp(OpBuilder &builder, Location loc,
                                    const VSMFMAConfig &config,
                                    ValueRange inputs, Value acc,
                                    VectorType expandedAccType,
                                    SmallVectorImpl<Value> &results) {
-  // Expand accumulator for kBatch > 1 and if this is the first VSMFMA.
-  bool accIsExpanded = cast<VectorType>(acc.getType()) == expandedAccType;
-  Value smfmacAcc = accIsExpanded ? acc : expandAccumulator(builder, loc, acc);
+  Value smfmacAcc = expandAccumulator(builder, loc, acc);
 
   // Find lane ID parity.
   Value isOddLane = createLaneParityPredicate(builder, loc);
@@ -1528,10 +1523,7 @@ static LogicalResult buildVSMFMAOp(OpBuilder &builder, Location loc,
       inputs[1], smfmacAcc, sparseIndex,
       /*cbsz=*/0, /*abid=*/0);
 
-  // Collapse accumulator for kBatch > 1 and if this is the last SVMFMA.
-  Value result = accIsExpanded
-                     ? smfmacResult
-                     : collapseAccumulator(builder, loc, smfmacResult);
+  Value result = collapseAccumulator(builder, loc, smfmacResult);
   results.push_back(result);
   return success();
 }
@@ -1555,14 +1547,13 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     return failure();
   }
 
-  // Output (acc) can match either collapsed or expanded type.
-  // When the caller passes an expanded acc, we skip internal expand/collapse
-  // to support deferred accumulator collapse across K-loop iterations.
   VectorType accType = cast<VectorType>(outputs[0].getType());
-  std::optional<VectorType> expandedAccType = getExpandedAccType();
-  if (accType != threadTypes.back() && expandedAccType != accType) {
+  if (accType != threadTypes.back()) {
     return failure();
   }
+
+  // VSMFMA intrinsics need the expanded accumulator type for the smfmac op.
+  std::optional<VectorType> expandedAccType = getExpandedAccType();
 
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
