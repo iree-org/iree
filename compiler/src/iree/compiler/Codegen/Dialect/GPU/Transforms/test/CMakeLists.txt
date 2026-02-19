@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "combine_barrier_regions.mlir"
     "distribute_inner_tiled_to_lanes.mlir"
     "expand_undistributed_inner_tiles.mlir"
   TOOLS

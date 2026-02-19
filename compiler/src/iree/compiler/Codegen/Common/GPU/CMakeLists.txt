@@ -58,7 +58,7 @@ iree_cc_library(
     "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineLayoutTransformation.cpp"
-    "GPUCombineValueBarriers.cpp"
+    "GPUCombineValueSemanticBarriers.cpp"
     "GPUConvertToCoalescedDMA.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"

@@ -97,3 +97,19 @@ func.func @do_not_hoist_scf_while() {
 //       CHECK:     scf.condition
 //       CHECK:     arith.addf
 //       CHECK:     scf.yield
+
+// -----
+
+func.func @hoist_from_barrier_region(%arg0: tensor<6xf32>, %arg1: f32) -> tensor<1xf32> {
+  %0 = iree_gpu.barrier_region ins(%arg0 : tensor<6xf32>) {
+  ^bb0(%intermediate: tensor<6xf32>):
+    %add = arith.addf %arg1, %arg1 : f32
+    %slice = tensor.extract_slice %intermediate[1] [1] [1] : tensor<6xf32> to tensor<1xf32>
+    iree_gpu.yield %slice : tensor<1xf32>
+  } : tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// CHECK-LABEL: @hoist_from_barrier_region
+//       CHECK:   arith.addf
+//       CHECK:   iree_gpu.barrier_region

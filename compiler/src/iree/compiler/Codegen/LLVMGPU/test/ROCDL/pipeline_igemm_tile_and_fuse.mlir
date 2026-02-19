@@ -151,8 +151,8 @@ hal.executable private @main {
 //          CHECK:   scf.forall ({{.*}}) in (17, 1, 81) {
 //          CHECK:     %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
+//          CHECK:       vector.transfer_read {{.*}} vector<4xf16>
+//          CHECK:       vector.transfer_read {{.*}} vector<4x1x1xf16>
 // CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 //          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]]
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
@@ -229,7 +229,7 @@ hal.executable private @main {
 //          CHECK:     scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<1x1x1x1x4x1xf32>)
 //          CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
-//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4xf16>
+//      CHECK-DAG:       vector.transfer_read {{.*}} vector<4x1x1xf16>
 //  CHECK-COUNT-1:       amdgpu.mfma 16x16x16
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 

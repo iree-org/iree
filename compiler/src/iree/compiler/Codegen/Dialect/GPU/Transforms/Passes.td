@@ -9,12 +9,6 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CombineBarrierRegionsPass :
-    Pass<"iree-gpu-combine-barrier-regions", ""> {
-  let summary = "Combines `iree_gpu.barrier_region` ops";
-  let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
-}
-
 def DistributeInnerTiledToLanesPass :
     InterfacePass<"iree-gpu-distribute-inner-tiled-to-lanes", "mlir::FunctionOpInterface"> {
   let summary = "Distributes iree_codegen.inner_tiled ops to lanes";
