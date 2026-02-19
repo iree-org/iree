@@ -252,6 +252,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform
   MLIRPythonSources.Dialects.transform.extras
   MLIRPythonSources.Dialects.transform.interpreter
+  MLIRPythonSources.Dialects.ub
   MLIRPythonSources.Dialects.vector
   MLIRPythonSources.Dialects.vector_transform
   MLIRPythonSources.Dialects.loop_transform
