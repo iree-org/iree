@@ -581,44 +581,6 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   return success();
 }
 
-/// Vectorizes iree_linalg_ext.arg_compare to iree_vector_ext.arg_compare.
-///
-/// This function performs a straightforward transformation: it wraps the
-/// iree_linalg_ext.arg_compare operation with vector.transfer_read/write
-/// operations to create a vector version, and creates an equivalent
-/// iree_vector_ext.arg_compare operation in between.
-///
-/// Example transformation (implicit-index mode):
-///
-/// %result:2 = iree_linalg_ext.arg_compare
-///   dimension(1)
-///   ins(%input : tensor<4x128xf32>)
-///   outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
-/// ^bb0(%a: f32, %b: f32):
-///   %cmp = arith.cmpf ogt, %a, %b : f32
-///   iree_linalg_ext.yield %cmp : i1
-/// } -> tensor<4xf32>, tensor<4xi32>
-///
-/// Vectorizes to:
-///
-/// %input_vec = vector.transfer_read %input[%c0, %c0]
-///   : tensor<4x128xf32>, vector<4x128xf32>
-/// %out_val_vec = vector.transfer_read %out_val[%c0]
-///   : tensor<4xf32>, vector<4xf32>
-/// %out_idx_vec = vector.transfer_read %out_idx[%c0]
-///   : tensor<4xi32>, vector<4xi32>
-/// %result_vec:2 = iree_vector_ext.arg_compare
-///   dimension(1)
-///   ins(%input_vec : vector<4x128xf32>)
-///   inits(%out_val_vec, %out_idx_vec : vector<4xf32>, vector<4xi32>) {
-/// ^bb0(%a: f32, %b: f32):
-///   %cmp = arith.cmpf ogt, %a, %b : f32
-///   iree_vector_ext.yield %cmp : i1
-/// } -> vector<4xf32>, vector<4xi32>
-/// %write_val = vector.transfer_write %result_vec#0, %out_val[%c0]
-///   : vector<4xf32>, tensor<4xf32>
-/// %write_idx = vector.transfer_write %result_vec#1, %out_idx[%c0]
-///   : vector<4xi32>, tensor<4xi32>
 LogicalResult
 vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
                              IREE::LinalgExt::ArgCompareOp argCompareOp,
@@ -627,6 +589,8 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   RewriterBase::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(argCompareOp);
 
+  ShapedType inputValTy =
+      cast<ShapedType>(argCompareOp.getInputValue().getType());
   ShapedType outValTy = argCompareOp.getOutputValueType();
   ShapedType outIdxTy = argCompareOp.getOutputIndexType();
 
@@ -635,7 +599,14 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   }
 
   // Only static shapes are supported. Dynamic shapes would require masking.
-  if (!outValTy.hasStaticShape()) {
+  // Check input shape (includes reduction dimension) to catch dynamic reduction
+  // dimensions that wouldn't appear in the static output shape.
+  if (!inputValTy.hasStaticShape()) {
+    return failure();
+  }
+
+  // Ensure full tiles - partial tiles would require masking support.
+  if (vectorSizes != outValTy.getShape()) {
     return failure();
   }
 
@@ -665,9 +636,8 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
   SmallVector<Value> initVecs;
   for (Value init : argCompareOp.getDpsInits()) {
     auto initTy = cast<ShapedType>(init.getType());
-    SmallVector<Value> readIndices(initTy.getRank(), zero);
-    auto initVecTy =
-        VectorType::get(initTy.getShape(), initTy.getElementType());
+    SmallVector<Value> readIndices(vectorSizes.size(), zero);
+    auto initVecTy = VectorType::get(vectorSizes, initTy.getElementType());
     auto readOp = vector::TransferReadOp::create(rewriter, loc, initVecTy, init,
                                                  readIndices, std::nullopt);
     initVecs.push_back(readOp);
@@ -692,26 +662,50 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
       /*index_base=*/indexBase,
       /*dimension=*/argCompareOp.getDimension());
 
-  // Clone the comparator region from LinalgExt op to VectorExt op.
-  // Clear the auto-created empty block first (from
-  // SingleBlockImplicitTerminator).
+  // Clone comparator region. Clear auto-created block from
+  // SingleBlockImplicitTerminator (not tracked by rewriter), then recreate and
+  // populate using rewriter.
   Region &dstRegion = vectorArgCompareOp.getRegion();
-  dstRegion.getBlocks().clear();
-  rewriter.cloneRegionBefore(srcRegion, dstRegion, dstRegion.begin());
+  Block *srcBlock = &srcRegion.front();
 
-  // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
-  Block &block = dstRegion.front();
-  auto oldYield = cast<IREE::LinalgExt::YieldOp>(block.getTerminator());
-  OpBuilder builder(oldYield);
-  IREE::VectorExt::YieldOp::create(builder, oldYield.getLoc(),
-                                   oldYield.getOperands());
-  oldYield.erase();
+  dstRegion.getBlocks().clear(); // Clear untracked auto-created block.
+
+  // Create a new block with arguments using the rewriter.
+  SmallVector<Location> argLocs(srcBlock->getNumArguments(), loc);
+  Block *dstBlock = rewriter.createBlock(&dstRegion, dstRegion.end(),
+                                         srcBlock->getArgumentTypes(), argLocs);
+
+  // Clone operations from source block to destination block using rewriter.
+  IRMapping mapper;
+  for (auto [srcArg, dstArg] :
+       llvm::zip(srcBlock->getArguments(), dstBlock->getArguments())) {
+    mapper.map(srcArg, dstArg);
+  }
+
+  rewriter.setInsertionPointToStart(dstBlock);
+  for (Operation &op : srcBlock->getOperations()) {
+    if (isa<IREE::LinalgExt::YieldOp>(op)) {
+      // Replace LinalgExt::YieldOp with VectorExt::YieldOp.
+      auto yieldOp = cast<IREE::LinalgExt::YieldOp>(op);
+      SmallVector<Value> mappedOperands;
+      for (const auto &operand : yieldOp.getOperands()) {
+        mappedOperands.push_back(mapper.lookup(operand));
+      }
+      IREE::VectorExt::YieldOp::create(rewriter, yieldOp.getLoc(),
+                                       mappedOperands);
+    } else {
+      rewriter.clone(op, mapper);
+    }
+  }
+
+  // Set insertion point to after the vectorArgCompareOp for subsequent
+  // operations.
+  rewriter.setInsertionPointAfter(vectorArgCompareOp);
 
   SmallVector<Value> results;
   for (auto [idx, result] : llvm::enumerate(vectorArgCompareOp.getResults())) {
     Value output = argCompareOp.getDpsInits()[idx];
-    auto outputTy = cast<ShapedType>(output.getType());
-    SmallVector<Value> writeIndices(outputTy.getRank(), zero);
+    SmallVector<Value> writeIndices(vectorSizes.size(), zero);
     auto writeOp = vector::TransferWriteOp::create(rewriter, loc, result,
                                                    output, writeIndices);
     results.push_back(writeOp.getResult());
