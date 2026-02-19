@@ -64,6 +64,29 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const GemmSize &gemmSize) {
   }
 }
 
+/// Computes L1 cache usage per wave for a given schedule.
+/// Returns: (tile_size(LHS) + tile_size(RHS)) * threads(WG) / waveSize
+/// This represents the total bytes accessed by all threads in a workgroup,
+/// normalized by wave size.
+static int64_t computeL1CacheUsagePerWave(const GPUMMASchedule &schedule,
+                                          int64_t lhsBitwidth,
+                                          int64_t rhsBitwidth,
+                                          int64_t threadsPerWG,
+                                          int64_t waveSize) {
+  int64_t tileM = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
+                  schedule.getTotalMSubgroupCount();
+  int64_t tileN = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
+                  schedule.getTotalNSubgroupCount();
+  int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
+
+  // tile_size(LHS) = tileM * tileK * lhsBitwidth / 8
+  // tile_size(RHS) = tileN * tileK * rhsBitwidth / 8
+  int64_t lhsBytes = (tileM * tileK * lhsBitwidth) / 8;
+  int64_t rhsBytes = (tileN * tileK * rhsBitwidth) / 8;
+
+  return (lhsBytes + rhsBytes) * threadsPerWG / waveSize;
+}
+
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
     const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
     int64_t lhsScaleBitwidth = 0, int64_t rhsScaleBitwidth = 0,
@@ -688,6 +711,16 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
     LDBG() << "Chosen MMA schedule:\n" << schedule;
+
+    {
+      int64_t lhsBw = intrinsic.aType.getIntOrFloatBitWidth();
+      int64_t rhsBw = intrinsic.bType.getIntOrFloatBitWidth();
+      int64_t threadsPerWG = subgroupSize * schedule.getTotalMSubgroupCount() *
+                             schedule.getTotalNSubgroupCount();
+      int64_t l1Usage = computeL1CacheUsagePerWave(schedule, lhsBw, rhsBw,
+                                                   threadsPerWG, subgroupSize);
+      LDBG() << "L1CacheUsagePerWave: " << l1Usage << " bytes";
+    }
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
