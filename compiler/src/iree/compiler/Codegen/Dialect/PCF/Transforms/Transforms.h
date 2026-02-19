@@ -24,6 +24,7 @@ namespace mlir::scf {
 class ForallOp;
 } // namespace mlir::scf
 namespace mlir::tensor {
+class ExpandShapeOp;
 class ExtractSliceOp;
 } // namespace mlir::tensor
 
@@ -148,6 +149,20 @@ LogicalResult
 fuseExtractSliceIntoProducerGeneric(RewriterBase &rewriter,
                                     PCF::GenericOp genericOp,
                                     tensor::ExtractSliceOp extractSliceOp);
+
+// Fuse a tensor.expand_shape consumer into a pcf.loop producer. This expands
+// the result shape and de-linearizes all write_slice offsets/sizes accordingly.
+LogicalResult fuseExpandShapeIntoProducerLoop(RewriterBase &rewriter,
+                                              PCF::LoopOp loopOp,
+                                              tensor::ExpandShapeOp expandOp);
+
+// Fuse a tensor.expand_shape consumer into a pcf.generic producer. This
+// expands the result shape and de-linearizes all write_slice offsets/sizes
+// accordingly.
+LogicalResult
+fuseExpandShapeIntoProducerGeneric(RewriterBase &rewriter,
+                                   PCF::GenericOp genericOp,
+                                   tensor::ExpandShapeOp expandOp);
 
 // Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
 // scf.forall terminator. The write_slice's destination must be produced by the

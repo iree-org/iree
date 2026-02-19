@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "convert_forall_to_loops.mlir"
     "convert_sref_to_memref.mlir"
     "fuse_consumers.mlir"
+    "fuse_expand_shape.mlir"
     "fuse_pcf_writes.mlir"
     "fuse_producers.mlir"
     "lower_structural_pcf.mlir"

@@ -12,6 +12,7 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
@@ -36,7 +37,7 @@ struct FuseConsumersPass final
   void runOnOperation() override;
 };
 
-struct FuseIntoGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
+struct FuseIntoGenericOp final : OpRewritePattern<IREE::PCF::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -61,7 +62,7 @@ struct FuseIntoGenericOp : public OpRewritePattern<IREE::PCF::GenericOp> {
   }
 };
 
-struct FuseIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
+struct FuseIntoLoopOp final : OpRewritePattern<IREE::PCF::LoopOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::PCF::LoopOp loopOp,
                                 PatternRewriter &rewriter) const override {
@@ -86,8 +87,8 @@ struct FuseIntoLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
   }
 };
 
-struct FuseExtractSliceIntoLoopOp
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct FuseExtractSliceIntoLoopOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -104,8 +105,8 @@ struct FuseExtractSliceIntoLoopOp
   }
 };
 
-struct FuseExtractSliceIntoGenericOp
-    : public OpRewritePattern<tensor::ExtractSliceOp> {
+struct FuseExtractSliceIntoGenericOp final
+    : OpRewritePattern<tensor::ExtractSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -124,6 +125,34 @@ struct FuseExtractSliceIntoGenericOp
   }
 };
 
+struct FuseExpandShapeIntoGenericOp final
+    : OpRewritePattern<tensor::ExpandShapeOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    IREE::PCF::GenericOp genericOp =
+        expandOp.getSrc().getDefiningOp<IREE::PCF::GenericOp>();
+    if (!genericOp) {
+      return rewriter.notifyMatchFailure(expandOp, "no generic op producer");
+    }
+    return fuseExpandShapeIntoProducerGeneric(rewriter, genericOp, expandOp);
+  }
+};
+
+struct FuseExpandShapeIntoLoopOp final
+    : OpRewritePattern<tensor::ExpandShapeOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
+                                PatternRewriter &rewriter) const override {
+    IREE::PCF::LoopOp loopOp =
+        expandOp.getSrc().getDefiningOp<IREE::PCF::LoopOp>();
+    if (!loopOp) {
+      return rewriter.notifyMatchFailure(expandOp, "no loop op producer");
+    }
+    return fuseExpandShapeIntoProducerLoop(rewriter, loopOp, expandOp);
+  }
+};
+
 WalkResult verifyOperationLegality(Operation *op) {
   if (isa<UnrealizedConversionCastOp>(op)) {
     return WalkResult::interrupt();
@@ -135,6 +164,8 @@ void FuseConsumersPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<FuseIntoGenericOp, FuseIntoLoopOp>(&getContext());
   patterns.add<FuseExtractSliceIntoLoopOp, FuseExtractSliceIntoGenericOp>(
+      &getContext());
+  patterns.add<FuseExpandShapeIntoGenericOp, FuseExpandShapeIntoLoopOp>(
       &getContext());
   populatePCFDropUnusedResultPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
@@ -859,6 +890,611 @@ fuseExtractSliceIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
   return success();
 }
 
+//===---------------------------------------------------------------------===//
+// Expand shape consumer fusion
+//===---------------------------------------------------------------------===//
+
+/// Classifies whether a collapsed offset/size pair is aligned to innerProduct.
+enum class AlignmentStatus { Aligned, Unaligned, Dynamic };
+
+/// Determines alignment status of a write_slice's offset and size
+/// with respect to the innerProduct of a reassociation group.
+static AlignmentStatus classifyAlignment(OpFoldResult offset, OpFoldResult size,
+                                         int64_t innerProduct) {
+  if (innerProduct == 1) {
+    return AlignmentStatus::Aligned;
+  }
+  std::optional<int64_t> constOffset = getConstantIntValue(offset);
+  std::optional<int64_t> constSize = getConstantIntValue(size);
+  if (constOffset && constSize) {
+    if (*constOffset % innerProduct == 0 && *constSize % innerProduct == 0) {
+      return AlignmentStatus::Aligned;
+    }
+    return AlignmentStatus::Unaligned;
+  }
+  // If either is dynamic but the known one is statically unaligned, fail.
+  if (constOffset && *constOffset % innerProduct != 0) {
+    return AlignmentStatus::Unaligned;
+  }
+  if (constSize && *constSize % innerProduct != 0) {
+    return AlignmentStatus::Unaligned;
+  }
+  return AlignmentStatus::Dynamic;
+}
+
+/// Computes the inner product for a multi-dim reassociation group.
+static int64_t computeInnerProduct(const ReassociationIndices &group,
+                                   ArrayRef<int64_t> expandedShape) {
+  int64_t innerProduct = 1;
+  for (size_t i = 1, e = group.size(); i < e; ++i) {
+    innerProduct *= expandedShape[group[i]];
+  }
+  return innerProduct;
+}
+
+/// Computes expanded offsets and sizes for the aligned case. For each
+/// reassociation group, the collapsed offset/size is de-linearized: the outer
+/// dimension gets offset/innerProduct and size/innerProduct, while inner
+/// dimensions get offset=0 and size=expandedDimSize.
+static void computeExpandedOffsetsAndSizes(
+    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sliceOffsets,
+    ArrayRef<OpFoldResult> sliceSizes, ArrayRef<int64_t> expandedShape,
+    ArrayRef<ReassociationIndices> reassociation,
+    SmallVectorImpl<OpFoldResult> &expandedOffsets,
+    SmallVectorImpl<OpFoldResult> &expandedSizes) {
+  for (const auto &[srcDim, group] : llvm::enumerate(reassociation)) {
+    if (group.size() == 1) {
+      // Singleton group: offset and size pass through.
+      expandedOffsets.push_back(sliceOffsets[srcDim]);
+      expandedSizes.push_back(sliceSizes[srcDim]);
+      continue;
+    }
+    // Multi-dim group. Compute the product of inner dimension sizes.
+    int64_t innerProduct = computeInnerProduct(group, expandedShape);
+
+    // Outer offset = collapsed_offset / innerProduct.
+    AffineExpr d0;
+    bindDims(builder.getContext(), d0);
+    AffineMap divMap =
+        AffineMap::get(1, 0, d0.floorDiv(innerProduct), builder.getContext());
+    OpFoldResult outerOffset = affine::makeComposedFoldedAffineApply(
+        builder, loc, divMap, {sliceOffsets[srcDim]});
+    expandedOffsets.push_back(outerOffset);
+
+    // Inner offsets are all zero.
+    for (size_t i = 1, e = group.size(); i < e; ++i) {
+      expandedOffsets.push_back(builder.getIndexAttr(0));
+    }
+
+    // Outer size = collapsed_size / innerProduct.
+    OpFoldResult outerSize = affine::makeComposedFoldedAffineApply(
+        builder, loc, divMap, {sliceSizes[srcDim]});
+    expandedSizes.push_back(outerSize);
+
+    // Inner sizes are the full dimension sizes.
+    for (size_t i = 1, e = group.size(); i < e; ++i) {
+      expandedSizes.push_back(builder.getIndexAttr(expandedShape[group[i]]));
+    }
+  }
+}
+
+/// Emits a single expanded write_slice for the aligned case. The source tensor
+/// is expanded with the same reassociation and written at de-linearized
+/// offsets/sizes.
+static void
+emitAlignedWriteSlice(OpBuilder &builder, Location loc, Value source,
+                      Value dest, ArrayRef<OpFoldResult> sliceOffsets,
+                      ArrayRef<OpFoldResult> sliceSizes,
+                      ArrayRef<int64_t> expandedShape,
+                      ArrayRef<ReassociationIndices> reassociation) {
+  RankedTensorType sourceType = cast<RankedTensorType>(source.getType());
+
+  // Compute expanded offsets and sizes.
+  SmallVector<OpFoldResult> expandedOffsets, expandedSizes;
+  computeExpandedOffsetsAndSizes(builder, loc, sliceOffsets, sliceSizes,
+                                 expandedShape, reassociation, expandedOffsets,
+                                 expandedSizes);
+
+  // Compute the expanded source type and output_shape.
+  SmallVector<int64_t> expandedSourceShape;
+  SmallVector<OpFoldResult> sourceOutputShape;
+  for (const auto &[srcDim, group] : llvm::enumerate(reassociation)) {
+    if (group.size() == 1) {
+      int64_t dimSize = sourceType.getDimSize(srcDim);
+      expandedSourceShape.push_back(dimSize);
+      if (ShapedType::isDynamic(dimSize)) {
+        Value dimVal = tensor::DimOp::create(
+            builder, loc, source,
+            arith::ConstantIndexOp::create(builder, loc, srcDim));
+        sourceOutputShape.push_back(dimVal);
+      } else {
+        sourceOutputShape.push_back(builder.getIndexAttr(dimSize));
+      }
+      continue;
+    }
+    int64_t innerProduct = computeInnerProduct(group, expandedShape);
+
+    // Outer dim of expanded source.
+    int64_t srcDimSize = sourceType.getDimSize(srcDim);
+    if (ShapedType::isDynamic(srcDimSize)) {
+      expandedSourceShape.push_back(ShapedType::kDynamic);
+      Value srcDimVal = tensor::DimOp::create(
+          builder, loc, source,
+          arith::ConstantIndexOp::create(builder, loc, srcDim));
+      Value innerProdVal =
+          arith::ConstantIndexOp::create(builder, loc, innerProduct);
+      Value outerDimVal =
+          arith::DivUIOp::create(builder, loc, srcDimVal, innerProdVal);
+      sourceOutputShape.push_back(outerDimVal);
+    } else {
+      int64_t outerSize = srcDimSize / innerProduct;
+      expandedSourceShape.push_back(outerSize);
+      sourceOutputShape.push_back(builder.getIndexAttr(outerSize));
+    }
+
+    // Inner dims: full static sizes.
+    for (size_t i = 1, e = group.size(); i < e; ++i) {
+      expandedSourceShape.push_back(expandedShape[group[i]]);
+      sourceOutputShape.push_back(
+          builder.getIndexAttr(expandedShape[group[i]]));
+    }
+  }
+
+  RankedTensorType expandedSourceType =
+      RankedTensorType::get(expandedSourceShape, sourceType.getElementType());
+
+  Value expandedSource =
+      tensor::ExpandShapeOp::create(builder, loc, expandedSourceType, source,
+                                    reassociation, sourceOutputShape);
+
+  // Create the new write_slice with expanded offsets/sizes.
+  SmallVector<OpFoldResult> strides(expandedOffsets.size(),
+                                    builder.getIndexAttr(1));
+  PCF::WriteSliceOp::create(builder, loc, expandedSource, dest, expandedOffsets,
+                            expandedSizes, strides);
+}
+
+/// Emits an scf.for loop that iterates over sub-tiles of the collapsed
+/// source tensor and writes each sub-tile to the correct position in the
+/// expanded destination. Used when the collapsed tile is not aligned to the
+/// innerProduct boundary, meaning it may span multiple "rows" in the outermost
+/// expanded dimension.
+///
+/// For a 2-dim reassociation group [outer, inner] with innerProduct = N:
+///   - The loop iterates from firstRow = off/N to ceil((off+sz)/N).
+///   - Each iteration computes the chunk within that row, extracts it from
+///     the source, reshapes to [1, chunk] and writes to [row, col].
+static void emitSubTileLoop(OpBuilder &builder, Location loc, Value source,
+                            Value dest, ArrayRef<OpFoldResult> sliceOffsets,
+                            ArrayRef<OpFoldResult> sliceSizes,
+                            ArrayRef<int64_t> expandedShape,
+                            ArrayRef<ReassociationIndices> reassociation,
+                            unsigned groupIdx, int64_t innerProduct) {
+  RankedTensorType sourceType = cast<RankedTensorType>(source.getType());
+
+  // Materialize offset and size as Values.
+  Value off =
+      getValueOrCreateConstantIndexOp(builder, loc, sliceOffsets[groupIdx]);
+  Value sz =
+      getValueOrCreateConstantIndexOp(builder, loc, sliceSizes[groupIdx]);
+  Value innerProdVal =
+      arith::ConstantIndexOp::create(builder, loc, innerProduct);
+  Value c1 = arith::ConstantIndexOp::create(builder, loc, 1);
+
+  // Loop bounds.
+  Value firstRow = arith::DivUIOp::create(builder, loc, off, innerProdVal);
+  Value end = arith::AddIOp::create(builder, loc, off, sz);
+  Value upper = arith::CeilDivUIOp::create(builder, loc, end, innerProdVal);
+
+  // Compute expanded offsets/sizes for non-iterated groups (used in all
+  // iterations). For singleton groups, pass through. For other aligned
+  // multi-dim groups, use the standard de-linearization.
+  SmallVector<OpFoldResult> baseExpandedOffsets, baseExpandedSizes;
+  computeExpandedOffsetsAndSizes(builder, loc, sliceOffsets, sliceSizes,
+                                 expandedShape, reassociation,
+                                 baseExpandedOffsets, baseExpandedSizes);
+
+  // Precompute the expanded dim index where the iterated group starts.
+  unsigned expandedGroupStart = 0;
+  for (unsigned i = 0; i < groupIdx; ++i) {
+    expandedGroupStart += reassociation[i].size();
+  }
+
+  scf::ForOp::create(
+      builder, loc, firstRow, upper, c1, /*iterArgs=*/ValueRange{},
+      [&](OpBuilder &b, Location l, Value row, ValueRange /*iterArgs*/) {
+        // Compute per-iteration bounds.
+        Value rowStart = arith::MulIOp::create(b, l, row, innerProdVal);
+        Value tileStart = arith::MaxUIOp::create(b, l, off, rowStart);
+        Value rowEnd = arith::AddIOp::create(b, l, rowStart, innerProdVal);
+        Value tileEnd = arith::MinUIOp::create(b, l, end, rowEnd);
+        Value colStart = arith::SubIOp::create(b, l, tileStart, rowStart);
+        Value chunkSize = arith::SubIOp::create(b, l, tileEnd, tileStart);
+        Value srcOffset = arith::SubIOp::create(b, l, tileStart, off);
+
+        // Build extract_slice offsets/sizes for the source tensor.
+        SmallVector<OpFoldResult> extractOffsets, extractSizes, extractStrides;
+        SmallVector<int64_t> extractShape;
+        for (unsigned i = 0, e = sourceType.getRank(); i < e; ++i) {
+          if (i == groupIdx) {
+            extractOffsets.push_back(srcOffset);
+            extractSizes.push_back(chunkSize);
+            extractShape.push_back(ShapedType::kDynamic);
+          } else {
+            extractOffsets.push_back(b.getIndexAttr(0));
+            extractSizes.push_back(sliceSizes[i]);
+            extractShape.push_back(sourceType.getDimSize(i));
+          }
+          extractStrides.push_back(b.getIndexAttr(1));
+        }
+
+        RankedTensorType extractType =
+            RankedTensorType::get(extractShape, sourceType.getElementType());
+
+        Value sub = tensor::ExtractSliceOp::create(b, l, extractType, source,
+                                                   extractOffsets, extractSizes,
+                                                   extractStrides);
+
+        // Expand the sub-tile to match the expanded sref rank.
+        // For the iterated group: [chunkSize] -> [1, chunkSize].
+        SmallVector<int64_t> expandedSubShape;
+        SmallVector<OpFoldResult> subOutputShape;
+        for (const auto &[dim, group] : llvm::enumerate(reassociation)) {
+          if (dim == groupIdx) {
+            // Iterated group: outer dim = 1, inner dim = chunkSize.
+            expandedSubShape.push_back(1);
+            subOutputShape.push_back(b.getIndexAttr(1));
+            expandedSubShape.push_back(ShapedType::kDynamic);
+            subOutputShape.push_back(chunkSize);
+            // For 3+ dim groups, remaining inner dims are full static sizes.
+            for (size_t i = 2, e = group.size(); i < e; ++i) {
+              expandedSubShape.push_back(expandedShape[group[i]]);
+              subOutputShape.push_back(b.getIndexAttr(expandedShape[group[i]]));
+            }
+          } else if (group.size() == 1) {
+            int64_t dimSize = extractShape[dim];
+            expandedSubShape.push_back(dimSize);
+            if (ShapedType::isDynamic(dimSize)) {
+              Value dimVal = tensor::DimOp::create(
+                  b, l, sub, arith::ConstantIndexOp::create(b, l, dim));
+              subOutputShape.push_back(dimVal);
+            } else {
+              subOutputShape.push_back(b.getIndexAttr(dimSize));
+            }
+          } else {
+            // Other multi-dim group (must be aligned). Expand like aligned
+            // path.
+            int64_t groupInnerProd = computeInnerProduct(group, expandedShape);
+            int64_t srcDimSize = extractShape[dim];
+            if (ShapedType::isDynamic(srcDimSize)) {
+              expandedSubShape.push_back(ShapedType::kDynamic);
+              Value srcDimVal = tensor::DimOp::create(
+                  b, l, sub, arith::ConstantIndexOp::create(b, l, dim));
+              Value ipVal =
+                  arith::ConstantIndexOp::create(b, l, groupInnerProd);
+              Value outerVal = arith::DivUIOp::create(b, l, srcDimVal, ipVal);
+              subOutputShape.push_back(outerVal);
+            } else {
+              int64_t outerSize = srcDimSize / groupInnerProd;
+              expandedSubShape.push_back(outerSize);
+              subOutputShape.push_back(b.getIndexAttr(outerSize));
+            }
+            for (size_t i = 1, e = group.size(); i < e; ++i) {
+              expandedSubShape.push_back(expandedShape[group[i]]);
+              subOutputShape.push_back(b.getIndexAttr(expandedShape[group[i]]));
+            }
+          }
+        }
+
+        RankedTensorType expandedSubType = RankedTensorType::get(
+            expandedSubShape, sourceType.getElementType());
+
+        Value expandedSub = tensor::ExpandShapeOp::create(
+            b, l, expandedSubType, sub, reassociation, subOutputShape);
+
+        // Build expanded offsets/sizes for the write_slice. Override the
+        // iterated group's entries.
+        SmallVector<OpFoldResult> writeOffsets(baseExpandedOffsets);
+        SmallVector<OpFoldResult> writeSizes(baseExpandedSizes);
+
+        // Outer dim: offset = row, size = 1.
+        writeOffsets[expandedGroupStart] = row;
+        writeSizes[expandedGroupStart] = b.getIndexAttr(1);
+
+        // First inner dim: offset = colStart, size = chunkSize.
+        writeOffsets[expandedGroupStart + 1] = colStart;
+        writeSizes[expandedGroupStart + 1] = chunkSize;
+
+        // Remaining inner dims (if any): offset = 0, size = full (already set
+        // by computeExpandedOffsetsAndSizes).
+
+        SmallVector<OpFoldResult> strides(writeOffsets.size(),
+                                          b.getIndexAttr(1));
+        PCF::WriteSliceOp::create(b, l, expandedSub, dest, writeOffsets,
+                                  writeSizes, strides);
+
+        scf::YieldOp::create(b, l);
+      });
+}
+
+template <typename OpTy>
+LogicalResult fuseExpandShapeIntoProducerImpl(RewriterBase &rewriter,
+                                              OpTy producerOp,
+                                              tensor::ExpandShapeOp expandOp) {
+  OpResult producerResult = cast<OpResult>(expandOp.getSrc());
+  if (!producerResult.hasOneUse()) {
+    return rewriter.notifyMatchFailure(producerOp,
+                                       "producer result has multiple uses");
+  }
+
+  unsigned resultIdx = producerResult.getResultNumber();
+  RankedTensorType producerResultType =
+      cast<RankedTensorType>(producerResult.getType());
+  RankedTensorType expandedType = expandOp.getResultType();
+
+  SmallVector<ReassociationIndices> reassociation =
+      expandOp.getReassociationIndices();
+  ArrayRef<int64_t> expandedShape = expandedType.getShape();
+
+  // For multi-dim reassociation groups, validate that inner dimensions have
+  // static sizes (required for computing innerProduct). Also, for groups with
+  // 3+ dims, we only support the aligned case so we defer checking those until
+  // we know alignment per-slice.
+  for (const auto &[srcDim, group] : llvm::enumerate(reassociation)) {
+    if (group.size() <= 1) {
+      continue;
+    }
+    for (size_t i = 1, e = group.size(); i < e; ++i) {
+      if (ShapedType::isDynamic(expandedShape[group[i]])) {
+        return rewriter.notifyMatchFailure(
+            expandOp,
+            "inner dimensions of multi-dim expand group must be static");
+      }
+    }
+  }
+
+  // Get the write_slice ops for this result.
+  SmallVector<PCF::WriteSliceOp> slices;
+  if (failed(lookupProducerSlices<OpTy>(producerResult, slices))) {
+    return rewriter.notifyMatchFailure(producerOp,
+                                       "failed to lookup producer slices");
+  }
+
+  if (slices.empty()) {
+    return rewriter.notifyMatchFailure(producerOp, "no write_slice producers");
+  }
+
+  // Verify basic constraints on write_slices. Also check alignment for groups
+  // with 3+ dims (those require static alignment since we cannot loop over
+  // partial inner sub-tiles).
+  for (PCF::WriteSliceOp slice : slices) {
+    if (!slice.hasUnitStride()) {
+      return rewriter.notifyMatchFailure(slice,
+                                         "write_slice has non-unit stride");
+    }
+    SmallVector<OpFoldResult> offsets = slice.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = slice.getMixedSizes();
+    for (const auto &[srcDim, group] : llvm::enumerate(reassociation)) {
+      if (group.size() <= 2) {
+        continue;
+      }
+      // Groups with 3+ dims require static alignment.
+      int64_t innerProduct = computeInnerProduct(group, expandedShape);
+      AlignmentStatus status =
+          classifyAlignment(offsets[srcDim], sizes[srcDim], innerProduct);
+      if (status != AlignmentStatus::Aligned) {
+        return rewriter.notifyMatchFailure(
+            slice, "unaligned access for 3+ dim expand group not supported");
+      }
+    }
+  }
+
+  // Get the mixed output_shape from the original expand_shape op.
+  SmallVector<OpFoldResult> origOutputShape = expandOp.getMixedOutputShape();
+
+  // Get the tied init for this result if it exists.
+  OpOperand *tiedInit = producerOp.getTiedInit(resultIdx);
+  Value initValue;
+  if (tiedInit) {
+    rewriter.setInsertionPoint(producerOp);
+    initValue = tensor::ExpandShapeOp::create(rewriter, producerOp.getLoc(),
+                                              expandedType, tiedInit->get(),
+                                              reassociation, origOutputShape);
+  }
+
+  // Compute new dynamic sizes.
+  SmallVector<Value> newDynamicSizes;
+  int64_t dynamicDimIdx = 0;
+
+  // Copy dynamic sizes for results before this one.
+  for (unsigned i = 0; i < resultIdx; ++i) {
+    RankedTensorType prevResultType =
+        cast<RankedTensorType>(producerOp->getResult(i).getType());
+    for (int64_t j = 0, e = prevResultType.getRank(); j < e; ++j) {
+      if (prevResultType.isDynamicDim(j)) {
+        newDynamicSizes.push_back(
+            producerOp.getDynamicSizes()[dynamicDimIdx++]);
+      }
+    }
+  }
+
+  // Skip dynamic sizes for the current result.
+  for (int64_t j = 0, e = producerResultType.getRank(); j < e; ++j) {
+    if (producerResultType.isDynamicDim(j)) {
+      dynamicDimIdx++;
+    }
+  }
+
+  // Add dynamic sizes for the expanded type, using the original expand_shape
+  // op's output_shape values for dynamic dims.
+  rewriter.setInsertionPoint(producerOp);
+  for (int64_t j = 0, e = expandedType.getRank(); j < e; ++j) {
+    if (expandedType.isDynamicDim(j)) {
+      Value dimSize = getValueOrCreateConstantIndexOp(
+          rewriter, producerOp.getLoc(), origOutputShape[j]);
+      newDynamicSizes.push_back(dimSize);
+    }
+  }
+
+  // Copy remaining dynamic sizes.
+  llvm::append_range(
+      newDynamicSizes,
+      llvm::drop_begin(producerOp.getDynamicSizes(), dynamicDimIdx));
+
+  // Update tied init if present.
+  SmallVector<Value> newInits(producerOp.getInits());
+  if (tiedInit) {
+    int64_t initIdx =
+        llvm::count(producerOp.getIsTied().take_front(resultIdx), true);
+    newInits[initIdx] = initValue;
+  }
+
+  // Create the new result types with expanded type for this result.
+  SmallVector<Type> newResultTypes;
+  for (unsigned i = 0, e = producerOp->getNumResults(); i < e; ++i) {
+    if (i == resultIdx) {
+      newResultTypes.push_back(expandedType);
+    } else {
+      newResultTypes.push_back(producerOp->getResult(i).getType());
+    }
+  }
+
+  // Clone the producer op with updated result type.
+  OpTy newOp;
+  if constexpr (std::is_same_v<OpTy, PCF::LoopOp>) {
+    newOp = PCF::LoopOp::create(
+        rewriter, producerOp.getLoc(), newResultTypes, producerOp.getScope(),
+        producerOp.getCount(), newInits, newDynamicSizes,
+        producerOp.getIsTied(), producerOp.getSyncOnReturn());
+    newOp.getRegion().takeBody(producerOp.getRegion());
+  } else {
+    newOp = PCF::GenericOp::create(
+        rewriter, producerOp.getLoc(), newResultTypes, producerOp.getScope(),
+        newInits, newDynamicSizes, producerOp.getIsTied(),
+        producerOp.getNumIterators(), producerOp.getSyncOnReturn());
+    newOp.getRegion().takeBody(producerOp.getRegion());
+    newOp.getInitializer().takeBody(producerOp.getInitializer());
+    newOp.setNumLeadingArgs(producerOp.getNumLeadingArgs());
+  }
+
+  // Update the region ref arg type to match the expanded shape.
+  Value newRefArg = newOp.getRegionRefArgs()[resultIdx];
+  PCF::ShapedRefType oldSrefType =
+      cast<PCF::ShapedRefType>(newRefArg.getType());
+  PCF::ShapedRefType newSrefType = PCF::ShapedRefType::get(
+      rewriter.getContext(), expandedType.getShape(),
+      expandedType.getElementType(), producerOp.getScope(),
+      oldSrefType.getSyncScope());
+  newRefArg.setType(newSrefType);
+
+  // Get the write_slices in the new op's region.
+  SmallVector<PCF::WriteSliceOp> newSlices;
+  for (Operation *user : newRefArg.getUsers()) {
+    if (auto writeSlice = dyn_cast<PCF::WriteSliceOp>(user)) {
+      newSlices.push_back(writeSlice);
+    }
+  }
+
+  // Transform each write_slice to use expanded offsets/sizes.
+  for (PCF::WriteSliceOp slice : newSlices) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(slice);
+    Location loc = slice.getLoc();
+
+    SmallVector<OpFoldResult> offsets = slice.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = slice.getMixedSizes();
+    Value source = slice.getSource();
+
+    // Classify alignment for each 2-dim multi-dim group.
+    AlignmentStatus overallStatus = AlignmentStatus::Aligned;
+    unsigned dynamicGroupIdx = 0;
+    int64_t dynamicGroupInnerProduct = 1;
+    for (const auto &[srcDim, group] : llvm::enumerate(reassociation)) {
+      if (group.size() != 2) {
+        continue;
+      }
+      int64_t innerProduct = computeInnerProduct(group, expandedShape);
+      AlignmentStatus status =
+          classifyAlignment(offsets[srcDim], sizes[srcDim], innerProduct);
+      if (status == AlignmentStatus::Unaligned ||
+          status == AlignmentStatus::Dynamic) {
+        overallStatus = status;
+        dynamicGroupIdx = srcDim;
+        dynamicGroupInnerProduct = innerProduct;
+        break;
+      }
+    }
+
+    if (overallStatus == AlignmentStatus::Aligned) {
+      // All groups aligned: simple expansion.
+      emitAlignedWriteSlice(rewriter, loc, source, slice.getDest(), offsets,
+                            sizes, expandedShape, reassociation);
+    } else if (overallStatus == AlignmentStatus::Unaligned) {
+      // Statically unaligned: use loop directly.
+      emitSubTileLoop(rewriter, loc, source, slice.getDest(), offsets, sizes,
+                      expandedShape, reassociation, dynamicGroupIdx,
+                      dynamicGroupInnerProduct);
+    } else {
+      // Dynamic alignment: generate scf.if. Only emit runtime checks for
+      // the operands that are not statically known to be aligned.
+      Value innerProdVal = arith::ConstantIndexOp::create(
+          rewriter, loc, dynamicGroupInnerProduct);
+      Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+      std::optional<int64_t> constOff =
+          getConstantIntValue(offsets[dynamicGroupIdx]);
+      std::optional<int64_t> constSz =
+          getConstantIntValue(sizes[dynamicGroupIdx]);
+
+      SmallVector<Value> conditions;
+      if (!constOff) {
+        Value off = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    offsets[dynamicGroupIdx]);
+        Value offRem = arith::RemUIOp::create(rewriter, loc, off, innerProdVal);
+        conditions.push_back(arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::eq, offRem, c0));
+      }
+      if (!constSz) {
+        Value sz = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                   sizes[dynamicGroupIdx]);
+        Value szRem = arith::RemUIOp::create(rewriter, loc, sz, innerProdVal);
+        conditions.push_back(arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::eq, szRem, c0));
+      }
+
+      // At least one condition must exist (otherwise we'd be in the Aligned
+      // branch).
+      Value aligned = conditions[0];
+      for (size_t i = 1, e = conditions.size(); i < e; ++i) {
+        aligned = arith::AndIOp::create(rewriter, loc, aligned, conditions[i]);
+      }
+
+      scf::IfOp::create(
+          rewriter, loc, aligned,
+          [&](OpBuilder &b, Location l) {
+            emitAlignedWriteSlice(b, l, source, slice.getDest(), offsets, sizes,
+                                  expandedShape, reassociation);
+            scf::YieldOp::create(b, l);
+          },
+          [&](OpBuilder &b, Location l) {
+            emitSubTileLoop(b, l, source, slice.getDest(), offsets, sizes,
+                            expandedShape, reassociation, dynamicGroupIdx,
+                            dynamicGroupInnerProduct);
+            scf::YieldOp::create(b, l);
+          });
+    }
+
+    rewriter.eraseOp(slice);
+  }
+
+  // Replace the original producer and expand_shape.
+  SmallVector<Value> replacements(newOp->getResults());
+  rewriter.replaceOp(producerOp, replacements);
+  rewriter.replaceOp(expandOp, newOp->getResult(resultIdx));
+
+  return success();
+}
+
 } // namespace
 
 //===---------------------------------------------------------------------===//
@@ -900,6 +1536,19 @@ void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp producerOp,
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp producerOp,
                          TilingInterface target, ConsumerFusionParams &params) {
   return fuseTilableConsumerImpl(rewriter, producerOp, target, params);
+}
+
+LogicalResult fuseExpandShapeIntoProducerLoop(RewriterBase &rewriter,
+                                              PCF::LoopOp loopOp,
+                                              tensor::ExpandShapeOp expandOp) {
+  return fuseExpandShapeIntoProducerImpl(rewriter, loopOp, expandOp);
+}
+
+LogicalResult
+fuseExpandShapeIntoProducerGeneric(RewriterBase &rewriter,
+                                   PCF::GenericOp genericOp,
+                                   tensor::ExpandShapeOp expandOp) {
+  return fuseExpandShapeIntoProducerImpl(rewriter, genericOp, expandOp);
 }
 
 } // namespace mlir::iree_compiler::IREE::PCF
