@@ -806,29 +806,16 @@ static iree_status_t iree_async_proactor_posix_submit_socket_accept(
   }
 
   if (iree_status_is_ok(op_status)) {
-    op_status = iree_allocator_malloc(proactor->base.allocator,
-                                      sizeof(*accepted_socket),
-                                      (void**)&accepted_socket);
-    if (!iree_status_is_ok(op_status)) {
-      // Malloc failed after successful accept — close the orphaned fd now.
-      close(accepted_fd);
+    op_status = iree_async_posix_socket_create_accepted(
+        proactor, accepted_fd, accept_op->listen_socket->type,
+        &accepted_socket);
+    if (iree_status_is_ok(op_status)) {
+      // Ownership of accepted_fd transferred to accepted_socket.
       accepted_fd = -1;
+      accept_op->accepted_socket = accepted_socket;
+      memcpy(accept_op->peer_address.storage, &addr, addr_length);
+      accept_op->peer_address.length = addr_length;
     }
-  }
-
-  if (iree_status_is_ok(op_status)) {
-    iree_atomic_ref_count_init(&accepted_socket->ref_count);
-    accepted_socket->proactor = &proactor->base;
-    accepted_socket->primitive = iree_async_primitive_from_fd(accepted_fd);
-    accepted_socket->fixed_file_index = -1;
-    accepted_socket->type = accept_op->listen_socket->type;
-    accepted_socket->state = IREE_ASYNC_SOCKET_STATE_CONNECTED;
-    accepted_socket->flags = IREE_ASYNC_SOCKET_FLAG_NONE;
-    iree_atomic_store(&accepted_socket->failure_status,
-                      (intptr_t)iree_ok_status(), iree_memory_order_release);
-    accept_op->accepted_socket = accepted_socket;
-    memcpy(accept_op->peer_address.storage, &addr, addr_length);
-    accept_op->peer_address.length = addr_length;
   }
 
   iree_async_completion_flags_t completion_flags =
@@ -846,7 +833,7 @@ static iree_status_t iree_async_proactor_posix_submit_socket_accept(
     // listen_socket retain. Clean up any local resources we created.
     if (accepted_socket) {
       accept_op->accepted_socket = NULL;
-      iree_allocator_free(proactor->base.allocator, accepted_socket);
+      iree_async_posix_socket_destroy(proactor, accepted_socket);
     }
     if (accepted_fd >= 0) close(accepted_fd);
   }
@@ -1850,23 +1837,12 @@ static iree_status_t iree_async_proactor_posix_execute_accept(
 
   // Create socket for the accepted connection.
   iree_async_socket_t* accepted_socket = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(proactor->base.allocator, sizeof(*accepted_socket),
-                            (void**)&accepted_socket);
+  iree_status_t status = iree_async_posix_socket_create_accepted(
+      proactor, accepted_fd, accept_op->listen_socket->type, &accepted_socket);
   if (!iree_status_is_ok(status)) {
     close(accepted_fd);
     return status;
   }
-
-  iree_atomic_ref_count_init(&accepted_socket->ref_count);
-  accepted_socket->proactor = &proactor->base;
-  accepted_socket->primitive = iree_async_primitive_from_fd(accepted_fd);
-  accepted_socket->fixed_file_index = -1;
-  accepted_socket->type = accept_op->listen_socket->type;
-  accepted_socket->state = IREE_ASYNC_SOCKET_STATE_CONNECTED;
-  accepted_socket->flags = IREE_ASYNC_SOCKET_FLAG_NONE;
-  iree_atomic_store(&accepted_socket->failure_status,
-                    (intptr_t)iree_ok_status(), iree_memory_order_release);
 
   accept_op->accepted_socket = accepted_socket;
   memcpy(accept_op->peer_address.storage, &addr, addr_len);
