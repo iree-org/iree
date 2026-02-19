@@ -1,1 +1,9 @@
-Checks: -clang-analyzer-cplusplus*,-clang-analyzer-core*
+Checks: -clang-analyzer-cplusplus*,-clang-analyzer-core*,-clang-analyzer-security*,iree-c-*
+HeaderFileExtensions:
+  - h
+ImplementationFileExtensions:
+  - c
+  - cc
+FormatStyle:     file
+CheckOptions:    {}
+SystemHeaders:   false

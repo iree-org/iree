@@ -50,6 +50,7 @@ option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the R
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
+option(IREE_ENABLE_EXPERIMENTAL_CUSTOM_CLANG_TIDY "Enable IREE-specific clang-tidy checks in experimental/iree-clang-tidy." ON)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
 set(IREE_TRACING_PROVIDER ${IREE_TRACING_PROVIDER_DEFAULT} CACHE STRING "Chooses which built-in tracing implementation is used when tracing is enabled.")
@@ -1111,7 +1112,12 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(IREE_ENABLE_CLANG_TIDY)
-  set(CMAKE_CXX_CLANG_TIDY clang-tidy -warnings-as-errors=*)
+  set(_CLANG_TIDY_FLAGS)
+  if(IREE_ENABLE_EXPERIMENTAL_CUSTOM_CLANG_TIDY)
+    list(APPEND _CLANG_TIDY_FLAGS -load $<TARGET_FILE:IREEClangTidyModule>)
+  endif()
+  set(CMAKE_C_CLANG_TIDY ${IREE_CLANG_TIDY_BINARY} ${_CLANG_TIDY_FLAGS})
+  set(CMAKE_CXX_CLANG_TIDY ${IREE_CLANG_TIDY_BINARY} ${_CLANG_TIDY_FLAGS})
 endif()
 
 add_subdirectory(build_tools/embed_data/)
@@ -1127,7 +1133,9 @@ add_subdirectory(runtime)
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(tests EXCLUDE_FROM_ALL)
 
+# Disable clang-tidy before we start building dependencies.
 if(IREE_ENABLE_CLANG_TIDY)
+  set(CMAKE_C_CLANG_TIDY "")
   set(CMAKE_CXX_CLANG_TIDY "")
 endif()
 
@@ -1171,6 +1179,10 @@ endif()
 
 if(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS)
   add_subdirectory(experimental/hal_executable_library_call_hooks)
+endif()
+
+if(IREE_ENABLE_EXPERIMENTAL_CUSTOM_CLANG_TIDY)
+  add_subdirectory(experimental/iree-clang-tidy)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
