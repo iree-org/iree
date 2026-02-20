@@ -575,7 +575,7 @@ hal.executable private @attention_4xDx1x32x128xf16 {
 
 //     CHECK-LABEL: func.func @attention_4xDx1x32x128xf16
 //           CHECK:   scf.forall ({{.*}}) in (4)
-//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x16x1x1x1x1x1x1x1x1x1x1x1x8xf32>) {
+//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x16x1x1x1x1x1x1x1x1x1x1x1x8xf32>, vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>) {
 //       CHECK-NOT:       gpu.subgroup_reduce
 //           CHECK:       scf.yield
 //

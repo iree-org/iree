@@ -457,7 +457,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK: transfer_read
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
-// CHECK-SAME: -> (vector<1x2x1x1x1x1xf32>, vector<1x2x1x1x1x1xf32>, vector<1x2x4x1x1x1x1x1x4xf32>)
+// CHECK-SAME: -> (vector<1x2x4x1x1x1x1x1x4xf32>, vector<1x2x1x1x1x1xf32>, vector<1x2x1x1x1x1xf32>)
 // CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 // CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
@@ -525,7 +525,7 @@ hal.executable private @attention_mfma_32x32x16 {
 
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
-// CHECK-SAME: -> (vector<1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x2x1x1x1x4x1x1x1x4xf32>)
+// CHECK-SAME: -> (vector<1x1x1x2x1x1x1x4x1x1x1x4xf32>, vector<1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1xf32>)
 // CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
 // CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield

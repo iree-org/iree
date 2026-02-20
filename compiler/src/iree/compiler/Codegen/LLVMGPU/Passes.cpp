@@ -828,6 +828,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
 
   // Linalg -> Vector
   funcPassManager.addPass(
