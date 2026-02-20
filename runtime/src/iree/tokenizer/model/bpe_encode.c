@@ -263,6 +263,18 @@ static iree_status_t iree_tokenizer_bpe_encode_segment(
   // for the fast-path whole-segment match. If that fails, we tokenize the
   // original segment without suffix.
   if (state->phase == IREE_TOKENIZER_BPE_PHASE_BYTE_LOOP) {
+    // On resumption after output exhaustion, drain frozen tokens that
+    // couldn't be emitted in the previous call. Without this, each
+    // resumption pushes a new token before draining, and with small output
+    // buffers the window accumulates undrained frozen tokens until overflow.
+    if (state->segment.byte_position > 0 && state->window.count > 0) {
+      if (!iree_tokenizer_bpe_emit_frozen_tokens(
+              state, model, state->segment.byte_position - 1, &cursor)) {
+        *out_token_count =
+            iree_tokenizer_bpe_output_cursor_count(&cursor, out_tokens);
+        return iree_ok_status();
+      }
+    }
     for (iree_host_size_t byte_position = state->segment.byte_position;
          byte_position < segment.size; ++byte_position) {
       uint8_t input_byte = (uint8_t)segment.data[byte_position];

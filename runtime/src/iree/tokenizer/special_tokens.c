@@ -210,6 +210,10 @@ iree_status_t iree_tokenizer_special_tokens_builder_build(
   IREE_ASSERT_ARGUMENT(builder);
   IREE_ASSERT_ARGUMENT(out_special_tokens);
 
+  // Always initialize output so callers get a valid zeroed struct even when
+  // building from an empty builder.
+  iree_tokenizer_special_tokens_initialize(out_special_tokens);
+
   // Empty case: nothing to allocate.
   if (builder->entry_count == 0) {
     return iree_ok_status();
@@ -226,7 +230,6 @@ iree_status_t iree_tokenizer_special_tokens_builder_build(
 
   // Sort entries by first byte, then by length descending.
   // Uses thread-safe insertion sort with explicit context (no global variable).
-  iree_tokenizer_special_tokens_initialize(out_special_tokens);
   iree_tokenizer_special_tokens_sort_entries(
       builder->entries, builder->entry_count, builder->string_data);
 
