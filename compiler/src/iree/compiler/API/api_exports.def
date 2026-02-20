@@ -5,28 +5,25 @@ EXPORTS
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
-  ireeAttributeIsAGPUVirtualMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
-  ireeAttributeIsAGPUVirtualIntrinsicAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
+  ireeAttributeIsAGPUVirtualMMAAttr
+  ireeAttributeIsAGPUVirtualMMAIntrinsicAttr
   ireeCodegenCompilationInfoAttrGet
   ireeCodegenCompilationInfoAttrGetParameters
   ireeCodegenCompilationInfoAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGet
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
-  ireeCodegenGetExecutableVariantOps
-  ireeGPUGetSingleSubgroupLayout
-  ireeGPUGetXorShuffleBounds
-  ireeGPUIsXORShuffleValid
-  ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
+  ireeCodegenGetExecutableVariantOps
+  ireeCodegenGetIGEMMGenericConvDetails
+  ireeCodegenGetTunerRootOps
+  ireeCodegenHasIGEMMGenericConvDetails
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
-  ireeCodegenHasIGEMMGenericConvDetails
-  ireeCodegenGetIGEMMGenericConvDetails
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID
@@ -60,6 +57,7 @@ EXPORTS
   ireeCompilerInvocationSetCrashHandler
   ireeCompilerInvocationSetDumpCompilationPhasesTo
   ireeCompilerInvocationSetVerifyIR
+  ireeCompilerInvocationSetupRemarks
   ireeCompilerOutputDestroy
   ireeCompilerOutputKeep
   ireeCompilerOutputMapMemory
@@ -81,6 +79,9 @@ EXPORTS
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit
   ireeCompilerSourceWrapBuffer
+  ireeGPUGetSingleSubgroupLayout
+  ireeGPUGetXorShuffleBounds
+  ireeGPUIsXORShuffleValid
   ireeGPULoweringConfigAttrGet
   ireeGPULoweringConfigAttrGetAttributes
   ireeGPULoweringConfigAttrGetMmaKind
@@ -88,17 +89,12 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
-  ireeGPUVirtualMMAAttrGet
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
-  ireeGPUVirtualMMAAttrGetTypeID
-  ireeGPUMMAIntrinsicAttrGet
-  ireeGPUVirtualMMAIntrinsicAttrGet
-  ireeGPUMMAIntrinsicAttrGetTypeID
-  ireeGPUVirtualMMAIntrinsicAttrGetTypeID
-  ireeGPUMMAIntrinsicAttrGetValue
-  ireeGPUVirtualMMAIntrinsicAttrGetValue
   ireeGPUMMAAttrGetVirtualMMAIntrinsic
+  ireeGPUMMAIntrinsicAttrGet
+  ireeGPUMMAIntrinsicAttrGetTypeID
+  ireeGPUMMAIntrinsicAttrGetValue
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchNumStages
@@ -110,6 +106,11 @@ EXPORTS
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
   ireeGPUTargetInfoGet
   ireeGPUTargetInfoGetMMAIntrinsics
+  ireeGPUVirtualMMAAttrGet
+  ireeGPUVirtualMMAAttrGetTypeID
+  ireeGPUVirtualMMAIntrinsicAttrGet
+  ireeGPUVirtualMMAIntrinsicAttrGetTypeID
+  ireeGPUVirtualMMAIntrinsicAttrGetValue
   ireeHALExecutableTargetAttrGetGPUTargetInfo
   ireeLinkRunMain
   ireeMlirLspServerRunMain
@@ -147,6 +148,7 @@ EXPORTS
   mlirAffineExprShiftSymbols
   mlirAffineFloorDivExprGet
   mlirAffineMapAttrGet
+  mlirAffineMapAttrGetName
   mlirAffineMapAttrGetTypeID
   mlirAffineMapAttrGetValue
   mlirAffineMapCompressUnusedSymbols
@@ -181,9 +183,13 @@ EXPORTS
   mlirAffineMulExprGet
   mlirAffineSymbolExprGet
   mlirAffineSymbolExprGetPosition
+  mlirApplyFullConversion
+  mlirApplyPartialConversion
   mlirApplyPatternsAndFoldGreedily
+  mlirApplyPatternsAndFoldGreedilyWithOp
   mlirArrayAttrGet
   mlirArrayAttrGetElement
+  mlirArrayAttrGetName
   mlirArrayAttrGetNumElements
   mlirArrayAttrGetTypeID
   mlirAsmStateCreateForOperation
@@ -228,11 +234,13 @@ EXPORTS
   mlirAttributeParseGet
   mlirAttributePrint
   mlirBF16TypeGet
+  mlirBF16TypeGetName
   mlirBFloat16TypeGetTypeID
   mlirBlockAddArgument
   mlirBlockAppendOwnedOperation
   mlirBlockArgumentGetArgNumber
   mlirBlockArgumentGetOwner
+  mlirBlockArgumentSetLocation
   mlirBlockArgumentSetType
   mlirBlockCreate
   mlirBlockDestroy
@@ -243,8 +251,12 @@ EXPORTS
   mlirBlockGetFirstOperation
   mlirBlockGetNextInRegion
   mlirBlockGetNumArguments
+  mlirBlockGetNumPredecessors
+  mlirBlockGetNumSuccessors
   mlirBlockGetParentOperation
   mlirBlockGetParentRegion
+  mlirBlockGetPredecessor
+  mlirBlockGetSuccessor
   mlirBlockGetTerminator
   mlirBlockInsertArgument
   mlirBlockInsertOwnedOperation
@@ -258,6 +270,7 @@ EXPORTS
   mlirBytecodeWriterConfigDestroy
   mlirComplexTypeGet
   mlirComplexTypeGetElementType
+  mlirComplexTypeGetName
   mlirComplexTypeGetTypeID
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
@@ -278,6 +291,21 @@ EXPORTS
   mlirContextLoadAllAvailableDialects
   mlirContextSetAllowUnregisteredDialects
   mlirContextSetThreadPool
+  mlirConversionConfigCreate
+  mlirConversionConfigDestroy
+  mlirConversionConfigEnableBuildMaterializations
+  mlirConversionConfigGetFoldingMode
+  mlirConversionConfigIsBuildMaterializationsEnabled
+  mlirConversionConfigSetFoldingMode
+  mlirConversionPatternAsRewritePattern
+  mlirConversionPatternGetTypeConverter
+  mlirConversionPatternRewriterAsPatternRewriter
+  mlirConversionTargetAddIllegalDialect
+  mlirConversionTargetAddIllegalOp
+  mlirConversionTargetAddLegalDialect
+  mlirConversionTargetAddLegalOp
+  mlirConversionTargetCreate
+  mlirConversionTargetDestroy
   mlirCreateExternalPass
   mlirDenseArrayAttrGetTypeID
   mlirDenseArrayGetNumElements
@@ -356,6 +384,7 @@ EXPORTS
   mlirDenseInt64ResourceElementsAttrGetValue
   mlirDenseInt8ResourceElementsAttrGetValue
   mlirDenseIntOrFPElementsAttrGetTypeID
+  mlirDenseResourceElementsAttrGetName
   mlirDenseUInt16ResourceElementsAttrGetValue
   mlirDenseUInt32ResourceElementsAttrGetValue
   mlirDenseUInt64ResourceElementsAttrGetValue
@@ -377,6 +406,7 @@ EXPORTS
   mlirDictionaryAttrGet
   mlirDictionaryAttrGetElement
   mlirDictionaryAttrGetElementByName
+  mlirDictionaryAttrGetName
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
   mlirDisctinctAttrCreate
@@ -387,37 +417,53 @@ EXPORTS
   mlirEnableGlobalDebug
   mlirExternalPassSignalFailure
   mlirF16TypeGet
+  mlirF16TypeGetName
   mlirF32TypeGet
+  mlirF32TypeGetName
   mlirF64TypeGet
+  mlirF64TypeGetName
   mlirFlatSymbolRefAttrGet
+  mlirFlatSymbolRefAttrGetName
   mlirFlatSymbolRefAttrGetValue
   mlirFloat16TypeGetTypeID
   mlirFloat32TypeGetTypeID
   mlirFloat4E2M1FNTypeGet
+  mlirFloat4E2M1FNTypeGetName
   mlirFloat4E2M1FNTypeGetTypeID
   mlirFloat64TypeGetTypeID
   mlirFloat6E2M3FNTypeGet
+  mlirFloat6E2M3FNTypeGetName
   mlirFloat6E2M3FNTypeGetTypeID
   mlirFloat6E3M2FNTypeGet
+  mlirFloat6E3M2FNTypeGetName
   mlirFloat6E3M2FNTypeGetTypeID
   mlirFloat8E3M4TypeGet
+  mlirFloat8E3M4TypeGetName
   mlirFloat8E3M4TypeGetTypeID
   mlirFloat8E4M3B11FNUZTypeGet
+  mlirFloat8E4M3B11FNUZTypeGetName
   mlirFloat8E4M3B11FNUZTypeGetTypeID
   mlirFloat8E4M3FNTypeGet
+  mlirFloat8E4M3FNTypeGetName
   mlirFloat8E4M3FNTypeGetTypeID
   mlirFloat8E4M3FNUZTypeGet
+  mlirFloat8E4M3FNUZTypeGetName
   mlirFloat8E4M3FNUZTypeGetTypeID
   mlirFloat8E4M3TypeGet
+  mlirFloat8E4M3TypeGetName
   mlirFloat8E4M3TypeGetTypeID
   mlirFloat8E5M2FNUZTypeGet
+  mlirFloat8E5M2FNUZTypeGetName
   mlirFloat8E5M2FNUZTypeGetTypeID
   mlirFloat8E5M2TypeGet
+  mlirFloat8E5M2TypeGetName
   mlirFloat8E5M2TypeGetTypeID
   mlirFloat8E8M0FNUTypeGet
+  mlirFloat8E8M0FNUTypeGetName
   mlirFloat8E8M0FNUTypeGetTypeID
   mlirFloatAttrDoubleGet
   mlirFloatAttrDoubleGetChecked
+  mlirFloatAttrGetName
   mlirFloatAttrGetTypeID
   mlirFloatAttrGetValueDouble
   mlirFloatTF32TypeGetTypeID
@@ -426,14 +472,17 @@ EXPORTS
   mlirFrozenRewritePatternSetDestroy
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
+  mlirFunctionTypeGetName
   mlirFunctionTypeGetNumInputs
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
   mlirFunctionTypeGetTypeID
   mlirGPUAsyncTokenTypeGet
+  mlirGPUAsyncTokenTypeGetName
   mlirGPUObjectAttrGet
   mlirGPUObjectAttrGetFormat
   mlirGPUObjectAttrGetKernels
+  mlirGPUObjectAttrGetName
   mlirGPUObjectAttrGetObject
   mlirGPUObjectAttrGetProperties
   mlirGPUObjectAttrGetTarget
@@ -441,6 +490,22 @@ EXPORTS
   mlirGPUObjectAttrHasKernels
   mlirGPUObjectAttrHasProperties
   mlirGetDialectHandle__transform__
+  mlirGreedyRewriteDriverConfigCreate
+  mlirGreedyRewriteDriverConfigDestroy
+  mlirGreedyRewriteDriverConfigEnableConstantCSE
+  mlirGreedyRewriteDriverConfigEnableFolding
+  mlirGreedyRewriteDriverConfigGetMaxIterations
+  mlirGreedyRewriteDriverConfigGetMaxNumRewrites
+  mlirGreedyRewriteDriverConfigGetRegionSimplificationLevel
+  mlirGreedyRewriteDriverConfigGetStrictness
+  mlirGreedyRewriteDriverConfigGetUseTopDownTraversal
+  mlirGreedyRewriteDriverConfigIsConstantCSEEnabled
+  mlirGreedyRewriteDriverConfigIsFoldingEnabled
+  mlirGreedyRewriteDriverConfigSetMaxIterations
+  mlirGreedyRewriteDriverConfigSetMaxNumRewrites
+  mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel
+  mlirGreedyRewriteDriverConfigSetStrictness
+  mlirGreedyRewriteDriverConfigSetUseTopDownTraversal
   mlirIREELinalgTransformRegisterPasses
   mlirIREETransformRegisterPasses
   mlirIRRewriterCreate
@@ -451,17 +516,24 @@ EXPORTS
   mlirIdentifierGetContext
   mlirIdentifierStr
   mlirIndexTypeGet
+  mlirIndexTypeGetName
   mlirIndexTypeGetTypeID
   mlirInferShapedTypeOpInterfaceInferReturnTypes
   mlirInferShapedTypeOpInterfaceTypeID
   mlirInferTypeOpInterfaceInferReturnTypes
   mlirInferTypeOpInterfaceTypeID
   mlirIntegerAttrGet
+  mlirIntegerAttrGetFromWords
+  mlirIntegerAttrGetName
   mlirIntegerAttrGetTypeID
+  mlirIntegerAttrGetValueBitWidth
   mlirIntegerAttrGetValueInt
+  mlirIntegerAttrGetValueNumWords
   mlirIntegerAttrGetValueSInt
   mlirIntegerAttrGetValueUInt
+  mlirIntegerAttrGetValueWords
   mlirIntegerSetAttrGet
+  mlirIntegerSetAttrGetName
   mlirIntegerSetAttrGetTypeID
   mlirIntegerSetAttrGetValue
   mlirIntegerSetDump
@@ -481,6 +553,7 @@ EXPORTS
   mlirIntegerSetPrint
   mlirIntegerSetReplaceGet
   mlirIntegerTypeGet
+  mlirIntegerTypeGetName
   mlirIntegerTypeGetTypeID
   mlirIntegerTypeGetWidth
   mlirIntegerTypeIsSigned
@@ -492,46 +565,73 @@ EXPORTS
   mlirIsGlobalDebugEnabled
   mlirLLVMArrayTypeGet
   mlirLLVMArrayTypeGetElementType
+  mlirLLVMArrayTypeGetName
   mlirLLVMCConvAttrGet
+  mlirLLVMCConvAttrGetName
   mlirLLVMComdatAttrGet
+  mlirLLVMComdatAttrGetName
   mlirLLVMDIAnnotationAttrGet
+  mlirLLVMDIAnnotationAttrGetName
   mlirLLVMDIBasicTypeAttrGet
+  mlirLLVMDIBasicTypeAttrGetName
   mlirLLVMDICompileUnitAttrGet
+  mlirLLVMDICompileUnitAttrGetName
   mlirLLVMDICompositeTypeAttrGet
+  mlirLLVMDICompositeTypeAttrGetName
   mlirLLVMDICompositeTypeAttrGetRecSelf
   mlirLLVMDIDerivedTypeAttrGet
   mlirLLVMDIDerivedTypeAttrGetBaseType
+  mlirLLVMDIDerivedTypeAttrGetName
   mlirLLVMDIExpressionAttrGet
+  mlirLLVMDIExpressionAttrGetName
   mlirLLVMDIExpressionElemAttrGet
+  mlirLLVMDIExpressionElemAttrGetName
   mlirLLVMDIFileAttrGet
+  mlirLLVMDIFileAttrGetName
   mlirLLVMDIFlagsAttrGet
+  mlirLLVMDIFlagsAttrGetName
   mlirLLVMDIImportedEntityAttrGet
+  mlirLLVMDIImportedEntityAttrGetName
   mlirLLVMDILexicalBlockAttrGet
+  mlirLLVMDILexicalBlockAttrGetName
   mlirLLVMDILexicalBlockFileAttrGet
+  mlirLLVMDILexicalBlockFileAttrGetName
   mlirLLVMDILocalVariableAttrGet
+  mlirLLVMDILocalVariableAttrGetName
   mlirLLVMDIModuleAttrGet
+  mlirLLVMDIModuleAttrGetName
   mlirLLVMDIModuleAttrGetScope
   mlirLLVMDINullTypeAttrGet
+  mlirLLVMDINullTypeAttrGetName
   mlirLLVMDIStringTypeAttrGet
+  mlirLLVMDIStringTypeAttrGetName
   mlirLLVMDISubprogramAttrGet
   mlirLLVMDISubprogramAttrGetCompileUnit
   mlirLLVMDISubprogramAttrGetFile
   mlirLLVMDISubprogramAttrGetLine
+  mlirLLVMDISubprogramAttrGetName
   mlirLLVMDISubprogramAttrGetRecSelf
   mlirLLVMDISubprogramAttrGetScope
   mlirLLVMDISubprogramAttrGetScopeLine
   mlirLLVMDISubprogramAttrGetType
   mlirLLVMDISubroutineTypeAttrGet
+  mlirLLVMDISubroutineTypeAttrGetName
   mlirLLVMFunctionTypeGet
   mlirLLVMFunctionTypeGetInput
+  mlirLLVMFunctionTypeGetName
   mlirLLVMFunctionTypeGetNumInputs
   mlirLLVMFunctionTypeGetReturnType
   mlirLLVMLinkageAttrGet
+  mlirLLVMLinkageAttrGetName
   mlirLLVMPointerTypeGet
   mlirLLVMPointerTypeGetAddressSpace
+  mlirLLVMPointerTypeGetName
+  mlirLLVMPointerTypeGetTypeID
   mlirLLVMStructTypeGetElementType
   mlirLLVMStructTypeGetIdentifier
+  mlirLLVMStructTypeGetName
   mlirLLVMStructTypeGetNumElementTypes
+  mlirLLVMStructTypeGetTypeID
   mlirLLVMStructTypeIdentifiedGet
   mlirLLVMStructTypeIdentifiedNewGet
   mlirLLVMStructTypeIsLiteral
@@ -542,9 +642,21 @@ EXPORTS
   mlirLLVMStructTypeOpaqueGet
   mlirLLVMStructTypeSetBody
   mlirLLVMVoidTypeGet
+  mlirLLVMVoidTypeGetName
   mlirLinalgFillBuiltinNamedOpRegion
+  mlirLinalgGetIndexingMapsAttribute
+  mlirLinalgInferContractionDimensions
+  mlirLinalgInferContractionDimensionsFromMaps
+  mlirLinalgInferConvolutionDimensions
+  mlirLinalgIsAContractionOp
+  mlirLinalgIsAConvolutionOp
+  mlirLlvmRawFdOStreamCreate
+  mlirLlvmRawFdOStreamDestroy
+  mlirLlvmRawFdOStreamIsNull
+  mlirLlvmRawFdOStreamWrite
   mlirLlvmThreadPoolCreate
   mlirLlvmThreadPoolDestroy
+  mlirLlvmThreadPoolGetMaxConcurrency
   mlirLocationCallSiteGet
   mlirLocationCallSiteGetCallee
   mlirLocationCallSiteGetCaller
@@ -583,20 +695,27 @@ EXPORTS
   mlirMemRefTypeGetChecked
   mlirMemRefTypeGetLayout
   mlirMemRefTypeGetMemorySpace
+  mlirMemRefTypeGetName
   mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
+  mlirMemoryEffectsOpInterfaceAttachFallbackModel
+  mlirMemoryEffectsOpInterfaceTypeID
   mlirMergeSymbolsIntoFromClone
   mlirModuleCreateEmpty
   mlirModuleCreateParse
   mlirModuleCreateParseFromFile
   mlirModuleDestroy
+  mlirModuleEqual
   mlirModuleFromOperation
   mlirModuleGetBody
   mlirModuleGetContext
   mlirModuleGetOperation
+  mlirModuleHashValue
   mlirNamedAttributeGet
   mlirNoneTypeGet
+  mlirNoneTypeGetName
   mlirNoneTypeGetTypeID
+  mlirOpConversionPatternCreate
   mlirOpOperandGetNextUse
   mlirOpOperandGetOperandNumber
   mlirOpOperandGetOwner
@@ -617,13 +736,16 @@ EXPORTS
   mlirOpPrintingFlagsUseLocalScope
   mlirOpResultGetOwner
   mlirOpResultGetResultNumber
+  mlirOpRewritePatternCreate
   mlirOpaqueAttrGet
   mlirOpaqueAttrGetData
   mlirOpaqueAttrGetDialectNamespace
+  mlirOpaqueAttrGetName
   mlirOpaqueAttrGetTypeID
   mlirOpaqueTypeGet
   mlirOpaqueTypeGetData
   mlirOpaqueTypeGetDialectNamespace
+  mlirOpaqueTypeGetName
   mlirOpaqueTypeGetTypeID
   mlirOperationClone
   mlirOperationCreate
@@ -648,6 +770,7 @@ EXPORTS
   mlirOperationGetNumRegions
   mlirOperationGetNumResults
   mlirOperationGetNumSuccessors
+  mlirOperationGetOpOperand
   mlirOperationGetOperand
   mlirOperationGetParentOperation
   mlirOperationGetRegion
@@ -655,8 +778,10 @@ EXPORTS
   mlirOperationGetSuccessor
   mlirOperationGetTypeID
   mlirOperationHasInherentAttributeByName
+  mlirOperationHashValue
   mlirOperationImplementsInterface
   mlirOperationImplementsInterfaceStatic
+  mlirOperationIsBeforeInBlock
   mlirOperationMoveAfter
   mlirOperationMoveBefore
   mlirOperationPrint
@@ -665,9 +790,11 @@ EXPORTS
   mlirOperationRemoveAttributeByName
   mlirOperationRemoveDiscardableAttributeByName
   mlirOperationRemoveFromParent
+  mlirOperationReplaceUsesOfWith
   mlirOperationSetAttributeByName
   mlirOperationSetDiscardableAttributeByName
   mlirOperationSetInherentAttributeByName
+  mlirOperationSetLocation
   mlirOperationSetOperand
   mlirOperationSetOperands
   mlirOperationSetSuccessor
@@ -683,27 +810,51 @@ EXPORTS
   mlirOperationWriteBytecode
   mlirOperationWriteBytecodeWithConfig
   mlirPDLAttributeTypeGet
+  mlirPDLAttributeTypeGetName
+  mlirPDLAttributeTypeGetTypeID
   mlirPDLOperationTypeGet
+  mlirPDLOperationTypeGetName
+  mlirPDLOperationTypeGetTypeID
   mlirPDLPatternModuleDestroy
   mlirPDLPatternModuleFromModule
+  mlirPDLPatternModuleRegisterConstraintFunction
+  mlirPDLPatternModuleRegisterRewriteFunction
   mlirPDLRangeTypeGet
   mlirPDLRangeTypeGetElementType
+  mlirPDLRangeTypeGetName
+  mlirPDLRangeTypeGetTypeID
+  mlirPDLResultListPushBackAttribute
+  mlirPDLResultListPushBackOperation
+  mlirPDLResultListPushBackType
+  mlirPDLResultListPushBackValue
   mlirPDLTypeTypeGet
+  mlirPDLTypeTypeGetName
+  mlirPDLTypeTypeGetTypeID
+  mlirPDLValueAsAttribute
+  mlirPDLValueAsOperation
+  mlirPDLValueAsType
+  mlirPDLValueAsValue
   mlirPDLValueTypeGet
+  mlirPDLValueTypeGetName
+  mlirPDLValueTypeGetTypeID
   mlirParsePassPipeline
   mlirPassManagerAddOwnedPass
   mlirPassManagerCreate
   mlirPassManagerCreateOnOperation
   mlirPassManagerDestroy
   mlirPassManagerEnableIRPrinting
+  mlirPassManagerEnableStatistics
+  mlirPassManagerEnableTiming
   mlirPassManagerEnableVerifier
   mlirPassManagerGetAsOpPassManager
   mlirPassManagerGetNestedUnder
   mlirPassManagerRunOnOp
+  mlirPatternRewriterAsBase
   mlirPrintPassPipeline
   mlirRankedTensorTypeGet
   mlirRankedTensorTypeGetChecked
   mlirRankedTensorTypeGetEncoding
+  mlirRankedTensorTypeGetName
   mlirRankedTensorTypeGetTypeID
   mlirRegionAppendOwnedBlock
   mlirRegionCreate
@@ -717,6 +868,9 @@ EXPORTS
   mlirRegionTakeBody
   mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
+  mlirRewritePatternSetAdd
+  mlirRewritePatternSetCreate
+  mlirRewritePatternSetDestroy
   mlirRewritePatternSetFromPDLPatternModule
   mlirRewriterBaseCancelOpModification
   mlirRewriterBaseClearInsertionPoint
@@ -730,6 +884,7 @@ EXPORTS
   mlirRewriterBaseGetBlock
   mlirRewriterBaseGetContext
   mlirRewriterBaseGetInsertionBlock
+  mlirRewriterBaseGetOperationAfterInsertion
   mlirRewriterBaseInlineBlockBefore
   mlirRewriterBaseInlineRegionBefore
   mlirRewriterBaseInsert
@@ -763,17 +918,22 @@ EXPORTS
   mlirShapedTypeIsDynamicDim
   mlirShapedTypeIsDynamicSize
   mlirShapedTypeIsDynamicStrideOrOffset
+  mlirShapedTypeIsStaticDim
+  mlirShapedTypeIsStaticSize
+  mlirShapedTypeIsStaticStrideOrOffset
   mlirSimplifyAffineExpr
   mlirSparseElementsAttrGetIndices
   mlirSparseElementsAttrGetTypeID
   mlirSparseElementsAttrGetValues
   mlirSparseElementsAttribute
   mlirStridedLayoutAttrGet
+  mlirStridedLayoutAttrGetName
   mlirStridedLayoutAttrGetNumStrides
   mlirStridedLayoutAttrGetOffset
   mlirStridedLayoutAttrGetStride
   mlirStridedLayoutAttrGetTypeID
   mlirStringAttrGet
+  mlirStringAttrGetName
   mlirStringAttrGetTypeID
   mlirStringAttrGetValue
   mlirStringAttrTypedGet
@@ -781,6 +941,7 @@ EXPORTS
   mlirStringRefEqual
   mlirSymbolRefAttrGet
   mlirSymbolRefAttrGetLeafReference
+  mlirSymbolRefAttrGetName
   mlirSymbolRefAttrGetNestedReference
   mlirSymbolRefAttrGetNumNestedReferences
   mlirSymbolRefAttrGetRootReference
@@ -795,14 +956,25 @@ EXPORTS
   mlirSymbolTableReplaceAllSymbolUses
   mlirSymbolTableWalkSymbolTables
   mlirTF32TypeGet
+  mlirTF32TypeGetName
   mlirTransformAnyOpTypeGet
+  mlirTransformAnyOpTypeGetName
   mlirTransformAnyOpTypeGetTypeID
   mlirTransformAnyParamTypeGet
+  mlirTransformAnyParamTypeGetName
   mlirTransformAnyParamTypeGetTypeID
   mlirTransformAnyValueTypeGet
+  mlirTransformAnyValueTypeGetName
   mlirTransformAnyValueTypeGetTypeID
   mlirTransformApplyNamedSequence
+  mlirTransformConsumesHandle
+  mlirTransformModifiesPayload
+  mlirTransformOnlyReadsHandle
+  mlirTransformOnlyReadsPayload
+  mlirTransformOpInterfaceAttachFallbackModel
+  mlirTransformOpInterfaceTypeID
   mlirTransformOperationTypeGet
+  mlirTransformOperationTypeGetName
   mlirTransformOperationTypeGetOperationName
   mlirTransformOperationTypeGetTypeID
   mlirTransformOptionsCreate
@@ -812,15 +984,29 @@ EXPORTS
   mlirTransformOptionsGetEnforceSingleTopLevelTransformOp
   mlirTransformOptionsGetExpensiveChecksEnabled
   mlirTransformParamTypeGet
+  mlirTransformParamTypeGetName
   mlirTransformParamTypeGetType
   mlirTransformParamTypeGetTypeID
+  mlirTransformProducesHandle
+  mlirTransformResultsSetOps
+  mlirTransformResultsSetParams
+  mlirTransformResultsSetValues
+  mlirTransformRewriterAsBase
+  mlirTransformStateForEachParam
+  mlirTransformStateForEachPayloadOp
+  mlirTransformStateForEachPayloadValue
   mlirTupleTypeGet
+  mlirTupleTypeGetName
   mlirTupleTypeGetNumTypes
   mlirTupleTypeGetType
   mlirTupleTypeGetTypeID
   mlirTypeAttrGet
+  mlirTypeAttrGetName
   mlirTypeAttrGetTypeID
   mlirTypeAttrGetValue
+  mlirTypeConverterAddConversion
+  mlirTypeConverterCreate
+  mlirTypeConverterDestroy
   mlirTypeDump
   mlirTypeEqual
   mlirTypeGetContext
@@ -880,6 +1066,7 @@ EXPORTS
   mlirTypeParseGet
   mlirTypePrint
   mlirUnitAttrGet
+  mlirUnitAttrGetName
   mlirUnitAttrGetTypeID
   mlirUnmanagedDenseBoolResourceElementsAttrGet
   mlirUnmanagedDenseDoubleResourceElementsAttrGet
@@ -895,10 +1082,12 @@ EXPORTS
   mlirUnmanagedDenseUInt8ResourceElementsAttrGet
   mlirUnrankedMemRefTypeGet
   mlirUnrankedMemRefTypeGetChecked
+  mlirUnrankedMemRefTypeGetName
   mlirUnrankedMemRefTypeGetTypeID
   mlirUnrankedMemrefGetMemorySpace
   mlirUnrankedTensorTypeGet
   mlirUnrankedTensorTypeGetChecked
+  mlirUnrankedTensorTypeGetName
   mlirUnrankedTensorTypeGetTypeID
   mlirValueDump
   mlirValueEqual
@@ -915,8 +1104,10 @@ EXPORTS
   mlirValueSetType
   mlirVectorTypeGet
   mlirVectorTypeGetChecked
+  mlirVectorTypeGetName
   mlirVectorTypeGetScalable
   mlirVectorTypeGetScalableChecked
   mlirVectorTypeGetTypeID
   mlirVectorTypeIsDimScalable
   mlirVectorTypeIsScalable
+  mlirWalkAndApplyPatterns
