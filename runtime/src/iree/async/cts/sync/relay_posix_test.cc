@@ -20,11 +20,11 @@
 //   - Flag behavior (OWN_SOURCE_PRIMITIVE, ERROR_SENSITIVE)
 //   - Lifecycle (unregister while pending, multiple active relays)
 
-#include "iree/async/relay.h"
-
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include "iree/async/relay.h"
 
 #ifdef __linux__
 #include <sys/eventfd.h>
@@ -77,8 +77,7 @@ class RelayPosixTest : public CtsTestBase<> {
 
   // Signals a primitive by writing to its write end.
   void SignalPrimitive(const TestPrimitive& primitive, uint64_t value = 1) {
-    ssize_t written =
-        write(primitive.signal_fd, &value, sizeof(value));
+    ssize_t written = write(primitive.signal_fd, &value, sizeof(value));
     EXPECT_EQ(written, static_cast<ssize_t>(sizeof(value)));
   }
 
@@ -87,8 +86,7 @@ class RelayPosixTest : public CtsTestBase<> {
   bool DrainPrimitive(const TestPrimitive& primitive,
                       uint64_t* out_value = nullptr) {
     uint64_t value = 0;
-    ssize_t bytes_read =
-        read(primitive.source_fd, &value, sizeof(value));
+    ssize_t bytes_read = read(primitive.source_fd, &value, sizeof(value));
     if (bytes_read > 0) {
       if (out_value) *out_value = value;
       return true;

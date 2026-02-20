@@ -27,8 +27,8 @@ class SparseTableTest : public ::testing::Test {
   }
 
   void AllocateTable(uint16_t capacity) {
-    IREE_ASSERT_OK(iree_io_uring_sparse_table_allocate(capacity, allocator_,
-                                                       &table_));
+    IREE_ASSERT_OK(
+        iree_io_uring_sparse_table_allocate(capacity, allocator_, &table_));
   }
 
   iree_allocator_t allocator_ = iree_allocator_null();

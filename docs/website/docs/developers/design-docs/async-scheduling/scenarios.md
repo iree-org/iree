@@ -37,7 +37,7 @@ cache and activations.
 **Voice-to-chat pipeline**: The user speaks, Whisper transcribes, Phi-3
 generates a response. This is a cross-device pipeline:
 
-```
+```text
 CPU: audio preprocessing
   signal(audio_sem, N)
   frontier: {cpu_axis: N}
@@ -121,7 +121,7 @@ The user is in a voice conversation with the LLM. Whisper transcribes on
 GPU 1, Llama-3-8B generates on GPU 0 with speculative decoding, and Bark
 synthesizes speech on GPU 1.
 
-```
+```text
 Voice-to-text:
   CPU NUMA1: audio preprocessing → signal(audio_sem, N)
   GPU 1: Whisper encode/decode → signal(whisper_sem, N)
@@ -171,7 +171,7 @@ anywhere, just deallocated once all in-flight compute using them has
 completed. The original weights remain available on disk or in system
 memory for future reload.
 
-```
+```text
 Deallocate Bark weights (4GB) on GPU 1:
   death_frontier: {bark_axis: latest_bark_epoch, dgpu1_axis: ...}
   Buffers return to GPU 1's free pool
@@ -190,7 +190,7 @@ SDXL cannot reuse the memory until Bark's compute has actually completed.
 
 **Step 2: SDXL generation**
 
-```
+```text
 GPU 1: SDXL UNet denoising (50 steps)
   Each step: wait(sdxl_sem, S), signal(sdxl_sem, S+1)
   frontier: {dgpu1_axis: ...}
@@ -200,7 +200,7 @@ GPU 1: SDXL UNet denoising (50 steps)
 
 When SDXL completes and the user sends another voice message:
 
-```
+```text
 SDXL buffers deallocated:
   death_frontier: {dgpu1_axis: sdxl_final_epoch}
 
@@ -223,7 +223,7 @@ concurrent chat sessions, the total KV cache across all sessions can exceed
 GPU memory. The scheduler pages cold KV cache blocks to host memory or
 NVMe.
 
-```
+```text
 Llama sessions 1-10 active on GPU 0. Session 3 goes idle (user reading).
 
 Page manager evicts session 3's KV blocks:
@@ -259,7 +259,7 @@ applies directly. During LoRA fine-tuning of the 8B model on GPU 0, the
 optimizer state (momentum, variance) and gradient accumulation buffers
 can exceed available memory:
 
-```
+```text
 GPU 0: forward pass (weights + activations)
   signal(train_sem, step*3 + 1)
 
@@ -294,7 +294,7 @@ A RAG query arrives: embed the query, retrieve documents, rerank, and
 generate an answer. The scheduler places work based on where weights are
 resident and which GPU has capacity:
 
-```
+```text
 CPU NUMA0: tokenize query → signal(rag_sem, 1)
 
 GPU 0 (BGE weights resident): embed query
@@ -338,7 +338,7 @@ features to a latent representation, a decoder produces source-language tokens,
 an LLM translates to the target language, TTS synthesizes speech, and playback
 delivers it.
 
-```
+```text
 CPU: VAD (voice activity detection)
   signal(vad_sem, N)
 
@@ -468,7 +468,7 @@ per token generation step across 4 GPUs.
 
 **With frontier-based gap-filling**:
 
-```
+```text
 GPUs 0-3: Llama-70B attention layer N
   signal(tp_collective_sem, 2*N)  // one collective axis for 4 GPUs
   frontier: {tp_collective: 2*N}
@@ -502,7 +502,7 @@ Two nodes run Llama-3-70B with pipeline parallelism: the first 32 layers
 on node 1's GPUs 0-3, the last 48 layers on node 2's GPUs 0-3. The RDMA
 NIC transfers activations between nodes.
 
-```
+```text
 Node 1 GPUs 0-3: layers 0-31 (TP collective within node)
   signal(pipeline_sem, S)
   frontier: {node1_tp_collective: ..., pipeline: S}
@@ -532,7 +532,7 @@ axis transitively, so node 2's scheduler knows the full dependency chain.
 With 50 concurrent sessions, the total KV cache requirement exceeds
 available HBM. The system pages cold KV cache blocks to NVMe:
 
-```
+```text
 Page manager on node 1:
   Identify LRU KV blocks across all sessions
   NVMe DMA: evict blocks → signal(page_sem, P++)
@@ -559,7 +559,7 @@ Mixtral-8x7B activates 2 of 8 experts per token. The active experts vary
 per token. Experts are sharded across GPUs 4-5, with some experts resident
 on NVMe for cold routing patterns.
 
-```
+```text
 GPU 4 or 5: Mixtral router network
   Determines expert indices for this token
   signal(moe_sem, T)
@@ -589,7 +589,7 @@ both experts were resident, the combination step proceeds immediately.
 For cross-node MoE (model #12), expert routing may select experts on the
 other node. The activation data for those experts is sent via RDMA:
 
-```
+```text
 Node 1: router selects expert on node 2
   NIC: RDMA send expert input → signal(network_sem, N)
 
@@ -613,7 +613,7 @@ wait.
 A multimedia request arrives: the user uploads an image with a voice note
 asking "what's in this picture and write code to generate something similar."
 
-```
+```text
 Phase 1 (parallel preprocessing):
   CPU: audio decode → signal(audio_sem, 1)
   CPU: image decode → signal(image_sem, 1)

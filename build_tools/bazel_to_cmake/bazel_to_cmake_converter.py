@@ -1387,7 +1387,10 @@ def GetDict(obj):
 
 
 def convert_build_file(
-    build_file_code, repo_cfg, build_dir, allow_partial_conversion=False,
+    build_file_code,
+    repo_cfg,
+    build_dir,
+    allow_partial_conversion=False,
     repo_root="",
 ):
     converter = Converter()
@@ -1398,8 +1401,12 @@ def convert_build_file(
     )(repo_map=repo_map)
     build_file_functions = getattr(
         repo_cfg, "CustomBuildFileFunctions", BuildFileFunctions
-    )(converter=converter, targets=target_converter, build_dir=build_dir,
-      repo_root=repo_root)
+    )(
+        converter=converter,
+        targets=target_converter,
+        build_dir=build_dir,
+        repo_root=repo_root,
+    )
 
     exec(build_file_code, GetDict(build_file_functions))
     converted_text = converter.convert()

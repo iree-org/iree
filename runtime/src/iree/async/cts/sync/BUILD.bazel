@@ -184,11 +184,11 @@ iree_runtime_cc_library(
     deps = [
         ":cancellation_test",
         ":notification_test",
+        ":relay_test",
         ":semaphore_async_test",
         ":semaphore_linked_test",
         ":semaphore_sync_test",
         ":signal_test",
-        ":relay_test",
     ] + select({
         "//build_tools/bazel:iree_is_windows": [
             ":relay_windows_test",

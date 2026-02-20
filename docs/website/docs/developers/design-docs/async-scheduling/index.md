@@ -82,7 +82,7 @@ A **frontier** is a sparse vector clock: a set of (axis, epoch) pairs where
 each axis identifies a timeline participant (a queue, collective channel, or
 host thread) and each epoch is the latest known position on that timeline.
 
-```
+```text
 Frontier = { (axis_A, 7), (axis_B, 3), (axis_C, 12) }
 ```
 
@@ -93,7 +93,7 @@ on axis B up to epoch 3, and on axis C up to epoch 12 is in my causal past."
 
 **Merge** combines two frontiers by taking the component-wise maximum:
 
-```
+```text
 merge({A:5, B:3}, {A:2, B:7, C:4}) = {A:5, B:7, C:4}
 ```
 
@@ -102,7 +102,7 @@ either input knew. It is associative, commutative, and idempotent.
 
 **Dominance** checks whether one frontier's knowledge subsumes another's:
 
-```
+```text
 dominates({A:5, B:7, C:4}, {A:3, B:7}) = true   (A:5>=3, B:7>=7)
 dominates({A:5, B:7},      {A:3, C:4}) = false  (C missing from left)
 ```
@@ -113,7 +113,7 @@ decisions: "are this operation's prerequisites satisfied?"
 
 **Insert-or-raise** adds or updates an (axis, epoch) entry:
 
-```
+```text
 insert_or_raise({A:5, B:3}, C, 4) = {A:5, B:3, C:4}
 insert_or_raise({A:5, B:3}, A, 8) = {A:8, B:3}
 ```
@@ -205,7 +205,7 @@ When queue Q waits on semaphore S >= V:
 
 This is the crucial property. Consider three queues:
 
-```
+```text
 Q_A signals semaphore S_1 to value 1
   S_1 frontier: {A: 5}
 
@@ -231,7 +231,7 @@ completed or can be pipelined.
 The >= semantics of timeline semaphores create an important distinction.
 Consider:
 
-```
+```text
 Q signals S to values 1, 2, 3, 4, 5 (five sequential operations)
 Later, Q_B submits a wait on S >= 2
 ```
@@ -307,7 +307,7 @@ compiled program, includes all operations that read or wrote the buffer.
 
 When another queue wants to reuse the buffer, it checks:
 
-```
+```text
 dominates(requesting_queue_frontier, buffer_death_frontier)
 ```
 
@@ -338,7 +338,7 @@ signaled yet. The hardware queue holds the work until the signal arrives.
 Combined with frontiers, this enables speculative pipeline construction.
 A client can submit an entire multi-stage pipeline at once:
 
-```
+```text
 Stage 1 on GPU_A: signal(S, 1)
 Stage 2 on GPU_B: wait(S, 1), signal(S, 2)
 Stage 3 on GPU_B: wait(S, 2), signal(S, 3)
