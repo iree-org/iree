@@ -881,3 +881,123 @@ func.func @ukernel_unpack_infer_vector_sizes(%lhs: tensor<1x8x16x1xf32>, %rhs: t
 // CHECK-MASK:         %[[READ:.*]] = vector.transfer_read %[[UKERNEL]]{{.*}} : tensor<1x1x16x16xf32>, vector<1x1x16x16xf32>
 // CHECK-MASK:         %[[CAST:.*]] = vector.shape_cast %[[READ]] : vector<1x1x16x16xf32> to vector<16x16xf32>
 // CHECK-MASK:         vector.transfer_write %[[CAST]]{{.*}} : vector<16x16xf32>, tensor<16x16xf32>
+
+// -----
+
+func.func @arg_compare_implicit_index(%input: tensor<4x128xf32>,
+                                      %out_val: tensor<4xf32>,
+                                      %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<4x128xf32>)
+    outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xf32>, tensor<4xi32>
+  return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_implicit_index
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]
+// CHECK:         %[[INPUT_VEC:.+]] = vector.transfer_read %[[INPUT]]
+// CHECK-SAME:      tensor<4x128xf32>, vector<4x128xf32>
+// CHECK:         %[[OUT_VAL_VEC:.+]] = vector.transfer_read %[[OUT_VAL]]
+// CHECK-SAME:      tensor<4xf32>, vector<4xf32>
+// CHECK:         %[[OUT_IDX_VEC:.+]] = vector.transfer_read %[[OUT_IDX]]
+// CHECK-SAME:      tensor<4xi32>, vector<4xi32>
+// CHECK:         %[[RESULT_VAL:.+]], %[[RESULT_IDX:.+]] = iree_vector_ext.arg_compare
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[INPUT_VEC]] : vector<4x128xf32>)
+// CHECK-SAME:      inits(%[[OUT_VAL_VEC]], %[[OUT_IDX_VEC]] : vector<4xf32>, vector<4xi32>)
+// CHECK:         ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:           %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:           iree_vector_ext.yield %[[CMP]] : i1
+// CHECK:         -> vector<4xf32>, vector<4xi32>
+// CHECK:         %[[WRITE_VAL:.+]] = vector.transfer_write %[[RESULT_VAL]], %[[OUT_VAL]]
+// CHECK-SAME:      vector<4xf32>, tensor<4xf32>
+// CHECK:         %[[WRITE_IDX:.+]] = vector.transfer_write %[[RESULT_IDX]], %[[OUT_IDX]]
+// CHECK-SAME:      vector<4xi32>, tensor<4xi32>
+// CHECK:         return %[[WRITE_VAL]], %[[WRITE_IDX]]
+
+// -----
+
+func.func @arg_compare_explicit_index(%partial_vals: tensor<4x32xf32>,
+                                      %partial_idxs: tensor<4x32xi32>,
+                                      %out_val: tensor<4xf32>,
+                                      %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%partial_vals, %partial_idxs : tensor<4x32xf32>, tensor<4x32xi32>)
+    outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xf32>, tensor<4xi32>
+  return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_explicit_index
+// CHECK-SAME:    %[[PARTIAL_VALS:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[PARTIAL_IDXS:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]
+// CHECK:         %[[VALS_VEC:.+]] = vector.transfer_read %[[PARTIAL_VALS]]
+// CHECK-SAME:      tensor<4x32xf32>, vector<4x32xf32>
+// CHECK:         %[[IDXS_VEC:.+]] = vector.transfer_read %[[PARTIAL_IDXS]]
+// CHECK-SAME:      tensor<4x32xi32>, vector<4x32xi32>
+// CHECK:         %[[OUT_VAL_VEC:.+]] = vector.transfer_read %[[OUT_VAL]]
+// CHECK-SAME:      tensor<4xf32>, vector<4xf32>
+// CHECK:         %[[OUT_IDX_VEC:.+]] = vector.transfer_read %[[OUT_IDX]]
+// CHECK-SAME:      tensor<4xi32>, vector<4xi32>
+// CHECK:         %[[RESULT_VAL:.+]], %[[RESULT_IDX:.+]] = iree_vector_ext.arg_compare
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[VALS_VEC]], %[[IDXS_VEC]] : vector<4x32xf32>, vector<4x32xi32>)
+// CHECK-SAME:      inits(%[[OUT_VAL_VEC]], %[[OUT_IDX_VEC]] : vector<4xf32>, vector<4xi32>)
+// CHECK:         ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:           %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:           iree_vector_ext.yield %[[CMP]] : i1
+// CHECK:         -> vector<4xf32>, vector<4xi32>
+// CHECK:         %[[WRITE_VAL:.+]] = vector.transfer_write %[[RESULT_VAL]], %[[OUT_VAL]]
+// CHECK-SAME:      vector<4xf32>, tensor<4xf32>
+// CHECK:         %[[WRITE_IDX:.+]] = vector.transfer_write %[[RESULT_IDX]], %[[OUT_IDX]]
+// CHECK-SAME:      vector<4xi32>, tensor<4xi32>
+// CHECK:         return %[[WRITE_VAL]], %[[WRITE_IDX]]
+
+// -----
+
+func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
+                                       %out_val: tensor<4xf32>,
+                                       %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+  %base = arith.constant 64 : index
+  %result:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<4x128xf32>)
+    outs(%out_val, %out_idx : tensor<4xf32>, tensor<4xi32>)
+    index_base(%base : index) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xf32>, tensor<4xi32>
+  return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
+}
+// CHECK-LABEL: func.func @arg_compare_with_index_base
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[OUT_IDX:[a-zA-Z0-9]+]]
+// CHECK:         %[[BASE:.+]] = arith.constant 64 : index
+// CHECK:         %[[INPUT_VEC:.+]] = vector.transfer_read %[[INPUT]]
+// CHECK:         %[[OUT_VAL_VEC:.+]] = vector.transfer_read %[[OUT_VAL]]
+// CHECK:         %[[OUT_IDX_VEC:.+]] = vector.transfer_read %[[OUT_IDX]]
+// CHECK:         %[[RESULT_VAL:.+]], %[[RESULT_IDX:.+]] = iree_vector_ext.arg_compare
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[INPUT_VEC]] : vector<4x128xf32>)
+// CHECK-SAME:      inits(%[[OUT_VAL_VEC]], %[[OUT_IDX_VEC]] : vector<4xf32>, vector<4xi32>)
+// CHECK-SAME:      index_base(%[[BASE]] : index)
+// CHECK:         ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:           %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:           iree_vector_ext.yield %[[CMP]] : i1
+// CHECK:         -> vector<4xf32>, vector<4xi32>
+// CHECK:         %[[WRITE_VAL:.+]] = vector.transfer_write %[[RESULT_VAL]], %[[OUT_VAL]]
+// CHECK:         %[[WRITE_IDX:.+]] = vector.transfer_write %[[RESULT_IDX]], %[[OUT_IDX]]
+// CHECK:         return %[[WRITE_VAL]], %[[WRITE_IDX]]
