@@ -29,8 +29,10 @@ extern "C" {
 //
 // Requires kernel 5.1+ with io_uring support enabled.
 //
-// Returns IREE_STATUS_UNAVAILABLE if io_uring is not supported on this system
-// (kernel too old, not enabled, or insufficient permissions).
+// Returns IREE_STATUS_UNAVAILABLE if io_uring is not usable on this system:
+// kernel too old (ENOSYS), blocked by seccomp/sysctl (EPERM), insufficient
+// locked memory (ENOMEM), or other io_uring_setup failures. The specific
+// errno is included in the status message for diagnostics.
 iree_status_t iree_async_proactor_create_io_uring(
     iree_async_proactor_options_t options, iree_allocator_t allocator,
     iree_async_proactor_t** out_proactor);

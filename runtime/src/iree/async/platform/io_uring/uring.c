@@ -51,22 +51,25 @@ static iree_status_t iree_io_uring_ring_try_setup(
     return iree_ok_status();
   }
 
-  // ENOSYS means io_uring is not available at all.
+  // All io_uring_setup failures other than EINVAL (which triggers flag
+  // fallbacks below) mean io_uring is not usable in this environment.
+  // We return UNAVAILABLE with the errno in the message for diagnostics.
+  // This matches the API contract in api.h and the industry-standard approach
+  // (MariaDB, sled, etc. all treat ENOSYS/EPERM/ENOMEM uniformly as
+  // "io_uring not available, fall back").
   if (errno == ENOSYS) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "io_uring not supported (ENOSYS)");
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "io_uring not supported by kernel (ENOSYS)");
   }
-
-  // EPERM means permission denied (common in containers).
   if (errno == EPERM) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "io_uring permission denied");
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "io_uring blocked by security policy (EPERM)");
   }
 
   // EINVAL may mean unsupported flags - try fallbacks.
   if (errno != EINVAL) {
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "io_uring_setup failed (%d)", errno);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "io_uring_setup failed (errno %d)", errno);
   }
 
   // Attempt 2: Remove DEFER_TASKRUN (requires 6.1+).
@@ -80,8 +83,8 @@ static iree_status_t iree_io_uring_ring_try_setup(
       return iree_ok_status();
     }
     if (errno != EINVAL) {
-      return iree_make_status(iree_status_code_from_errno(errno),
-                              "io_uring_setup failed (%d)", errno);
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "io_uring_setup failed (errno %d)", errno);
     }
   }
 
@@ -97,8 +100,8 @@ static iree_status_t iree_io_uring_ring_try_setup(
       return iree_ok_status();
     }
     if (errno != EINVAL) {
-      return iree_make_status(iree_status_code_from_errno(errno),
-                              "io_uring_setup failed (%d)", errno);
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "io_uring_setup failed (errno %d)", errno);
     }
   }
 
@@ -112,8 +115,9 @@ static iree_status_t iree_io_uring_ring_try_setup(
     return iree_ok_status();
   }
 
-  return iree_make_status(iree_status_code_from_errno(errno),
-                          "io_uring_setup failed with no flags (%d)", errno);
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "io_uring_setup failed with no flags (errno %d)",
+                          errno);
 }
 
 // Validates that an offset + size fits within a mapped region.
