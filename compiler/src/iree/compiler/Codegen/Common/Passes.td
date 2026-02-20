@@ -871,6 +871,11 @@ def MemrefCopyToLinalgPass :
   let summary = "Convert memref.copy to linalg op";
 }
 
+def NDTo1DVectorUnrollingPass : Pass<"iree-codegen-nd-to-1d-vector-unrolling"> {
+  let summary = "";
+  let description = [{}];
+}
+
 def NormalizeLoopBoundsPass :
     Pass<"iree-codegen-normalize-loop-bounds", ""> {
   let summary = "Normalize the loop bounds of `scf.for` and `scf.forall`";
