@@ -1039,8 +1039,8 @@ static void iree_async_proactor_posix_semaphore_wait_timepoint_callback(
   uintptr_t encoded = (uintptr_t)user_data;
   iree_async_posix_semaphore_wait_tracker_t* tracker =
       (iree_async_posix_semaphore_wait_tracker_t*)(encoded &
-                                                   0x0000FFFFFFFFFFFFull);
-  iree_host_size_t index = (iree_host_size_t)(encoded >> 48);
+                                                   0x00FFFFFFFFFFFFFFull);
+  iree_host_size_t index = (iree_host_size_t)(encoded >> 56);
 
   if (!iree_status_is_ok(status)) {
     // Failure or cancellation. Store the error status (first one wins).
@@ -1083,6 +1083,18 @@ static iree_status_t iree_async_proactor_posix_submit_semaphore_wait(
     iree_async_proactor_posix_t* proactor,
     iree_async_semaphore_wait_operation_t* wait_op) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // The timepoint callback encodes {tracker_pointer, semaphore_index} in a
+  // single pointer using a 56-bit/8-bit split. The 8-bit index field limits
+  // the maximum number of semaphores per wait to 255.
+  if (IREE_UNLIKELY(wait_op->count > 255)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "semaphore wait count %" PRIhsz
+        " exceeds the maximum of 255 (limited by timepoint user_data encoding)",
+        wait_op->count);
+  }
 
   // Check for immediate satisfaction before allocating a tracker.
   bool immediately_satisfied = false;
@@ -1156,8 +1168,11 @@ static iree_status_t iree_async_proactor_posix_submit_semaphore_wait(
     iree_async_semaphore_timepoint_t* timepoint = &tracker->timepoints[i];
     timepoint->callback =
         iree_async_proactor_posix_semaphore_wait_timepoint_callback;
-    // Encode tracker pointer + index in user_data (index in upper 16 bits).
-    timepoint->user_data = (void*)((uintptr_t)tracker | ((uintptr_t)i << 48));
+    // Encode tracker pointer + index in user_data using a 56-bit/8-bit split
+    // for LA57 (5-level paging) safety: userspace pointers use at most 56 bits
+    // on x86-64, leaving 8 bits for the index (max 255).
+    // The count <= 255 check above guarantees this shift is safe.
+    timepoint->user_data = (void*)((uintptr_t)tracker | ((uintptr_t)i << 56));
     status = iree_async_semaphore_acquire_timepoint(
         wait_op->semaphores[i], wait_op->values[i], timepoint);
     if (iree_status_is_ok(status)) {

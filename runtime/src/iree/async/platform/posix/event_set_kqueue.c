@@ -19,8 +19,9 @@
 //   same fd multiple times per poll iteration. The proactor's dispatch loop
 //   handles this correctly by filtering operations against per-event revents.
 // - Filter add/modify/remove operations are batched into a single kevent()
-//   call to ensure atomicity: either all filters for an fd are registered or
-//   none are (no orphaned filters on partial failure).
+//   call. kevent(2) processes entries sequentially (not atomically), so
+//   iree_kqueue_submit_changes rolls back successfully-applied EV_ADD entries
+//   when a later entry fails (all-or-nothing semantics for adds).
 //
 // References:
 // - https://man.openbsd.org/kqueue.2
@@ -80,8 +81,14 @@ static short iree_kevent_to_poll_events(const struct kevent* event) {
   return poll_events;
 }
 
-// Submits a batch of changelist entries to the kqueue atomically.
-// On failure, individual entries report EV_ERROR with the errno in |data|.
+// Submits a batch of changelist entries to the kqueue.
+//
+// kevent(2) processes changelist entries sequentially, not atomically: if the
+// first EV_ADD succeeds and the second EV_ADD fails, the first filter is
+// already registered in the kernel. This function provides all-or-nothing
+// semantics for EV_ADD entries by submitting compensating EV_DELETE for any
+// successfully-applied ADDs when a fatal error is detected.
+//
 // For DELETE operations, ENOENT (not registered) and EBADF (fd closed) are
 // silently ignored since the filter is already gone.
 static iree_status_t iree_kqueue_submit_changes(int kqueue_fd, int fd,
@@ -90,7 +97,7 @@ static iree_status_t iree_kqueue_submit_changes(int kqueue_fd, int fd,
   // kevent() with a zero timeout applies all changelist entries and returns
   // immediately. The eventlist receives EV_ERROR entries for any changelist
   // items that failed, plus any already-ready events. We size the eventlist
-  // to the changelist length — we only care about error events.
+  // to the changelist length so we can receive an error for every entry.
   struct kevent eventlist[4];  // max 4 changes (2 deletes + 2 adds in modify)
   IREE_ASSERT(change_count <= 4);
 
@@ -105,37 +112,69 @@ static iree_status_t iree_kqueue_submit_changes(int kqueue_fd, int fd,
                             fd, strerror(error));
   }
 
-  // The returned eventlist is a mix of EV_ERROR entries (for failed changelist
-  // items) and normal ready events (for already-monitored fds). We only care
-  // about EV_ERROR entries. Each EV_ERROR event carries the filter and flags
-  // from the original changelist entry that failed.
+  // First pass: match each EV_ERROR event back to its changelist entry and
+  // determine which entries failed. Entries without a matching EV_ERROR
+  // succeeded. Track the first fatal error (non-ignorable) to return.
+  bool changelist_failed[4] = {false, false, false, false};
+  iree_status_t error_status = iree_ok_status();
   for (int i = 0; i < result; ++i) {
     if (!(eventlist[i].flags & EV_ERROR)) continue;
     int error = (int)eventlist[i].data;
-    // For DELETE operations, ENOENT (filter not registered) and EBADF (fd
-    // already closed) are expected and harmless — the filter is already gone.
-    // We identify delete operations by matching the error event back to the
-    // changelist: the event's ident and filter correspond to the failed entry.
+
+    // Match the error event back to the changelist entry by ident+filter.
+    int matched_index = -1;
     bool is_delete = false;
     for (int j = 0; j < change_count; ++j) {
       if (changelist[j].ident == eventlist[i].ident &&
-          changelist[j].filter == eventlist[i].filter &&
-          (changelist[j].flags & EV_DELETE)) {
-        is_delete = true;
+          changelist[j].filter == eventlist[i].filter) {
+        matched_index = j;
+        is_delete = (changelist[j].flags & EV_DELETE) != 0;
         break;
       }
     }
+    if (matched_index >= 0) {
+      changelist_failed[matched_index] = true;
+    }
+
+    // For DELETE operations, ENOENT (filter not registered) and EBADF (fd
+    // already closed) are expected and harmless — the filter is already gone.
     if (is_delete && (error == ENOENT || error == EBADF)) {
       continue;
     }
-    const char* action_name = is_delete ? "DELETE" : "ADD";
-    return iree_make_status(iree_status_code_from_errno(error),
-                            "kevent(%s) failed for fd %d filter %d: %s",
-                            action_name, fd, (int)eventlist[i].filter,
-                            strerror(error));
+
+    // Record the first fatal error.
+    if (iree_status_is_ok(error_status)) {
+      const char* action_name = is_delete ? "DELETE" : "ADD";
+      error_status = iree_make_status(
+          iree_status_code_from_errno(error),
+          "kevent(%s) failed for fd %d filter %d: %s", action_name, fd,
+          (int)eventlist[i].filter, strerror(error));
+    }
   }
 
-  return iree_ok_status();
+  if (iree_status_is_ok(error_status)) return iree_ok_status();
+
+  // Roll back any EV_ADD entries that succeeded to maintain all-or-nothing
+  // semantics. Without this, a partial add (e.g., READ succeeded but WRITE
+  // failed) would leave an orphaned filter that causes spurious wake-ups.
+  // DELETE entries that succeeded don't need rollback (the filter was being
+  // removed anyway, and we can't restore the original registration flags).
+  struct kevent rollback[4];
+  int rollback_count = 0;
+  for (int j = 0; j < change_count; ++j) {
+    if ((changelist[j].flags & EV_ADD) && !changelist_failed[j]) {
+      EV_SET(&rollback[rollback_count++], changelist[j].ident,
+             changelist[j].filter, EV_DELETE, 0, 0, NULL);
+    }
+  }
+  if (rollback_count > 0) {
+    // Best-effort rollback: we're already returning an error, so rollback
+    // failures can't be reported. If the rollback itself fails, the orphaned
+    // filter will be cleaned up when the fd is closed.
+    kevent(kqueue_fd, rollback, rollback_count, NULL, 0, &zero_timeout);
+  }
+
+  return error_status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,8 +199,8 @@ static iree_status_t iree_async_posix_event_set_kqueue_add(
   iree_async_posix_event_set_kqueue_t* event_set =
       iree_async_posix_event_set_kqueue_cast(base_event_set);
 
-  // Batch all filter additions into a single kevent() call so that either
-  // both READ and WRITE are registered or neither is (no orphaned filters).
+  // Batch all filter additions into a single kevent() call.
+  // iree_kqueue_submit_changes provides all-or-nothing rollback for ADDs.
   struct kevent changelist[2];
   int change_count = 0;
   if (events & POLLIN) {
@@ -182,8 +221,9 @@ static iree_status_t iree_async_posix_event_set_kqueue_modify(
 
   // Batch all filter changes into a single kevent() call.
   // EV_ADD updates existing filters, EV_DELETE removes unwanted ones.
-  // Deletions are listed first so that any stale filters are cleaned up
-  // before new ones are applied within the same atomic submission.
+  // Deletions are listed first so that stale filters are cleaned up before
+  // new ones are applied. iree_kqueue_submit_changes rolls back successful
+  // ADDs if any entry fails.
   struct kevent changelist[4];
   int change_count = 0;
 
