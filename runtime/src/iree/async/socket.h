@@ -256,7 +256,8 @@ static inline iree_async_socket_state_t iree_async_socket_query_state(
 static inline iree_status_t iree_async_socket_query_failure(
     const iree_async_socket_t* socket) {
   intptr_t value =
-      iree_atomic_load(&socket->failure_status, iree_memory_order_acquire);
+      iree_atomic_load((iree_atomic_intptr_t*)&socket->failure_status,
+                       iree_memory_order_acquire);
   return (iree_status_t)value;
 }
 
