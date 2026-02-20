@@ -57,7 +57,7 @@ iree_cc_library(
   HDRS
     "defs.h"
   DEPS
-
+    iree::base::core_headers
   PUBLIC
 )
 endif()
