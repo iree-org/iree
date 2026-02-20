@@ -7,12 +7,9 @@
 //
 // Usage: node validate.mjs
 
-import { scenarios } from './scenarios.js';
-import { simulate, frontierToString } from './simulator.js';
-import {
-  scaleScenario, supportsDepth,
-  getScalableHardware, expandHardware,
-} from './scaling.js';
+import {scenarios} from './scenarios.js';
+import {simulate, frontierToString} from './simulator.js';
+import {scaleScenario, supportsDepth, getScalableHardware, expandHardware,} from './scaling.js';
 
 let errors = 0;
 let warnings = 0;
@@ -57,7 +54,9 @@ function check_structure(scenario) {
   for (const op of scenario.operations) {
     // Hardware reference valid.
     if (!hw_set.has(op.hardware)) {
-      error(scenario, `op "${op.id}" references unknown hardware "${op.hardware}"`);
+      error(
+          scenario,
+          `op "${op.id}" references unknown hardware "${op.hardware}"`);
     }
 
     // Wait semaphores exist.
@@ -77,7 +76,10 @@ function check_structure(scenario) {
     // Signal values positive.
     for (const [sem_id, value] of Object.entries(op.signal)) {
       if (value <= 0 || !Number.isInteger(value)) {
-        error(scenario, `op "${op.id}" signals "${sem_id}" with non-positive value ${value}`);
+        error(
+            scenario,
+            `op "${op.id}" signals "${sem_id}" with non-positive value ${
+                value}`);
       }
     }
   }
@@ -88,7 +90,10 @@ function check_structure(scenario) {
     for (const [sem_id, value] of Object.entries(op.signal)) {
       const key = `${sem_id}:${value}`;
       if (signal_pairs.has(key)) {
-        error(scenario, `duplicate signal ${key} in ops "${signal_pairs.get(key)}" and "${op.id}"`);
+        error(
+            scenario,
+            `duplicate signal ${key} in ops "${signal_pairs.get(key)}" and "${
+                op.id}"`);
       }
       signal_pairs.set(key, op.id);
     }
@@ -99,7 +104,9 @@ function check_structure(scenario) {
     for (const [sem_id, value] of Object.entries(op.wait)) {
       const key = `${sem_id}:${value}`;
       if (!signal_pairs.has(key)) {
-        error(scenario, `op "${op.id}" waits on ${key} but no operation signals it`);
+        error(
+            scenario,
+            `op "${op.id}" waits on ${key} but no operation signals it`);
       }
     }
   }
@@ -108,7 +115,9 @@ function check_structure(scenario) {
   if (scenario.chain_through) {
     for (const chain_sem of scenario.chain_through) {
       if (!sem_set.has(chain_sem)) {
-        error(scenario, `chain_through references unknown semaphore "${chain_sem}"`);
+        error(
+            scenario,
+            `chain_through references unknown semaphore "${chain_sem}"`);
       }
     }
   }
@@ -118,18 +127,26 @@ function check_structure(scenario) {
   if (scenario.iteration_deps) {
     for (const [dep_op, dep_sems] of Object.entries(scenario.iteration_deps)) {
       if (!op_set.has(dep_op)) {
-        error(scenario, `iteration_deps references unknown operation "${dep_op}"`);
+        error(
+            scenario,
+            `iteration_deps references unknown operation "${dep_op}"`);
       }
       for (const dep_sem of dep_sems) {
         if (!sem_set.has(dep_sem)) {
-          error(scenario, `iteration_deps["${dep_op}"] references unknown semaphore "${dep_sem}"`);
+          error(
+              scenario,
+              `iteration_deps["${dep_op}"] references unknown semaphore "${
+                  dep_sem}"`);
         }
         // The operation should signal the referenced semaphore — otherwise the
         // inter-iteration dependency doesn't correspond to state carried by
         // that operation.
         const op_def = scenario.operations.find(o => o.id === dep_op);
         if (op_def && !(dep_sem in op_def.signal)) {
-          error(scenario, `iteration_deps["${dep_op}"] references semaphore "${dep_sem}" but the operation does not signal it`);
+          error(
+              scenario,
+              `iteration_deps["${dep_op}"] references semaphore "${
+                  dep_sem}" but the operation does not signal it`);
         }
       }
     }
@@ -145,11 +162,11 @@ function check_structure(scenario) {
 // Simulate a scenario, applying hardware expansion if needed.
 function prepare_and_simulate(scenario) {
   const expanded = expandHardware(scenario);
-  return { snapshots: simulate(expanded), expanded };
+  return {snapshots: simulate(expanded), expanded};
 }
 
 function check_simulation(label, scenario) {
-  const { snapshots, expanded } = prepare_and_simulate(scenario);
+  const {snapshots, expanded} = prepare_and_simulate(scenario);
   const max_tick = snapshots.length - 1;
 
   if (max_tick >= 499) {
@@ -159,18 +176,18 @@ function check_simulation(label, scenario) {
 
   const final = snapshots[max_tick];
   const all_retired = expanded.operations.every(
-    op => final.operations[op.id]?.state === 'retired'
-  );
+      op => final.operations[op.id]?.state === 'retired');
 
   if (!all_retired) {
-    const stuck = expanded.operations
-      .filter(op => final.operations[op.id]?.state !== 'retired')
-      .map(op => `${op.id}(${final.operations[op.id]?.state})`);
+    const stuck =
+        expanded.operations
+            .filter(op => final.operations[op.id]?.state !== 'retired')
+            .map(op => `${op.id}(${final.operations[op.id]?.state})`);
     error(scenario, `${label}: not all ops retired: ${stuck.join(', ')}`);
     return null;
   }
 
-  return { snapshots, max_tick, op_count: expanded.operations.length };
+  return {snapshots, max_tick, op_count: expanded.operations.length};
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +217,10 @@ function check_scaled_structure(label, scenario) {
   for (const op of scenario.operations) {
     for (const [sem_id, value] of Object.entries(op.wait)) {
       if (!signal_pairs.has(`${sem_id}:${value}`)) {
-        error(scenario, `${label}: op "${op.id}" waits on ${sem_id}:${value} but no op signals it`);
+        error(
+            scenario,
+            `${label}: op "${op.id}" waits on ${sem_id}:${
+                value} but no op signals it`);
         return false;
       }
     }
@@ -223,13 +243,17 @@ for (const scenario of scenarios) {
   // Base simulation (with hardware expansion at default count).
   const result = check_simulation('base', scenario);
   if (result) {
-    ok(`simulation OK (${result.max_tick} ticks, ${result.op_count} ops retired)`);
+    ok(`simulation OK (${result.max_tick} ticks, ${
+        result.op_count} ops retired)`);
 
     // Annotation ticks within range.
     if (scenario.annotations) {
       for (const ann of scenario.annotations) {
         if (ann.tick > result.max_tick) {
-          error(scenario, `annotation at t=${ann.tick} exceeds final tick ${result.max_tick}`);
+          error(
+              scenario,
+              `annotation at t=${ann.tick} exceeds final tick ${
+                  result.max_tick}`);
         }
       }
     }
@@ -292,5 +316,6 @@ for (const scenario of scenarios) {
 // Summary
 // ---------------------------------------------------------------------------
 
-console.log(`\nValidation complete: ${errors} error(s), ${warnings} warning(s)`);
+console.log(
+    `\nValidation complete: ${errors} error(s), ${warnings} warning(s)`);
 process.exit(errors > 0 ? 1 : 0);

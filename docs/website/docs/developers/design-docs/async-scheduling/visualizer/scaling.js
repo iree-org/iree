@@ -60,11 +60,9 @@ export function scaleScenario(base, width, depth) {
 
   // Root operations: those with no waits in the base scenario.
   // At depth > 0, these get injected chain_through waits.
-  const root_op_ids = new Set(
-    base.operations
-      .filter(op => Object.keys(op.wait).length === 0)
-      .map(op => op.id)
-  );
+  const root_op_ids =
+      new Set(base.operations.filter(op => Object.keys(op.wait).length === 0)
+                  .map(op => op.id));
 
   // Hardware is shared across all instances — that's the whole point.
   const hardware = base.hardware;
@@ -106,7 +104,8 @@ export function scaleScenario(base, width, depth) {
         const wait = {};
         for (const [sem_id, value] of Object.entries(op.wait)) {
           const is_shared = depth_shared_set.has(sem_id);
-          const new_id = make_sem_id(sem_id, w, is_shared ? null : d, width, depth);
+          const new_id =
+              make_sem_id(sem_id, w, is_shared ? null : d, width, depth);
           const offset = is_shared ? d * max_signal[sem_id] : 0;
           wait[new_id] = value + offset;
         }
@@ -138,7 +137,8 @@ export function scaleScenario(base, width, depth) {
         const signal = {};
         for (const [sem_id, value] of Object.entries(op.signal)) {
           const is_shared = depth_shared_set.has(sem_id);
-          const new_id = make_sem_id(sem_id, w, is_shared ? null : d, width, depth);
+          const new_id =
+              make_sem_id(sem_id, w, is_shared ? null : d, width, depth);
           const offset = is_shared ? d * max_signal[sem_id] : 0;
           signal[new_id] = value + offset;
         }
@@ -168,8 +168,10 @@ export function scaleScenario(base, width, depth) {
 
 // Check if a scenario supports depth chaining.
 export function supportsDepth(scenario) {
-  const has_chain = Array.isArray(scenario.chain_through) && scenario.chain_through.length > 0;
-  const has_iteration_deps = scenario.iteration_deps && Object.keys(scenario.iteration_deps).length > 0;
+  const has_chain = Array.isArray(scenario.chain_through) &&
+      scenario.chain_through.length > 0;
+  const has_iteration_deps = scenario.iteration_deps &&
+      Object.keys(scenario.iteration_deps).length > 0;
   return has_chain || has_iteration_deps;
 }
 

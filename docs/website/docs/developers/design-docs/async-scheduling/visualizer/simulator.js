@@ -59,7 +59,7 @@ export function frontierToString(frontier) {
 }
 
 function cloneFrontier(frontier) {
-  return { ...frontier };
+  return {...frontier};
 }
 
 // ---------------------------------------------------------------------------
@@ -89,8 +89,8 @@ export function simulate(scenario) {
   for (const sem of scenario.semaphores) {
     sem_states[sem.id] = {
       value: 0,
-      frontier: {},      // frontier of the latest signal (for display)
-      frontiers: {},     // per-value frontier history (for causal lookup)
+      frontier: {},   // frontier of the latest signal (for display)
+      frontiers: {},  // per-value frontier history (for causal lookup)
     };
   }
 
@@ -204,9 +204,8 @@ export function simulate(scenario) {
         const free_lanes = lanes.filter(lane => !occupied_lanes.has(lane));
         if (free_lanes.length === 0) continue;
 
-        const ready_ops = type_ops.filter(
-          op => op_states[op.id].state === 'ready'
-        );
+        const ready_ops =
+            type_ops.filter(op => op_states[op.id].state === 'ready');
         if (ready_ops.length === 0) continue;
 
         // Assign operations to lanes: definition order for ops (maintained
@@ -229,23 +228,23 @@ export function simulate(scenario) {
           //
           // The hardware lane does NOT contribute to the frontier. Two
           // independent operations on the same GPU share no causal info.
-          const wait_frontiers = Object.entries(ready_op.wait)
-            .filter(([sem_id]) => sem_states[sem_id])
-            .map(([sem_id, wait_value]) =>
-              sem_states[sem_id].frontiers[wait_value] || {}
-            );
+          const wait_frontiers =
+              Object.entries(ready_op.wait)
+                  .filter(([sem_id]) => sem_states[sem_id])
+                  .map(
+                      ([sem_id, wait_value]) =>
+                          sem_states[sem_id].frontiers[wait_value] || {});
 
           os.frontier = mergeFrontiers(
-            ...wait_frontiers,
-            ready_op.signal,
+              ...wait_frontiers,
+              ready_op.signal,
           );
 
           events.push({
             type: 'issued',
             op_id: ready_op.id,
-            description:
-              `${ready_op.label} issued ` +
-              `(frontier: ${frontierToString(os.frontier)})`,
+            description: `${ready_op.label} issued ` +
+                `(frontier: ${frontierToString(os.frontier)})`,
           });
         }
       }
@@ -254,34 +253,31 @@ export function simulate(scenario) {
     // Record a deep-cloned snapshot of the full state at this tick.
     snapshots.push({
       tick,
-      operations: Object.fromEntries(
-        scenario.operations.map(op => [
-          op.id,
-          {
-            state: op_states[op.id].state,
-            start_tick: op_states[op.id].start_tick,
-            end_tick: op_states[op.id].end_tick,
-            frontier: cloneFrontier(op_states[op.id].frontier),
-            assigned_lane: op_states[op.id].assigned_lane,
-          },
-        ])
-      ),
-      semaphores: Object.fromEntries(
-        scenario.semaphores.map(sem => [
-          sem.id,
-          {
-            value: sem_states[sem.id].value,
-            frontier: cloneFrontier(sem_states[sem.id].frontier),
-          },
-        ])
-      ),
+      operations: Object.fromEntries(scenario.operations.map(
+          op =>
+              [op.id,
+               {
+                 state: op_states[op.id].state,
+                 start_tick: op_states[op.id].start_tick,
+                 end_tick: op_states[op.id].end_tick,
+                 frontier: cloneFrontier(op_states[op.id].frontier),
+                 assigned_lane: op_states[op.id].assigned_lane,
+               },
+    ])),
+      semaphores: Object.fromEntries(scenario.semaphores.map(
+          sem =>
+              [sem.id,
+               {
+                 value: sem_states[sem.id].value,
+                 frontier: cloneFrontier(sem_states[sem.id].frontier),
+               },
+    ])),
       events: [...events],
     });
 
     // All operations retired — add one final empty-event tick and stop.
-    const all_retired = scenario.operations.every(
-      op => op_states[op.id].state === 'retired'
-    );
+    const all_retired =
+        scenario.operations.every(op => op_states[op.id].state === 'retired');
     if (all_retired) {
       snapshots.push({
         tick: tick + 1,
@@ -309,9 +305,8 @@ export function computeDependencies(scenario) {
   const deps = [];
   for (const waiter of scenario.operations) {
     for (const [sem_id, wait_value] of Object.entries(waiter.wait)) {
-      const signaler = scenario.operations.find(
-        op => op.signal[sem_id] === wait_value
-      );
+      const signaler =
+          scenario.operations.find(op => op.signal[sem_id] === wait_value);
       if (signaler) {
         deps.push({
           from: signaler.id,

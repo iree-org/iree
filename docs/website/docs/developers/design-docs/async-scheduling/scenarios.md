@@ -163,7 +163,7 @@ for weights + UNet latents. GPU 0 has Llama (5GB weights + KV cache) and
 the draft model (1GB). GPU 1 has Whisper (2GB) + Bark (4GB). Neither GPU
 has 6GB free.
 
-**Step 1: Deallocate cold model weights**
+#### Step 1: Deallocate cold model weights
 
 The scheduler decides to drop Bark's weights (lowest priority, longest
 expected idle time). Weights are read-only — they don't need to be saved
@@ -188,7 +188,7 @@ No DMA "eviction" step — Bark's weights are immutable, so dropping them
 is just a deallocation. The death frontier on the freed buffers ensures
 SDXL cannot reuse the memory until Bark's compute has actually completed.
 
-**Step 2: SDXL generation**
+#### Step 2: SDXL generation
 
 ```text
 GPU 1: SDXL UNet denoising (50 steps)
@@ -196,7 +196,7 @@ GPU 1: SDXL UNet denoising (50 steps)
   frontier: {dgpu1_axis: ...}
 ```
 
-**Step 3: Bark weight reload**
+#### Step 3: Bark weight reload
 
 When SDXL completes and the user sends another voice message:
 

@@ -6,13 +6,10 @@
 //                DAG, timeline, and transport controls.
 //   ?scenario=<id> — Load a specific scenario by ID on startup.
 
-import { simulate, frontierToString } from './simulator.js';
-import { scenarios } from './scenarios.js';
-import { createRenderer } from './renderer.js';
-import {
-  scaleScenario, supportsDepth,
-  getScalableHardware, expandHardware,
-} from './scaling.js';
+import {createRenderer} from './renderer.js';
+import {expandHardware, getScalableHardware, scaleScenario, supportsDepth,} from './scaling.js';
+import {scenarios} from './scenarios.js';
+import {frontierToString, simulate} from './simulator.js';
 
 const url_params = new URLSearchParams(window.location.search);
 const is_inline = url_params.has('inline');
@@ -152,7 +149,8 @@ function apply_scaling() {
     parts.push(`${instance_count} instance${instance_count > 1 ? 's' : ''}`);
   }
   if (scalable_hw && hw_count !== default_hw_count) {
-    parts.push(`${hw_count} ${scalable_hw.label.toLowerCase()}${hw_count > 1 ? 's' : ''}`);
+    parts.push(`${hw_count} ${scalable_hw.label.toLowerCase()}${
+        hw_count > 1 ? 's' : ''}`);
   }
   if (parts.length > 0) {
     const op_count = expanded.operations.length;
@@ -176,11 +174,11 @@ function apply_scaling() {
   // static mode (all nodes retired, no tick animation) so the user can still
   // see the dependency structure. The timeline uses the expanded scenario.
   current_renderer = createRenderer(
-    dom.dag,
-    dom.timeline,
-    expanded,
-    current_snapshots,
-    is_scaled ? base_scenario : null,
+      dom.dag,
+      dom.timeline,
+      expanded,
+      current_snapshots,
+      is_scaled ? base_scenario : null,
   );
 
   // Show initial state.
@@ -215,17 +213,17 @@ function update_state_display(snapshot) {
   const sem_entries = Object.entries(snapshot.semaphores);
   if (sem_entries.length > 0) {
     let html = '<table><thead><tr>' +
-      '<th>Semaphore</th><th>Value</th><th>Frontier</th>' +
-      '</tr></thead><tbody>';
+        '<th>Semaphore</th><th>Value</th><th>Frontier</th>' +
+        '</tr></thead><tbody>';
 
     for (const [sem_id, state] of sem_entries) {
       const sem_def = current_scenario.semaphores.find(s => s.id === sem_id);
       const label = sem_def ? sem_def.label : sem_id;
       html += '<tr>' +
-        `<td class="sem-name">${label}</td>` +
-        `<td>${state.value}</td>` +
-        `<td class="frontier">${frontierToString(state.frontier)}</td>` +
-        '</tr>';
+          `<td class="sem-name">${label}</td>` +
+          `<td>${state.value}</td>` +
+          `<td class="frontier">${frontierToString(state.frontier)}</td>` +
+          '</tr>';
     }
     html += '</tbody></table>';
     dom.sem_state.innerHTML = html;
@@ -237,21 +235,21 @@ function update_state_display(snapshot) {
   const op_entries = Object.entries(snapshot.operations);
   if (op_entries.length > 0) {
     let html = '<table><thead><tr>' +
-      '<th>Operation</th><th>State</th><th>Frontier</th>' +
-      '</tr></thead><tbody>';
+        '<th>Operation</th><th>State</th><th>Frontier</th>' +
+        '</tr></thead><tbody>';
 
     for (const [op_id, state] of op_entries) {
       const op_def = current_scenario.operations.find(o => o.id === op_id);
       const label = op_def ? op_def.label : op_id;
       const display_state = state.state.replace('_', ' ');
-      const frontier = Object.keys(state.frontier).length > 0
-        ? frontierToString(state.frontier)
-        : '\u2014';
+      const frontier = Object.keys(state.frontier).length > 0 ?
+          frontierToString(state.frontier) :
+          '\u2014';
       html += '<tr>' +
-        `<td class="op-name">${label}</td>` +
-        `<td>${display_state}</td>` +
-        `<td class="frontier">${frontier}</td>` +
-        '</tr>';
+          `<td class="op-name">${label}</td>` +
+          `<td>${display_state}</td>` +
+          `<td class="frontier">${frontier}</td>` +
+          '</tr>';
     }
     html += '</tbody></table>';
     dom.op_frontiers.innerHTML = html;
@@ -265,23 +263,24 @@ function update_state_display(snapshot) {
 // ---------------------------------------------------------------------------
 
 const EVENT_ICONS = {
-  retired:  '\u25a0', // filled square
-  signaled: '\u25b2', // filled triangle
-  ready:    '\u25cf', // filled circle
-  issued:   '\u25b6', // play symbol
+  retired: '\u25a0',   // filled square
+  signaled: '\u25b2',  // filled triangle
+  ready: '\u25cf',     // filled circle
+  issued: '\u25b6',    // play symbol
 };
 
 function update_event_log(snapshot) {
   if (snapshot.events.length === 0) {
     dom.event_list.innerHTML =
-      '<div class="no-events">No events this tick</div>';
+        '<div class="no-events">No events this tick</div>';
     return;
   }
 
   let html = '';
   for (const event of snapshot.events) {
     const icon = EVENT_ICONS[event.type] || '\u2022';
-    html += `<div class="event ${event.type}">${icon} ${event.description}</div>`;
+    html +=
+        `<div class="event ${event.type}">${icon} ${event.description}</div>`;
   }
   dom.event_list.innerHTML = html;
 }
@@ -297,9 +296,9 @@ function update_annotation(tick) {
   const annotations = at_defaults ? base_scenario.annotations : null;
 
   if (!annotations || annotations.length === 0) {
-    dom.annotation_text.textContent = at_defaults
-      ? 'Scrub the timeline or step through ticks to see annotations.'
-      : 'Annotations are available at default settings.';
+    dom.annotation_text.textContent = at_defaults ?
+        'Scrub the timeline or step through ticks to see annotations.' :
+        'Annotations are available at default settings.';
     dom.annotation_section.classList.remove('active');
     return;
   }
@@ -309,7 +308,8 @@ function update_annotation(tick) {
     dom.annotation_text.textContent = annotation.text;
     dom.annotation_section.classList.add('active');
   } else {
-    dom.annotation_text.textContent = 'Scrub the timeline or step through ticks to see annotations.';
+    dom.annotation_text.textContent =
+        'Scrub the timeline or step through ticks to see annotations.';
     dom.annotation_section.classList.remove('active');
   }
 }
@@ -339,7 +339,7 @@ function toggle_playback() {
   }
 
   playing = true;
-  dom.btn_play.textContent = '\u23f8'; // pause symbol
+  dom.btn_play.textContent = '\u23f8';  // pause symbol
   play_timer = setInterval(() => {
     if (current_tick < current_snapshots.length - 1) {
       set_tick(current_tick + 1);
@@ -402,7 +402,8 @@ document.addEventListener('keydown', (event) => {
       break;
     case 'ArrowRight':
       event.preventDefault();
-      if (current_tick < current_snapshots.length - 1) set_tick(current_tick + 1);
+      if (current_tick < current_snapshots.length - 1)
+        set_tick(current_tick + 1);
       break;
     case ' ':
       event.preventDefault();
@@ -444,7 +445,7 @@ window.addEventListener('message', (event) => {
 // Follow OS preference changes in standalone mode.
 if (!is_inline) {
   window.matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', (event) => applyTheme(event.matches));
+      .addEventListener('change', (event) => applyTheme(event.matches));
 }
 
 // ---------------------------------------------------------------------------
@@ -453,6 +454,7 @@ if (!is_inline) {
 
 // Load the scenario specified in the URL, or the first scenario by default.
 const initial_id = url_params.get('scenario');
-const initial_scenario = (initial_id && scenarios.find(s => s.id === initial_id)) || scenarios[0];
+const initial_scenario =
+    (initial_id && scenarios.find(s => s.id === initial_id)) || scenarios[0];
 dom.select.value = initial_scenario.id;
 load_scenario(initial_scenario);

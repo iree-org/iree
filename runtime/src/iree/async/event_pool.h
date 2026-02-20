@@ -46,7 +46,8 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
     iree_async_event_pool_return_stack_t {
   // Treiber stack head (lock-free push/pop via CAS).
   iree_atomic_intptr_t head;
-} iree_async_event_pool_return_stack_t;
+}
+iree_async_event_pool_return_stack_t;
 
 // High-performance event pool with producer-consumer separation.
 //
