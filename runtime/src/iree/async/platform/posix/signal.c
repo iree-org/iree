@@ -59,14 +59,14 @@ static iree_status_t iree_selfpipe_create_pipe(int* out_read_fd,
   for (int i = 0; i < 2; ++i) {
     int flags = fcntl(fds[i], F_GETFL);
     if (flags == -1 || fcntl(fds[i], F_SETFL, flags | O_NONBLOCK) == -1) {
-      int error = errno;
+      IREE_ATTRIBUTE_UNUSED int error = errno;
       close(fds[0]);
       close(fds[1]);
       return iree_make_status(IREE_STATUS_INTERNAL,
                               "fcntl(F_SETFL, O_NONBLOCK) failed: %d", error);
     }
     if (fcntl(fds[i], F_SETFD, FD_CLOEXEC) == -1) {
-      int error = errno;
+      IREE_ATTRIBUTE_UNUSED int error = errno;
       close(fds[0]);
       close(fds[1]);
       return iree_make_status(IREE_STATUS_INTERNAL,
@@ -138,7 +138,7 @@ iree_status_t iree_async_selfpipe_signal_add_signal(
 
   if (sigaction(posix_signal, &new_action, &state->saved_actions[signal]) !=
       0) {
-    int error = errno;
+    IREE_ATTRIBUTE_UNUSED int error = errno;
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "sigaction(install) failed: %d", error);
   }
@@ -150,7 +150,7 @@ iree_status_t iree_async_selfpipe_signal_add_signal(
   sigemptyset(&unblock_mask);
   sigaddset(&unblock_mask, posix_signal);
   if (pthread_sigmask(SIG_UNBLOCK, &unblock_mask, NULL) != 0) {
-    int error = errno;
+    IREE_ATTRIBUTE_UNUSED int error = errno;
     // Rollback: restore original handler.
     sigaction(posix_signal, &state->saved_actions[signal], NULL);
     state->action_saved[signal] = false;

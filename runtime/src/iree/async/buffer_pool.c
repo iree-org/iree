@@ -107,7 +107,8 @@ IREE_API_EXPORT void iree_async_buffer_pool_free(
   if (!pool) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_host_size_t buffer_count = pool->region->buffer_count;
+  IREE_ATTRIBUTE_UNUSED iree_host_size_t buffer_count =
+      pool->region->buffer_count;
 
   // Debug check: all buffers should be returned.
   iree_host_size_t available = iree_atomic_freelist_count(&pool->freelist);
@@ -138,7 +139,8 @@ IREE_API_EXPORT iree_status_t iree_async_buffer_pool_acquire(
   IREE_ASSERT_ARGUMENT(out_lease);
 
   iree_host_size_t buffer_size = pool->region->buffer_size;
-  iree_host_size_t buffer_count = pool->region->buffer_count;
+  IREE_ATTRIBUTE_UNUSED iree_host_size_t buffer_count =
+      pool->region->buffer_count;
 
   // Try to pop from lock-free freelist.
   uint16_t index;
