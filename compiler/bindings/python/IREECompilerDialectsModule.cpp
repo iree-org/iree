@@ -199,6 +199,22 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return parameters.translationInfo;
           });
 
+  //===-------------------------------------------------------------------===//
+  // CodegenRootOpAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "RootOpAttr",
+                          ireeAttributeIsACodegenRootOpAttr,
+                          ireeCodegenRootOpAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, int64_t set, MlirContext ctx) {
+            return ireeCodegenRootOpAttrGet(ctx, set);
+          },
+          "cls"_a, "set"_a = 0, py::kw_only(), "ctx"_a = py::none(),
+          "Gets an #iree_codegen.root_op attribute.")
+      .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
+
   //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =

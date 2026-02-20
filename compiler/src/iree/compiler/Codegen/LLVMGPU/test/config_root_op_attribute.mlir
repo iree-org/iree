@@ -9,7 +9,7 @@ func.func @matmul(%lhs: tensor<4x4xf32>, %rhs: tensor<4x4xf32>) -> tensor<4x4xf3
   return %result : tensor<4x4xf32>
 }
 
-// CHECK: %2 = linalg.matmul {lowering_config = #{{.*}}, root_op} ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+// CHECK: %2 = linalg.matmul {lowering_config = #{{.*}}, root_op = #iree_codegen.root_op<set = 0>} ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
 
 // -----
 
@@ -24,7 +24,7 @@ func.func @matvec(%matrix: tensor<32000x4096xf16>, %vector: tensor<4096xf16>, %i
 // CHECK-LABEL: func.func @matvec
 // CHECK: linalg.matvec
 // CHECK-SAME: lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME: root_op
+// CHECK-SAME: root_op = #iree_codegen.root_op<set = 0>
 
 // -----
 
@@ -48,4 +48,4 @@ func.func @reduction_sum(%input: tensor<2x32x128x4096xf32>, %init: tensor<2x32xf
 // CHECK: %{{.*}} = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "reduction"]
 // CHECK-SAME: lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME: root_op
+// CHECK-SAME: root_op = #iree_codegen.root_op<set = 0>

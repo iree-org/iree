@@ -685,4 +685,21 @@ def WorkgroupScopeAttr : AttrDef<IREECodegen_Dialect, "WorkgroupScope", []> {
   // Interface is registered as an external model to avoid HAL dep.
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.root_op
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_RootOpAttr : AttrDef<IREECodegen_Dialect, "RootOp"> {
+  let mnemonic = "root_op";
+  let summary = "Marks an operation as a tuner root op in a given set";
+  let description = [{
+    Attribute identifying a root operation. The `set` parameter groups root ops
+    into numbered sets: all root ops in the given set share the same
+    `lowering_config`. Codegen does not rely on the `root_op` attribute; it is
+    only used for constraint generation when tuning.
+  }];
+  let parameters = (ins "int64_t":$set);
+  let assemblyFormat = "`<` `set` `=` $set `>`";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

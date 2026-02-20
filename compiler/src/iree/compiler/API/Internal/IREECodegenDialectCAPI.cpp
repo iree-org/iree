@@ -32,6 +32,7 @@ using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
 using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
+using mlir::iree_compiler::IREE::Codegen::RootOpAttr;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
 using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
 
@@ -158,6 +159,23 @@ ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr) {
   parameters.loweringConfig = wrap(compilationInfo.getLoweringConfig());
   parameters.translationInfo = wrap(compilationInfo.getTranslationInfo());
   return parameters;
+}
+
+bool ireeAttributeIsACodegenRootOpAttr(MlirAttribute attr) {
+  return llvm::isa<RootOpAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenRootOpAttrGetTypeID() {
+  return wrap(RootOpAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenRootOpAttrGet(MlirContext mlirCtx, int64_t set) {
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(RootOpAttr::get(ctx, set));
+}
+
+int64_t ireeCodegenRootOpAttrGetSet(MlirAttribute attr) {
+  return llvm::cast<RootOpAttr>(unwrap(attr)).getSet();
 }
 
 void ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,

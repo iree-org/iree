@@ -21,6 +21,32 @@ def run(fn):
 
 
 @run
+def root_op_attr():
+    # Test 1: Create RootOpAttr and read back the set.
+    attr = iree_codegen.RootOpAttr.get(set=0)
+    assert isinstance(attr, iree_codegen.RootOpAttr)
+    assert attr.set == 0
+
+    attr1 = iree_codegen.RootOpAttr.get(set=42)
+    assert attr1.set == 42
+
+    # Test 2: Default set value is 0.
+    attr_default = iree_codegen.RootOpAttr.get()
+    assert attr_default.set == 0
+
+    # Test 3: Parse from MLIR and read back.
+    parsed = ir.Attribute.parse("#iree_codegen.root_op<set = 7>")
+    assert isinstance(parsed, iree_codegen.RootOpAttr)
+    assert parsed.set == 7
+
+    # Test 4: Round-trip through string.
+    attr2 = iree_codegen.RootOpAttr.get(set=3)
+    reparsed = ir.Attribute.parse(str(attr2))
+    assert isinstance(reparsed, iree_codegen.RootOpAttr)
+    assert reparsed.set == 3
+
+
+@run
 def root_op():
     module_str = """
         module {
@@ -44,7 +70,7 @@ def root_op():
                 %cst = arith.constant 0.000000e+00 : f32
                 %0 = tensor.empty() : tensor<4x4xf32>
                 %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                %2 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul { root_op = #iree_codegen.root_op<set = 0> } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %2 : tensor<4x4xf32>
             }
         }
@@ -60,8 +86,8 @@ def root_op():
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
                 %cst = arith.constant 0.000000e+00 : f32
                 %0 = tensor.empty() : tensor<4x4xf32>
-                %1 = linalg.fill { root_op } ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
-                %2 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %1 = linalg.fill { root_op = #iree_codegen.root_op<set = 0> } ins(%cst : f32) outs(%0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %2 = linalg.matmul { root_op = #iree_codegen.root_op<set = 0> } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%1 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %2 : tensor<4x4xf32>
             }
         }
@@ -120,7 +146,7 @@ def test_isa_attention_op():
                     %scale : f16,
                     %output : tensor<20x4096x64xf16>
                 ) -> tensor<20x4096x64xf16> {
-                    %result = iree_linalg_ext.attention { root_op,
+                    %result = iree_linalg_ext.attention { root_op = #iree_codegen.root_op<set = 0>,
                         indexing_maps = [
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
@@ -151,7 +177,7 @@ def test_igemm_conv_details():
     module_str = """
         module {
             func.func @conv_2d_nhwc_hwcf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
-                %0 = linalg.conv_2d_nhwc_hwcf { root_op, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+                %0 = linalg.conv_2d_nhwc_hwcf { root_op = #iree_codegen.root_op<set = 0>, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
                     ins(%arg0, %arg1 : tensor<1x16x16x4xf32>, tensor<3x3x4x16xf32>)
                     outs(%arg2 : tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
                 return %0 : tensor<1x14x14x16xf32>
@@ -193,7 +219,7 @@ def test_igemm_conv_details():
     module_str = """
         module {
             func.func @conv_2d_nhwc_fhwc(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<16x3x3x4xf32>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
-                %0 = linalg.conv_2d_nhwc_fhwc { root_op, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+                %0 = linalg.conv_2d_nhwc_fhwc { root_op = #iree_codegen.root_op<set = 0>, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
                     ins(%arg0, %arg1 : tensor<1x16x16x4xf32>, tensor<16x3x3x4xf32>)
                     outs(%arg2 : tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
                 return %0 : tensor<1x14x14x16xf32>
@@ -234,7 +260,7 @@ def test_igemm_conv_details():
     module_str = """
         module {
             func.func @conv_2d_nchw_fchw(%arg0: tensor<1x4x16x16xf32>, %arg1: tensor<16x4x3x3xf32>, %arg2: tensor<1x16x14x14xf32>) -> tensor<1x16x14x14xf32> {
-                %0 = linalg.conv_2d_nchw_fchw { root_op, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
+                %0 = linalg.conv_2d_nchw_fchw { root_op = #iree_codegen.root_op<set = 0>, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
                     ins(%arg0, %arg1 : tensor<1x4x16x16xf32>, tensor<16x4x3x3xf32>)
                     outs(%arg2 : tensor<1x16x14x14xf32>) -> tensor<1x16x14x14xf32>
                 return %0 : tensor<1x16x14x14xf32>
@@ -283,7 +309,7 @@ def test_igemm_conv_details():
                         affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
                     ],
                     iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
-                } ins(%arg0, %arg1 : tensor<16x98x64x96xf32>, tensor<16x96x64x96xf32>) outs(%arg2 : tensor<96x3x96xf32>) attrs = {root_op} {
+                } ins(%arg0, %arg1 : tensor<16x98x64x96xf32>, tensor<16x96x64x96xf32>) outs(%arg2 : tensor<96x3x96xf32>) attrs = {root_op = #iree_codegen.root_op<set = 0>} {
                 ^bb0(%in: f32, %in_1: f32, %out: f32):
                     %mul = arith.mulf %in, %in_1 : f32
                     %add = arith.addf %out, %mul : f32
@@ -318,7 +344,7 @@ def test_igemm_conv_details():
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
-                %0 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %0 = linalg.matmul { root_op = #iree_codegen.root_op<set = 0> } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %0 : tensor<4x4xf32>
             }
         }
@@ -337,7 +363,7 @@ def test_isa_scaled_contraction_op():
     module_str = """
         module {
             func.func @matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
-                %0 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %0 = linalg.matmul { root_op = #iree_codegen.root_op<set = 0> } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %0 : tensor<4x4xf32>
             }
         }
@@ -357,7 +383,7 @@ def test_isa_scaled_contraction_op():
         module {
             func.func @fill(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
                 %cst = arith.constant 0.000000e+00 : f32
-                %0 = linalg.fill { root_op } ins(%cst : f32) outs(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %0 = linalg.fill { root_op = #iree_codegen.root_op<set = 0> } ins(%cst : f32) outs(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %0 : tensor<4x4xf32>
             }
         }
@@ -389,7 +415,7 @@ def test_isa_scaled_contraction_op():
                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>
                     ],
                     iterator_types = ["parallel", "parallel", "reduction", "reduction"],
-                    root_op
+                    root_op = #iree_codegen.root_op<set = 0>
                 } ins(%lhs, %rhs, %lhs_scales, %rhs_scales : tensor<16x4x32xf4E2M1FN>, tensor<16x4x32xf4E2M1FN>, tensor<16x4xf8E8M0FNU>, tensor<16x4xf8E8M0FNU>)
                   outs(%out : tensor<16x16xf32>) {
                 ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %acc: f32):
@@ -440,7 +466,7 @@ def test_infer_scaled_contraction_dimensions():
                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>
                     ],
                     iterator_types = ["parallel", "parallel", "reduction", "reduction"],
-                    root_op
+                    root_op = #iree_codegen.root_op<set = 0>
                 } ins(%lhs, %rhs, %lhs_scales, %rhs_scales : tensor<16x4x32xf4E2M1FN>, tensor<16x4x32xf4E2M1FN>, tensor<16x4xf8E8M0FNU>, tensor<16x4xf8E8M0FNU>)
                   outs(%out : tensor<16x16xf32>) {
                 ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %acc: f32):
@@ -475,7 +501,7 @@ def test_infer_scaled_contraction_dimensions():
     module_str_regular = """
         module {
             func.func @regular_matmul(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>, %arg2: tensor<4x4xf32>) -> tensor<4x4xf32> {
-                %0 = linalg.matmul { root_op } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
+                %0 = linalg.matmul { root_op = #iree_codegen.root_op<set = 0> } ins(%arg0, %arg1 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%arg2 : tensor<4x4xf32>) -> tensor<4x4xf32>
                 return %0 : tensor<4x4xf32>
             }
         }
@@ -515,7 +541,7 @@ def test_infer_scaled_contraction_dimensions():
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
                     ],
                     iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"],
-                    root_op
+                    root_op = #iree_codegen.root_op<set = 0>
                 } ins(%lhs, %rhs, %lhs_scales, %rhs_scales : tensor<8x16x4x32xf4E2M1FN>, tensor<8x16x4x32xf4E2M1FN>, tensor<8x16x4xf8E8M0FNU>, tensor<8x16x4xf8E8M0FNU>)
                   outs(%out : tensor<8x16x16xf32>) {
                 ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %acc: f32):
