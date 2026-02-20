@@ -674,7 +674,7 @@ func.func @paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
 // CHECK-GATHER: %[[INDEX_LOAD:.+]] = vector.transfer_read %[[ARG1]]
 // CHECK-GATHER: %[[INDEX_CAST:.+]] = arith.index_cast %[[INDEX_LOAD]] : vector<128xi64> to vector<128xindex>
 // CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER-SAME: [%[[INDEX_CAST]]: vector<128xindex>, None]
+// CHECK-GATHER-SAME: [%[[INDEX_CAST]] : vector<128xindex>]
 // CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
 
 // -----
@@ -703,7 +703,6 @@ func.func @contiguous_gather_read(%storage : !storage) -> !x {
 // CHECK-GATHER-LABEL: @contiguous_gather_read
 // CHECK-GATHER-SAME: %[[ARG0:.+]]: tensor<8192x8xf16>
 // CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER-SAME: [None, None]
 // CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
 
 // -----
@@ -718,7 +717,7 @@ func.func @contiguous_gather_read(%storage : !storage) -> !x {
     iterator_types = ["parallel", "parallel"]
 }
 
-func.func @negative_strided_paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
+func.func @strided_paged_gather_read(%storage : !storage, %ind: !ind) -> !x {
   %x = tensor.empty() : !x
   %c2 = arith.constant 2 : index
   %x_g = linalg.generic #gather
@@ -734,10 +733,10 @@ func.func @negative_strided_paged_gather_read(%storage : !storage, %ind: !ind) -
   return %x_g : !x
 }
 
-// For now, the vectorizer does not walk back on binary ops to find a mapping
-// from the iteration space to the memory space. This can be improved in future.
-// CHECK-GATHER-LABEL: @negative_strided_paged_gather_read
-// CHECK-GATHER: linalg.generic
+// The strided index (arith.muli) is treated as a gathered dimension.
+// CHECK-GATHER-LABEL: @strided_paged_gather_read
+// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather
+// CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
 
 // -----
 
@@ -774,7 +773,7 @@ func.func @full_gather_read(%storage : !storage, %ind0: !ind0, %ind1 : !ind1) ->
 // CHECK-GATHER-DAG: %[[CAST0:.+]] = arith.index_cast %[[IDX0]] : vector<128xi64> to vector<128xindex>
 // CHECK-GATHER-DAG: %[[CAST1:.+]] = arith.index_cast %[[IDX1]] : vector<8xi64> to vector<8xindex>
 // CHECK-GATHER-DAG: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-// CHECK-GATHER-SAME: [%[[CAST0]]: vector<128xindex>, %[[CAST1]]: vector<8xindex>]
+// CHECK-GATHER-SAME: [%[[CAST0]], %[[CAST1]] : vector<128xindex>, vector<8xindex>]
 // CHECK-GATHER: vector.transfer_write %[[GATHER]], %{{.*}}
 
 // -----

@@ -3109,8 +3109,10 @@ func.func @cache_swizzle_resource_cast(%stride: index) {
 func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>) -> vector<8x64xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
-  %out = iree_vector_ext.transfer_gather %source[%c0, %c0][%indices: vector<8xindex>, None], %cst {
-    indexed_maps = [affine_map<(d0, d1) -> (d0)>]
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<8xindex>], %cst {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
   } : tensor<?x64xf16>, vector<8x64xf16>
   return %out : vector<8x64xf16>
 }
@@ -3119,7 +3121,7 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 // CHECK-SAME: %[[SOURCE:.+]]: tensor<?x64xf16>, %[[INDICES:.+]]: vector<8xindex>
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.+]] = bufferization.to_buffer %[[SOURCE]]
-// CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]][%[[INDICES]]: vector<8xindex>, None]
+// CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]] [%[[INDICES]] : vector<8xindex>]
 
 // -----
 

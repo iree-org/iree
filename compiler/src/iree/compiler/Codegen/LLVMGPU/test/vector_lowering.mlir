@@ -222,3 +222,27 @@ func.func @int_contract_add_no_chain_fma(
 // CHECK-LABEL: func.func @int_contract_add_no_chain_fma
 // CHECK-NOT:  math.fma
 // CHECK:  return %{{.*}} : vector<3x2xi32>
+
+// -----
+
+// Test unrolling of a 2D transfer_gather representing an embedding lookup:
+// outer dim is gathered (indices), inner dim is contiguous.
+
+func.func @transfer_gather_unroll_embedding_lookup(
+  %source: memref<4096x64xf16>,
+  %indices: vector<4xindex>) -> vector<4x64xf16> {
+  %cst = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<4xindex>], %cst {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : memref<4096x64xf16>, vector<4x64xf16>
+  return %out : vector<4x64xf16>
+}
+
+// After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
+// CHECK-LABEL: func.func @transfer_gather_unroll_embedding_lookup
+// CHECK-NOT: transfer_gather
+// CHECK-COUNT-4: vector.load
+// CHECK-NOT: transfer_gather
