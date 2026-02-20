@@ -67,6 +67,9 @@ iree_runtime_cc_library(
     name = "defs",
     hdrs = ["defs.h"],
     target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
 )
 
 iree_runtime_cc_library(

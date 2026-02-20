@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include "iree/base/target_platform.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -28,8 +30,14 @@ extern "C" {
 // Syscall numbers and setup flags
 //===----------------------------------------------------------------------===//
 
-// io_uring syscall numbers are consistent across architectures since 5.1.
-#if defined(__x86_64__) || defined(__aarch64__)
+// io_uring syscall numbers for verified architectures. x86, ARM, and RISC-V
+// (both 32-bit and 64-bit) all assign 425/426/427. ARM and RISC-V share the
+// generic syscall table; x86 happens to use the same values in both its 32-bit
+// and 64-bit tables. Other architectures (MIPS, s390x) have different numbering
+// schemes — add them explicitly after verifying.
+#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64) || \
+    defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64) || \
+    defined(IREE_ARCH_RISCV_32) || defined(IREE_ARCH_RISCV_64)
 #define IREE_IO_URING_SYSCALL_SETUP 425
 #define IREE_IO_URING_SYSCALL_ENTER 426
 #define IREE_IO_URING_SYSCALL_REGISTER 427
