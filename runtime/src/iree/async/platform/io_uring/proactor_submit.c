@@ -56,15 +56,13 @@ static void iree_async_proactor_io_uring_fill_nop(
 // explicit reset syscall on acquire.
 //
 // The linked pair:
-//   SQE 1 (poll_sqe): POLL_ADD on eventfd, IOSQE_IO_LINK | CQE_SKIP_SUCCESS
+//   SQE 1 (poll_sqe): POLL_ADD on eventfd, IOSQE_IO_LINK
 //   SQE 2 (read_sqe): READ to drain the eventfd counter into drain_buffer
 //
-// On success, POLL_ADD produces no CQE (CQE_SKIP_SUCCESS). The READ CQE is
-// the user-visible completion that fires the callback. This ensures one
-// logical request (EVENT_WAIT) produces one logical response (READ CQE).
-//
-// On POLL_ADD failure, it produces an error CQE (marked internal) and READ
-// is cancelled. The READ's -ECANCELED CQE still fires the user callback.
+// On success, POLL_ADD produces a CQE (tagged internal, ignored by
+// process_cqe) and then READ fires the user callback. On POLL_ADD failure,
+// both POLL_ADD and READ produce CQEs; the POLL_ADD CQE is ignored and the
+// READ -ECANCELED CQE fires the user callback with the error status.
 static void iree_async_proactor_io_uring_fill_event_wait(
     iree_io_uring_sqe_t* poll_sqe, iree_io_uring_sqe_t* read_sqe,
     iree_async_operation_t* base_operation) {
@@ -74,21 +72,17 @@ static void iree_async_proactor_io_uring_fill_event_wait(
   int fd = event_wait->event->primitive.value.fd;
 
   // SQE 1: POLL_ADD with link to next SQE.
-  // CQE_SKIP_SUCCESS suppresses the CQE on success — only the READ CQE fires
-  // the user callback. On error (bad fd, cancellation), the linked READ is
-  // never started by the kernel and produces no CQE. The TAG_LINKED_POLL tag
-  // in user_data routes the error CQE to a handler that dispatches the user
-  // callback directly.
+  // Tagged internal so process_cqe ignores it — the READ CQE handles
+  // resource release and user callback for both success and failure paths.
   memset(poll_sqe, 0, sizeof(*poll_sqe));
   poll_sqe->opcode = IREE_IORING_OP_POLL_ADD;
-  poll_sqe->flags = IREE_IOSQE_IO_LINK | IREE_IOSQE_CQE_SKIP_SUCCESS;
+  poll_sqe->flags = IREE_IOSQE_IO_LINK;
   poll_sqe->fd = fd;
   poll_sqe->poll32_events = POLLIN;
   poll_sqe->user_data = iree_io_uring_internal_encode(
       IREE_IO_URING_TAG_LINKED_POLL, (uintptr_t)base_operation);
 
   // SQE 2: READ to drain the eventfd counter.
-  // This is the user-visible operation — its CQE fires the callback.
   // The eventfd stores an 8-byte counter; reading resets it to 0.
   memset(read_sqe, 0, sizeof(*read_sqe));
   read_sqe->opcode = IREE_IORING_OP_READ;
@@ -858,7 +852,7 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   // Same TAG_LINKED_POLL pattern as EVENT_WAIT — see fill_event_wait comments.
   memset(poll_sqe, 0, sizeof(*poll_sqe));
   poll_sqe->opcode = IREE_IORING_OP_POLL_ADD;
-  poll_sqe->flags = IREE_IOSQE_IO_LINK | IREE_IOSQE_CQE_SKIP_SUCCESS;
+  poll_sqe->flags = IREE_IOSQE_IO_LINK;
   poll_sqe->fd = fd;
   poll_sqe->poll32_events = POLLIN;
   poll_sqe->user_data = iree_io_uring_internal_encode(

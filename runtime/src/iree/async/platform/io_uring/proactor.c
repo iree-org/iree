@@ -1156,37 +1156,12 @@ iree_async_proactor_io_uring_socket_from_io_operation(
 static iree_host_size_t iree_async_proactor_io_uring_process_cqe(
     iree_async_proactor_io_uring_t* proactor, const iree_io_uring_cqe_t* cqe) {
   // Linked POLL_ADD head CQE for EVENT_WAIT or NOTIFICATION_WAIT (event mode).
-  //
-  // On success, CQE_SKIP_SUCCESS suppresses this CQE and the linked READ
-  // fires the user callback. On error (bad fd, cancellation, etc.), the kernel
-  // never starts the linked READ and generates no CQE for it, so we must
-  // dispatch the user callback from the POLL_ADD's error CQE here.
+  // Always ignored — the linked READ CQE handles resource release and user
+  // callback dispatch for both success (READ returns data) and failure
+  // (READ gets -ECANCELED when POLL_ADD fails).
   if (iree_io_uring_is_internal_cqe(cqe) &&
       iree_io_uring_internal_tag(cqe->user_data) ==
           IREE_IO_URING_TAG_LINKED_POLL) {
-    if (cqe->res < 0) {
-      iree_async_operation_t* operation =
-          (iree_async_operation_t*)(uintptr_t)iree_io_uring_internal_payload(
-              cqe->user_data);
-      iree_status_t status =
-          iree_make_status(iree_status_code_from_errno(-cqe->res),
-                           "linked poll head failed (%d)", -cqe->res);
-      // Detach continuation before callback (callback may free operation).
-      iree_async_operation_t* continuation = operation->linked_next;
-      operation->linked_next = NULL;
-      iree_async_operation_release_resources(operation);
-      operation->completion_fn(operation->user_data, operation, status,
-                               IREE_ASYNC_COMPLETION_FLAG_NONE);
-      // Cancel continuation via MPSC (counted by post-CQE MPSC drain).
-      if (continuation) {
-        iree_async_proactor_io_uring_cancel_continuation_chain_to_mpsc(
-            proactor, continuation);
-      }
-      return 1;
-    }
-    // Success CQE should be suppressed by CQE_SKIP_SUCCESS. If it arrives
-    // (kernel doesn't support CQE_SKIP_SUCCESS), ignore it — the linked READ
-    // CQE will fire the user callback.
     return 0;
   }
 
