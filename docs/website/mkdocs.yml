@@ -260,6 +260,10 @@ nav:
           - "developers/design-docs/hip-hal-driver.md"
           - "developers/design-docs/metal-hal-driver.md"
           - "developers/design-docs/vm.md"
+          - "Async Scheduling":
+              - "developers/design-docs/async-scheduling/index.md"
+              - "developers/design-docs/async-scheduling/comparisons.md"
+              - "developers/design-docs/async-scheduling/scenarios.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
           - "developers/update-sdxl-golden-outputs.md"
