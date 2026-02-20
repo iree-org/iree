@@ -201,7 +201,7 @@ thread count. For a given input graph, the knobs associated with a particular
 dispatch can be seen by adding the following flags when compiling.
 
 * `--iree-hal-dump-executable-benchmarks-to=<directory>`
-* `--iree-config-add-tuner-attributes`
+* `--iree-codegen-add-tuner-attributes`
 
 These will dump standalone hal.executable benchmarks for each dispatch. Within
 these benchmark files we can find an attribute associated to the root op of the

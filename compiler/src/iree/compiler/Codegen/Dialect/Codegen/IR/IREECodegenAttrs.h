@@ -12,7 +12,6 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -28,11 +27,8 @@ using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
 /// Typedef for scalable tile flags at different levels of tiling.
 using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
-/// Flag to add attributes for tuner.
-inline llvm::cl::opt<bool>
-    clSetTunerAttr("iree-config-add-tuner-attributes",
-                   llvm::cl::desc("Adds attribute for tuner."),
-                   llvm::cl::init(false));
+/// Returns whether tuner attributes should be set on root ops.
+bool shouldSetTunerAttributes();
 } // namespace mlir::iree_compiler
 
 // clang-format off
@@ -71,7 +67,7 @@ getWorkgroupSize(mlir::FunctionOpInterface funcOp);
 /// Returns the subgroup size specified on the `exportOp`.
 std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp);
 
-/// Sets and overwites the translate executable info for the given entry point.
+/// Sets and overwrites the translate executable info for the given entry point.
 /// Returns success() at the end. It is convenient when a caller need to
 /// propagate the state.
 LogicalResult
@@ -146,7 +142,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     mlir::FunctionOpInterface entryPointFn, Operation *op,
     IREE::Codegen::LoweringConfigAttrInterface config,
     IREE::Codegen::TranslationInfoAttr translationInfo) {
-  if (clSetTunerAttr) {
+  if (shouldSetTunerAttributes()) {
     setRootOpInfo(op);
   }
   if (config) {

@@ -22,6 +22,9 @@ struct CodegenOptions {
   // Path to a module containing a tuning spec.
   static std::string tuningSpecPath;
 
+  // Whether to add attributes for the tuner on root ops.
+  static bool setTunerAttributes;
+
   void bindOptions(OptionsBinder &binder);
 };
 

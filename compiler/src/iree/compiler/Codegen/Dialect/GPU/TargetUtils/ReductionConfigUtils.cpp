@@ -785,7 +785,7 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
       context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
       {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
 
-  if (clSetTunerAttr) {
+  if (shouldSetTunerAttributes()) {
     setRootOpInfo(op);
   }
   return setTranslationInfo(entryPoint, translationInfo);
