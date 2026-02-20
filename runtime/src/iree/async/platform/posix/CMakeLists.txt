@@ -19,6 +19,7 @@ iree_cc_library(
   NAME
     posix
   HDRS
+    "api.h"
     "compat.h"
     "event_set.h"
     "fd_map.h"

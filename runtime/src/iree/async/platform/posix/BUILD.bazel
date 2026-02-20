@@ -31,6 +31,7 @@ iree_runtime_cc_library(
         "worker.c",
     ],
     hdrs = [
+        "api.h",
         "compat.h",
         "event_set.h",
         "fd_map.h",
