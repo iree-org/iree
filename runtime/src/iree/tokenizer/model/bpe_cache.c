@@ -336,7 +336,8 @@ static void iree_tokenizer_bpe_try_split_for_suffix(
         last_start_byte + (uint32_t)left_raw_bytes, 0);
     state->backtrack.stack_count++;
     // Apply suffix to the new last token (right component).
-    return iree_tokenizer_bpe_apply_suffix_to_last_token(model, state, segment);
+    iree_tokenizer_bpe_apply_suffix_to_last_token(model, state, segment);
+    return;
   }
 }
 
@@ -405,7 +406,8 @@ static void iree_tokenizer_bpe_apply_suffix_to_last_token(
 
   // No suffixed version exists for this token. Try splitting if it's a merge.
   if (suffixed_last_token_id < 0) {
-    return iree_tokenizer_bpe_try_split_for_suffix(model, state, segment);
+    iree_tokenizer_bpe_try_split_for_suffix(model, state, segment);
+    return;
   }
 
   // Case 1: Simple suffix replacement (when no previous token or no merge).

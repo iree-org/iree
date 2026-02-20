@@ -120,7 +120,7 @@ static iree_status_t iree_tokenizer_segmenter_sequence_calculate_state_layout(
     fields[i] = (iree_struct_field_t){
         .count = {child_state_size, 1},
         .element_size = 1,  // Raw bytes.
-        .alignment = iree_alignof(iree_max_align_t),
+        .alignment = iree_max_align_t,
         .out_offset = &segmenter->child_state_offsets[i],
     };
   }

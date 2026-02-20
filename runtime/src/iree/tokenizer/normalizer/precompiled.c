@@ -263,6 +263,12 @@ static bool iree_tokenizer_precompiled_is_valid_string_start(
   return pool[offset - 1] == '\0';
 }
 
+// DFS stack entry for trie validation traversal.
+typedef struct iree_tokenizer_precompiled_validation_entry_t {
+  iree_host_size_t position;
+  iree_host_size_t depth;
+} iree_tokenizer_precompiled_validation_entry_t;
+
 // Validates precompiled trie structure before allocation.
 static iree_status_t iree_tokenizer_precompiled_trie_validate(
     const uint32_t* trie, iree_host_size_t trie_count, const uint8_t* pool,
@@ -343,17 +349,16 @@ static iree_status_t iree_tokenizer_precompiled_trie_validate(
     // Stack for iterative DFS: stores (position, depth) pairs.
     // DFS can have multiple pending children per level, so we use a generous
     // stack and reject tries that would overflow it.
-    struct {
-      iree_host_size_t position;
-      iree_host_size_t depth;
-    } stack[IREE_TOKENIZER_PRECOMPILED_VALIDATION_STACK_SIZE];
+    iree_tokenizer_precompiled_validation_entry_t
+        stack[IREE_TOKENIZER_PRECOMPILED_VALIDATION_STACK_SIZE];
     iree_host_size_t stack_size = 0;
 
     // Start from root.
     uint32_t root_unit = iree_unaligned_load_le(&trie[0]);
     iree_host_size_t root_offset = ((iree_host_size_t)(root_unit >> 10))
                                    << (((root_unit >> 9) & 1) * 3);
-    stack[stack_size++] = (typeof(stack[0])){root_offset, 0};
+    stack[stack_size++] =
+        (iree_tokenizer_precompiled_validation_entry_t){root_offset, 0};
 
     while (stack_size > 0) {
       iree_host_size_t position = stack[stack_size - 1].position;
@@ -393,7 +398,8 @@ static iree_status_t iree_tokenizer_precompiled_trie_validate(
                 IREE_STATUS_INVALID_ARGUMENT,
                 "trie structure too complex for validation");
           }
-          stack[stack_size++] = (typeof(stack[0])){next_position, child_depth};
+          stack[stack_size++] = (iree_tokenizer_precompiled_validation_entry_t){
+              next_position, child_depth};
         }
       }
     }
