@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -1068,11 +1069,12 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
 static SmallVector<Value>
 distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
                                   const TileSwizzle &swizzle) {
-  auto internalShape = sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-    return dim.kind == TileSwizzle::Dim::Kind::Internal;
-  });
+  auto internalShape =
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      });
   auto crossIntrinsicShape =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
@@ -1143,11 +1145,11 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 
@@ -1931,11 +1933,11 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
 
   // Insert the results into the destination accumulator.
   SmallVector<int64_t> accCrossIntrinsicShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
   SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 

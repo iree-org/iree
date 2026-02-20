@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"

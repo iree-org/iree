@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.cpp.inc"
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
 namespace mlir::iree_compiler::IREE::CPU {

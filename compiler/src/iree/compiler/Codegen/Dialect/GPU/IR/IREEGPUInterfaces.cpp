@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "llvm/Support/DebugLog.h"
@@ -66,7 +67,7 @@ void DataTiledMMAInterfaceAttr::getDistributedTileTypes(
   SmallVector<Type> elementTypes;
   getElementTypes(elementTypes);
   auto getShape = [=](unsigned operandIndex) {
-    return sliceSwizzledShape(
+    return Codegen::sliceSwizzledShape(
         getTileSwizzle(operandIndex), [](TileSwizzle::Dim d) {
           return d.kind != TileSwizzle::Dim::Kind::CrossThread;
         });
@@ -110,7 +111,7 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   // to bound the offset to be within the dim bounds by dividing by the extra
   // distribution factor (see the definition of TileSwizzle::Dim).
   SmallVector<int64_t> layoutThreadSizes =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
       });
   for (auto [offset, threadSize, distributionSize] : llvm::zip_equal(
@@ -130,7 +131,7 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
   // CrossThread.
   MLIRContext *ctx = builder.getContext();
   SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
-      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
+      ctx, Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind != TileSwizzle::Dim::Kind::CrossThread;
       }));
   // Strides are trivial: each slice is contiguous along the *expanded* dims
