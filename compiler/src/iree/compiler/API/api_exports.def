@@ -18,6 +18,8 @@ EXPORTS
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
   ireeCodegenGetExecutableVariantOps
   ireeGPUGetSingleSubgroupLayout
+  ireeGPUGetXorShuffleBounds
+  ireeGPUIsXORShuffleValid
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
   ireeCodegenInferScaledContractionDimensions

@@ -258,6 +258,10 @@ enum {
 #define IREE_RETURN_AND_END_ZONE_IF_ERROR(zone_id, ...) \
   IREE_RETURN_IF_ERROR(__VA_ARGS__)
 
+// Ends the current zone and returns unconditionally.
+// Sugar for IREE_TRACE_ZONE_END + return for non-conditional error returns.
+#define IREE_RETURN_AND_END_ZONE(zone_id, ...) return (__VA_ARGS__)
+
 // Sets the dynamic color of the zone to an XXBBGGRR value.
 #define IREE_TRACE_ZONE_SET_COLOR(zone_id, color_xrgb)
 

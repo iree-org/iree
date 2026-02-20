@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -153,12 +154,6 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
                     StringRef updateName) {
   static_assert(llvm::is_one_of<OpTy, GatherOp, ScatterOp>::value,
                 "applies to only gather or scatter operations");
-  if (op.getInputs().size() != 2) {
-    return op.emitOpError("expected two input operands");
-  }
-  if (op.getOutputs().size() != 1) {
-    return op.emitOpError("expected one output operand");
-  }
 
   auto indicesType = op.getIndicesType();
   if (indicesType.getRank() < 1 ||
@@ -746,9 +741,48 @@ bool MapGatherOp::isIdentity() {
   return true;
 }
 
+Value MapGatherOp::getPaddingValue() {
+  Block &transformBody = getTransformationRegion().front();
+  auto yieldOp = cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+  return yieldOp.getOperand(yieldOp.getNumOperands() - 1);
+}
+
 void MapGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *ctx) {
   results.add<ConvertIdentityMapGatherScatterToCopy<MapGatherOp>>(ctx);
+}
+
+MapGatherOp MapGatherOp::createIdentityMapGather(OpBuilder &builder,
+                                                 Location loc, Value source,
+                                                 Value output) {
+  assert(source.getType() == output.getType() &&
+         "expected source and output types to match");
+  SmallVector<Type> resultType;
+  if (isa<RankedTensorType>(output.getType())) {
+    resultType.push_back(output.getType());
+  }
+  auto mapGatherOp =
+      MapGatherOp::create(builder, loc, resultType, source, output);
+
+  // Add the transformation block with an identity transformation.
+  Region &region = mapGatherOp.getTransformationRegion();
+  auto outputType = cast<ShapedType>(output.getType());
+  SmallVector<Location> blockArgLocs(outputType.getRank(), loc);
+  SmallVector<Type> indexTypes(outputType.getRank(), builder.getIndexType());
+  OpBuilder::InsertionGuard guard(builder);
+  Block *block =
+      builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
+  SmallVector<Value> yieldedValues(block->getArguments());
+
+  // Add a poison padding value. The identity transformation shouldn't need it
+  // since source and output have the same shape. Using poison indicates that
+  // no real padding is needed, and allows foldPadIntoMapGather to detect
+  // whether it's safe to set a new padding value.
+  Type elementType = outputType.getElementType();
+  Value padding = ub::PoisonOp::create(builder, loc, elementType);
+  yieldedValues.push_back(padding);
+  IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
+  return mapGatherOp;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1085,18 +1119,8 @@ LogicalResult FftOp::verify() {
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
   }
-  if (!getNumDpsInputs() || !isScalar(getDpsInputOperand(0))) {
+  if (!isScalar(getDpsInputOperand(0))) {
     return op->emitOpError("expected to carry `stage` input");
-  }
-  if (getNumDpsInputs() != 1) {
-    if (getNumDpsInputs() != 3 || isScalar(getDpsInputOperand(1)) ||
-        isScalar(getDpsInputOperand(2))) {
-      return op->emitOpError("expected to carry real and imag coeff inputs");
-    }
-  }
-  if (getNumDpsInits() != 2) {
-    return op->emitOpError(
-        "expected outputs to be real and imag tensor/memref");
   }
   return success();
 }
@@ -1108,21 +1132,17 @@ FftOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+MutableOperandRange FftOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/hasCoeff() ? 3 : 1,
+                             /*numInits=*/2);
+}
+
 //===----------------------------------------------------------------------===//
 // ScanOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult ScanOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected one input operands");
-  }
-  if (getNumDpsInits() != 2) {
-    return op->emitOpError("expected two output operands");
-  }
-  if (!isa<ShapedType>(getInput().getType())) {
-    return op->emitOpError("expected first input element type to be shaped");
-  }
   auto accumulatorType = cast<ShapedType>(getAccumulator().getType());
   auto inputType = cast<ShapedType>(getInput().getType());
   auto outputType = cast<ShapedType>(getOutput().getType());
@@ -1181,31 +1201,29 @@ ScanOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+MutableOperandRange ScanOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/1, /*numInits=*/2);
+}
+
 //===----------------------------------------------------------------------===//
 // TopkOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult TopkOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() != 1 && getNumDpsInputs() != 2) {
-    return op->emitOpError("expected one or two input operands");
-  }
-  if (getNumDpsInits() != 2) {
-    return op->emitOpError("expected two output operands");
-  }
   if (getDimension() >= getInputRank()) {
     return op->emitOpError("dimension exceeds rank");
   }
   // Ensure input/output element types match
   auto inputValuesType = cast<ShapedType>(getValues().getType());
-  auto outputValuesType = cast<ShapedType>(outputValues().getType());
+  auto outputValuesType = cast<ShapedType>(getOutputValues().getType());
   if (inputValuesType.getElementType() != outputValuesType.getElementType()) {
     return op->emitOpError("expected input/output value types to be identical");
   }
   // Indices must be int if provided
-  auto outputIndicesType = cast<ShapedType>(outputIndices().getType());
-  if (auto inputIndices = getIndices()) {
-    auto inputIndicesType = cast<ShapedType>(inputIndices->getType());
+  auto outputIndicesType = cast<ShapedType>(getOutputIndices().getType());
+  if (Value inputIndices = getIndices()) {
+    auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
     if (!inputIndicesType.getElementType().isInteger(32) ||
         !outputIndicesType.getElementType().isInteger(32)) {
       return op->emitOpError("expected input/output indices types to be int32");
@@ -1216,15 +1234,15 @@ LogicalResult TopkOp::verify() {
   if (inputValuesType.getRank() != outputValuesType.getRank()) {
     return op->emitOpError("expected input/output to have the same rank");
   }
-  if (auto inputIndices = getIndices()) {
-    auto inputIndicesType = cast<ShapedType>(inputIndices->getType());
+  if (Value inputIndices = getIndices()) {
+    auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
     if (inputIndicesType.getRank() != outputIndicesType.getRank()) {
       return op->emitOpError("expected input/output to have the same rank");
     }
   }
   // Input indicies and values must have the same shape.
-  if (auto inputIndices = getIndices()) {
-    auto inputIndicesType = cast<ShapedType>(inputIndices->getType());
+  if (Value inputIndices = getIndices()) {
+    auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
     if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
       return op->emitOpError("input indices/values shape must match");
     }
@@ -1271,6 +1289,11 @@ TopkOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+MutableOperandRange TopkOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/getIndices() ? 2 : 1,
+                             /*numInits=*/2);
+}
+
 //===----------------------------------------------------------------------===//
 // ArgCompareOp
 //===----------------------------------------------------------------------===//
@@ -1278,27 +1301,11 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 LogicalResult ArgCompareOp::verify() {
   Operation *op = getOperation();
 
-  // The operation supports two modes based on the number of inputs:
-  // - Implicit-index mode (1 input): Computes indices from iteration variables.
-  // - Explicit-index mode (2 inputs): Uses pre-existing (value, index) pairs.
-  unsigned numInputs = llvm::size(getInputs());
-  if (numInputs != 1 && numInputs != 2) {
-    return op->emitOpError("expected 1 or 2 input operands, but got ")
-           << numInputs;
-  }
-
   ShapedType inputValueType = getInputType();
   Type inputValueElemType = inputValueType.getElementType();
 
-  unsigned numOutputs = getNumDpsInits();
-  if (numOutputs != 2) {
-    return op->emitOpError(
-               "expected two output operands (value and index), but got ")
-           << numOutputs;
-  }
-
-  auto outputValueType = getOutputValueType();
-  auto outputIndexType = getOutputIndexType();
+  ShapedType outputValueType = getOutputValueType();
+  ShapedType outputIndexType = getOutputIndexType();
   Type outputIndexElemType = getOutputIndexElementType();
 
   if (hasExplicitIndexInput()) {
@@ -1459,6 +1466,11 @@ IREE::LinalgExt::ArgCompareOp::getIndexingMapsForResults() {
 
 SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
   return llvm::to_vector(getInputType().getShape());
+}
+
+MutableOperandRange ArgCompareOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/getInputIndex() ? 2 : 1,
+                             /*numInits=*/2);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1795,6 +1807,8 @@ PackOp::reifyResultShapes(OpBuilder &builder,
       .reifyResultShapes(builder, reifiedReturnShapes);
 }
 
+MutableOperandRange PackOp::getDpsInitsMutable() { return getOutputMutable(); }
+
 //===----------------------------------------------------------------------===//
 // UnPackOp
 //===----------------------------------------------------------------------===//
@@ -1845,18 +1859,16 @@ LogicalResult UnPackOp::verify() {
   return success();
 }
 
+MutableOperandRange UnPackOp::getDpsInitsMutable() {
+  return getOutputMutable();
+}
+
 //===----------------------------------------------------------------------===//
 // WinogradInputTransformOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult WinogradInputTransformOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected one input operand");
-  }
-  if (getNumDpsInits() != 1) {
-    return op->emitOpError("expected one output operand");
-  }
   auto inputType = getInputType();
   auto outputType = getOutputType();
   if (outputType.getElementType() != inputType.getElementType()) {
@@ -1949,12 +1961,6 @@ LogicalResult WinogradInputTransformOp::reifyResultShapes(
 
 LogicalResult WinogradFilterTransformOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected one input operand");
-  }
-  if (getNumDpsInits() != 1) {
-    return op->emitOpError("expected one output operand");
-  }
   auto inputType = getInputType();
   auto outputType = getOutputType();
   if (outputType.getElementType() != inputType.getElementType()) {
@@ -2042,12 +2048,6 @@ LogicalResult WinogradFilterTransformOp::reifyResultShapes(
 
 LogicalResult WinogradOutputTransformOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() != 1) {
-    return op->emitOpError("expected one input operand");
-  }
-  if (getNumDpsInits() != 1) {
-    return op->emitOpError("expected one output operand");
-  }
   auto inputType = getInputType();
   auto outputType = getOutputType();
   unsigned inputRank = inputType.getRank();

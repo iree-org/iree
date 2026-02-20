@@ -18,7 +18,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -28,11 +27,9 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
@@ -61,7 +58,6 @@ struct VulkanSPIRVTargetOptions {
             "Force indirect bindings for all generated dispatches."));
   }
 };
-} // namespace
 
 using DescriptorSetLayout = std::pair<unsigned, ArrayRef<PipelineBindingAttr>>;
 
@@ -153,13 +149,13 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
 }
 
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
-class VulkanTargetDevice : public TargetDevice {
+class VulkanTargetDevice final : public TargetDevice {
 public:
   VulkanTargetDevice(const VulkanSPIRVTargetOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -175,17 +171,17 @@ public:
   }
 };
 
-class VulkanSPIRVTargetBackend : public TargetBackend {
+class VulkanSPIRVTargetBackend final : public TargetBackend {
 public:
   VulkanSPIRVTargetBackend(const VulkanSPIRVTargetOptions &options)
       : options_(options) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "vulkan"; }
+  std::string getLegacyDefaultDeviceID() const final { return "vulkan"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(
         getExecutableTarget(context, options_.indirectBindings));
   }
@@ -209,7 +205,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::Encoding::IREEEncodingDialect, spirv::SPIRVDialect,
                     gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
@@ -217,22 +213,22 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
+                                 OpPassManager &passManager) final {
     buildSPIRVCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     buildSPIRVCodegenPassPipeline(passManager);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildSPIRVLinkingPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     // Today we special-case external variants but in the future we could allow
     // for a linking approach allowing both code generation and external .spv
     // files to be combined together.
@@ -495,17 +491,16 @@ private:
   const VulkanSPIRVTargetOptions &options_;
 };
 
-namespace {
-struct VulkanSPIRVSession
+struct VulkanSPIRVSession final
     : public PluginSession<VulkanSPIRVSession, VulkanSPIRVTargetOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"vulkan", ...
     targets.add("vulkan", [&]() {
       return std::make_shared<VulkanTargetDevice>(options);
     });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"vulkan-spirv", ...
     targets.add("vulkan-spirv", [&]() {
       return std::make_shared<VulkanSPIRVTargetBackend>(options);
@@ -514,7 +509,6 @@ struct VulkanSPIRVSession
 };
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_vulkan_spirv(

@@ -119,14 +119,12 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
       rewriter, loc, valuesExpandedType, valuesOrig, reassociationIndices);
 
   // Expand input indices shape for parallel processing if they exist
-  std::optional<Value> indicesExpanded;
-  if (std::optional<Value> inputIndices = topkOp.getIndices()) {
-    // Type inputElementType = cast<ShapedType>(inputIndices->getType());
+  Value indicesExpanded;
+  if (Value inputIndices = topkOp.getIndices()) {
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
     indicesExpanded = tensor::ExpandShapeOp::create(
-        rewriter, loc, indicesExpandedType, inputIndices.value(),
-        reassociationIndices);
+        rewriter, loc, indicesExpandedType, inputIndices, reassociationIndices);
   }
 
   // Define the expanded output types
@@ -179,17 +177,15 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
                                                outputIndicesExpandedType};
   SmallVector<Value> parallelTopkIns = {valuesExpanded};
   if (indicesExpanded) {
-    parallelTopkIns.push_back(indicesExpanded.value());
+    parallelTopkIns.push_back(indicesExpanded);
   }
   SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
 
   // Parallel topk
   auto parallelTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
-      rewriter, loc,
-      /*resultTypes=*/
-      parallelTopkResultTypes,
-      /*ins=*/parallelTopkIns,
-      /*outs=*/parallelTopkOuts, kDimParallel);
+      rewriter, loc, parallelTopkResultTypes, parallelTopkIns[0],
+      /*indices=*/parallelTopkIns.size() > 1 ? parallelTopkIns[1] : Value(),
+      parallelTopkOuts[0], parallelTopkOuts[1], kDimParallel);
   rewriter.cloneRegionBefore(topkOp.getRegion(), parallelTopkOp.getRegion(),
                              parallelTopkOp.getRegion().end());
 
@@ -263,10 +259,9 @@ TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
 
   // Combined final topk
   auto reductionTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
-      rewriter, loc,
-      /*resultTypes=*/topkOp->getResultTypes(),
-      /*ins=*/ValueRange{valuesCollapsed, indicesCollapsed},
-      /*outs=*/topkOp.getOutputs(), kDimOrig);
+      rewriter, loc, topkOp->getResultTypes(), valuesCollapsed,
+      indicesCollapsed, topkOp.getOutputValues(), topkOp.getOutputIndices(),
+      kDimOrig);
   rewriter.cloneRegionBefore(topkOp.getRegion(), reductionTopkOp.getRegion(),
                              reductionTopkOp.getRegion().end());
   return reductionTopkOp;

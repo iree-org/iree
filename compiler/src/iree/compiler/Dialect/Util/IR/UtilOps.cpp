@@ -2396,6 +2396,8 @@ LogicalResult BufferConstantOp::verify() {
   return success();
 }
 
+OpFoldResult BufferConstantOp::fold(FoldAdaptor adaptor) { return getValue(); }
+
 void BufferAllocOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "buffer");
@@ -2639,6 +2641,229 @@ void BufferHashOp::setSubrangeOperand(unsigned operandIndex,
   getSourceSizeMutable().assign(operand.resourceSize);
   getSourceOffsetMutable().assign(operand.offset);
   getLengthMutable().assign(operand.length);
+}
+
+//===----------------------------------------------------------------------===//
+// String formatting helpers
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// A segment of a parsed format string: either a literal string or a reference
+// to an argument by index.
+struct FormatSegment {
+  enum Kind { Literal, Arg };
+  Kind kind;
+  std::string literal; // For Literal segments.
+  unsigned argIndex;   // For Arg segments.
+};
+
+} // namespace
+
+// Parses a format string into literal and argument segments.
+// Returns failure on syntax errors (unclosed braces, invalid placeholders,
+// mixed sequential/explicit indexing, or wrong argument count).
+static FailureOr<SmallVector<FormatSegment>>
+parseFormatString(StringRef format, unsigned argCount) {
+  SmallVector<FormatSegment> segments;
+  bool hasSequential = false;
+  bool hasExplicit = false;
+  unsigned nextSequentialIndex = 0;
+  unsigned maxArgIndex = 0;
+  bool hasAnyArg = false;
+
+  std::string currentLiteral;
+  size_t i = 0;
+  while (i < format.size()) {
+    char c = format[i];
+    if (c == '{') {
+      if (i + 1 < format.size() && format[i + 1] == '{') {
+        // Escaped brace: {{ produces literal {.
+        currentLiteral += '{';
+        i += 2;
+        continue;
+      }
+      // Start of placeholder.
+      if (!currentLiteral.empty()) {
+        segments.push_back({FormatSegment::Literal, currentLiteral, 0});
+        currentLiteral.clear();
+      }
+      size_t closePosition = format.find('}', i + 1);
+      if (closePosition == StringRef::npos) {
+        return failure();
+      }
+      StringRef content = format.slice(i + 1, closePosition);
+      if (content.empty()) {
+        // Sequential placeholder: {}.
+        hasSequential = true;
+        hasAnyArg = true;
+        if (nextSequentialIndex > 0) {
+          maxArgIndex = std::max(maxArgIndex, nextSequentialIndex);
+        }
+        segments.push_back({FormatSegment::Arg, {}, nextSequentialIndex});
+        ++nextSequentialIndex;
+      } else {
+        // Explicit placeholder: {N}.
+        unsigned index;
+        if (content.getAsInteger(10, index)) {
+          return failure();
+        }
+        hasExplicit = true;
+        hasAnyArg = true;
+        maxArgIndex = std::max(maxArgIndex, index);
+        segments.push_back({FormatSegment::Arg, {}, index});
+      }
+      i = closePosition + 1;
+    } else if (c == '}') {
+      if (i + 1 < format.size() && format[i + 1] == '}') {
+        // Escaped brace: }} produces literal }.
+        currentLiteral += '}';
+        i += 2;
+        continue;
+      }
+      return failure();
+    } else {
+      currentLiteral += c;
+      ++i;
+    }
+  }
+  if (!currentLiteral.empty()) {
+    segments.push_back({FormatSegment::Literal, currentLiteral, 0});
+  }
+
+  if (hasSequential && hasExplicit) {
+    return failure();
+  }
+
+  unsigned expectedArgCount =
+      hasAnyArg ? (hasExplicit ? (maxArgIndex + 1) : nextSequentialIndex) : 0;
+  if (expectedArgCount != argCount) {
+    return failure();
+  }
+
+  return segments;
+}
+
+// Evaluates a fully-resolved format string (all args constant) into a string.
+static std::string evaluateFormatString(ArrayRef<FormatSegment> segments,
+                                        ArrayRef<std::string> argStrings) {
+  std::string result;
+  for (const auto &segment : segments) {
+    if (segment.kind == FormatSegment::Literal) {
+      result += segment.literal;
+    } else {
+      result += argStrings[segment.argIndex];
+    }
+  }
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
+// util.string.format
+//===----------------------------------------------------------------------===//
+
+LogicalResult StringFormatOp::verify() {
+  StringRef format = getFormat();
+  unsigned argCount = getArgs().size();
+
+  auto segmentsOr = parseFormatString(format, argCount);
+  if (succeeded(segmentsOr)) {
+    return success();
+  }
+
+  // Parse failed — produce a specific diagnostic.
+  bool hasSequential = false;
+  bool hasExplicit = false;
+  size_t i = 0;
+  while (i < format.size()) {
+    if (format[i] == '{') {
+      if (i + 1 < format.size() && format[i + 1] == '{') {
+        i += 2;
+        continue;
+      }
+      size_t closePosition = format.find('}', i + 1);
+      if (closePosition == StringRef::npos) {
+        return emitOpError("unclosed '{' in format string");
+      }
+      StringRef content = format.slice(i + 1, closePosition);
+      if (content.empty()) {
+        hasSequential = true;
+      } else {
+        unsigned index;
+        if (content.getAsInteger(10, index)) {
+          return emitOpError("invalid placeholder '{")
+                 << content << "}' in format string; expected '{}' or '{N}'";
+        }
+        hasExplicit = true;
+      }
+      i = closePosition + 1;
+    } else if (format[i] == '}') {
+      if (i + 1 < format.size() && format[i + 1] == '}') {
+        i += 2;
+        continue;
+      }
+      return emitOpError("unmatched '}' in format string");
+    } else {
+      ++i;
+    }
+  }
+  if (hasSequential && hasExplicit) {
+    return emitOpError(
+        "cannot mix sequential '{}' and explicit '{N}' placeholders");
+  }
+  return emitOpError("format string placeholder count does not match the ")
+         << argCount << " provided argument(s)";
+}
+
+void StringFormatOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // Build a result name from the format string by substituting N for
+  // placeholders and sanitizing to identifier characters.
+  StringRef format = getFormat();
+  std::string name;
+  size_t i = 0;
+  while (i < format.size() && name.size() < 32) {
+    char c = format[i];
+    if (c == '{') {
+      if (i + 1 < format.size() && format[i + 1] == '{') {
+        i += 2;
+        continue;
+      }
+      size_t closePosition = format.find('}', i + 1);
+      if (closePosition == StringRef::npos) {
+        break;
+      }
+      name += 'N';
+      i = closePosition + 1;
+    } else if (c == '}') {
+      if (i + 1 < format.size() && format[i + 1] == '}') {
+        i += 2;
+        continue;
+      }
+      ++i;
+    } else if (c == '.' || c == '-' || c == '/') {
+      name += '_';
+      ++i;
+    } else if (isalnum(static_cast<unsigned char>(c)) || c == '_') {
+      name += c;
+      ++i;
+    } else {
+      ++i;
+    }
+  }
+  if (name.empty()) {
+    name = "formatted";
+  }
+  setNameFn(getResult(), name);
+}
+
+//===----------------------------------------------------------------------===//
+// util.string.itoa
+//===----------------------------------------------------------------------===//
+
+void StringItoaOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "itoa");
 }
 
 //===----------------------------------------------------------------------===//

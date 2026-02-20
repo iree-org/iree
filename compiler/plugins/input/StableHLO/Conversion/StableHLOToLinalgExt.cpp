@@ -283,8 +283,8 @@ struct ScatterOpConversion final
     }
 
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
-        rewriter, op.getLoc(), originalType, ValueRange{updates, indices},
-        ValueRange{original}, scatterDimMap, op.getUniqueIndices());
+        rewriter, op.getLoc(), originalType, updates, indices, original,
+        scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),
@@ -567,9 +567,29 @@ struct ScanOpConversion final
       outputTys.push_back(output.getType());
     }
 
+    // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
+    // To support suffix (postfix) scans, we can reverse the input, perform a
+    // prefix scan, and then reverse the output.
+    auto createReverse = [&](Value val, int64_t axis) -> Value {
+      auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
+      SmallVector<int64_t> dimensions;
+      dimensions.push_back(axis);
+      return mlir::stablehlo::ReverseOp::create(
+          rewriter, op.getLoc(), valTy, val,
+          rewriter.getDenseI64ArrayAttr(dimensions));
+    };
+    llvm::SmallVector<Value> scanInputs;
+    if (isPostfix) {
+      for (auto input : inputs) {
+        scanInputs.push_back(createReverse(input, reduceAxis));
+      }
+    } else {
+      scanInputs = inputs;
+    }
+
     auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, inputs, outputs,
-        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
+        rewriter, op.getLoc(), outputTys, scanInputs[0], outputs[0], outputs[1],
+        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
                                 scanOp.getRegion().begin());
@@ -581,7 +601,12 @@ struct ScanOpConversion final
     rewriter.applySignatureConversion(&scanOp.getRegion().front(),
                                       signatureConverter);
 
-    rewriter.replaceOp(op, scanOp.getResult(0));
+    Value result = scanOp.getResult(0);
+    if (isPostfix) {
+      result = createReverse(result, reduceAxis);
+    }
+
+    rewriter.replaceOp(op, result);
     return success();
   }
 };
@@ -654,8 +679,8 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
       newResultTypes.push_back(op->getResultTypes()[i]);
     }
     auto topkOp = rewriter.replaceOpWithNewOp<IREE::LinalgExt::TopkOp>(
-        op, newResultTypes, ValueRange{operand},
-        ValueRange{negInfTensor, posInfTensor}, kDim);
+        op, newResultTypes, /*values=*/operand, /*indices=*/Value(),
+        /*output_values=*/negInfTensor, /*output_indices=*/posInfTensor, kDim);
 
     // Define the region of TopK with a GT comparison
     SmallVector<Type> types(2, valueElementType);

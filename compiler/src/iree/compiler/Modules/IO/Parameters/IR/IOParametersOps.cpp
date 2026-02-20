@@ -21,38 +21,38 @@
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
 //===----------------------------------------------------------------------===//
-// custom<ParameterReference>($scope, $key)
+// Shared parameter reference parsing/printing: %scope :: %key  or  %key
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseParameterReference(OpAsmParser &parser,
-                                           StringAttr &scopeAttr,
-                                           StringAttr &keyAttr) {
-  auto builder = parser.getBuilder();
-  StringAttr firstAttr;
-  if (failed(parser.parseCustomAttributeWithFallback(firstAttr,
-                                                     builder.getNoneType()))) {
+// Parses an operand, then checks for `::`. If present, the first operand was
+// the scope and the second is the key. Otherwise the first operand is the key
+// and scope is unset.
+static ParseResult
+parseParameterReference(OpAsmParser &parser,
+                        std::optional<OpAsmParser::UnresolvedOperand> &scope,
+                        OpAsmParser::UnresolvedOperand &key) {
+  OpAsmParser::UnresolvedOperand firstOperand;
+  if (failed(parser.parseOperand(firstOperand))) {
     return failure();
   }
-  if (failed(parser.parseOptionalColon())) {
-    keyAttr = firstAttr;
-    return success();
-  }
-  scopeAttr = firstAttr;
-  if (failed(parser.parseColon()) ||
-      failed(parser.parseCustomAttributeWithFallback(keyAttr,
-                                                     builder.getNoneType()))) {
-    return failure();
+  if (succeeded(parser.parseOptionalColon())) {
+    scope = firstOperand;
+    if (failed(parser.parseColon()) || failed(parser.parseOperand(key))) {
+      return failure();
+    }
+  } else {
+    key = firstOperand;
   }
   return success();
 }
 
-static void printParameterReference(OpAsmPrinter &p, Operation *op,
-                                    StringAttr scopeAttr, StringAttr keyAttr) {
-  if (scopeAttr) {
-    p << "\"" << scopeAttr.getValue() << "\"";
+static void printParameterReference(OpAsmPrinter &p, Operation *op, Value scope,
+                                    Value key) {
+  if (scope) {
+    p.printOperand(scope);
     p << "::";
   }
-  p << "\"" << keyAttr.getValue() << "\"";
+  p.printOperand(key);
 }
 
 //===----------------------------------------------------------------------===//
@@ -62,20 +62,21 @@ static void printParameterReference(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseParameterLoadOperations(
-    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    OpAsmParser &parser,
+    std::optional<OpAsmParser::UnresolvedOperand> &sourceScope,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceKeys,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes) {
-  auto builder = parser.getBuilder();
-  SmallVector<Attribute> sourceKeyAttrs;
+  std::optional<OpAsmParser::UnresolvedOperand> firstScope;
+  bool firstRow = true;
   do {
-    StringAttr rowSourceScopeAttr;
-    StringAttr sourceKeyAttr;
+    std::optional<OpAsmParser::UnresolvedOperand> rowScope;
+    OpAsmParser::UnresolvedOperand sourceKey;
     OpAsmParser::UnresolvedOperand sourceOffset;
     Type resultType;
     OpAsmParser::UnresolvedOperand resultSize;
-    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
-                                       sourceKeyAttr)) ||
+    if (failed(parseParameterReference(parser, rowScope, sourceKey)) ||
         failed(parser.parseLSquare()) ||
         failed(parser.parseOperand(sourceOffset)) ||
         failed(parser.parseRSquare()) ||
@@ -85,35 +86,34 @@ static ParseResult parseParameterLoadOperations(
         failed(parser.parseRBrace())) {
       return failure();
     }
-    if (!sourceScopeAttr) {
-      sourceScopeAttr = rowSourceScopeAttr;
-    } else if (rowSourceScopeAttr != sourceScopeAttr) {
+    if (firstRow) {
+      firstScope = rowScope;
+      sourceScope = rowScope;
+      firstRow = false;
+    } else if (rowScope.has_value() != firstScope.has_value() ||
+               (rowScope.has_value() && rowScope->name != firstScope->name)) {
       return parser.emitError(parser.getCurrentLocation(),
                               "each operation must use the same scope");
     }
-    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceKeys.push_back(sourceKey);
     sourceOffsets.push_back(sourceOffset);
     resultTypes.push_back(resultType);
     resultSizes.push_back(resultSize);
   } while (succeeded(parser.parseOptionalComma()));
-  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
   return success();
 }
 
-static void printParameterLoadOperations(OpAsmPrinter &p, Operation *op,
-                                         StringAttr sourceScopeAttr,
-                                         ArrayAttr sourceKeysAttr,
-                                         ValueRange sourceOffsets,
-                                         TypeRange resultTypes,
-                                         ValueRange resultSizes) {
+static void
+printParameterLoadOperations(OpAsmPrinter &p, Operation *op, Value sourceScope,
+                             ValueRange sourceKeys, ValueRange sourceOffsets,
+                             TypeRange resultTypes, ValueRange resultSizes) {
   p.increaseIndent();
   p.printNewline();
   llvm::interleave(
-      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
-                      resultTypes, resultSizes),
-      [&](std::tuple<StringAttr, Value, Type, Value> it) {
-        auto [sourceKeyAttr, sourceOffset, resultType, resultSize] = it;
-        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+      llvm::zip_equal(sourceKeys, sourceOffsets, resultTypes, resultSizes),
+      [&](std::tuple<Value, Value, Type, Value> it) {
+        auto [sourceKey, sourceOffset, resultType, resultSize] = it;
+        printParameterReference(p, op, sourceScope, sourceKey);
         p << "[";
         p.printOperand(sourceOffset);
         p << "] : ";
@@ -157,23 +157,24 @@ void LoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseParameterGatherOperations(
-    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    OpAsmParser &parser,
+    std::optional<OpAsmParser::UnresolvedOperand> &sourceScope,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceKeys,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
     OpAsmParser::UnresolvedOperand &targetBuffer, Type &targetType,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetLengths) {
-  auto builder = parser.getBuilder();
-  SmallVector<Attribute> sourceKeyAttrs;
+  std::optional<OpAsmParser::UnresolvedOperand> firstScope;
+  bool firstRow = true;
   do {
-    StringAttr rowSourceScopeAttr;
-    StringAttr sourceKeyAttr;
+    std::optional<OpAsmParser::UnresolvedOperand> rowScope;
+    OpAsmParser::UnresolvedOperand sourceKey;
     OpAsmParser::UnresolvedOperand sourceOffset;
     OpAsmParser::UnresolvedOperand targetOffset;
     OpAsmParser::UnresolvedOperand targetLength;
     OpAsmParser::UnresolvedOperand rowTargetBuffer;
     Type rowTargetType;
-    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
-                                       sourceKeyAttr)) ||
+    if (failed(parseParameterReference(parser, rowScope, sourceKey)) ||
         failed(parser.parseLSquare()) ||
         failed(parser.parseOperand(sourceOffset)) ||
         failed(parser.parseRSquare()) || failed(parser.parseArrow()) ||
@@ -186,38 +187,39 @@ static ParseResult parseParameterGatherOperations(
         failed(parser.parseColonType(rowTargetType))) {
       return failure();
     }
-    if (!targetType) {
-      sourceScopeAttr = rowSourceScopeAttr;
+    if (firstRow) {
+      firstScope = rowScope;
+      sourceScope = rowScope;
       targetBuffer = rowTargetBuffer;
       targetType = rowTargetType;
-    } else if (rowSourceScopeAttr != sourceScopeAttr ||
+      firstRow = false;
+    } else if (rowScope.has_value() != firstScope.has_value() ||
+               (rowScope.has_value() && rowScope->name != firstScope->name) ||
                rowTargetBuffer.name != targetBuffer.name ||
                rowTargetType != targetType) {
       return parser.emitError(
           parser.getCurrentLocation(),
           "each operation must use the same scope and target resource");
     }
-    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceKeys.push_back(sourceKey);
     sourceOffsets.push_back(sourceOffset);
     targetOffsets.push_back(targetOffset);
     targetLengths.push_back(targetLength);
   } while (succeeded(parser.parseOptionalComma()));
-  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
   return success();
 }
 
 static void printParameterGatherOperations(
-    OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
-    ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value targetBuffer,
-    Type targetType, ValueRange targetOffsets, ValueRange targetLengths) {
+    OpAsmPrinter &p, Operation *op, Value sourceScope, ValueRange sourceKeys,
+    ValueRange sourceOffsets, Value targetBuffer, Type targetType,
+    ValueRange targetOffsets, ValueRange targetLengths) {
   p.increaseIndent();
   p.printNewline();
   llvm::interleave(
-      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
-                      targetOffsets, targetLengths),
-      [&](std::tuple<StringAttr, Value, Value, Value> it) {
-        auto [sourceKeyAttr, sourceOffset, targetOffset, targetLength] = it;
-        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+      llvm::zip_equal(sourceKeys, sourceOffsets, targetOffsets, targetLengths),
+      [&](std::tuple<Value, Value, Value, Value> it) {
+        auto [sourceKey, sourceOffset, targetOffset, targetLength] = it;
+        printParameterReference(p, op, sourceScope, sourceKey);
         p << "[";
         p.printOperand(sourceOffset);
         p << "] -> ";
@@ -270,17 +272,18 @@ static ParseResult parseParameterScatterOperations(
     Type &sourceType,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceLengths,
-    StringAttr &targetScopeAttr, ArrayAttr &targetKeysAttr,
+    std::optional<OpAsmParser::UnresolvedOperand> &targetScope,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetKeys,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets) {
-  auto builder = parser.getBuilder();
-  SmallVector<Attribute> targetKeyAttrs;
+  std::optional<OpAsmParser::UnresolvedOperand> firstScope;
+  bool firstRow = true;
   do {
     OpAsmParser::UnresolvedOperand sourceOffset;
     OpAsmParser::UnresolvedOperand sourceLength;
     OpAsmParser::UnresolvedOperand rowSourceBuffer;
     Type rowSourceType;
-    StringAttr rowTargetScopeAttr;
-    StringAttr targetKeyAttr;
+    std::optional<OpAsmParser::UnresolvedOperand> rowScope;
+    OpAsmParser::UnresolvedOperand targetKey;
     OpAsmParser::UnresolvedOperand targetOffset;
     if (failed(parser.parseOperand(rowSourceBuffer)) ||
         failed(parser.parseLSquare()) ||
@@ -290,47 +293,44 @@ static ParseResult parseParameterScatterOperations(
         failed(parser.parseRSquare()) ||
         failed(parser.parseColonType(rowSourceType)) ||
         failed(parser.parseArrow()) ||
-        failed(parseParameterReference(parser, rowTargetScopeAttr,
-                                       targetKeyAttr)) ||
+        failed(parseParameterReference(parser, rowScope, targetKey)) ||
         failed(parser.parseLSquare()) ||
         failed(parser.parseOperand(targetOffset)) ||
         failed(parser.parseRSquare())) {
       return failure();
     }
-    if (!sourceType) {
+    if (firstRow) {
       sourceBuffer = rowSourceBuffer;
       sourceType = rowSourceType;
-      targetScopeAttr = rowTargetScopeAttr;
+      firstScope = rowScope;
+      targetScope = rowScope;
+      firstRow = false;
     } else if (rowSourceBuffer.name != sourceBuffer.name ||
                rowSourceType != sourceType ||
-               rowTargetScopeAttr != targetScopeAttr) {
+               rowScope.has_value() != firstScope.has_value() ||
+               (rowScope.has_value() && rowScope->name != firstScope->name)) {
       return parser.emitError(
           parser.getCurrentLocation(),
           "each operation must use the same source resource and scope");
     }
     sourceOffsets.push_back(sourceOffset);
     sourceLengths.push_back(sourceLength);
-    targetKeyAttrs.push_back(targetKeyAttr);
+    targetKeys.push_back(targetKey);
     targetOffsets.push_back(targetOffset);
   } while (succeeded(parser.parseOptionalComma()));
-  targetKeysAttr = builder.getArrayAttr(targetKeyAttrs);
   return success();
 }
 
-static void printParameterScatterOperations(OpAsmPrinter &p, Operation *op,
-                                            Value sourceBuffer, Type sourceType,
-                                            ValueRange sourceOffsets,
-                                            ValueRange sourceLengths,
-                                            StringAttr targetScopeAttr,
-                                            ArrayAttr targetKeysAttr,
-                                            ValueRange targetOffsets) {
+static void printParameterScatterOperations(
+    OpAsmPrinter &p, Operation *op, Value sourceBuffer, Type sourceType,
+    ValueRange sourceOffsets, ValueRange sourceLengths, Value targetScope,
+    ValueRange targetKeys, ValueRange targetOffsets) {
   p.increaseIndent();
   p.printNewline();
   llvm::interleave(
-      llvm::zip_equal(sourceOffsets, sourceLengths,
-                      targetKeysAttr.getAsRange<StringAttr>(), targetOffsets),
-      [&](std::tuple<Value, Value, StringAttr, Value> it) {
-        auto [sourceOffset, sourceLength, targetKeyAttr, targetOffset] = it;
+      llvm::zip_equal(sourceOffsets, sourceLengths, targetKeys, targetOffsets),
+      [&](std::tuple<Value, Value, Value, Value> it) {
+        auto [sourceOffset, sourceLength, targetKey, targetOffset] = it;
         p.printOperand(sourceBuffer);
         p << "[";
         p.printOperand(sourceOffset);
@@ -339,7 +339,7 @@ static void printParameterScatterOperations(OpAsmPrinter &p, Operation *op,
         p << "] : ";
         p.printType(sourceType);
         p << " -> ";
-        printParameterReference(p, op, targetScopeAttr, targetKeyAttr);
+        printParameterReference(p, op, targetScope, targetKey);
         p << "[";
         p.printOperand(targetOffset);
         p << "]";

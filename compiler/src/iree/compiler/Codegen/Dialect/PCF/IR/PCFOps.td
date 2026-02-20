@@ -460,6 +460,7 @@ let opDocGroup = OpGroupWriteOps in {
   def PCF_WriteSliceOp
       : PCF_Op<"write_slice", [AttrSizedOperandSegments,
                                OffsetSizeAndStrideOpInterface,
+                               DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
                                AllRanksMatch<["source", "dest"]>,
                                AllElementTypesMatch<["source", "dest"]>,
   ]> {

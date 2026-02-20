@@ -35,6 +35,7 @@ iree_cc_library(
     StablehloOps
     StablehloPasses
     VhloOps
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion
   PUBLIC

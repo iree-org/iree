@@ -228,6 +228,7 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
        ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
@@ -299,6 +300,19 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
 
+    ## In-Bounds Attribute
+
+    The optional `in_bounds` attribute is a boolean array with one entry per
+    dimension of `init`. When not present, all dimensions are treated as
+    in-bounds (source and init must have matching sizes for non-indexed dims).
+
+    When present, `in_bounds[i] = false` indicates that the source may be
+    smaller than init along dimension `i`. Reads beyond the source extent
+    return zero (padding semantics). This enables fusion of `tensor.pad`
+    with zero padding into the DMA operation.
+
+    `in_bounds[i] = true` means the source and init sizes match along that
+    dimension, and no padding is needed.
 
     ## Example of a single subgroup using coalesced_gather_dma in copy mode
        for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
@@ -319,13 +333,15 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     AnyRankedTensorOrMemRef:$source,
     Variadic<RankedTensorOrVectorOrMemRefOf<[I32, Index]>>:$indices,
     AnyRankedTensorOrMemRef:$init,
-    Index:$lane
+    Index:$lane,
+    OptionalAttr<BoolArrayAttr>:$in_bounds
   );
 
   let results = (outs Optional<AnyRankedTensorOrMemRef>:$result);
 
   let assemblyFormat = [{
     $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)`
+    (`in_bounds` $in_bounds^)?
     attr-dict `:` type(operands) ( `->` type($result)^ )?
   }];
 

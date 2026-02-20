@@ -333,6 +333,13 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   return iree_ok_status();
 }
 
+void* iree_dynamic_library_try_lookup_symbol(iree_dynamic_library_t* library,
+                                             const char* symbol_name) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(symbol_name);
+  return (void*)GetProcAddress(library->module, symbol_name);
+}
+
 iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
     void* symbol, iree_string_builder_t* builder) {
   HMODULE hm = NULL;

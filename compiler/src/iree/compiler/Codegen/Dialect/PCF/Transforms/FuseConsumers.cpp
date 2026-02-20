@@ -510,7 +510,7 @@ addResults(RewriterBase &rewriter, PCF::GenericOp genericOp,
 template <typename OpTy>
 static void fuseTilableConsumerImpl(RewriterBase &rewriter, OpTy producerOp,
                                     TilingInterface target,
-                                    const ConsumerFusionParams &params) {
+                                    ConsumerFusionParams &params) {
   assert(!params.results.empty() && "unexpected empty number of results");
 
   Location loc = target.getLoc();
@@ -893,14 +893,12 @@ LogicalResult matchTilableConsumer(RewriterBase &rewriter,
 }
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::GenericOp producerOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params) {
+                         TilingInterface target, ConsumerFusionParams &params) {
   return fuseTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 
 void fuseTilableConsumer(RewriterBase &rewriter, PCF::LoopOp producerOp,
-                         TilingInterface target,
-                         const ConsumerFusionParams &params) {
+                         TilingInterface target, ConsumerFusionParams &params) {
   return fuseTilableConsumerImpl(rewriter, producerOp, target, params);
 }
 

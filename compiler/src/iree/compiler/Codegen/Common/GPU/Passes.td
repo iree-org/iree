@@ -50,9 +50,9 @@ def GPUCombineLayoutTransformationPass :
   ];
 }
 
-def GPUCombineValueBarriersPass :
-    Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
-  let summary = "Combines `iree_gpu.value_barrier` ops";
+def GPUCombineValueSemanticBarriersPass :
+    Pass<"iree-codegen-gpu-combine-value-semantic-barriers", ""> {
+  let summary = "Combines `iree_gpu.value_barrier` and `iree_gpu.barrier_region` ops";
   let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
@@ -138,6 +138,21 @@ def GPUBubbleResourceCastsPass :
   let summary = "Bubbles iree_gpu.buffer_resource_cast ops upwards.";
   let dependentDialects = [
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUFuseSubgroupConsumersPass :
+    Pass<"iree-codegen-gpu-fuse-subgroup-consumers", ""> {
+  let summary = "Fuses tilable consumers into subgroup-scoped pcf.generic ops";
+  let description = [{
+    Fuses tilable consumer operations into producer pcf loop-like ops with
+    `iree_gpu.subgroup_scope` scope.
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::affine::AffineDialect",
+    "::mlir::iree_compiler::IREE::PCF::PCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
   ];
 }
 

@@ -116,8 +116,7 @@ getOuterReductionSizes(PartialReductionOpInterface op,
 /// These convolutions have a special CHWN or CNHW layout, where the filter
 /// sizes (corresponding to output image sizes in forward convolutions) are
 /// typically large, while the output spatial dimensions are small. This makes
-/// the split reduction strategy particularly effective. Currently, splitting
-/// is only applied along the input channel dimension.
+/// the split reduction strategy particularly effective.
 static std::optional<SmallVector<int64_t>>
 getWeightBackwardReductionSizes(PartialReductionOpInterface op,
                                 int64_t splitReductionTargetSize) {
@@ -355,22 +354,26 @@ getMatmulLikeReductionSizes(PartialReductionOpInterface op,
   int64_t nSize = getSizeAt(nDims);
   int64_t kSize = getSizeAt(kDims);
 
-  // The constants below are determined based on empirical data.
-  const int64_t ratioThreshold = 384;
-  const int64_t largeKSize = 24576;
-  const int64_t largeMNSize = 1024;
+  // TODO(vivian): Take element type into account, and use total bytes instead
+  // of output size.
+  int64_t outputSize = mSize * nSize * batchSize;
+  int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
 
-  // When the M or N size is large, the workload tends to distributed across
+  // The constants below are determined based on empirical data.
+  const int64_t largeOutputSize = 2048 * 4096;
+  const int64_t largeKSize = 18000;
+  const int64_t ratioThreshold = 48;
+
+  // When the output size is large, the workload tends to distributed across
   // many workgroups, making split reduction little to no effect.
-  if (mSize > largeMNSize || nSize > largeMNSize) {
-    LDBG() << "skipping op; large M or N size";
+  if (outputSize > largeOutputSize) {
+    LDBG() << "skipping op; large output size";
     return std::nullopt;
   }
 
   // When the reduction size is small relative to the M/N sizes, split
   // reduction often has no effect or even degrades performance.
-  int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
-  if (ratio <= ratioThreshold && kSize < largeKSize) {
+  if (kSize < largeKSize && ratio < ratioThreshold) {
     LDBG() << "skipping op; small reduction size";
     return std::nullopt;
   }
@@ -380,18 +383,19 @@ getMatmulLikeReductionSizes(PartialReductionOpInterface op,
   // workgroups, thereby reducing the need for extensive splitting along the
   // reduction dimensions.
   SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-  int64_t outputSize = mSize * nSize * batchSize;
   int64_t limitParallelLoops;
-  if (outputSize < 16 * 16 || kSize > 1e7) {
+  if (outputSize <= 16 * 16 || kSize > 1e7) {
     limitParallelLoops = 2048;
-  } else if (outputSize < 64 * 64 || kSize > 1e6) {
+  } else if (outputSize <= 64 * 64 || kSize > 1e6) {
     limitParallelLoops = 128;
-  } else if (outputSize < 128 * 128) {
+  } else if (outputSize <= 128 * 128) {
     limitParallelLoops = 64;
-  } else if (outputSize < 384 * 384) {
+  } else if (outputSize <= 256 * 256) {
+    limitParallelLoops = 32;
+  } else if (outputSize <= 512 * 512) {
     limitParallelLoops = 16;
   } else {
-    limitParallelLoops = std::min<int64_t>(16, tileSizes[0]);
+    limitParallelLoops = std::min<int64_t>(8, tileSizes[0]);
   }
 
   // Based on the limitParallelLoops, assign tile size from the outermost

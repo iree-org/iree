@@ -209,8 +209,8 @@ public:
         isNchwFchw ? fchwKernelDims : hwcfKernelDims;
     Value winogradFilter =
         IREE::LinalgExt::WinogradFilterTransformOp::create(
-            rewriter, loc, kernelInit.getType(), ValueRange{kernel},
-            ValueRange{kernelInit}, outputTileSize, kernelSize, kernelDims)
+            rewriter, loc, kernelInit.getType(), /*input=*/kernel,
+            /*output=*/kernelInit, outputTileSize, kernelSize, kernelDims)
             .getResults()[0];
 
     // Add collapse shape
@@ -259,9 +259,9 @@ public:
     const std::array<int64_t, 2> imageDims =
         isNchwFchw ? nchwImageDims : nhwcImageDims;
     Value winogradInput =
-        IREE::LinalgExt::WinogradInputTransformOp ::create(
-            rewriter, loc, inputTfInit.getType(), ValueRange{input},
-            ValueRange{inputTfInit}, outputTileSize, kernelSize, imageDims)
+        IREE::LinalgExt::WinogradInputTransformOp::create(
+            rewriter, loc, inputTfInit.getType(), input,
+            /*output=*/inputTfInit, outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
     // Add collapse shape
@@ -317,7 +317,7 @@ public:
     Value paddedOutput =
         IREE::LinalgExt::WinogradOutputTransformOp::create(
             rewriter, loc, outputTfInit.getType(),
-            ValueRange{expandedBmmResult}, ValueRange{outputTfInit},
+            /*input=*/expandedBmmResult, /*output=*/outputTfInit,
             outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 

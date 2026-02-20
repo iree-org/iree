@@ -7,11 +7,13 @@
 #include <cstdint>
 #include <limits>
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -23,6 +25,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -56,6 +59,15 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   // Map it to gpu.lane_id<0>.
   mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, 0));
   return mapping;
+}
+
+/// Trace through extract_slice operations to find an underlying tensor.pad.
+/// Returns the PadOp if found, nullptr otherwise.
+static tensor::PadOp traceToTensorPad(Value source) {
+  while (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+    source = extractSlice.getSource();
+  }
+  return source.getDefiningOp<tensor::PadOp>();
 }
 
 /// Check if a value traces back to tensor.empty (possibly through forall args).
@@ -97,6 +109,97 @@ static bool tracesToTensorEmpty(Value value) {
   return initValue.getDefiningOp<tensor::EmptyOp>() != nullptr;
 }
 
+/// Check if the source of a copy traces to a fat_raw_buffer source.
+/// Traces through extract_slice and pad ops to find the originating op.
+/// Returns true if source is a block arg (opaque, allow DMA) or if it
+/// traces to a LoadFromBufferOp with fat_raw_buffer address space.
+/// Returns false if source traces to a LoadFromBufferOp without
+/// fat_raw_buffer, or to any other concrete op (e.g. dispatch.tensor.load).
+static bool sourceIsFromFatRawBuffer(Value source) {
+  // Trace through extract_slice and pad ops.
+  while (true) {
+    if (auto extractSlice = source.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractSlice.getSource();
+      continue;
+    }
+    if (auto pad = source.getDefiningOp<tensor::PadOp>()) {
+      source = pad.getSource();
+      continue;
+    }
+    break;
+  }
+
+  // Block args are opaque; conservatively allow DMA.
+  if (isa<BlockArgument>(source)) {
+    return true;
+  }
+
+  // Check if source comes from a LoadFromBufferOp with fat_raw_buffer.
+  auto loadOp = source.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return false;
+  }
+
+  auto memrefType = cast<MemRefType>(loadOp.getBuffer().getType());
+  return hasAMDGPUFatRawBufferAddressSpace(memrefType);
+}
+
+/// Check if the target architecture supports global load DMA.
+/// Returns true only for CDNA4+ (gfx950+) architectures.
+static bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
+  if (!target) {
+    return false;
+  }
+  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
+  if (failed(chipset)) {
+    return false;
+  }
+  // CDNA4 is gfx950+ (major=9, minor>=5). Other major versions (RDNA, etc.)
+  // do not support global load DMA.
+  return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
+}
+
+/// Returns the subgroup size if the available elements are aligned to DMA
+/// transfer sizes, std::nullopt otherwise.
+static std::optional<int64_t>
+getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
+                          int64_t availableElements) {
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
+    return std::nullopt;
+  }
+
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
+      availableElements % minElementsPerTransfer != 0) {
+    return std::nullopt;
+  }
+
+  return subgroupSize;
+}
+
 /// Helper to compute thread number of threads based on translation_info.
 /// Uses the subgroup_size from translation_info for thread-level tiling.
 static SmallVector<OpFoldResult>
@@ -108,52 +211,15 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     return {};
   }
 
-  // Get the function containing this operation.
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   if (!funcOp) {
     return {};
   }
 
-  // Get subgroup size from translation_info.
-  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-  if (!subgroupSize) {
-    return {};
-  }
-
-  // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-  // transfer size. The minimum transfer size is subgroupSize *
-  // minElementsPerLane.
   int64_t rank = outputType.getRank();
   int64_t innermostDim = outputType.getShape()[rank - 1];
   if (ShapedType::isDynamic(innermostDim)) {
     return {};
-  }
-
-  // Get element type bit width.
-  Type elementType = outputType.getElementType();
-  int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-  // Get DMA sizes from target to compute minimum transfer size.
-  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!target) {
-    return {};
-  }
-
-  ArrayRef<int64_t> dmaSizes;
-  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
-    dmaSizes = dmaSizesAttr.asArrayRef();
-  }
-
-  // Find minimum elements per transfer across all DMA sizes.
-  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-  for (int64_t dmaSize : dmaSizes) {
-    if (dmaSize % elementBits != 0) {
-      continue;
-    }
-    int64_t elementsPerLane = dmaSize / elementBits;
-    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-    minElementsPerTransfer =
-        std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
   // Determine how many elements are available for coalesced access.
@@ -168,13 +234,48 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
     }
   }
 
-  // If no valid DMA size found or elements not aligned to transfer size, skip.
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      availableElements % minElementsPerTransfer != 0) {
+  auto subgroupSize = getDMAAlignedSubgroupSize(
+      funcOp, outputType.getElementType(), availableElements);
+  if (!subgroupSize) {
     return {};
   }
 
   return {builder.getIndexAttr(*subgroupSize)};
+}
+
+/// Check if a linalg.copy is viable for DMA conversion based on alignment and
+/// size constraints. This does NOT modify the IR.
+static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
+  auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
+  if (!funcOp) {
+    return false;
+  }
+
+  auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
+  int64_t rank = outputType.getRank();
+  ArrayRef<int64_t> shape = outputType.getShape();
+  int64_t innermostDim = shape[rank - 1];
+  if (ShapedType::isDynamic(innermostDim)) {
+    return false;
+  }
+
+  // The pre-check runs before tiling, so the output is directly a
+  // tensor.empty() (not yet inside forall block args). A simple defining op
+  // check suffices here, unlike tracesToTensorEmpty used post-tiling.
+  // TODO: If the pass pipeline changes such that copies are already inside
+  // forall ops at pre-check time, switch to tracesToTensorEmpty here to avoid
+  // undercounting availableElements (currently safe but conservative).
+  int64_t availableElements = innermostDim;
+  Value output = copyOp.getOutputs()[0];
+  if (output.getDefiningOp<tensor::EmptyOp>()) {
+    if (llvm::none_of(shape, ShapedType::isDynamic)) {
+      availableElements = ShapedType::getNumElements(shape);
+    }
+  }
+
+  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   availableElements)
+      .has_value();
 }
 
 /// Check if the given forall op has warp mapping.
@@ -200,7 +301,7 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
   }
 
   // Get the rank of the operation.
-  auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+  auto outputType = cast<RankedTensorType>(op.getDpsInits()[0].getType());
   int64_t rank = outputType.getRank();
 
   // threadNumThreads contains only the innermost dimension's num threads.
@@ -300,14 +401,77 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   Location loc = innerOp.getLoc();
   Value source, indices;
+  SmallVector<bool> inBoundsVec;
 
   // Extract source and indices based on op type.
   if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
     Value input = innerOp.getInputs()[0];
-    if (auto extractSlice = input.getDefiningOp<tensor::ExtractSliceOp>()) {
-      source = extractSlice.getSource();
-    } else {
-      return failure();
+
+    // After tiling, the input is typically:
+    //   tensor.extract_slice %padded[...] [...] [1, 1]
+    // We need to trace through extract_slice to find if source is tensor.pad.
+    if (tensor::PadOp pad = traceToTensorPad(input)) {
+      // Verify pad constraints: low padding must be all zeros, pad value must
+      // be 0.
+      // TODO(#23365): Support non-zero pad values (e.g., -inf, 1) by emitting
+      // a select on the loaded values from LDS to replace OOB zeros with the
+      // desired padding element.
+      bool validPad = true;
+      for (OpFoldResult low : pad.getMixedLowPad()) {
+        if (!isConstantIntValue(low, 0)) {
+          validPad = false;
+          break;
+        }
+      }
+      Value padVal = pad.getConstantPaddingValue();
+      if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
+                       matchPattern(padVal, m_Zero()))) {
+        validPad = false;
+      }
+
+      if (validPad) {
+        // Use pad.getSource() directly as the DMA source.
+        // This is the tensor.extract_slice result (e.g., tensor<?x64xf32>).
+        source = pad.getSource();
+
+        // Check if source tensor's innermost row size is DWORD (4-byte)
+        // aligned. On AMD CDNA, per-component range checking is performed for
+        // each DWORD. If a DWORD is partially out-of-bounds, the entire DWORD
+        // returns zero, causing incorrect results. Additionally, partial OOB
+        // triggers the slow path with multi-cycling and instruction issue
+        // penalties.
+        auto sourceType = cast<RankedTensorType>(source.getType());
+        int64_t innermostDim = sourceType.getShape().back();
+        if (!ShapedType::isDynamic(innermostDim)) {
+          Type elemType = sourceType.getElementType();
+          int64_t elemBytes = elemType.getIntOrFloatBitWidth() / 8;
+          int64_t rowBytes = innermostDim * elemBytes;
+          if (rowBytes % 4 != 0) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "Skipping DMA: row size " << rowBytes
+                       << " bytes not DWORD-aligned (slow path)\n");
+            return failure();
+          }
+        }
+
+        // Compute in_bounds based on whether padding was added per dimension.
+        for (auto [low, high] :
+             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
+          bool isInBounds =
+              isConstantIntValue(low, 0) && isConstantIntValue(high, 0);
+          inBoundsVec.push_back(isInBounds);
+        }
+      }
+    }
+
+    // Fallback: no tensor.pad fusion. The input is an extract_slice from
+    // tiling; trace through it to get the actual source.
+    if (!source) {
+      if (auto extractSlice = input.getDefiningOp<tensor::ExtractSliceOp>()) {
+        source = extractSlice.getSource();
+      } else {
+        return failure();
+      }
     }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
     source = innerOp.getSource();
@@ -356,15 +520,22 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   // Create the DMA op in the in_parallel region.
   rewriter.setInsertionPointToStart(&inParallelBlock);
-  SmallVector<Value, 1> indicesVec;
+  SmallVector<Value, 1> indicesOperands;
   if (indices) {
-    indicesVec.push_back(indices);
+    indicesOperands.push_back(indices);
+  }
+
+  // Create in_bounds attribute if we fused a tensor.pad.
+  ArrayAttr inBoundsAttr;
+  if (!inBoundsVec.empty()) {
+    inBoundsAttr = rewriter.getBoolArrayAttr(inBoundsVec);
   }
 
   // When used in forall.in_parallel, the op doesn't return a result
   // as it performs an in-place update to the shared_outs tensor.
   IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
-                                          indicesVec, sharedOut, laneId);
+                                          indicesOperands, sharedOut, laneId,
+                                          inBoundsAttr);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (tensor::ParallelInsertSliceOp &insertOp : toErase) {
@@ -416,8 +587,68 @@ protected:
   SmallVector<OpFoldResult>
   computeThreadNumThreads(OpBuilder &builder,
                           linalg::CopyOp copyOp) const override {
+    if (!sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+      return {};
+    }
     auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
     return computeThreadNumThreadsImpl(builder, copyOp, outputType);
+  }
+};
+
+/// Pattern to convert tensor.pad fusion cases directly without requiring
+/// warp-mapped forall parent.
+struct ConvertPadFusionCopyToCoalescedDMA
+    : public OpRewritePattern<linalg::CopyOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
+                                PatternRewriter &rewriter) const override {
+    // Only match copies with use_global_load_dma config.
+    auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
+    if (!config) {
+      return failure();
+    }
+
+    // Skip if source is not from fat_raw_buffer.
+    if (!sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+      return failure();
+    }
+
+    // Check if this is a tensor.pad fusion case.
+    tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
+    if (!pad) {
+      return failure(); // Not a pad fusion case
+    }
+
+    // Check if padding exists (non-zero low/high pad).
+    bool hasPadding = false;
+    for (auto [low, high] :
+         llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
+      if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
+        hasPadding = true;
+        break;
+      }
+    }
+    if (!hasPadding) {
+      return failure(); // No actual padding
+    }
+
+    // This is a tensor.pad fusion case. Convert directly to
+    // coalesced_gather_dma without requiring warp-mapped forall.
+    auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
+    SmallVector<OpFoldResult> threadNumThreads =
+        computeThreadNumThreadsImpl(rewriter, copyOp, outputType);
+    if (threadNumThreads.empty()) {
+      return failure();
+    }
+
+    scf::ForallOp threadForallOp =
+        tileToThreadLevel(copyOp, rewriter, threadNumThreads);
+    if (!threadForallOp) {
+      return failure();
+    }
+
+    return createDMAInForall<linalg::CopyOp>(threadForallOp, rewriter);
   }
 };
 
@@ -453,8 +684,7 @@ struct ConvertGatherToCoalescedDMA
     }
 
     // Validate that innermost dimension is large enough for coalesced DMA.
-    auto outputType =
-        cast<RankedTensorType>(gatherOp.getOutputs()[0].getType());
+    auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
     if (ShapedType::isDynamic(innermostDim)) {
@@ -465,7 +695,7 @@ struct ConvertGatherToCoalescedDMA
     int64_t elementBits = elementType.getIntOrFloatBitWidth();
 
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
+    if (!target || !targetSupportsGlobalLoadDMA(target)) {
       return failure();
     }
 
@@ -574,7 +804,8 @@ struct ConvertGatherToCoalescedDMA
     rewriter.setInsertionPointToStart(&inParallelBlock);
 
     IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
-                                            indicesVec, sharedOut, laneId);
+                                            indicesVec, sharedOut, laneId,
+                                            /*in_bounds=*/nullptr);
 
     // Erase parallel_insert_slice ops and gather op.
     SmallVector<tensor::ParallelInsertSliceOp> toErase;
@@ -599,15 +830,59 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
+    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
+    // Only activate when at least one copy already has use_global_load_dma
+    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
+    // direct-load). Collect all promoted copies (use_global_load_dma or
+    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
+    // use_global_load_dma. If ANY fails, downgrade them all to
+    // derived_thread_config.
+    // Note: GatherOps are excluded — they come from input IR (not from
+    // GPUPromoteMatmulOperands) and are handled independently by
+    // ConvertGatherToCoalescedDMA.
+    SmallVector<linalg::CopyOp> promotedCopies;
+    bool hasDMAIntent = false;
+    funcOp->walk([&](linalg::CopyOp copyOp) {
+      if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
+        hasDMAIntent = true;
+        promotedCopies.push_back(copyOp);
+      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
+                     copyOp)) {
+        promotedCopies.push_back(copyOp);
+      }
+    });
+
+    if (hasDMAIntent) {
+      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+      LLVM_DEBUG({
+        if (!allConvertible) {
+          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                       << "downgrading " << promotedCopies.size()
+                       << " copies to derived_thread_config\n";
+        }
+      });
+      for (linalg::CopyOp copyOp : promotedCopies) {
+        if (allConvertible) {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
+        } else {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::DerivedThreadConfigAttr::get(context));
+        }
+      }
+    }
+
     // Preprocessing: apply subgroup-level tiling.
     if (failed(applySubgroupTiling(funcOp))) {
       return signalPassFailure();
     }
 
     // Only tile and convert ops within forall ops with warp mapping.
+    // Also handle tensor.pad fusion cases that don't have warp mapping.
     RewritePatternSet patterns(context);
     patterns.add<ConvertGatherToCoalescedDMA>(context);
     patterns.add<ConvertCopyToCoalescedDMA>(context);
+    patterns.add<ConvertPadFusionCopyToCoalescedDMA>(context);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
   }
@@ -696,7 +971,7 @@ private:
     }
 
     // Get the output type to determine rank and shape.
-    auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+    auto outputType = cast<RankedTensorType>(op.getDpsInits()[0].getType());
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
@@ -758,9 +1033,44 @@ private:
       return failure();
     }
 
-    // Compute tile sizes for subgroup-level distribution.
-    auto [tileSizes, numTiledDims] =
-        computeSubgroupTileSizes(rewriter, shape, numWarps);
+    // Check if this is a tensor.pad fusion case.
+    bool isPadFusion = false;
+    if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
+      if (tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0])) {
+        // Check if padding exists (non-zero low/high pad).
+        for (auto [low, high] :
+             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
+          if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
+            isPadFusion = true;
+            break;
+          }
+        }
+      }
+    }
+
+    SmallVector<OpFoldResult> tileSizes;
+    int64_t numTiledDims = 0;
+
+    if (isPadFusion) {
+      // TODO(#23365): Tile to subgroups for pad fusion by propagating source
+      // offsets through tiling. Currently, after subgroup tiling each warp's
+      // DMA gets the full pre-pad source but a sub-tiled init, and the DMA
+      // lowering has no way to offset into the source. This requires adding
+      // source offset support to CoalescedGatherDMAOp. For now, create a
+      // single-iteration wrapper forall so the DMA sees the full buffer.
+      // Bail out if any dimension is dynamic since we need static tile sizes.
+      if (llvm::any_of(shape, ShapedType::isDynamic)) {
+        return failure();
+      }
+      for (int64_t i = 0; i < rank; ++i) {
+        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
+        ++numTiledDims;
+      }
+    } else {
+      // Compute tile sizes for subgroup-level distribution.
+      std::tie(tileSizes, numTiledDims) =
+          computeSubgroupTileSizes(rewriter, shape, numWarps);
+    }
 
     if (numTiledDims == 0) {
       return failure();
@@ -780,13 +1090,28 @@ private:
   }
 
   LogicalResult applySubgroupTiling(FunctionOpInterface funcOp) {
+    // Check if the target supports global load DMA (gfx950+).
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+    if (!targetSupportsGlobalLoadDMA(target)) {
+      return success();
+    }
+
     MLIRContext *context = &getContext();
     SmallVector<Operation *> opsToTile;
 
     // Collect all ops with iree_gpu.use_global_load_dma lowering config.
     // Skip ops that are already inside a warp-mapped forall.
     funcOp->walk([&](Operation *op) {
-      if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
+      if (auto copyOp = dyn_cast<linalg::CopyOp>(op)) {
+        auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
+        if (!config || !sourceIsFromFatRawBuffer(copyOp.getInputs()[0])) {
+          return;
+        }
+        auto parentForall = op->getParentOfType<scf::ForallOp>();
+        if (!hasWarpMapping(parentForall)) {
+          opsToTile.push_back(op);
+        }
+      } else if (isa<IREE::LinalgExt::GatherOp>(op)) {
         auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
         if (config) {
           auto parentForall = op->getParentOfType<scf::ForallOp>();
@@ -798,6 +1123,9 @@ private:
     });
 
     // Apply subgroup-level tiling to each op.
+    // For tensor.pad fusion cases, tileAtSubgroupLevel creates a
+    // single-iteration wrapper forall to maintain the expected structure while
+    // allowing the DMA to operate on the full buffer.
     IRRewriter rewriter(context);
     for (Operation *op : opsToTile) {
       FailureOr<scf::SCFTilingResult> tilingResult =

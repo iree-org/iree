@@ -284,8 +284,15 @@ struct OnlineAttentionOpInterface final
                                        arith::AtomicRMWKind::addf, bounds,
                                        paddedOp.getValueMap());
     if (paddedOp.getMask()) {
+      Type maskElementType = getElementTypeOrSelf(paddedOp.getMask().getType());
+      // The attention mask can be either float or integer. For float masks,
+      // we use maximumf whose identity is -INF.
+      // For integer masks we use addi with identity value 0/false.
+      arith::AtomicRMWKind maskNeutralKind =
+          isa<FloatType>(maskElementType) ? arith::AtomicRMWKind::maximumf
+                                          : arith::AtomicRMWKind::addi;
       selectNeutralElementForReducedDims(builder, paddedOp.getMaskMutable()[0],
-                                         arith::AtomicRMWKind::maximumf, bounds,
+                                         maskNeutralKind, bounds,
                                          *paddedOp.getMaskMap());
     }
     return result->replacements;

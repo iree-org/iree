@@ -32,6 +32,7 @@ iree_cc_library(
     "ConvertSRefToMemRef.cpp"
     "FuseConsumers.cpp"
     "FusePCFWrites.cpp"
+    "FuseProducers.cpp"
     "LowerStructuralPCF.cpp"
     "Passes.cpp"
     "ResolveTokens.cpp"

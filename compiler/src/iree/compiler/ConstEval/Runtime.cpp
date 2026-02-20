@@ -100,29 +100,18 @@ static TypedAttr createAttributeFromRawData(Location loc,
                                             MutableArrayRef<char> rawBuffer) {
   Type elementType = tensorType.getElementType();
   // For numeric types that are byte-width aligned, we just use the raw buffer
-  // loading support of DenseElementsAttr.
+  // loading support of DenseElementsAttr. i1 is included here because both
+  // IREE and MLIR store i1 as full bytes (not bit-packed).
   if (elementType.isIntOrFloat() &&
-      elementType.getIntOrFloatBitWidth() % 8 == 0) {
-    bool detectedSplat = false;
-    if (DenseElementsAttr::isValidRawBuffer(tensorType, rawBuffer,
-                                            detectedSplat)) {
+      (elementType.getIntOrFloatBitWidth() % 8 == 0 ||
+       elementType.isInteger(1))) {
+    if (DenseElementsAttr::isValidRawBuffer(tensorType, rawBuffer)) {
       return DenseElementsAttr::getFromRawBuffer(tensorType, rawBuffer);
-    } else {
-      emitError(loc) << "mapped memory region was not valid for constructing "
-                        "tensor of type "
-                     << tensorType << " (length=" << rawBuffer.size() << ")";
-      return {};
     }
-  }
-
-  // For i1, IREE (currently) returns these as 8bit integer values and MLIR
-  // has a loader that accepts bool arrays (the raw buffer loader also
-  // supports them but bit-packed, which is not convenient for us).
-  if (elementType.isInteger(1)) {
-    // Note: cannot use std::vector because it specializes bool in a way
-    // that is not compatible with ArrayRef.
-    SmallVector<bool> boolVector(rawBuffer);
-    return DenseElementsAttr::get(tensorType, boolVector);
+    emitError(loc) << "mapped memory region was not valid for constructing "
+                      "tensor of type "
+                   << tensorType << " (length=" << rawBuffer.size() << ")";
+    return {};
   }
 
   emitError(loc) << "unhandled case when converting raw buffer of "

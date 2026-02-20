@@ -54,7 +54,7 @@ struct CmdParameterLoadOpPattern
                                      rewriter.getType<IREE::HAL::BufferType>());
     auto newOp = IREE::IO::Parameters::LoadOp::create(
         rewriter, loc, newResultTypes, device, queueAffinity, waitFence,
-        signalFence, adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
+        signalFence, adaptor.getSourceScope(), adaptor.getSourceKeys(),
         adaptor.getSourceOffsets(), resolveOp.getMemoryTypes(),
         resolveOp.getBufferUsage(), adaptor.getResultSizes());
 
@@ -85,8 +85,7 @@ struct CmdParameterReadOpPattern
     // Queue operation (a read is just a gather with a single span).
     IREE::IO::Parameters::GatherOp::create(
         rewriter, loc, device, queueAffinity, waitFence, signalFence,
-        adaptor.getSourceScopeAttr(),
-        rewriter.getArrayAttr(adaptor.getSourceKeyAttr()),
+        adaptor.getSourceScope(), ValueRange{adaptor.getSourceKey()},
         ValueRange{adaptor.getSourceOffset()}, adaptor.getTarget(),
         ValueRange{adaptor.getTargetOffset()},
         ValueRange{adaptor.getTargetLength()});
@@ -116,8 +115,8 @@ struct CmdParameterWriteOpPattern
     IREE::IO::Parameters::ScatterOp::create(
         rewriter, loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getSource(), ValueRange{adaptor.getSourceOffset()},
-        ValueRange{adaptor.getSourceLength()}, adaptor.getTargetScopeAttr(),
-        rewriter.getArrayAttr(adaptor.getTargetKeyAttr()),
+        ValueRange{adaptor.getSourceLength()}, adaptor.getTargetScope(),
+        ValueRange{adaptor.getTargetKey()},
         ValueRange{adaptor.getTargetOffset()});
 
     rewriter.replaceOp(writeOp, {signalFence});
@@ -145,7 +144,7 @@ struct CmdParameterGatherOpPattern
     // Queue operation.
     IREE::IO::Parameters::GatherOp::create(
         rewriter, loc, device, queueAffinity, waitFence, signalFence,
-        adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
+        adaptor.getSourceScope(), adaptor.getSourceKeys(),
         adaptor.getSourceOffsets(), adaptor.getTarget(),
         adaptor.getTargetOffsets(), adaptor.getTargetLengths());
 
@@ -175,8 +174,8 @@ struct CmdParameterScatterOpPattern
     IREE::IO::Parameters::ScatterOp::create(
         rewriter, loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getSource(), adaptor.getSourceOffsets(),
-        adaptor.getSourceLengths(), adaptor.getTargetScopeAttr(),
-        adaptor.getTargetKeysAttr(), adaptor.getTargetOffsets());
+        adaptor.getSourceLengths(), adaptor.getTargetScope(),
+        adaptor.getTargetKeys(), adaptor.getTargetOffsets());
 
     rewriter.replaceOp(scatterOp, {signalFence});
     return success();

@@ -482,6 +482,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
   }
 
+  // Convert global load DMAs after reduction tiling but before pack
+  // decomposition. DecomposePackUnPackOps introduces linalg.transpose which
+  // breaks the source tracing in the coalesced DMA conversion.
   funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
 
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
@@ -555,18 +558,18 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
-  CombineLayoutTransformationPassOptions combineLayoutOptions;
+  CombineResultLayoutTransformationPassOptions combineLayoutOptions;
   combineLayoutOptions.scope =
       IREE::Codegen::RelayoutCombinationScope::Workgroup;
   funcPassManager.addPass(
-      createCombineLayoutTransformationPass(combineLayoutOptions));
+      createCombineResultLayoutTransformationPass(combineLayoutOptions));
   funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(IREE::GPU::createCombineBarrierRegionsPass());
+  funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Step 6. Lower special ops and vectorize.
   funcPassManager.addPass(
@@ -576,7 +579,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
-  funcPassManager.addPass(createGPUCombineValueBarriersPass());
+  funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Step 7. Bufferize.
   addGPUBufferizePasses(funcPassManager);
@@ -813,6 +816,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  // Convert convolutions to matmuls by tiling filter dimensions.
+  funcPassManager.addPass(createGPUTileAndConvertConvToMatmulPass());
+
   // Set anchors at tensor level for vector distribution later and hoist out
   // loop invariant anchors.
   funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
@@ -854,7 +860,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUVectorAllocPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createGPUCombineValueBarriersPass());
+  funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);

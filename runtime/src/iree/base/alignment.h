@@ -79,6 +79,10 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 #define iree_alignof(x) __alignof__(x)
 #endif  // IREE_COMPILER_*
 
+// Container-of macro for getting struct from embedded member.
+#define iree_containerof(ptr, type, member) \
+  ((type*)((char*)(ptr) - offsetof(type, member)))
+
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
 static inline iree_host_size_t iree_host_align(iree_host_size_t value,
@@ -104,6 +108,29 @@ static inline bool iree_host_size_has_alignment(iree_host_size_t value,
   return iree_host_align(value, alignment) == value;
 }
 
+// Returns the smallest power of two >= |value|.
+// Returns 1 for |value| of 0 or 1.
+// Saturates to maximum representable value on overflow.
+static inline iree_host_size_t iree_host_size_next_power_of_two(
+    iree_host_size_t value) {
+  if (value <= 1) return 1;
+  // Check for overflow: max representable power-of-two is SIZE_MAX/2 + 1.
+  // Any value larger than that cannot have a next power-of-two in this type.
+  if (value > ((~(iree_host_size_t)0) >> 1) + 1) {
+    return ~(iree_host_size_t)0;  // Saturate to maximum value.
+  }
+  value--;
+  value |= value >> 1;
+  value |= value >> 2;
+  value |= value >> 4;
+  value |= value >> 8;
+  value |= value >> 16;
+  if (sizeof(iree_host_size_t) == 8) {
+    value |= value >> 32;
+  }
+  return value + 1;
+}
+
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
 static inline iree_device_size_t iree_device_align(
@@ -127,6 +154,29 @@ static inline bool iree_device_size_is_valid_alignment(
 static inline bool iree_device_size_has_alignment(
     iree_device_size_t value, iree_device_size_t alignment) {
   return iree_device_align(value, alignment) == value;
+}
+
+// Returns the smallest power of two >= |value|.
+// Returns 1 for |value| of 0 or 1.
+// Saturates to maximum representable value on overflow.
+static inline iree_device_size_t iree_device_size_next_power_of_two(
+    iree_device_size_t value) {
+  if (value <= 1) return 1;
+  // Check for overflow: max representable power-of-two is SIZE_MAX/2 + 1.
+  // Any value larger than that cannot have a next power-of-two in this type.
+  if (value > ((~(iree_device_size_t)0) >> 1) + 1) {
+    return ~(iree_device_size_t)0;  // Saturate to maximum value.
+  }
+  value--;
+  value |= value >> 1;
+  value |= value >> 2;
+  value |= value >> 4;
+  value |= value >> 8;
+  value |= value >> 16;
+  if (sizeof(iree_device_size_t) == 8) {
+    value |= value >> 32;
+  }
+  return value + 1;
 }
 
 // Returns true if |value| is a power-of-two.

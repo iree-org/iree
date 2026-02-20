@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "attr_based_pipeline.mlir"
+    "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
     "conv_filter_to_channels_last.mlir"
     "conv_to_channels_last.mlir"

@@ -491,8 +491,8 @@ def IREECodegen_RotateRowsAttr  :
     ```
     0000 1111 2222 3333 /// 0 1 2 3
     7777 4444 5555 6666 /// 3 0 1 2
-    BBBB AAAA 8888 9999 /// 2 3 0 1
-    FFFF EEEE DDDD CCCC /// 1 2 3 0
+    AAAA BBBB 8888 9999 /// 2 3 0 1
+    DDDD EEEE FFFF CCCC /// 1 2 3 0
     ```
 
     The pattern repeats for subsequent rows.
@@ -593,11 +593,11 @@ def IREECodegen_XORShuffleAttr  :
     is swizzled to
     ```
     0000 1111 2222 3333 /// 0 1 2 3
-    7777 4444 5555 6666 /// 1 0 3 2
-    BBBB AAAA 8888 9999 /// 2 3 0 1
+    5555 4444 7777 6666 /// 1 0 3 2
+    AAAA BBBB 8888 9999 /// 2 3 0 1
     FFFF EEEE DDDD CCCC /// 3 2 1 0
     ```
-    |access_width| allows to keep the same shuffling accross multiple rows. For example,
+    |per_phase| allows to keep the same shuffling across multiple rows. For example,
 
     ```
     row_width = 16, access_width = 4, per_phase = 2
@@ -611,9 +611,9 @@ def IREECodegen_XORShuffleAttr  :
     is swizzled to
     ```
     0000 1111 2222 3333 /// 0 1 2 3
-    7777 4444 5555 6666 /// 0 1 2 3
-    BBBB AAAA 8888 9999 /// 1 0 3 2
-    FFFF EEEE DDDD CCCC /// 1 0 3 2
+    4444 5555 6666 7777 /// 0 1 2 3
+    9999 8888 BBBB AAAA /// 1 0 3 2
+    DDDD CCCC FFFF EEEE /// 1 0 3 2
     ```
 
     The pattern repeats for subsequent rows.

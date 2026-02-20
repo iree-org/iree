@@ -130,7 +130,7 @@ iree_status_t iree_hal_heap_buffer_create(
       memcmp(&data_allocator, &host_allocator, sizeof(data_allocator)) == 0;
 
   iree_hal_heap_buffer_t* buffer = NULL;
-  iree_byte_span_t data = iree_make_byte_span(NULL, 0);
+  iree_byte_span_t data = iree_byte_span_empty();
   iree_status_t status =
       same_allocator
           ? iree_hal_heap_buffer_allocate_slab(allocation_size, host_allocator,

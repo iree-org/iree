@@ -103,14 +103,14 @@ util.func public @no_split_dynamic_matmul(%arg0: tensor<?x40960xf32>, %arg1: ten
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-util.func public @no_split_matmul_large_mn(%arg0: tensor<4096x150000xf32>, %arg1: tensor<150000x2048xf32>, %arg2: tensor<4096x2048xf32>) -> tensor<4096x2048xf32> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4096x150000xf32>, tensor<150000x2048xf32>) outs(%arg2 : tensor<4096x2048xf32>) {
+util.func public @no_split_matmul_large_mn(%arg0: tensor<4096x150000xf32>, %arg1: tensor<150000x2268xf32>, %arg2: tensor<4096x2268xf32>) -> tensor<4096x2268xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<4096x150000xf32>, tensor<150000x2268xf32>) outs(%arg2 : tensor<4096x2268xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %1 = arith.mulf %in, %in_0 : f32
     %2 = arith.addf %1, %out : f32
     linalg.yield %2 : f32
-  } -> tensor<4096x2048xf32>
-  util.return %0 : tensor<4096x2048xf32>
+  } -> tensor<4096x2268xf32>
+  util.return %0 : tensor<4096x2268xf32>
 }
 
 // CHECK-LABEL: @no_split_matmul_large_mn

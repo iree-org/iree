@@ -1366,4 +1366,495 @@ OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+// String formatting helpers (mirrored from UtilOps.cpp for fold/canonicalize)
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct FormatSegment {
+  enum Kind { Literal, Arg };
+  Kind kind;
+  std::string literal;
+  unsigned argIndex;
+};
+
+} // namespace
+
+static FailureOr<SmallVector<FormatSegment>>
+parseFormatString(StringRef format, unsigned argCount) {
+  SmallVector<FormatSegment> segments;
+  bool hasSequential = false;
+  bool hasExplicit = false;
+  unsigned nextSequentialIndex = 0;
+  unsigned maxArgIndex = 0;
+  bool hasAnyArg = false;
+
+  std::string currentLiteral;
+  size_t i = 0;
+  while (i < format.size()) {
+    char c = format[i];
+    if (c == '{') {
+      if (i + 1 < format.size() && format[i + 1] == '{') {
+        currentLiteral += '{';
+        i += 2;
+        continue;
+      }
+      if (!currentLiteral.empty()) {
+        segments.push_back({FormatSegment::Literal, currentLiteral, 0});
+        currentLiteral.clear();
+      }
+      size_t closePosition = format.find('}', i + 1);
+      if (closePosition == StringRef::npos) {
+        return failure();
+      }
+      StringRef content = format.slice(i + 1, closePosition);
+      if (content.empty()) {
+        hasSequential = true;
+        hasAnyArg = true;
+        if (nextSequentialIndex > 0) {
+          maxArgIndex = std::max(maxArgIndex, nextSequentialIndex);
+        }
+        segments.push_back({FormatSegment::Arg, {}, nextSequentialIndex});
+        ++nextSequentialIndex;
+      } else {
+        unsigned index;
+        if (content.getAsInteger(10, index)) {
+          return failure();
+        }
+        hasExplicit = true;
+        hasAnyArg = true;
+        maxArgIndex = std::max(maxArgIndex, index);
+        segments.push_back({FormatSegment::Arg, {}, index});
+      }
+      i = closePosition + 1;
+    } else if (c == '}') {
+      if (i + 1 < format.size() && format[i + 1] == '}') {
+        currentLiteral += '}';
+        i += 2;
+        continue;
+      }
+      return failure();
+    } else {
+      currentLiteral += c;
+      ++i;
+    }
+  }
+  if (!currentLiteral.empty()) {
+    segments.push_back({FormatSegment::Literal, currentLiteral, 0});
+  }
+
+  if (hasSequential && hasExplicit) {
+    return failure();
+  }
+
+  unsigned expectedArgCount =
+      hasAnyArg ? (hasExplicit ? (maxArgIndex + 1) : nextSequentialIndex) : 0;
+  if (expectedArgCount != argCount) {
+    return failure();
+  }
+
+  return segments;
+}
+
+//===----------------------------------------------------------------------===//
+// util.string.format
+//===----------------------------------------------------------------------===//
+
+OpFoldResult StringFormatOp::fold(FoldAdaptor operands) {
+  // Fold when all arguments are constant: evaluate the format string and
+  // return a StringAttr (materialized as util.buffer.constant).
+  SmallVector<std::string> argStrings;
+  for (auto [index, arg] : llvm::enumerate(getArgs())) {
+    if (isa<IREE::Util::BufferType>(arg.getType())) {
+      // Buffer arg: look through to a buffer constant with a string value.
+      auto definingOp = arg.getDefiningOp<IREE::Util::BufferConstantOp>();
+      if (!definingOp) {
+        return {};
+      }
+      auto stringAttr = dyn_cast<StringAttr>(definingOp.getValue());
+      if (!stringAttr) {
+        return {};
+      }
+      argStrings.push_back(stringAttr.getValue().str());
+    } else {
+      // Integer arg: check the fold adaptor for a constant attribute.
+      auto constantAttr =
+          dyn_cast_or_null<IntegerAttr>(operands.getArgs()[index]);
+      if (!constantAttr) {
+        return {};
+      }
+      argStrings.push_back(
+          std::to_string(constantAttr.getValue().getZExtValue()));
+    }
+  }
+
+  // All args are constant. Parse and evaluate.
+  auto segmentsOr = parseFormatString(getFormat(), getArgs().size());
+  if (failed(segmentsOr)) {
+    return {};
+  }
+
+  std::string result;
+  for (const auto &segment : *segmentsOr) {
+    if (segment.kind == FormatSegment::Literal) {
+      result += segment.literal;
+    } else {
+      result += argStrings[segment.argIndex];
+    }
+  }
+
+  return StringAttr::get(getContext(), result);
+}
+
+namespace {
+
+// Partially folds constant arguments into the format string literal segments.
+// When all arguments are constant, replaces the op with a buffer constant.
+// When some arguments are constant, merges them into the format string and
+// produces a new format op with fewer arguments.
+struct PartialFoldStringFormat : public OpRewritePattern<StringFormatOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(StringFormatOp op,
+                                PatternRewriter &rewriter) const override {
+    auto segmentsOr = parseFormatString(op.getFormat(), op.getArgs().size());
+    if (failed(segmentsOr)) {
+      return failure();
+    }
+    auto &segments = *segmentsOr;
+
+    // Determine which arguments are constant.
+    SmallVector<std::optional<std::string>> constantArgValues(
+        op.getArgs().size());
+    bool anyConstant = false;
+    for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
+      if (isa<IREE::Util::BufferType>(arg.getType())) {
+        auto definingOp = arg.getDefiningOp<BufferConstantOp>();
+        if (definingOp) {
+          if (auto stringAttr = dyn_cast<StringAttr>(definingOp.getValue())) {
+            constantArgValues[index] = stringAttr.getValue().str();
+            anyConstant = true;
+          }
+        }
+      } else {
+        APInt value;
+        if (matchPattern(arg, m_ConstantInt(&value))) {
+          constantArgValues[index] = std::to_string(value.getZExtValue());
+          anyConstant = true;
+        }
+      }
+    }
+    if (!anyConstant) {
+      return failure();
+    }
+
+    // Check if ALL arguments are constant.
+    bool allConstant = llvm::all_of(
+        constantArgValues, [](const auto &v) { return v.has_value(); });
+
+    if (allConstant) {
+      // Evaluate fully and replace with a buffer constant.
+      std::string result;
+      for (const auto &segment : segments) {
+        if (segment.kind == FormatSegment::Literal) {
+          result += segment.literal;
+        } else {
+          result += *constantArgValues[segment.argIndex];
+        }
+      }
+      rewriter.replaceOpWithNewOp<BufferConstantOp>(
+          op, StringAttr::get(op.getContext(), result));
+      return success();
+    }
+
+    // Partial fold: inline constant args as literal text, keep dynamic args.
+    // First, build segments with constant args replaced by literals.
+    SmallVector<FormatSegment> newSegments;
+    for (const auto &segment : segments) {
+      if (segment.kind == FormatSegment::Arg &&
+          constantArgValues[segment.argIndex].has_value()) {
+        newSegments.push_back(
+            {FormatSegment::Literal, *constantArgValues[segment.argIndex], 0});
+      } else {
+        newSegments.push_back(segment);
+      }
+    }
+
+    // Merge adjacent literal segments.
+    SmallVector<FormatSegment> mergedSegments;
+    for (const auto &segment : newSegments) {
+      if (!mergedSegments.empty() &&
+          mergedSegments.back().kind == FormatSegment::Literal &&
+          segment.kind == FormatSegment::Literal) {
+        mergedSegments.back().literal += segment.literal;
+      } else {
+        mergedSegments.push_back(segment);
+      }
+    }
+
+    // Rebuild format string and args. Use sequential {} placeholders; each
+    // arg reference pushes the corresponding SSA value into the new arg list
+    // (duplicating if referenced multiple times, which is valid).
+    std::string newFormat;
+    SmallVector<Value> newArgs;
+    for (const auto &segment : mergedSegments) {
+      if (segment.kind == FormatSegment::Literal) {
+        for (char c : segment.literal) {
+          if (c == '{') {
+            newFormat += "{{";
+          } else if (c == '}') {
+            newFormat += "}}";
+          } else {
+            newFormat += c;
+          }
+        }
+      } else {
+        newFormat += "{}";
+        newArgs.push_back(op.getArgs()[segment.argIndex]);
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<StringFormatOp>(
+        op, op.getResult().getType(), rewriter.getStringAttr(newFormat),
+        newArgs);
+    return success();
+  }
+};
+
+// Eliminates identity format operations: util.string.format "{}"(%buf) -> %buf.
+// When the format string contains only a single placeholder with no surrounding
+// text and the argument is a buffer, the format is a no-op.
+struct EliminateIdentityFormat : public OpRewritePattern<StringFormatOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(StringFormatOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only match single-argument formats.
+    if (op.getArgs().size() != 1) {
+      return failure();
+    }
+
+    // Parse the format string.
+    auto segmentsOr = parseFormatString(op.getFormat(), op.getArgs().size());
+    if (failed(segmentsOr)) {
+      return failure();
+    }
+    auto &segments = *segmentsOr;
+
+    // Check if format is exactly "{}": single arg segment, no literal segments
+    // (or only empty literals).
+    bool hasNonEmptyLiteral = false;
+    bool hasArgSegment = false;
+    for (const auto &segment : segments) {
+      if (segment.kind == FormatSegment::Literal) {
+        if (!segment.literal.empty()) {
+          hasNonEmptyLiteral = true;
+          break;
+        }
+      } else {
+        hasArgSegment = true;
+      }
+    }
+
+    if (hasNonEmptyLiteral || !hasArgSegment) {
+      return failure();
+    }
+
+    // Only applies to buffer arguments (identity for buffer pass-through).
+    Value arg = op.getArgs()[0];
+    if (!isa<IREE::Util::BufferType>(arg.getType())) {
+      return failure();
+    }
+
+    // Replace with the buffer argument directly.
+    rewriter.replaceOp(op, arg);
+    return success();
+  }
+};
+
+// Simplifies single-integer-argument format to itoa:
+// util.string.format "{}"(%num) -> util.string.itoa %num.
+// More direct and itoa is simpler than format.
+struct SimplifySingleIntFormatToItoa : public OpRewritePattern<StringFormatOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(StringFormatOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only match single-argument formats.
+    if (op.getArgs().size() != 1) {
+      return failure();
+    }
+
+    // Parse the format string.
+    auto segmentsOr = parseFormatString(op.getFormat(), op.getArgs().size());
+    if (failed(segmentsOr)) {
+      return failure();
+    }
+    auto &segments = *segmentsOr;
+
+    // Check if format is exactly "{}": single arg segment, no literal segments.
+    bool hasNonEmptyLiteral = false;
+    bool hasArgSegment = false;
+    for (const auto &segment : segments) {
+      if (segment.kind == FormatSegment::Literal) {
+        if (!segment.literal.empty()) {
+          hasNonEmptyLiteral = true;
+          break;
+        }
+      } else {
+        hasArgSegment = true;
+      }
+    }
+
+    if (hasNonEmptyLiteral || !hasArgSegment) {
+      return failure();
+    }
+
+    // Only applies to integer arguments.
+    Value arg = op.getArgs()[0];
+    if (isa<IREE::Util::BufferType>(arg.getType())) {
+      return failure();
+    }
+
+    // Replace with itoa.
+    rewriter.replaceOpWithNewOp<StringItoaOp>(op, op.getResult().getType(),
+                                              arg);
+    return success();
+  }
+};
+
+// Normalizes ordinals in format strings to sequential placeholders.
+// This handles explicit ordinals ("{0} {1}"), out-of-order ("{1} {0}"), and
+// duplicates ("{0} {0}") even when all arguments are dynamic (which means
+// PartialFoldStringFormat won't trigger).
+struct NormalizeFormatOrdinals : public OpRewritePattern<StringFormatOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(StringFormatOp op,
+                                PatternRewriter &rewriter) const override {
+    auto segmentsOr = parseFormatString(op.getFormat(), op.getArgs().size());
+    if (failed(segmentsOr)) {
+      return failure();
+    }
+    auto &segments = *segmentsOr;
+
+    // Check if the format string uses sequential implicit "{}" placeholders
+    // already. If so, no normalization needed.
+    std::string currentFormat = op.getFormat().str();
+    bool needsNormalization = false;
+
+    // Simple heuristic: if we see any digits after '{', we have explicit
+    // ordinals.
+    for (size_t i = 0; i < currentFormat.size(); ++i) {
+      if (currentFormat[i] == '{' && i + 1 < currentFormat.size() &&
+          currentFormat[i + 1] != '{' && currentFormat[i + 1] != '}') {
+        // Check if next char is a digit
+        if (std::isdigit(currentFormat[i + 1])) {
+          needsNormalization = true;
+          break;
+        }
+      }
+    }
+
+    if (!needsNormalization) {
+      return failure();
+    }
+
+    // Rebuild format string with sequential "{}" and reorder args.
+    std::string newFormat;
+    SmallVector<Value> newArgs;
+    for (const auto &segment : segments) {
+      if (segment.kind == FormatSegment::Literal) {
+        for (char c : segment.literal) {
+          if (c == '{') {
+            newFormat += "{{";
+          } else if (c == '}') {
+            newFormat += "}}";
+          } else {
+            newFormat += c;
+          }
+        }
+      } else {
+        newFormat += "{}";
+        newArgs.push_back(op.getArgs()[segment.argIndex]);
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<StringFormatOp>(
+        op, op.getResult().getType(), rewriter.getStringAttr(newFormat),
+        newArgs);
+    return success();
+  }
+};
+
+} // namespace
+
+void StringFormatOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<PartialFoldStringFormat, EliminateIdentityFormat,
+                 SimplifySingleIntFormatToItoa, NormalizeFormatOrdinals>(
+      context);
+}
+
+//===----------------------------------------------------------------------===//
+// util.string.itoa
+//===----------------------------------------------------------------------===//
+
+OpFoldResult StringItoaOp::fold(FoldAdaptor operands) {
+  auto constantAttr = dyn_cast_or_null<IntegerAttr>(operands.getValue());
+  if (!constantAttr) {
+    return {};
+  }
+  uint64_t value = constantAttr.getValue().getZExtValue();
+  return StringAttr::get(getContext(), std::to_string(value));
+}
+
+namespace {
+
+// Folds itoa through zero-extending casts (extui, index_cast to wider type).
+// Since itoa produces unsigned decimal representation, zero-extension doesn't
+// change the string output, so we can fold through the cast.
+struct FoldItoaThroughZeroExtend : public OpRewritePattern<StringItoaOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(StringItoaOp op,
+                                PatternRewriter &rewriter) const override {
+    Value value = op.getValue();
+
+    // Look through arith.extui (zero-extend).
+    if (auto extui = value.getDefiningOp<mlir::arith::ExtUIOp>()) {
+      // If the input is constant, fold completely.
+      APInt constantValue;
+      if (matchPattern(extui.getIn(), m_ConstantInt(&constantValue))) {
+        rewriter.replaceOpWithNewOp<BufferConstantOp>(
+            op, StringAttr::get(op.getContext(),
+                                std::to_string(constantValue.getZExtValue())));
+        return success();
+      }
+      // Otherwise, apply itoa to the narrow value directly.
+      rewriter.replaceOpWithNewOp<StringItoaOp>(op, op.getResult().getType(),
+                                                extui.getIn());
+      return success();
+    }
+
+    // Look through arith.index_cast when the source is constant.
+    // We can only fold if the input is constant because index_cast could be
+    // widening or narrowing, and we don't know the bit width at compile time.
+    if (auto indexCast = value.getDefiningOp<mlir::arith::IndexCastOp>()) {
+      APInt constantValue;
+      if (matchPattern(indexCast.getIn(), m_ConstantInt(&constantValue))) {
+        rewriter.replaceOpWithNewOp<BufferConstantOp>(
+            op, StringAttr::get(op.getContext(),
+                                std::to_string(constantValue.getZExtValue())));
+        return success();
+      }
+    }
+
+    return failure();
+  }
+};
+
+} // namespace
+
+void StringItoaOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<FoldItoaThroughZeroExtend>(context);
+}
+
 } // namespace mlir::iree_compiler::IREE::Util

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-encode-host-tensors --iree-experimental-vscale-value=2 %s | FileCheck %s
 
 // CHECK-LABEL: @tensorSizeOfUnalignedPackedI1
 util.func public @tensorSizeOfUnalignedPackedI1() -> index {
@@ -52,11 +52,11 @@ util.func public @sizeof_lhs_encoding_dynamic_using_layouts(%arg0: index, %arg1:
 // CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C4]]
-// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]] overflow<nsw>
 // CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
-// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]] overflow<nsw>
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]] overflow<nsw>
 // CHECK:         return %[[T1]]
 
 // -----
@@ -71,8 +71,8 @@ util.func public @sizeof_lhs_encoding_partially_dynamic_using_layouts(%arg0: ind
 // CHECK-DAG:     %[[C48:.+]] = arith.constant 48 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg0, %[[C16]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
-// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D1]], %[[C48]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]] overflow<nsw>
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D1]], %[[C48]] overflow<nsw>
 // CHECK:         return %[[T0]]
 
 // -----
@@ -91,11 +91,11 @@ util.func public @sizeof_rhs_encoding_dynamic_using_layouts(%arg0: index, %arg1:
 // CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C8]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]] overflow<nsw>
 // CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C16]]
-// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C16]]
-// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C16]] overflow<nsw>
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]] overflow<nsw>
 // CHECK:         return %[[T1]]
 
 // -----
@@ -110,11 +110,11 @@ util.func public @sizeof_result_encoding_dynamic_using_layouts(%arg0: index, %ar
 // CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
 // CHECK:         %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C4]]
-// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK:         %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]] overflow<nsw>
 // CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C8]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
-// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]] overflow<nsw>
+// CHECK:         %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]] overflow<nsw>
 // CHECK:         return %[[T1]]
 
 // -----
@@ -131,12 +131,12 @@ util.func public @sizeof_lhs_encoding_with_bcast_across_m_dim_dynamic_using_layo
 // CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK:         %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
-// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
+// CHECK:         %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]] overflow<nsw>
 //
 // Multiplied by 4 because f32 has 4 bytes.
 //
-// CHECK:         %[[T0:.+]] = arith.muli %arg0, %[[C4]]
-// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK:         %[[T0:.+]] = arith.muli %arg0, %[[C4]] overflow<nsw>
+// CHECK:         %[[T1:.+]] = arith.muli %[[T0]], %[[PAD_D1]] overflow<nsw>
 // CHECK:         return %[[T1]]
 
 // -----
@@ -219,32 +219,49 @@ util.func public @sizeof_multi_encoding_layouts(%arg0: index, %arg1: index) -> i
 // Check for the first layout.
 //
 // CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C4]]
-// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C4]] overflow<nsw>
 // CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C8]]
-// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]]
-// CHECK-DAG:     %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK-DAG:     %[[SIZE0:.+]] = arith.muli %[[T0]], %[[PAD_D1]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C8]] overflow<nsw>
+// CHECK-DAG:     %[[T0:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK-DAG:     %[[SIZE0:.+]] = arith.muli %[[T0]], %[[PAD_D1]] overflow<nsw>
 //
 // Check for the second layout.
 //
 // CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C2]]
-// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C2]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C2]] overflow<nsw>
 // CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
-// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
-// CHECK-DAG:     %[[T1:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK-DAG:     %[[SIZE1:.+]] = arith.muli %[[T1]], %[[PAD_D1]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]] overflow<nsw>
+// CHECK-DAG:     %[[T1:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK-DAG:     %[[SIZE1:.+]] = arith.muli %[[T1]], %[[PAD_D1]] overflow<nsw>
 //
 // Check for the third layout.
 //
 // CHECK-DAG:     %[[CEIL_DIV_D0:.+]] = arith.ceildivsi %arg0, %[[C128]]
-// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C128]]
+// CHECK-DAG:     %[[PAD_D0:.+]] = arith.muli %[[CEIL_DIV_D0]], %[[C128]] overflow<nsw>
 // CHECK-DAG:     %[[CEIL_DIV_D1:.+]] = arith.ceildivsi %arg1, %[[C16]]
-// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]]
-// CHECK-DAG:     %[[T2:.+]] = arith.muli %[[PAD_D0]], %[[C4]]
-// CHECK-DAG:     %[[SIZE2:.+]] = arith.muli %[[T2]], %[[PAD_D1]]
+// CHECK-DAG:     %[[PAD_D1:.+]] = arith.muli %[[CEIL_DIV_D1]], %[[C16]] overflow<nsw>
+// CHECK-DAG:     %[[T2:.+]] = arith.muli %[[PAD_D0]], %[[C4]] overflow<nsw>
+// CHECK-DAG:     %[[SIZE2:.+]] = arith.muli %[[T2]], %[[PAD_D1]] overflow<nsw>
 //
 // Return the max value.
 //
 // CHECK-DAG:     %[[RES_0_1:.+]] = arith.maxui %[[SIZE0]], %[[SIZE1]]
 // CHECK-DAG:     %[[RES:.+]] = arith.maxui %[[RES_0_1]], %[[SIZE2]]
 // CHECK:         return %[[RES]]
+
+// -----
+
+// Tests that the correct size could be inferred with scalable encoding.
+// Tests the workaround until #21317 and #21590 are resolved.
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {
+    innerDimsPos = [0, 1], innerTileSizes = [8, 1], outerDimsPerm = [0, 1], scalableTiles = [true, false]}}>]>
+util.func public @sizeof_scalable_layout() -> index {
+    %size = stream.tensor.sizeof tensor<24x8xf32, #encoding> : index
+    util.return %size : index
+}
+
+// CHECK-LABEL: @sizeof_scalable_layout
+// Since we have vscale=2, the packed layout is effectively <2x8x16x1xf32>.
+// Therefore, the calculated size is 2*8*16*1*4(f32)=1024.
+// CHECK:         %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK-NEXT:    util.return %[[C1024]]

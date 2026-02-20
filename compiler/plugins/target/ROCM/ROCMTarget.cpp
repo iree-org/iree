@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -61,7 +62,6 @@
 #include "mlir/Target/LLVMIR/Export.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
 namespace {
 
 enum class ContainerType {
@@ -84,7 +84,6 @@ struct ROCMOptions {
   std::string enableROCMUkernels = "none";
   std::string encodingLayoutResolver =
       GPU::kDataTilingEncodingLayoutResolverName;
-  std::string tuningSpecPath = "";
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
@@ -179,12 +178,6 @@ struct ROCMOptions {
         cl::desc(
             "Deprecated; use --iree-rocm-encoding-layout-resolver instead."),
         Deprecated("use --iree-rocm-encoding-layout-resolver instead"));
-
-    binder.opt<std::string>(
-        "iree-codegen-tuning-spec-path", tuningSpecPath, cl::cat(category),
-        cl::desc("Path to a module containing a tuning spec (transform "
-                 "dialect library). Accepts MLIR text (.mlir) and bytecode "
-                 "(.mlirbc) formats."));
 
     binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
@@ -368,18 +361,17 @@ static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
   }
 }
 
-} // namespace
-
 class ROCMTargetBackend final : public TargetBackend {
 public:
-  ROCMTargetBackend(const ROCMOptions &options) : options(options) {}
+  ROCMTargetBackend(const ROCMOptions &options, GPUCodegenOptions codegenOpts)
+      : targetOptions(options), codegenOptions(std::move(codegenOpts)) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "hip"; }
+  std::string getLegacyDefaultDeviceID() const final { return "hip"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     if (auto target = getExecutableTarget(deviceID, context)) {
       executableTargetAttrs.push_back(target);
     }
@@ -393,25 +385,25 @@ public:
       configItems.emplace_back(name, value);
     };
 
-    if (failed(options.verify(b))) {
+    if (failed(targetOptions.verify(b))) {
       return nullptr;
     }
 
     addConfig("abi", b.getStringAttr(deviceID));
     std::string format;
     if (deviceID == "amdgpu") {
-      format = options.target;
+      format = targetOptions.target;
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
 
     if (auto target = GPU::getHIPTargetDetails(
-            options.target, options.targetFeatures, context)) {
+            targetOptions.target, targetOptions.targetFeatures, context)) {
       addConfigGPUTarget(context, target, configItems);
-      if (options.encodingLayoutResolver !=
+      if (targetOptions.encodingLayoutResolver !=
           GPU::kNoEncodingLayoutResolverName) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
-                target, options.encodingLayoutResolver)) {
+                target, targetOptions.encodingLayoutResolver)) {
           addConfig(IREE::Encoding::kEncodingResolverAttrName, encoding);
         }
       }
@@ -446,20 +438,22 @@ public:
       }
     }
 
-    addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
-    if (options.enableROCMUkernels != "none") {
+    addConfig("ukernels", b.getStringAttr(targetOptions.enableROCMUkernels));
+    if (targetOptions.enableROCMUkernels != "none") {
       addConfig("iree_codegen.ukernel_provider",
                 IREE::ROCM::UKernelProviderAttr::get(context));
     }
-    if (options.wavesPerEu > 0) {
-      addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
+    if (targetOptions.wavesPerEu > 0) {
+      addConfigWavesPerEu(b.getContext(), targetOptions.wavesPerEu,
+                          configItems);
     }
-    if (options.denormalFpMathF32 != IREE::Codegen::DenormalFpMath::None) {
-      addConfigDenormalFpMathF32(b.getContext(), options.denormalFpMathF32,
-                                 configItems);
+    if (targetOptions.denormalFpMathF32 !=
+        IREE::Codegen::DenormalFpMath::None) {
+      addConfigDenormalFpMathF32(b.getContext(),
+                                 targetOptions.denormalFpMathF32, configItems);
     }
 
-    if (options.enableTensorUKernels) {
+    if (targetOptions.enableTensorUKernels) {
       addConfig(kUKernelProviderName,
                 IREE::ROCM::TensorUKernelProviderAttr::get(context));
     }
@@ -469,7 +463,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
@@ -485,8 +479,8 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
-    if (options.specializeDispatches) {
+                                 OpPassManager &passManager) final {
+    if (targetOptions.specializeDispatches) {
       if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
         options.enableSpecialization = true;
@@ -502,7 +496,7 @@ public:
         });
       }
     }
-    if (options.enableTensorUKernels) {
+    if (targetOptions.enableTensorUKernels) {
       if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
         options.enableTensorUKernels = true;
@@ -521,25 +515,27 @@ public:
     passManager.addPass(createSpecializeExportsPass());
     buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
-    if (options.enableTensorUKernels) {
+    if (targetOptions.enableTensorUKernels) {
       modulePassManager.addPass(
           IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
     }
     {
       MaterializeTuningSpecsPassOptions passOptions;
-      passOptions.tuningSpecPath = options.tuningSpecPath;
+      passOptions.tuningSpecPath = codegenOptions.tuningSpecPath;
       modulePassManager.addPass(createMaterializeTuningSpecsPass(passOptions));
     }
     modulePassManager.addPass(createMaterializeUserConfigsPass());
-    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
+    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
+        LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, true, options.debugSymbols);
+                                    OpPassManager &passManager) final {
+    buildLLVMGPUCodegenPassPipeline(passManager, true,
+                                    targetOptions.debugSymbols);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildLLVMGPULinkingPassPipeline(passManager, "rocm");
   }
 
@@ -604,11 +600,11 @@ public:
   LogicalResult
   serializeExecutable(const SerializationOptions &serializationOptions,
                       IREE::HAL::ExecutableVariantOp variantOp,
-                      OpBuilder &executableBuilder) override {
+                      OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
-    StringRef targetArch = options.target;
-    StringRef targetFeatures = options.targetFeatures;
+    StringRef targetArch = targetOptions.target;
+    StringRef targetFeatures = targetOptions.targetFeatures;
     if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
@@ -720,7 +716,6 @@ public:
         }
         llvm::TargetOptions opt;
         opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-        opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
         // Be extra cautious while this is less tested, and prevent unknown
         // fallbacks from global isel.
@@ -732,8 +727,8 @@ public:
         // might work around unimplemented cases or errors in GlobalISel
         // resulting in a successful compilation but would make one assume
         // results are with GlobalISel when they are not.
-        opt.EnableGlobalISel = options.globalISel;
-        opt.GlobalISelAbort = options.globalISel
+        opt.EnableGlobalISel = targetOptions.globalISel;
+        opt.GlobalISelAbort = targetOptions.globalISel
                                   ? llvm::GlobalISelAbortMode::Enable
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
@@ -816,7 +811,7 @@ public:
       }
 
       // Link module to HIP device library.
-      if (options.bitcodeDirectory.empty()) {
+      if (targetOptions.bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
@@ -824,7 +819,7 @@ public:
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
                                         targetArch,
-                                        options.bitcodeDirectory))) {
+                                        targetOptions.bitcodeDirectory))) {
         return failure();
       }
 
@@ -848,8 +843,8 @@ public:
 
       // Run LLVM optimization passes.
       std::string passesString;
-      optimizeModule(*llvmModule, *targetMachine, options.slpVectorization,
-                     passesString);
+      optimizeModule(*llvmModule, *targetMachine,
+                     targetOptions.slpVectorization, passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
         // Additional context on '-mcpu' flag in PR comments, see for example:
         // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
@@ -900,7 +895,7 @@ public:
         return failure();
       }
 
-      if (options.enableRegSpillWarning) {
+      if (targetOptions.enableRegSpillWarning) {
         checkRegisterSpilling(variantOp, targetObj);
       }
     }
@@ -912,7 +907,7 @@ public:
     }
 
     // Determine container type from the target ABI attribute.
-    ContainerType containerType = options.containerType;
+    ContainerType containerType = targetOptions.containerType;
     if (containerType == ContainerType::Auto) {
       if (getABI(targetAttr) == "amdgpu") {
         containerType = ContainerType::AMDGPU;
@@ -1144,7 +1139,8 @@ protected:
   }
 
 private:
-  const ROCMOptions &options;
+  const ROCMOptions &targetOptions;
+  const GPUCodegenOptions codegenOptions;
 };
 
 class AMDGPUTargetDevice final : public TargetDevice {
@@ -1153,7 +1149,7 @@ public:
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -1176,7 +1172,7 @@ public:
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
+                         const TargetRegistry &targetRegistry) const final {
     Builder b(context);
     auto deviceConfigAttr = b.getDictionaryAttr({});
     auto executableConfigAttr = b.getDictionaryAttr({});
@@ -1193,16 +1189,14 @@ public:
   }
 };
 
-namespace {
-
 struct ROCMSession final
     : PluginSession<ROCMSession, ROCMOptions,
                     PluginActivationPolicy::DefaultActivated> {
   static void registerPasses() { IREE::ROCM::registerROCMTargetPasses(); }
-  void onRegisterDialects(DialectRegistry &registry) {
+  void onRegisterDialects(DialectRegistry &registry) final {
     registry.insert<IREE::ROCM::ROCMDialect>();
   }
-  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"amdgpu", ...
     targets.add("amdgpu", [&]() {
       return std::make_shared<AMDGPUTargetDevice>(options);
@@ -1211,7 +1205,7 @@ struct ROCMSession final
     targets.add("hip",
                 [&]() { return std::make_shared<HIPTargetDevice>(options); });
   }
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();
@@ -1219,9 +1213,38 @@ struct ROCMSession final
       LLVMInitializeAMDGPUTargetInfo();
       LLVMInitializeAMDGPUAsmParser();
       LLVMInitializeAMDGPUAsmPrinter();
-      return std::make_shared<ROCMTargetBackend>(options);
+      return std::make_shared<ROCMTargetBackend>(options, codegenOptions);
     });
   }
+
+  // Override Registration to also bind GPUCodegenOptions to the session.
+  struct Registration : PluginSession::Registration {
+    using PluginSession::Registration::Registration;
+    std::unique_ptr<AbstractPluginSession>
+    createUninitializedSession(OptionsBinder &localOptionsBinder) final {
+      auto instance = std::make_unique<ROCMSession>();
+      // Bootstrap target options from global CLI if available.
+      if (globalCLIOptions) {
+        instance->options = *(*globalCLIOptions);
+      }
+      instance->options.bindOptions(localOptionsBinder);
+
+      // Bootstrap codegen options from global CLI if available.
+      if (globalCLICodegenOptions) {
+        instance->codegenOptions = *(*globalCLICodegenOptions);
+      }
+      instance->codegenOptions.bindOptions(localOptionsBinder);
+
+      return instance;
+    }
+    void initializeCLI() final {
+      PluginSession::Registration::initializeCLI();
+      globalCLICodegenOptions = &GPUCodegenOptions::FromFlags::get();
+    }
+    std::optional<GPUCodegenOptions *> globalCLICodegenOptions;
+  };
+
+  GPUCodegenOptions codegenOptions;
 };
 
 // Iterate over ukernel bitcode embedded-data files, and insert them into the
@@ -1236,7 +1259,6 @@ static void addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
 }
 
 } // namespace
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_rocm(

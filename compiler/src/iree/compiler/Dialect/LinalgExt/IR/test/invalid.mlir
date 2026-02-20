@@ -598,44 +598,6 @@ func.func @map_scatter_0D(
 
 // -----
 
-func.func @arg_compare_invalid_too_many_inputs(
-    %input_val: tensor<2x10xf32>,
-    %input_idx: tensor<2x10xi32>,
-    %input_extra: tensor<2x10xf32>,
-    %out_val: tensor<2xf32>,
-    %out_idx: tensor<2xi32>
-) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{expected 1 or 2 input operands, but got 3}}
-  %0:2 = iree_linalg_ext.arg_compare
-    dimension(1)
-    ins(%input_val, %input_idx, %input_extra : tensor<2x10xf32>, tensor<2x10xi32>, tensor<2x10xf32>)
-    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
-  } -> tensor<2xf32>, tensor<2xi32>
-  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
-}
-
-// -----
-
-func.func @arg_compare_invalid_missing_output(
-    %input_val: tensor<2x10xf32>,
-    %out_val: tensor<2xf32>) -> (tensor<2xf32>, tensor<2xi32>) {
-  // expected-error@+1 {{expected two output operands (value and index), but got 1}}
-  %0:2 = iree_linalg_ext.arg_compare
-    dimension(1)
-    ins(%input_val : tensor<2x10xf32>)
-    outs(%out_val : tensor<2xf32>) {
-    ^bb0(%a: f32, %b: f32):
-      %cmp = arith.cmpf ogt, %a, %b : f32
-      iree_linalg_ext.yield %cmp : i1
-  } -> tensor<2xf32>, tensor<2xi32>
-  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
-}
-
-// -----
-
 func.func @arg_compare_invalid_dim(
     %input_val: tensor<2x10xf32>,
     %out_val: tensor<2xf32>,
@@ -935,21 +897,6 @@ func.func @arg_compare_invalid_explicit_index_with_base(
       iree_linalg_ext.yield %cmp : i1
   } -> tensor<2xf32>, tensor<2xi32>
   return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
-}
-
-// -----
-
-func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
-  // expected-error@+1 {{expected one or two input operands}}
-  %0:2 = iree_linalg_ext.topk
-        dimension(1)
-        ins(%input_indices, %input_indices, %input_indices : tensor<2x10xi32>, tensor<2x10xi32>, tensor<2x10xi32>)
-        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):
-          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
-          iree_linalg_ext.yield %0 : i1
-        } -> tensor<2x3xf32>, tensor<2x3xi32>
-  return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
 }
 
 // -----

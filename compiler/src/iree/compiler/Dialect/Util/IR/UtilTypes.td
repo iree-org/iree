@@ -17,6 +17,7 @@ include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 def Util_BufferType : Util_TypeDef<"Buffer", [
   Util_ReferenceType,
   Util_SizeAwareType,
+  Util_HoistableType,
   DeclareTypeInterfaceMethods<Util_GlobalType, [
     "isAccessStorageCompatible",
   ]>,

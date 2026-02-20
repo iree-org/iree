@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdlib>
-#include <unordered_set>
 
 #include "compiler/plugins/target/LLVMCPU/Builtins/Device.h"
 #include "compiler/plugins/target/LLVMCPU/Builtins/Musl.h"
@@ -24,7 +23,6 @@
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -36,7 +34,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
@@ -56,6 +53,7 @@
 using llvm::dbgs;
 
 namespace mlir::iree_compiler::IREE::HAL {
+namespace {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
@@ -149,12 +147,12 @@ public:
       : defaultTargetOptions_(std::move(targetOptions)),
         codegenOptions_(std::move(codegenOpts)) {}
 
-  std::string getLegacyDefaultDeviceID() const override { return "local"; }
+  std::string getLegacyDefaultDeviceID() const final { return "local"; }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
-      const override {
+      const final {
     executableTargetAttrs.push_back(
         getExecutableTarget(context, defaultTargetOptions_.target));
   }
@@ -162,7 +160,7 @@ public:
   void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
                                 DictionaryAttr deviceConfigAttr,
                                 SmallVectorImpl<IREE::HAL::ExecutableTargetAttr>
-                                    &executableTargetAttrs) const override {
+                                    &executableTargetAttrs) const final {
     std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
     if (maybeTarget) {
       executableTargetAttrs.push_back(
@@ -220,7 +218,7 @@ public:
         b.getDictionaryAttr(configItems));
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry &registry) const final {
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerArmSMEDialectTranslation(registry);
@@ -242,19 +240,19 @@ public:
 
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                 OpPassManager &passManager) override {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+                                 OpPassManager &passManager) final {
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager, codegenOptions_);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                    OpPassManager &passManager) override {
+                                    OpPassManager &passManager) final {
     bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
                             hasSMEFeature(targetAttr.getConfiguration());
     buildLLVMCPUCodegenPassPipeline(passManager, codegenOptions_,
                                     enableAArch64SME);
   }
 
-  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+  void buildLinkingPassPipeline(OpPassManager &passManager) final {
     buildLLVMCPULinkingPassPipeline(passManager, "llvm-cpu");
   }
 
@@ -271,7 +269,7 @@ public:
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
                                     IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpBuilder &executableBuilder) override {
+                                    OpBuilder &executableBuilder) final {
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
@@ -866,11 +864,10 @@ private:
   const CPUCodegenOptions codegenOptions_;
 };
 
-struct LLVMCPUSession
+struct LLVMCPUSession final
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void
-  populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) override {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"llvm-cpu", ...
     // Use session-scoped codegen options bound in createUninitializedSession.
     targets.add("llvm-cpu", [=]() {
@@ -883,7 +880,7 @@ struct LLVMCPUSession
   struct Registration : PluginSession::Registration {
     using PluginSession::Registration::Registration;
     std::unique_ptr<AbstractPluginSession>
-    createUninitializedSession(OptionsBinder &localOptionsBinder) override {
+    createUninitializedSession(OptionsBinder &localOptionsBinder) final {
       auto instance = std::make_unique<LLVMCPUSession>();
       // Bootstrap target options from global CLI if available.
       if (globalCLIOptions) {
@@ -899,7 +896,7 @@ struct LLVMCPUSession
 
       return instance;
     }
-    void initializeCLI() override {
+    void initializeCLI() final {
       PluginSession::Registration::initializeCLI();
       globalCLICodegenOptions = &CPUCodegenOptions::FromFlags::get();
     }
@@ -909,6 +906,7 @@ struct LLVMCPUSession
   CPUCodegenOptions codegenOptions;
 };
 
+} // namespace
 } // namespace mlir::iree_compiler::IREE::HAL
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(

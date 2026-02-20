@@ -648,12 +648,71 @@ TEST(JsonTryLookupObjectValueTest, EmptyObject) {
 // String Lookup Tests
 //===----------------------------------------------------------------------===//
 
+TEST(JsonLookupStringTest, SimpleString) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_lookup_string(
+      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
+  EXPECT_EQ(length, 5);
+  EXPECT_EQ(std::string(buffer, length), "hello");
+}
+
+TEST(JsonLookupStringTest, StringWithEscapes) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_lookup_string(
+      IREE_SV("{\"key\": \"hello\\nworld\"}"), IREE_SV("key"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
+  EXPECT_EQ(length, 11);
+  EXPECT_EQ(std::string(buffer, length), "hello\nworld");
+}
+
+TEST(JsonLookupStringTest, NullValueReturnsError) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_json_lookup_string(
+          IREE_SV("{\"key\": null}"), IREE_SV("key"),
+          iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
+}
+
+TEST(JsonLookupStringTest, MissingKeyReturnsError) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_NOT_FOUND,
+      iree_json_lookup_string(
+          IREE_SV("{\"other\": \"value\"}"), IREE_SV("key"),
+          iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
+}
+
+TEST(JsonLookupStringTest, BufferTooSmall) {
+  char buffer[3];
+  iree_host_size_t length = 0;
+  iree_status_t status = iree_json_lookup_string(
+      IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+  EXPECT_EQ(length, 5);
+}
+
+TEST(JsonLookupStringTest, EmptyString) {
+  char buffer[32];
+  iree_host_size_t length = 0;
+  IREE_ASSERT_OK(iree_json_lookup_string(
+      IREE_SV("{\"key\": \"\"}"), IREE_SV("key"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
+  EXPECT_EQ(length, 0);
+}
+
 TEST(JsonTryLookupStringTest, SimpleString) {
   char buffer[32];
   iree_host_size_t length = 0;
   IREE_ASSERT_OK(iree_json_try_lookup_string(
       IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), iree_string_view_empty(),
-      buffer, sizeof(buffer), &length));
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 5);
   EXPECT_EQ(std::string(buffer, length), "hello");
 }
@@ -663,7 +722,8 @@ TEST(JsonTryLookupStringTest, StringWithEscapes) {
   iree_host_size_t length = 0;
   IREE_ASSERT_OK(iree_json_try_lookup_string(
       IREE_SV("{\"key\": \"hello\\nworld\"}"), IREE_SV("key"),
-      iree_string_view_empty(), buffer, sizeof(buffer), &length));
+      iree_string_view_empty(),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 11);
   EXPECT_EQ(std::string(buffer, length), "hello\nworld");
 }
@@ -671,9 +731,9 @@ TEST(JsonTryLookupStringTest, StringWithEscapes) {
 TEST(JsonTryLookupStringTest, NullValueUsesDefault) {
   char buffer[32];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": null}"),
-                                             IREE_SV("key"), IREE_SV("default"),
-                                             buffer, sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"key\": null}"), IREE_SV("key"), IREE_SV("default"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 7);
   EXPECT_EQ(std::string(buffer, length), "default");
 }
@@ -681,9 +741,9 @@ TEST(JsonTryLookupStringTest, NullValueUsesDefault) {
 TEST(JsonTryLookupStringTest, MissingKeyUsesDefault) {
   char buffer[32];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"other\": \"value\"}"),
-                                             IREE_SV("key"), IREE_SV("default"),
-                                             buffer, sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"other\": \"value\"}"), IREE_SV("key"), IREE_SV("default"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 7);
   EXPECT_EQ(std::string(buffer, length), "default");
 }
@@ -691,9 +751,9 @@ TEST(JsonTryLookupStringTest, MissingKeyUsesDefault) {
 TEST(JsonTryLookupStringTest, EmptyObjectUsesDefault) {
   char buffer[32];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{}"), IREE_SV("key"),
-                                             IREE_SV("default"), buffer,
-                                             sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{}"), IREE_SV("key"), IREE_SV("default"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 7);
   EXPECT_EQ(std::string(buffer, length), "default");
 }
@@ -702,9 +762,9 @@ TEST(JsonTryLookupStringTest, StringLiteralNullIsNotJsonNull) {
   // String "null" is different from JSON null.
   char buffer[32];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": \"null\"}"),
-                                             IREE_SV("key"), IREE_SV("default"),
-                                             buffer, sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"key\": \"null\"}"), IREE_SV("key"), IREE_SV("default"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   // Should get the string "null", not the default.
   EXPECT_EQ(length, 4);
   EXPECT_EQ(std::string(buffer, length), "null");
@@ -713,9 +773,9 @@ TEST(JsonTryLookupStringTest, StringLiteralNullIsNotJsonNull) {
 TEST(JsonTryLookupStringTest, EmptyString) {
   char buffer[32];
   iree_host_size_t length = 0;
-  IREE_ASSERT_OK(iree_json_try_lookup_string(IREE_SV("{\"key\": \"\"}"),
-                                             IREE_SV("key"), IREE_SV("default"),
-                                             buffer, sizeof(buffer), &length));
+  IREE_ASSERT_OK(iree_json_try_lookup_string(
+      IREE_SV("{\"key\": \"\"}"), IREE_SV("key"), IREE_SV("default"),
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
   EXPECT_EQ(length, 0);
 }
 
@@ -724,9 +784,9 @@ TEST(JsonTryLookupStringTest, NumberValueReturnsError) {
   iree_host_size_t length = 0;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_INVALID_ARGUMENT,
-      iree_json_try_lookup_string(IREE_SV("{\"key\": 123}"), IREE_SV("key"),
-                                  iree_string_view_empty(), buffer,
-                                  sizeof(buffer), &length));
+      iree_json_try_lookup_string(
+          IREE_SV("{\"key\": 123}"), IREE_SV("key"), iree_string_view_empty(),
+          iree_make_mutable_string_view(buffer, sizeof(buffer)), &length));
 }
 
 TEST(JsonTryLookupStringTest, BufferTooSmall) {
@@ -734,7 +794,7 @@ TEST(JsonTryLookupStringTest, BufferTooSmall) {
   iree_host_size_t length = 0;
   iree_status_t status = iree_json_try_lookup_string(
       IREE_SV("{\"key\": \"hello\"}"), IREE_SV("key"), iree_string_view_empty(),
-      buffer, sizeof(buffer), &length);
+      iree_make_mutable_string_view(buffer, sizeof(buffer)), &length);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
   // Length should still indicate required size.
   EXPECT_EQ(length, 5);

@@ -14,12 +14,14 @@ iree_cc_library(
   NAME
     Conversion
   HDRS
+    "BuiltinRegistry.h"
     "ConversionDialectInterface.h"
     "ConversionTarget.h"
     "ImportUtils.h"
     "TargetOptions.h"
     "TypeConverter.h"
   SRCS
+    "BuiltinRegistry.cpp"
     "ConversionTarget.cpp"
     "ImportUtils.cpp"
     "TargetOptions.cpp"

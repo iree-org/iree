@@ -302,10 +302,11 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
 // CHECK:         %[[V11:.*]] = vector.extract {{.*}} : f16 from vector<1xf16>
-// CHECK:         gpu.subgroup_reduce  maxnumf %[[V11]] : (f16) -> f16
+// CHECK:         %[[MAXNUMF:.+]] = gpu.subgroup_reduce  maxnumf %[[V11]] : (f16) -> f16
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
+// CHECK:         %[[MAXNUMF_BCAST:.+]] = vector.broadcast %[[MAXNUMF]] : f16 to vector<1xf16>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK2:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
 // CHECK:           vector.transfer_read %{{.*}}, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
@@ -321,17 +322,15 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         vector.extract {{.*}}[0] : f16 from vector<1xf16>
 // CHECK:         gpu.subgroup_reduce  add {{.*}} : (f16) -> f16
 // CHECK:         arith.addf {{.*}} : f16
-// CHECK:         gpu.subgroup_reduce  maxnumf {{.*}} : (f16) -> f16
-// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
-// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
+// CHECK:         %[[SUM_BCAST:.+]] = vector.broadcast {{.*}} : f16 to vector<1xf16>
 
 // Store the result back to global memory in a loop, recomputing the
 // elementwise part.
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK3:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
-// CHECK:           vector.transfer_read {{.*}} %[[MASK3]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
-// CHECK:           arith.subf
-// CHECK:           math.exp
-// CHECK:           arith.divf
-// CHECK:           vector.transfer_write {{.*}} %[[MASK3]] {{.*}} : vector<1xf16>, memref<32x?xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:           %[[LOAD:.+]] = vector.transfer_read {{.*}} %[[MASK3]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK:           %[[SUB:.+]] = arith.subf %[[LOAD]], %[[MAXNUMF_BCAST]] : vector<1xf16>
+// CHECK:           %[[EXP:.+]] = math.exp %[[SUB]] : vector<1xf16>
+// CHECK:           %[[DIV:.+]] = arith.divf %[[EXP]], %[[SUM_BCAST]] : vector<1xf16>
+// CHECK:           vector.transfer_write %[[DIV]], {{.*}} %[[MASK3]] {{.*}} : vector<1xf16>, memref<32x?xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:         }

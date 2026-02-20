@@ -223,10 +223,14 @@ static inline bool iree_device_size_checked_align(
 
 // Descriptor for a single field in a struct layout calculation.
 typedef struct iree_struct_field_t {
-  iree_host_size_t count;         // Number of elements (0 for padding-only).
-  iree_host_size_t element_size;  // Size of each element.
-  iree_host_size_t alignment;     // Required alignment (0 = none).
-  iree_host_size_t* out_offset;   // Output offset pointer (NULL to skip).
+  // Element count per dimension ([0]*[1] = total).
+  iree_host_size_t count[2];
+  // Size of each element.
+  iree_host_size_t element_size;
+  // Required alignment (0 = none).
+  iree_host_size_t alignment;
+  // Output offset pointer (NULL to skip).
+  iree_host_size_t* out_offset;
 } iree_struct_field_t;
 
 // Calculates the total allocation size for a struct with trailing fields.
@@ -249,6 +253,12 @@ typedef struct iree_struct_field_t {
 //       IREE_STRUCT_FIELD_ALIGNED(size, uint8_t,
 //       IREE_HAL_HEAP_BUFFER_ALIGNMENT,
 //                                 &data_offset)));
+//
+// Example - 2D array (num_states rows of 256 columns):
+//   iree_host_size_t total = 0, trans_offset = 0;
+//   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+//       sizeof(header_t), &total,
+//       IREE_STRUCT_ARRAY_FIELD(num_states, 256, uint16_t, &trans_offset)));
 IREE_ATTRIBUTE_ALWAYS_INLINE static inline iree_status_t
 iree_struct_layout_calculate(iree_host_size_t base_size,
                              const iree_struct_field_t* fields,
@@ -269,10 +279,16 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
     if (field->out_offset) {
       *field->out_offset = total;
     }
-    // Checked multiply: count * element_size.
+    // Checked multiply: count[0] * count[1] * element_size.
+    iree_host_size_t element_count = 0;
+    if (IREE_UNLIKELY(!iree_host_size_checked_mul(
+            field->count[0], field->count[1], &element_count))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "struct layout field count overflow");
+    }
     iree_host_size_t field_size = 0;
     if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-            field->count, field->element_size, &field_size))) {
+            element_count, field->element_size, &field_size))) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "struct layout field size overflow");
     }
@@ -288,17 +304,22 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
 
 // Field descriptor for an unaligned array.
 #define IREE_STRUCT_FIELD(count_expr, type, out_offset_ptr) \
-  { (count_expr), sizeof(type), 0, (out_offset_ptr) }
+  { {(count_expr), 1}, sizeof(type), 0, (out_offset_ptr) }
+
+// Field descriptor for an unaligned 2D array (count1 * count2 elements).
+// Both count multiplications are overflow-checked.
+#define IREE_STRUCT_ARRAY_FIELD(count1, count2, type, out_offset_ptr) \
+  { {(count1), (count2)}, sizeof(type), 0, (out_offset_ptr) }
 
 // Field descriptor for an aligned array.
 #define IREE_STRUCT_FIELD_ALIGNED(count_expr, type, align, out_offset_ptr) \
-  { (count_expr), sizeof(type), (align), (out_offset_ptr) }
+  { {(count_expr), 1}, sizeof(type), (align), (out_offset_ptr) }
 
 // Field descriptor for a flexible array member (FAM). FAMs are accessed via
 // the struct member (e.g., foo->bar[]) so no offset is needed. The alignment
 // ensures the FAM starts at an address suitable for its element type.
 #define IREE_STRUCT_FIELD_FAM(count_expr, type) \
-  { (count_expr), sizeof(type), iree_alignof(type), NULL }
+  { {(count_expr), 1}, sizeof(type), iree_alignof(type), NULL }
 
 // Calculates struct layout using inline field descriptors.
 // C++ version uses a lambda to create a local array (compound literals are a
@@ -443,6 +464,7 @@ iree_allocator_clone(iree_allocator_t allocator,
                      iree_const_byte_span_t source_bytes, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the given allocator.
+// Safe to pass NULL (no-op).
 IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator, void* ptr);
 
 //===----------------------------------------------------------------------===//

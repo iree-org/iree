@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRNVGPUDialect
     MLIRSCFDialect
     MLIRSCFTransforms

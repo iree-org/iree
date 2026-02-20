@@ -26,10 +26,6 @@ void buildCommonInputConversionPassPipeline(
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
 
-  // TODO: this pass should either live in InputConversion or be run in flow -
-  // it's a mistake that it's here.
-  passManager.addPass(IREE::Flow::createConvertShardToFlowPass());
-
   // ML frontends have very uneven support for user-controlled types _and_ users
   // tend to use types not well suited for the work they are doing. These
   // demotions/promotions allow users to change the types after lowering out of

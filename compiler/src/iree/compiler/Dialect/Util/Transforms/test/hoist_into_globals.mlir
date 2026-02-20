@@ -487,3 +487,66 @@ module @hoist_multiple_globals_ordered {
     util.return %extracted, %extracted : f32, f32
   }
 }
+
+// -----
+
+// Verify that buffer constants are recognized as const-expr roots and their
+// consumers are hoisted into globals.
+
+// CHECK-LABEL: @hoist_buffer_constant
+module @hoist_buffer_constant {
+  // CHECK: util.global private @[[HOISTED:.*]] : !util.buffer
+  // CHECK: util.initializer {
+  // CHECK:   %[[BUF:.*]] = util.buffer.constant : !util.buffer = "hello"
+  // CHECK:   %[[CE:.*]] = "iree_unregistered.const_expr"(%[[BUF]])
+  // CHECK:   util.global.store %[[CE]], @[[HOISTED]] : !util.buffer
+  // CHECK:   util.return
+  // CHECK: }
+  util.func public @main() -> !util.buffer {
+    %buf = util.buffer.constant : !util.buffer = "hello"
+    %result = "iree_unregistered.const_expr"(%buf) : (!util.buffer) -> !util.buffer
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED]] : !util.buffer
+    // CHECK: util.return %[[VAL]]
+    util.return %result : !util.buffer
+  }
+}
+
+// -----
+
+// Verify that string.format with all-constant args is hoisted (the format and
+// its constant index operand are both const-expr).
+
+// CHECK-LABEL: @hoist_string_format_constant_args
+module @hoist_string_format_constant_args {
+  // CHECK: util.global private @[[HOISTED:.*]] : !util.buffer
+  // CHECK: util.initializer {
+  // CHECK:   arith.constant 42
+  // CHECK:   util.string.format "blk.{}.weight"
+  // CHECK:   "iree_unregistered.const_expr"
+  // CHECK:   util.global.store %{{.*}}, @[[HOISTED]] : !util.buffer
+  // CHECK:   util.return
+  // CHECK: }
+  util.func public @main() -> !util.buffer {
+    %c42 = arith.constant 42 : index
+    %key = util.string.format "blk.{}.weight"(%c42) : (index) -> !util.buffer
+    %result = "iree_unregistered.const_expr"(%key) : (!util.buffer) -> !util.buffer
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED]] : !util.buffer
+    // CHECK: util.return %[[VAL]]
+    util.return %result : !util.buffer
+  }
+}
+
+// -----
+
+// Verify that string.format with dynamic args is NOT hoisted.
+
+// CHECK-LABEL: @do_not_hoist_dynamic_string_format
+module @do_not_hoist_dynamic_string_format {
+  // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
+  util.func public @main(%idx : index) -> !util.buffer {
+    %key = util.string.format "blk.{}.weight"(%idx) : (index) -> !util.buffer
+    // CHECK: util.string.format
+    util.return %key : !util.buffer
+  }
+}

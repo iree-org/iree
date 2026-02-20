@@ -49,56 +49,6 @@ func.func @check_no_cse() attributes {hal.executable.target = #executable_target
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
-#map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @peel_partially_unaligned_matmul() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
-  %4 = arith.index_castui %0 {stream.alignment = 128 : index, stream.values = [0 : index, 131712 : index]} : i32 to index
-  %5 = arith.index_castui %1 {stream.alignment = 64 : index, stream.values = [576704 : index, 1763072 : index]} : i32 to index
-  %6 = arith.index_castui %2 {stream.alignment = 64 : index, stream.values = [908480 : index, 2094848 : index]} : i32 to index
-  %7 = arith.index_castui %3 {stream.alignment = 128 : index, stream.values = [2304 : index, 134016 : index]} : i32 to index
-  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x576xf32>>
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<576x144xf32>>
-  %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x144xf32>>
-  %11 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%7) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x144xf32>>
-  %12 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x576xf32>> -> tensor<1x576xf32>
-  %13 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0], sizes = [576, 144], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<576x144xf32>> -> tensor<576x144xf32>
-  %14 = iree_tensor_ext.dispatch.tensor.load %10, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x144xf32>> -> tensor<1x144xf32>
-  %15 = tensor.empty() : tensor<1x144xf32>
-  %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1x144xf32>) -> tensor<1x144xf32>
-  %17 = linalg.matmul ins(%12, %13 : tensor<1x576xf32>, tensor<576x144xf32>) outs(%16 : tensor<1x144xf32>) -> tensor<1x144xf32>
-  %18 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%17, %14 : tensor<1x144xf32>, tensor<1x144xf32>) outs(%15 : tensor<1x144xf32>) {
-  ^bb0(%in: f32, %in_0: f32, %out: f32):
-    %19 = arith.addf %in, %in_0 : f32
-    %20 = arith.maximumf %19, %cst : f32
-    linalg.yield %20 : f32
-  } -> tensor<1x144xf32>
-  iree_tensor_ext.dispatch.tensor.store %18, %11, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : tensor<1x144xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x144xf32>>
-  return
-}
-// Checks that the bounded stack allocation are created.
-// CHECK-LABEL: func.func @peel_partially_unaligned_matmul
-// Main loop:
-//       CHECK:     vector.fma
-//       CHECK:     arith.addf {{.*}} : vector<
-//       CHECK:     arith.maximumf {{.*}} : vector<
-//
-// Peeled loop:
-//       CHECK:     vector.fma
-//       CHECK:     arith.addf {{.*}} : vector<
-//       CHECK:     arith.maximumf {{.*}} : vector<
-
-// -----
-
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -252,7 +202,7 @@ func.func @multi_result() attributes {hal.executable.target = #executable_target
 //          CHECK:     scf.for
 //          CHECK:       scf.for
 // CHECK-COUNT-16:         vector.fma
-//          CHECK:       arith.addf %{{.+}}, %{{.+}} : vector<8x32xf32>
+//          CHECK:       arith.addf %{{.+}}, %{{.+}} : vector<8x16xf32>
 
 // -----
 

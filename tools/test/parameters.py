@@ -29,3 +29,13 @@ save_file(
     },
     "parameters_b.safetensors",
 )
+
+save_file(
+    {
+        "param0": torch.arange(0, 4),
+        "param1": torch.arange(4, 8),
+        "param2": torch.arange(8, 12),
+        "param3": torch.arange(12, 16),
+    },
+    "parameters_dynamic.safetensors",
+)

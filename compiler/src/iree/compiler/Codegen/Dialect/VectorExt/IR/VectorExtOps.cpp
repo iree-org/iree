@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -680,6 +681,165 @@ void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 Type TransferGatherOp::getExpectedMaskType() {
   return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
+}
+
+//===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyYieldForArgCompare(YieldOp yieldOp,
+                                              ArgCompareOp argCompareOp) {
+  unsigned numOperands = yieldOp.getNumOperands();
+  if (numOperands != 1) {
+    return yieldOp.emitOpError("expected 1 yield operand, but got ")
+           << numOperands;
+  }
+
+  Type yieldType = yieldOp.getOperand(0).getType();
+  if (!yieldType.isInteger(1)) {
+    return yieldOp.emitOpError(
+               "expected yield operand to have type i1, but got ")
+           << yieldType;
+  }
+
+  return success();
+}
+
+LogicalResult YieldOp::verify() {
+  // ParentOneOf<["ArgCompareOp"]> ODS trait ensures parent is ArgCompareOp.
+  auto argCompareOp = cast<ArgCompareOp>((*this)->getParentOp());
+  return verifyYieldForArgCompare(*this, argCompareOp);
+}
+
+//===----------------------------------------------------------------------===//
+// ArgCompareOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArgCompareOp::verify() {
+  Operation *op = getOperation();
+
+  VectorType inputType = getInputValueType();
+  VectorType initValueType = getInitValueType();
+  VectorType initIndexType = getInitIndexType();
+
+  int64_t inputRank = inputType.getRank();
+  int64_t initValueRank = initValueType.getRank();
+  int64_t initIndexRank = initIndexType.getRank();
+  int64_t dimension = getDimension();
+
+  if (dimension < 0 || dimension >= inputRank) {
+    return op->emitOpError("dimension ")
+           << dimension << " is out of range [0, " << inputRank << ")";
+  }
+
+  if (initValueRank != inputRank - 1) {
+    return op->emitOpError("init value rank (")
+           << initValueRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  if (initIndexRank != inputRank - 1) {
+    return op->emitOpError("init index rank (")
+           << initIndexRank << ") must be input rank - 1 (" << (inputRank - 1)
+           << ")";
+  }
+
+  SmallVector<int64_t> expectedShape;
+  for (int64_t i = 0; i < inputRank; ++i) {
+    if (i != dimension) {
+      expectedShape.push_back(inputType.getDimSize(i));
+    }
+  }
+
+  ArrayRef<int64_t> initValueShape = initValueType.getShape();
+  if (expectedShape != initValueShape) {
+    return op->emitOpError(
+               "init value shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initValueShape);
+  }
+
+  ArrayRef<int64_t> initIndexShape = initIndexType.getShape();
+  if (expectedShape != initIndexShape) {
+    return op->emitOpError(
+               "init index shape must match input shape with reduction "
+               "dimension removed. ")
+           << "Expected: " << llvm::interleaved_array(expectedShape)
+           << ", but got: " << llvm::interleaved_array(initIndexShape);
+  }
+
+  Type initIndexElementType = initIndexType.getElementType();
+  if (!isa<IntegerType, IndexType>(initIndexElementType)) {
+    return op->emitOpError(
+               "init index must have integer or index element type, but got ")
+           << initIndexElementType;
+  }
+
+  if (hasExplicitIndexInput()) {
+    VectorType inputIndexType = getInputIndexType();
+    ArrayRef<int64_t> inputIndexShape = inputIndexType.getShape();
+    ArrayRef<int64_t> inputValueShape = inputType.getShape();
+
+    if (inputIndexShape != inputValueShape) {
+      return op->emitOpError(
+                 "explicit-index mode: value and index inputs must have the "
+                 "same shape. ")
+             << "Value shape: " << llvm::interleaved_array(inputValueShape)
+             << ", index shape: " << llvm::interleaved_array(inputIndexShape);
+    }
+
+    Type inputIndexElementType = getInputIndexElementType();
+    Type initIndexElementType = initIndexType.getElementType();
+
+    if (!isa<IntegerType, IndexType>(inputIndexElementType)) {
+      return op->emitOpError("explicit-index mode: index input must have "
+                             "integer or index element type, but got ")
+             << inputIndexElementType;
+    }
+
+    if (inputIndexElementType != initIndexElementType) {
+      return op->emitOpError(
+                 "explicit-index mode: input and init index element types "
+                 "must match. ")
+             << "Input index type: " << inputIndexElementType
+             << ", init index type: " << initIndexElementType;
+    }
+
+    if (getIndexBase()) {
+      return op->emitOpError(
+          "index_base must not be used with explicit indices");
+    }
+  }
+
+  // Region structure is enforced by ODS (SizedRegion<1> and
+  // SingleBlockImplicitTerminator), so we can directly access it.
+  Block &block = getRegion().front();
+  if (block.getNumArguments() != 2) {
+    return op->emitOpError("comparator region must have exactly 2 arguments");
+  }
+
+  Type inputElementType = inputType.getElementType();
+  Type arg0Type = block.getArgument(0).getType();
+  Type arg1Type = block.getArgument(1).getType();
+
+  if (arg0Type != inputElementType || arg1Type != inputElementType) {
+    return op->emitOpError(
+               "comparator arguments must match input value element type. ")
+           << "Expected: " << inputElementType << ", but got: " << arg0Type
+           << " and " << arg1Type;
+  }
+
+  // Since ArgCompareOp is marked Pure, all operations in the comparator must
+  // also be pure.
+  for (Operation &op : block.getOperations()) {
+    if (!isPure(&op)) {
+      return op.emitOpError(
+          "comparator region must contain only pure operations");
+    }
+  }
+
+  return success();
 }
 
 // clang-format off

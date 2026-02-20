@@ -103,7 +103,8 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
 
   // Skip swizzle hint ops.
   Operation *destination = forallOp.getDpsInits()[0].getDefiningOp();
-  if (auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination)) {
+  auto swizzleOp = dyn_cast<IREE::Codegen::SwizzleHintOp>(destination);
+  if (swizzleOp) {
     destination = swizzleOp->getOperand(0).getDefiningOp();
   }
 
@@ -130,13 +131,9 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   // If the original `tensor.empty` has a swizzle hint, apply it to the new
   // allocation. Note that if there is a swizzle hint, it will be the only user
   // of the `tensor.empty` op.
-  if (auto swizzleHintOp =
-          dyn_cast<IREE::Codegen::SwizzleHintOp>(*empty->getUsers().begin())) {
-    assert(empty->hasOneUse() &&
-           "a tensor.empty op with a swizzle hint applied, should have the "
-           "swizzle hint as its only user");
+  if (swizzleOp) {
     auto newSwizzle = IREE::Codegen::SwizzleHintOp::create(
-        rewriter, loc, allocTensor.getResult(), swizzleHintOp.getSwizzle());
+        rewriter, loc, allocTensor.getResult(), swizzleOp.getSwizzle());
     return newSwizzle.getResult();
   }
   return allocTensor.getResult();
@@ -320,7 +317,8 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     auto newGatherOp = IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, loc, coalescedGather.getInit().getType(),
         coalescedGather.getSource(), coalescedGather.getIndices(),
-        coalescedGather.getInit(), coalescedGather.getLane());
+        coalescedGather.getInit(), coalescedGather.getLane(),
+        coalescedGather.getInBoundsAttr());
     Value gatherResult = newGatherOp.getResult();
 
     // Use a tensor.insert_slice to insert the gather result back into the
@@ -458,7 +456,7 @@ static void composeCoalescedGatherDMA(
     auto dmaOp = IREE::GPU::CoalescedGatherDMAOp::create(
         rewriter, warpInsert.getLoc(), destSlice.getType(),
         laneInsert.getSource(), laneInsert.getIndices(), destSlice,
-        laneInsert.getLane());
+        laneInsert.getLane(), laneInsert.getInBoundsAttr());
 
     // Replace the warp parallel_insert_slice with one that inserts the DMA
     // result.

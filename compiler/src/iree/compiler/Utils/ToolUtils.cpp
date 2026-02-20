@@ -187,6 +187,19 @@ std::string findToolFromDylibDir(SmallVector<std::string> toolNames) {
     return toolPath;
   }
 
+  // Then search in an nested llvm/bin/ directory. This is the ROCm/TheRock
+  // standard location:
+  //   lib/
+  //     libIREECompiler.so
+  //     llvm/bin/
+  //       lld
+  toolPath = findToolAtPath(normalizedToolNames, dylibDir + "/llvm/bin/");
+  if (!toolPath.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "Found tool in ROCm llvm/bin directory at path "
+                            << toolPath << "\n");
+    return toolPath;
+  }
+
   // Then search in an adjacent tools/ directory. Build trees are
   // organized this way for reasons:
   //   lib/
@@ -272,17 +285,31 @@ std::string findPlatformLibDirectory(StringRef platformName) {
     return {};
   }
 
-  SmallString<256> path(dylibPath);
-  llvm::sys::path::remove_filename(path);
-  llvm::sys::path::append(path, "iree_platform_libs", platformName);
-  if (!llvm::sys::fs::is_directory(path)) {
-    return {};
-  }
-  llvm::sys::fs::make_absolute(path);
-  (void)llvm::sys::path::remove_dots(path, /*remove_dot_dot=*/true);
+  SmallString<256> libPath(dylibPath);
+  // Trim path to lib dir: some/path/lib/libIREECompiler.so -> some/path/lib
+  llvm::sys::path::remove_filename(libPath);
 
-  std::string pathStr(path);
-  return pathStr;
+  // Try IREE's convention: lib/iree_platform_libs/<platform>/
+  SmallString<256> ireeLibPath(libPath);
+  llvm::sys::path::append(ireeLibPath, "iree_platform_libs", platformName);
+  if (llvm::sys::fs::is_directory(ireeLibPath)) {
+    (void)llvm::sys::fs::make_absolute(ireeLibPath);
+    (void)llvm::sys::path::remove_dots(ireeLibPath, /*remove_dot_dot=*/true);
+    return std::string(ireeLibPath);
+  }
+
+  if (platformName == "rocm") {
+    // Fallback: ROCm/TheRock standard location lib/llvm/amdgcn/bitcode/
+    SmallString<256> rocmLibPath(libPath);
+    llvm::sys::path::append(rocmLibPath, "llvm", "amdgcn", "bitcode");
+    if (llvm::sys::fs::is_directory(rocmLibPath)) {
+      (void)llvm::sys::fs::make_absolute(rocmLibPath);
+      (void)llvm::sys::path::remove_dots(rocmLibPath, /*remove_dot_dot=*/true);
+      return std::string(rocmLibPath);
+    }
+  }
+
+  return {};
 }
 
 } // namespace mlir::iree_compiler

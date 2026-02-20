@@ -6,8 +6,8 @@
 
 //===----------------------------------------------------------------------===//
 //
-// This file implements a pass to emulate 16-bit brain float operations with
-// 32-bit ones.
+// This file implements a pass to convert unsupported float buffer types to
+// integer types of the same bit width for backends that don't support them.
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,25 +31,29 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#define DEBUG_TYPE "iree-codegen-convert-bf16-to-uint16-buffers"
+#define DEBUG_TYPE "iree-codegen-convert-unsupported-float-to-int-buffers"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_CONVERTBF16TOUINT16BUFFERSPASS
+#define GEN_PASS_DECL_CONVERTUNSUPPORTEDFLOATTOINTBUFFERSPASS
+#define GEN_PASS_DEF_CONVERTUNSUPPORTEDFLOATTOINTBUFFERSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
-class Bf16EmulationConverter : public TypeConverter {
+using Options = ConvertUnsupportedFloatToIntBuffersPassOptions;
+
+class UnsupportedFloatEmulationConverter : public TypeConverter {
 public:
-  explicit Bf16EmulationConverter() {
+  explicit UnsupportedFloatEmulationConverter(const Options &options)
+      : options(options) {
     // Allow unknown types.
     addConversion([](Type ty) -> std::optional<Type> { return ty; });
 
-    // Scalar case.
-    addConversion([](FloatType ty) -> std::optional<Type> {
-      if (ty.isBF16()) {
-        return IntegerType::get(ty.getContext(), 16);
+    // Scalar float case.
+    addConversion([this](FloatType ty) -> std::optional<Type> {
+      if (auto intTy = getIntTypeForFloat(ty)) {
+        return intTy;
       }
       return ty;
     });
@@ -72,6 +76,37 @@ public:
       return FunctionType::get(ty.getContext(), inputs, results);
     });
   }
+
+  bool shouldConvertFloat(FloatType ty) const {
+    return getIntTypeForFloat(ty) != nullptr;
+  }
+
+private:
+  /// Returns the integer type to use for the given float type, or nullptr if
+  /// the float type should not be converted.
+  IntegerType getIntTypeForFloat(FloatType ty) const {
+    if (options.includeBf16 && ty.isBF16()) {
+      return IntegerType::get(ty.getContext(), 16);
+    }
+    IntegerType i8Type = IntegerType::get(ty.getContext(), 8);
+    if (options.includeF8E5M2 && isa<Float8E5M2Type>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E4M3FN && isa<Float8E4M3FNType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E5M2FNUZ && isa<Float8E5M2FNUZType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E4M3FNUZ && isa<Float8E4M3FNUZType>(ty)) {
+      return i8Type;
+    }
+    if (options.includeF8E8M0FNU && isa<Float8E8M0FNUType>(ty)) {
+      return i8Type;
+    }
+    return nullptr;
+  }
+  ConvertUnsupportedFloatToIntBuffersPassOptions options;
 };
 
 //===----------------------------------------------------------------------===//
@@ -96,7 +131,8 @@ struct ConvertHalInterfaceBindingSubspan final
             op, newResultTy, adaptor.getLayout(), adaptor.getBinding(),
             adaptor.getByteOffset(), adaptor.getDynamicDims(),
             adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
-    LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "UnsupportedFloatEmulation: new op: " << newOp << "\n");
     (void)newOp;
     return success();
   }
@@ -138,19 +174,28 @@ struct GenericTypeConversionPattern : public ConversionPattern {
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
     llvm::SmallVector<NamedAttribute> newAttrs;
+    auto *converter =
+        static_cast<const UnsupportedFloatEmulationConverter *>(typeConverter);
     if (op->hasTrait<OpTrait::ConstantLike>() ||
         isa<IREE::Util::GlobalOpInterface>(op)) {
       for (auto attr : op->getAttrs()) {
         auto oldAttr = attr.getValue();
         Attribute newAttr = oldAttr;
         if (auto floatAttr = dyn_cast<FloatAttr>(oldAttr)) {
-          APInt apint = floatAttr.getValue().bitcastToAPInt();
-          newAttr = rewriter.getI16IntegerAttr(apint.getZExtValue());
+          auto floatTy = cast<FloatType>(floatAttr.getType());
+          if (converter->shouldConvertFloat(floatTy)) {
+            APInt apint = floatAttr.getValue().bitcastToAPInt();
+            newAttr = rewriter.getIntegerAttr(
+                rewriter.getIntegerType(apint.getBitWidth()), apint);
+          }
         } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
-          newAttr =
-              denseAttr.mapValues(rewriter.getI16Type(), [&](APFloat src) {
-                return src.bitcastToAPInt();
-              });
+          auto floatTy = cast<FloatType>(denseAttr.getType().getElementType());
+          if (converter->shouldConvertFloat(floatTy)) {
+            unsigned bitWidth = floatTy.getWidth();
+            newAttr = denseAttr.mapValues(
+                rewriter.getIntegerType(bitWidth),
+                [&](const APFloat &src) { return src.bitcastToAPInt(); });
+          }
         }
 
         newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
@@ -247,7 +292,8 @@ struct ConvertAmdgpuFatRawBufferCast final
         op, newTy, adaptor.getSource(), adaptor.getValidBytes(),
         adaptor.getCacheSwizzleStride(), adaptor.getBoundsCheck(),
         adaptor.getResetOffset());
-    LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "UnsupportedFloatEmulation: new op: " << newOp << "\n");
     (void)newOp;
     return success();
   }
@@ -262,7 +308,8 @@ Value materializeArithBitcast(OpBuilder &builder, Type resultTy,
   return arith::BitcastOp::create(builder, loc, resultTy, inputs);
 }
 
-static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
+static void
+populateIreeUnsupportedFloatEmulationPatterns(RewritePatternSet &patterns,
                                               TypeConverter &typeConverter) {
   populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns,
                                                                  typeConverter);
@@ -278,8 +325,11 @@ static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
 // Main pass
 //===----------------------------------------------------------------------===//
 
-struct ConvertBf16ToUInt16BuffersPass final
-    : impl::ConvertBf16ToUInt16BuffersPassBase<ConvertBf16ToUInt16BuffersPass> {
+struct ConvertUnsupportedFloatToIntBuffersPass final
+    : impl::ConvertUnsupportedFloatToIntBuffersPassBase<
+          ConvertUnsupportedFloatToIntBuffersPass> {
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
@@ -288,7 +338,14 @@ struct ConvertBf16ToUInt16BuffersPass final
     auto op = getOperation();
     MLIRContext *ctx = &getContext();
 
-    Bf16EmulationConverter typeConverter;
+    ConvertUnsupportedFloatToIntBuffersPassOptions opts;
+    opts.includeBf16 = includeBf16;
+    opts.includeF8E5M2 = includeF8E5M2;
+    opts.includeF8E4M3FN = includeF8E4M3FN;
+    opts.includeF8E5M2FNUZ = includeF8E5M2FNUZ;
+    opts.includeF8E4M3FNUZ = includeF8E4M3FNUZ;
+    opts.includeF8E8M0FNU = includeF8E8M0FNU;
+    UnsupportedFloatEmulationConverter typeConverter(opts);
     typeConverter.addTargetMaterialization(materializeArithBitcast);
     typeConverter.addSourceMaterialization(materializeArithBitcast);
 
@@ -300,16 +357,15 @@ struct ConvertBf16ToUInt16BuffersPass final
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
       });
       target.addLegalOp<arith::TruncFOp, arith::ExtFOp, ModuleOp>();
-      target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
-                                        IREE::HAL::HALDialect,
-                                        memref::MemRefDialect, scf::SCFDialect,
-                                        IREE::Codegen::IREECodegenDialect>(
-          [&typeConverter](Operation *op) {
-            bool legal = typeConverter.isLegal(op);
-            LLVM_DEBUG(if (!legal) llvm::dbgs()
-                       << "Bf16Emulation: illegal op: " << *op << "\n");
-            return legal;
-          });
+      target.addDynamicallyLegalDialect<
+          arith::ArithDialect, func::FuncDialect, IREE::HAL::HALDialect,
+          memref::MemRefDialect, scf::SCFDialect,
+          IREE::Codegen::IREECodegenDialect>([&typeConverter](Operation *op) {
+        bool legal = typeConverter.isLegal(op);
+        LLVM_DEBUG(if (!legal) llvm::dbgs()
+                   << "UnsupportedFloatEmulation: illegal op: " << *op << "\n");
+        return legal;
+      });
 
       // Support the list of all vector operations that do not perform numerical
       // changes. Also handle amdgpu buffer casts:
@@ -323,16 +379,16 @@ struct ConvertBf16ToUInt16BuffersPass final
           vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
           vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
           vector::MaskOp, vector::TransposeOp, vector::YieldOp,
-          vector::FromElementsOp, vector::ToElementsOp>(
-          [&typeConverter](Operation *op) {
-            bool legal = typeConverter.isLegal(op);
-            LLVM_DEBUG(if (!legal) llvm::dbgs()
-                       << "Bf16Emulation: illegal op: " << *op << "\n");
-            return legal;
-          });
+          vector::FromElementsOp, vector::ToElementsOp>([&typeConverter](
+                                                            Operation *op) {
+        bool legal = typeConverter.isLegal(op);
+        LLVM_DEBUG(if (!legal) llvm::dbgs()
+                   << "UnsupportedFloatEmulation: illegal op: " << *op << "\n");
+        return legal;
+      });
 
       RewritePatternSet patterns(ctx);
-      populateIreeBf16EmulationPatterns(patterns, typeConverter);
+      populateIreeUnsupportedFloatEmulationPatterns(patterns, typeConverter);
 
       if (failed(applyPartialConversion(op, target, std::move(patterns)))) {
         signalPassFailure();

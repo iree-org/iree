@@ -69,6 +69,53 @@ void iree_memory_jit_context_end(void);
 void iree_memory_flush_icache(void* base_address, iree_host_size_t length);
 
 //===----------------------------------------------------------------------===//
+// Secure memory operations
+//===----------------------------------------------------------------------===//
+
+// Locks a memory region to prevent it from being paged to swap.
+// Use for sensitive data like cryptographic keys that should never be written
+// to disk. The region should be unlocked with iree_memory_unlock when no longer
+// needed.
+//
+// Platform implementations:
+//   Linux/BSD/macOS: mlock()
+//   Windows:         VirtualLock()
+//
+// May fail if the process has insufficient privileges or exceeds the locked
+// memory limit (RLIMIT_MEMLOCK on POSIX). Failure is not fatal for security
+// but reduces protection.
+iree_status_t iree_memory_lock(void* ptr, iree_host_size_t size);
+
+// Unlocks a previously locked memory region, allowing paging.
+void iree_memory_unlock(void* ptr, iree_host_size_t size);
+
+// Advises the OS to exclude a memory region from core dumps.
+// Use for sensitive data that should not appear in crash dumps.
+//
+// Platform implementations:
+//   Linux:   madvise(MADV_DONTDUMP)
+//   macOS:   Not available (no-op)
+//   Windows: Not directly available (no-op)
+//
+// This is best-effort; the call succeeds even if the platform doesn't support
+// the feature.
+void iree_memory_protect_sensitive(void* ptr, iree_host_size_t size);
+
+// Securely wipes a memory region to prevent sensitive data recovery.
+// The wipe is performed in a way that the compiler cannot optimize away.
+//
+// Platform implementations:
+//   Windows:              SecureZeroMemory
+//   C11 Annex K / macOS:  memset_s
+//   Linux/Android/BSD:    explicit_bzero
+//   Other platforms:      volatile writes with memory barrier
+//
+// Use immediately before freeing memory that contained secrets (keys, tokens).
+// Note: This does not guarantee the data is unrecoverable from physical memory
+// or swap; use iree_memory_lock to prevent swapping of sensitive regions.
+void iree_memory_wipe(void* ptr, iree_host_size_t size);
+
+//===----------------------------------------------------------------------===//
 // C11 aligned_alloc shim
 //===----------------------------------------------------------------------===//
 

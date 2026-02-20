@@ -253,7 +253,19 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createSPIRVMapMemRefStorageClassPass)
       .addPass(createSPIRVEmulateI64Pass)
       .addPass(createConvertBf16ArithToF32Pass)
-      .addPass(createConvertBf16ToUInt16BuffersPass)
+      .addPass([]() {
+        // Convert bf16 buffers to i16. Other float types are not yet
+        // supported in the SPIR-V pipeline.
+        return createConvertUnsupportedFloatToIntBuffersPass(
+            ConvertUnsupportedFloatToIntBuffersPassOptions{
+                /*includeBf16=*/true,
+                /*includeF8E5M2=*/false,
+                /*includeF8E4M3FN=*/false,
+                /*includeF8E5M2FNUZ=*/false,
+                /*includeF8E4M3FNUZ=*/false,
+                /*includeF8E8M0FNU=*/false,
+            });
+      })
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 

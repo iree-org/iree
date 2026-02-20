@@ -855,6 +855,27 @@ func.func @map_scatter_vector(
 
 // -----
 
+func.func @map_scatter_mixed_tensor_memref(
+    %input: tensor<16xf32>, %output: memref<16xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<16xf32> into memref<16xf32>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_mixed_tensor_memref(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<16xf32>
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<16xf32>
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : tensor<16xf32> into memref<16xf32>
+//       CHECK:   return
+
+// -----
+
 func.func @arg_compare_static(
     %input : tensor<2x6xf32>,
     %outv : tensor<2xf32>, %outi : tensor<2xindex>
