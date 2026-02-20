@@ -1268,11 +1268,10 @@ func.func @paged_transfer_gather(%indices: vector<16xindex>,
   %c0 = arith.constant 0 : index
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
-  [None, %indices: vector<16xindex>, None], %cst0 { indexed_maps = [
-                                             affine_map<(d0, d1, d2) -> (d1)>],
-    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
-    in_bounds = [true, true] }
-  : memref<4096x512x8xf16>, vector<16x8xf16>
+  [%indices : vector<16xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : memref<4096x512x8xf16>, vector<16x8xf16>
 
   %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
 
@@ -1320,13 +1319,11 @@ func.func @paged_transfer_gather_multi_index(%indices: vector<16xindex>,
   %c0 = arith.constant 0 : index
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
-  [None, %indices: vector<16xindex>, %indices2: vector<8x16xindex>], %cst0
-                                           { indexed_maps = [
-                                             affine_map<(d0, d1, d2) -> (d1)>,
-                                             affine_map<(d0, d1, d2) -> (d2, d1)>],
-    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
-    in_bounds = [true, true] }
-  : memref<4096x512x8xf16>, vector<16x8xf16>
+  [%indices, %indices2 : vector<16xindex>, vector<8x16xindex>], %cst0 {
+    indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (0, s0, s1)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d0)>,
+                     affine_map<(d0, d1)[s0, s1] -> (d1, d0)>]
+  } : memref<4096x512x8xf16>, vector<16x8xf16>
 
   %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
 

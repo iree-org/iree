@@ -384,11 +384,11 @@ func.func @paged_transfer_gather_mask(%indices: vector<16xindex>,
   %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
-  [None, %indices: vector<16xindex>, None], %cst0, %mask { indexed_maps = [
-                                             affine_map<(d0, d1, d2) -> (d1)>],
-    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
-    in_bounds = [true, true] }
-  : memref<4096x512x8xf16>, vector<16x8xf16>
+  [%indices : vector<16xindex>], %cst0, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : memref<4096x512x8xf16>, vector<16x8xf16>, vector<16x8xi1>
 
   %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
 
@@ -404,11 +404,15 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @paged_transfer_gather_mask
-// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[MASK]]
-// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[MASK]]
-// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[MASK]]
-// CHECK: %[[MASK:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[MASK]]
+// CHECK: %[[MASK0:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: %[[CMASK0:.+]] = vector.shape_cast %[[MASK0]] : vector<1x8xi1> to vector<8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[CMASK0]]
+// CHECK: %[[MASK1:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: %[[CMASK1:.+]] = vector.shape_cast %[[MASK1]] : vector<1x8xi1> to vector<8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[CMASK1]]
+// CHECK: %[[MASK2:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: %[[CMASK2:.+]] = vector.shape_cast %[[MASK2]] : vector<1x8xi1> to vector<8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[CMASK2]]
+// CHECK: %[[MASK3:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
+// CHECK: %[[CMASK3:.+]] = vector.shape_cast %[[MASK3]] : vector<1x8xi1> to vector<8xi1>
+// CHECK: vector.transfer_read {{.+}} %[[CMASK3]]

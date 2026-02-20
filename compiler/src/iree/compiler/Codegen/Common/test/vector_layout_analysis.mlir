@@ -702,11 +702,11 @@ func.func @paged_transfer_gather(%indices: vector<16xindex>,
   // expected-remark @above {{element_tile = [1]}}
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
   // expected-remark @above {{element_tile = [1, 8]}}
-  [None, %indices1: vector<16xindex>, None], %cst0, %mask { indexed_maps = [
-                                             affine_map<(d0, d1, d2) -> (d1)>],
-    permutation_map = affine_map<(d0, d1, d2) -> (d1, d2)>,
-    in_bounds = [true, true] }
-  : memref<4096x512x8xf16>, vector<16x8xf16>
+  [%indices1 : vector<16xindex>], %cst0, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : memref<4096x512x8xf16>, vector<16x8xf16>, vector<16x8xi1>
   %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
 
   return %l_out : vector<16x8xf16>

@@ -117,128 +117,114 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
 }
 
 def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
-    DeclareOpInterfaceMethods<VectorTransferOpInterface>,
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
     DeclareOpInterfaceMethods<MaskableOpInterface>,
-    AttrSizedOperandSegments
+    AttrSizedOperandSegments,
+    TypesMatchWith<"padding type must match source element type",
+                   "base", "padding", "getElementTypeOrSelf($_self)">
   ]> {
   let arguments = (ins AnyShaped:$base,
-                       Variadic<Index>:$indices,
-                       Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
-                       BoolArrayAttr:$indexed,
-                       AffineMapArrayAttr:$indexed_maps,
-                       AffineMapAttr:$permutation_map,
+                       Variadic<Index>:$offsets,
+                       Variadic<AnyTypeOf<[Index, VectorOfAnyRankOf<[Index]>]>>:$index_vecs,
+                       AffineMapArrayAttr:$indexing_maps,
                        AnyType:$padding,
-                       Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
-                       BoolArrayAttr:$in_bounds);
+                       Optional<VectorOfAnyRankOf<[I1]>>:$mask);
   let results = (outs AnyVectorOfAnyRank:$vector);
 
-  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
+  let summary = [{Gathers a supervector from a shaped source into an SSA vector value.}];
 
   let description = [{
-    The iree_vector_ext.transfer_gather operation provides a structured
-    abstraction for gathers, by preserving the iteration space mapping between
-    the result vector and the memory dimensions being indexed.
+    The `transfer_gather` operation reads elements from a shaped source (memref
+    or tensor) into a vector, where each source dimension can be independently
+    contiguous, gathered, or broadcast.
 
-    The operation is a generalization of `vector.transfer_read` op, where the
-    slice from which the read is performed is not guranteed to be contiguous,
-    and instead how the slice is gathered is defined explicitly in the
-    operation.
-
-    The operation can be thought of as:
-      1. A contiguous slice gathered from the base as described by the operation
-      2. A `vector.transfer_read` on the contiguous slice
-
-    The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
-    the same way as `vector.transfer_read` defines, but on the inferred
-    contiguous slice.
-
-    The other parameters of the operation define how the contiguous slice is
-    gathered from the source. `indices` define a base to offset the source by.
-    `indexed` defines for each dimension if the dimension is gathered or
-    contiguous.
-
-    The `indices` contains a base to offset the source by. The `indexed` array
-    defines if a dimension is gathered or not. For example, for the following
-    gather:
+    Semantically, for each position in the result vector:
 
     ```
-    slice[i, j, k] = base[i + i_offset][j][indices[i][j][k]]
+    result[d0, d1, ...] = base[offsets[0] + f0(d, s), offsets[1] + f1(d, s), ...]
     ```
 
-    The operation would represent this as:
+    where each `fi` is the i-th result of the source indexing map evaluated at
+    the vector position `d = (d0, d1, ...)` and gathered index values
+    `s = (s0, s1, ...)`.
+
+    The `indexing_maps` attribute describes all indexing. Every map has
+    `numDims = result vector rank` and `numSymbols = number of index vecs`:
+
+    - Map 0 (source map): `(vector_dims)[symbols] -> (source_dims)`.
+      A dim expr means the source dimension is contiguous (iterated in
+      lockstep with the vector dimension). A symbol expr means the source
+      dimension is gathered (looked up via the corresponding index vector).
+      A constant 0 means the source dimension is broadcast (always reads
+      at the base offset).
+    - Maps 1..N (index vec maps): `(vector_dims)[symbols] -> (index_vec_dims)`.
+      Describes how each index vector is indexed from the vector iteration
+      space. Only dim exprs are allowed.
+    - Optional last map (mask map): present only when a mask operand is
+      provided. Only dim exprs are allowed.
+
+    Example — embedding lookup: reading rows from a 3D source where the row
+    index is gathered from an index vector, while the column is contiguous:
 
     ```
-    indices = %i_offset, 0, 0
-    indexed = [False, False, True]
+    // result[i, j] = base[0, indices[i], j]
+    %result = iree_vector_ext.transfer_gather %base[%c0, %c0, %c0]
+      [%indices : vector<16xindex>], %pad {
+        indexing_maps = [
+          affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
+          affine_map<(d0, d1)[s0] -> (d0)>
+        ]
+      } : memref<4096x512x8xf16>, vector<16x8xf16>
     ```
-
-    For every dimension that is gathered, the operation defines how it is
-    gathered. For each gathered dimension, the operation expects a vector of
-    indices in `index_vecs` to act as a source of indices for that dimension
-    and an AffineMap in `index_maps` describing how this source of indices is
-    indexed. For example, for the following gather:
-
-    ```
-    slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
-    ```
-
-    The indexing would be described by:
-
-    ```
-    indices      = 0, %offset, 0
-    indexed      = [False, True, True]
-    index_vecs   = %index_vec1, %index_vec2
-    index_maps = [
-      affine_map<(i, j, k) -> (i),
-      affine_map<(i, j, k) -> (j, k)
-    ]
-    ```
-
-    With these additional parameters, the operation can define a supervector
-    read from a non-contiguous slice. For example:
-
-    ```
-    base: memref<8192x8x16xf32>
-    indices0 : vector<2xindex>
-    indices1 : vector<4x8xindex>
-
-    slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
-    vector = read(slice) : memref<8192x8x16xf32> -> vector<16x8x2xf32>
-    ```
-
-    Can be represented by:
-
-    ```
-    %vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
-      gather_dims = [0, 2],
-      index_maps = [
-        affine_map<(i, j, k) -> (k)>,
-        affine_map<(i, j, k) -> (i, j)>
-      ],
-      in_bounds = [true, true, true],
-      permutation_map = affine_map<(i, j, k) -> (k, j, i)>
-    } : memref<8192x8x16xf32> -> vector<16x8x2xf32>
-    ```
-
-    The crucial structure of the operation relies on the index_vec and
-    the result vector's indexing being defined based on the dimensions of the
-    memory. This mapping can be exploited to simplify gathered dimensions
-    to contiguous dimensions.
   }];
 
   let extraClassDeclaration = [{
     // MaskableOpInterface methods.
     bool supportsPassthru() { return true; }
 
-    SmallVector<AffineMap> getIndexedMapsArray() {
-      return llvm::to_vector(getIndexedMaps().getAsValueRange<AffineMapAttr>());
+    SmallVector<AffineMap> getIndexingMapsArray() {
+      return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
+    }
+
+    AffineMap getSourceIndexingMap() {
+      return getIndexingMapsArray().front();
+    }
+
+    SmallVector<AffineMap> getIndexVecIndexingMaps() {
+      auto maps = getIndexingMapsArray();
+      return SmallVector<AffineMap>(
+          maps.begin() + 1, maps.begin() + 1 + getIndexVecs().size());
+    }
+
+    std::optional<AffineMap> getMaskIndexingMap() {
+      if (!getMask()) return std::nullopt;
+      return getIndexingMapsArray().back();
+    }
+
+    /// Invert the source indexing map to get a permutation map suitable for
+    /// vector.transfer_read. The source map is
+    /// (vector_dims)[symbols] -> (source_dims). This returns
+    /// (source_dims) -> (vector_dims), where non-dim results (gathered
+    /// symbols, broadcast constants) become constant 0.
+    AffineMap getPermutationMap() {
+      AffineMap sourceMap = getSourceIndexingMap();
+      MLIRContext *ctx = getContext();
+      SmallVector<AffineExpr> exprs(sourceMap.getNumDims(),
+                                    getAffineConstantExpr(0, ctx));
+      for (auto [i, expr] : llvm::enumerate(sourceMap.getResults())) {
+        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
+        }
+      }
+      return AffineMap::get(sourceMap.getNumResults(), /*symbolCount=*/0,
+                            exprs, ctx);
     }
   }];
 
+  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
+
   let hasCanonicalizer = 1;
-  let hasCustomAssemblyFormat = 1;
   let hasFolder = 1;
   let hasVerifier = 1;
 }
