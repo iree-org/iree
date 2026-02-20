@@ -67,6 +67,7 @@ iree_cc_library(
     "UserConfig.h"
   SRCS
     "AddFastMathFlags.cpp"
+    "AlignMemRefOps.cpp"
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"

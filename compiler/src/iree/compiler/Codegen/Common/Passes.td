@@ -303,6 +303,16 @@ def DecomposeMemrefsPass :
   let summary = "Decomposes memrefs";
 }
 
+def AlignMemRefOpsPass:
+    Pass<"iree-codegen-align-memref-ops", ""> {
+  let summary = "Aligns memref ops";
+
+  let dependentDialects = [
+      "memref::MemRefDialect"
+  ];
+}
+
+
 def DecomposeLinalgGenericPass :
     Pass<"iree-codegen-decompose-linalg-generic", ""> {
   let summary = "Decomposes linalg generic ops into individual ops";
