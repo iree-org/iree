@@ -40,8 +40,21 @@ struct VectorizeToLayoutOpPattern final
         toLayoutOp.getLayout().getUndistributedShape();
     Value mask = nullptr;
     if (!toLayoutOp.getType().hasStaticShape()) {
-      SmallVector<OpFoldResult> mixedSourceDims =
-          tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
+      Value input = toLayoutOp.getInput();
+      SmallVector<OpFoldResult> mixedSourceDims;
+      // Use reification if possible to reuse existing SSA values for the mask,
+      // to enable folding later on.
+      if (auto *defOp = input.getDefiningOp()) {
+        auto reified = reifyShapeOfResult(
+            rewriter, defOp, cast<OpResult>(input).getResultNumber());
+        if (succeeded(reified)) {
+          mixedSourceDims = std::move(*reified);
+        }
+      }
+      // Fallback in case reification fails.
+      if (mixedSourceDims.empty()) {
+        mixedSourceDims = tensor::getMixedSizes(rewriter, loc, input);
+      }
       auto maskType = VectorType::get(readShape, rewriter.getI1Type());
       mask = vector::CreateMaskOp::create(rewriter, loc, maskType,
                                           mixedSourceDims);
