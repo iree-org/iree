@@ -453,7 +453,9 @@ static iree_status_t iree_hal_hip_device_enable_peering(
 
     hip_error = symbols->hipDeviceEnablePeerAccess(j, 0);
     if (hip_error == hipErrorPeerAccessAlreadyEnabled) {
-      // Already peered. That's okay.
+      // Already peered. That's okay. Clear the sticky error so it doesn't
+      // affect subsequent HIP calls.
+      symbols->hipGetLastError();
       continue;
     } else if (hip_error != hipSuccess) {
       // Unhandled error, propagate it.
