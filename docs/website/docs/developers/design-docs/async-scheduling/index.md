@@ -5,6 +5,8 @@ for heterogeneous, multi-device, and multi-host scheduling. It is written for
 developers familiar with timeline semaphores (Vulkan) or fences (D3D12) and
 binary events (CUDA/HIP) who want to understand what frontiers add and why.
 
+<!-- markdownlint-disable MD013 -->
+
 <div class="visualizer-link" markdown>
 [Open interactive visualizer :material-open-in-new:](visualizer/){ .md-button target="_blank" }
 </div>
@@ -13,6 +15,8 @@ binary events (CUDA/HIP) who want to understand what frontiers add and why.
         style="width: 100%; height: 800px; border: 1px solid #e0e0e0; border-radius: 8px;"
         loading="lazy"
         title="Vector Clock & Frontier Explorer"></iframe>
+
+<!-- markdownlint-enable MD013 -->
 
 <script>
 // Sync the visualizer iframe theme with the mkdocs Material color scheme.

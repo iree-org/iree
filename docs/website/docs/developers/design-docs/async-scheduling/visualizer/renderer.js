@@ -3,13 +3,14 @@
 // Produces two coordinated views:
 //   1. DAG View — topological layout of the operation dependency graph.
 //      Nodes are operations, edges are semaphore wait/signal pairs.
-//   2. Execution Timeline — hardware lanes as rows, operations as bars over time.
+//   2. Execution Timeline — hardware lanes as rows, operations as bars over
+//   time.
 //      Shows WHERE and WHEN operations run on physical hardware.
 //
 // Both views update together when the tick changes: node/bar colors reflect
 // operation state, and a time cursor sweeps the timeline.
 
-import { computeDependencies, frontierToString } from './simulator.js';
+import {computeDependencies, frontierToString} from './simulator.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -22,10 +23,26 @@ export function readThemeColors() {
   const get = (name) => style.getPropertyValue(name).trim();
   return {
     state: {
-      pending:   { fill: get('--state-pending-fill'),   stroke: get('--state-pending-stroke'),   text: get('--state-pending-text') },
-      ready:     { fill: get('--state-ready-fill'),      stroke: get('--state-ready-stroke'),     text: get('--state-ready-text') },
-      in_flight: { fill: get('--state-in-flight-fill'),  stroke: get('--state-in-flight-stroke'), text: get('--state-in-flight-text') },
-      retired:   { fill: get('--state-retired-fill'),    stroke: get('--state-retired-stroke'),   text: get('--state-retired-text') },
+      pending: {
+        fill: get('--state-pending-fill'),
+        stroke: get('--state-pending-stroke'),
+        text: get('--state-pending-text')
+      },
+      ready: {
+        fill: get('--state-ready-fill'),
+        stroke: get('--state-ready-stroke'),
+        text: get('--state-ready-text')
+      },
+      in_flight: {
+        fill: get('--state-in-flight-fill'),
+        stroke: get('--state-in-flight-stroke'),
+        text: get('--state-in-flight-text')
+      },
+      retired: {
+        fill: get('--state-retired-fill'),
+        stroke: get('--state-retired-stroke'),
+        text: get('--state-retired-text')
+      },
     },
     arrow_sat: get('--arrow-sat'),
     arrow_unsat: get('--arrow-unsat'),
@@ -123,9 +140,8 @@ function buildDagSvg(scenario, deps, layers, state, theme) {
   }
 
   const num_layers = max_layer + 1;
-  const max_per_layer = Math.max(
-    ...Object.values(layer_groups).map(g => g.length)
-  );
+  const max_per_layer =
+      Math.max(...Object.values(layer_groups).map(g => g.length));
 
   const content_w = num_layers * DAG.LAYER_GAP;
   const content_h = max_per_layer * DAG.NODE_GAP;
@@ -155,9 +171,9 @@ function buildDagSvg(scenario, deps, layers, state, theme) {
   // Defs: arrowhead markers.
   const defs = el('defs');
   for (const [id, color] of [
-    ['dag-arrow-sat', theme.arrow_sat],
-    ['dag-arrow-unsat', theme.arrow_unsat],
-    ['dag-arrow-hl', theme.arrow_hl],
+           ['dag-arrow-sat', theme.arrow_sat],
+           ['dag-arrow-unsat', theme.arrow_unsat],
+           ['dag-arrow-hl', theme.arrow_hl],
   ]) {
     const marker = el('marker', {
       id,
@@ -224,14 +240,14 @@ function buildDagSvg(scenario, deps, layers, state, theme) {
     }));
 
     setup_edge_tooltip(hit, dep, scenario);
-    state.dag_edges.push({ path, dep });
+    state.dag_edges.push({path, dep});
   }
 
   // Draw nodes.
   state.dag_nodes = {};
   for (const op of scenario.operations) {
     const pos = positions[op.id];
-    const group = el('g', { cursor: 'pointer' });
+    const group = el('g', {cursor: 'pointer'});
 
     const rect = el('rect', {
       x: pos.x,
@@ -268,12 +284,13 @@ function buildDagSvg(scenario, deps, layers, state, theme) {
     }));
 
     svg.appendChild(group);
-    state.dag_nodes[op.id] = { rect, label, group };
+    state.dag_nodes[op.id] = {rect, label, group};
   }
 
   // Highlight group — sits above nodes so highlighted edges are fully visible
-  // even when the graph is dense. pointer-events: none lets clicks pass through.
-  const dag_hl_group = el('g', { 'pointer-events': 'none' });
+  // even when the graph is dense. pointer-events: none lets clicks pass
+  // through.
+  const dag_hl_group = el('g', {'pointer-events': 'none'});
   svg.appendChild(dag_hl_group);
   state.dag_hl_group = dag_hl_group;
 
@@ -305,14 +322,14 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
 
   // Adaptive tick width. Floor at 26px — below that, arrows become unreadable.
   // The container scrolls horizontally for wide timelines.
-  const tick_w =
-    max_tick <= 14 ? 50 :
-    max_tick <= 24 ? 42 :
-    max_tick <= 40 ? 34 :
-    26;
+  const tick_w = max_tick <= 14 ? 50 :
+      max_tick <= 24            ? 42 :
+      max_tick <= 40            ? 34 :
+                                  26;
 
   const svg_w = TL.LABEL_W + (max_tick + 1) * tick_w + TL.PAD;
-  const svg_h = TL.HEADER_H + num_lanes * (TL.LANE_H + TL.LANE_GAP) - TL.LANE_GAP + TL.PAD;
+  const svg_h = TL.HEADER_H + num_lanes * (TL.LANE_H + TL.LANE_GAP) -
+      TL.LANE_GAP + TL.PAD;
 
   const svg = el('svg', {
     width: svg_w,
@@ -323,7 +340,8 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
   const defs = el('defs');
   svg.appendChild(defs);
 
-  const lanes_bottom = TL.HEADER_H + num_lanes * (TL.LANE_H + TL.LANE_GAP) - TL.LANE_GAP;
+  const lanes_bottom =
+      TL.HEADER_H + num_lanes * (TL.LANE_H + TL.LANE_GAP) - TL.LANE_GAP;
 
   // Lane backgrounds.
   for (let i = 0; i < num_lanes; i++) {
@@ -375,7 +393,9 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
 
   // Build hardware index for Y positioning.
   const hw_index = {};
-  hw_lanes.forEach((hw, i) => { hw_index[hw.id] = i; });
+  hw_lanes.forEach((hw, i) => {
+    hw_index[hw.id] = i;
+  });
 
   // Inset for operation bars — scales with tick width for narrow scenarios.
   const OP_INSET = Math.min(16, Math.floor(tick_w * 0.3));
@@ -393,9 +413,11 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
 
     // Connect from right edge of source bar to left edge of target bar.
     const x1 = TL.LABEL_W + from_state.end_tick * tick_w - OP_INSET;
-    const y1 = TL.HEADER_H + from_lane * (TL.LANE_H + TL.LANE_GAP) + TL.LANE_H / 2;
+    const y1 =
+        TL.HEADER_H + from_lane * (TL.LANE_H + TL.LANE_GAP) + TL.LANE_H / 2;
     const x2 = TL.LABEL_W + to_state.start_tick * tick_w + OP_INSET;
-    const y2 = TL.HEADER_H + to_lane * (TL.LANE_H + TL.LANE_GAP) + TL.LANE_H / 2;
+    const y2 =
+        TL.HEADER_H + to_lane * (TL.LANE_H + TL.LANE_GAP) + TL.LANE_H / 2;
     const mx = (x1 + x2) / 2;
 
     const path_d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
@@ -408,14 +430,14 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
       'marker-end': 'url(#tl-arrow-unsat)',
     });
     svg.appendChild(path);
-    state.tl_edges.push({ path, dep });
+    state.tl_edges.push({path, dep});
   }
 
   // Arrow markers for timeline.
   for (const [id, color] of [
-    ['tl-arrow-sat', theme.arrow_sat],
-    ['tl-arrow-unsat', theme.arrow_unsat],
-    ['tl-arrow-hl', theme.arrow_hl],
+           ['tl-arrow-sat', theme.arrow_sat],
+           ['tl-arrow-unsat', theme.arrow_unsat],
+           ['tl-arrow-hl', theme.arrow_hl],
   ]) {
     const marker = el('marker', {
       id,
@@ -440,19 +462,22 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
 
     const lane = hw_index[op_state.assigned_lane];
     const x = TL.LABEL_W + op_state.start_tick * tick_w + OP_INSET;
-    const y = TL.HEADER_H + lane * (TL.LANE_H + TL.LANE_GAP) + (TL.LANE_H - TL.BAR_H) / 2;
+    const y = TL.HEADER_H + lane * (TL.LANE_H + TL.LANE_GAP) +
+        (TL.LANE_H - TL.BAR_H) / 2;
     const w = op.duration * tick_w - OP_INSET * 2;
 
-    const group = el('g', { cursor: 'pointer' });
+    const group = el('g', {cursor: 'pointer'});
 
     // Clip text to bar bounds.
     const clip_id = `clip-tl-${op.id}`;
-    const clip = el('clipPath', { id: clip_id });
-    clip.appendChild(el('rect', { x: x + 4, y, width: Math.max(0, w - 8), height: TL.BAR_H }));
+    const clip = el('clipPath', {id: clip_id});
+    clip.appendChild(
+        el('rect', {x: x + 4, y, width: Math.max(0, w - 8), height: TL.BAR_H}));
     defs.appendChild(clip);
 
     const rect = el('rect', {
-      x, y,
+      x,
+      y,
       width: w,
       height: TL.BAR_H,
       rx: 5,
@@ -476,13 +501,13 @@ function buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme) {
     group.appendChild(label);
 
     svg.appendChild(group);
-    state.tl_bars[op.id] = { rect, label, group };
+    state.tl_bars[op.id] = {rect, label, group};
 
     setup_op_tooltip(group, op, state, scenario);
   }
 
   // Highlight group — sits above bars so highlighted edges are fully visible.
-  const tl_hl_group = el('g', { 'pointer-events': 'none' });
+  const tl_hl_group = el('g', {'pointer-events': 'none'});
   svg.appendChild(tl_hl_group);
   state.tl_hl_group = tl_hl_group;
 
@@ -557,7 +582,7 @@ export function createRenderer(
       node.rect.setAttribute('opacity', '1');
       node.label.setAttribute('fill', retired_colors.text);
     }
-    for (const { path } of state.dag_edges) {
+    for (const {path} of state.dag_edges) {
       path.setAttribute('stroke', theme.arrow_sat);
       path.setAttribute('stroke-dasharray', 'none');
       path.setAttribute('marker-end', 'url(#dag-arrow-sat)');
@@ -566,7 +591,8 @@ export function createRenderer(
 
   const max_tick = snapshots.length - 1;
   const final_snapshot = snapshots[max_tick];
-  const tl_svg = buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme);
+  const tl_svg =
+      buildTimelineSvg(scenario, final_snapshot, max_tick, state, theme);
   timeline_container.appendChild(tl_svg);
 
   // Wire up hover-to-highlight for edges connected to each node/bar.
@@ -574,8 +600,9 @@ export function createRenderer(
   for (const op of dag_scenario.operations) {
     const node = state.dag_nodes[op.id];
     if (node) {
-      setupEdgeHighlight(node.group, op.id, dag_edge_map,
-        state.dag_hl_group, 'dag-arrow-hl', theme.arrow_hl);
+      setupEdgeHighlight(
+          node.group, op.id, dag_edge_map, state.dag_hl_group, 'dag-arrow-hl',
+          theme.arrow_hl);
     }
   }
 
@@ -583,8 +610,9 @@ export function createRenderer(
   for (const op of scenario.operations) {
     const bar = state.tl_bars[op.id];
     if (bar) {
-      setupEdgeHighlight(bar.group, op.id, tl_edge_map,
-        state.tl_hl_group, 'tl-arrow-hl', theme.arrow_hl);
+      setupEdgeHighlight(
+          bar.group, op.id, tl_edge_map, state.tl_hl_group, 'tl-arrow-hl',
+          theme.arrow_hl);
     }
   }
 
@@ -616,13 +644,15 @@ export function createRenderer(
         }
 
         // Update DAG edge styles.
-        for (const { path, dep } of state.dag_edges) {
+        for (const {path, dep} of state.dag_edges) {
           const from_state = snapshot.operations[dep.from].state;
           const satisfied = from_state === 'retired';
-          path.setAttribute('stroke', satisfied ? theme.arrow_sat : theme.arrow_unsat);
+          path.setAttribute(
+              'stroke', satisfied ? theme.arrow_sat : theme.arrow_unsat);
           path.setAttribute('stroke-dasharray', satisfied ? 'none' : '6,4');
-          path.setAttribute('marker-end',
-            satisfied ? 'url(#dag-arrow-sat)' : 'url(#dag-arrow-unsat)');
+          path.setAttribute(
+              'marker-end',
+              satisfied ? 'url(#dag-arrow-sat)' : 'url(#dag-arrow-unsat)');
         }
       }
 
@@ -649,13 +679,15 @@ export function createRenderer(
       }
 
       // Update timeline edge styles.
-      for (const { path, dep } of state.tl_edges) {
+      for (const {path, dep} of state.tl_edges) {
         const from_state = snapshot.operations[dep.from].state;
         const satisfied = from_state === 'retired';
-        path.setAttribute('stroke', satisfied ? theme.arrow_sat : theme.arrow_unsat);
+        path.setAttribute(
+            'stroke', satisfied ? theme.arrow_sat : theme.arrow_unsat);
         path.setAttribute('stroke-dasharray', satisfied ? 'none' : '6,4');
-        path.setAttribute('marker-end',
-          satisfied ? 'url(#tl-arrow-sat)' : 'url(#tl-arrow-unsat)');
+        path.setAttribute(
+            'marker-end',
+            satisfied ? 'url(#tl-arrow-sat)' : 'url(#tl-arrow-unsat)');
       }
 
       // Move timeline cursor.
@@ -687,7 +719,8 @@ function buildEdgeMap(edges) {
 // Attach hover handlers to a node/bar group that highlight connected edges.
 // On mouseenter, clones connected edge paths into the highlight group with
 // bright styling. On mouseleave, clears all clones.
-function setupEdgeHighlight(group, op_id, edge_map, hl_group, marker_id, hl_color) {
+function setupEdgeHighlight(
+    group, op_id, edge_map, hl_group, marker_id, hl_color) {
   const entries = edge_map[op_id];
   if (!entries || entries.length === 0) return;
 
@@ -749,17 +782,19 @@ function position_tooltip(tt, event) {
 function setup_op_tooltip(group, op, state, scenario) {
   group.addEventListener('mouseenter', (event) => {
     const tick = state.current_tick;
-    const snapshot = state.snapshots[Math.min(tick, state.snapshots.length - 1)];
+    const snapshot =
+        state.snapshots[Math.min(tick, state.snapshots.length - 1)];
     const op_snap = snapshot.operations[op.id];
 
     // Show the assigned lane if issued, otherwise the hardware type.
     const assigned = op_snap.assigned_lane;
-    const hw = assigned
-      ? scenario.hardware.find(h => h.id === assigned)
-      : scenario.hardware.find(h => h.id === op.hardware);
+    const hw = assigned ? scenario.hardware.find(h => h.id === assigned) :
+                          scenario.hardware.find(h => h.id === op.hardware);
     let html = `<strong>${op.label}</strong>`;
-    html += `<div class="tt-row">Hardware: ${hw ? hw.label : op.hardware}</div>`;
-    html += `<div class="tt-row">State: ${op_snap.state.replace('_', ' ')}</div>`;
+    html +=
+        `<div class="tt-row">Hardware: ${hw ? hw.label : op.hardware}</div>`;
+    html +=
+        `<div class="tt-row">State: ${op_snap.state.replace('_', ' ')}</div>`;
 
     if (op_snap.start_tick !== null) {
       html += `<div class="tt-row">Time: t=${op_snap.start_tick}`;
@@ -768,17 +803,20 @@ function setup_op_tooltip(group, op, state, scenario) {
     }
 
     if (Object.keys(op_snap.frontier).length > 0) {
-      html += `<div class="tt-row tt-frontier">Frontier: ${frontierToString(op_snap.frontier)}</div>`;
+      html += `<div class="tt-row tt-frontier">Frontier: ${
+          frontierToString(op_snap.frontier)}</div>`;
     }
 
     const waits = Object.entries(op.wait);
     if (waits.length > 0) {
-      html += `<div class="tt-row">Waits: ${waits.map(([s, v]) => `${s}\u2265${v}`).join(', ')}</div>`;
+      html += `<div class="tt-row">Waits: ${
+          waits.map(([s, v]) => `${s}\u2265${v}`).join(', ')}</div>`;
     }
 
     const signals = Object.entries(op.signal);
     if (signals.length > 0) {
-      html += `<div class="tt-row">Signals: ${signals.map(([s, v]) => `${s}\u2192${v}`).join(', ')}</div>`;
+      html += `<div class="tt-row">Signals: ${
+          signals.map(([s, v]) => `${s}\u2192${v}`).join(', ')}</div>`;
     }
 
     show_tooltip(html, event);
