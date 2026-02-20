@@ -23,9 +23,16 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
                      "dialect library). Accepts MLIR text (.mlir) and "
                      "bytecode (.mlirbc) formats."));
 
-  binder.opt<bool>("iree-config-add-tuner-attributes", setTunerAttributes,
+  binder.opt<bool>("iree-codegen-add-tuner-attributes", setTunerAttributes,
                    llvm::cl::cat(category),
                    llvm::cl::desc("Adds attribute for tuner."));
+
+  // Deprecated alias for the old spelling.
+  binder.opt<bool>(
+      "iree-config-add-tuner-attributes", setTunerAttributes,
+      Deprecated("use --iree-codegen-add-tuner-attributes instead"),
+      llvm::cl::Hidden, llvm::cl::desc("Adds attribute for tuner."),
+      llvm::cl::cat(category));
 }
 
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
