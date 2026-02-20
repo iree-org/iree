@@ -19,6 +19,13 @@
 #ifndef IREE_ASYNC_PLATFORM_POSIX_COMPAT_H_
 #define IREE_ASYNC_PLATFORM_POSIX_COMPAT_H_
 
+// accept4() requires _GNU_SOURCE for the glibc declaration. Callers should
+// define _GNU_SOURCE before their first system header; this is defense in depth
+// for cases where compat.h is included before sys/socket.h.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif  // _GNU_SOURCE
+
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
