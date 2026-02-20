@@ -345,14 +345,22 @@ TEST_P(BindListenErrorTest, Accept_NonListening) {
 // rather than causing hangs or silent failures.
 class ResetTest : public SocketTestBase<> {};
 
-// When a socket is closed with unread data in its receive buffer, the TCP stack
-// sends an RST to the peer. The peer should receive an error on subsequent
-// operations.
+// When a socket with unread data is closed with LINGER_ZERO, the TCP stack
+// sends an RST to the peer. The peer should receive an error on subsequent send
+// operations. LINGER_ZERO ensures the RST fires deterministically — without it,
+// some platforms (macOS XNU) may perform a graceful FIN close even with unread
+// data, and the RST from the FIN→data→RST round-trip may not propagate back
+// before small eager writes complete.
+//
+// Distinct from Reset_LingerZero which tests recv after RST; this tests send.
 TEST_P(ResetTest, Reset_CloseWithUnreadData) {
   iree_async_socket_t* client = nullptr;
   iree_async_socket_t* server = nullptr;
   iree_async_socket_t* listener = nullptr;
-  EstablishConnection(&client, &server, &listener);
+  EstablishConnectionWithOptions(
+      &client, &server, &listener,
+      IREE_ASYNC_SOCKET_OPTION_NO_DELAY | IREE_ASYNC_SOCKET_OPTION_LINGER_ZERO,
+      IREE_ASYNC_SOCKET_OPTION_NONE);
 
   // Server sends data to client.
   const char* message = "This data will not be read";
@@ -372,7 +380,7 @@ TEST_P(ResetTest, Reset_CloseWithUnreadData) {
             /*total_budget=*/iree_make_duration_ms(5000));
   IREE_ASSERT_OK(send_tracker.ConsumeStatus());
 
-  // Client closes WITHOUT reading the data. This should trigger an RST.
+  // Client closes WITHOUT reading the data. LINGER_ZERO causes immediate RST.
   iree_async_socket_release(client);
   client = nullptr;
 
@@ -383,7 +391,6 @@ TEST_P(ResetTest, Reset_CloseWithUnreadData) {
   iree_async_span_t more_span =
       iree_async_span_from_ptr((void*)more_data, strlen(more_data));
 
-  // Send multiple times to ensure we hit the error.
   bool got_error = false;
   for (int i = 0; i < 10 && !got_error; ++i) {
     iree_async_socket_send_operation_t send2_op;
@@ -410,7 +417,6 @@ TEST_P(ResetTest, Reset_CloseWithUnreadData) {
     }
   }
 
-  // We should have gotten an error at some point.
   EXPECT_TRUE(got_error) << "Expected error after peer closed with unread data";
 
   iree_async_socket_release(server);
