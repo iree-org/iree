@@ -886,8 +886,8 @@ func.func @ukernel_unpack_infer_vector_sizes(%lhs: tensor<1x8x16x1xf32>, %rhs: t
 // -----
 
 func.func @arg_compare_implicit_index(%input: tensor<4x128xf32>,
-                                       %out_val: tensor<4xf32>,
-                                       %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+                                      %out_val: tensor<4xf32>,
+                                      %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
   %result:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%input : tensor<4x128xf32>)
@@ -925,9 +925,9 @@ func.func @arg_compare_implicit_index(%input: tensor<4x128xf32>,
 // -----
 
 func.func @arg_compare_explicit_index(%partial_vals: tensor<4x32xf32>,
-                                       %partial_idxs: tensor<4x32xi32>,
-                                       %out_val: tensor<4xf32>,
-                                       %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+                                      %partial_idxs: tensor<4x32xi32>,
+                                      %out_val: tensor<4xf32>,
+                                      %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
   %result:2 = iree_linalg_ext.arg_compare
     dimension(1)
     ins(%partial_vals, %partial_idxs : tensor<4x32xf32>, tensor<4x32xi32>)
@@ -968,8 +968,8 @@ func.func @arg_compare_explicit_index(%partial_vals: tensor<4x32xf32>,
 // -----
 
 func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
-                                        %out_val: tensor<4xf32>,
-                                        %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
+                                       %out_val: tensor<4xf32>,
+                                       %out_idx: tensor<4xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
   %base = arith.constant 64 : index
   %result:2 = iree_linalg_ext.arg_compare
     dimension(1)
