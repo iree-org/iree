@@ -142,6 +142,17 @@ static iree_status_t iree_async_proactor_iocp_allocate_carrier(
   return iree_ok_status();
 }
 
+// Releases a carrier that was allocated but never successfully posted to IOCP.
+// Decrements the outstanding_carrier_count and frees the carrier memory.
+// This is the symmetric counterpart to allocate_carrier for error paths where
+// the overlapped I/O call fails synchronously (error != *_IO_PENDING).
+static void iree_async_proactor_iocp_release_carrier(
+    iree_async_proactor_iocp_t* proactor, iree_async_iocp_carrier_t* carrier) {
+  iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
+                        iree_memory_order_relaxed);
+  iree_allocator_free(proactor->base.allocator, carrier);
+}
+
 // Builds a WSABUF array from a span list. Returns the number of buffers.
 static DWORD iree_async_proactor_iocp_build_wsabuf(
     WSABUF* wsabuf, iree_async_span_list_t buffers) {
@@ -297,7 +308,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_accept(
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
       closesocket(accept_sock);
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &accept_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -436,7 +447,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_connect(
   if (!connected) {
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &connect_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -476,7 +487,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_recv(
   if (result == SOCKET_ERROR) {
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &recv_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -516,7 +527,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_send(
   if (result == SOCKET_ERROR) {
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &send_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -557,7 +568,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_sendto(
   if (result == SOCKET_ERROR) {
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &sendto_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -604,7 +615,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_recvfrom(
   if (result == SOCKET_ERROR) {
     int wsa_error = WSAGetLastError();
     if (wsa_error != WSA_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &recvfrom_op->base,
                                                    wsa_error);
       return iree_ok_status();
@@ -675,7 +686,7 @@ static iree_status_t iree_async_proactor_iocp_submit_socket_recv_pool(
       // Release pool lease here because the direct completion path has no
       // carrier-type-specific handling to do it.
       iree_async_buffer_lease_release(&recv_pool_op->lease);
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(
           proactor, &recv_pool_op->base, wsa_error);
       return iree_ok_status();
@@ -1141,7 +1152,7 @@ static iree_status_t iree_async_proactor_iocp_submit_file_read(
   if (!read_ok) {
     DWORD error = GetLastError();
     if (error != ERROR_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &read_op->base,
                                                    (int)error);
       return iree_ok_status();
@@ -1184,7 +1195,7 @@ static iree_status_t iree_async_proactor_iocp_submit_file_write(
   if (!write_ok) {
     DWORD error = GetLastError();
     if (error != ERROR_IO_PENDING) {
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_async_proactor_iocp_post_submit_failure(proactor, &write_op->base,
                                                    (int)error);
       return iree_ok_status();
