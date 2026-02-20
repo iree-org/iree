@@ -220,7 +220,6 @@ hal.executable private @attention_20x1x64x4096x64 {
     }
     builtin.module {
       func.func @attention_20x1x64x4096x64() attributes {translation_info = #translation} {
-        %cst = arith.constant 1.250000e-01 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x1x64xf16>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
@@ -233,14 +232,13 @@ hal.executable private @attention_20x1x64x4096x64 {
         %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>],
                      lowering_config = #config,
                      decomposition_config = {
                       qk_attrs = {lowering_config = #qk_config},
                       pv_attrs = {lowering_config = #pv_config}
                      }}
-                     ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x1x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x1x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x1x64xf16>
@@ -314,7 +312,6 @@ hal.executable private @attention_20x1x64x4096x64 {
     }
     builtin.module {
       func.func @attention_20x1x64x4096x64() attributes {translation_info = #translation} {
-        %cst = arith.constant 1.250000e-01 : f16
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x1x64xf16>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
@@ -327,14 +324,13 @@ hal.executable private @attention_20x1x64x4096x64 {
         %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>],
                      lowering_config = #config,
                      decomposition_config = {
                       qk_attrs = {lowering_config = #qk_config},
                       pv_attrs = {lowering_config = #pv_config}
                      }}
-                     ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x1x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x1x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x1x64xf16>
@@ -508,7 +504,6 @@ hal.executable private @attention_4xDx1x32x128xf16 {
     }
     builtin.module {
       func.func @attention_4xDx1x32x128xf16() attributes {translation_info = #translation} {
-        %cst = arith.constant 8.837890e-02 : f16
         %cst_0 = arith.constant 0.000000e+00 : f16
         %cst_1 = arith.constant 0xFC00 : f16
         %c32 = arith.constant 32 : index
@@ -556,12 +551,11 @@ hal.executable private @attention_4xDx1x32x128xf16 {
               affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
               affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
               affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
-              affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
               affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
               affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
             lowering_config = #attention_lowering_config
           }
-           ins(%11, %16, %17, %cst, %18 : tensor<4x1x1x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x?x1x32x128xf16>, f16, tensor<4x1x1x?x32xf16>)
+           ins(%11, %16, %17, %18 : tensor<4x1x1x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x1x1x?x32xf16>)
           outs(%12 : tensor<4x1x1x128xf16>) {
             ^bb0(%arg0: f32):
               iree_linalg_ext.yield %arg0 : f32

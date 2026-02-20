@@ -94,7 +94,6 @@ util.func public @attention_broadcast(
   %arg0 : tensor<32x16x?x128xf16>,
   %arg1 : tensor<4x?x8x128xf8E4M3FN>,
   %arg2 : tensor<4x?x8x128xf8E4M3FN>,
-  %arg3 : f16,
   %arg4 : tensor<32x16x?x?xf16>) -> (tensor<32x16x?x128xf16>) {
   %cst = arith.constant 1 : index
   %dim = tensor.dim %arg1, %cst : tensor<4x?x8x128xf8E4M3FN>
@@ -135,10 +134,9 @@ util.func public @attention_broadcast(
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>,
-      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]}
-    ins(%arg0, %k_collapse, %v_collapse, %arg3, %arg4 : tensor<32x16x?x128xf16>, tensor<32x16x?x128xf16>, tensor<32x16x128x?xf16>, f16, tensor<32x16x?x?xf16>)
+    ins(%arg0, %k_collapse, %v_collapse, %arg4 : tensor<32x16x?x128xf16>, tensor<32x16x?x128xf16>, tensor<32x16x128x?xf16>, tensor<32x16x?x?xf16>)
     outs(%empty4 : tensor<32x16x?x128xf16>) {
   ^bb0(%arg8: f32):
       iree_linalg_ext.yield %arg8 : f32
@@ -155,7 +153,7 @@ util.func public @attention_broadcast(
 //       CHECK:     %[[K:.+]] = linalg.generic
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]
 //       CHECK:     iree_linalg_ext.attention
-//  CHECK-SAME:       ins({{.*}}, %[[Q]], %[[K]], {{.*}} : tensor<4x8x?x128xf16>, tensor<4x?x8x128xf16>, tensor<4x?x8x128xf16>, f16, tensor<4x8x?x?xf16>)
+//  CHECK-SAME:       ins({{.*}}, %[[Q]], %[[K]], {{.*}} : tensor<4x8x?x128xf16>, tensor<4x?x8x128xf16>, tensor<4x?x8x128xf16>, tensor<4x8x?x?xf16>)
 
 // -----
 

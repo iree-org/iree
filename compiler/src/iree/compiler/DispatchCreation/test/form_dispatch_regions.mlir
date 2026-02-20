@@ -900,8 +900,6 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
   %false = arith.constant 0 : i1
   %true = arith.constant 1 : i1
 
-  %scale = arith.constant 1.0 : f16
-
   %mask_e = tensor.empty(%M, %K2) : tensor<?x?xi1>
   %out_e = tensor.empty(%M, %N) : tensor<?x?xf16>
 
@@ -919,11 +917,10 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
       affine_map<(M, N, K2, K1) -> (M, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, N)>,
-      affine_map<(M, N, K2, K1) -> ()>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
       affine_map<(M, N, K2, K1) -> (M, N)>
     ]
-  } ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+  } ins(%Q, %K, %V, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xi1>)
   outs(%out_e : tensor<?x?xf16>) {
   ^bb0(%score : f32):
       iree_linalg_ext.yield %score : f32
@@ -1265,8 +1262,8 @@ util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
 
 // Fuse rope computation only with query and not key/value
 util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
-    %arg1: tensor<10x20x40x50xbf16>, %arg2: tensor<10x20x40x50xbf16>,
-    %cst : bf16) -> tensor<10x20x30x40xbf16> {
+    %arg1: tensor<10x20x40x50xbf16>, %arg2: tensor<10x20x40x50xbf16>)
+    -> tensor<10x20x30x40xbf16> {
   %query_empty = tensor.empty() : tensor<10x20x30x50xbf16>
   %query = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
@@ -1311,10 +1308,9 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
-      ins(%query, %key, %value, %cst
-          : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
+      ins(%query, %key, %value
+          : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>)
       outs(%empty : tensor<10x20x30x40xbf16>) {
     ^bb0(%arg6: f32):
       iree_linalg_ext.yield %arg6 : f32

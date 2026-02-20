@@ -105,7 +105,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   OnlineAttentionOp onlineAttn = OnlineAttentionOp::create(
       rewriter, loc,
       TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
-      attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
+      attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(),
       mask, accFill, maxFill, sumFill,
       rewriter.getAffineMapArrayAttr(indexingMaps),
       attnOp.getDecompositionConfigAttr());

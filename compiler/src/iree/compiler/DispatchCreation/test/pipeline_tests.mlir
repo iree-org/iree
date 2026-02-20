@@ -153,7 +153,7 @@ util.func public @verify_operand_cse(%arg0: !hal.buffer_view, %arg1: !hal.buffer
 // -----
 
 util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
-    %arg2: tensor<4x8x4x?x128xf16>, %arg3: tensor<4x8x4x128x?xf16>, %arg4: f16,
+    %arg2: tensor<4x8x4x?x128xf16>, %arg3: tensor<4x8x4x128x?xf16>,
     %arg5: tensor<4x8x4x?x?xf16>, %arg6: tensor<4x?x32x128xf16>)
     -> tensor<4x8x4x?x128xf16> {
   %c2 = arith.constant 2 : index
@@ -201,12 +201,11 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d5)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6, d5)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d6)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d6)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>]}
-      ins(%expanded, %arg2, %arg3, %arg4, %arg5
+      ins(%expanded, %arg2, %arg3, %arg5
         : tensor<4x8x4x?x128xf16>, tensor<4x8x4x?x128xf16>,
-          tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x?xf16>)
+          tensor<4x8x4x128x?xf16>, tensor<4x8x4x?x?xf16>)
       outs(%3 : tensor<4x8x4x?x128xf16>) {
     ^bb0(%arg7: f32):
       iree_linalg_ext.yield %arg7 : f32

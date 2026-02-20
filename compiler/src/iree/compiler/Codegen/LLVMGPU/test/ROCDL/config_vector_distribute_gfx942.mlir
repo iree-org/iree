@@ -244,7 +244,6 @@ func.func @matmul_dynamic_dim() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_20x4096x64x4096x64() {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
@@ -257,9 +256,8 @@ func.func @attention_20x4096x64x4096x64() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x4096x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x4096x64xf16>
@@ -289,7 +287,6 @@ func.func @attention_20x4096x64x4096x64() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_20x4096x64x4096x64_f8() {
-  %cst = arith.constant 1.250000e-01 : f8E4M3FNUZ
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>>
@@ -302,9 +299,8 @@ func.func @attention_20x4096x64x4096x64_f8() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%7 : tensor<20x4096x64xf8E4M3FNUZ>) {
+                     ins(%4, %5, %6 : tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>) outs(%7 : tensor<20x4096x64xf8E4M3FNUZ>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x4096x64xf8E4M3FNUZ>
@@ -338,7 +334,6 @@ func.func @attention_20x4096x64x4096x64_f8() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_large_head_dim_shared_mem() {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x512xf16>>
@@ -351,9 +346,8 @@ func.func @attention_large_head_dim_shared_mem() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d1, d2, d3, d4) -> (d1, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d4)>,
-                     affine_map<(d1, d2, d3, d4) -> ()>,
                      affine_map<(d1, d2, d3, d4) -> (d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%7 : tensor<1024x512xf16>) {
+                     ins(%4, %5, %6 : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>) outs(%7 : tensor<1024x512xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<1024x512xf16>
@@ -383,7 +377,6 @@ func.func @attention_large_head_dim_shared_mem() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_20x64x4096x64_f8() {
-  %cst = arith.constant 1.250000e-01 : f8E4M3FNUZ
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x64xf8E4M3FNUZ>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>>
@@ -396,9 +389,8 @@ func.func @attention_20x64x4096x64_f8() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d2, d3, d4) -> (d0, d2)>,
                      affine_map<(d0, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d2, d3, d4) -> ()>,
                      affine_map<(d0, d2, d3, d4) -> (d0, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%7 : tensor<20x64xf8E4M3FNUZ>) {
+                     ins(%4, %5, %6 : tensor<20x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>) outs(%7 : tensor<20x64xf8E4M3FNUZ>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x64xf8E4M3FNUZ>
@@ -409,16 +401,14 @@ func.func @attention_20x64x4096x64_f8() {
 // -----
 
 func.func @attention_multi_m(%4 : tensor<20x256x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x256x16x64xf16> {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %7 = tensor.empty() : tensor<20x256x16x64xf16>
   %8 = iree_linalg_ext.attention  {indexing_maps = [
                      affine_map<(b, m0, m1, k1, k2, n) -> (b, m0, m1, k1)>,
                      affine_map<(b, m0, m1, k1, k2, n) -> (b, k2, k1)>,
                      affine_map<(b, m0, m1, k1, k2, n) -> (b, k2, n)>,
-                     affine_map<(b, m0, m1, k1, k2, n) -> ()>,
                      affine_map<(b, m0, m1, k1, k2, n) -> (b, m0, m1, n)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x256x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x256x16x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x256x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x256x16x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x256x16x64xf16>
@@ -438,7 +428,6 @@ func.func @attention_multi_m(%4 : tensor<20x256x16x64xf16>, %5 : tensor<20x4096x
 // -----
 
 func.func @attention_multi_m_dynamic(%4 : tensor<20x8x?x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x8x?x16x64xf16> {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %dim = tensor.dim %4, %c2 : tensor<20x8x?x16x64xf16>
@@ -447,9 +436,8 @@ func.func @attention_multi_m_dynamic(%4 : tensor<20x8x?x16x64xf16>, %5 : tensor<
                      affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, k1)>,
                      affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, k1)>,
                      affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, n)>,
-                     affine_map<(b, m0, m1, m2, k1, k2, n) -> ()>,
                      affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, n)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x8x?x16x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x8x?x16x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x8x?x16x64xf16>

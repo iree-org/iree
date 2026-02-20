@@ -46,6 +46,7 @@ iree_cc_library(
     ::PassesIncGen
     MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRTensorDialect

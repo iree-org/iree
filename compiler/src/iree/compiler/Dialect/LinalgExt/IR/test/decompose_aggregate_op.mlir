@@ -78,7 +78,6 @@ module attributes { transform.with_named_sequence } {
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
-#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
@@ -87,11 +86,10 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
                          %value: tensor<192x1024x64xf16>,
                          %output: tensor<192x1024x64xf32>)
                          -> (tensor<192x1024x64xf32>) {
-  %scale = arith.constant 1.0 : f16
 
   %out = iree_linalg_ext.attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO] }
-        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapO] }
+        ins(%query, %key, %value : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>)
         outs(%output : tensor<192x1024x64xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -103,9 +101,6 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 
 // We just want to check if we are using the correct algorithm
 // CHECK-LABEL: @attention_f16
-// Q = Q * scale
-// CHECK: linalg.generic
-// CHECK:   arith.mulf
 // S = Q @ K
 // CHECK: linalg.generic
 // CHECK:   arith.extf
@@ -161,7 +156,6 @@ module attributes { transform.with_named_sequence } {
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
-#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
@@ -172,11 +166,10 @@ func.func @online_attention_f16(%query: tensor<192x1024x64xf16>,
                          %max: tensor<192x1024xf32>,
                          %sum: tensor<192x1024xf32>)
                          -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
-  %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
-        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -189,10 +182,6 @@ func.func @online_attention_f16(%query: tensor<192x1024x64xf16>,
 // We just want to check if we are using the correct algorithm and the
 // correct number of extf/truncfs are emitted.
 // CHECK-LABEL: @online_attention_f16
-// Q = Q * scale
-// CHECK: arith.constant 1.442380e+00 : f16
-// CHECK: linalg.generic
-// CHECK:   arith.mulf
 // S = Q @ K
 // CHECK: linalg.generic
 // CHECK:   arith.extf
@@ -254,7 +243,6 @@ module attributes { transform.with_named_sequence } {
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
-#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
@@ -265,11 +253,10 @@ func.func @online_attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
                          %max: tensor<192x1024xf32>,
                          %sum: tensor<192x1024xf32>)
                          -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
-  %scale = arith.constant 1.0 : f32
 
   %out:3 = iree_linalg_ext.online_attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
-        ins(%query, %key, %value, %scale : tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, f32)
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value : tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -287,11 +274,6 @@ func.func @online_attention_f8(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// S = S * scale
-// CHECK:   linalg.generic
-// CHECK-NOT: arith.extf
-// CHECK:   arith.mulf
-// CHECK-NEXT:   linalg.yield
 // S = S + F8_linear_offset
 // CHECK:   linalg.generic
 // CHECK-NOT: arith.extf
@@ -356,7 +338,6 @@ module attributes { transform.with_named_sequence } {
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
-#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapM = affine_map<(batch, m, k1, k2, n) -> (batch, m, k2)>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
@@ -369,11 +350,10 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
                               %max: tensor<192x1024xf32>,
                               %sum: tensor<192x1024xf32>)
                               -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
-  %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR] }
-        ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, f16, tensor<192x1024x1024xf8E4M3FNUZ>)
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapM, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value, %mask : tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x64xf8E4M3FNUZ>, tensor<192x1024x1024xf8E4M3FNUZ>)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -390,10 +370,8 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// S = S * scale
-// CHECK:   linalg.generic
-// CHECK:   arith.mulf
 // S = S + mask
+// CHECK:   linalg.generic
 // CHECK:   arith.addf
 // newMax = max(oldMax, rowMax(S))
 // CHECK: linalg.generic
@@ -432,7 +410,6 @@ module attributes { transform.with_named_sequence } {
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
-#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
@@ -443,11 +420,10 @@ func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
                          %max: tensor<192x1024xf32>,
                          %sum: tensor<192x1024xf32>)
                          -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
-  %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
-        {decomposition_config = {use_exp2=false}, indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
-        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        {decomposition_config = {use_exp2=false}, indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR] }
+        ins(%query, %key, %value : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -460,10 +436,6 @@ func.func @online_attention_f16_noexp2(%query: tensor<192x1024x64xf16>,
 // We want to check that we're correctly using exp
 // when specified so from the decomposition_config.
 // CHECK-LABEL: @online_attention_f16_noexp2
-// Q = Q * scale
-// CHECK: arith.constant 1.000000e+00 : f16
-// CHECK: linalg.generic
-// CHECK:   arith.mulf
 // norm = exp (oldMax - newMax)
 // CHECK: linalg.generic
 // CHECK:   arith.subf
