@@ -2238,6 +2238,11 @@ struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
   }
 };
 
+/// Distributes an iree_codegen.inner_tiled operation to a distributed
+/// iree_codegen.inner_tiled operation with distributed semantics.
+///
+/// The pattern assumes that the inputs have the correct layouts and distributes
+/// the operations according to the operation intrinsic and semantics.
 struct DistributeInnerTiled final
     : OpDistributionPattern<IREE::Codegen::InnerTiledOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -2248,13 +2253,23 @@ struct DistributeInnerTiled final
     if (tiledOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(tiledOp, "requires vector semantics");
     }
+    auto semantics =
+        dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+    if (!semantics) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "expected GPU inner tiled semantics");
+    }
+    if (semantics.getDistributed()) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "already distributed inner tiled op");
+    }
 
     Location loc = tiledOp.getLoc();
     MLIRContext *ctx = tiledOp.getContext();
 
     // Get layouts, distributed forms, and unpacked forms for all inputs.
     SmallVector<Value> unpackedInputs;
-    for (auto input : tiledOp.getInputs()) {
+    for (Value input : tiledOp.getInputs()) {
       auto vec = dyn_cast<VectorValue>(input);
       if (!vec) {
         return rewriter.notifyMatchFailure(tiledOp,
@@ -2262,8 +2277,8 @@ struct DistributeInnerTiled final
       }
       auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
       if (!layout) {
-        return rewriter.notifyMatchFailure(
-            tiledOp, "missing nested layout for input");
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for input");
       }
       VectorValue dist = getDistributed(rewriter, vec, layout);
       unpackedInputs.push_back(
@@ -2273,7 +2288,7 @@ struct DistributeInnerTiled final
     // Get layouts, distributed forms, and unpacked forms for all outputs.
     SmallVector<Value> unpackedOutputs;
     SmallVector<NestedLayoutAttr> resultLayouts;
-    for (auto output : tiledOp.getOutputs()) {
+    for (Value output : tiledOp.getOutputs()) {
       auto vec = dyn_cast<VectorValue>(output);
       if (!vec) {
         return rewriter.notifyMatchFailure(tiledOp,
@@ -2281,8 +2296,8 @@ struct DistributeInnerTiled final
       }
       auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
       if (!layout) {
-        return rewriter.notifyMatchFailure(
-            tiledOp, "missing nested layout for output");
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for output");
       }
       VectorValue dist = getDistributed(rewriter, vec, layout);
       unpackedOutputs.push_back(
@@ -2290,7 +2305,7 @@ struct DistributeInnerTiled final
     }
 
     // Collect result layouts.
-    for (auto result : tiledOp->getResults()) {
+    for (Value result : tiledOp->getResults()) {
       auto vec = dyn_cast<VectorValue>(result);
       if (!vec) {
         return rewriter.notifyMatchFailure(tiledOp,
@@ -2298,21 +2313,15 @@ struct DistributeInnerTiled final
       }
       auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
       if (!layout) {
-        return rewriter.notifyMatchFailure(
-            tiledOp, "missing nested layout for result");
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for result");
       }
       resultLayouts.push_back(layout);
     }
 
     // Create distributed inner_tiled op.
-    auto oldSemantics = dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(
-        tiledOp.getSemantics());
-    if (!oldSemantics) {
-      return rewriter.notifyMatchFailure(
-          tiledOp, "expected GPU inner tiled semantics");
-    }
     auto newSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
-        ctx, /*distributed=*/true, oldSemantics.getOpaque());
+        ctx, /*distributed=*/true, semantics.getOpaque());
 
     auto newOp = IREE::Codegen::InnerTiledOp::create(
         rewriter, loc, unpackedInputs, unpackedOutputs,
