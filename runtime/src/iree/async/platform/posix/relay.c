@@ -368,9 +368,13 @@ void iree_async_proactor_posix_dispatch_relay(
     short revents) {
   bool should_fire = true;
 
-  // Check ERROR_SENSITIVE flag: suppress sink on error conditions without data.
+  // Check ERROR_SENSITIVE flag: suppress sink on error/hangup conditions.
+  // On Linux epoll, pipe close delivers POLLERR|POLLHUP without POLLIN, but
+  // on macOS kqueue, EVFILT_READ+EV_EOF translates to POLLIN|POLLHUP (the fd
+  // is technically readable — returning EOF). We suppress on any POLLERR or
+  // POLLHUP regardless of POLLIN because the connection is dead either way.
   if (relay->flags & IREE_ASYNC_RELAY_FLAG_ERROR_SENSITIVE) {
-    if ((revents & (POLLERR | POLLHUP)) && !(revents & POLLIN)) {
+    if (revents & (POLLERR | POLLHUP)) {
       should_fire = false;
     }
   }

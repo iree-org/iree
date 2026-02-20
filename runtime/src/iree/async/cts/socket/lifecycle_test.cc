@@ -403,10 +403,8 @@ TEST_P(SocketTest, StickyFailure_ReleaseAfterError) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &client));
 
-  // Trigger failure via connect to unreachable port.
-  iree_async_address_t address;
-  IREE_ASSERT_OK(iree_async_address_from_ipv4(
-      iree_make_cstring_view("127.0.0.1"), 1, &address));
+  // Trigger failure via connect to a port with no listener.
+  iree_async_address_t address = CreateRefusedAddress();
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker tracker;
@@ -604,11 +602,8 @@ TEST_P(SocketTest, ConnectRefused) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &client));
 
-  // Try to connect to a port that should have nothing listening.
-  // Port 1 is typically privileged and not listening.
-  iree_async_address_t address;
-  IREE_ASSERT_OK(iree_async_address_from_ipv4(
-      iree_make_cstring_view("127.0.0.1"), 1, &address));
+  // Connect to a port with no listener — should fail with ECONNREFUSED.
+  iree_async_address_t address = CreateRefusedAddress();
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker connect_tracker;
@@ -622,16 +617,9 @@ TEST_P(SocketTest, ConnectRefused) {
             /*total_budget=*/iree_make_duration_ms(5000));
 
   EXPECT_EQ(connect_tracker.call_count, 1);
-  // Should be either PERMISSION_DENIED (EACCES) or UNAVAILABLE (ECONNREFUSED).
-  {
-    iree_status_t status = connect_tracker.ConsumeStatus();
-    if (!iree_status_is_permission_denied(status) &&
-        !iree_status_is_unavailable(status)) {
-      IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE, status);
-    } else {
-      iree_status_ignore(status);
-    }
-  }
+  // Should be UNAVAILABLE (ECONNREFUSED).
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
+                        connect_tracker.ConsumeStatus());
 
   iree_async_socket_release(client);
 }
