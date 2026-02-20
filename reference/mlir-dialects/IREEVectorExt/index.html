@@ -5246,82 +5246,51 @@ distributed vectors.</p>
 </tbody>
 </table>
 <h3 id="iree_vector_exttransfer_gather-vectorexttransfergatherop"><code>iree_vector_ext.transfer_gather</code> (VectorExt::TransferGatherOp)<a class="headerlink" href="#iree_vector_exttransfer_gather-vectorexttransfergatherop" title="Permanent link">link</a></h3>
-<p><em>Gathers a supervector from memory into an SSA vector value.</em></p>
-<p>The iree_vector_ext.transfer_gather operation provides a structured
-abstraction for gathers, by preserving the iteration space mapping between
-the result vector and the memory dimensions being indexed.</p>
-<p>The operation is a generalization of <code>vector.transfer_read</code> op, where the
-slice from which the read is performed is not guranteed to be contiguous,
-and instead how the slice is gathered is defined explicitly in the
-operation.</p>
-<p>The operation can be thought of as:
-  1. A contiguous slice gathered from the base as described by the operation
-  2. A <code>vector.transfer_read</code> on the contiguous slice</p>
-<p>The operation defines <code>permutation_map</code>, <code>padding</code>, <code>mask</code>, <code>in_bounds</code> in
-the same way as <code>vector.transfer_read</code> defines, but on the inferred
-contiguous slice.</p>
-<p>The other parameters of the operation define how the contiguous slice is
-gathered from the source. <code>indices</code> define a base to offset the source by.
-<code>indexed</code> defines for each dimension if the dimension is gathered or
-contiguous.</p>
-<p>The <code>indices</code> contains a base to offset the source by. The <code>indexed</code> array
-defines if a dimension is gathered or not. For example, for the following
-gather:</p>
-<div class="highlight"><pre><span></span><code>slice[i, j, k] = base[i + i_offset][j][indices[i][j][k]]
+<p><em>Gathers a supervector from a shaped source into an SSA vector value.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.transfer_gather` $base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?
 </code></pre></div>
-<p>The operation would represent this as:</p>
-<div class="highlight"><pre><span></span><code>indices = %i_offset, 0, 0
-indexed = [False, False, True]
+<p>The <code>transfer_gather</code> operation reads elements from a shaped source (memref
+or tensor) into a vector, where each source dimension can be independently
+contiguous, gathered, or broadcast.</p>
+<p>Semantically, for each position in the result vector:</p>
+<div class="highlight"><pre><span></span><code>result[d0, d1, ...] = base[offsets[0] + f0(d, s), offsets[1] + f1(d, s), ...]
 </code></pre></div>
-<p>For every dimension that is gathered, the operation defines how it is
-gathered. For each gathered dimension, the operation expects a vector of
-indices in <code>index_vecs</code> to act as a source of indices for that dimension
-and an AffineMap in <code>index_maps</code> describing how this source of indices is
-indexed. For example, for the following gather:</p>
-<div class="highlight"><pre><span></span><code>slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
+<p>where each <code>fi</code> is the i-th result of the source indexing map evaluated at
+the vector position <code>d = (d0, d1, ...)</code> and gathered index values
+<code>s = (s0, s1, ...)</code>.</p>
+<p>The <code>indexing_maps</code> attribute describes all indexing. Every map has
+<code>numDims = result vector rank</code> and <code>numSymbols = number of index vecs</code>:</p>
+<ul>
+<li>Map 0 (source map): <code>(vector_dims)[symbols] -&gt; (source_dims)</code>.
+  A dim expr means the source dimension is contiguous (iterated in
+  lockstep with the vector dimension). A symbol expr means the source
+  dimension is gathered (looked up via the corresponding index vector).
+  A constant 0 means the source dimension is broadcast (always reads
+  at the base offset).</li>
+<li>Maps 1..N (index vec maps): <code>(vector_dims)[symbols] -&gt; (index_vec_dims)</code>.
+  Describes how each index vector is indexed from the vector iteration
+  space. Only dim exprs are allowed.</li>
+<li>Optional last map (mask map): present only when a mask operand is
+  provided. Only dim exprs are allowed.</li>
+</ul>
+<p>Example — embedding lookup: reading rows from a 3D source where the row
+index is gathered from an index vector, while the column is contiguous:</p>
+<div class="highlight"><pre><span></span><code>// result[i, j] = base[0, indices[i], j]
+%result = iree_vector_ext.transfer_gather %base[%c0, %c0, %c0]
+  [%indices : vector&lt;16xindex&gt;], %pad {
+    indexing_maps = [
+      affine_map&lt;(d0, d1)[s0] -&gt; (0, s0, d1)&gt;,
+      affine_map&lt;(d0, d1)[s0] -&gt; (d0)&gt;
+    ]
+  } : memref&lt;4096x512x8xf16&gt;, vector&lt;16x8xf16&gt;
 </code></pre></div>
-<p>The indexing would be described by:</p>
-<div class="highlight"><pre><span></span><code>indices      = 0, %offset, 0
-indexed      = [False, True, True]
-index_vecs   = %index_vec1, %index_vec2
-index_maps = [
-  affine_map&lt;(i, j, k) -&gt; (i),
-  affine_map&lt;(i, j, k) -&gt; (j, k)
-]
-</code></pre></div>
-<p>With these additional parameters, the operation can define a supervector
-read from a non-contiguous slice. For example:</p>
-<div class="highlight"><pre><span></span><code>base: memref&lt;8192x8x16xf32&gt;
-indices0 : vector&lt;2xindex&gt;
-indices1 : vector&lt;4x8xindex&gt;
-
-slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
-vector = read(slice) : memref&lt;8192x8x16xf32&gt; -&gt; vector&lt;16x8x2xf32&gt;
-</code></pre></div>
-<p>Can be represented by:</p>
-<div class="highlight"><pre><span></span><code>%vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
-  gather_dims = [0, 2],
-  index_maps = [
-    affine_map&lt;(i, j, k) -&gt; (k)&gt;,
-    affine_map&lt;(i, j, k) -&gt; (i, j)&gt;
-  ],
-  in_bounds = [true, true, true],
-  permutation_map = affine_map&lt;(i, j, k) -&gt; (k, j, i)&gt;
-} : memref&lt;8192x8x16xf32&gt; -&gt; vector&lt;16x8x2xf32&gt;
-</code></pre></div>
-<p>The crucial structure of the operation relies on the index_vec and
-the result vector's indexing being defined based on the dimensions of the
-memory. This mapping can be exploited to simplify gathered dimensions
-to contiguous dimensions.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MaskableOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>VectorTransferOpInterface</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MaskableOpInterface</code>, <code>MemoryEffectOpInterface</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>indexed</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
-<tr><td><code>indexed_maps</code></td><td>::mlir::ArrayAttr</td><td>AffineMap array attribute</td></tr>
-<tr><td><code>permutation_map</code></td><td>::mlir::AffineMapAttr</td><td>AffineMap attribute</td></tr>
-<tr><td><code>in_bounds</code></td><td>::mlir::ArrayAttr</td><td>1-bit boolean array attribute</td></tr>
+<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>AffineMap array attribute</td></tr>
 </table>
 
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
@@ -5338,12 +5307,12 @@ to contiguous dimensions.</p>
 <td>shaped of any type values</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>indices</code></td>
+<td style="text-align: center;"><code>offsets</code></td>
 <td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>index_vecs</code></td>
-<td>variadic of vector of index values</td>
+<td>variadic of index or vector of index values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>padding</code></td>
