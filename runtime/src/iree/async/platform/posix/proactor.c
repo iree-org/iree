@@ -1293,10 +1293,12 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
     }
 
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SEND: {
-      // Sends are executed eagerly during submit to consume data buffers
-      // before the caller's stack frame may be invalidated. This matches
-      // io_uring's contract where the kernel reads data during the submit
-      // syscall. The operation completes immediately with the write result.
+      // Eager send: attempt writev during submit as a latency optimization.
+      // When the socket buffer has space, data is consumed immediately
+      // without a poll-thread round-trip. On EAGAIN (buffer full, zero bytes
+      // consumed), defer to the poll loop for POLLOUT-driven retry, matching
+      // io_uring's internal async-poll behavior. Buffer data remains valid
+      // until the completion callback (async contract).
       iree_async_socket_send_operation_t* send_op =
           (iree_async_socket_send_operation_t*)operation;
       iree_async_proactor_posix_materialize_iovecs(
@@ -1305,8 +1307,8 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
       iree_status_t send_status =
           iree_async_proactor_posix_execute_send(send_op, &send_result);
       if (send_result == IREE_ASYNC_IO_WOULD_BLOCK) {
-        send_status = iree_make_status(IREE_STATUS_UNAVAILABLE,
-                                       "socket send buffer is full");
+        iree_async_proactor_posix_push_pending(proactor, operation);
+        return iree_ok_status();
       }
       if (!iree_status_is_ok(send_status)) {
         iree_async_socket_set_failure(send_op->socket, send_status);
@@ -1326,7 +1328,8 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
     }
 
     case IREE_ASYNC_OPERATION_TYPE_SOCKET_SENDTO: {
-      // Eager execution like SOCKET_SEND (see comment above).
+      // Eager sendto: same latency optimization as SOCKET_SEND above.
+      // On EAGAIN, defer to poll loop for POLLOUT-driven retry.
       iree_async_socket_sendto_operation_t* sendto_op =
           (iree_async_socket_sendto_operation_t*)operation;
       iree_async_proactor_posix_materialize_iovecs(
@@ -1335,8 +1338,8 @@ static iree_status_t iree_async_proactor_posix_submit_operation(
       iree_status_t sendto_status =
           iree_async_proactor_posix_execute_sendto(sendto_op, &sendto_result);
       if (sendto_result == IREE_ASYNC_IO_WOULD_BLOCK) {
-        sendto_status = iree_make_status(IREE_STATUS_UNAVAILABLE,
-                                         "socket send buffer is full");
+        iree_async_proactor_posix_push_pending(proactor, operation);
+        return iree_ok_status();
       }
       if (!iree_status_is_ok(sendto_status)) {
         iree_async_socket_set_failure(sendto_op->socket, sendto_status);
