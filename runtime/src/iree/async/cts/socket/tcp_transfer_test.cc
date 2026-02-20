@@ -8,6 +8,12 @@
 
 #include <cstring>
 
+#if defined(_WIN32)
+#include <winsock2.h>
+#else
+#include <sys/socket.h>
+#endif
+
 #include "iree/async/cts/util/registry.h"
 #include "iree/async/cts/util/socket_test_base.h"
 #include "iree/async/operations/net.h"
@@ -134,13 +140,17 @@ class LargeTransferTest : public SocketTestBase<> {
   }
 };
 
-// Send 1MB of data and verify all bytes received correctly.
+// Send 1MB of data with concurrent recv to prevent TCP flow control deadlock.
+//
+// Sends and recvs are interleaved: each iteration submits a send for remaining
+// data and a recv (if none is in flight), then polls until at least one
+// completes. This prevents deadlock when the send buffer fills and sends defer
+// to the poll loop for POLLOUT — without a concurrent recv draining the
+// receiver, the TCP window closes and POLLOUT never fires.
 TEST_P(LargeTransferTest, LargeTransfer_1MB) {
-  // Create a listener.
   iree_async_address_t listen_address;
   iree_async_socket_t* listener = CreateListener(&listen_address);
 
-  // Submit accept operation.
   iree_async_socket_accept_operation_t accept_op;
   CompletionTracker accept_tracker;
   InitAcceptOperation(&accept_op, listener, CompletionTracker::Callback,
@@ -148,7 +158,6 @@ TEST_P(LargeTransferTest, LargeTransfer_1MB) {
 
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &accept_op.base));
 
-  // Create client with TCP_NODELAY to avoid Nagle delays.
   iree_async_socket_t* client = nullptr;
   IREE_ASSERT_OK(iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
                                           IREE_ASYNC_SOCKET_OPTION_NO_DELAY,
@@ -161,7 +170,6 @@ TEST_P(LargeTransferTest, LargeTransfer_1MB) {
 
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
 
-  // Poll until connect and accept complete.
   PollUntil(/*min_completions=*/2,
             /*total_budget=*/iree_make_duration_ms(5000));
 
@@ -173,29 +181,162 @@ TEST_P(LargeTransferTest, LargeTransfer_1MB) {
 
   iree_async_socket_t* server = accept_op.accepted_socket;
 
-  // Verify no sticky failures on either socket before data transfer.
   IREE_ASSERT_OK(iree_async_socket_query_failure(client));
   IREE_ASSERT_OK(iree_async_socket_query_failure(server));
 
-  // Allocate 1MB send and receive buffers.
   static constexpr iree_host_size_t kTransferSize = 1024 * 1024;  // 1MB
+  std::vector<uint8_t> send_buffer(kTransferSize);
+  std::vector<uint8_t> recv_buffer(kTransferSize, 0);
+
+  FillPattern(send_buffer.data(), kTransferSize);
+
+  iree_host_size_t total_sent = 0;
+  iree_host_size_t total_received = 0;
+
+  // Operations and trackers are declared outside the loop because deferred
+  // operations (EAGAIN → push_pending) remain registered in the proactor's
+  // fd_map until their completion callback fires. Stack-local operations that
+  // go out of scope while still registered produce dangling pointers and
+  // corrupt the fd_map's operation chain.
+  iree_async_socket_recv_operation_t recv_op;
+  CompletionTracker recv_tracker;
+  bool recv_in_flight = false;
+  iree_async_socket_send_operation_t send_op;
+  CompletionTracker send_tracker;
+  bool send_in_flight = false;
+
+  while (total_sent < kTransferSize || total_received < kTransferSize) {
+    // Submit a recv if none is in flight and we haven't received everything.
+    if (!recv_in_flight && total_received < kTransferSize) {
+      iree_async_span_t recv_span = iree_async_span_from_ptr(
+          recv_buffer.data() + total_received, kTransferSize - total_received);
+      recv_tracker.Reset();
+      InitRecvOperation(&recv_op, server, &recv_span, 1,
+                        CompletionTracker::Callback, &recv_tracker);
+      IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &recv_op.base));
+      recv_in_flight = true;
+    }
+
+    // Submit a send if none is in flight and we haven't sent everything.
+    if (!send_in_flight && total_sent < kTransferSize) {
+      iree_async_span_t send_span = iree_async_span_from_ptr(
+          (void*)(send_buffer.data() + total_sent), kTransferSize - total_sent);
+      send_tracker.Reset();
+      InitSendOperation(&send_op, client, &send_span, 1,
+                        IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
+                        CompletionTracker::Callback, &send_tracker);
+      IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
+      send_in_flight = true;
+    }
+
+    // Poll until at least one operation completes.
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(30000));
+
+    // Process send completion.
+    if (send_in_flight && send_tracker.call_count > 0) {
+      send_in_flight = false;
+      IREE_ASSERT_OK(send_tracker.ConsumeStatus());
+      ASSERT_GT(send_op.bytes_sent, static_cast<iree_host_size_t>(0))
+          << "writev returned 0 bytes at offset " << total_sent;
+      total_sent += send_op.bytes_sent;
+    }
+
+    // Process recv completion.
+    if (recv_in_flight && recv_tracker.call_count > 0) {
+      recv_in_flight = false;
+      IREE_ASSERT_OK(recv_tracker.ConsumeStatus());
+      ASSERT_GT(recv_op.bytes_received, static_cast<iree_host_size_t>(0))
+          << "readv returned 0 bytes (EOF) at offset " << total_received;
+      total_received += recv_op.bytes_received;
+    }
+  }
+
+  ASSERT_EQ(total_sent, kTransferSize) << "Failed to send all data";
+  ASSERT_EQ(total_received, kTransferSize) << "Failed to receive all data";
+
+  EXPECT_TRUE(VerifyPattern(recv_buffer.data(), kTransferSize))
+      << "Data corruption detected in received buffer";
+
+  iree_async_socket_release(server);
+  iree_async_socket_release(client);
+  iree_async_socket_release(listener);
+}
+
+// Verify that sends complete when the socket send buffer is artificially small.
+// Sets SO_SNDBUF to the minimum (kernel rounds up to its floor, typically ~2KB
+// on Linux) and sends 64KB. On POSIX, the eager writev during submit hits
+// EAGAIN when the small buffer fills; the proactor defers to the poll loop for
+// POLLOUT-driven retry. On io_uring, the kernel handles this internally. On
+// IOCP, WSASend is inherently async. All backends must deliver the data.
+TEST_P(LargeTransferTest, LargeTransfer_SmallSendBuffer) {
+  iree_async_address_t listen_address;
+  iree_async_socket_t* listener = CreateListener(&listen_address);
+
+  iree_async_socket_accept_operation_t accept_op;
+  CompletionTracker accept_tracker;
+  InitAcceptOperation(&accept_op, listener, CompletionTracker::Callback,
+                      &accept_tracker);
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &accept_op.base));
+
+  iree_async_socket_t* client = nullptr;
+  IREE_ASSERT_OK(iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
+                                          IREE_ASYNC_SOCKET_OPTION_NO_DELAY,
+                                          &client));
+
+  // Shrink the send buffer to the platform minimum. The kernel rounds up: on
+  // Linux the minimum is ~2304 bytes (SOCK_MIN_SNDBUF), on macOS it varies.
+  // This ensures that a 64KB send cannot complete in a single writev.
+  int send_buffer_size = 1;
+#if defined(_WIN32)
+  ASSERT_EQ(
+      setsockopt(reinterpret_cast<SOCKET>(client->primitive.value.win32_handle),
+                 SOL_SOCKET, SO_SNDBUF,
+                 reinterpret_cast<const char*>(&send_buffer_size),
+                 sizeof(send_buffer_size)),
+      0)
+      << "setsockopt SO_SNDBUF failed";
+#else
+  ASSERT_EQ(setsockopt(client->primitive.value.fd, SOL_SOCKET, SO_SNDBUF,
+                       &send_buffer_size, sizeof(send_buffer_size)),
+            0)
+      << "setsockopt SO_SNDBUF failed: errno=" << errno;
+#endif
+
+  iree_async_socket_connect_operation_t connect_op;
+  CompletionTracker connect_tracker;
+  InitConnectOperation(&connect_op, client, listen_address,
+                       CompletionTracker::Callback, &connect_tracker);
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
+
+  PollUntil(/*min_completions=*/2,
+            /*total_budget=*/iree_make_duration_ms(5000));
+
+  ASSERT_EQ(accept_tracker.call_count, 1);
+  IREE_ASSERT_OK(accept_tracker.ConsumeStatus());
+  ASSERT_EQ(connect_tracker.call_count, 1);
+  IREE_ASSERT_OK(connect_tracker.ConsumeStatus());
+  ASSERT_NE(accept_op.accepted_socket, nullptr);
+
+  iree_async_socket_t* server = accept_op.accepted_socket;
+
+  // 64KB is large enough to exceed any platform's minimum SO_SNDBUF.
+  static constexpr iree_host_size_t kTransferSize = 64 * 1024;
   std::vector<uint8_t> send_buffer(kTransferSize);
   std::vector<uint8_t> recv_buffer(kTransferSize);
 
-  // Fill send buffer with pattern.
   FillPattern(send_buffer.data(), kTransferSize);
 
-  // Send all data from client.
   iree_host_size_t bytes_sent =
       SendAll(client, send_buffer.data(), kTransferSize);
   ASSERT_EQ(bytes_sent, kTransferSize) << "Failed to send all data";
 
-  // Receive all data on server.
   iree_host_size_t bytes_received =
       RecvAll(server, recv_buffer.data(), kTransferSize);
   ASSERT_EQ(bytes_received, kTransferSize) << "Failed to receive all data";
 
-  // Verify pattern matches.
   EXPECT_TRUE(VerifyPattern(recv_buffer.data(), kTransferSize))
       << "Data corruption detected in received buffer";
 
@@ -206,11 +347,10 @@ TEST_P(LargeTransferTest, LargeTransfer_1MB) {
 
 // Send data in multiple smaller chunks, receive all in one stream.
 //
-// Sends and recvs are interleaved: for each chunk, submit a send and a recv
-// for remaining data, then poll. This prevents TCP flow control deadlock on
-// completion-based backends (IOCP) where overlapped WSASend defers completion
-// until the kernel send buffer has space. Without a concurrent recv draining
-// the receiver, the TCP window closes after ~200KB and sends stall.
+// Sends and recvs are interleaved with in-flight tracking. Each send is limited
+// to kChunkSize bytes, exercising the proactor's ability to handle many smaller
+// operations. Concurrent recvs prevent TCP flow control deadlock when the send
+// buffer fills and sends defer to the poll loop for POLLOUT-driven retry.
 TEST_P(LargeTransferTest, LargeTransfer_Chunked) {
   iree_async_address_t listen_address;
   iree_async_socket_t* listener = CreateListener(&listen_address);
@@ -245,83 +385,78 @@ TEST_P(LargeTransferTest, LargeTransfer_Chunked) {
 
   static constexpr iree_host_size_t kTotalSize = 256 * 1024;
   static constexpr iree_host_size_t kChunkSize = 16 * 1024;
-  static constexpr int kNumChunks = kTotalSize / kChunkSize;
 
   std::vector<uint8_t> send_buffer(kTotalSize);
   std::vector<uint8_t> recv_buffer(kTotalSize, 0);
 
   FillPattern(send_buffer.data(), kTotalSize);
 
-  // Send chunks and receive concurrently. For each send chunk, also submit a
-  // recv for remaining data and poll until at least the send completes. Recv
-  // completions may also fire, which is fine — the recv tracker tracks
-  // progress independently.
   iree_host_size_t total_sent = 0;
   iree_host_size_t total_received = 0;
-  bool recv_in_flight = false;
+
+  // Operations and trackers are declared outside the loop because deferred
+  // operations (EAGAIN -> push_pending) remain registered in the proactor's
+  // fd_map until their completion callback fires. Stack-local operations that
+  // go out of scope while still registered produce dangling pointers and
+  // corrupt the fd_map's operation chain.
   iree_async_socket_recv_operation_t recv_op;
   CompletionTracker recv_tracker;
+  bool recv_in_flight = false;
+  iree_async_socket_send_operation_t send_op;
+  CompletionTracker send_tracker;
+  bool send_in_flight = false;
 
-  for (int chunk = 0; chunk < kNumChunks; ++chunk) {
+  while (total_sent < kTotalSize || total_received < kTotalSize) {
     // Submit a recv if none is in flight and we haven't received everything.
     if (!recv_in_flight && total_received < kTotalSize) {
       iree_async_span_t recv_span = iree_async_span_from_ptr(
           recv_buffer.data() + total_received, kTotalSize - total_received);
+      recv_tracker.Reset();
       InitRecvOperation(&recv_op, server, &recv_span, 1,
                         CompletionTracker::Callback, &recv_tracker);
       IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &recv_op.base));
       recv_in_flight = true;
     }
 
-    // Submit this chunk's send.
-    iree_host_size_t chunk_offset = chunk * kChunkSize;
-    iree_async_span_t send_span =
-        iree_async_span_from_ptr(send_buffer.data() + chunk_offset, kChunkSize);
-    iree_async_socket_send_operation_t send_op;
-    CompletionTracker send_tracker;
-    InitSendOperation(&send_op, client, &send_span, 1,
-                      IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
-                      CompletionTracker::Callback, &send_tracker);
-    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
-
-    // Poll until the send completes. Recv completions may also fire here.
-    while (send_tracker.call_count == 0) {
-      PollUntil(/*min_completions=*/1,
-                /*total_budget=*/iree_make_duration_ms(30000));
+    // Submit a send if none is in flight, limiting each operation to
+    // kChunkSize bytes to exercise many smaller send operations.
+    if (!send_in_flight && total_sent < kTotalSize) {
+      iree_host_size_t send_size =
+          std::min(kChunkSize, kTotalSize - total_sent);
+      iree_async_span_t send_span = iree_async_span_from_ptr(
+          (void*)(send_buffer.data() + total_sent), send_size);
+      send_tracker.Reset();
+      InitSendOperation(&send_op, client, &send_span, 1,
+                        IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
+                        CompletionTracker::Callback, &send_tracker);
+      IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
+      send_in_flight = true;
     }
-    IREE_ASSERT_OK(send_tracker.ConsumeStatus());
-    ASSERT_EQ(send_op.bytes_sent, kChunkSize)
-        << "Failed to send chunk " << chunk;
-    total_sent += send_op.bytes_sent;
 
-    // Check if the recv completed during the poll.
+    // Poll until at least one operation completes.
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(30000));
+
+    // Process send completion.
+    if (send_in_flight && send_tracker.call_count > 0) {
+      send_in_flight = false;
+      IREE_ASSERT_OK(send_tracker.ConsumeStatus());
+      ASSERT_GT(send_op.bytes_sent, static_cast<iree_host_size_t>(0))
+          << "writev returned 0 bytes at offset " << total_sent;
+      total_sent += send_op.bytes_sent;
+    }
+
+    // Process recv completion.
     if (recv_in_flight && recv_tracker.call_count > 0) {
-      IREE_ASSERT_OK(recv_tracker.ConsumeStatus());
-      total_received += recv_op.bytes_received;
       recv_in_flight = false;
+      IREE_ASSERT_OK(recv_tracker.ConsumeStatus());
+      ASSERT_GT(recv_op.bytes_received, static_cast<iree_host_size_t>(0))
+          << "readv returned 0 bytes (EOF) at offset " << total_received;
+      total_received += recv_op.bytes_received;
     }
   }
-  ASSERT_EQ(total_sent, kTotalSize);
 
-  // Drain any in-flight recv.
-  if (recv_in_flight) {
-    while (recv_tracker.call_count == 0) {
-      PollUntil(/*min_completions=*/1,
-                /*total_budget=*/iree_make_duration_ms(30000));
-    }
-    IREE_ASSERT_OK(recv_tracker.ConsumeStatus());
-    total_received += recv_op.bytes_received;
-    recv_in_flight = false;
-  }
-
-  // Receive any remaining data.
-  if (total_received < kTotalSize) {
-    iree_host_size_t remaining =
-        RecvAll(server, recv_buffer.data() + total_received,
-                kTotalSize - total_received);
-    total_received += remaining;
-  }
-
+  ASSERT_EQ(total_sent, kTotalSize) << "Failed to send all data";
   ASSERT_EQ(total_received, kTotalSize) << "Failed to receive all data";
 
   // Verify pattern matches.
