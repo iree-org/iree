@@ -301,6 +301,12 @@ function(iree_llvm_add_external_project name location)
     endif()
   endif()
 
+  # Disable PCH for external projects (llvm/llvm-project@b82c7fc65229).
+  # External projects live in a separate binary dir from LLVM, so CMake cannot
+  # resolve the LLVMSupport PCH path for targets that try to reuse it.
+  # Function scope ensures this doesn't affect LLVM/MLIR's own PCH.
+  set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
+
   add_subdirectory(${location} "llvm-external-projects/${name}" EXCLUDE_FROM_ALL)
 endfunction()
 
