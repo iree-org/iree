@@ -13,6 +13,26 @@ include "mlir/Pass/PassBase.td"
 // ROCDL Passes (keep alphabetical)
 //===----------------------------------------------------------------------===//
 
+def ROCDLAddLDSAliasScopesPass : Pass<
+    "iree-rocdl-add-lds-alias-scopes", "ModuleOp"> {
+  let summary = "Add alias scope metadata to ROCDL LoadToLDS operations";
+  let description = [{
+    Attaches LLVM alias scope metadata to ROCDL::LoadToLDSOp operations so the
+    LLVM backend can distinguish between different LDS buffers used in
+    multi-buffered pipelining.
+
+    Without alias scopes, SIInsertWaitcnts conservatively inserts
+    s_waitcnt vmcnt(0) before every LDS read that might alias with a prior
+    LoadToLDS. With alias scopes, the backend knows that LoadToLDS ops to
+    different buffers don't alias, eliminating redundant vmcnt(0) and enabling
+    overlap between global-to-LDS loads and LDS reads.
+  }];
+  let dependentDialects = [
+    "LLVM::LLVMDialect",
+    "ROCDL::ROCDLDialect"
+  ];
+}
+
 def ROCDLAnnotateKernelForTranslationPass : Pass<
     "iree-rocdl-annotate-kernel-for-translation", "LLVM::LLVMFuncOp"> {
   let summary = "Set function attributes before translating to LLVM IR";

@@ -90,6 +90,7 @@ iree_cc_library(
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
+    "ROCDLAddLDSAliasScopes.cpp"
     "ROCDLAnnotateKernelForTranslation.cpp"
     "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
