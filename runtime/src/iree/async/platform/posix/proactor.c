@@ -2234,7 +2234,13 @@ static void iree_async_proactor_posix_process_operation_chain(
     short op_events = iree_async_operation_type_to_poll_events(current->type);
 
     // Skip operations whose events haven't fired.
-    if (!(revents & op_events)) {
+    // POLLERR and POLLHUP are always delivered by poll() regardless of the
+    // requested event mask. When either is set, all pending operations on the
+    // fd must be attempted so their I/O syscalls can report the actual error
+    // (e.g., getsockopt(SO_ERROR) for connect, EPIPE from writev for send).
+    // Without this, macOS can deliver POLLERR alone for a connection-refused
+    // and the connect handler would never fire.
+    if (!(revents & (op_events | POLLERR | POLLHUP))) {
       prev = current;
       current = next;
       continue;
