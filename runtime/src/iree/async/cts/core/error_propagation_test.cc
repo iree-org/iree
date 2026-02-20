@@ -295,10 +295,7 @@ TEST_P(ErrorPropagationTest, ConnectFailureCarriesCorrectStatus) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &socket));
 
-  // Connect to localhost port 1 (privileged, almost certainly not listening).
-  iree_async_address_t address;
-  IREE_ASSERT_OK(iree_async_address_from_ipv4(
-      iree_make_cstring_view("127.0.0.1"), 1, &address));
+  iree_async_address_t address = CreateRefusedAddress();
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker tracker;
@@ -394,10 +391,7 @@ TEST_P(ErrorPropagationTest, ConnectFailurePropagatesThroughLinkedChain) {
                                           IREE_ASYNC_SOCKET_OPTION_NONE,
                                           &socket));
 
-  // Connect to localhost port 1 (privileged, no listener).
-  iree_async_address_t address;
-  IREE_ASSERT_OK(iree_async_address_from_ipv4(
-      iree_make_cstring_view("127.0.0.1"), 1, &address));
+  iree_async_address_t address = CreateRefusedAddress();
 
   iree_async_socket_connect_operation_t connect_op;
   CompletionTracker connect_tracker;

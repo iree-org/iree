@@ -531,11 +531,8 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
                                           IREE_ASYNC_SOCKET_OPTION_NO_DELAY,
                                           &client));
 
-  // Connect to localhost port 1 - nothing should be listening there and
-  // it's a privileged port, so we should get ECONNREFUSED immediately.
-  iree_async_address_t bad_address;
-  IREE_ASSERT_OK(iree_async_address_from_ipv4(
-      iree_make_cstring_view("127.0.0.1"), 1, &bad_address));
+  // Connect to a port with no listener — should get ECONNREFUSED.
+  iree_async_address_t bad_address = CreateRefusedAddress();
 
   CompletionTracker connect_tracker, send_tracker;
 

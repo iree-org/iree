@@ -54,6 +54,22 @@ class SocketTestBase : public CtsTestBase<BaseType> {
     return listener;
   }
 
+  // Returns a loopback address where nothing is listening, guaranteed to
+  // produce ECONNREFUSED on any platform. Works by binding a listener to an
+  // ephemeral port, recording the address, then closing the listener. The
+  // kernel knows this port was just in LISTEN state and sends RST immediately.
+  //
+  // This is portable across firewalls, macOS stealth mode, Docker/bwrap
+  // sandboxes, and FreeBSD tcp.blackhole — environments where connecting to a
+  // hardcoded well-known port (like port 1) may silently drop SYN packets
+  // instead of sending RST, causing the connect to hang.
+  iree_async_address_t CreateRefusedAddress() {
+    iree_async_address_t address;
+    iree_async_socket_t* listener = CreateListener(&address);
+    iree_async_socket_release(listener);
+    return address;
+  }
+
   // Establishes a connected client/server pair via loopback.
   // Creates a listener, submits accept+connect, and polls until both complete.
   // Caller must release all three sockets when done.
