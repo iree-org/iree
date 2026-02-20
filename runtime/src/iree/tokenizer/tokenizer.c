@@ -2633,15 +2633,13 @@ iree_status_t iree_tokenizer_encode_state_feed(
   // buffer is smaller than max_token_length (configuration error).
   if (iree_status_is_ok(status) && chunk.size > 0 && *out_bytes_consumed == 0 &&
       total_tokens == 0) {
-    iree_host_size_t logical_capacity = state->capacity_mask + 1;
-    iree_host_size_t used = state->write_position - state->read_position;
     return iree_make_status(
         IREE_STATUS_INTERNAL,
         "encode deadlock: no progress despite partial segment handling "
         "(logical_capacity=%" PRIhsz " bytes, used=%" PRIhsz
         " bytes, pending_input=%" PRIhsz " bytes, has_partial=%" PRIu32 ")",
-        logical_capacity, used, chunk.size,
-        (uint32_t)state->has_partial_segment);
+        state->capacity_mask + 1, state->write_position - state->read_position,
+        chunk.size, (uint32_t)state->has_partial_segment);
   }
 
   return status;
