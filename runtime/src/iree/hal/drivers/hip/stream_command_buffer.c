@@ -7,6 +7,7 @@
 
 #include "iree/hal/drivers/hip/stream_command_buffer.h"
 
+
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/native_executable.h"
 #include "iree/hal/drivers/hip/rccl_channel.h"
@@ -657,76 +658,115 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     //
     // For now, we pass via HIP_LAUNCH_PARAM_BUFFER and hope alignment is OK.
     // TODO: Add proper alignment handling or use void** kernelParams.
+    // Build void** kernelParams from the parameter metadata.
+    // This is safer than HIP_LAUNCH_PARAM_BUFFER because the HIP runtime
+    // handles argument packing/alignment itself.
+    void** kernel_params_ptrs = NULL;
     size_t kernarg_size = constants.data_length;
+    
+    // Pre-packed dispatches (e.g., hipBLASLt GEMM) have hidden params embedded
+    // in the constants buffer - they MUST use HIP_LAUNCH_PARAM_BUFFER (extra[]).
+    // Non-pre-packed dispatches (hipLaunchKernel) use void** kernelParams so 
+    // the HIP runtime can inject hidden parameters automatically.
+    #define IREE_HAL_DISPATCH_FLAG_PRE_PACKED_BUFFER (1ull << 16)
+    bool is_pre_packed = (flags & IREE_HAL_DISPATCH_FLAG_PRE_PACKED_BUFFER) != 0;
+    
+    // For pre-packed kernels, the kernarg buffer MUST be 256-byte aligned.
+    // The deferred command buffer arena may not provide sufficient alignment.
+    // Allocate an aligned copy on the stack if needed.
+    void* kernarg_buf = (void*)constants.data;
+    if (is_pre_packed && (((uintptr_t)constants.data) % 256) != 0) {
+      void* raw = iree_alloca(constants.data_length + 256);
+      kernarg_buf = (void*)(((uintptr_t)raw + 255) & ~(uintptr_t)255);
+      memcpy(kernarg_buf, constants.data, constants.data_length);
+    }
+    
     void* extra[] = {
-        HIP_LAUNCH_PARAM_BUFFER_POINTER, (void*)constants.data,
+        HIP_LAUNCH_PARAM_BUFFER_POINTER, kernarg_buf,
         HIP_LAUNCH_PARAM_BUFFER_SIZE, &kernarg_size,
         HIP_LAUNCH_PARAM_END,
     };
-#if 0  // Debug output disabled
-    // Sync to catch any async errors from previous kernels
-    command_buffer->hip_symbols->hipStreamSynchronize(command_buffer->hip_stream);
-    fprintf(stderr, "[IREE_HIP_DISPATCH] DIRECT function=%p '%.*s' grid=(%u,%u,%u) block=(%u,%u,%u) stream=%p kernarg=%p size=%zu\n",
-            (void*)kernel_params->function,
-            (int)kernel_params->function_name.size, 
-            kernel_params->function_name.data,
+    
+    bool use_kernel_params_ptrs = !is_pre_packed &&
+                                    (kernel_params->parameters != NULL && 
+                                    kernel_params->parameter_count > 0);
+    if (use_kernel_params_ptrs) {
+      kernel_params_ptrs = (void**)iree_alloca(
+          kernel_params->parameter_count * sizeof(void*));
+      for (iree_host_size_t i = 0; i < kernel_params->parameter_count; ++i) {
+        kernel_params_ptrs[i] = (uint8_t*)constants.data + 
+                                kernel_params->parameters[i].buffer_offset;
+      }
+    }
+
+    // Debug dispatch logging (disabled for performance)
+#if 0
+    static int dispatch_count = 0;
+    ++dispatch_count;
+    fprintf(stderr, "[IREE_HIP_DISPATCH] #%d '%.*s' pre_packed=%d grid=(%u,%u,%u) block=(%u,%u,%u)\n",
+            dispatch_count,
+            (int)kernel_params->function_name.size, kernel_params->function_name.data,
+            (int)is_pre_packed,
             config.workgroup_count[0], config.workgroup_count[1], config.workgroup_count[2],
             config.workgroup_size[0] ? config.workgroup_size[0] : kernel_params->block_dims[0],
             config.workgroup_size[1] ? config.workgroup_size[1] : kernel_params->block_dims[1],
-            config.workgroup_size[2] ? config.workgroup_size[2] : kernel_params->block_dims[2],
-            (void*)command_buffer->hip_stream,
-            constants.data, constants.data_length);
-    // Dump first few pointer-sized values
-    if (constants.data) {
-      void** ptrs = (void**)constants.data;
-      fprintf(stderr, "[IREE_HIP_DISPATCH]   args:");
-      for (size_t i = 0; i < 8 && (i * sizeof(void*)) < constants.data_length; ++i) {
-        fprintf(stderr, " %p", ptrs[i]);
-      }
-      fprintf(stderr, "\n");
-      // Hexdump for debugging
-      fprintf(stderr, "[IREE_HIP_DISPATCH]   hex:");
-      const uint8_t* bytes = (const uint8_t*)constants.data;
-      for (size_t i = 0; i < 64 && i < constants.data_length; ++i) {
-        fprintf(stderr, " %02x", bytes[i]);
-      }
-      fprintf(stderr, "\n");
-    }
+            config.workgroup_size[2] ? config.workgroup_size[2] : kernel_params->block_dims[2]);
 #endif
-    status = IREE_HIP_CALL_TO_STATUS(
-        command_buffer->hip_symbols,
-        hipModuleLaunchKernel(
-            kernel_params->function, config.workgroup_count[0],
-            config.workgroup_count[1], config.workgroup_count[2],
-            config.workgroup_size[0] ? config.workgroup_size[0]
-                                     : kernel_params->block_dims[0],
-            config.workgroup_size[1] ? config.workgroup_size[1]
-                                     : kernel_params->block_dims[1],
-            config.workgroup_size[2] ? config.workgroup_size[2]
-                                     : kernel_params->block_dims[2],
-            config.dynamic_workgroup_local_memory, command_buffer->hip_stream,
-            NULL, extra),
-        "hipModuleLaunchKernel(direct)");
+    hipStream_t launch_stream = command_buffer->hip_stream;
+    if (use_kernel_params_ptrs) {
+      status = IREE_HIP_CALL_TO_STATUS(
+          command_buffer->hip_symbols,
+          hipModuleLaunchKernel(
+              kernel_params->function, config.workgroup_count[0],
+              config.workgroup_count[1], config.workgroup_count[2],
+              config.workgroup_size[0] ? config.workgroup_size[0]
+                                       : kernel_params->block_dims[0],
+              config.workgroup_size[1] ? config.workgroup_size[1]
+                                       : kernel_params->block_dims[1],
+              config.workgroup_size[2] ? config.workgroup_size[2]
+                                       : kernel_params->block_dims[2],
+              config.dynamic_workgroup_local_memory, launch_stream,
+              kernel_params_ptrs, NULL),
+          "hipModuleLaunchKernel(kernelParams)");
+    } else if (is_pre_packed && command_buffer->hip_symbols->hipExtModuleLaunchKernel) {
+      // Pre-packed dispatches MUST use hipExtModuleLaunchKernel, not
+      // hipModuleLaunchKernel. The two APIs differ in how they handle
+      // AQL packet generation for pre-packed kernarg buffers.
+      // hipModuleLaunchKernel produces incorrect results for split-K
+      // GEMM kernels from hipBLASLt.
+      status = IREE_HIP_CALL_TO_STATUS(
+          command_buffer->hip_symbols,
+          hipExtModuleLaunchKernel(
+              kernel_params->function, config.workgroup_count[0],
+              config.workgroup_count[1], config.workgroup_count[2],
+              config.workgroup_size[0] ? config.workgroup_size[0]
+                                       : kernel_params->block_dims[0],
+              config.workgroup_size[1] ? config.workgroup_size[1]
+                                       : kernel_params->block_dims[1],
+              config.workgroup_size[2] ? config.workgroup_size[2]
+                                       : kernel_params->block_dims[2],
+              config.dynamic_workgroup_local_memory, launch_stream,
+              NULL, extra,
+              NULL, NULL,  // startEvent, stopEvent
+              0),          // flags
+          "hipExtModuleLaunchKernel(extra)");
+    } else {
+      status = IREE_HIP_CALL_TO_STATUS(
+          command_buffer->hip_symbols,
+          hipModuleLaunchKernel(
+              kernel_params->function, config.workgroup_count[0],
+              config.workgroup_count[1], config.workgroup_count[2],
+              config.workgroup_size[0] ? config.workgroup_size[0]
+                                       : kernel_params->block_dims[0],
+              config.workgroup_size[1] ? config.workgroup_size[1]
+                                       : kernel_params->block_dims[1],
+              config.workgroup_size[2] ? config.workgroup_size[2]
+                                       : kernel_params->block_dims[2],
+              config.dynamic_workgroup_local_memory, launch_stream,
+              NULL, extra),
+          "hipModuleLaunchKernel(extra)");
+    }
   } else {
-#if 0  // Debug output disabled
-    fprintf(stderr, "[IREE_HIP_DISPATCH] BINDINGS function=%p grid=(%u,%u,%u) block=(%u,%u,%u) stream=%p bindings=%zu constants=%zu\n",
-            (void*)kernel_params->function,
-            config.workgroup_count[0], config.workgroup_count[1], config.workgroup_count[2],
-            config.workgroup_size[0] ? config.workgroup_size[0] : kernel_params->block_dims[0],
-            config.workgroup_size[1] ? config.workgroup_size[1] : kernel_params->block_dims[1],
-            config.workgroup_size[2] ? config.workgroup_size[2] : kernel_params->block_dims[2],
-            (void*)command_buffer->hip_stream,
-            bindings.count, constants.data_length);
-    // Dump first few pointer-sized values from storage_base
-    if (storage_base) {
-      void** ptrs = (void**)storage_base;
-      fprintf(stderr, "[IREE_HIP_DISPATCH]   args:");
-      for (size_t i = 0; i < 8 && i < kernel_params->parameter_count; ++i) {
-        fprintf(stderr, " %p", ptrs[i]);
-      }
-      fprintf(stderr, "\n");
-    }
-#endif
     status = IREE_HIP_CALL_TO_STATUS(
         command_buffer->hip_symbols,
         hipModuleLaunchKernel(
@@ -742,19 +782,6 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
             (void**)storage_base, NULL),
         "hipModuleLaunchKernel");
   }
-  
-  (void)status;  // Silence unused warning if debugging disabled
-#if 0  // Debug output disabled for performance
-  if (!iree_status_is_ok(status)) {
-    fprintf(stderr, "[IREE_HIP_DISPATCH] FAILED!\n");
-  } else {
-    // Force synchronization to catch errors immediately (debug only)
-    hipError_t sync_err = command_buffer->hip_symbols->hipStreamSynchronize(command_buffer->hip_stream);
-    if (sync_err != hipSuccess) {
-      fprintf(stderr, "[IREE_HIP_DISPATCH] POST-SYNC FAILED: err=%d\n", sync_err);
-    }
-  }
-#endif
 
   IREE_HAL_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  &command_buffer->tracing_event_list,
