@@ -1119,14 +1119,12 @@ func.func @winograd_filter_transform(%2: tensor<3x3x64x128xf32>) -> tensor<8x8x6
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6: tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %scale = arith.constant 0.125 : f16
   %7 = tensor.empty() : tensor<20x4096x64xf16>
   %8 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-    affine_map<(d0, d1, d2, d3, d4) -> ()>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-    ins(%4, %5, %6, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
+    ins(%4, %5, %6 : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>)
     outs(%7 : tensor<20x4096x64xf16>) {
      ^bb0(%score: f32):
        iree_linalg_ext.yield %score : f32
@@ -1147,12 +1145,11 @@ func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6:
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 func.func @attention_transpose_distribute_4d(%29: index, %37: tensor<4x4x?x128xf16>, %38: tensor<4x4x?x1x1x128xf16>, %39: tensor<4x4x?x1x1x128xf16>, %40: tensor<4x4x?x?x1x1xf16>) -> tensor<4x?x4x128xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %cst = arith.constant 8.837890e-02 : f16
   %30 = util.assume.int %29<umin = 16, umax = 131056, udiv = 16> : index
   %31 = iree_tensor_ext.dispatch.workload.ordinal %30, 0 : index
   %41 = tensor.empty(%31) : tensor<4x?x4x128xf16>
   %42 = tensor.empty(%31) : tensor<4x4x?x128xf16>
-  %43 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d3)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>]} ins(%37, %38, %39, %cst, %40 : tensor<4x4x?x128xf16>, tensor<4x4x?x1x1x128xf16>, tensor<4x4x?x1x1x128xf16>, f16, tensor<4x4x?x?x1x1xf16>) outs(%42 : tensor<4x4x?x128xf16>) {
+  %43 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d3)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>]} ins(%37, %38, %39, %40 : tensor<4x4x?x128xf16>, tensor<4x4x?x1x1x128xf16>, tensor<4x4x?x1x1x128xf16>, tensor<4x4x?x?x1x1xf16>) outs(%42 : tensor<4x4x?x128xf16>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<4x4x?x128xf16>
@@ -1443,10 +1440,9 @@ func.func @decode_reduction_f32(%arg0: tensor<32x262144xf16>, %arg1: tensor<32xf
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %arg2: tensor<?x4x32xf16>, %arg3: tensor<?x4x32xf16>, %arg4: tensor<4x2x?x?xf16>) -> tensor<?x256x1x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
   %cst = arith.constant 0.000000e+00 : f16
-  %cst_0 = arith.constant 1.767580e-01 : f16
   %0 = tensor.empty(%arg0) : tensor<?x4x2x32xf16>
   %1 = tensor.empty(%arg0) : tensor<4x2x?x32xf16>
-  %2 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]} ins(%arg1, %arg2, %arg3, %cst_0, %arg4 : tensor<4x2x?x32xf16>, tensor<?x4x32xf16>, tensor<?x4x32xf16>, f16, tensor<4x2x?x?xf16>) outs(%1 : tensor<4x2x?x32xf16>) {
+  %2 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]} ins(%arg1, %arg2, %arg3, %arg4 : tensor<4x2x?x32xf16>, tensor<?x4x32xf16>, tensor<?x4x32xf16>, tensor<4x2x?x?xf16>) outs(%1 : tensor<4x2x?x32xf16>) {
   ^bb0(%arg5: f32):
     iree_linalg_ext.yield %arg5 : f32
   } -> tensor<4x2x?x32xf16>
@@ -1472,14 +1468,12 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value: tensor<?x?x?xf32>, %dim0: index, %dim1: index, %dim2: index) -> tensor<?x?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %scale = arith.constant 0.125 : f32
   %out = tensor.empty(%dim0, %dim1, %dim2) : tensor<?x?x?xf32>
   %result = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-    affine_map<(d0, d1, d2, d3, d4) -> ()>,
     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-    ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
+    ins(%query, %key, %value : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>)
     outs(%out : tensor<?x?x?xf32>) {
      ^bb0(%score: f32):
        iree_linalg_ext.yield %score : f32

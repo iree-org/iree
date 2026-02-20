@@ -346,13 +346,12 @@ def MatchAttentionOp : Op<Transform_Dialect, "iree.match.attention",
     #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
     #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
     #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
-    #map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
     #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
     %batch_dims, %m_dims, %n_dims, %k1_dims, %k2_dims =
       transform.iree.match.attention %attn_op,
         query_type = f32, key_type = f32, value_type = f32, output_type = f32,
-        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
+        indexing_maps = [#map_query, #map_key, #map_value, #map_output] :
         !transform.any_op -> !transform.param<i64>
     ```
 

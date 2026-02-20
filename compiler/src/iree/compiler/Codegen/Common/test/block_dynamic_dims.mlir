@@ -8,7 +8,6 @@
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @block_attention_dims() {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 8.837890e-02 : f16
   %m_in = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
   %k2_in = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
   %0:2 = util.assume.int
@@ -41,10 +40,9 @@ func.func @block_attention_dims() {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d3)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]}
-      ins(%q, %key, %value, %cst, %mask : tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, f16, tensor<4x32x?x?xf16>)
+      ins(%q, %key, %value, %mask : tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, tensor<4x32x?x?xf16>)
       outs(%2 : tensor<4x32x?x128xf16>) {
     ^bb0(%b0 : f16) :
       iree_linalg_ext.yield %b0 : f16
@@ -97,7 +95,7 @@ func.func @block_attention_dims() {
 //  CHECK-SAME:       sizes = [4, 32, %[[M_DYNAMIC]], 16, %[[K2_DYNAMIC]], 32]
 //  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
-//       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK]] :
+//       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %[[MASK]] :
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
 

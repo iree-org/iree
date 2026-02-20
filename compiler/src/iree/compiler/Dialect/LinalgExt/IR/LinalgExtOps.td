@@ -1013,7 +1013,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     }
     std::optional<AffineMap> getMaskMap() {
       if (getMask()) {
-        return cast<AffineMap>(getIndexingMapsArray()[4]);
+        return cast<AffineMap>(getIndexingMapsArray()[3]);
       }
       return std::nullopt;
     }

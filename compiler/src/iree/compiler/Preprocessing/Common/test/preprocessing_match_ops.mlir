@@ -930,7 +930,6 @@ module attributes {transform.with_named_sequence} {
 #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
-#map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
 // CHECK-LABEL: func.func @attention_ops
@@ -938,7 +937,6 @@ func.func @attention_ops(
     %query: tensor<2x10x6x4xf16>,
     %key: tensor<2x10x4x4xf16>,
     %value: tensor<2x10x4x4xf16>,
-    %scale: f16,
     %output: tensor<2x10x6x4xf16>,
     %input_mm: tensor<32x64xf32>,
     %filter_mm: tensor<64x32xf32>,
@@ -946,8 +944,8 @@ func.func @attention_ops(
 
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   match_status = "matched"
-  %res1 = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output], match_status = "unmatched"}
-      ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
+  %res1 = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_output], match_status = "unmatched"}
+      ins(%query, %key, %value : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
       iree_linalg_ext.yield %arg : f32
@@ -967,7 +965,7 @@ module attributes {transform.with_named_sequence} {
     %batch, %m, %n, %k1, %k2 =
       transform.iree.match.attention %op,
         query_type = f16, key_type = f16, value_type = f16, output_type = f16,
-        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
+        indexing_maps = [#map_query, #map_key, #map_value, #map_output] :
         !transform.any_op -> !transform.param<i64>
 
     transform.yield %op : !transform.any_op
@@ -994,7 +992,6 @@ module attributes {transform.with_named_sequence} {
 #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
-#map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
 #lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
@@ -1004,17 +1001,16 @@ func.func @attention_constraints(
     %query: tensor<2x10x6x4xf16>,
     %key: tensor<2x10x4x4xf16>,
     %value: tensor<2x10x4x4xf16>,
-    %scale: f16,
     %output: tensor<2x10x6x4xf16>) -> tensor<2x10x6x4xf16> {
 
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
   // CHECK-SAME:   match_status = "matched"
   %res = iree_linalg_ext.attention {
-      indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output],
+      indexing_maps = [#map_query, #map_key, #map_value, #map_output],
       lowering_config = #lowering_config,
       match_status = "unmatched"}
-      ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
+      ins(%query, %key, %value : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
       iree_linalg_ext.yield %arg : f32
@@ -1028,7 +1024,7 @@ module attributes {transform.with_named_sequence} {
     %batch, %m, %n, %k1, %k2 =
       transform.iree.match.attention %op,
         query_type = f16, key_type = f16, value_type = f16, output_type = f16,
-        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
+        indexing_maps = [#map_query, #map_key, #map_value, #map_output] :
         !transform.any_op -> !transform.param<i64>
 
     transform.iree.match.dims_equal %batch, [2, 10] : !transform.param<i64>
@@ -1060,7 +1056,6 @@ module attributes {transform.with_named_sequence} {
 #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
-#map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
 #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
 #map_wrong_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
@@ -1070,13 +1065,12 @@ func.func @indexing_maps_test(
     %query: tensor<2x10x6x4xf16>,
     %key: tensor<2x10x4x4xf16>,
     %value: tensor<2x10x4x4xf16>,
-    %scale: f16,
     %output: tensor<2x10x6x4xf16>) -> tensor<2x10x6x4xf16> {
 
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   maps_match = "unmatched"
-  %res = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output], maps_match = "unmatched"}
-      ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
+  %res = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_output], maps_match = "unmatched"}
+      ins(%query, %key, %value : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
       iree_linalg_ext.yield %arg : f32
@@ -1090,7 +1084,7 @@ module attributes {transform.with_named_sequence} {
     %batch, %m, %n, %k1, %k2 =
       transform.iree.match.attention %op,
         query_type = f16, key_type = f16, value_type = f16, output_type = f16,
-        indexing_maps = [#map_query, #map_wrong_key, #map_value, #map_scale, #map_output] :
+        indexing_maps = [#map_query, #map_wrong_key, #map_value, #map_output] :
         !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }

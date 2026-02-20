@@ -3030,7 +3030,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
-    int64_t baseIdx = attnMask ? 5 : 4;
+    int64_t baseIdx = attnMask ? 4 : 3;
     resultTypes.push_back(tiledOperands[baseIdx].getType());
   }
 

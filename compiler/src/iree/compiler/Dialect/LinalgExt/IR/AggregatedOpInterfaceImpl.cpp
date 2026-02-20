@@ -321,8 +321,9 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
                               Type sElementType, Region &elementwiseRegion,
                               DictionaryAttr qkAttrs, bool useExp2) {
   MLIRContext *ctx = b.getContext();
-  
+
   auto qETy = getElementTypeOrSelf(query.getType());
+  bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
 
   AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
                                       /*symbolCount=*/0, ctx);
@@ -408,16 +409,13 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap kMap = getKeyMap();
   AffineMap sMap = opInfo.getSMap();
 
-  auto qETy = getElementTypeOrSelf(query.getType());
-  bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
-
   // We compute output of first matmul in f32.
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(
-      loc, b, query, key, mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true);
+  Value s = computeQKAndElementwise(loc, b, query, key, mask, qMap, kMap, sMap,
+                                    getMaskMap(), sizes, f32Type, getRegion(),
+                                    qkAttrs, /*useExp2=*/true);
 
   // ---- Softmax ----
 
@@ -477,6 +475,8 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   auto pETy = getElementTypeOrSelf(p.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
+    bool lowPrecision =
+        getElementTypeOrSelf(query.getType()).getIntOrFloatBitWidth() <= 8;
     Value convertP = tensor::EmptyOp::create(b, loc, sSizes, vETy);
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }
@@ -530,13 +530,10 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap kMap = getKeyMap();
   AffineMap sMap = opInfo.getSMap();
 
-  auto qETy = getElementTypeOrSelf(query.getType());
-  bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
-
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(
-      loc, b, query, key, mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
+  Value s = computeQKAndElementwise(loc, b, query, key, mask, qMap, kMap, sMap,
+                                    getMaskMap(), sizes, elementType,
+                                    getRegion(), qkAttrs, useExp2);
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -578,6 +575,8 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   auto pETy = getElementTypeOrSelf(p.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
+    bool lowPrecision =
+        getElementTypeOrSelf(query.getType()).getIntOrFloatBitWidth() <= 8;
     Value convertP = tensor::EmptyOp::create(b, loc, sSizes, vETy);
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }

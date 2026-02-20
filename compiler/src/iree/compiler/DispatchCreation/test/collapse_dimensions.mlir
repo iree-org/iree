@@ -549,13 +549,13 @@ util.func public @dequant_contraction(%arg0: tensor<2x32xf32>, %arg1: tensor<2x3
 
 // -----
 
-util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<2x10x4096x64xf16> {
+util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>) -> tensor<2x10x4096x64xf16> {
     %expanded = tensor.expand_shape %arg0 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 16] : tensor<20x4096x16xf16> into tensor<2x10x4096x16xf16>
     %expanded_0 = tensor.expand_shape %arg1 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 16] : tensor<20x1024x16xf16> into tensor<2x10x1024x16xf16>
     %expanded_1 = tensor.expand_shape %arg2 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 64] : tensor<20x1024x64xf16> into tensor<2x10x1024x64xf16>
   %0 = flow.dispatch.region -> (tensor<2x10x4096x64xf16>) {
     %0 = tensor.empty() : tensor<2x10x4096x64xf16>
-    %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16) outs(%0 : tensor<2x10x4096x64xf16>) {
+    %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%expanded, %expanded_0, %expanded_1 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>) outs(%0 : tensor<2x10x4096x64xf16>) {
     ^bb0(%arg4: f16):
       iree_linalg_ext.yield %arg4 : f16
     } -> tensor<2x10x4096x64xf16>
@@ -566,21 +566,21 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
 
 // CHECK-LABEL: util.func public @collapse_attention
 //       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
-//  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
+//  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>
 //  CHECK-SAME:      tensor<20x4096x64xf16>
 //       CHECK:   flow.return %[[ATTN]] : tensor<20x4096x64xf16>
 
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, %arg1: tensor<20x1024x16xf32>, %arg2: tensor<20x1024x64xf32>, %arg3: f32) -> tensor<2x10x4096x64xf16> {
+util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, %arg1: tensor<20x1024x16xf32>, %arg2: tensor<20x1024x64xf32>) -> tensor<2x10x4096x64xf16> {
     %expanded = tensor.expand_shape %arg0 [[0, 1], [2], [3]] output_shape [2, 10, 4096, 16] : tensor<20x4096x16xf32> into tensor<2x10x4096x16xf32>
     %expanded_0 = tensor.expand_shape %arg1 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 16] : tensor<20x1024x16xf32> into tensor<2x10x1024x16xf32>
     %expanded_1 = tensor.expand_shape %arg2 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 64] : tensor<20x1024x64xf32> into tensor<2x10x1024x64xf32>
   %0 = flow.dispatch.region -> (tensor<2x10x4096x64xf16>) {
     %0 = tensor.empty() : tensor<2x10x4096x64xf32>
     %5 = tensor.empty() : tensor<2x10x4096x64xf16>
-    %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf32>, tensor<2x10x1024x16xf32>, tensor<2x10x1024x64xf32>, f32) outs(%0 : tensor<2x10x4096x64xf32>) {
+    %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%expanded, %expanded_0, %expanded_1 : tensor<2x10x4096x16xf32>, tensor<2x10x1024x16xf32>, tensor<2x10x1024x64xf32>) outs(%0 : tensor<2x10x4096x64xf32>) {
     ^bb0(%arg4: f32):
       iree_linalg_ext.yield %arg4 : f32
     } -> tensor<2x10x4096x64xf32>
@@ -601,7 +601,7 @@ util.func public @collapse_attention_with_truncf(%arg0: tensor<20x4096x16xf32>, 
 
 // CHECK-LABEL: util.func public @collapse_attention_with_truncf
 //       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
-//  CHECK-SAME:      tensor<20x4096x16xf32>, tensor<20x1024x16xf32>, tensor<20x1024x64xf32>, f32
+//  CHECK-SAME:      tensor<20x4096x16xf32>, tensor<20x1024x16xf32>, tensor<20x1024x64xf32>
 //  CHECK-SAME:      tensor<20x4096x64xf32>
 //       CHECK:   %[[TRUNC:.*]] = linalg.generic
 //  CHECK-SAME:      ins(%[[ATTN]] : tensor<20x4096x64xf32>
@@ -790,7 +790,6 @@ util.func public @masked_attention_dynamic(%arg0: index, %arg1: tensor<4x8x4x?x3
     %cst = arith.constant 0xFC00 : f16
     %cst_0 = arith.constant 0.000000e+00 : f16
     %5 = tensor.empty(%0, %0) : tensor<4x8x4x?x32x?x32xf16>
-    %cst_1 = arith.constant 8.837890e-02 : f16
     %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%5 : tensor<4x8x4x?x32x?x32xf16>) {
     ^bb0(%out: f16):
       %9 = linalg.index 4 : index
@@ -803,7 +802,7 @@ util.func public @masked_attention_dynamic(%arg0: index, %arg1: tensor<4x8x4x?x3
       %16 = arith.select %15, %cst_0, %cst : f16
       linalg.yield %16 : f16
     } -> tensor<4x8x4x?x32x?x32xf16>
-    %7 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d7, d8)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg1, %arg2, %arg3, %cst_1, %6 : tensor<4x8x4x?x32x128xf16>, tensor<4x?x32x8x128xf16>, tensor<4x?x32x8x128xf16>, f16, tensor<4x8x4x?x32x?x32xf16>) outs(%4 : tensor<4x8x4x?x32x128xf16>) {
+    %7 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d8, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d7, d8)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg1, %arg2, %arg3, %6 : tensor<4x8x4x?x32x128xf16>, tensor<4x?x32x8x128xf16>, tensor<4x?x32x8x128xf16>, tensor<4x8x4x?x32x?x32xf16>) outs(%4 : tensor<4x8x4x?x32x128xf16>) {
     ^bb0(%arg4: f32):
       iree_linalg_ext.yield %arg4 : f32
     } -> tensor<4x8x4x?x32x128xf16>

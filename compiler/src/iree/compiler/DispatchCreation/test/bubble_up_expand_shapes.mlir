@@ -28,7 +28,7 @@ util.func public @unsupported_bubbble_expand_through_extract(%arg0 : tensor<2x40
 // 2. Use of folders to convert (expand(collapse)) -> (collapse)
 util.func public @attention_v_reshape_propagation(%arg0: index,
     %arg1: tensor<4x8x4x128x?xf16>, %arg2: tensor<128x?x128xf16>,
-    %arg3: tensor<128x?x128xf16>, %arg4: f16, %arg5: tensor<128x?x?xf16>)
+    %arg3: tensor<128x?x128xf16>, %arg5: tensor<128x?x?xf16>)
     -> tensor<4x?x32x128xf16> {
   %0 = tensor.empty(%arg0) : tensor<4x?x32x128xf16>
   %1 = tensor.empty(%arg0) : tensor<128x?x128xf16>
@@ -38,12 +38,11 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
-                       affine_map<(d0, d1, d2, d3, d4) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
-      ins(%arg2, %arg3, %collapsed, %arg4, %arg5
+      ins(%arg2, %arg3, %collapsed, %arg5
         : tensor<128x?x128xf16>, tensor<128x?x128xf16>, tensor<128x128x?xf16>,
-          f16, tensor<128x?x?xf16>)
+          tensor<128x?x?xf16>)
       outs(%1 : tensor<128x?x128xf16>) {
       ^bb0(%arg6: f32):
     iree_linalg_ext.yield %arg6 : f32

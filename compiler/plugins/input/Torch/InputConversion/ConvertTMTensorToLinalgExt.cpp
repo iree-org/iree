@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -109,14 +110,12 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
   auto qMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k1}, ctx);
   auto kMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, k1}, ctx);
   auto vMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {k2, n}, ctx);
-  auto sMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, ctx);
   auto rMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, n}, ctx);
   if (hasMask) {
-    // Add mask map only if it exists
     auto mMap = AffineMap::get(/*dimCount=*/4, /*symbolCount=*/0, {m, k2}, ctx);
-    return {qMap, kMap, vMap, sMap, mMap, rMap};
+    return {qMap, kMap, vMap, mMap, rMap};
   }
-  return {qMap, kMap, vMap, sMap, rMap};
+  return {qMap, kMap, vMap, rMap};
 }
 
 struct AttentionOpConversion
@@ -173,21 +172,41 @@ struct AttentionOpConversion
     Type elementType = op.getQueryType().getElementType();
     bool lowPrecision = elementType.getIntOrFloatBitWidth() <= 8;
     FloatType targetType = cast<FloatType>(elementType);
-    
+
+    // Pre-apply scale to query. Include log2(e) factor since decomposition
+    // uses exp2. For high precision: Q * (1/sqrt(d) * log2(e))
+    // For low precision: Q / (sqrt(d) / log2(e)) to avoid overflow in fp8.
     double dk = static_cast<double>(headDim);
-    mlir::linalg::Linalg_Op opTy;
-    if(lowPrecision) {
-      dk = std::sqrt(dk) / M_LOG2E;
-      opTy = mlir::linalg::Linalg_Op::DivOp;
+    double scaleVal;
+    if (lowPrecision) {
+      scaleVal = std::sqrt(dk) / M_LOG2E;
     } else {
-      dk = (1.0 / std::sqrt(dk)) * M_LOG2E;
-      opTy = mlir::linalg::Linalg_Op::MulOp;
+      scaleVal = (1.0 / std::sqrt(dk)) * M_LOG2E;
     }
-    Value scale = arith::ConstantOp::create(
-        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, dk));
-    Value scaleTensor =
-        rewriter.create<tensor::SplatOp>(loc, op.getQueryType(), scale);
-    Value scaledQuery = opTy::create(rewriter, loc, query, scaleTensor).getResult();
+    Value scaleConst = arith::ConstantOp::create(
+        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, scaleVal));
+
+    auto queryType = cast<RankedTensorType>(query.getType());
+    AffineMap identityMap =
+        rewriter.getMultiDimIdentityMap(queryType.getRank());
+    AffineMap scalarMap =
+        AffineMap::get(queryType.getRank(), /*symbolCount=*/0, ctx);
+    SmallVector<utils::IteratorType> iteratorTypes(
+        queryType.getRank(), utils::IteratorType::parallel);
+    auto genericOp = linalg::GenericOp::create(
+        rewriter, loc, queryType, scaleConst, query,
+        SmallVector<AffineMap>{scalarMap, identityMap}, iteratorTypes,
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value result;
+          if (lowPrecision) {
+            result = arith::DivFOp::create(b, loc, args[1], args[0]);
+          } else {
+            result = arith::MulFOp::create(b, loc, args[1], args[0]);
+          }
+          linalg::YieldOp::create(b, loc, result);
+        });
+    query = genericOp.getResult(0);
+
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
         getStandardAttentionIndexingMaps(ctx, optionalMask.has_value());
@@ -195,16 +214,13 @@ struct AttentionOpConversion
     int64_t numBatches = op.getQueryType().getRank() - 2;
     for (AffineMap &map : indexingMaps) {
       map = map.shiftDims(numBatches);
-      if (map.getNumResults() == 0) {
-        continue;
-      }
       for (int batch : llvm::seq<int>(numBatches)) {
         map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
       }
     }
 
     auto attention = IREE::LinalgExt::AttentionOp::create(
-        rewriter, loc, result.getType(), scaledQuery, key, value, result,
+        rewriter, loc, result.getType(), query, key, value, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {
@@ -233,6 +249,7 @@ class ConvertTMTensorToLinalgExtPass final
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<linalg::LinalgDialect>();
     registry.insert<tensor::TensorDialect>();
   }
 

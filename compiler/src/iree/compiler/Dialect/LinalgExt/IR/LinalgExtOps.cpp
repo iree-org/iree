@@ -2136,21 +2136,21 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, Value query, Value key, Value value,
-                        Value scale, Value output, ArrayAttr indexingMaps,
+                        Value output, ArrayAttr indexingMaps,
                         std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
+  build(odsBuilder, odsState, results, query, key, value, maskIn, output,
         indexingMaps, DictionaryAttr());
 }
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         TypeRange results, ValueRange inputOperands,
                         ValueRange initOperands, ArrayAttr indexingMaps) {
-  assert(inputOperands.size() < 6);
+  assert(inputOperands.size() < 5);
   assert(initOperands.size() == 1);
-  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  Value mask = inputOperands.size() > 3 ? inputOperands[3] : Value();
   build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
-        inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
+        inputOperands[2], mask, initOperands[0], indexingMaps,
         DictionaryAttr());
 }
 
@@ -2166,11 +2166,6 @@ LogicalResult AttentionOp::verify() {
       getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
   if (failed(maybeOpInfo)) {
     return attnOp->emitOpError("failed to verify op's indexing maps");
-  }
-
-  FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
-  if (!scaleElementType) {
-    return attnOp->emitOpError("expected scale to be of floating point type");
   }
 
   // Check shape compatibility based on indexing maps.
@@ -2235,7 +2230,6 @@ LogicalResult AttentionOp::verify() {
   if (failed(checkDomain("Query", getQueryMap())) ||
       failed(checkDomain("Key", getKeyMap())) ||
       failed(checkDomain("Value", getValueMap())) ||
-      failed(checkDomain("Scale", getScaleMap())) ||
       failed(checkDomain("Output", getOutputMap()))) {
     return failure();
   }
@@ -2266,7 +2260,7 @@ LogicalResult AttentionOp::verify() {
 }
 
 MutableOperandRange AttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 4 : 3,
                              /*numInits=*/1);
 }
 
@@ -2334,12 +2328,12 @@ AffineMap AttentionOp::getMatchingIndexingMap(OpOperand *operand) {
 
 void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               TypeRange results, Value query, Value key,
-                              Value value, Value scale, Value output, Value max,
-                              Value sum, ArrayAttr indexingMaps,
+                              Value value, Value output, Value max, Value sum,
+                              ArrayAttr indexingMaps,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
-        max, sum, indexingMaps, DictionaryAttr());
+  build(odsBuilder, odsState, results, query, key, value, maskIn, output, max,
+        sum, indexingMaps, DictionaryAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -2415,7 +2409,6 @@ LogicalResult OnlineAttentionOp::verify() {
   if (failed(checkDomain("Query", getQueryMap())) ||
       failed(checkDomain("Key", getKeyMap())) ||
       failed(checkDomain("Value", getValueMap())) ||
-      failed(checkDomain("Scale", getScaleMap())) ||
       failed(checkDomain("Output", getOutputMap())) ||
       failed(checkDomain("Max", getMaxMap())) ||
       failed(checkDomain("Sum", getSumMap()))) {
@@ -2452,7 +2445,7 @@ LogicalResult OnlineAttentionOp::verify() {
 }
 
 MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 5 : 4,
+  return MutableOperandRange(*this, /*numInputs=*/getMask() ? 4 : 3,
                              /*numInits=*/3);
 }
 

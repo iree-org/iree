@@ -1064,7 +1064,7 @@ static Operation *createCollapsedOp(AttentionOp origOp,
 
   Value maskOperand;
   if (inputOperands.size() > 3) {
-    maskOperand = inputOperands[4];
+    maskOperand = inputOperands[3];
   }
 
   auto collapsedOp = AttentionOp::create(

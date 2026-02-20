@@ -869,18 +869,16 @@ flow.executable private @ex {
       %1 = iree_tensor_ext.dispatch.tensor.load %arg1, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>> -> tensor<1024x64xf32>
       %2 = iree_tensor_ext.dispatch.tensor.load %arg2, offsets = [0, 0], sizes = [1024, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x64xf32>> -> tensor<1024x64xf32>
       %3 = tensor.empty() : tensor<1024x64xf32>
-      %scale = arith.constant 1.0 : f32
 
       %4 = iree_linalg_ext.attention {
         indexing_maps = [
           affine_map<(m, n, k2, k1) -> (m, k1)>,
           affine_map<(m, n, k2, k1) -> (k2, k1)>,
           affine_map<(m, n, k2, k1) -> (k2, n)>,
-          affine_map<(m, n, k2, k1) -> ()>,
           affine_map<(m, n, k2, k1) -> (m, n)>
         ]
       }
-      ins(%0, %1, %2, %scale : tensor<1024x64xf32>, tensor<1024x64xf32>, tensor<1024x64xf32>, f32)
+      ins(%0, %1, %2 : tensor<1024x64xf32>, tensor<1024x64xf32>, tensor<1024x64xf32>)
       outs(%3 : tensor<1024x64xf32>) {
       ^bb0(%score : f32):
         iree_linalg_ext.yield %score : f32

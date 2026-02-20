@@ -203,7 +203,6 @@ func.func @matmul_dynamic_dim() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_20x4096x64x4096x64() {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
@@ -216,9 +215,8 @@ func.func @attention_20x4096x64x4096x64() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x4096x64xf16>) {
+                     ins(%4, %5, %6 : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>) outs(%7 : tensor<20x4096x64xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x4096x64xf16>
@@ -251,7 +249,6 @@ func.func @attention_20x4096x64x4096x64() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @attention_large_head_dim_shared_mem() {
-  %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512xf16>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x512xf16>>
@@ -264,9 +261,8 @@ func.func @attention_large_head_dim_shared_mem() {
   %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d1, d2, d3, d4) -> (d1, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d2)>,
                      affine_map<(d1, d2, d3, d4) -> (d3, d4)>,
-                     affine_map<(d1, d2, d3, d4) -> ()>,
                      affine_map<(d1, d2, d3, d4) -> (d1, d4)>]}
-                     ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%7 : tensor<1024x512xf16>) {
+                     ins(%4, %5, %6 : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>) outs(%7 : tensor<1024x512xf16>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<1024x512xf16>
@@ -296,10 +292,9 @@ func.func @attention_large_head_dim_shared_mem() {
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
-#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
-#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-func.func @attention_check_mma_accs_compatable(%arg0: f32, %arg1: tensor<960x4096x64xf8E4M3FN>, %arg2: tensor<960x4096x64xf8E4M3FN>, %arg3: tensor<960x4096x64xf8E4M3FN>, %arg4: tensor<960x4096x64xf32>, %arg5: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>) {
-  %0 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%arg1, %arg2, %arg3, %arg0 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, f32) outs(%arg4 : tensor<960x4096x64xf32>) {
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+func.func @attention_check_mma_accs_compatable(%arg1: tensor<960x4096x64xf8E4M3FN>, %arg2: tensor<960x4096x64xf8E4M3FN>, %arg3: tensor<960x4096x64xf8E4M3FN>, %arg4: tensor<960x4096x64xf32>, %arg5: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>) {
+  %0 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3]} ins(%arg1, %arg2, %arg3 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>) outs(%arg4 : tensor<960x4096x64xf32>) {
   ^bb0(%arg6: f32):
     iree_linalg_ext.yield %arg6 : f32
   } -> tensor<960x4096x64xf32>

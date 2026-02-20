@@ -373,7 +373,6 @@ util.func public @attention_clone_mask(%arg0: tensor<?x?xf16>,
   %dim_1 = tensor.dim %arg2, %c1 : tensor<?x?xf16>
   %false = arith.constant false
   %true = arith.constant true
-  %cst = arith.constant 1.000000e+00 : f16
   %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xi1>
   %1 = tensor.empty(%dim, %dim_1) : tensor<?x?xf16>
   %2 = linalg.generic {
@@ -392,11 +391,10 @@ util.func public @attention_clone_mask(%arg0: tensor<?x?xf16>,
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
-                         affine_map<(d0, d1, d2, d3) -> ()>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d0, d1)>]}
-        ins(%arg0, %arg1, %arg2, %cst, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
-            tensor<?x?xf16>, f16, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
+        ins(%arg0, %arg1, %arg2, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
+            tensor<?x?xf16>, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
     ^bb0(%arg3: f32):
       iree_linalg_ext.yield %arg3 : f32
     } -> tensor<?x?xf16>
@@ -424,7 +422,6 @@ util.func public @dont_clone_flow_ops(%arg0: tensor<?x?xf16>, %arg1: tensor<?x?x
   %dim_3 = tensor.dim %arg3, %c1 : tensor<?x?xi1>
   %false = arith.constant false
   %true = arith.constant true
-  %cst = arith.constant 1.000000e+00 : f16
   %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xi1>
   %1 = tensor.empty(%dim, %dim_1) : tensor<?x?xf16>
   %2 = flow.tensor.transfer %arg3 : tensor<?x?xi1>{%dim_2, %dim_3} to #hal.device.promise<@dev_a>
@@ -433,11 +430,10 @@ util.func public @dont_clone_flow_ops(%arg0: tensor<?x?xf16>, %arg1: tensor<?x?x
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
-                         affine_map<(d0, d1, d2, d3) -> ()>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d0, d1)>]}
-        ins(%arg0, %arg1, %arg2, %cst, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
-            tensor<?x?xf16>, f16, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
+        ins(%arg0, %arg1, %arg2, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
+            tensor<?x?xf16>, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
     ^bb0(%in: f32):
       iree_linalg_ext.yield %in : f32
     } -> tensor<?x?xf16>
@@ -495,8 +491,8 @@ util.func public @clone_scatter_indices(%arg0: tensor<1x?x32x8x128xf8E4M3FNUZ>, 
 
 // Still fuse Q, K, and V in the case of bit-extend ops.
 util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
-    %arg1: tensor<10x20x40x50xf8E4M3FNUZ>, %arg2: tensor<10x20x40x50xf8E4M3FNUZ>,
-    %cst : bf16) -> tensor<10x20x30x40xbf16> {
+    %arg1: tensor<10x20x40x50xf8E4M3FNUZ>, %arg2: tensor<10x20x40x50xf8E4M3FNUZ>)
+    -> tensor<10x20x30x40xbf16> {
   %query_empty = tensor.empty() : tensor<10x20x30x50xbf16>
   %query = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
@@ -533,10 +529,9 @@ util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
         indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
-                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
-        ins(%query, %key, %value, %cst
-            : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
+        ins(%query, %key, %value
+            : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>)
         outs(%empty : tensor<10x20x30x40xbf16>) {
       ^bb0(%arg6: f32):
         iree_linalg_ext.yield %arg6 : f32
@@ -708,16 +703,14 @@ util.func public @clone_linalg_ext_gather_attention(
 
   %3 = flow.dispatch.region -> (tensor<8x4x1x128xf16>) {
     %4 = tensor.empty() : tensor<8x4x1x128xf16>
-    %cst = arith.constant 8.837890e-02 : f16
     %5 = iree_linalg_ext.attention {
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d3)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>]}
-      ins(%arg1, %1, %2, %cst, %arg2 : tensor<8x4x1x128xf16>, tensor<1x?x32x8x128xf16>, tensor<1x?x32x8x128xf16>, f16, tensor<8x4x1x?x32xf16>)
+      ins(%arg1, %1, %2, %arg2 : tensor<8x4x1x128xf16>, tensor<1x?x32x8x128xf16>, tensor<1x?x32x8x128xf16>, tensor<8x4x1x?x32xf16>)
       outs(%4 : tensor<8x4x1x128xf16>) {
     ^bb0(%arg6: f32):
       iree_linalg_ext.yield %arg6 : f32
@@ -744,7 +737,7 @@ util.func public @clone_linalg_ext_gather_attention(
 // -----
 
 // Don't clone 'gather-like' operations (only `iree_linalg_ext.gather`) is supported.
-util.func public @dont_clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<16384x16x32x128xf16>, %arg2: f16, %arg3: i64, %arg4: tensor<4x4x16x32x128xf16>, %arg5: tensor<4x1x32x1x128xf16>) -> tensor<4x32x1x128xf16> {
+util.func public @dont_clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor<16384x16x32x128xf16>, %arg3: i64, %arg4: tensor<4x4x16x32x128xf16>, %arg5: tensor<4x1x32x1x128xf16>) -> tensor<4x32x1x128xf16> {
   %0 = tensor.empty() : tensor<4x1x4x16x32x128xf16>
   %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<4x1x4xi64>) outs(%0 : tensor<4x1x4x16x32x128xf16>) {
   ^bb0(%in: i64, %out: f16):
@@ -772,9 +765,8 @@ util.func public @dont_clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]}
-      ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16)
+      ins(%arg5, %1, %2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>)
       outs(%3 : tensor<4x1x32x1x128xf16>) {
       ^bb0(%score: f16):
         iree_linalg_ext.yield %score: f16
