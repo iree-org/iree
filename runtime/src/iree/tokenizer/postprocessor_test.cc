@@ -348,12 +348,8 @@ TEST(PostprocessorEncodeState, EmitPrefix) {
   iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
   iree_tokenizer_token_id_t token_ids[8] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 8,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
 
   iree_host_size_t emitted =
       iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
@@ -371,12 +367,8 @@ TEST(PostprocessorEncodeState, EmitPrefixMultiple) {
   iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
   iree_tokenizer_token_id_t token_ids[8] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 8,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
 
   iree_host_size_t emitted =
       iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
@@ -396,12 +388,8 @@ TEST(PostprocessorEncodeState, EmitPrefixPartialCapacity) {
   iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
   iree_tokenizer_token_id_t token_ids[2] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 2,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 2);
 
   iree_host_size_t emitted =
       iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
@@ -414,12 +402,8 @@ TEST(PostprocessorEncodeState, EmitPrefixPartialCapacity) {
 
   // Resume with more capacity.
   iree_tokenizer_token_id_t token_ids2[4] = {};
-  iree_tokenizer_token_output_t output2 = {
-      .capacity = 4,
-      .token_ids = token_ids2,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output2 =
+      iree_tokenizer_make_token_output(token_ids2, NULL, NULL, 4);
   emitted = iree_tokenizer_postprocessor_emit_prefix(&state, output2, 0);
   EXPECT_EQ(emitted, 1u);
   EXPECT_EQ(token_ids2[0], 50360);
@@ -434,12 +418,8 @@ TEST(PostprocessorEncodeState, EmitPrefixNoOpWhenNotInPrefixPhase) {
 
   // Advance past prefix.
   iree_tokenizer_token_id_t token_ids[8] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 8,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
   iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
   ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
 
@@ -456,12 +436,8 @@ TEST(PostprocessorEncodeState, EmitSuffix) {
   iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
   iree_tokenizer_token_id_t token_ids[8] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 8,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
 
   // Emit prefix, then transition to suffix.
   iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
@@ -502,12 +478,8 @@ TEST(PostprocessorEncodeState, AssignTypeIds) {
 
   uint8_t type_ids[4] = {0xFF, 0xFF, 0xFF, 0xFF};
   iree_tokenizer_token_id_t token_ids[4] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 4,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = type_ids,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 4);
 
   iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
   EXPECT_EQ(type_ids[0], 0);
@@ -529,12 +501,8 @@ TEST(PostprocessorEncodeState, AssignTypeIdsNonZero) {
 
   uint8_t type_ids[3] = {};
   iree_tokenizer_token_id_t token_ids[3] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 3,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = type_ids,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 3);
 
   iree_tokenizer_postprocessor_assign_type_ids(&state, output, 1, 2);
   EXPECT_EQ(type_ids[0], 0);  // Untouched.
@@ -551,12 +519,8 @@ TEST(PostprocessorEncodeState, AssignTypeIdsNoOpWhenNotSequencePhase) {
 
   uint8_t type_ids[4] = {0xFF, 0xFF, 0xFF, 0xFF};
   iree_tokenizer_token_id_t token_ids[4] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 4,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = type_ids,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 4);
 
   iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
   // All untouched — wrong phase.
@@ -575,12 +539,8 @@ TEST(PostprocessorEncodeState, AssignTypeIdsNoOpNullTypeIds) {
   state.active_template = &tmpl;
 
   iree_tokenizer_token_id_t token_ids[4] = {};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 4,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = NULL,  // No type_ids buffer.
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 4);
 
   // Should not crash.
   iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
@@ -598,12 +558,8 @@ TEST(PostprocessorEncodeState, FullBertFlow) {
 
   iree_tokenizer_token_id_t token_ids[8] = {};
   uint8_t type_ids[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 8,
-      .token_ids = token_ids,
-      .token_offsets = NULL,
-      .type_ids = type_ids,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 8);
 
   iree_host_size_t offset = 0;
 
@@ -648,12 +604,8 @@ TEST(PostprocessorEncodeState, EmitPrefixWithOffsets) {
 
   iree_tokenizer_token_id_t token_ids[4] = {};
   iree_tokenizer_offset_t offsets[4] = {{99, 99}, {99, 99}, {99, 99}, {99, 99}};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 4,
-      .token_ids = token_ids,
-      .token_offsets = offsets,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 4);
 
   iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
   // Special tokens get zero-length offsets.
@@ -719,12 +671,8 @@ TEST(PostprocessorTrimOffsets, NoOpWhenDisabled) {
 
   iree_tokenizer_token_id_t token_ids[2] = {100, 200};
   iree_tokenizer_offset_t offsets[2] = {{0, 5}, {5, 10}};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 2,
-      .token_ids = token_ids,
-      .token_offsets = offsets,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 2);
 
   // With TRIM_OFFSETS unset, offsets should be unchanged (even with NULL
   // vocab).
@@ -744,12 +692,8 @@ TEST(PostprocessorTrimOffsets, NoOpWhenNoOffsets) {
   iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
   iree_tokenizer_token_id_t token_ids[2] = {100, 200};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 2,
-      .token_ids = token_ids,
-      .token_offsets = NULL,  // No offsets array.
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 2);
 
   // Should not crash with NULL token_offsets.
   iree_tokenizer_postprocessor_trim_token_offsets(&state, /*vocab=*/NULL,
@@ -765,12 +709,8 @@ TEST(PostprocessorTrimOffsets, NoOpWhenNoVocab) {
 
   iree_tokenizer_token_id_t token_ids[2] = {100, 200};
   iree_tokenizer_offset_t offsets[2] = {{0, 5}, {5, 10}};
-  iree_tokenizer_token_output_t output = {
-      .capacity = 2,
-      .token_ids = token_ids,
-      .token_offsets = offsets,
-      .type_ids = NULL,
-  };
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 2);
 
   // With NULL vocab, offsets should be unchanged (early return).
   iree_tokenizer_postprocessor_trim_token_offsets(&state, /*vocab=*/NULL,

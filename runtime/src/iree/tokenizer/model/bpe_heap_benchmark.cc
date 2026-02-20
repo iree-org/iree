@@ -57,11 +57,9 @@ BENCHMARK_DEFINE_F(HeapBenchmark, FillAndDrain)(benchmark::State& state) {
 
     // Fill with pseudo-random ranks to avoid best/worst case behavior.
     for (uint32_t i = 0; i < capacity_; ++i) {
-      iree_tokenizer_bpe_heap_entry_t entry = {
-          .rank = (i * 7919) % (uint32_t)capacity_,
-          .left_start_byte = i,
-      };
-      iree_tokenizer_bpe_heap_push(&heap_, entry);
+      iree_tokenizer_bpe_heap_push(&heap_,
+                                   iree_tokenizer_make_bpe_heap_entry(
+                                       (i * 7919) % (uint32_t)capacity_, i));
     }
 
     // Drain completely, consuming all entries.
@@ -105,14 +103,10 @@ BENCHMARK_DEFINE_F(HeapBenchmark, BPEPattern)(benchmark::State& state) {
     iree_host_size_t iterations = capacity_ / 2;
     for (uint32_t i = 0; i < iterations; ++i) {
       // Each merge creates 2 new candidates (left pair + right pair).
-      iree_tokenizer_bpe_heap_entry_t entry1 = {
-          .rank = (i * 7919) % 1000,
-          .left_start_byte = i * 2,
-      };
-      iree_tokenizer_bpe_heap_entry_t entry2 = {
-          .rank = (i * 7927) % 1000,
-          .left_start_byte = i * 2 + 1,
-      };
+      iree_tokenizer_bpe_heap_entry_t entry1 =
+          iree_tokenizer_make_bpe_heap_entry((i * 7919) % 1000, i * 2);
+      iree_tokenizer_bpe_heap_entry_t entry2 =
+          iree_tokenizer_make_bpe_heap_entry((i * 7927) % 1000, i * 2 + 1);
       iree_tokenizer_bpe_heap_push(&heap_, entry1);
       iree_tokenizer_bpe_heap_push(&heap_, entry2);
 
@@ -150,21 +144,17 @@ BENCHMARK_DEFINE_F(HeapBenchmark, PushHeavy)(benchmark::State& state) {
   // Pre-fill heap to 50% capacity.
   iree_host_size_t prefill = capacity_ / 2;
   for (uint32_t i = 0; i < prefill; ++i) {
-    iree_tokenizer_bpe_heap_entry_t entry = {
-        .rank = (i * 7919) % (uint32_t)capacity_,
-        .left_start_byte = i,
-    };
-    iree_tokenizer_bpe_heap_push(&heap_, entry);
+    iree_tokenizer_bpe_heap_push(&heap_,
+                                 iree_tokenizer_make_bpe_heap_entry(
+                                     (i * 7919) % (uint32_t)capacity_, i));
   }
 
   uint32_t counter = (uint32_t)prefill;
   for (auto _ : state) {
     // Push one entry, pop one to keep size stable.
-    iree_tokenizer_bpe_heap_entry_t entry = {
-        .rank = (counter * 7919) % (uint32_t)capacity_,
-        .left_start_byte = counter,
-    };
-    iree_tokenizer_bpe_heap_push(&heap_, entry);
+    iree_tokenizer_bpe_heap_push(
+        &heap_, iree_tokenizer_make_bpe_heap_entry(
+                    (counter * 7919) % (uint32_t)capacity_, counter));
     iree_tokenizer_bpe_heap_entry_t popped =
         iree_tokenizer_bpe_heap_pop(&heap_);
     benchmark::DoNotOptimize(popped);

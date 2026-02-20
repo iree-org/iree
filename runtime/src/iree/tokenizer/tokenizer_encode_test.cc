@@ -5820,12 +5820,9 @@ TEST_F(TokenizerAlbertTest, SmallBufferRingWrap) {
       &token_count));
 
   // Finalize.
-  iree_tokenizer_token_output_t remaining_output = {
-      .capacity = token_ids.size() - token_count,
-      .token_ids = token_ids.data() + token_count,
-      .token_offsets = nullptr,
-      .type_ids = nullptr,
-  };
+  iree_tokenizer_token_output_t remaining_output =
+      iree_tokenizer_make_token_output(token_ids.data() + token_count, nullptr,
+                                       nullptr, token_ids.size() - token_count);
   iree_host_size_t finalize_count = 0;
   IREE_ASSERT_OK(iree_tokenizer_encode_state_finalize(state, remaining_output,
                                                       &finalize_count));

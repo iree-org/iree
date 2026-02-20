@@ -98,10 +98,8 @@ TEST_F(CTCDecoderTest, ZeroCapacityOutput) {
   ScopedDecoderState state(decoder());
   std::vector<std::string> tokens = {"h", "e", "l", "l", "o"};
   auto views = ToStringViews(tokens);
-  iree_tokenizer_string_list_t token_list = {
-      .count = views.size(),
-      .values = views.data(),
-  };
+  iree_tokenizer_string_list_t token_list =
+      iree_tokenizer_make_string_list(views.data(), views.size());
   iree_host_size_t strings_consumed = 0;
   iree_host_size_t bytes_written = 0;
   IREE_ASSERT_OK(iree_tokenizer_decoder_state_process(
@@ -340,10 +338,8 @@ TEST_F(CTCDecoderTest, MultipleFinalizeCallsSmallBuffer) {
   iree_host_size_t consumed = 0, written = 0;
   size_t position = 0;
   while (position < tokens.size()) {
-    iree_tokenizer_string_list_t token_list = {
-        .count = tokens.size() - position,
-        .values = views.data() + position,
-    };
+    iree_tokenizer_string_list_t token_list = iree_tokenizer_make_string_list(
+        views.data() + position, tokens.size() - position);
     IREE_ASSERT_OK(iree_tokenizer_decoder_state_process(
         state.get(), token_list,
         iree_make_mutable_string_view(output, sizeof(output)), &consumed,

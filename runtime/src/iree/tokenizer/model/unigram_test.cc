@@ -738,11 +738,9 @@ TEST_F(UnigramModelTest, PartialSegmentDeferred) {
 
   // Two segments: "hello" and "world", with "world" marked as partial.
   iree_tokenizer_segment_t segments[] = {{0, 5}, {5, 10}};
-  iree_tokenizer_segment_list_t segment_list = {
-      .count = 2,
-      .values = segments,
-      .last_is_partial = true,
-  };
+  iree_tokenizer_segment_list_t segment_list =
+      iree_tokenizer_make_segment_list(segments, 2);
+  segment_list.last_is_partial = true;
 
   iree_tokenizer_token_id_t tokens[8];
   iree_host_size_t segments_consumed = 0;
@@ -776,8 +774,9 @@ TEST_F(UnigramModelTest, StreamingMultipleChunks) {
   iree_const_byte_span_t buffer1 = {
       reinterpret_cast<const uint8_t*>(chunk1.data()), chunk1.size()};
   iree_tokenizer_segment_t segments1[] = {{0, 5}, {5, 8}};
-  iree_tokenizer_segment_list_t list1 = {
-      .count = 2, .values = segments1, .last_is_partial = true};
+  iree_tokenizer_segment_list_t list1 =
+      iree_tokenizer_make_segment_list(segments1, 2);
+  list1.last_is_partial = true;
 
   iree_tokenizer_token_id_t tokens[8];
   iree_host_size_t segments_consumed = 0;
@@ -797,8 +796,8 @@ TEST_F(UnigramModelTest, StreamingMultipleChunks) {
   iree_const_byte_span_t buffer2 = {
       reinterpret_cast<const uint8_t*>(chunk2.data()), chunk2.size()};
   iree_tokenizer_segment_t segments2[] = {{0, 5}};
-  iree_tokenizer_segment_list_t list2 = {
-      .count = 1, .values = segments2, .last_is_partial = false};
+  iree_tokenizer_segment_list_t list2 =
+      iree_tokenizer_make_segment_list(segments2, 1);
 
   state.Reset();  // Start fresh for the new chunk.
   IREE_ASSERT_OK(iree_tokenizer_model_state_encode(
@@ -825,8 +824,9 @@ TEST_F(UnigramModelTest, AllSegmentsPartial) {
   iree_const_byte_span_t buffer = {
       reinterpret_cast<const uint8_t*>(text.data()), text.size()};
   iree_tokenizer_segment_t segments[] = {{0, 3}};
-  iree_tokenizer_segment_list_t list = {
-      .count = 1, .values = segments, .last_is_partial = true};
+  iree_tokenizer_segment_list_t list =
+      iree_tokenizer_make_segment_list(segments, 1);
+  list.last_is_partial = true;
 
   iree_tokenizer_token_id_t tokens[8];
   iree_host_size_t segments_consumed = 0;
@@ -861,8 +861,8 @@ TEST_F(UnigramModelTest, SegmentBoundsEndExceedsBuffer) {
 
   // Segment end (10) exceeds buffer length (3).
   iree_tokenizer_segment_t segments[] = {{0, 10}};
-  iree_tokenizer_segment_list_t list = {
-      .count = 1, .values = segments, .last_is_partial = false};
+  iree_tokenizer_segment_list_t list =
+      iree_tokenizer_make_segment_list(segments, 1);
 
   iree_tokenizer_token_id_t tokens[8];
   iree_host_size_t segments_consumed = 0;
@@ -891,8 +891,8 @@ TEST_F(UnigramModelTest, SegmentBoundsStartExceedsEnd) {
 
   // Segment start (2) > end (1) - invalid.
   iree_tokenizer_segment_t segments[] = {{2, 1}};
-  iree_tokenizer_segment_list_t list = {
-      .count = 1, .values = segments, .last_is_partial = false};
+  iree_tokenizer_segment_list_t list =
+      iree_tokenizer_make_segment_list(segments, 1);
 
   iree_tokenizer_token_id_t tokens[8];
   iree_host_size_t segments_consumed = 0;

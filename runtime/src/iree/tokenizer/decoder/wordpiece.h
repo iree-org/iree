@@ -27,6 +27,16 @@ typedef struct iree_tokenizer_decoder_wordpiece_config_t {
   bool cleanup;
 } iree_tokenizer_decoder_wordpiece_config_t;
 
+// Creates a WordPiece configuration with the given continuation prefix and
+// cleanup flag.
+static inline iree_tokenizer_decoder_wordpiece_config_t
+iree_tokenizer_make_decoder_wordpiece_config(iree_string_view_t prefix,
+                                             bool cleanup) {
+  iree_tokenizer_decoder_wordpiece_config_t config = {/*prefix=*/prefix,
+                                                      /*cleanup=*/cleanup};
+  return config;
+}
+
 // Allocates a WordPiece decoder for BERT-style tokenizers.
 //
 // The decoder handles subword tokens:

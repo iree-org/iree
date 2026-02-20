@@ -70,10 +70,8 @@ std::string ProcessBatchedAndFinalize(iree_tokenizer_decoder_t* decoder,
     size_t remaining = tokens.size() - position;
     size_t batch = remaining < batch_size ? remaining : batch_size;
 
-    iree_tokenizer_string_list_t token_list = {
-        .count = batch,
-        .values = views.data() + position,
-    };
+    iree_tokenizer_string_list_t token_list =
+        iree_tokenizer_make_string_list(views.data() + position, batch);
 
     iree_host_size_t strings_consumed = 0;
     iree_host_size_t bytes_written = 0;
@@ -153,10 +151,8 @@ void TestLimitedOutputCapacity(iree_tokenizer_decoder_t* decoder,
 
   // Process tokens one at a time with limited output capacity.
   while (position < tokens.size()) {
-    iree_tokenizer_string_list_t token_list = {
-        .count = tokens.size() - position,
-        .values = views.data() + position,
-    };
+    iree_tokenizer_string_list_t token_list = iree_tokenizer_make_string_list(
+        views.data() + position, tokens.size() - position);
 
     iree_host_size_t strings_consumed = 0;
     iree_host_size_t bytes_written = 0;

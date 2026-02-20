@@ -34,10 +34,9 @@ class WordPieceDecoderTest : public ::testing::Test {
   void SetUp() override { decoder_ = CreateDecoder("##", true); }
 
   ScopedDecoder CreateDecoder(const char* prefix, bool cleanup) {
-    iree_tokenizer_decoder_wordpiece_config_t config = {
-        .prefix = iree_make_cstring_view(prefix),
-        .cleanup = cleanup,
-    };
+    iree_tokenizer_decoder_wordpiece_config_t config =
+        iree_tokenizer_make_decoder_wordpiece_config(
+            iree_make_cstring_view(prefix), cleanup);
     iree_tokenizer_decoder_t* raw_decoder = nullptr;
     IREE_CHECK_OK(iree_tokenizer_decoder_wordpiece_allocate(
         config, iree_allocator_system(), &raw_decoder));

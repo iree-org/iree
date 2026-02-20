@@ -42,6 +42,15 @@ typedef struct iree_tokenizer_bpe_heap_entry_t {
   uint32_t left_start_byte;
 } iree_tokenizer_bpe_heap_entry_t;
 
+// Creates a heap entry from a merge rank and the starting byte of the left
+// token in the segment.
+static inline iree_tokenizer_bpe_heap_entry_t
+iree_tokenizer_make_bpe_heap_entry(uint32_t rank, uint32_t left_start_byte) {
+  iree_tokenizer_bpe_heap_entry_t entry = {/*rank=*/rank,
+                                           /*left_start_byte=*/left_start_byte};
+  return entry;
+}
+
 // Returns true if entry |a| has higher priority (should be closer to root)
 // than entry |b|. Priority is determined by rank first, then by start_byte
 // for equal ranks (smaller start_byte = higher priority = leftmost first).
