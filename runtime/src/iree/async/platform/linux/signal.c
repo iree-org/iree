@@ -65,7 +65,7 @@ iree_status_t iree_async_linux_signal_add_signal(
   int fd = signalfd(state->signal_fd, &state->active_mask,
                     SFD_NONBLOCK | SFD_CLOEXEC);
   if (fd < 0) {
-    int error = errno;
+    IREE_ATTRIBUTE_UNUSED int error = errno;
     // Rollback: remove from active mask and unblock.
     sigdelset(&state->active_mask, posix_signal);
     pthread_sigmask(SIG_UNBLOCK, &block_mask, NULL);
