@@ -44,6 +44,7 @@ class SignalTest : public CtsTestBase<> {
  protected:
   void SetUp() override {
     CtsTestBase<>::SetUp();
+    if (!proactor_) return;  // Base class skipped (backend unavailable).
 
     // Skip if signal handling isn't available on this backend.
     if (!iree_async_proactor_supports_signals(proactor_)) {
