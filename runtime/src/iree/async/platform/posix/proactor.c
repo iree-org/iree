@@ -4,6 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// accept4() in compat.h requires _GNU_SOURCE for the glibc declaration.
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif  // _GNU_SOURCE
+
 #include "iree/async/platform/posix/proactor.h"
 
 #include <errno.h>
