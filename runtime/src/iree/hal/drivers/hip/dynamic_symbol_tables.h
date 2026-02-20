@@ -113,6 +113,11 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLaunchKernel, hipFunction_t,
                                unsigned int, unsigned int, unsigned int,
                                unsigned int, unsigned int, unsigned int,
                                unsigned int, hipStream_t, void **, void **)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipExtModuleLaunchKernel, hipFunction_t,
+                               unsigned int, unsigned int, unsigned int,
+                               unsigned int, unsigned int, unsigned int,
+                               size_t, hipStream_t, void **, void **,
+                               hipEvent_t, hipEvent_t, unsigned int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadData, hipModule_t *, const void *)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *,
                                unsigned int, hipJitOption *, void **)
