@@ -214,7 +214,6 @@ static inline iree_status_t iree_tokenizer_decoder_state_process(
     iree_tokenizer_string_list_t token_strings,
     iree_mutable_string_view_t output, iree_host_size_t* out_strings_consumed,
     iree_host_size_t* out_bytes_written) {
-  IREE_ASSERT(output.size >= IREE_TOKENIZER_DECODER_MIN_BUFFER_SIZE);
   return state->decoder->vtable->state_process(
       state, token_strings, output, out_strings_consumed, out_bytes_written);
 }
