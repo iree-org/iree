@@ -201,6 +201,25 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
       if (!getMask()) return std::nullopt;
       return getIndexingMapsArray().back();
     }
+
+    /// Invert the source indexing map to get a permutation map suitable for
+    /// vector.transfer_read. The source map is
+    /// (vector_dims)[symbols] -> (source_dims). This returns
+    /// (source_dims) -> (vector_dims), where non-dim results (gathered
+    /// symbols, broadcast constants) become constant 0.
+    AffineMap getPermutationMap() {
+      AffineMap sourceMap = getSourceIndexingMap();
+      MLIRContext *ctx = getContext();
+      SmallVector<AffineExpr> exprs(sourceMap.getNumDims(),
+                                    getAffineConstantExpr(0, ctx));
+      for (auto [i, expr] : llvm::enumerate(sourceMap.getResults())) {
+        if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+          exprs[dimExpr.getPosition()] = getAffineDimExpr(i, ctx);
+        }
+      }
+      return AffineMap::get(sourceMap.getNumResults(), /*symbolCount=*/0,
+                            exprs, ctx);
+    }
   }];
 
   let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";

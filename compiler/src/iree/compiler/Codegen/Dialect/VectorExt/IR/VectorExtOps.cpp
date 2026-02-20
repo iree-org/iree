@@ -357,22 +357,6 @@ OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
   return OpFoldResult();
 }
 
-/// Invert the source indexing map to get a permutation_map for
-/// vector.transfer_read. Constant-0 results become broadcast dims (0 in
-/// output), dim exprs are inverted.
-static AffineMap inverseSourceMap(AffineMap map) {
-  MLIRContext *ctx = map.getContext();
-  SmallVector<AffineExpr> exprs(map.getNumDims(),
-                                getAffineConstantExpr(0, ctx));
-  for (unsigned i : llvm::seq(unsigned(0), map.getNumResults())) {
-    if (isa<AffineConstantExpr>(map.getResult(i))) {
-      continue;
-    }
-    exprs[map.getDimPosition(i)] = getAffineDimExpr(i, ctx);
-  }
-  return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, ctx);
-}
-
 /// Apply an affine map transformation to a vector using broadcast and
 /// transpose operations.
 static Value applyTransformMapToVector(PatternRewriter &rewriter, Location loc,
@@ -517,8 +501,7 @@ struct FoldContiguousGatherToTransferRead final
       return failure();
     }
 
-    AffineMap baseMap = op.getIndexingMapsArray().front();
-    AffineMap permutationMap = inverseSourceMap(baseMap);
+    AffineMap permutationMap = op.getPermutationMap();
 
     Value mask = op.getMask();
     if (mask) {
@@ -539,7 +522,7 @@ struct FoldContiguousGatherToTransferRead final
       }
     }
 
-    SmallVector<bool> inBoundsVec(baseMap.getNumDims(), true);
+    SmallVector<bool> inBoundsVec(op.getType().getRank(), true);
     ArrayAttr inBounds = rewriter.getBoolArrayAttr(inBoundsVec);
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(

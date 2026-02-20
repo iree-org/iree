@@ -199,6 +199,31 @@ func.func @transfer_gather(%indices: vector<128xindex>,
 
 // -----
 
+func.func @transfer_gather_scalar_index(%idx: index,
+  %source: tensor<4096x64xf16>)
+  -> vector<64xf16> {
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%idx : index], %cst0 {
+    indexing_maps = [affine_map<(d0)[s0] -> (s0, d0)>,
+                     affine_map<(d0)[s0] -> ()>]
+  } : tensor<4096x64xf16>, vector<64xf16>
+
+  return %out : vector<64xf16>
+}
+
+// CHECK-DAG: #[[$SMAP_S0D0:.+]] = affine_map<(d0)[s0] -> (s0, d0)>
+// CHECK-DAG: #[[$IVMAP_SCALAR:.+]] = affine_map<(d0)[s0] -> ()>
+// CHECK-LABEL: func.func @transfer_gather_scalar_index
+// CHECK-SAME:    %[[IDX:.+]]: index, %[[SOURCE:.+]]: tensor<4096x64xf16>
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:   %[[PAD:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK:       iree_vector_ext.transfer_gather %[[SOURCE]][%[[C0]], %[[C0]]] [%[[IDX]] : index], %[[PAD]] {indexing_maps = [#[[$SMAP_S0D0]], #[[$IVMAP_SCALAR]]]} : tensor<4096x64xf16>, vector<64xf16>
+
+// -----
+
 // CHECK-LABEL: func @arg_compare_implicit_index
 func.func @arg_compare_implicit_index(%input: vector<4x128xf32>,
                                       %out_val: vector<4xf32>,

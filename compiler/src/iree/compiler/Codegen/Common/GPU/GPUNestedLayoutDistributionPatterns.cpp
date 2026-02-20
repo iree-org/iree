@@ -233,11 +233,11 @@ static LogicalResult populateWarpAndThreadIndices(
   return success();
 }
 
-static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
-                                         Location loc,
-                                         ArrayRef<int64_t> offsets,
-                                         NestedLayoutAttr vectorLayout,
-                                         VectorValue mask) {
+static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
+                                          Location loc,
+                                          ArrayRef<int64_t> offsets,
+                                          NestedLayoutAttr vectorLayout,
+                                          VectorValue mask) {
   SmallVector<int64_t> sliceMaskOffsets =
       getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
   SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
@@ -245,19 +245,6 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
       rewriter, loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(),
       strides);
   return slicedMask;
-}
-
-static VectorValue getSlicedIndexVec(PatternRewriter &rewriter, Location loc,
-                                     ArrayRef<int64_t> offsets,
-                                     NestedLayoutAttr vectorLayout,
-                                     VectorValue indexVec) {
-  SmallVector<int64_t> sliceMaskOffsets =
-      getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
-  SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
-  VectorValue slicedIndexVec = vector::ExtractStridedSliceOp::create(
-      rewriter, loc, indexVec, sliceMaskOffsets, vectorLayout.getElementTile(),
-      strides);
-  return slicedIndexVec;
 }
 
 /// Project a vector based on a provided projection map.
@@ -393,8 +380,8 @@ struct DistributeTransferRead final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, readOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       VectorValue slicedRead = vector::TransferReadOp::create(
@@ -576,8 +563,8 @@ struct DistributeTransferWrite final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, writeOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       vector::TransferWriteOp::create(rewriter, writeOp.getLoc(), slicedVector,
@@ -679,25 +666,11 @@ struct DistributeTransferGather final
     ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
 
-    // Derive the permutation map from the source indexing map.
-    // The source map is (vector_dims)[symbols] -> (source_dims).
-    // We need to build a permutation map (source_dims) -> (vector_dims)
-    // for getTransferIndicesFromNestedLayout.
-    AffineMap sourceMap = gatherOp.getIndexingMapsArray().front();
-    int64_t sourceRank =
-        cast<ShapedType>(gatherOp.getBase().getType()).getRank();
-    MLIRContext *ctx = rewriter.getContext();
-    SmallVector<AffineExpr> permExprs(rank, getAffineConstantExpr(0, ctx));
-    SmallVector<bool> isGatheredSourceDim(sourceRank, false);
-    for (auto [j, expr] : llvm::enumerate(sourceMap.getResults())) {
-      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        unsigned vecDim = dimExpr.getPosition();
-        permExprs[vecDim] = getAffineDimExpr(j, ctx);
-      } else if (isa<AffineSymbolExpr>(expr)) {
-        isGatheredSourceDim[j] = true;
-      }
-    }
-    AffineMap permMap = AffineMap::get(sourceRank, 0, permExprs, ctx);
+    // getPermutationMap inverts the source map, mapping gathered (symbol) and
+    // broadcast (constant) dims to constant 0. This is correct here because
+    // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
+    // leaving the original base offset unchanged for gathered dimensions.
+    AffineMap permMap = gatherOp.getPermutationMap();
 
     SmallVector<SmallVector<int64_t>> allMaskOffsets;
     std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
@@ -721,14 +694,6 @@ struct DistributeTransferGather final
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
 
-      // Only take the sliced indices for the non-indexed (non-gathered) values.
-      for (auto [dim, slicedIndex, index] :
-           llvm::enumerate(slicedIndices, indices)) {
-        if (isGatheredSourceDim[dim]) {
-          slicedIndex = index;
-        }
-      }
-
       // Extract offset from index_vecs.
       SmallVector<Value> slicedIndexVecs;
       for (auto [indexVecIdx, disIndexVec, layout] :
@@ -736,7 +701,7 @@ struct DistributeTransferGather final
         SmallVector<int64_t> offsets =
             llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
         ++allIndexVecOffsets[indexVecIdx];
-        VectorValue slicedIndexVec = getSlicedIndexVec(
+        VectorValue slicedIndexVec = getSlicedPermutedValue(
             rewriter, gatherOp.getLoc(), offsets, layout, disIndexVec);
         slicedIndexVecs.push_back(slicedIndexVec);
       }
@@ -747,8 +712,8 @@ struct DistributeTransferGather final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, gatherOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, gatherOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
