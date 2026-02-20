@@ -12,6 +12,7 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 namespace mlir::iree_compiler {
 
 std::string CodegenOptions::tuningSpecPath = "";
+bool CodegenOptions::setTunerAttributes = false;
 
 void CodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE Codegen Options");
@@ -21,6 +22,10 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Path to a module containing a tuning spec (transform "
                      "dialect library). Accepts MLIR text (.mlir) and "
                      "bytecode (.mlirbc) formats."));
+
+  binder.opt<bool>("iree-config-add-tuner-attributes", setTunerAttributes,
+                   llvm::cl::cat(category),
+                   llvm::cl::desc("Adds attribute for tuner."));
 }
 
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
