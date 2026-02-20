@@ -1936,16 +1936,25 @@ static iree_status_t iree_async_proactor_posix_execute_send(
     iree_async_socket_send_operation_t* send_op,
     iree_async_io_result_t* out_result) {
   *out_result = IREE_ASYNC_IO_COMPLETE;
+  int fd = send_op->socket->primitive.value.fd;
   struct iovec* iovecs = (struct iovec*)send_op->platform.posix.iovecs;
-  ssize_t result = writev(send_op->socket->primitive.value.fd, iovecs,
-                          send_op->buffers.count);
+  int iovec_count = (int)send_op->buffers.count;
+
+  ssize_t result = writev(fd, iovecs, iovec_count);
   if (result < 0) {
-    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+    int error = errno;
+    if (error == EAGAIN || error == EWOULDBLOCK) {
       *out_result = IREE_ASYNC_IO_WOULD_BLOCK;
       return iree_ok_status();
     }
-    return iree_make_status(iree_status_code_from_errno(errno),
-                            "writev() failed");
+    uint64_t total_requested = 0;
+    for (int i = 0; i < iovec_count; ++i) {
+      total_requested += iovecs[i].iov_len;
+    }
+    return iree_make_status(iree_status_code_from_errno(error),
+                            "writev(fd=%d, count=%d, total=%" PRIu64
+                            ") failed with errno=%d",
+                            fd, iovec_count, total_requested, error);
   }
 
   send_op->bytes_sent = (iree_host_size_t)result;

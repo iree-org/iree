@@ -64,14 +64,25 @@ class LargeTransferTest : public SocketTestBase<> {
       iree_status_t status =
           iree_async_proactor_submit_one(proactor_, &send_op.base);
       if (!iree_status_is_ok(status)) {
-        iree_status_ignore(status);
+        ADD_FAILURE() << "SendAll: submit_one failed at offset " << total_sent
+                      << "/" << total_size << ": "
+                      << iree::Status(std::move(status)).ToString();
         return 0;
       }
 
       PollUntil(/*min_completions=*/1,
                 /*total_budget=*/iree_make_duration_ms(30000));
 
-      if (!iree_status_is_ok(tracker.last_status) || send_op.bytes_sent == 0) {
+      if (!iree_status_is_ok(tracker.last_status)) {
+        ADD_FAILURE() << "SendAll: completion error at offset " << total_sent
+                      << "/" << total_size << ": "
+                      << iree::Status(tracker.ConsumeStatus()).ToString();
+        return 0;
+      }
+      if (send_op.bytes_sent == 0) {
+        ADD_FAILURE() << "SendAll: writev returned 0 bytes at offset "
+                      << total_sent << "/" << total_size
+                      << " (tracker.call_count=" << tracker.call_count << ")";
         return 0;
       }
       total_sent += send_op.bytes_sent;
@@ -97,15 +108,24 @@ class LargeTransferTest : public SocketTestBase<> {
       iree_status_t status =
           iree_async_proactor_submit_one(proactor_, &recv_op.base);
       if (!iree_status_is_ok(status)) {
-        iree_status_ignore(status);
+        ADD_FAILURE() << "RecvAll: submit_one failed at offset "
+                      << total_received << "/" << total_size << ": "
+                      << iree::Status(std::move(status)).ToString();
         return 0;
       }
 
       PollUntil(/*min_completions=*/1,
                 /*total_budget=*/iree_make_duration_ms(30000));
 
-      if (!iree_status_is_ok(tracker.last_status) ||
-          recv_op.bytes_received == 0) {
+      if (!iree_status_is_ok(tracker.last_status)) {
+        ADD_FAILURE() << "RecvAll: completion error at offset "
+                      << total_received << "/" << total_size << ": "
+                      << iree::Status(tracker.ConsumeStatus()).ToString();
+        return 0;
+      }
+      if (recv_op.bytes_received == 0) {
+        ADD_FAILURE() << "RecvAll: readv returned 0 bytes (EOF) at offset "
+                      << total_received << "/" << total_size;
         return 0;
       }
       total_received += recv_op.bytes_received;
@@ -146,10 +166,16 @@ TEST_P(LargeTransferTest, LargeTransfer_1MB) {
             /*total_budget=*/iree_make_duration_ms(5000));
 
   ASSERT_EQ(accept_tracker.call_count, 1);
+  IREE_ASSERT_OK(accept_tracker.ConsumeStatus());
   ASSERT_EQ(connect_tracker.call_count, 1);
+  IREE_ASSERT_OK(connect_tracker.ConsumeStatus());
   ASSERT_NE(accept_op.accepted_socket, nullptr);
 
   iree_async_socket_t* server = accept_op.accepted_socket;
+
+  // Verify no sticky failures on either socket before data transfer.
+  IREE_ASSERT_OK(iree_async_socket_query_failure(client));
+  IREE_ASSERT_OK(iree_async_socket_query_failure(server));
 
   // Allocate 1MB send and receive buffers.
   static constexpr iree_host_size_t kTransferSize = 1024 * 1024;  // 1MB
