@@ -27,9 +27,9 @@ namespace iree::async::cts {
 // Creates an IOCP proactor with full capabilities.
 static iree::StatusOr<iree_async_proactor_t*> CreateIOCPProactor() {
   iree_async_proactor_t* proactor = nullptr;
-  IREE_RETURN_IF_ERROR(iree_async_proactor_create_iocp(
-      iree_async_proactor_options_default(), iree_allocator_system(),
-      &proactor));
+  IREE_RETURN_IF_ERROR(
+      iree_async_proactor_create_iocp(iree_async_proactor_options_default(),
+                                      iree_allocator_system(), &proactor));
   return proactor;
 }
 
@@ -38,12 +38,11 @@ static iree::StatusOr<iree_async_proactor_t*> CreateIOCPProactor() {
 //===----------------------------------------------------------------------===//
 
 // IOCP backend: Windows-native, completion-based async I/O.
-static bool iocp_registered_ =
-    (CtsRegistry::RegisterBackend({
-         "iocp",
-         {"iocp", CreateIOCPProactor},
-         {"portable", "multishot"},
-     }),
-     true);
+static bool iocp_registered_ = (CtsRegistry::RegisterBackend({
+                                    "iocp",
+                                    {"iocp", CreateIOCPProactor},
+                                    {"portable", "multishot"},
+                                }),
+                                true);
 
 }  // namespace iree::async::cts

@@ -25,7 +25,7 @@ A binary event has two states: unsignaled and signaled. One operation records
 the event; another operation waits on it. The event carries no information
 beyond "has this specific thing happened."
 
-```
+```text
 cuEventRecord(event, stream_A);    // marks event on stream A
 cuStreamWaitEvent(stream_B, event); // stream B blocks until event fires
 ```
@@ -37,7 +37,7 @@ cuStreamWaitEvent(stream_B, event); // stream B blocks until event fires
 A timeline semaphore is a monotonically increasing uint64. Operations signal
 it to a value; other operations wait for it to reach or exceed a target value.
 
-```
+```text
 vkQueueSubmit(..., signal semaphore S to value 5);
 vkQueueSubmit(..., wait for S >= 5);
 ```

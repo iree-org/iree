@@ -54,8 +54,8 @@ class RelayWindowsTest : public CtsTestBase<> {
     while (iree_time_now() < deadline) {
       if (IsEventSignaled(event)) return true;
       // Poll to process relay dispatch.
-      iree_status_t status =
-          iree_async_proactor_poll(proactor_, iree_make_timeout_ms(10), nullptr);
+      iree_status_t status = iree_async_proactor_poll(
+          proactor_, iree_make_timeout_ms(10), nullptr);
       if (iree_status_is_deadline_exceeded(status)) {
         iree_status_ignore(status);
       } else if (!iree_status_is_ok(status)) {

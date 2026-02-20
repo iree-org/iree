@@ -603,24 +603,22 @@ TEST_P(FencePosixTest, ImportFence_MultipleCrossThreadImports) {
 
   std::thread threads[kThreadCount];
   for (int i = 0; i < kThreadCount; ++i) {
-    threads[i] = std::thread(
-        [this, semaphore, &signaler_fds, i]() {
-          // Stagger starts slightly so threads overlap with poll.
-          std::this_thread::sleep_for(std::chrono::milliseconds(5 + i * 5));
+    threads[i] = std::thread([this, semaphore, &signaler_fds, i]() {
+      // Stagger starts slightly so threads overlap with poll.
+      std::this_thread::sleep_for(std::chrono::milliseconds(5 + i * 5));
 
-          int fence_fd = -1;
-          CreateTestFenceWithSignaler(&fence_fd, &signaler_fds[i]);
+      int fence_fd = -1;
+      CreateTestFenceWithSignaler(&fence_fd, &signaler_fds[i]);
 
-          // Import fence from this thread. Each thread signals a different
-          // value so we can verify all imports completed.
-          iree_async_primitive_t fence_primitive =
-              iree_async_primitive_from_fd(fence_fd);
-          IREE_ASSERT_OK(iree_async_semaphore_import_fence(
-              proactor_, fence_primitive, semaphore,
-              static_cast<uint64_t>(i + 1)));
+      // Import fence from this thread. Each thread signals a different
+      // value so we can verify all imports completed.
+      iree_async_primitive_t fence_primitive =
+          iree_async_primitive_from_fd(fence_fd);
+      IREE_ASSERT_OK(iree_async_semaphore_import_fence(
+          proactor_, fence_primitive, semaphore, static_cast<uint64_t>(i + 1)));
 
-          SignalTestFence(signaler_fds[i]);
-        });
+      SignalTestFence(signaler_fds[i]);
+    });
   }
 
   // Main thread polls until semaphore reaches the highest value.

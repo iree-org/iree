@@ -9,7 +9,7 @@
 # Uses I/O Completion Ports for completion-based async I/O. The kernel
 # performs I/O and posts completion packets, so no worker threads are needed.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],

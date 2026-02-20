@@ -79,13 +79,13 @@ void iree_io_uring_sparse_table_unlock(iree_io_uring_sparse_table_t* table);
 // Acquires a contiguous range of |count| slots using first-fit strategy.
 // Returns the starting index, or -1 if insufficient contiguous space.
 // Caller MUST hold the lock.
-int32_t iree_io_uring_sparse_table_acquire(
-    iree_io_uring_sparse_table_t* table, uint16_t count);
+int32_t iree_io_uring_sparse_table_acquire(iree_io_uring_sparse_table_t* table,
+                                           uint16_t count);
 
 // Releases a contiguous range of |count| slots starting at |start|.
 // Caller MUST hold the lock.
-void iree_io_uring_sparse_table_release(
-    iree_io_uring_sparse_table_t* table, uint16_t start, uint16_t count);
+void iree_io_uring_sparse_table_release(iree_io_uring_sparse_table_t* table,
+                                        uint16_t start, uint16_t count);
 
 // Returns the total slot capacity of the table.
 static inline uint16_t iree_io_uring_sparse_table_capacity(

@@ -56,8 +56,7 @@ TEST_P(ResourceExhaustionTest, ManyConcurrentTimers) {
       IREE_EXPECT_OK(trackers[i].ConsumeStatus()) << "Timer " << i << " failed";
     }
   }
-  EXPECT_EQ(completed_count, kNumTimers)
-      << "Not all timers completed";
+  EXPECT_EQ(completed_count, kNumTimers) << "Not all timers completed";
 }
 
 // Submit and immediately cancel many operations.
@@ -131,8 +130,7 @@ TEST_P(ResourceExhaustionTest, RapidNopSubmissions) {
       IREE_EXPECT_OK(trackers[i].ConsumeStatus()) << "NOP " << i << " failed";
     }
   }
-  EXPECT_EQ(completed_count, kNumNops)
-      << "Not all NOPs completed";
+  EXPECT_EQ(completed_count, kNumNops) << "Not all NOPs completed";
 }
 
 // Interleaved submit and poll - simulates realistic workload.
@@ -155,7 +153,8 @@ TEST_P(ResourceExhaustionTest, InterleavedSubmitPoll) {
       timers[i].base.completion_fn = CompletionTracker::Callback;
       timers[i].base.user_data = &trackers[i];
 
-      IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &timers[i].base));
+      IREE_ASSERT_OK(
+          iree_async_proactor_submit_one(proactor_, &timers[i].base));
       ++total_submitted;
     }
 
