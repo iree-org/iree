@@ -36,9 +36,11 @@ static void iree_selfpipe_signal_handler(int signo) {
   int fd = g_selfpipe_write_fd;
   if (fd >= 0) {
     uint8_t byte = (uint8_t)signo;
-    // Errors intentionally ignored: EAGAIN (pipe full) or EBADF (teardown
-    // race) are both acceptable.
-    (void)write(fd, &byte, 1);
+    // Async-signal-safe: cannot log, assert, or handle errors.
+    // EAGAIN (pipe full) means signal already pending (coalesced by design).
+    // EBADF (teardown race) means system is shutting down.
+    ssize_t ignored = write(fd, &byte, 1);
+    (void)ignored;
   }
 }
 

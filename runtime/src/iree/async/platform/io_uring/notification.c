@@ -183,7 +183,9 @@ bool iree_async_io_uring_notification_wait(
 
     if (pfd.revents & POLLIN) {
       uint64_t value;
-      (void)read(fd, &value, sizeof(value));
+      ssize_t result = read(fd, &value, sizeof(value));
+      // EAGAIN means counter is already 0 (spurious wake, benign).
+      IREE_ASSERT(result >= 0 || errno == EAGAIN);
     }
 
     if (pfd.revents & (POLLHUP | POLLERR)) return false;

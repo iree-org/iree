@@ -640,10 +640,12 @@ static void iree_async_io_uring_fence_export_callback(
 
   if (iree_status_is_ok(status)) {
     // Semaphore reached the target value. Write to eventfd to make it readable.
-    // eventfd write only fails on counter overflow (UINT64_MAX-1 reached),
-    // which cannot happen with a single write of 1.
     uint64_t value = 1;
-    (void)write(tracker->eventfd, &value, sizeof(value));
+    ssize_t result = write(tracker->eventfd, &value, sizeof(value));
+    // EAGAIN means counter is already nonzero (redundant signal, benign).
+    // Any other failure (EBADF) indicates a lifecycle bug — the eventfd was
+    // closed while a timepoint callback was still pending.
+    IREE_ASSERT(result >= 0 || errno == EAGAIN);
   } else {
     // Semaphore failed or was cancelled. Leave fd unreadable so consumers
     // observe a timeout or check the semaphore for failure status.
@@ -1447,7 +1449,9 @@ static iree_status_t iree_async_proactor_io_uring_cancel_semaphore_wait(
 
   // Wake the proactor to process the cancellation.
   uint64_t wake_value = 1;
-  (void)write(proactor->wake_eventfd, &wake_value, sizeof(wake_value));
+  ssize_t result =
+      write(proactor->wake_eventfd, &wake_value, sizeof(wake_value));
+  IREE_ASSERT(result >= 0 || errno == EAGAIN);
 
   return iree_ok_status();
 }

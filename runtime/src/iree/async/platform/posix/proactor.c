@@ -3285,15 +3285,17 @@ static void iree_async_proactor_posix_notification_signal(
     iree_async_notification_t* notification, int32_t wake_count) {
   (void)base_proactor;
   // Write eventfd/pipe to wake the poll thread (async waits and relays).
+  // EAGAIN means already signaled (redundant, benign). EBADF/EPIPE indicates
+  // the notification's fd was closed while still in use — a lifecycle bug.
+  int signal_fd = notification->platform.posix.signal_primitive.value.fd;
 #if defined(IREE_PLATFORM_LINUX)
   uint64_t value = 1;
-  (void)write(notification->platform.posix.signal_primitive.value.fd, &value,
-              sizeof(value));
+  ssize_t result = write(signal_fd, &value, sizeof(value));
 #else
   uint8_t value = 1;
-  (void)write(notification->platform.posix.signal_primitive.value.fd, &value,
-              sizeof(value));
+  ssize_t result = write(signal_fd, &value, sizeof(value));
 #endif  // IREE_PLATFORM_LINUX
+  IREE_ASSERT(result >= 0 || errno == EAGAIN);
   // Wake sync waiters directly via futex on the epoch atomic.
   iree_futex_wake(&notification->epoch, wake_count);
 }
@@ -3333,15 +3335,17 @@ static void iree_async_proactor_posix_notification_signal(
     iree_async_notification_t* notification, int32_t wake_count) {
   (void)base_proactor;
   // Write eventfd/pipe to wake the poll thread (async waits and relays).
+  // EAGAIN means already signaled (redundant, benign). EBADF/EPIPE indicates
+  // the notification's fd was closed while still in use — a lifecycle bug.
+  int signal_fd = notification->platform.posix.signal_primitive.value.fd;
 #if defined(IREE_PLATFORM_LINUX)
   uint64_t value = 1;
-  (void)write(notification->platform.posix.signal_primitive.value.fd, &value,
-              sizeof(value));
+  ssize_t result = write(signal_fd, &value, sizeof(value));
 #else
   uint8_t value = 1;
-  (void)write(notification->platform.posix.signal_primitive.value.fd, &value,
-              sizeof(value));
+  ssize_t result = write(signal_fd, &value, sizeof(value));
 #endif  // IREE_PLATFORM_LINUX
+  IREE_ASSERT(result >= 0 || errno == EAGAIN);
   // Wake sync waiters via condvar.
   iree_notification_post(&notification->platform.posix.sync_notification,
                          wake_count);

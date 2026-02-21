@@ -123,7 +123,8 @@ TEST_P(EventSourceEventfdTest, CallbackFires) {
         state->call_count++;
         // Drain the eventfd to prevent re-triggering (level-triggered).
         uint64_t value = 0;
-        (void)read(state->fd, &value, sizeof(value));
+        ssize_t result = read(state->fd, &value, sizeof(value));
+        IREE_ASSERT(result >= 0 || errno == EAGAIN);
       },
       &state};
 
@@ -167,7 +168,8 @@ TEST_P(EventSourceEventfdTest, MultipleSignals) {
         state->call_count++;
         // Drain the eventfd.
         uint64_t value = 0;
-        (void)read(state->fd, &value, sizeof(value));
+        ssize_t result = read(state->fd, &value, sizeof(value));
+        IREE_ASSERT(result >= 0 || errno == EAGAIN);
       },
       &state};
 
@@ -215,7 +217,8 @@ TEST_P(EventSourceEventfdTest, UnregisterStopsCallbacks) {
         auto* state = static_cast<CallbackState*>(user_data);
         state->call_count++;
         uint64_t value = 0;
-        (void)read(state->fd, &value, sizeof(value));
+        ssize_t result = read(state->fd, &value, sizeof(value));
+        IREE_ASSERT(result >= 0 || errno == EAGAIN);
       },
       &state};
 
@@ -281,7 +284,8 @@ TEST_P(EventSourceEventfdTest, MultipleEventSources) {
           auto* data = static_cast<CallbackData*>(user_data);
           (*data->counter)++;
           uint64_t value = 0;
-          (void)read(data->fd, &value, sizeof(value));
+          ssize_t result = read(data->fd, &value, sizeof(value));
+          IREE_ASSERT(result >= 0 || errno == EAGAIN);
         },
         &callback_data[i]};
 
@@ -434,7 +438,8 @@ TEST_P(EventSourcePosixTest, PipeDataDeliversPollIn) {
         state->last_events.store(events);
         // Drain the pipe to prevent re-triggering.
         char buffer[64];
-        (void)read(state->read_fd, buffer, sizeof(buffer));
+        ssize_t result = read(state->read_fd, buffer, sizeof(buffer));
+        IREE_ASSERT(result >= 0 || errno == EAGAIN);
       },
       &state};
 
