@@ -16,6 +16,7 @@ package(
 exports_files([
     "IREECPUAttrs.td",
     "IREECPUDialect.td",
+    "IREECPUEnums.td",
 ])
 
 iree_td_library(
@@ -25,6 +26,7 @@ iree_td_library(
         [
             "IREECPUAttrs.td",
             "IREECPUDialect.td",
+            "IREECPUEnums.td",
         ],
         include = ["*.td"],
     ),
@@ -43,6 +45,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "IREECPUDialect.h",
+        "IREECPUEnums.h",
         "IREECPUTypes.h",
     ],
     textual_hdrs = [
@@ -50,10 +53,13 @@ iree_compiler_cc_library(
         "IREECPUAttrs.h.inc",
         "IREECPUDialect.cpp.inc",
         "IREECPUDialect.h.inc",
+        "IREECPUEnums.cpp.inc",
+        "IREECPUEnums.h.inc",
     ],
     deps = [
         ":IREECPUAttrs",
         ":IREECPUDialectGen",
+        ":IREECPUEnums",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
@@ -82,6 +88,29 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREECPUDialect.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREECPUEnums",
+    tbl_outs = [
+        (
+            [
+                "--gen-enum-decls",
+                "--dialect=iree_cpu",
+            ],
+            "IREECPUEnums.h.inc",
+        ),
+        (
+            [
+                "--gen-enum-defs",
+                "--dialect=iree_cpu",
+            ],
+            "IREECPUEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREECPUEnums.td",
     deps = [":td_files"],
 )
 

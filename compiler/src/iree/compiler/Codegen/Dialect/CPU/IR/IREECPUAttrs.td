@@ -8,8 +8,92 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_CPU_IREECPUATTRS
 
 include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.td"
+include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.td"
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
+
+//===----------------------------------------------------------------------===//
+// MMA intrinsic
+//===----------------------------------------------------------------------===//
+
+def IREECPU_MMAIntrinsicAttr
+    : EnumAttr<IREECPU_Dialect, IREECPU_MMAIntrinsic, "mma_intrinsic">;
+
+//===----------------------------------------------------------------------===//
+// InnerTiledSemantics (for use with iree_codegen.inner_tiled)
+//===----------------------------------------------------------------------===//
+
+def IREECPU_InnerTiledSemanticsAttr
+    : AttrDef<
+          IREECPU_Dialect, "InnerTiledSemantics",
+          [DeclareAttrInterfaceMethods<
+              IREECodegen_InnerTiledSemanticsAttrInterface, ["getTileTypes",
+                                                             "getOpaque"]>]> {
+  let mnemonic = "mma_semantics";
+  let cppNamespace = "::mlir::iree_compiler::IREE::CPU";
+
+  let description = [{
+    Attribute describing aspects of inner-tiled MMA semantics that are
+    orthogonal to the data_tiled_mma_layout kind. On CPU, tiles are always
+    undistributed (no thread distribution) and always expanded (opaque = false),
+    so there is currently no parameter here, making this temporarily a unit
+    attribute, but this could evolve in the future to look more like
+    IREEGPU_InnerTiledSemanticsAttr.
+  }];
+
+  let parameters = (ins);
+
+  let assemblyFormat = "`<` `>`";
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiled MMA Attributes
+//===----------------------------------------------------------------------===//
+//
+// CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
+// iree_codegen.inner_tiled. Like the GPU case, this wraps an intrinsic-enum and
+// some intrinsics_{m,n,k} unrolling factor. Unlike the GPU case, there is no
+// thread-distribution, no concept of subgroups and no interleaving of
+// intrinsics' layout.
+//
+// Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
+// here but are unused.
+//
+
+def IREECPU_DataTiledMMAAttr
+    : AttrDef<
+          IREECPU_Dialect, "DataTiledMMA",
+          [DeclareAttrInterfaceMethods<
+              IREECodegen_InnerTileDescAttrInterface,
+              ["getExpectedNumInputs", "getExpectedNumOutputs",
+               "verifyIndexingMaps", "getUndistributedTileTypes",
+               "getDistributedTileTypes", "getUndistributedTileDimExpansion",
+               "populateOperandOffsetsSizesStrides",
+               "getDistributionMappingKind", "getDistributionWorkerCount",
+               "buildUnderlyingOperations",
+]>]> {
+  let mnemonic = "data_tiled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::CPU";
+
+  let description = [{
+    CPU data-tiled MMA layout.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters =
+      (ins EnumParameter<IREECPU_MMAIntrinsic>:$intrinsic,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the M dimension.">:$intrinsics_m,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the N dimension.">:$intrinsics_n,
+          DefaultValuedParameter<
+              "int64_t", "1",
+              "Intrinsic count along the K dimension.">:$intrinsics_k);
+}
 
 //===----------------------------------------------------------------------===//
 // CPU Specific Lowering Config Attributes
