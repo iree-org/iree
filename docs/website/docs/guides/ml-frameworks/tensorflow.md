@@ -115,7 +115,7 @@ print(list(loaded_model.signatures.keys()))
     ["Missing serving signature in SavedModel"](#missing-serving-signature-in-savedmodel).
 
 Then you can import the model with `iree-import-tf`. You can read the options
-supported via `iree-import-tf -help`. Using
+supported via `iree-import-tf --help`. Using
 [MobileNet v2](https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification)
 as an example and assuming the serving signature is `predict`:
 

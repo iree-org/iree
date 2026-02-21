@@ -66,7 +66,6 @@ iree-build/tools/iree-compile \
   --iree-vm-target-truncate-unsupported-floats \
   --iree-llvmgpu-enable-prefetch=true \
   --iree-opt-data-tiling=false \
-  --iree-codegen-gpu-native-math-precision=true \
   --iree-codegen-llvmgpu-use-vector-distribution \
   --iree-rocm-waves-per-eu=2 \
   --iree-execution-model=async-external \
