@@ -291,7 +291,7 @@ TEST_P(LargeTransferTest, LargeTransfer_SmallSendBuffer) {
   int send_buffer_size = 1;
 #if defined(_WIN32)
   ASSERT_EQ(
-      setsockopt(reinterpret_cast<SOCKET>(client->primitive.value.win32_handle),
+      setsockopt(static_cast<SOCKET>(client->primitive.value.win32_handle),
                  SOL_SOCKET, SO_SNDBUF,
                  reinterpret_cast<const char*>(&send_buffer_size),
                  sizeof(send_buffer_size)),
