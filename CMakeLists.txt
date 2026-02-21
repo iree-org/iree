@@ -294,6 +294,41 @@ set(IREE_HAL_DRIVER_METAL_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 # Right now only support Apple silicon devices.
 if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
   set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
+else()
+  # Check if Metal offline compilation tools are available
+  # These tools are required to compile MSL to Metal libraries
+  find_program(METAL_COMPILER xcrun)
+  if(METAL_COMPILER)
+    execute_process(
+      COMMAND xcrun --find metal
+      OUTPUT_VARIABLE METAL_TOOL_PATH
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE METAL_TOOL_RESULT
+    )
+    execute_process(
+      COMMAND xcrun --find metallib
+      OUTPUT_VARIABLE METALLIB_TOOL_PATH
+      ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE METALLIB_TOOL_RESULT
+    )
+    if(NOT METAL_TOOL_RESULT EQUAL 0 OR NOT METALLIB_TOOL_RESULT EQUAL 0)
+      message(WARNING "Metal offline compilation tools (metal/metallib) not found. "
+              "Metal support will be disabled. "
+              "To enable Metal support, install Xcode (not just Command Line Tools) "
+              "and run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer")
+      set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
+      set(IREE_TARGET_BACKEND_METAL_SPIRV OFF CACHE BOOL "Metal backend disabled (tools not found)" FORCE)
+    else()
+      message(STATUS "Metal offline compilation tools found:")
+      message(STATUS "  metal: ${METAL_TOOL_PATH}")
+      message(STATUS "  metallib: ${METALLIB_TOOL_PATH}")
+    endif()
+  else()
+    message(WARNING "xcrun not found. Metal support will be disabled.")
+    set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
+  endif()
 endif()
 
 # Null skeleton driver is only enabled in debug builds or dev mode.
