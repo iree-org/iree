@@ -373,6 +373,8 @@ def VMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F16", 0>;
 def VMFMA_F32_32x32x16_F16  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F16", 1>;
 def VMFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F8E4M3FNUZ", 2>;
 def VMFMA_F32_32x32x16_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F8E4M3FNUZ", 3>;
+def VSMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VSMFMA_F32_16x16x32_F16", 4>;
+def VSMFMA_I32_16x16x64_I8   : I32EnumAttrCase<"VSMFMA_I32_16x16x64_I8", 5>;
 
 def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
     "Descriptor for different Virtual MMA intrinsics", [
@@ -380,6 +382,8 @@ def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
       VMFMA_F32_32x32x16_F16,
       VMFMA_F32_16x16x32_F8E4M3FNUZ,
       VMFMA_F32_32x32x16_F8E4M3FNUZ,
+      VSMFMA_F32_16x16x32_F16,
+      VSMFMA_I32_16x16x64_I8,
     ]>;
 
 // Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above
