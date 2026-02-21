@@ -6,7 +6,7 @@ exclude: "third_party/"
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v6.0.0
     hooks:
       - id: check-merge-conflict
 
@@ -25,7 +25,7 @@ repos:
         exclude_types: ["image", "jupyter"]
 
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 25.11.0
     hooks:
       - id: black
         name: Run Black to format Python files
@@ -34,14 +34,14 @@ repos:
     # Loosely track the most recent versions in
     #   * Runner images: https://github.com/actions/runner-images/
     #   * Editor extensions: https://github.com/microsoft/vscode-cpptools
-    rev: v18.1.3
+    rev: v21.1.8
     hooks:
       - id: clang-format
         name: Run clang-format on C/C++/etc. files
         exclude_types: ["jupyter"]
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
         name: Run markdownlint on .md files

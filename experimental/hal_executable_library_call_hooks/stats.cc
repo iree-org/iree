@@ -11,7 +11,7 @@
 #include <cmath>
 #include <cstdio>
 
-float sum(const std::vector<float> &v) {
+float sum(const std::vector<float>& v) {
   float s = 0;
   for (float x : v) {
     s += x;
@@ -19,9 +19,9 @@ float sum(const std::vector<float> &v) {
   return s;
 }
 
-float mean(const std::vector<float> &v) { return sum(v) / v.size(); }
+float mean(const std::vector<float>& v) { return sum(v) / v.size(); }
 
-float covariance(const std::vector<float> &u, const std::vector<float> &v) {
+float covariance(const std::vector<float>& u, const std::vector<float>& v) {
   assert(u.size() == v.size());
   float mean_u = mean(u);
   float mean_v = mean(v);
@@ -32,15 +32,15 @@ float covariance(const std::vector<float> &u, const std::vector<float> &v) {
   return s / u.size();
 }
 
-float variance(const std::vector<float> &v) { return covariance(v, v); }
+float variance(const std::vector<float>& v) { return covariance(v, v); }
 
-float correlation(const std::vector<float> &u, const std::vector<float> &v) {
+float correlation(const std::vector<float>& u, const std::vector<float>& v) {
   return covariance(u, v) / std::sqrt(variance(u) * variance(v));
 }
 
-void splitIntoBuckets(const std::vector<float> &v, int bucket_count,
-                      std::vector<float> *bucket_means,
-                      std::vector<int> *bucket_indices) {
+void splitIntoBuckets(const std::vector<float>& v, int bucket_count,
+                      std::vector<float>* bucket_means,
+                      std::vector<int>* bucket_indices) {
   bucket_means->resize(bucket_count);
   bucket_indices->resize(v.size());
   std::vector<float> sorted(v);
@@ -68,8 +68,8 @@ void splitIntoBuckets(const std::vector<float> &v, int bucket_count,
 }
 
 void computeConditionalProbabilityTable(
-    int bucket_count, const std::vector<int> &bucket_indices_x,
-    const std::vector<int> &bucket_indices_y, std::vector<float> *table) {
+    int bucket_count, const std::vector<int>& bucket_indices_x,
+    const std::vector<int>& bucket_indices_y, std::vector<float>* table) {
   assert(bucket_indices_x.size() == bucket_indices_y.size());
   int sample_count = bucket_indices_x.size();
   table->clear();
@@ -92,12 +92,12 @@ void computeConditionalProbabilityTable(
   }
 }
 
-void printConditionalProbabilityTable(FILE *file, int bucket_count,
-                                      const std::vector<float> &table) {
-  const char *gamma_env = getenv("IREE_HOOK_GAMMA");
+void printConditionalProbabilityTable(FILE* file, int bucket_count,
+                                      const std::vector<float>& table) {
+  const char* gamma_env = getenv("IREE_HOOK_GAMMA");
   float gamma = gamma_env ? strtof(gamma_env, nullptr) : 0.5f;
 
-  const char *shades[] = {"  ", "_ ", "__", "▁_", "▁▁", "▂▁", "▂▂",
+  const char* shades[] = {"  ", "_ ", "__", "▁_", "▁▁", "▂▁", "▂▂",
                           "▃▂", "▃▃", "▄▃", "▄▄", "▅▄", "▅▅", "▆▅",
                           "▆▆", "▇▆", "▇▇", "█▇", "██"};
   const int shades_count = (sizeof shades) / (sizeof shades[0]);

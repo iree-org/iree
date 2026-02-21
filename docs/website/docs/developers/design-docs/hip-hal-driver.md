@@ -223,8 +223,9 @@ instead:
 Another problem is that per the `hipLaunchHostFunc()` doc, "the function will
 be called after currently enqueued work and will block work added after it."
 We don't want the blocking behavior involving host. So we can use a dedicated
-`hipStream_t` for launching the host function, waiting on the `hipEvent_t` from the
-original stream too. We can also handle resource deallocation together there.
+`hipStream_t` for launching the host function, waiting on the
+`hipEvent_t` from the original stream too. We can also handle
+resource deallocation together there.
 
 #### Data structures
 

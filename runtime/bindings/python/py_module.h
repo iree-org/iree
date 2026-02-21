@@ -13,7 +13,7 @@
 
 namespace iree::python {
 
-void SetupPyModuleBindings(py::module_ &m);
+void SetupPyModuleBindings(py::module_& m);
 
 }  // namespace iree::python
 

@@ -25,13 +25,13 @@ namespace iree::python {
 
 namespace {
 
-VmModule CreateIoParametersModule(VmInstance &instance, py::args providers) {
-  iree_vm_module_t *module = nullptr;
-  std::vector<iree_io_parameter_provider_t *> c_providers;
+VmModule CreateIoParametersModule(VmInstance& instance, py::args providers) {
+  iree_vm_module_t* module = nullptr;
+  std::vector<iree_io_parameter_provider_t*> c_providers;
   iree_host_size_t size = providers.size();
   c_providers.resize(size);
   for (iree_host_size_t i = 0; i < size; ++i) {
-    ParameterProvider *provider = py::cast<ParameterProvider *>(providers[i]);
+    ParameterProvider* provider = py::cast<ParameterProvider*>(providers[i]);
     c_providers[i] = provider->raw_ptr();
   }
   CheckApiStatus(iree_io_parameters_module_create(
@@ -42,7 +42,7 @@ VmModule CreateIoParametersModule(VmInstance &instance, py::args providers) {
 }
 
 FileHandle FileHandleWrapMemory(py::object host_buffer, bool readable,
-                                bool writable, size_t &out_buffer_size) {
+                                bool writable, size_t& out_buffer_size) {
   struct Retained {
     Retained(py::object host_buffer)
         : buffer_request(host_buffer, PyBUF_SIMPLE),
@@ -55,21 +55,21 @@ FileHandle FileHandleWrapMemory(py::object host_buffer, bool readable,
   iree_io_file_access_t access = 0;
   if (readable) access |= IREE_IO_FILE_ACCESS_READ;
   if (writable) access |= IREE_IO_FILE_ACCESS_WRITE;
-  iree_io_file_handle_t *created_handle;
+  iree_io_file_handle_t* created_handle;
   out_buffer_size = outer_retained->buffer_request.view().len;
   CheckApiStatus(
       iree_io_file_handle_wrap_host_allocation(
           access,
           iree_byte_span_t{
-              static_cast<uint8_t *>(outer_retained->buffer_request.view().buf),
+              static_cast<uint8_t*>(outer_retained->buffer_request.view().buf),
               static_cast<iree_host_size_t>(
                   outer_retained->buffer_request.view().len)},
           iree_io_file_handle_release_callback_t{
-              +[](void *user_data, iree_io_file_handle_primitive_t primitive) {
-                Retained *inner_retained = static_cast<Retained *>(user_data);
+              +[](void* user_data, iree_io_file_handle_primitive_t primitive) {
+                Retained* inner_retained = static_cast<Retained*>(user_data);
                 delete inner_retained;
               },
-              (void *)outer_retained.get(),
+              (void*)outer_retained.get(),
           },
           iree_allocator_system(), &created_handle),
       "Could not wrap host memory into a file handle");
@@ -81,7 +81,7 @@ FileHandle FileHandleWrapFd(int fd, bool readable, bool writable) {
   iree_io_file_mode_t mode = 0;
   if (readable) mode |= IREE_IO_FILE_MODE_READ;
   if (writable) mode |= IREE_IO_FILE_MODE_WRITE;
-  iree_io_file_handle_t *created_handle;
+  iree_io_file_handle_t* created_handle;
   CheckApiStatus(iree_io_file_handle_open_fd(mode, fd, iree_allocator_system(),
                                              &created_handle),
                  "Could not wrap host fd into a file handle");
@@ -89,15 +89,15 @@ FileHandle FileHandleWrapFd(int fd, bool readable, bool writable) {
   return FileHandle::StealFromRawPtr(created_handle);
 }
 
-void ParameterIndexAddFromFileHandle(ParameterIndex &self, std::string &key,
-                                     FileHandle &file_handle, uint64_t length,
+void ParameterIndexAddFromFileHandle(ParameterIndex& self, std::string& key,
+                                     FileHandle& file_handle, uint64_t length,
                                      uint64_t offset,
                                      std::optional<std::string> metadata) {
   iree_io_parameter_index_entry_t entry;
   memset(&entry, 0, sizeof(entry));
   entry.key = iree_make_string_view(key.data(), key.size());
   if (metadata) {
-    entry.metadata.data = reinterpret_cast<const uint8_t *>(metadata->data());
+    entry.metadata.data = reinterpret_cast<const uint8_t*>(metadata->data());
     entry.metadata.data_length = metadata->size();
   }
   entry.length = length;
@@ -108,9 +108,9 @@ void ParameterIndexAddFromFileHandle(ParameterIndex &self, std::string &key,
                  "Could not add parameter index entry");
 }
 
-void ParameterIndexParseFileHandle(ParameterIndex &self,
-                                   FileHandle &file_handle,
-                                   std::string &format) {
+void ParameterIndexParseFileHandle(ParameterIndex& self,
+                                   FileHandle& file_handle,
+                                   std::string& format) {
   CheckApiStatus(
       iree_io_parse_file_index(
           iree_make_string_view(format.data(), format.size()),
@@ -118,7 +118,7 @@ void ParameterIndexParseFileHandle(ParameterIndex &self,
       "Could not parse parameter file index");
 }
 
-void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
+void ParameterIndexLoadFile(ParameterIndex& self, std::string& file_path,
                             std::optional<std::string> format, bool readable,
                             bool writable, bool mmap) {
   // Default format from extension.
@@ -140,19 +140,19 @@ void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
   // so for now this remains slow.
 
   // Open file.
-  iree_io_file_handle_t *raw_file_handle = nullptr;
+  iree_io_file_handle_t* raw_file_handle = nullptr;
   if (mmap) {
-    iree_io_file_contents_t *contents = NULL;
+    iree_io_file_contents_t* contents = NULL;
     CheckApiStatus(
         iree_io_file_contents_map(
             iree_make_string_view(file_path.data(), file_path.size()),
             IREE_IO_FILE_ACCESS_READ, iree_allocator_system(), &contents),
         "Mapping parameter file");
     iree_io_file_handle_release_callback_t release_callback = {
-        /*.fn=*/+[](void *user_data,
+        /*.fn=*/+[](void* user_data,
                     iree_io_file_handle_primitive_t handle_primitive) {
-          iree_io_file_contents_t *contents =
-              (iree_io_file_contents_t *)user_data;
+          iree_io_file_contents_t* contents =
+              (iree_io_file_contents_t*)user_data;
           iree_io_file_contents_free(contents);
         },
         /*.user_data=*/contents,
@@ -181,12 +181,12 @@ struct ParameterIndexEntryWrapper {
   ParameterIndexEntryWrapper(ParameterIndex index) : index(std::move(index)) {}
 
   ParameterIndex index;
-  const iree_io_parameter_index_entry_t *entry = nullptr;
+  const iree_io_parameter_index_entry_t* entry = nullptr;
 };
 
 }  // namespace
 
-int FileHandle::HandleBufferProtocol(Py_buffer *view, int flags) {
+int FileHandle::HandleBufferProtocol(Py_buffer* view, int flags) {
   auto primitive = iree_io_file_handle_primitive(raw_ptr());
   if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     PyErr_SetString(PyExc_ValueError,
@@ -205,7 +205,7 @@ int FileHandle::HandleBufferProtocol(Py_buffer *view, int flags) {
       iree_io_file_handle_access(raw_ptr()) & IREE_IO_FILE_ACCESS_WRITE;
   view->readonly = !is_writable;
   view->itemsize = 1;
-  view->format = (char *)"B";  // Byte
+  view->format = (char*)"B";  // Byte
   view->ndim = 1;
   view->shape = nullptr;
   view->strides = nullptr;
@@ -214,7 +214,7 @@ int FileHandle::HandleBufferProtocol(Py_buffer *view, int flags) {
   return 0;
 }
 
-void SetupIoBindings(py::module_ &m) {
+void SetupIoBindings(py::module_& m) {
   m.def("create_io_parameters_module", &CreateIoParametersModule);
 
   auto file_handle = py::class_<FileHandle>(m, "FileHandle");
@@ -233,7 +233,7 @@ void SetupIoBindings(py::module_ &m) {
                   py::arg("readable") = true, py::arg("writable") = false)
       .def_prop_ro(
           "is_host_allocation",
-          [](FileHandle &self) {
+          [](FileHandle& self) {
             auto primitive = iree_io_file_handle_primitive(self.raw_ptr());
             return primitive.type == IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION;
           })
@@ -243,13 +243,13 @@ void SetupIoBindings(py::module_ &m) {
             return py::steal<py::object>(PyMemoryView_FromObject(self.ptr()));
           })
       .def_prop_ro("is_fd",
-                   [](FileHandle &self) {
+                   [](FileHandle& self) {
                      auto primitive =
                          iree_io_file_handle_primitive(self.raw_ptr());
                      return primitive.type == IREE_IO_FILE_HANDLE_TYPE_FD;
                    })
       .def_prop_ro("fd",
-                   [](FileHandle &self) {
+                   [](FileHandle& self) {
                      auto primitive =
                          iree_io_file_handle_primitive(self.raw_ptr());
                      return primitive.value.fd;
@@ -268,30 +268,30 @@ void SetupIoBindings(py::module_ &m) {
   py::class_<ParameterProvider>(m, "ParameterProvider");
   py::class_<ParameterIndexEntryWrapper>(m, "ParameterIndexEntry")
       .def_prop_ro("key",
-                   [](ParameterIndexEntryWrapper &self) {
+                   [](ParameterIndexEntryWrapper& self) {
                      return py::str(self.entry->key.data, self.entry->key.size);
                    })
       .def_prop_ro(
           "length",
-          [](ParameterIndexEntryWrapper &self) { return self.entry->length; })
+          [](ParameterIndexEntryWrapper& self) { return self.entry->length; })
       .def_prop_ro("metadata",
-                   [](ParameterIndexEntryWrapper &self) {
-                     return py::bytes((const char *)self.entry->metadata.data,
+                   [](ParameterIndexEntryWrapper& self) {
+                     return py::bytes((const char*)self.entry->metadata.data,
                                       self.entry->metadata.data_length);
                    })
       .def_prop_ro("is_file",
-                   [](ParameterIndexEntryWrapper &self) {
+                   [](ParameterIndexEntryWrapper& self) {
                      return self.entry->type ==
                             IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE;
                    })
       .def_prop_ro("is_splat",
-                   [](ParameterIndexEntryWrapper &self) {
+                   [](ParameterIndexEntryWrapper& self) {
                      return self.entry->type ==
                             IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT;
                    })
       .def_prop_ro(
           "file_storage",
-          [](ParameterIndexEntryWrapper &self) {
+          [](ParameterIndexEntryWrapper& self) {
             if (self.entry->type !=
                 IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE) {
               throw std::invalid_argument("Entry is not file storage based");
@@ -312,16 +312,16 @@ void SetupIoBindings(py::module_ &m) {
                      return memview.attr("__getitem__")(slice);
                    })
       .def_prop_ro("splat_pattern",
-                   [](ParameterIndexEntryWrapper &self) {
+                   [](ParameterIndexEntryWrapper& self) {
                      if (self.entry->type !=
                          IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT) {
                        throw std::invalid_argument("Entry is not splat");
                      }
                      return py::bytes(
-                         (const char *)self.entry->storage.splat.pattern,
+                         (const char*)self.entry->storage.splat.pattern,
                          self.entry->storage.splat.pattern_length);
                    })
-      .def("__repr__", [](py::handle &self_object) {
+      .def("__repr__", [](py::handle& self_object) {
         if (py::cast<py::bool_>(self_object.attr("is_splat"))) {
           return py::str("<ParameterIndexEntry '{}' splat {}:{}>")
               .format(self_object.attr("key"),
@@ -338,8 +338,8 @@ void SetupIoBindings(py::module_ &m) {
       });
   py::class_<ParameterIndex>(m, "ParameterIndex")
       .def("__init__",
-           [](ParameterIndex *new_self) {
-             iree_io_parameter_index_t *created;
+           [](ParameterIndex* new_self) {
+             iree_io_parameter_index_t* created;
              CheckApiStatus(iree_io_parameter_index_create(
                                 iree_allocator_system(), &created),
                             "Could not create IO parameter index");
@@ -347,12 +347,12 @@ void SetupIoBindings(py::module_ &m) {
              *new_self = ParameterIndex::StealFromRawPtr(created);
            })
       .def("__len__",
-           [](ParameterIndex &self) {
+           [](ParameterIndex& self) {
              return iree_io_parameter_index_count(self.raw_ptr());
            })
       .def(
           "__getitem__",
-          [](ParameterIndex &self, iree_host_size_t i) {
+          [](ParameterIndex& self, iree_host_size_t i) {
             ParameterIndexEntryWrapper entry_wrapper(self);
             CheckApiStatus(iree_io_parameter_index_get(self.raw_ptr(), i,
                                                        &entry_wrapper.entry),
@@ -361,7 +361,7 @@ void SetupIoBindings(py::module_ &m) {
           },
           py::arg("i"))
       .def("items",
-           [](ParameterIndex &self) {
+           [](ParameterIndex& self) {
              py::list items;
              for (iree_host_size_t i = 0;
                   i < iree_io_parameter_index_count(self.raw_ptr()); ++i) {
@@ -377,7 +377,7 @@ void SetupIoBindings(py::module_ &m) {
              return items;
            })
       .def("__repr__",
-           [](ParameterIndex &self) {
+           [](ParameterIndex& self) {
              iree_string_builder_t b;
              iree_string_builder_initialize(iree_allocator_system(), &b);
              iree_status_t status = iree_io_parameter_index_dump(
@@ -390,7 +390,7 @@ void SetupIoBindings(py::module_ &m) {
            })
       .def(
           "reserve",
-          [](ParameterIndex &self, iree_host_size_t new_capacity) {
+          [](ParameterIndex& self, iree_host_size_t new_capacity) {
             CheckApiStatus(
                 iree_io_parameter_index_reserve(self.raw_ptr(), new_capacity),
                 "Could not reserve capacity");
@@ -398,14 +398,14 @@ void SetupIoBindings(py::module_ &m) {
           py::arg("new_capacity"))
       .def(
           "add_splat",
-          [](ParameterIndex &self, std::string key, py::object pattern,
+          [](ParameterIndex& self, std::string key, py::object pattern,
              uint64_t total_length, std::optional<std::string> metadata) {
             iree_io_parameter_index_entry_t entry;
             memset(&entry, 0, sizeof(entry));
             entry.key = iree_make_string_view(key.data(), key.size());
             if (metadata) {
               entry.metadata.data =
-                  reinterpret_cast<const uint8_t *>(metadata->data());
+                  reinterpret_cast<const uint8_t*>(metadata->data());
               entry.metadata.data_length = metadata->size();
             }
             entry.length = total_length;
@@ -429,7 +429,7 @@ void SetupIoBindings(py::module_ &m) {
            py::arg("offset") = 0, py::arg("metadata") = py::none())
       .def(
           "add_buffer",
-          [](ParameterIndex &self, std::string key, py::object buffer,
+          [](ParameterIndex& self, std::string key, py::object buffer,
              bool readable, bool writable,
              std::optional<std::string> metadata) {
             size_t buffer_size;
@@ -447,13 +447,13 @@ void SetupIoBindings(py::module_ &m) {
            py::arg("writable") = false, py::arg("mmap") = true)
       .def(
           "create_provider",
-          [](ParameterIndex &self, std::string scope,
+          [](ParameterIndex& self, std::string scope,
              std::optional<iree_host_size_t> max_concurrent_operations) {
             if (!max_concurrent_operations) {
               max_concurrent_operations =
                   IREE_IO_PARAMETER_INDEX_PROVIDER_DEFAULT_MAX_CONCURRENT_OPERATIONS;
             }
-            iree_io_parameter_provider_t *created;
+            iree_io_parameter_provider_t* created;
             CheckApiStatus(
                 iree_io_parameter_index_provider_create(
                     iree_make_string_view(scope.data(), scope.size()),
@@ -466,16 +466,16 @@ void SetupIoBindings(py::module_ &m) {
           py::arg("max_concurrent_operations") = py::none())
       .def(
           "create_archive_file",
-          [](ParameterIndex &self, std::string file_path,
+          [](ParameterIndex& self, std::string file_path,
              iree_io_physical_offset_t file_offset,
-             ParameterIndex *explicit_target_index) {
+             ParameterIndex* explicit_target_index) {
             // If no target index was given, RAII manage a local target index.
-            iree_io_parameter_index_t *target_index = nullptr;
+            iree_io_parameter_index_t* target_index = nullptr;
             ParameterIndex default_target_index;
             if (explicit_target_index) {
               target_index = explicit_target_index->raw_ptr();
             } else {
-              iree_io_parameter_index_t *created;
+              iree_io_parameter_index_t* created;
               CheckApiStatus(iree_io_parameter_index_create(
                                  iree_allocator_system(), &created),
                              "Could not create IO parameter index");
@@ -485,14 +485,14 @@ void SetupIoBindings(py::module_ &m) {
 
             // Open the file via callback.
             struct OpenParams {
-              const char *path;
+              const char* path;
             };
             OpenParams file_open_user_data{file_path.c_str()};
             auto file_open_callback =
-                +[](void *user_data, iree_io_physical_offset_t archive_offset,
+                +[](void* user_data, iree_io_physical_offset_t archive_offset,
                     iree_io_physical_size_t archive_length,
-                    iree_io_file_handle_t **out_file_handle) -> iree_status_t {
-              OpenParams *params = static_cast<OpenParams *>(user_data);
+                    iree_io_file_handle_t** out_file_handle) -> iree_status_t {
+              OpenParams* params = static_cast<OpenParams*>(user_data);
               return iree_io_file_handle_create(
                   IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE,
                   iree_make_cstring_view(params->path),

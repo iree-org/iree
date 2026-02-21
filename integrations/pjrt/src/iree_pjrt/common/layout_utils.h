@@ -16,13 +16,13 @@ class ApiMemoryLayout {
  public:
   ApiMemoryLayout() = default;
 
-  void InitializeDenseRowMajorStrided(size_t rank, const int64_t *dims,
+  void InitializeDenseRowMajorStrided(size_t rank, const int64_t* dims,
                                       size_t unit_stride_bytes);
   void InitializeDenseRowMajorTiled(int64_t rank);
   void Reset() { valid_ = false; }
 
   bool is_valid() const { return valid_; }
-  const PJRT_Buffer_MemoryLayout &c_layout() const { return c_layout_; };
+  const PJRT_Buffer_MemoryLayout& c_layout() const { return c_layout_; };
 
  private:
   PJRT_Buffer_MemoryLayout c_layout_;

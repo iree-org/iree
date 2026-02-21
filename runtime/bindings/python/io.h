@@ -18,37 +18,37 @@ namespace iree::python {
 
 template <>
 struct ApiPtrAdapter<iree_io_file_handle_t> {
-  static void Retain(iree_io_file_handle_t *v) {
+  static void Retain(iree_io_file_handle_t* v) {
     iree_io_file_handle_retain(v);
   }
-  static void Release(iree_io_file_handle_t *v) {
+  static void Release(iree_io_file_handle_t* v) {
     iree_io_file_handle_release(v);
   }
 };
 
 template <>
 struct ApiPtrAdapter<iree_io_parameter_provider_t> {
-  static void Retain(iree_io_parameter_provider_t *v) {
+  static void Retain(iree_io_parameter_provider_t* v) {
     iree_io_parameter_provider_retain(v);
   }
-  static void Release(iree_io_parameter_provider_t *v) {
+  static void Release(iree_io_parameter_provider_t* v) {
     iree_io_parameter_provider_release(v);
   }
 };
 
 template <>
 struct ApiPtrAdapter<iree_io_parameter_index_t> {
-  static void Retain(iree_io_parameter_index_t *v) {
+  static void Retain(iree_io_parameter_index_t* v) {
     iree_io_parameter_index_retain(v);
   }
-  static void Release(iree_io_parameter_index_t *v) {
+  static void Release(iree_io_parameter_index_t* v) {
     iree_io_parameter_index_release(v);
   }
 };
 
 class FileHandle : public ApiRefCounted<FileHandle, iree_io_file_handle_t> {
  public:
-  int HandleBufferProtocol(Py_buffer *view, int flags);
+  int HandleBufferProtocol(Py_buffer* view, int flags);
 };
 
 class ParameterProvider
@@ -57,7 +57,7 @@ class ParameterProvider
 class ParameterIndex
     : public ApiRefCounted<ParameterIndex, iree_io_parameter_index_t> {};
 
-void SetupIoBindings(py::module_ &m);
+void SetupIoBindings(py::module_& m);
 
 }  // namespace iree::python
 

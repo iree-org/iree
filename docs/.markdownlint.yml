@@ -102,3 +102,9 @@ table-pipe-style: false
 # Allow table rows to have irregular numbers of columns
 # (markdownlint has false positives for `|` characters in code blocks)
 table-column-count: false
+
+# Allow inconsistent table column spacing styles
+table-column-style: false
+
+# Allow non-descriptive link text (e.g. "[here]")
+descriptive-link-text: false

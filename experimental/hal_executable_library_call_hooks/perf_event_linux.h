@@ -14,11 +14,11 @@
 // Describes a perf event type. Matches the corresponding data structure in
 // the linux perf source code.
 struct PerfEventType {
-  const char *name;
+  const char* name;
   uint32_t type;
   uint64_t config;
-  const char *target;
-  const char *description;
+  const char* target;
+  const char* description;
 };
 
 // A perf-event file-descriptor for querying a specific event count.
@@ -41,9 +41,9 @@ class PerfEventFd {
 };
 
 // Parses a string as a comma-separated list of event types.
-std::vector<PerfEventType> parsePerfEventTypes(const char *types_str);
+std::vector<PerfEventType> parsePerfEventTypes(const char* types_str);
 
 // Prints all event types and their descriptions.
-void printAllEventTypesAndDescriptions(FILE *file);
+void printAllEventTypesAndDescriptions(FILE* file);
 
 #endif  // EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS_PERF_EVENT_LINUX_H_

@@ -98,8 +98,8 @@ typedef struct iree_instrument_dispatch_print_t {
 } iree_instrument_dispatch_print_t;
 
 typedef struct iree_instrument_dispatch_memory_op_t {
-  uint64_t
-      tag : 8;  // IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_LOAD / _MEMORY_STORE
+  uint64_t tag
+      : 8;  // IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_LOAD / _MEMORY_STORE
   uint64_t length : 16;
   uint64_t workgroup_offset : 40;
   uint64_t address;

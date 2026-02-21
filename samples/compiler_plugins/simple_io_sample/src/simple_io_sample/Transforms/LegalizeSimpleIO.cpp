@@ -21,7 +21,7 @@ class LegalizeSimpleIOPass
     : public ::impl::LegalizeSimpleIOBase<LegalizeSimpleIOPass> {
  public:
   void runOnOperation() override {
-    auto *context = &getContext();
+    auto* context = &getContext();
     // TODO: This is all just a placeholder. To make it real, we should be
     // checking if the import already exists and likely doing some more fancy
     // lowering.
@@ -33,7 +33,7 @@ class LegalizeSimpleIOPass
         .setPrivate();
 
     // Legalize operations.
-    m.walk([&](Operation *op) {
+    m.walk([&](Operation* op) {
       if (auto printOp = dyn_cast<IREE::SimpleIO::PrintOp>(op)) {
         OpBuilder b(op);
         func::CallOp::create(b, printOp.getLoc(), "simple_io.print",

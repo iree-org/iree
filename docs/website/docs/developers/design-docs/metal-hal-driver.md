@@ -109,8 +109,9 @@ Such submission enables asynchronous execution of the workload on the GPU.
 
 #### Queue-ordered allocation
 
-Queue-ordered asynchronous allocations via `iree_hal_device_queue_alloc` is not fully
-supported yet; it just translates to blocking wait and allocation.
+Queue-ordered asynchronous allocations via
+`iree_hal_device_queue_alloc` is not fully supported yet; it just
+translates to blocking wait and allocation.
 
 #### Collectives
 
@@ -190,8 +191,8 @@ IREE [`iree_hal_buffer_t`][hal-buffer] maps Metal `MTLBuffer`. See
 
 ### Executable
 
-IREE [`iree_hal_executable_t`][hal-executable] represents a GPU program archive with
-a driver-defined format. It maps naturally to Metal [`MTLLibrary`][mtl-library].
+IREE [`iree_hal_executable_t`][hal-executable] represents a GPU
+program archive with a driver-defined format. It maps naturally to Metal [`MTLLibrary`][mtl-library].
 An entry point in a `MTLLibrary` is a [`MTLFunction`][mtl-function]. We define
 [`iree_hal_metal_executable_t`][metal-executable] to wrap around a
 `MTLLibrary`, its `MTLFunction`s, and also `MTLComputePipelineState` objects
