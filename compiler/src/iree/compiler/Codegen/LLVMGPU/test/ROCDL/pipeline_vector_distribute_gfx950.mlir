@@ -153,13 +153,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //    CHECK-LABEL: func @expanded_matmul_transpose_b
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
-//          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x4x1xf16>)
-//          CHECK:     arith.extf %[[ARG]] : vector<4x1x1x1x4x1xf16> to vector<4x1x1x1x4x1xf32>
+//          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>)
+//          CHECK:     arith.extf %[[ARG]] : vector<1x1x4x1x1x1x1x1x1x1x4x1xf16> to vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
-//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<4x1x1x1x4x1xf32> to vector<4x1x1x1x4x1xf16>
-//          CHECK:     scf.yield %[[TRUNC]] : vector<4x1x1x1x4x1xf16>
+//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<1x1x4x1x1x1x1x1x1x1x4x1xf32> to vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>
+//          CHECK:     scf.yield %[[TRUNC]] : vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>
 // CHECK-COUNT-32:   amdgpu.mfma
-//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -207,7 +207,7 @@ hal.executable @matmul_multiple_k {
 // CHECK:            affine.delinearize_index %[[IV]] into (128, 16)
 // CHECK-COUNT-32:   amdgpu.mfma
 // CHECK:            scf.yield
-// CHECK-COUNT-4:  vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-COUNT-4:  vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -457,7 +457,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK: transfer_read
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
-// CHECK-SAME: -> (vector<2x1x1xf32>, vector<2x1x1xf32>, vector<2x4x1x1x1x4xf32>)
+// CHECK-SAME: -> (vector<1x2x4x1x1x1x1x1x4xf32>, vector<1x2x1x1x1x1xf32>, vector<1x2x1x1x1x1xf32>)
 // CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
 // CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
@@ -525,7 +525,7 @@ hal.executable private @attention_mfma_32x32x16 {
 
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
-// CHECK-SAME: -> (vector<1x1x1xf32>, vector<1x1x1xf32>, vector<1x2x1x4x1x4xf32>)
+// CHECK-SAME: -> (vector<1x1x1x2x1x1x1x4x1x1x1x4xf32>, vector<1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1xf32>)
 // CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
 // CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield

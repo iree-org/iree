@@ -51,7 +51,7 @@ hal.executable private @matvec_fp16 {
 //     CHECK-LABEL: func.func @matvec_fp16
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c128
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1xf16>
+//     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
 
@@ -108,7 +108,7 @@ hal.executable private @matvec_fp16_parallel_subgroup {
 //     CHECK-LABEL: func.func @matvec_fp16_parallel_subgroup
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c512
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1xf16>
+//     CHECK-SAME:      vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
 
@@ -169,7 +169,7 @@ hal.executable private @matvec_fp16_promote_rhs {
 //          CHECK:      %[[RHS_SHARED_READ:.+]] = vector.transfer_read %alloc
 //          CHECK:      %[[RHS_INSERT:.+]] = vector.insert_strided_slice %[[RHS_SHARED_READ]]
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      %{{.*}}, %[[RHS_INSERT]], %{{.*}} : vector<1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1xf16>
+//     CHECK-SAME:      %{{.*}}, %[[RHS_INSERT]], %{{.*}} : vector<1x1x1x1x1x8xf16>, vector<1x1x1x1x1x8xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
 
@@ -255,7 +255,7 @@ hal.executable private @attention_20x1x64x4096x64 {
 // CHECK:         scf.for %{{.*}} = %c0 to %c4096 step %c128
 // QK Matmul
 // CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x32xf16>, vector<1x1x1x1x4x32xf16> into vector<1x1x4xf32>
+// CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x1x4xf32>
 // CHECK-COUNT-4:   gpu.subgroup_reduce  add
 
 // QK Max
@@ -349,7 +349,7 @@ hal.executable private @attention_20x1x64x4096x64 {
 // CHECK:         scf.for %{{.*}} = %c0 to %c4096 step %c128
 // QK Matmul
 // CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x32xf16>, vector<1x1x1x1x4x32xf16> into vector<1x1x4xf32>
+// CHECK-SAME:      vector<1x1x1x1x1x1x1x1x32xf16>, vector<1x1x1x1x1x1x1x4x32xf16> into vector<1x1x1x1x1x1x1x4x1xf32>
 // CHECK-COUNT-4:   gpu.subgroup_reduce  add
 
 // No subgroup reduction in the loop other than QK reductions
@@ -361,13 +361,13 @@ hal.executable private @attention_20x1x64x4096x64 {
 // CHECK-COUNT-1:   gpu.subgroup_reduce  maximumf
 
 // Sum
-// CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x4xf32>, vector<1x1x4xf32> into f32
+// CHECK:           vector.multi_reduction <add>
+// CHECK-SAME:      vector<1x1x1x1x1x1x4x1x1xf32> to vector<1x1x1x1x1x1xf32>
 // CHECK-COUNT-1:   gpu.subgroup_reduce  add
 
 // PV Matmul
-// CHECK:           vector.contract
-// CHECK-SAME:      vector<1x1x4xf32>, vector<1x2x1x1x4x4xf32> into vector<2x1x4xf32>
+// CHECK:           vector.multi_reduction
+// CHECK-SAME:      vector<1x1x1x2x1x1x1x1x4x1x1x4xf32> to vector<1x1x2x1x1x1x1x1x4xf32>
 // CHECK-COUNT-8:   gpu.subgroup_reduce  add
 
 
@@ -420,7 +420,7 @@ hal.executable private @matvec_fp16 {
 //     CHECK-LABEL: func.func @matvec_fp16_subgroup_reduction
 //          CHECK:    scf.for {{.*}} = %c0 to %c4096 step %c128
 //          CHECK:      %[[OUT:.+]] = vector.contract
-//     CHECK-SAME:      vector<1x1x4xf16>, vector<1x1x1x1x1x4xf16> into vector<1x1x1xf16>
+//     CHECK-SAME:      vector<1x1x1x1x1x4xf16>, vector<1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1xf16>
 //          CHECK:      %[[SCALAR:.+]] = vector.extract %[[OUT]]
 //          CHECK:      gpu.subgroup_reduce  add %[[SCALAR]]
 //          CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
@@ -575,7 +575,7 @@ hal.executable private @attention_4xDx1x32x128xf16 {
 
 //     CHECK-LABEL: func.func @attention_4xDx1x32x128xf16
 //           CHECK:   scf.forall ({{.*}}) in (4)
-//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1xf32>, vector<1x1x16x1x1x1x1x1x8xf32>) {
+//           CHECK:     scf.for {{.*}} -> (vector<1x1x1x1x1x16x1x1x1x1x1x1x1x1x1x1x1x8xf32>, vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>, vector<1x1x1x1x1x1x1x1x1x1x1x1x1x1x1xf32>) {
 //       CHECK-NOT:       gpu.subgroup_reduce
 //           CHECK:       scf.yield
 //

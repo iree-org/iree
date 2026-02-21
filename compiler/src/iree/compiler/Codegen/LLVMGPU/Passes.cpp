@@ -825,30 +825,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
 
-  // Generalize all named ops so that we can fold away unit extent dims. By this
-  // point, all tiling is finished so the tiling configurations on those ops can
-  // be safely dropped. This additionally allows vectorization of convolution to
-  // `vector.contract` as filter dimensions are expected to be tiled to 1 by
-  // this point.
-  funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
-  {
-    IREE::LinalgExt::FoldUnitExtentDimsPassOptions options;
-    options.useReshapes = false;
-    funcPassManager.addPass(
-        IREE::LinalgExt::createFoldUnitExtentDimsPass(options));
-  }
-  funcPassManager.addPass(
-      IREE::VectorExt::createVectorExtFoldUnitExtentDimsPass());
-  {
-    LinalgFoldUnitExtentDimsPassOptions options;
-    options.useRankReducingSlices = true;
-    funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
-    funcPassManager.addPass(createCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-    funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
-  }
-
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
 
   // Linalg -> Vector
   funcPassManager.addPass(
