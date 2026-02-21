@@ -12,6 +12,7 @@
 
 extern void ireeAttributeIsACodegenCompilationInfoAttr();
 extern void ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr();
+extern void ireeAttributeIsACodegenRootOpAttr();
 extern void ireeAttributeIsACodegenTranslationInfoAttr();
 extern void ireeAttributeIsAGPULoweringConfigAttr();
 extern void ireeAttributeIsAGPUMMAAttr();
@@ -34,6 +35,9 @@ extern void ireeCodegenHasIGEMMGenericConvDetails();
 extern void ireeCodegenInferScaledContractionDimensions();
 extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
 extern void ireeCodegenMlirOperationIsAScaledContractionOp();
+extern void ireeCodegenRootOpAttrGet();
+extern void ireeCodegenRootOpAttrGetSet();
+extern void ireeCodegenRootOpAttrGetTypeID();
 extern void ireeCodegenTranslationInfoAttrGet();
 extern void ireeCodegenTranslationInfoAttrGetParameters();
 extern void ireeCodegenTranslationInfoAttrGetTypeID();
@@ -1126,6 +1130,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   uintptr_t x = 0;
   x += (uintptr_t)&ireeAttributeIsACodegenCompilationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+  x += (uintptr_t)&ireeAttributeIsACodegenRootOpAttr;
   x += (uintptr_t)&ireeAttributeIsACodegenTranslationInfoAttr;
   x += (uintptr_t)&ireeAttributeIsAGPULoweringConfigAttr;
   x += (uintptr_t)&ireeAttributeIsAGPUMMAAttr;
@@ -1148,6 +1153,9 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenInferScaledContractionDimensions;
   x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
   x += (uintptr_t)&ireeCodegenMlirOperationIsAScaledContractionOp;
+  x += (uintptr_t)&ireeCodegenRootOpAttrGet;
+  x += (uintptr_t)&ireeCodegenRootOpAttrGetSet;
+  x += (uintptr_t)&ireeCodegenRootOpAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGet;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetParameters;
   x += (uintptr_t)&ireeCodegenTranslationInfoAttrGetTypeID;
