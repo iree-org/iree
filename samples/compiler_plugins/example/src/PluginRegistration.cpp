@@ -17,7 +17,7 @@ namespace {
 struct MyOptions {
   bool flag = false;
 
-  void bindOptions(OptionsBinder &binder) {
+  void bindOptions(OptionsBinder& binder) {
     static llvm::cl::OptionCategory category("IREE Example Plugin");
     binder.opt<bool>("iree-example-flag", flag,
                      llvm::cl::desc("Dummy flag for the example plugin"),
@@ -39,7 +39,7 @@ struct MySession : public PluginSession<MySession, MyOptions> {
 IREE_DEFINE_COMPILER_OPTION_FLAGS(MyOptions);
 
 extern "C" bool iree_register_compiler_plugin_example(
-    mlir::iree_compiler::PluginRegistrar *registrar) {
+    mlir::iree_compiler::PluginRegistrar* registrar) {
   registrar->registerPlugin<MySession>("example");
   return true;
 }

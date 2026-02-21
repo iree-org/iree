@@ -51,10 +51,10 @@ int64_t PerfEventFd::read() const {
 }
 
 // Returns a list of all known perf event types.
-static const std::vector<PerfEventType> &listAllPerfEventTypes();
+static const std::vector<PerfEventType>& listAllPerfEventTypes();
 
 static PerfEventType parsePerfEventType(int type_str_length,
-                                        const char *type_str) {
+                                        const char* type_str) {
   for (PerfEventType event_type : listAllPerfEventTypes()) {
     if (strncmp(event_type.name, type_str, type_str_length)) {
       continue;
@@ -66,12 +66,12 @@ static PerfEventType parsePerfEventType(int type_str_length,
   return {};
 }
 
-std::vector<PerfEventType> parsePerfEventTypes(const char *types_str) {
+std::vector<PerfEventType> parsePerfEventTypes(const char* types_str) {
   std::vector<PerfEventType> out_event_types;
   while (*types_str) {
-    const char *segment_ptr = types_str;
+    const char* segment_ptr = types_str;
     int segment_length = 0;
-    const char *comma_ptr = strchr(types_str, ',');
+    const char* comma_ptr = strchr(types_str, ',');
     if (comma_ptr) {
       segment_length = comma_ptr - types_str;
       types_str = comma_ptr + 1;
@@ -84,7 +84,7 @@ std::vector<PerfEventType> parsePerfEventTypes(const char *types_str) {
   return out_event_types;
 }
 
-void printAllEventTypesAndDescriptions(FILE *file) {
+void printAllEventTypesAndDescriptions(FILE* file) {
   for (PerfEventType event_type : listAllPerfEventTypes()) {
     fprintf(file, "%-40s [%s] %s\n", event_type.name,
             strlen(event_type.target) ? event_type.target : "generic",
@@ -92,7 +92,7 @@ void printAllEventTypesAndDescriptions(FILE *file) {
   }
 }
 
-static const std::vector<PerfEventType> &listAllPerfEventTypes() {
+static const std::vector<PerfEventType>& listAllPerfEventTypes() {
   static const std::vector<PerfEventType> sAllPerfEventTypes{
       // Standard event types, not specific to a target.
       // These are not always useful, as some targets don't always implement

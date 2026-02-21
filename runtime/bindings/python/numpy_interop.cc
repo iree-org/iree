@@ -68,28 +68,28 @@ int ConvertHalElementTypeToNumPyTypeNum(iree_hal_element_type_t t) {
 }
 
 py::object DescrNewFromType(int typenum) {
-  PyArray_Descr *dtype = PyArray_DescrNewFromType(typenum);
+  PyArray_Descr* dtype = PyArray_DescrNewFromType(typenum);
   if (!dtype) {
     throw py::python_error();
   }
-  return py::steal((PyObject *)dtype);
+  return py::steal((PyObject*)dtype);
 }
 
 int TypenumFromDescr(py::handle dtype) {
   if (!PyArray_DescrCheck(dtype.ptr())) {
     throw py::cast_error();
   }
-  PyArray_Descr *descr = (PyArray_Descr *)dtype.ptr();
+  PyArray_Descr* descr = (PyArray_Descr*)dtype.ptr();
   return descr->type_num;
 }
 
-py::object SimpleNewFromData(int nd, intptr_t const *dims, int typenum,
-                             void *data, py::handle base_object) {
-  PyObject *array_c = PyArray_SimpleNewFromData(nd, dims, typenum, data);
+py::object SimpleNewFromData(int nd, intptr_t const* dims, int typenum,
+                             void* data, py::handle base_object) {
+  PyObject* array_c = PyArray_SimpleNewFromData(nd, dims, typenum, data);
   if (!array_c) throw py::python_error();
   py::object array = py::steal(array_c);
   if (base_object) {
-    if (PyArray_SetBaseObject(reinterpret_cast<PyArrayObject *>(array.ptr()),
+    if (PyArray_SetBaseObject(reinterpret_cast<PyArrayObject*>(array.ptr()),
                               base_object.ptr())) {
       throw py::python_error();
     }

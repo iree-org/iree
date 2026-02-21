@@ -876,7 +876,7 @@ template <typename Owner>
 struct NativeFunction {
   iree_string_view_t name;
   iree_string_view_t cconv;
-  void (Owner::*const ptr)();
+  void (Owner::* const ptr)();
   Status (*const call)(void (Owner::*ptr)(), Owner* self,
                        iree_vm_stack_t* stack, iree_vm_function_call_t call);
 };
@@ -887,7 +887,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
   using dispatch_functor_t = packing::DispatchFunctor<Owner, Result, Params...>;
   return {iree_make_cstring_view(name),
           packing::cconv_storage<Result, sizeof...(Params), Params...>::value(),
-          (void(Owner::*)())fn, &dispatch_functor_t::Call};
+          (void (Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 template <typename Owner, typename... Params>
@@ -896,7 +896,7 @@ constexpr NativeFunction<Owner> MakeNativeFunction(
   using dispatch_functor_t = packing::DispatchFunctorVoid<Owner, Params...>;
   return {iree_make_cstring_view(name),
           packing::cconv_storage_void<sizeof...(Params), Params...>::value(),
-          (void(Owner::*)())fn, &dispatch_functor_t::Call};
+          (void (Owner::*)())fn, &dispatch_functor_t::Call};
 }
 
 }  // namespace vm

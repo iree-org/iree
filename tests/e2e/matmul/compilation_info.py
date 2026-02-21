@@ -61,8 +61,7 @@ class CompilationInfo:
     def workgroup_size_str(self):
         return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
 
-    def get_compilation_info_attr(self) -> str:
-        ...
+    def get_compilation_info_attr(self) -> str: ...
 
 
 @dataclasses.dataclass

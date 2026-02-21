@@ -16,7 +16,7 @@ extern "C" {
 // Initializes the compiler API stub by loading a libOpenXLAPartitioner.so
 // implementation library.
 // Returns true on success. On failure, may log to stderr.
-bool openxlaPartitionerLoadLibrary(const char *libraryPath);
+bool openxlaPartitionerLoadLibrary(const char* libraryPath);
 
 #ifdef __cplusplus
 }

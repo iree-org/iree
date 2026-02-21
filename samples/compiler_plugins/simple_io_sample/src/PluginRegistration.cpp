@@ -27,19 +27,19 @@ namespace {
 namespace {
 
 struct MyOptions {
-  void bindOptions(OptionsBinder &binder) {}
+  void bindOptions(OptionsBinder& binder) {}
 };
 
 struct MySession : public PluginSession<MySession, MyOptions> {
   static void registerPasses() { ::detail::registerPasses(); }
 
-  void onRegisterDialects(DialectRegistry &registry) override {
+  void onRegisterDialects(DialectRegistry& registry) override {
     registry.insert<IREE::SimpleIO::SimpleIODialect>();
   }
 
   LogicalResult onActivate() override { return success(); }
 
-  void extendPreprocessingPassPipeline(OpPassManager &pm) override {
+  void extendPreprocessingPassPipeline(OpPassManager& pm) override {
     pm.addPass(IREE::SimpleIO::createLegalizeSimpleIOPass());
   }
 };
@@ -49,7 +49,7 @@ struct MySession : public PluginSession<MySession, MyOptions> {
 IREE_DEFINE_COMPILER_OPTION_FLAGS(MyOptions);
 
 extern "C" bool iree_register_compiler_plugin_simple_io_sample(
-    mlir::iree_compiler::PluginRegistrar *registrar) {
+    mlir::iree_compiler::PluginRegistrar* registrar) {
   registrar->registerPlugin<MySession>("simple_io_sample");
   return true;
 }

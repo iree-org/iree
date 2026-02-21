@@ -32,7 +32,7 @@ class Logger {
   static std::optional<Level> LevelFromString(std::string_view level);
   static std::string_view LevelToString(Level level);
 
-  Logger(Level level) : level_(level){};
+  Logger(Level level) : level_(level) {};
   void debug(std::string_view message);
   void error(std::string_view message);
 

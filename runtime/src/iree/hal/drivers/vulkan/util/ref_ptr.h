@@ -102,7 +102,7 @@ template <class T>
 class ref_ptr {
  private:
   typedef ref_ptr this_type;
-  typedef T* this_type::*unspecified_bool_type;
+  typedef T* this_type::* unspecified_bool_type;
 
  public:
   // Initializes with nullptr.

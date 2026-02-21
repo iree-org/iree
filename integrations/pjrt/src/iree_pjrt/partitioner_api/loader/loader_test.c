@@ -124,7 +124,7 @@
 //   return rc;
 // }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   // openxla_partitioner_error_t *error;
   if (argc < 2) {
     printf("ERROR: Requires library path\n");
@@ -143,11 +143,11 @@ int main(int argc, char **argv) {
   openxlaPartitionerGlobalInitialize();
   printf("Initialized\n");
 
-  const char *revision = openxlaPartitionerGetRevision();
+  const char* revision = openxlaPartitionerGetRevision();
   printf("Revision: %s\n", revision);
 
   // Session.
-  openxla_partitioner_session_t *session = openxlaPartitionerSessionCreate();
+  openxla_partitioner_session_t* session = openxlaPartitionerSessionCreate();
 
   // Define sources that produce errors.
   // openxla_partitioner_source_t *sourceWithErrors;
