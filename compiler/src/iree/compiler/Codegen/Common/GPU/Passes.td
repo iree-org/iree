@@ -303,8 +303,8 @@ def GPUReduceBankConflictsPass :
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
   let options = [
     Option<"paddingBits", "padding-bits", "unsigned",
-            /*default=*/"128",
-            "Padding size (in bits) to introduce between rows.">
+           /*default=*/"128",
+           "Fallback padding size in bits for allocs without explicit hints.">,
   ];
 }
 

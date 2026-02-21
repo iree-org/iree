@@ -133,7 +133,8 @@ def IREECodegen_FusionBarrierOp :
 //===----------------------------------------------------------------------===//
 
 def IREECodegen_SwizzleHintOp : Op<IREECodegen_Dialect, "swizzle_hint", [
-    SameOperandsAndResultType, Pure]> {
+    SameOperandsAndResultType, Pure,
+    DeclareOpInterfaceMethods<IREECodegen_AllocationHintOpInterface>]> {
   let summary = [{Hint to swizzle accesses according to an access pattern.}];
   let description = [{
     Optimization hint to swizzle all accesses to the memref or tensor that this takes a
