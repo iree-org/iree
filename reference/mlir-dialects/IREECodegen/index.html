@@ -2141,6 +2141,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rootopattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      RootOpAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rotaterowsattr" class="md-nav__link">
     <span class="md-ellipsis">
       RotateRowsAttr
@@ -5522,6 +5531,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rootopattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      RootOpAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#rotaterowsattr" class="md-nav__link">
     <span class="md-ellipsis">
       RotateRowsAttr
@@ -6026,6 +6044,7 @@ within a backend.</p>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#loweringconfigtilinglevelattr">LoweringConfigTilingLevelAttr</a></li>
 <li><a href="#loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr</a></li>
+<li><a href="#rootopattr">RootOpAttr</a></li>
 <li><a href="#rotaterowsattr">RotateRowsAttr</a></li>
 <li><a href="#simpletargetattr">SimpleTargetAttr</a></li>
 <li><a href="#symbolicukernelproviderattr">SymbolicUKernelProviderAttr</a></li>
@@ -6917,6 +6936,34 @@ the pipeline.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="rootopattr">RootOpAttr<a class="headerlink" href="#rootopattr" title="Permanent link">link</a></h3>
+<p><em>Marks an operation as a tuner root op in a given set</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_codegen.root_op&lt;
+  int64_t   # set
+&gt;
+</code></pre></div>
+<p>Attribute identifying a root operation. The <code>set</code> parameter groups root ops
+into numbered sets: all root ops in the given set share the same
+<code>lowering_config</code>. Codegen does not rely on the <code>root_op</code> attribute; it is
+only used for constraint generation when tuning.</p>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">set</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h3 id="rotaterowsattr">RotateRowsAttr<a class="headerlink" href="#rotaterowsattr" title="Permanent link">link</a></h3>
 <p><em>An attribute that describes a swizzling pattern for rotating rows.</em></p>
 <p>Syntax:</p>
@@ -6943,7 +6990,7 @@ AAAA BBBB 8888 9999 /// 2 3 0 1
 DDDD EEEE FFFF CCCC /// 1 2 3 0
 </code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6974,7 +7021,7 @@ DDDD EEEE FFFF CCCC /// 1 2 3 0
 </code></pre></div>
 <p>Implements the basic information needed to satisfy the
 <code>TargetInfoAttrInterface</code></p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7016,7 +7063,7 @@ dispatch region (like <code>linalg.matmul</code>/<code>linalg.*conv*</code>), th
 attribute gets propagated to the entry point function.</p>
 <p>The fields are
 - <code>passPipeline</code> : The pass pipeline to use.</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7063,7 +7110,7 @@ attribute gets propagated to the entry point function.</p>
   ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind
 &gt;
 </code></pre></div>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7127,7 +7174,7 @@ CCCC DDDD EEEE FFFF /// 0 1 2 3
 DDDD CCCC FFFF EEEE /// 1 0 3 2
 </code></pre></div></p>
 <p>The pattern repeats for subsequent rows.</p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7179,7 +7226,7 @@ DDDD CCCC FFFF EEEE /// 1 0 3 2
     }
   }
 </code></pre></div>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7223,7 +7270,7 @@ if <code>a &gt; b</code>. In the same way it is illegal to for the list to
 - have <code>workgroup_mapping&lt;y&gt;</code> but not <code>workgroup_mapping&lt;x&gt;</code>
 - have <code>workgroup_mapping&lt;z:*&gt;</code>  but not have <code>workgroup_mapping&lt;x&gt;</code>
   and <code>workgroup_mapping&lt;y&gt;</code></p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7250,7 +7297,7 @@ if <code>a &gt; b</code>. In the same way it is illegal to for the list to
 <p>Parallel scope that maps to workgroup execution.</p>
 <p>If |linearize| is set to true, workgroup ids are linearized into a single
 id which is then typically delinearized based on the problem space.</p>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
+<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
