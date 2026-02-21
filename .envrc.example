@@ -1,0 +1,10 @@
+# direnv configuration for IREE tools/utils
+# Copy to .envrc and run `direnv allow`
+#
+# See: https://direnv.net/
+
+# Add tools to PATH
+PATH_add tools/utils/bin
+
+# Optional: Set build directory for tools that need iree-opt/FileCheck
+# export IREE_BUILD_DIR="../builds/main"

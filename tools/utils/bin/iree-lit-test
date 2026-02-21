@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+"""Thin wrapper for lit/iree_lit_test.py."""
+
+import sys
+from pathlib import Path
+
+# Add parent directory to sys.path.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from lit_tools import iree_lit_test
+
+if __name__ == "__main__":
+    sys.exit(iree_lit_test.main(iree_lit_test.parse_arguments()))

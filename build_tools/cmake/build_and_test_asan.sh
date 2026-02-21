@@ -48,17 +48,9 @@ CMAKE_ARGS=(
   "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 )
 
-echo "::group::Configuring CMake"
 "${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
-echo "::endgroup::"
-
-echo "::group::Building all"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
-echo "::endgroup::"
-
-echo "::group::Building test deps"
 "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
-echo "::endgroup::"
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
@@ -116,16 +108,12 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 pushd "${BUILD_DIR?}"
 
-echo "::group::Running main project ctests"
 ctest \
   --timeout 900 \
   --output-on-failure \
   --no-tests=error \
   --label-exclude "${label_exclude_regex}"
-echo "::endgroup::"
 
-echo "::group::Running llvm-external-projects tests"
 cmake --build . --target check-iree-dialects -- -k 0
-echo "::endgroup::"
 
 popd
