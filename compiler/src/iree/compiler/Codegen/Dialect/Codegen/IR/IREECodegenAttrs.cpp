@@ -868,12 +868,13 @@ void eraseCompilationInfo(Operation *op) {
 // Helpers for setting attributes for tuner.
 // ===----------------------------------------------------------------------===//
 
-void setRootOpInfo(Operation *op) {
-  op->setAttr(kRootOpInfoAttrName, UnitAttr::get(op->getContext()));
+void setRootOpInfo(Operation *op, int64_t set) {
+  op->setAttr(kRootOpInfoAttrName,
+              IREE::Codegen::RootOpAttr::get(op->getContext(), set));
 }
 
 bool hasRootOpInfo(Operation *op) {
-  return op->hasAttrOfType<UnitAttr>(kRootOpInfoAttrName);
+  return op->hasAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
 }
 
 //===----------------------------------------------------------------------===//

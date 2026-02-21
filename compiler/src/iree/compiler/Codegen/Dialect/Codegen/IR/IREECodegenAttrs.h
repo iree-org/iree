@@ -128,11 +128,11 @@ SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, Attribute config);
 
-/// Sets an attribute to identify the rootOp and adds any information needed for
-/// the tuner from compiler. Currently, only sets a `UnitAttr`. Note that this
-/// attribute is not used by the compiler at any level and is only intended for
-/// tuner use.
-void setRootOpInfo(Operation *op);
+/// Sets an attribute to identify the root op. The `set` parameter groups root
+/// ops into numbered sets (default 0): all root ops in the same set share the
+/// same `lowering_config`. Codegen does not rely on this attribute; it is only
+/// used for constraint generation when tuning.
+void setRootOpInfo(Operation *op, int64_t set = 0);
 
 bool hasRootOpInfo(Operation *op);
 

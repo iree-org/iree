@@ -2,6 +2,7 @@
 EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
+  ireeAttributeIsACodegenRootOpAttr
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
@@ -24,6 +25,9 @@ EXPORTS
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
+  ireeCodegenRootOpAttrGet
+  ireeCodegenRootOpAttrGetSet
+  ireeCodegenRootOpAttrGetTypeID
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID

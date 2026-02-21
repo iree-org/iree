@@ -3,6 +3,7 @@ VER_0 {
   global:
     ireeAttributeIsACodegenCompilationInfoAttr;
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+    ireeAttributeIsACodegenRootOpAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
@@ -25,6 +26,9 @@ VER_0 {
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
+    ireeCodegenRootOpAttrGet;
+    ireeCodegenRootOpAttrGetSet;
+    ireeCodegenRootOpAttrGetTypeID;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
