@@ -340,6 +340,53 @@ static const iree_unicode_nfd_mapping_t* iree_unicode_nfd_lookup(
 // Unicode Categories
 //===----------------------------------------------------------------------===//
 
+// Direct lookup table for Latin-1 Supplement (U+0080-U+00FF).
+// Eliminates binary search (~9 comparisons) for the most common non-ASCII
+// range. This is the hot path for ByteLevel pre-tokenizers (GPT-2, Llama-3,
+// etc.) which map raw bytes 0x80-0xFF to codepoints in this range.
+//
+// Categories from Unicode 15.0 General_Category property:
+//   U+0080-009F: Cc (Control)           → OTHER
+//   U+00A0:      Zs (Space Separator)   → SEPARATOR
+//   U+00A1-00BF: Mixed Po/Sc/So/Sk/Sm/Pi/Pf/No/Lo/Cf
+//   U+00C0-00D6: Lu (Uppercase Letter)  → LETTER
+//   U+00D7:      Sm (Math Symbol)       → SYMBOL  (×)
+//   U+00D8-00F6: Lu/Ll (Letter)         → LETTER
+//   U+00F7:      Sm (Math Symbol)       → SYMBOL  (÷)
+//   U+00F8-00FF: Ll (Lowercase Letter)  → LETTER
+// clang-format off
+static const uint8_t iree_unicode_latin1_categories[128] = {
+    // U+0080-008F: C1 Controls (Cc).
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    // U+0090-009F: C1 Controls (Cc).
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    // U+00A0-00AF:
+    //   A0=Zs  A1=Po  A2=Sc  A3=Sc  A4=Sc  A5=Sc  A6=So  A7=Po
+    //   A8=Sk  A9=So  AA=Lo  AB=Pi  AC=Sm  AD=Cf  AE=So  AF=Sk
+    0x20, 0x08, 0x10, 0x10, 0x10, 0x10, 0x10, 0x08,
+    0x10, 0x10, 0x01, 0x08, 0x10, 0x40, 0x10, 0x10,
+    // U+00B0-00BF:
+    //   B0=So  B1=Sm  B2=No  B3=No  B4=Sk  B5=Ll  B6=So  B7=Po
+    //   B8=Sk  B9=No  BA=Lo  BB=Pf  BC=No  BD=No  BE=No  BF=Po
+    0x10, 0x10, 0x04, 0x04, 0x10, 0x01, 0x10, 0x08,
+    0x10, 0x04, 0x01, 0x08, 0x04, 0x04, 0x04, 0x08,
+    // U+00C0-00CF: Lu (Uppercase Letter).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00D0-00DF: Lu except D7=Sm (×).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x10,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00E0-00EF: Ll (Lowercase Letter).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00F0-00FF: Ll except F7=Sm (÷).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x10,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+};
+// clang-format on
+
 iree_unicode_category_t iree_unicode_category(uint32_t codepoint) {
   // Fast path for ASCII.
   if (codepoint < 0x80) {
@@ -371,6 +418,11 @@ iree_unicode_category_t iree_unicode_category(uint32_t codepoint) {
       }
       return IREE_UNICODE_CATEGORY_PUNCTUATION;
     }
+  }
+  // Fast path for Latin-1 Supplement (U+0080-U+00FF).
+  if (codepoint <= 0xFF) {
+    return (iree_unicode_category_t)
+        iree_unicode_latin1_categories[codepoint - 0x80];
   }
   return iree_unicode_category_lookup(codepoint);
 }

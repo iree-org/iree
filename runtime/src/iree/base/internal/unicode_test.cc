@@ -586,6 +586,116 @@ TEST(UnicodeCategoryTest, UnassignedCodepoints) {
   EXPECT_TRUE(iree_unicode_is_other(0x10FFFF));  // Max codepoint (unassigned)
 }
 
+TEST(UnicodeCategoryTest, Latin1SupplementCategories) {
+  // Verify the Latin-1 Supplement fast path table (U+0080-U+00FF) produces
+  // correct categories for every codepoint in the range.
+
+  // U+0080-009F: C1 Controls (Cc) → OTHER.
+  for (uint32_t cp = 0x80; cp <= 0x9F; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_OTHER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00A0: No-Break Space (Zs) → SEPARATOR.
+  EXPECT_EQ(iree_unicode_category(0x00A0), IREE_UNICODE_CATEGORY_SEPARATOR);
+
+  // U+00A1: ¡ Inverted Exclamation Mark (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00A1), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00A2-00A6: Currency/Other symbols (Sc/So) → SYMBOL.
+  for (uint32_t cp = 0xA2; cp <= 0xA6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_SYMBOL)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00A7: § Section Sign (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00A7), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00A8-00A9: Modifier/Other symbols (Sk/So) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00A8), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00A9), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00AA: ª Feminine Ordinal (Lo) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00AA), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00AB: « Left-Pointing Double Angle (Pi) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00AB), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00AC: ¬ Not Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00AC), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00AD: Soft Hyphen (Cf) → OTHER.
+  EXPECT_EQ(iree_unicode_category(0x00AD), IREE_UNICODE_CATEGORY_OTHER);
+
+  // U+00AE-00AF: ® ¯ (So/Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00AE), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00AF), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B0-00B1: ° ± (So/Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B0), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00B1), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B2-00B3: ² ³ (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00B2), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00B3), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00B4: ´ Acute Accent (Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B4), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B5: µ Micro Sign (Ll) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00B5), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00B6: ¶ Pilcrow Sign (So) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B6), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B7: · Middle Dot (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00B7), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00B8: ¸ Cedilla (Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B8), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B9: ¹ Superscript One (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00B9), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00BA: º Masculine Ordinal (Lo) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00BA), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00BB: » Right-Pointing Double Angle (Pf) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00BB), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00BC-00BE: ¼ ½ ¾ (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00BC), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00BD), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00BE), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00BF: ¿ Inverted Question Mark (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00BF), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00C0-00D6: Latin uppercase letters (Lu) → LETTER.
+  for (uint32_t cp = 0xC0; cp <= 0xD6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00D7: × Multiplication Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00D7), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00D8-00F6: Latin letters (Lu/Ll) → LETTER.
+  for (uint32_t cp = 0xD8; cp <= 0xF6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00F7: ÷ Division Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00F7), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00F8-00FF: Latin lowercase letters (Ll) → LETTER.
+  for (uint32_t cp = 0xF8; cp <= 0xFF; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Case Folding Tests
 //===----------------------------------------------------------------------===//
