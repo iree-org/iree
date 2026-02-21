@@ -223,12 +223,12 @@ void iree_async_posix_fence_export_callback(
 
   if (iree_status_is_ok(status)) {
     // Semaphore reached the target value. Write to fd to make it readable.
-    // eventfd write only fails on counter overflow (UINT64_MAX-1 reached),
-    // which cannot happen with a single write of 1.
-    // pipe write only fails on PIPE_BUF overflow (4096+ bytes), which cannot
-    // happen with a single 8-byte write.
     uint64_t value = 1;
-    (void)write(tracker->eventfd, &value, sizeof(value));
+    ssize_t result = write(tracker->eventfd, &value, sizeof(value));
+    // EAGAIN means already signaled (redundant, benign). Any other failure
+    // (EBADF, EPIPE) indicates the eventfd/pipe was closed while a timepoint
+    // callback was still pending — a lifecycle bug.
+    IREE_ASSERT(result >= 0 || errno == EAGAIN);
   } else {
     // Semaphore failed or was cancelled. Leave fd unreadable so consumers
     // observe a timeout or check the semaphore for failure status.

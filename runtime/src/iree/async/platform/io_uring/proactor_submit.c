@@ -1176,7 +1176,9 @@ static void iree_async_io_uring_semaphore_wait_enqueue_completion(
   iree_atomic_slist_push(&tracker->proactor->pending_semaphore_waits,
                          &tracker->slist_entry);
   uint64_t wake_value = 1;
-  (void)write(tracker->proactor->wake_eventfd, &wake_value, sizeof(wake_value));
+  ssize_t result =
+      write(tracker->proactor->wake_eventfd, &wake_value, sizeof(wake_value));
+  IREE_ASSERT(result >= 0 || errno == EAGAIN);
 }
 
 // Timepoint callback for SEMAPHORE_WAIT operations.
