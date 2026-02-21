@@ -103,13 +103,8 @@ static iree_status_t iree_tokenizer_bpe_encode_segment(
       iree_tokenizer_bpe_heap_reset(&state->heap);
       state->phase = IREE_TOKENIZER_BPE_PHASE_BYTE_LOOP;
     } else {
-      // Word cache: skip trie/backtracking for previously-tokenized segments.
-      if (iree_tokenizer_bpe_cache_lookup(model, state, segment, &cursor)) {
-        *out_token_count =
-            iree_tokenizer_bpe_output_cursor_count(&cursor, out_tokens);
-        *out_segment_complete = true;
-        return iree_ok_status();
-      }
+      // Word cache is checked inline in bpe_state_encode before calling this
+      // function, so cache hits never reach here. No need to re-check.
 
       // Suffix-aware whole-segment match: when end_of_word_suffix is set,
       // check if segment + suffix matches exactly as a vocabulary token.
@@ -446,9 +441,36 @@ iree_status_t iree_tokenizer_bpe_state_encode(
         (const char*)transform_buffer.data + segment->start,
         segment->end - segment->start);
 
+    bool is_partial = segments.last_is_partial && (i == segments.count - 1);
+
+    // Inline cache fast-path: check the word cache before entering the BPE
+    // state machine. On hit (60-68% of segments for English text), this
+    // skips the bpe_encode_segment function call, phase dispatch, cursor
+    // construction, and all fast-path/backtrack setup.
+    //
+    // Guards: state machine must be ready for a new segment, the segment
+    // must be complete (not partial), and no offset tracking (cache doesn't
+    // store per-token byte positions).
+    if (!is_partial &&
+        bpe_state->phase == IREE_TOKENIZER_BPE_PHASE_SEGMENT_START &&
+        !current_offset_output && segment_text.size > 0) {
+      iree_tokenizer_bpe_output_cursor_t cache_cursor =
+          iree_tokenizer_bpe_output_cursor_make(
+              current_token_output, NULL, segment->start, remaining_capacity);
+      if (iree_tokenizer_bpe_cache_lookup(model, bpe_state, segment_text,
+                                          &cache_cursor)) {
+        iree_host_size_t count = iree_tokenizer_bpe_output_cursor_count(
+            &cache_cursor, current_token_output);
+        total_tokens_written += count;
+        remaining_capacity -= count;
+        current_token_output += count;
+        (*out_segments_consumed)++;
+        continue;
+      }
+    }
+
     iree_host_size_t tokens_for_segment = 0;
     bool segment_complete = false;
-    bool is_partial = segments.last_is_partial && (i == segments.count - 1);
     IREE_RETURN_IF_ERROR(iree_tokenizer_bpe_encode_segment(
         model, bpe_state, segment_text, current_token_output,
         current_offset_output, remaining_capacity, segment->start, is_partial,
