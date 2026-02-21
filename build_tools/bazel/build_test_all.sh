@@ -126,10 +126,17 @@ fi
 #
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
-# We use `bazel query //...` piped to `bazel test` rather than the simpler
+#
+# We use `bazel cquery //...` piped to `bazel test` rather than the simpler
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with tags.
+#
+# cquery (configured query) evaluates platform constraints, so targets marked
+# with target_compatible_with for a different platform (e.g. Windows-only IOCP
+# targets on a Linux host) are automatically excluded. Plain `bazel query`
+# operates pre-analysis and returns all targets regardless of platform, which
+# causes errors when those targets are explicitly listed via xargs.
 #
 # Explicitly list bazelrc so that builds are reproducible and get cache hits
 # when this script is invoked locally.
@@ -172,6 +179,6 @@ BAZEL_TEST_CMD+=(
   --config=generic_clang_ci
 )
 
-"${BAZEL_STARTUP_CMD[@]}" query //... | \
+"${BAZEL_STARTUP_CMD[@]}" cquery //... --output=label 2>/dev/null | \
   xargs --max-args 1000000 --max-chars 1000000 --exit \
     "${BAZEL_TEST_CMD[@]}"
