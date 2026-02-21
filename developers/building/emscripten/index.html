@@ -5972,7 +5972,7 @@ $<span class="w"> </span>cmake<span class="w"> </span>--build<span class="w"> </
 </code></pre></div>
 <h3 id="target-configuration">Target configuration<a class="headerlink" href="#target-configuration" title="Permanent link">link</a></h3>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>emcmake<span class="w"> </span>cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span>../iree-build-emscripten/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMake_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build-host/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_TESTS<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
