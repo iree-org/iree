@@ -46,7 +46,8 @@ typedef struct iree_tokenizer_bpe_validation_frame_t {
   uint32_t token2;
   // Maximum rank allowed for blocking merges.
   uint32_t limit;
-  // Current split position in decomposition search (1+).
+  // Current split position in decomposition search.
+  // 0 = try split_table fast path first, 1+ = byte offset in text.
   uint16_t split_pos;
   uint8_t stage;  // iree_tokenizer_bpe_validation_stage_t
   // Which token to decompose: 1 = token1, 2 = token2.
@@ -152,73 +153,130 @@ static bool iree_tokenizer_bpe_is_valid_token_pair(
       }
 
       frame->stage = IREE_TOKENIZER_BPE_VALIDATION_STAGE_FIRST;
-      frame->split_pos = 1;  // Start at first split position.
+      frame->split_pos = 0;  // 0 = try split_table fast path first.
       continue;
     }
 
-    // Get the token text for the side we're decomposing.
+    // Get the token we're decomposing (based on which side).
     uint32_t decompose_token =
         (frame->side == 1) ? frame->token1 : frame->token2;
-    iree_string_view_t decompose_text =
-        iree_tokenizer_vocab_token_text(vocab, (int32_t)decompose_token);
 
-    // Try split positions starting from frame->split_pos.
     bool found_decomposition = false;
-    for (iree_host_size_t split_pos = frame->split_pos;
-         split_pos < decompose_text.size; ++split_pos) {
-      iree_string_view_t left_text =
-          iree_make_string_view(decompose_text.data, split_pos);
-      iree_string_view_t right_text = iree_make_string_view(
-          decompose_text.data + split_pos, decompose_text.size - split_pos);
 
-      // Look up both halves in vocab.
-      int32_t left_id = iree_tokenizer_vocab_lookup(vocab, left_text);
-      int32_t right_id = iree_tokenizer_vocab_lookup(vocab, right_text);
-      if (left_id < 0 || right_id < 0) continue;
+    // Fast path: try split_table decomposition first (O(1), no hash lookups).
+    // split_table stores the first reachable merge for each token. On the
+    // first attempt (split_pos == 0), use it directly instead of scanning
+    // all byte positions with hash lookups. This eliminates 3 hash lookups
+    // per split position in the common case.
+    if (frame->split_pos == 0) {
+      frame->split_pos = 1;  // On backtrack, fall through to the full loop.
+      iree_tokenizer_bpe_split_entry_t split = split_table[decompose_token];
+      if (split.left_id != decompose_token) {
+        // Non-base token: split_table provides (left_id, right_id) directly.
+        // By construction, merge(left_id, right_id) == decompose_token.
+        uint32_t new_limit;
+        uint32_t new_token1, new_token2;
+        if (frame->side == 1) {
+          new_token1 = split.right_id;
+          new_token2 = frame->token2;
+          new_limit = effective_rank[frame->token1];
+        } else {
+          new_token1 = frame->token1;
+          new_token2 = split.left_id;
+          new_limit = effective_rank[frame->token2] + 1;
+        }
 
-      // Check if there's a merge left + right → decompose_token.
-      iree_tokenizer_merge_hash_result_t merge =
-          iree_tokenizer_vocab_merge_hash_lookup(model->merge_hash, left_id,
-                                                 right_id);
-      if (merge.result_id != (int32_t)decompose_token) continue;
+        if (stack_count < IREE_TOKENIZER_BPE_PAIR_VALIDATION_STACK_CAPACITY) {
+          stack[stack_count] = (iree_tokenizer_bpe_validation_frame_t){
+              .token1 = new_token1,
+              .token2 = new_token2,
+              .limit = new_limit,
+              .split_pos = 0,
+              .stage = IREE_TOKENIZER_BPE_VALIDATION_STAGE_INIT,
+              .side = 0,
+          };
+          ++stack_count;
+          found_decomposition = true;
+        } else {
+          return false;
+        }
+      }
+    }
 
-      // Valid decomposition found. Compute new limit and push child frame.
-      uint32_t new_limit;
-      uint32_t new_token1, new_token2;
-      if (frame->side == 1) {
-        // Decomposing token1: new pair is (right_id, token2).
-        new_token1 = (uint32_t)right_id;
-        new_token2 = frame->token2;
-        new_limit = effective_rank[frame->token1];
-      } else {
-        // Decomposing token2: new pair is (token1, left_id).
-        new_token1 = frame->token1;
-        new_token2 = (uint32_t)left_id;
-        new_limit = effective_rank[frame->token2] + 1;
+    // Slow path: try all text split positions with hash lookups.
+    // Only reached when the split_table fast path didn't apply (base token)
+    // or failed (child validation rejected the split_table decomposition).
+    if (!found_decomposition) {
+      iree_string_view_t decompose_text =
+          iree_tokenizer_vocab_token_text(vocab, (int32_t)decompose_token);
+
+      // Compute the split_table's byte position so we can skip it (already
+      // tried by the fast path). Recomputing is cheap: one array read + one
+      // text length lookup, vs the 3 hash lookups we'd waste retrying it.
+      iree_host_size_t table_split_pos = 0;
+      {
+        iree_tokenizer_bpe_split_entry_t split = split_table[decompose_token];
+        if (split.left_id != decompose_token) {
+          table_split_pos =
+              iree_tokenizer_vocab_token_text(vocab, (int32_t)split.left_id)
+                  .size;
+        }
       }
 
-      // Save resume position for backtracking.
-      frame->split_pos = (uint16_t)(split_pos + 1);
-      found_decomposition = true;
+      for (iree_host_size_t split_pos = frame->split_pos;
+           split_pos < decompose_text.size; ++split_pos) {
+        // Skip the position already tried by the fast path.
+        if (split_pos == table_split_pos && table_split_pos > 0) continue;
 
-      // Check stack capacity before pushing.
-      if (stack_count >= IREE_TOKENIZER_BPE_PAIR_VALIDATION_STACK_CAPACITY) {
-        // Stack exhausted. Conservatively reject to avoid false positives.
-        // This path is unreachable for well-formed BPE vocabularies.
-        return false;
+        iree_string_view_t left_text =
+            iree_make_string_view(decompose_text.data, split_pos);
+        iree_string_view_t right_text = iree_make_string_view(
+            decompose_text.data + split_pos, decompose_text.size - split_pos);
+
+        // Look up both halves in vocab.
+        int32_t left_id = iree_tokenizer_vocab_lookup(vocab, left_text);
+        int32_t right_id = iree_tokenizer_vocab_lookup(vocab, right_text);
+        if (left_id < 0 || right_id < 0) continue;
+
+        // Check if there's a merge left + right → decompose_token.
+        iree_tokenizer_merge_hash_result_t merge =
+            iree_tokenizer_vocab_merge_hash_lookup(model->merge_hash, left_id,
+                                                   right_id);
+        if (merge.result_id != (int32_t)decompose_token) continue;
+
+        // Valid decomposition found. Compute new limit and push child frame.
+        uint32_t new_limit;
+        uint32_t new_token1, new_token2;
+        if (frame->side == 1) {
+          new_token1 = (uint32_t)right_id;
+          new_token2 = frame->token2;
+          new_limit = effective_rank[frame->token1];
+        } else {
+          new_token1 = frame->token1;
+          new_token2 = (uint32_t)left_id;
+          new_limit = effective_rank[frame->token2] + 1;
+        }
+
+        // Save resume position for backtracking.
+        frame->split_pos = (uint16_t)(split_pos + 1);
+        found_decomposition = true;
+
+        if (stack_count >= IREE_TOKENIZER_BPE_PAIR_VALIDATION_STACK_CAPACITY) {
+          return false;
+        }
+
+        // Push child frame.
+        stack[stack_count] = (iree_tokenizer_bpe_validation_frame_t){
+            .token1 = new_token1,
+            .token2 = new_token2,
+            .limit = new_limit,
+            .split_pos = 0,
+            .stage = IREE_TOKENIZER_BPE_VALIDATION_STAGE_INIT,
+            .side = 0,
+        };
+        ++stack_count;
+        break;
       }
-
-      // Push child frame.
-      stack[stack_count] = (iree_tokenizer_bpe_validation_frame_t){
-          .token1 = new_token1,
-          .token2 = new_token2,
-          .limit = new_limit,
-          .split_pos = 0,
-          .stage = IREE_TOKENIZER_BPE_VALIDATION_STAGE_INIT,
-          .side = 0,
-      };
-      ++stack_count;
-      break;
     }
 
     if (found_decomposition) {
@@ -239,7 +297,7 @@ static bool iree_tokenizer_bpe_is_valid_token_pair(
       if (!other_is_base) {
         frame->stage = IREE_TOKENIZER_BPE_VALIDATION_STAGE_SECOND;
         frame->side = other_side;
-        frame->split_pos = 1;
+        frame->split_pos = 0;  // 0 = try split_table fast path first.
         continue;
       }
     }
