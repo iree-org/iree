@@ -964,6 +964,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // If needed then add C operand which would be operand 2 or 4 for unscaled
     // and scaled GEMM respectively.
     promotionList.push_back(promotionList.size());
+    // Use default config attribute for the C promotion.
+    if (!promotionArray.empty()) {
+      promotionArray.push_back(
+          IREE::GPU::DerivedThreadConfigAttr::get(context));
+    }
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
