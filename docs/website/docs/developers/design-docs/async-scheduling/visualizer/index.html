@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vector Clock &amp; Frontier Explorer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>Vector Clock &amp; Frontier Explorer</h1>
+    <p class="subtitle">Interactive visualization of causal ordering in IREE's async runtime</p>
+  </header>
+
+  <main>
+
+    <section class="card" id="scenario-section">
+      <div class="scenario-header">
+        <label for="scenario-select">Scenario</label>
+        <select id="scenario-select"></select>
+      </div>
+      <p id="scenario-description"></p>
+      <div id="scaling-controls" class="scaling-controls">
+        <div class="scaling-slider-group">
+          <label for="width-slider">Width</label>
+          <input type="range" id="width-slider" min="1" max="4" value="1" step="1">
+          <span id="width-value" class="scaling-value">1</span>
+        </div>
+        <span class="scaling-times">&times;</span>
+        <div class="scaling-slider-group">
+          <label for="depth-slider">Depth</label>
+          <input type="range" id="depth-slider" min="1" max="8" value="1" step="1">
+          <span id="depth-value" class="scaling-value">1</span>
+        </div>
+        <span class="scaling-separator"></span>
+        <div class="scaling-slider-group">
+          <label for="hw-slider" id="hw-label">GPUs</label>
+          <input type="range" id="hw-slider" min="1" max="4" value="1" step="1">
+          <span id="hw-value" class="scaling-value">1</span>
+        </div>
+        <span id="scaling-summary" class="scaling-summary"></span>
+      </div>
+    </section>
+
+    <section class="card" id="dag-section">
+      <h2>Dependency Graph</h2>
+      <div id="dag-container"></div>
+    </section>
+
+    <section class="card" id="timeline-section">
+      <h2>Execution Timeline</h2>
+      <div id="timeline-container"></div>
+    </section>
+
+    <section id="controls-section">
+      <div class="transport">
+        <button id="btn-reset" title="Reset to start (Home)">&#x23EE;</button>
+        <button id="btn-step-back" title="Step back (&larr;)">&#x25C1;</button>
+        <button id="btn-play" title="Play / Pause (Space)">&#x25B6;</button>
+        <button id="btn-step-fwd" title="Step forward (&rarr;)">&#x25B7;</button>
+        <button id="btn-end" title="Jump to end (End)">&#x23ED;</button>
+      </div>
+      <input type="range" id="time-slider" min="0" max="0" value="0" step="1">
+      <div class="time-display">
+        <span id="time-label">t = 0</span>
+        <span id="time-total">/ 0</span>
+      </div>
+    </section>
+
+    <section class="card annotation" id="annotation-section">
+      <div id="annotation-text"></div>
+    </section>
+
+    <div id="bottom-panels">
+      <section class="card" id="frontier-section">
+        <h2>Semaphore State</h2>
+        <div id="sem-state"></div>
+        <h2 class="section-divider">Operation Frontiers</h2>
+        <div id="op-frontiers"></div>
+      </section>
+
+      <section class="card" id="events-section">
+        <h2>Events</h2>
+        <div id="event-list"></div>
+      </section>
+    </div>
+
+  </main>
+
+  <div id="tooltip" class="hidden"></div>
+
+  <footer>
+    <p>Part of <a href="https://iree.dev">IREE</a>'s async runtime documentation</p>
+    <p class="legend">
+      <span class="legend-item pending">Pending</span>
+      <span class="legend-item ready">Ready</span>
+      <span class="legend-item in-flight">In Flight</span>
+      <span class="legend-item retired">Retired</span>
+    </p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# IOCP-based proactor implementation for Windows.
+#
+# Uses I/O Completion Ports for completion-based async I/O. The kernel
+# performs I/O and posts completion packets, so no worker threads are needed.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# IOCP Proactor (Public API)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "iocp",
+    srcs = [
+        "proactor.c",
+        "proactor.h",
+        "proactor_submit.c",
+        "socket.c",
+        "socket.h",
+        "timer_list.c",
+        "timer_list.h",
+    ],
+    hdrs = ["api.h"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:types",
+        "//runtime/src/iree/async/util:message_pool",
+        "//runtime/src/iree/async/util:sequence_emulation",
+        "//runtime/src/iree/async/util:signal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:memory",
+    ],
+)

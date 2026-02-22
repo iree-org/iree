@@ -1,0 +1,88 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for buffer pools and buffer registration.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Buffer pool tests: allocation, acquire/release, pool lifecycle.
+iree_runtime_cc_library(
+    name = "pool_test",
+    testonly = True,
+    srcs = ["pool_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Buffer registration tests: host buffers, dmabuf, recv pools.
+# Uses socket operations for recv pool tests, so depends on socket_test_base.
+iree_runtime_cc_library(
+    name = "registration_test",
+    testonly = True,
+    srcs = ["registration_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All buffer tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":pool_test",
+        ":registration_test",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Buffer pool benchmarks: acquire/release cycles, batch operations.
+iree_runtime_cc_library(
+    name = "pool_benchmark",
+    testonly = True,
+    srcs = ["pool_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All buffer benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":pool_benchmark",
+    ],
+)

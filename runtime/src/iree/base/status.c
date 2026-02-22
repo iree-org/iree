@@ -242,6 +242,50 @@ iree_status_code_from_win32_error(uint32_t error) {
       return IREE_STATUS_DATA_LOSS;
     case ERROR_NOT_SUPPORTED:
       return IREE_STATUS_UNIMPLEMENTED;
+
+    // ERROR_OPERATION_ABORTED (995): overlapped I/O cancelled via CancelIoEx.
+    case 995:
+      return IREE_STATUS_CANCELLED;
+
+    // ERROR_NETNAME_DELETED (64): network connection closed by remote host
+    // during an overlapped I/O operation.
+    case 64:
+      return IREE_STATUS_UNAVAILABLE;
+
+    // WinSock error codes (from winsock2.h, stable ABI since WinSock 1.0).
+    // Raw values used here to avoid pulling in winsock2.h.
+    case 10013:  // WSAEACCES
+      return IREE_STATUS_PERMISSION_DENIED;
+    case 10022:  // WSAEINVAL
+      return IREE_STATUS_INVALID_ARGUMENT;
+    case 10035:  // WSAEWOULDBLOCK
+      return IREE_STATUS_UNAVAILABLE;
+    case 10036:  // WSAEINPROGRESS
+      return IREE_STATUS_UNAVAILABLE;
+    case 10040:  // WSAEMSGSIZE
+      return IREE_STATUS_OUT_OF_RANGE;
+    case 10047:  // WSAEAFNOSUPPORT
+      return IREE_STATUS_INVALID_ARGUMENT;
+    case 10048:  // WSAEADDRINUSE
+      return IREE_STATUS_FAILED_PRECONDITION;
+    case 10049:  // WSAEADDRNOTAVAIL
+      return IREE_STATUS_INVALID_ARGUMENT;
+    case 10051:  // WSAENETUNREACH
+    case 10052:  // WSAENETRESET
+    case 10053:  // WSAECONNABORTED
+    case 10054:  // WSAECONNRESET
+      return IREE_STATUS_UNAVAILABLE;
+    case 10055:  // WSAENOBUFS
+      return IREE_STATUS_RESOURCE_EXHAUSTED;
+    case 10057:  // WSAENOTCONN
+    case 10058:  // WSAESHUTDOWN
+      return IREE_STATUS_FAILED_PRECONDITION;
+    case 10060:  // WSAETIMEDOUT
+      return IREE_STATUS_DEADLINE_EXCEEDED;
+    case 10061:  // WSAECONNREFUSED
+    case 10065:  // WSAEHOSTUNREACH
+      return IREE_STATUS_UNAVAILABLE;
+
     default:
       return IREE_STATUS_UNKNOWN;
   }

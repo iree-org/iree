@@ -307,6 +307,7 @@ def convert_directory(directory_path, write_files, allow_partial_conversion, ver
             repo_cfg=repo_cfg,
             build_dir=directory_path,
             allow_partial_conversion=allow_partial_conversion,
+            repo_root=repo_root,
         )
     except (NameError, NotImplementedError) as e:
         log(

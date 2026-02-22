@@ -1,0 +1,234 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for synchronization primitives: notifications, cancellation, fences.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Notification tests: async wait/signal, cross-thread signaling, chaining.
+iree_runtime_cc_library(
+    name = "notification_test",
+    testonly = True,
+    srcs = ["notification_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading",
+    ],
+    alwayslink = True,
+)
+
+# Cancellation tests: timer/recv/accept/connect cancellation, guarantees.
+# Uses socket operations for recv/accept/connect cancel tests.
+iree_runtime_cc_library(
+    name = "cancellation_test",
+    testonly = True,
+    srcs = ["cancellation_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# POSIX fence tests: import/export device fences using file descriptors.
+# Uses poll.h and eventfd — POSIX-only (Linux and macOS).
+iree_runtime_cc_library(
+    name = "fence_posix_test",
+    testonly = True,
+    srcs = ["fence_posix_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Relay tests: portable notification-to-notification relay dataflow.
+# Uses only notifications (no platform primitives) — runs on all platforms.
+iree_runtime_cc_library(
+    name = "relay_test",
+    testonly = True,
+    srcs = ["relay_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading",
+    ],
+    alwayslink = True,
+)
+
+# POSIX relay tests: primitive source/sink tests using eventfd (Linux) or
+# pipe (macOS). Tests PRIMITIVE→PRIMITIVE, PRIMITIVE→NOTIFICATION,
+# NOTIFICATION→PRIMITIVE, ownership transfer, error sensitivity, etc.
+iree_runtime_cc_library(
+    name = "relay_posix_test",
+    testonly = True,
+    srcs = ["relay_posix_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading",
+    ],
+    alwayslink = True,
+)
+
+# Windows relay tests: NOTIFICATION→SIGNAL_PRIMITIVE using Win32 Events.
+# Tests the primary relay use case: bridging notification signals to Windows
+# primitives for external consumption (semaphore signaling, device wake, etc.).
+iree_runtime_cc_library(
+    name = "relay_windows_test",
+    testonly = True,
+    srcs = ["relay_windows_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Semaphore sync tests: timeline semantics, timepoint callbacks, frontier.
+iree_runtime_cc_library(
+    name = "semaphore_sync_test",
+    testonly = True,
+    srcs = ["semaphore_sync_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Semaphore async tests: WAIT/SIGNAL operations via proactor.
+iree_runtime_cc_library(
+    name = "semaphore_async_test",
+    testonly = True,
+    srcs = ["semaphore_async_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Semaphore linked tests: chained WAIT/SIGNAL with sockets.
+iree_runtime_cc_library(
+    name = "semaphore_linked_test",
+    testonly = True,
+    srcs = ["semaphore_linked_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Signal handling tests: subscribe, unsubscribe, delivery, multiple subscribers.
+iree_runtime_cc_library(
+    name = "signal_test",
+    testonly = True,
+    srcs = ["signal_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All sync tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":cancellation_test",
+        ":notification_test",
+        ":relay_test",
+        ":semaphore_async_test",
+        ":semaphore_linked_test",
+        ":semaphore_sync_test",
+        ":signal_test",
+    ] + select({
+        "//build_tools/bazel:iree_is_windows": [
+            ":relay_windows_test",
+        ],
+        "//build_tools/bazel:iree_is_linux": [
+            ":fence_posix_test",
+            ":relay_posix_test",
+        ],
+        "//conditions:default": [
+            ":fence_posix_test",
+            ":relay_posix_test",
+        ],
+    }),
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Relay benchmarks: throughput, latency, scalability.
+# Uses only notifications (no platform primitives) — runs on all platforms.
+iree_runtime_cc_library(
+    name = "relay_benchmark",
+    testonly = True,
+    srcs = ["relay_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All sync benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":relay_benchmark",
+    ],
+)

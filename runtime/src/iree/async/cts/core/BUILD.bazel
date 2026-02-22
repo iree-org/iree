@@ -1,0 +1,160 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for proactor lifecycle, NOP operations, timers, and linked sequences.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Error propagation tests: sticky failure, multishot errors, proactor resilience.
+iree_runtime_cc_library(
+    name = "error_propagation_test",
+    testonly = True,
+    srcs = ["error_propagation_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Proactor lifecycle tests: create, retain, release, capabilities.
+iree_runtime_cc_library(
+    name = "lifecycle_test",
+    testonly = True,
+    srcs = ["lifecycle_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# NOP operation tests: submit, poll, callback mechanics.
+iree_runtime_cc_library(
+    name = "nop_test",
+    testonly = True,
+    srcs = ["nop_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Resource exhaustion tests: concurrent operations, stress testing.
+iree_runtime_cc_library(
+    name = "resource_exhaustion_test",
+    testonly = True,
+    srcs = ["resource_exhaustion_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# Linked operation sequence tests (requires LINKED_OPERATIONS capability).
+# Uses socket operations to test linked sequences, so depends on socket_test_base.
+iree_runtime_cc_library(
+    name = "sequence_test",
+    testonly = True,
+    srcs = ["sequence_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Timer operation tests: deadlines, ordering, cancellation.
+iree_runtime_cc_library(
+    name = "timer_test",
+    testonly = True,
+    srcs = ["timer_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All core tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":error_propagation_test",
+        ":lifecycle_test",
+        ":nop_test",
+        ":resource_exhaustion_test",
+        ":sequence_test",
+        ":timer_test",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Dispatch scalability benchmarks: O(1) dispatch validation, fan-out throughput.
+iree_runtime_cc_library(
+    name = "dispatch_scalability_benchmark",
+    testonly = True,
+    srcs = ["dispatch_scalability_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# Sequence operation benchmarks: LINK vs emulation vs raw linked overhead.
+iree_runtime_cc_library(
+    name = "sequence_benchmark",
+    testonly = True,
+    srcs = ["sequence_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All core benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":dispatch_scalability_benchmark",
+        ":sequence_benchmark",
+    ],
+)
