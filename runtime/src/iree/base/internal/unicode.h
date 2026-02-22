@@ -51,8 +51,76 @@ extern "C" {
 //     uint32_t codepoint = iree_unicode_utf8_decode(text, &position);
 //     // process codepoint...
 //   }
-uint32_t iree_unicode_utf8_decode(iree_string_view_t text,
-                                  iree_host_size_t* position);
+static IREE_ATTRIBUTE_ALWAYS_INLINE inline uint32_t iree_unicode_utf8_decode(
+    iree_string_view_t text, iree_host_size_t* position) {
+  if (*position >= text.size) {
+    return IREE_UNICODE_REPLACEMENT_CHAR;
+  }
+
+  const uint8_t* data = (const uint8_t*)text.data;
+  uint8_t first_byte = data[*position];
+
+  // Single byte (ASCII): 0xxxxxxx
+  if ((first_byte & 0x80) == 0) {
+    (*position)++;
+    return first_byte;
+  }
+
+  // Determine sequence length from leading byte.
+  iree_host_size_t sequence_length;
+  uint32_t codepoint;
+  if ((first_byte & 0xE0) == 0xC0) {
+    sequence_length = 2;
+    codepoint = first_byte & 0x1F;
+  } else if ((first_byte & 0xF0) == 0xE0) {
+    sequence_length = 3;
+    codepoint = first_byte & 0x0F;
+  } else if ((first_byte & 0xF8) == 0xF0) {
+    sequence_length = 4;
+    codepoint = first_byte & 0x07;
+  } else {
+    (*position)++;
+    return IREE_UNICODE_REPLACEMENT_CHAR;
+  }
+
+  // Check we have enough bytes remaining.
+  if (*position + sequence_length > text.size) {
+    (*position)++;
+    return IREE_UNICODE_REPLACEMENT_CHAR;
+  }
+
+  // Decode continuation bytes.
+  for (iree_host_size_t i = 1; i < sequence_length; ++i) {
+    uint8_t continuation_byte = data[*position + i];
+    if ((continuation_byte & 0xC0) != 0x80) {
+      (*position)++;
+      return IREE_UNICODE_REPLACEMENT_CHAR;
+    }
+    codepoint = (codepoint << 6) | (continuation_byte & 0x3F);
+  }
+
+  // Validate codepoint range and overlong sequences.
+  bool valid = true;
+  if (codepoint > IREE_UNICODE_MAX_CODEPOINT) {
+    valid = false;
+  } else if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
+    valid = false;
+  } else if (sequence_length == 2 && codepoint < 0x80) {
+    valid = false;
+  } else if (sequence_length == 3 && codepoint < 0x800) {
+    valid = false;
+  } else if (sequence_length == 4 && codepoint < 0x10000) {
+    valid = false;
+  }
+
+  if (!valid) {
+    (*position)++;
+    return IREE_UNICODE_REPLACEMENT_CHAR;
+  }
+
+  *position += sequence_length;
+  return codepoint;
+}
 
 // Encodes a single codepoint to UTF-8, writing to |out_buffer|.
 // Returns the number of bytes written (1-4), or 0 if |codepoint| is invalid.
@@ -239,8 +307,67 @@ typedef struct iree_unicode_nfkd_mapping_t {
   uint32_t inline_targets[4];  // Inline storage for short decompositions.
 } iree_unicode_nfkd_mapping_t;
 
+// Binary search fallback for category lookup (defined in unicode.c).
+iree_unicode_category_t iree_unicode_category_lookup(uint32_t codepoint);
+
+// Direct lookup table for Latin-1 Supplement (U+0080-U+00FF).
+extern const uint8_t iree_unicode_latin1_categories[128];
+
 // Returns the general category of |codepoint|.
-iree_unicode_category_t iree_unicode_category(uint32_t codepoint);
+static IREE_ATTRIBUTE_ALWAYS_INLINE inline iree_unicode_category_t
+iree_unicode_category(uint32_t codepoint) {
+  // Fast path for ASCII.
+  if (codepoint < 0x80) {
+    if (codepoint >= 'A' && codepoint <= 'Z') {
+      return IREE_UNICODE_CATEGORY_LETTER;
+    }
+    if (codepoint >= 'a' && codepoint <= 'z') {
+      return IREE_UNICODE_CATEGORY_LETTER;
+    }
+    if (codepoint >= '0' && codepoint <= '9') {
+      return IREE_UNICODE_CATEGORY_NUMBER;
+    }
+    if (codepoint < 0x20 || codepoint == 0x7F) {
+      return IREE_UNICODE_CATEGORY_OTHER;
+    }
+    if (codepoint == ' ') {
+      return IREE_UNICODE_CATEGORY_SEPARATOR;
+    }
+    if ((codepoint >= '!' && codepoint <= '/') ||
+        (codepoint >= ':' && codepoint <= '@') ||
+        (codepoint >= '[' && codepoint <= '`') ||
+        (codepoint >= '{' && codepoint <= '~')) {
+      if (codepoint == '$' || codepoint == '+' || codepoint == '<' ||
+          codepoint == '=' || codepoint == '>' || codepoint == '^' ||
+          codepoint == '`' || codepoint == '|' || codepoint == '~') {
+        return IREE_UNICODE_CATEGORY_SYMBOL;
+      }
+      return IREE_UNICODE_CATEGORY_PUNCTUATION;
+    }
+  }
+  // Fast path for Latin-1 Supplement (U+0080-U+00FF).
+  if (codepoint <= 0xFF) {
+    return (iree_unicode_category_t)
+        iree_unicode_latin1_categories[codepoint - 0x80];
+  }
+  // Fast path for Latin Extended-A/B and IPA Extensions (U+0100-U+02C1).
+  if (codepoint <= 0x02C1) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for CJK Unified Ideographs (U+4E00-U+9FFF).
+  if (codepoint >= 0x4E00 && codepoint <= 0x9FFF) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for Hiragana (U+3041-U+3096).
+  if (codepoint >= 0x3041 && codepoint <= 0x3096) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for Katakana (U+30A1-U+30FA).
+  if (codepoint >= 0x30A1 && codepoint <= 0x30FA) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  return iree_unicode_category_lookup(codepoint);
+}
 
 // Returns true if |codepoint| is a letter (L category).
 static inline bool iree_unicode_is_letter(uint32_t codepoint) {
@@ -289,9 +416,24 @@ static inline bool iree_unicode_is_other(uint32_t codepoint) {
   return (iree_unicode_category(codepoint) & IREE_UNICODE_CATEGORY_OTHER) != 0;
 }
 
+// Binary search fallback for whitespace lookup (defined in unicode.c).
+bool iree_unicode_whitespace_lookup(uint32_t codepoint);
+
 // Returns true if |codepoint| has the White_Space property.
 // This is a derived property that includes more than just the Z category.
-bool iree_unicode_is_whitespace(uint32_t codepoint);
+static IREE_ATTRIBUTE_ALWAYS_INLINE inline bool iree_unicode_is_whitespace(
+    uint32_t codepoint) {
+  if (codepoint == ' ' || codepoint == '\t' || codepoint == '\n' ||
+      codepoint == '\r' || codepoint == '\f' || codepoint == '\v') {
+    return true;
+  }
+  if (codepoint >= 0x80) {
+    if (codepoint == 0x85 || codepoint == 0xA0) return true;
+    if (codepoint < 0x1680 || codepoint > 0x3000) return false;
+    return iree_unicode_whitespace_lookup(codepoint);
+  }
+  return false;
+}
 
 // Returns true if |codepoint| is a control character (Cc category).
 bool iree_unicode_is_control(uint32_t codepoint);

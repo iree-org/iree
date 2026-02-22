@@ -32,8 +32,8 @@
 //   This function maps codepoints to CATEGORY pseudo-bytes only.
 //   Exact codepoint range matching (e.g., [一-龥]) is handled separately
 //   through the DFA's range checking mechanism, not through pseudo-bytes.
-static inline uint8_t iree_tokenizer_regex_codepoint_to_byte(
-    uint32_t codepoint) {
+static IREE_ATTRIBUTE_ALWAYS_INLINE inline uint8_t
+iree_tokenizer_regex_codepoint_to_byte(uint32_t codepoint) {
   // ASCII bytes pass through directly.
   if (codepoint < 0x80) return (uint8_t)codepoint;
 

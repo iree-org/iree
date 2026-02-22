@@ -46,86 +46,6 @@ extern const iree_host_size_t iree_unicode_nfkd_overflow_count;
 // UTF-8 Codec
 //===----------------------------------------------------------------------===//
 
-uint32_t iree_unicode_utf8_decode(iree_string_view_t text,
-                                  iree_host_size_t* position) {
-  if (*position >= text.size) {
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  const uint8_t* data = (const uint8_t*)text.data;
-  uint8_t first_byte = data[*position];
-
-  // Single byte (ASCII): 0xxxxxxx
-  if ((first_byte & 0x80) == 0) {
-    (*position)++;
-    return first_byte;
-  }
-
-  // Determine sequence length from leading byte.
-  iree_host_size_t sequence_length;
-  uint32_t codepoint;
-  if ((first_byte & 0xE0) == 0xC0) {
-    // Two bytes: 110xxxxx 10xxxxxx
-    sequence_length = 2;
-    codepoint = first_byte & 0x1F;
-  } else if ((first_byte & 0xF0) == 0xE0) {
-    // Three bytes: 1110xxxx 10xxxxxx 10xxxxxx
-    sequence_length = 3;
-    codepoint = first_byte & 0x0F;
-  } else if ((first_byte & 0xF8) == 0xF0) {
-    // Four bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-    sequence_length = 4;
-    codepoint = first_byte & 0x07;
-  } else {
-    // Invalid leading byte.
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  // Check we have enough bytes remaining.
-  if (*position + sequence_length > text.size) {
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  // Decode continuation bytes.
-  for (iree_host_size_t i = 1; i < sequence_length; ++i) {
-    uint8_t continuation_byte = data[*position + i];
-    if ((continuation_byte & 0xC0) != 0x80) {
-      // Invalid continuation byte.
-      (*position)++;
-      return IREE_UNICODE_REPLACEMENT_CHAR;
-    }
-    codepoint = (codepoint << 6) | (continuation_byte & 0x3F);
-  }
-
-  // Validate codepoint range and overlong sequences.
-  bool valid = true;
-  if (codepoint > IREE_UNICODE_MAX_CODEPOINT) {
-    valid = false;
-  } else if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
-    // Surrogate pairs are invalid in UTF-8.
-    valid = false;
-  } else if (sequence_length == 2 && codepoint < 0x80) {
-    // Overlong 2-byte sequence.
-    valid = false;
-  } else if (sequence_length == 3 && codepoint < 0x800) {
-    // Overlong 3-byte sequence.
-    valid = false;
-  } else if (sequence_length == 4 && codepoint < 0x10000) {
-    // Overlong 4-byte sequence.
-    valid = false;
-  }
-
-  if (!valid) {
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  *position += sequence_length;
-  return codepoint;
-}
-
 int iree_unicode_utf8_encode(uint32_t codepoint, char* out_buffer) {
   if (codepoint > IREE_UNICODE_MAX_CODEPOINT ||
       (codepoint >= 0xD800 && codepoint <= 0xDFFF)) {
@@ -235,8 +155,7 @@ iree_host_size_t iree_unicode_utf8_incomplete_tail_length(
 
 // Binary search for codepoint in category ranges.
 // Returns OTHER for valid but unassigned codepoints (Cn category).
-static iree_unicode_category_t iree_unicode_category_lookup(
-    uint32_t codepoint) {
+iree_unicode_category_t iree_unicode_category_lookup(uint32_t codepoint) {
   if (iree_unicode_category_ranges_count == 0) {
     return IREE_UNICODE_CATEGORY_OTHER;
   }
@@ -260,7 +179,7 @@ static iree_unicode_category_t iree_unicode_category_lookup(
 }
 
 // Binary search for codepoint in whitespace list.
-static bool iree_unicode_whitespace_lookup(uint32_t codepoint) {
+bool iree_unicode_whitespace_lookup(uint32_t codepoint) {
   iree_host_size_t low = 0;
   iree_host_size_t high = iree_unicode_whitespace_count;
   while (low < high) {
@@ -355,7 +274,7 @@ static const iree_unicode_nfd_mapping_t* iree_unicode_nfd_lookup(
 //   U+00F7:      Sm (Math Symbol)       → SYMBOL  (÷)
 //   U+00F8-00FF: Ll (Lowercase Letter)  → LETTER
 // clang-format off
-static const uint8_t iree_unicode_latin1_categories[128] = {
+const uint8_t iree_unicode_latin1_categories[128] = {
     // U+0080-008F: C1 Controls (Cc).
     0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
     0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
@@ -386,87 +305,6 @@ static const uint8_t iree_unicode_latin1_categories[128] = {
     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
 };
 // clang-format on
-
-iree_unicode_category_t iree_unicode_category(uint32_t codepoint) {
-  // Fast path for ASCII.
-  if (codepoint < 0x80) {
-    if (codepoint >= 'A' && codepoint <= 'Z') {
-      return IREE_UNICODE_CATEGORY_LETTER;
-    }
-    if (codepoint >= 'a' && codepoint <= 'z') {
-      return IREE_UNICODE_CATEGORY_LETTER;
-    }
-    if (codepoint >= '0' && codepoint <= '9') {
-      return IREE_UNICODE_CATEGORY_NUMBER;
-    }
-    if (codepoint < 0x20 || codepoint == 0x7F) {
-      return IREE_UNICODE_CATEGORY_OTHER;  // Control
-    }
-    if (codepoint == ' ') {
-      return IREE_UNICODE_CATEGORY_SEPARATOR;
-    }
-    // ASCII punctuation and symbols.
-    if ((codepoint >= '!' && codepoint <= '/') ||
-        (codepoint >= ':' && codepoint <= '@') ||
-        (codepoint >= '[' && codepoint <= '`') ||
-        (codepoint >= '{' && codepoint <= '~')) {
-      // Mix of punctuation and symbols - check specific ranges.
-      if (codepoint == '$' || codepoint == '+' || codepoint == '<' ||
-          codepoint == '=' || codepoint == '>' || codepoint == '^' ||
-          codepoint == '`' || codepoint == '|' || codepoint == '~') {
-        return IREE_UNICODE_CATEGORY_SYMBOL;
-      }
-      return IREE_UNICODE_CATEGORY_PUNCTUATION;
-    }
-  }
-  // Fast path for Latin-1 Supplement (U+0080-U+00FF).
-  if (codepoint <= 0xFF) {
-    return (iree_unicode_category_t)
-        iree_unicode_latin1_categories[codepoint - 0x80];
-  }
-  // Fast path for Latin Extended-A/B and IPA Extensions (U+0100-U+02C1): all
-  // LETTER. This covers GPT-2/LLaMA ByteLevel-remapped non-Latin-1 bytes
-  // (U+0100-U+0143), eliminating 11-comparison binary search for every
-  // ByteLevel-remapped CJK byte that falls outside the Latin-1 range.
-  if (codepoint <= 0x02C1) {
-    return IREE_UNICODE_CATEGORY_LETTER;
-  }
-  // Fast path for CJK Unified Ideographs (U+4E00-U+9FFF): all LETTER.
-  // This is the dominant range in Chinese and Japanese text (~20K characters).
-  if (codepoint >= 0x4E00 && codepoint <= 0x9FFF) {
-    return IREE_UNICODE_CATEGORY_LETTER;
-  }
-  // Fast path for Hiragana (U+3041-U+3096): all LETTER.
-  if (codepoint >= 0x3041 && codepoint <= 0x3096) {
-    return IREE_UNICODE_CATEGORY_LETTER;
-  }
-  // Fast path for Katakana (U+30A1-U+30FA): all LETTER.
-  if (codepoint >= 0x30A1 && codepoint <= 0x30FA) {
-    return IREE_UNICODE_CATEGORY_LETTER;
-  }
-  return iree_unicode_category_lookup(codepoint);
-}
-
-bool iree_unicode_is_whitespace(uint32_t codepoint) {
-  // Fast path for common whitespace.
-  if (codepoint == ' ' || codepoint == '\t' || codepoint == '\n' ||
-      codepoint == '\r' || codepoint == '\f' || codepoint == '\v') {
-    return true;
-  }
-  // Check the full whitespace table for non-ASCII.
-  if (codepoint >= 0x80) {
-    // U+0085 (NEL) and U+00A0 (NBSP) are the only whitespace below U+1680,
-    // and U+3000 (Ideographic Space) is the highest whitespace codepoint in
-    // Unicode. Reject U+0080-U+167F and U+3001+ with two comparisons instead
-    // of binary-searching 19 entries (~4-5 comparisons). This covers both
-    // GPT-2 ByteLevel-remapped bytes (U+0100-U+0143) and CJK codepoints
-    // (Hiragana U+3041+, Katakana U+30A1+, CJK Ideographs U+4E00+).
-    if (codepoint == 0x85 || codepoint == 0xA0) return true;
-    if (codepoint < 0x1680 || codepoint > 0x3000) return false;
-    return iree_unicode_whitespace_lookup(codepoint);
-  }
-  return false;
-}
 
 bool iree_unicode_is_control(uint32_t codepoint) {
   // Cc category: C0 controls (0x00-0x1F), DEL (0x7F), C1 controls (0x80-0x9F).
