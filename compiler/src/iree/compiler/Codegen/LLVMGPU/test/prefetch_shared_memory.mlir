@@ -404,7 +404,6 @@ func.func @prefetch_nested_loop(%arg0: memref<128xf32>) {
 // -----
 
 // CHECK-LABEL: @prefetch_gather_to_lds_two_operands
-// CHECK-SAME: (%[[A_GLOBAL:.*]]: memref<128x128xf32>, %[[B_GLOBAL:.*]]: memref<128x128xf32>, %[[C_GLOBAL:.*]]: memref<128xf32>)
 // CHECK-3STAGE-LABEL: @prefetch_gather_to_lds_two_operands
 func.func @prefetch_gather_to_lds_two_operands(
     %A_global: memref<128x128xf32>,
@@ -416,36 +415,51 @@ func.func @prefetch_gather_to_lds_two_operands(
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
 
-  // 2-stage pipelining: 2 buffers for double-buffering
-  // CHECK: %[[A_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
-  // 3-stage pipelining: 3 buffers for triple-buffering
+  // 2-stage: double-buffered, 3-stage: triple-buffered
+  // CHECK: memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  // CHECK: memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  // CHECK-3STAGE: memref.alloc() : memref<3x1xf32, #gpu.address_space<workgroup>>
   // CHECK-3STAGE: memref.alloc() : memref<3x1xf32, #gpu.address_space<workgroup>>
   %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
-  // CHECK: %[[B_ALLOC:.*]] = memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
-  // CHECK-3STAGE: memref.alloc() : memref<3x1xf32, #gpu.address_space<workgroup>>
   %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
+  // 2-stage: 1 prologue iteration
+  // CHECK-COUNT-2: amdgpu.gather_to_lds
+  // 3-stage: 2 prologue iterations (N-1 for N stages)
+  // CHECK-3STAGE-COUNT-4: amdgpu.gather_to_lds
+  // CHECK: scf.for
+  // CHECK-3STAGE: scf.for
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
-    // CHECK: %[[IDX:.*]] = affine.apply #map(%[[K:.*]])
-    // CHECK: %[[B_SUB:.*]] = memref.subview %[[B_ALLOC]][%[[IDX]], 0] [1, 1] [1, 1] : memref<2x1xf32, #gpu.address_space<workgroup>> to memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
-    // CHECK: %[[A_SUB:.*]] = memref.subview %[[A_ALLOC]][%[[IDX]], 0] [1, 1] [1, 1] : memref<2x1xf32, #gpu.address_space<workgroup>> to memref<1xf32, strided<[1], offset: ?>, #gpu.address_space<workgroup>>
-    // CHECK: amdgpu.gather_to_lds %[[A_GLOBAL]][%c0, %[[K]]], %[[A_SUB]][%c0]
+    // CHECK: gpu.barrier
+    // CHECK-3STAGE: gpu.barrier
+    // CHECK-COUNT-2: amdgpu.gather_to_lds
+    // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds
     amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
-    // CHECK: amdgpu.gather_to_lds %[[B_GLOBAL]][%[[K]], %c0], %[[B_SUB]][%c0]
     amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
 
-    // CHECK: vector.transfer_read %[[A_SUB]][%c0]
+    // CHECK-COUNT-2: vector.transfer_read
+    // CHECK-3STAGE-COUNT-2: vector.transfer_read
     %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
-    // CHECK: vector.transfer_read %[[B_SUB]][%c0]
     %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     // CHECK: arith.mulf
+    // CHECK-3STAGE: arith.mulf
     %prod = arith.mulf %a_val, %b_val : vector<1xf32>
     // CHECK: arith.addf
+    // CHECK-3STAGE: arith.addf
     %sum = arith.addf %prod, %acc : vector<1xf32>
 
     // CHECK: scf.yield
+    // CHECK-3STAGE: scf.yield
     scf.yield %sum : vector<1xf32>
   }
+  // CHECK: gpu.barrier
+  // CHECK: vector.transfer_read
+  // CHECK: arith.mulf
+  // CHECK-3STAGE: gpu.barrier
+  // CHECK-3STAGE: vector.transfer_read
+  // CHECK-3STAGE: arith.mulf
+  // CHECK-3STAGE: vector.transfer_read
+  // CHECK-3STAGE: arith.mulf
 
   vector.transfer_write %result, %C_global[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
