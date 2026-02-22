@@ -21,7 +21,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "iree/async/cts/util/registry.h"
 #include "iree/async/cts/util/socket_test_base.h"
@@ -31,7 +34,20 @@
 
 namespace iree::async::cts {
 
-class SocketPosixTest : public SocketTestBase<> {};
+class SocketPosixTest : public SocketTestBase<> {
+ protected:
+  // Returns a unique abstract socket name incorporating PID and a counter to
+  // avoid collisions when test binaries run in parallel (--runs_per_test).
+  // Abstract namespace sockets are process-global on Linux and persist until
+  // all references are closed, so hardcoded names collide across processes.
+  std::string UniqueAbstractName(const char* base_name) {
+    static std::atomic<int> counter{0};
+    char buffer[108];  // sun_path max
+    snprintf(buffer, sizeof(buffer), "@iree_cts_%s_%d_%d", base_name,
+             (int)getpid(), counter.fetch_add(1, std::memory_order_relaxed));
+    return std::string(buffer);
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // Import tests: wrapping raw file descriptors
@@ -116,10 +132,12 @@ TEST_P(SocketPosixTest, UnixSocket_AbstractNamespace) {
       iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_UNIX_STREAM,
                                IREE_ASYNC_SOCKET_OPTION_NONE, &socket));
 
-  // Abstract namespace path (@ prefix).
+  // Abstract namespace path (@ prefix). Name must be unique per process to
+  // avoid collisions under parallel test execution.
+  std::string name = UniqueAbstractName("abstract_test");
   iree_async_address_t address;
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_abstract_test"), &address));
+      iree_make_cstring_view(name.c_str()), &address));
 
   IREE_EXPECT_OK(iree_async_socket_bind(socket, &address));
   IREE_EXPECT_OK(iree_async_socket_listen(socket, 4));
@@ -138,9 +156,10 @@ TEST_P(SocketPosixTest, UnixSocket_AbstractConnect) {
       iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_UNIX_STREAM,
                                IREE_ASYNC_SOCKET_OPTION_NONE, &server));
 
+  std::string name = UniqueAbstractName("abstract_connect");
   iree_async_address_t address;
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_abstract_connect"), &address));
+      iree_make_cstring_view(name.c_str()), &address));
   IREE_ASSERT_OK(iree_async_socket_bind(server, &address));
   IREE_ASSERT_OK(iree_async_socket_listen(server, 4));
 
@@ -313,12 +332,14 @@ TEST_P(SocketPosixTest, UnixDgram_ConnectedLoopback) {
       iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_UNIX_DGRAM,
                                IREE_ASYNC_SOCKET_OPTION_NONE, &socket_b));
 
-  // Bind both to abstract namespace paths.
+  // Bind both to abstract namespace paths. Names must be unique per process.
+  std::string name_a = UniqueAbstractName("dgram_a");
+  std::string name_b = UniqueAbstractName("dgram_b");
   iree_async_address_t addr_a, addr_b;
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_dgram_a"), &addr_a));
+      iree_make_cstring_view(name_a.c_str()), &addr_a));
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_dgram_b"), &addr_b));
+      iree_make_cstring_view(name_b.c_str()), &addr_b));
 
   IREE_ASSERT_OK(iree_async_socket_bind(socket_a, &addr_a));
   IREE_ASSERT_OK(iree_async_socket_bind(socket_b, &addr_b));
@@ -390,11 +411,13 @@ TEST_P(SocketPosixTest, UnixDgram_MessageBoundary) {
       iree_async_socket_create(proactor_, IREE_ASYNC_SOCKET_TYPE_UNIX_DGRAM,
                                IREE_ASYNC_SOCKET_OPTION_NONE, &socket_b));
 
+  std::string name_a = UniqueAbstractName("dgram_boundary_a");
+  std::string name_b = UniqueAbstractName("dgram_boundary_b");
   iree_async_address_t addr_a, addr_b;
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_dgram_boundary_a"), &addr_a));
+      iree_make_cstring_view(name_a.c_str()), &addr_a));
   IREE_ASSERT_OK(iree_async_address_from_unix(
-      iree_make_cstring_view("@iree_cts_dgram_boundary_b"), &addr_b));
+      iree_make_cstring_view(name_b.c_str()), &addr_b));
 
   IREE_ASSERT_OK(iree_async_socket_bind(socket_a, &addr_a));
   IREE_ASSERT_OK(iree_async_socket_bind(socket_b, &addr_b));
