@@ -212,8 +212,8 @@ void buildIREEPrecompileTransformPassPipeline(
       globalOptimizationOptions.stripAssertions;
   globalTransformOptions.generalizeMatmul =
       globalOptimizationOptions.generalizeMatmul;
-  globalTransformOptions.enableConv2DToImg2Col =
-      globalOptimizationOptions.enableConv2DToImg2Col;
+  globalTransformOptions.useIm2colForConvs =
+      globalOptimizationOptions.useIm2colForConvs;
   globalTransformOptions.constExprHoisting = pipelineOptions.constExprHoisting;
   globalTransformOptions.constExprMaxSizeIncreaseThreshold =
       pipelineOptions.constExprMaxSizeIncreaseThreshold;

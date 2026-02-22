@@ -121,10 +121,10 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Converts linalg named matmul ops to linalg generic ops."),
       llvm::cl::init(false),
   };
-  Option<bool> enableConv2DToImg2Col{
+  Option<bool> useIm2colForConvs{
       *this,
-      "enable-conv2d-to-img2col",
-      llvm::cl::desc("Enables conversion of Conv2D operations to img2col + "
+      "use-im2col-for-convs",
+      llvm::cl::desc("Enables converting convolution operations to im2col + "
                      "matmul form to leverage optimized matmul implementations."),
       llvm::cl::init(false),
   };

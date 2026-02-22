@@ -303,8 +303,8 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                      "global optimization to enable better fusion."),
       llvm::cl::cat(category));
   binder.opt<bool>(
-      "iree-global-opt-enable-conv2d-to-img2col", enableConv2DToImg2Col,
-      llvm::cl::desc("Enables conversion of Conv2D operations to img2col + "
+      "iree-global-opt-use-im2col-for-convs", useIm2colForConvs,
+      llvm::cl::desc("Enables converting convolution operations to im2col + "
                      "matmul form to leverage optimized matmul implementations."),
       llvm::cl::cat(category));
 }
