@@ -424,6 +424,26 @@ iree_unicode_category_t iree_unicode_category(uint32_t codepoint) {
     return (iree_unicode_category_t)
         iree_unicode_latin1_categories[codepoint - 0x80];
   }
+  // Fast path for Latin Extended-A/B and IPA Extensions (U+0100-U+02C1): all
+  // LETTER. This covers GPT-2/LLaMA ByteLevel-remapped non-Latin-1 bytes
+  // (U+0100-U+0143), eliminating 11-comparison binary search for every
+  // ByteLevel-remapped CJK byte that falls outside the Latin-1 range.
+  if (codepoint <= 0x02C1) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for CJK Unified Ideographs (U+4E00-U+9FFF): all LETTER.
+  // This is the dominant range in Chinese and Japanese text (~20K characters).
+  if (codepoint >= 0x4E00 && codepoint <= 0x9FFF) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for Hiragana (U+3041-U+3096): all LETTER.
+  if (codepoint >= 0x3041 && codepoint <= 0x3096) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
+  // Fast path for Katakana (U+30A1-U+30FA): all LETTER.
+  if (codepoint >= 0x30A1 && codepoint <= 0x30FA) {
+    return IREE_UNICODE_CATEGORY_LETTER;
+  }
   return iree_unicode_category_lookup(codepoint);
 }
 
@@ -435,6 +455,14 @@ bool iree_unicode_is_whitespace(uint32_t codepoint) {
   }
   // Check the full whitespace table for non-ASCII.
   if (codepoint >= 0x80) {
+    // U+0085 (NEL) and U+00A0 (NBSP) are the only whitespace below U+1680,
+    // and U+3000 (Ideographic Space) is the highest whitespace codepoint in
+    // Unicode. Reject U+0080-U+167F and U+3001+ with two comparisons instead
+    // of binary-searching 19 entries (~4-5 comparisons). This covers both
+    // GPT-2 ByteLevel-remapped bytes (U+0100-U+0143) and CJK codepoints
+    // (Hiragana U+3041+, Katakana U+30A1+, CJK Ideographs U+4E00+).
+    if (codepoint == 0x85 || codepoint == 0xA0) return true;
+    if (codepoint < 0x1680 || codepoint > 0x3000) return false;
     return iree_unicode_whitespace_lookup(codepoint);
   }
   return false;
