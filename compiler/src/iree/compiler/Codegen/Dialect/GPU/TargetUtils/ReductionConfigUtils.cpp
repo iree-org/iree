@@ -130,6 +130,21 @@ static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
   return largestInput.elementBitwidth;
 }
 
+/// Returns the dimension size that threadLoads must divide for the given op.
+static int64_t getThreadLoadsConstraint(linalg::LinalgOp op) {
+  SmallVector<unsigned> parallelDims, reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
+
+  if (reductionDims.empty()) {
+    // Parallel-only op: threadLoads must divide last parallel dim
+    return bounds[parallelDims.back()];
+  }
+  // Reduction op: threadLoads must divide last reduction dim
+  return bounds[reductionDims.back()];
+}
+
 /// Check if the reduction op has a single combiner operation.
 static LogicalResult checkSingleCombiner(linalg::LinalgOp op) {
   bool foundSingleReductionOutput = false;
@@ -661,7 +676,7 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   // reductions in scaled matmul with the last dimension being the block size
   // (32 for gfx950).
   int64_t reductionSize = bounds[reductionDims.back()];
-  if (!ShapedType::isDynamic(reductionSize) &&
+  if (ShapedType::isStatic(reductionSize) &&
       reductionSize % target.getPreferredSubgroupSize() != 0) {
     // Consider the entire reduction dimension.
     reductionSize = 1;
@@ -717,6 +732,20 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  // Adjust threadLoads to satisfy constraints from all compute ops in the
+  // dispatch.
+  for (linalg::LinalgOp linalgOp : *computeOps) {
+    int64_t constraint = getThreadLoadsConstraint(linalgOp);
+    if (ShapedType::isStatic(constraint)) {
+      while (threadLoads > 1 && constraint % threadLoads != 0) {
+        threadLoads /= 2;
+      }
+    }
+    if (threadLoads <= 1) {
+      break;
+    }
+  }
+
   std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
@@ -767,9 +796,6 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     *parallelSize /= 2;
   }
 
-  // TODO(pashu123): Currently, the threadLoads is done on the basis of
-  // the root operation and ignores other operation within a dispatch.
-  // Extend it to use per operation within a dispatch.
   if (failed(populateConfigInfo(*computeOps, target, workgroupSize,
                                 subgroupSize, threadLoads))) {
     return failure();
