@@ -4,9 +4,9 @@
 
 `iree/async/` is a completion-based (proactor pattern) async I/O layer for IREE.
 It provides a unified submission/completion interface over platform-specific
-async mechanisms: io_uring on Linux and a POSIX backend using worker threads
-with pluggable event notification (poll, epoll, kqueue) on all POSIX platforms.
-Planned but currently unimplemented is IOCP for Windows.
+async mechanisms: io_uring on Linux, a POSIX backend using worker threads
+with pluggable event notification (poll, epoll, kqueue) on all POSIX platforms,
+and IOCP on Windows.
 
 The async system depends only on `iree/base/` and serves as the foundation for
 higher-level layers -- HAL drivers, networking, task executors, and the VM

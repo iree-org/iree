@@ -185,10 +185,15 @@ static int iree_async_posix_worker_main(iree_async_posix_worker_t* worker) {
   iree_async_proactor_posix_t* proactor = worker->proactor;
   while (iree_atomic_load(&worker->state, iree_memory_order_acquire) ==
          IREE_ASYNC_POSIX_WORKER_STATE_RUNNING) {
-    // Prepare wait token BEFORE checking for work.
-    // This ensures we don't miss work that arrives after we check but before
-    // we start waiting. All workers share the proactor's ready_notification
-    // so that enqueue_for_execution's post(1) wakes exactly one idle worker.
+    // Event count pattern: prepare_wait captures the current epoch BEFORE
+    // checking any conditions that would prevent sleeping. This ensures we
+    // don't miss notifications that arrive between checking and sleeping.
+    //
+    // Both conditions that prevent sleeping (new work AND exit request) must
+    // be checked AFTER prepare_wait and BEFORE commit_wait. The corresponding
+    // posters (enqueue_for_execution and request_exit) increment the epoch
+    // via post(), so if they fire between prepare_wait and commit_wait, the
+    // epoch will differ from our token and commit_wait returns immediately.
     iree_wait_token_t wait_token =
         iree_notification_prepare_wait(&proactor->ready_notification);
 
@@ -271,8 +276,20 @@ static int iree_async_posix_worker_main(iree_async_posix_worker_t* worker) {
       // Wake the poll thread to process the completion.
       iree_async_posix_wake_trigger(&proactor->wake);
 
+    } else if (iree_atomic_load(&worker->state, iree_memory_order_acquire) !=
+               IREE_ASYNC_POSIX_WORKER_STATE_RUNNING) {
+      // Exit requested between the loop-top state check and here. The
+      // request_exit post may have already incremented the epoch past our
+      // wait_token, so commit_wait would return immediately — but if the post
+      // happened before prepare_wait, our token matches the current epoch and
+      // commit_wait would block forever (classic event-count lost wakeup).
+      // Cancel the wait and let the loop condition handle the exit.
+      iree_notification_cancel_wait(&proactor->ready_notification);
     } else {
-      // No work - commit to waiting on the shared notification.
+      // No work and no exit request — commit to waiting on the shared
+      // notification. The event count guarantees: if request_exit posts between
+      // our prepare_wait and this commit_wait, the epoch will have changed,
+      // causing commit_wait to return immediately.
       iree_notification_commit_wait(&proactor->ready_notification, wait_token,
                                     /*spin_ns=*/0,
                                     /*deadline_ns=*/IREE_TIME_INFINITE_FUTURE);
