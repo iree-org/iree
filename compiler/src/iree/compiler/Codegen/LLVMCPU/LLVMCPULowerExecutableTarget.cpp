@@ -146,6 +146,21 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.enableVectorMasking =
       isX86(targetConfig) || isRISCV(targetConfig) ||
       (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig));
+  // TODO(#16956): The decomposition of attention op leads to complex control
+  // flow, which leads to non-trivial stack allocation. Enforcing masking for
+  // targets that do not support native vector masking enables the
+  // functionality, though the performance may be suboptimal.
+  auto hasAttentionOp = [](FunctionOpInterface funcOp) {
+    bool hasAttention = false;
+    funcOp.walk([&](IREE::LinalgExt::AttentionOp) {
+      hasAttention = true;
+      return WalkResult::interrupt();
+    });
+    return hasAttention;
+  };
+  if (isAArch64(targetConfig) && hasAttentionOp(funcOp)) {
+    pipelineOpts.enableVectorMasking = true;
+  }
   pipelineOpts.enableAArch64SME = isAArch64(targetConfig) &&
                                   hasAnySVEFeature(targetConfig) &&
                                   hasSMEFeature(targetConfig);
