@@ -19,8 +19,11 @@
 #include "iree/async/operations/net.h"
 #include "iree/async/slab.h"
 
-// Linux-specific includes for memfd_create (used as dmabuf stand-in for tests).
-#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+// memfd_create is used as a dmabuf stand-in for tests. Available on Linux
+// glibc 2.27+ and Android API level 30+.
+#if defined(IREE_PLATFORM_LINUX) && \
+    !(defined(__ANDROID_API__) && __ANDROID_API__ < 30)
+#define IREE_TEST_HAS_MEMFD 1
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -115,7 +118,7 @@ TEST_P(BufferRegistrationTest, StateCleanupUnregistersAll) {
 // dmabuf registration tests (Linux-only)
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+#if IREE_TEST_HAS_MEMFD
 
 // Basic dmabuf registration using memfd as a test stand-in.
 TEST_P(BufferRegistrationTest, RegisterDmabuf) {
@@ -207,7 +210,7 @@ TEST_P(BufferRegistrationTest, RegisterDmabufWithOffset) {
   close(memfd);
 }
 
-#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
+#endif  // IREE_TEST_HAS_MEMFD
 
 //===----------------------------------------------------------------------===//
 // RECV_POOL operation tests (using slab + register_slab + pool)
@@ -388,7 +391,7 @@ TEST_P(BufferRegistrationTest, MultipleSendSlabRegistrations) {
 
 // Verifies that slab and dmabuf registrations can coexist in the same buffer
 // table on 5.19+ kernels. Both share the sparse table's slot space.
-#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+#if IREE_TEST_HAS_MEMFD
 TEST_P(BufferRegistrationTest, SlabAndDmabufCoexist) {
   iree_async_proactor_capabilities_t caps =
       iree_async_proactor_query_capabilities(proactor_);
@@ -442,7 +445,7 @@ TEST_P(BufferRegistrationTest, SlabAndDmabufCoexist) {
   iree_async_region_release(slab_region);
   iree_async_slab_release(slab);
 }
-#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
+#endif  // IREE_TEST_HAS_MEMFD
 
 //===----------------------------------------------------------------------===//
 // Reference counting and lifetime tests

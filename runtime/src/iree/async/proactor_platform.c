@@ -6,9 +6,9 @@
 
 #include "iree/async/proactor_platform.h"
 
-#if defined(IREE_PLATFORM_LINUX)
+#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_ANDROID)
 #include "iree/async/platform/io_uring/api.h"
-#endif  // IREE_PLATFORM_LINUX
+#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_ANDROID
 
 #if !defined(IREE_PLATFORM_WINDOWS)
 #include "iree/async/platform/posix/api.h"
@@ -31,7 +31,7 @@ iree_status_t iree_async_proactor_create_platform(
 
   status = iree_async_proactor_create_iocp(options, allocator, out_proactor);
 
-#elif defined(IREE_PLATFORM_LINUX)
+#elif defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_ANDROID)
 
   // Try io_uring first (kernel 5.1+, enabled). Falls back to POSIX proactor
   // if io_uring is not usable (kernel too old, blocked by seccomp/sysctl,
@@ -43,7 +43,7 @@ iree_status_t iree_async_proactor_create_platform(
     status = iree_async_proactor_create_posix(options, allocator, out_proactor);
   }
 
-#else  // macOS, BSD, etc.
+#else  // macOS, BSD, Android, etc.
 
   status = iree_async_proactor_create_posix(options, allocator, out_proactor);
 
