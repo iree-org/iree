@@ -1486,7 +1486,7 @@ func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf3
     } -> tensor<?x?x?xf32>
   return %result : tensor<?x?x?xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 0, 16, 0]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 16, 16, 0]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPULinalgExtTileAndVectorize>
 //      CHECK: func.func @attention_dynamic_3d(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
