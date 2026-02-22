@@ -6,6 +6,7 @@
 
 import platform
 import os
+import shutil
 import subprocess
 import sys
 
@@ -69,6 +70,47 @@ def cmake_bool_is_true(value):
     return value.upper() in ("ON", "YES", "TRUE", "Y", "1")
 
 
+def detect_cuda_toolkit():
+    """Check if CUDA toolkit is available.
+
+    Follows MLIR's search order: CUDA_ROOT, CUDA_HOME, CUDA_PATH, then nvcc in PATH.
+    """
+    for env_var in ["CUDA_ROOT", "CUDA_HOME", "CUDA_PATH"]:
+        if os.environ.get(env_var):
+            return True
+    if shutil.which("nvcc"):
+        return True
+    return False
+
+
+def detect_rocm_toolkit():
+    """Check if ROCm toolkit is available.
+
+    Follows MLIR's search order: ROCM_PATH, ROCM_ROOT, ROCM_HOME, then hipcc in PATH.
+    """
+    for env_var in ["ROCM_PATH", "ROCM_ROOT", "ROCM_HOME"]:
+        if os.environ.get(env_var):
+            return True
+    if shutil.which("hipcc"):
+        return True
+    return False
+
+
+def detect_submodule(submodule_path):
+    """Check if a submodule is initialized by looking for a marker file.
+
+    Args:
+        submodule_path: Path relative to repo root (e.g., "third_party/torch-mlir")
+
+    Returns:
+        True if the submodule appears to be initialized.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # Check for CMakeLists.txt as a common marker that the submodule has content
+    marker = os.path.join(script_dir, submodule_path, "CMakeLists.txt")
+    return os.path.isfile(marker)
+
+
 def get_hal_driver_defaults():
     """Get HAL driver defaults matching CMake option(IREE_HAL_DRIVER_*) definitions."""
     defaults_enabled = True  # Matches IREE_HAL_DRIVER_DEFAULTS in CMakeLists.txt
@@ -98,6 +140,141 @@ def env_var_to_bazel_tag(name):
     return tag_name.lower().replace("_", "-")
 
 
+def get_plugin_defaults():
+    """Get compiler plugin defaults matching CMake option definitions.
+
+    Returns a dict mapping plugin_id -> (default_enabled, env_var_name, can_build).
+    The can_build field indicates whether the plugin can be built on this system
+    (e.g., CUDA requires toolkit, Metal requires macOS, input plugins require submodules).
+    """
+    cuda_available = detect_cuda_toolkit()
+    rocm_available = detect_rocm_toolkit()
+    stablehlo_available = detect_submodule("third_party/stablehlo")
+    is_darwin = platform.system() == "Darwin"
+
+    return {
+        # Input plugins (require submodules)
+        "input_stablehlo": (True, "IREE_INPUT_STABLEHLO", stablehlo_available),
+        "input_tosa": (True, "IREE_INPUT_TOSA", True),  # Part of MLIR, no submodule
+        # TODO: Enable input_torch when torch-mlir Bazel changes land upstream.
+        # Target plugins
+        "hal_target_cuda": (False, "IREE_TARGET_BACKEND_CUDA", cuda_available),
+        "hal_target_llvm_cpu": (True, "IREE_TARGET_BACKEND_LLVM_CPU", True),
+        "hal_target_local": (True, "IREE_TARGET_BACKEND_LOCAL", True),
+        "hal_target_metal_spirv": (
+            is_darwin,
+            "IREE_TARGET_BACKEND_METAL_SPIRV",
+            is_darwin,
+        ),
+        "hal_target_rocm": (False, "IREE_TARGET_BACKEND_ROCM", rocm_available),
+        "hal_target_vmvx": (True, "IREE_TARGET_BACKEND_VMVX", True),
+        "hal_target_vulkan_spirv": (True, "IREE_TARGET_BACKEND_VULKAN_SPIRV", True),
+        # Sample plugins (always buildable)
+        "example": (True, None, True),
+        "simple_io_sample": (True, None, True),
+    }
+
+
+def parse_plugin_spec(spec, plugin_defaults):
+    """Parse a plugin specification that may include 'all' and exclusions.
+
+    Supports:
+      - "all" - all plugins that can be built on this system
+      - "all,-plugin1,-plugin2" - all except specified plugins
+      - "plugin1,plugin2" - explicit list
+
+    Returns a tuple (plugin_list, used_all) where used_all indicates whether
+    "all" expansion was performed, or (None, False) if no spec provided.
+    """
+    if not spec:
+        return None, False
+
+    parts = [p.strip().lower() for p in spec.split(",")]
+    if parts[0] == "all":
+        # Start with all buildable plugins
+        enabled = set(
+            plugin_id
+            for plugin_id, (_, _, can_build) in plugin_defaults.items()
+            if can_build
+        )
+
+        # Process exclusions
+        for part in parts[1:]:
+            if part.startswith("-"):
+                plugin_to_exclude = part[1:]
+                if plugin_to_exclude in enabled:
+                    enabled.discard(plugin_to_exclude)
+                elif plugin_to_exclude not in plugin_defaults:
+                    print(f"WARNING: Unknown plugin in exclusion: {plugin_to_exclude}")
+
+        return sorted(enabled), True
+    else:
+        # Explicit list - validate plugins exist and can be built
+        validated = []
+        for plugin_id in parts:
+            if plugin_id not in plugin_defaults:
+                print(f"WARNING: Unknown plugin: {plugin_id}")
+                continue
+            _, _, can_build = plugin_defaults[plugin_id]
+            if not can_build:
+                print(
+                    f"ERROR: Plugin '{plugin_id}' requested but cannot be built "
+                    f"(missing toolkit/submodule). Either install prerequisites or "
+                    f"remove from IREE_COMPILER_PLUGINS."
+                )
+                sys.exit(1)
+            validated.append(plugin_id)
+        return validated, False
+
+
+def write_iree_plugin_options(bazelrc):
+    """Write compiler plugin configuration to bazelrc."""
+    plugin_defaults = get_plugin_defaults()
+
+    # Check for IREE_COMPILER_PLUGINS env var with "all" support
+    plugins_spec = os.environ.get("IREE_COMPILER_PLUGINS")
+    parsed_plugins, used_all = parse_plugin_spec(plugins_spec, plugin_defaults)
+
+    if parsed_plugins is not None:
+        # Explicit specification via IREE_COMPILER_PLUGINS
+        enabled_plugins = parsed_plugins
+        if used_all:
+            print(
+                f"IREE_COMPILER_PLUGINS=all resolved to: {', '.join(enabled_plugins)}"
+            )
+        else:
+            print(f"IREE_COMPILER_PLUGINS set to: {', '.join(enabled_plugins)}")
+    else:
+        # Standard per-plugin env var processing
+        enabled_plugins = []
+        for plugin_id, (default, env_var, can_build) in plugin_defaults.items():
+            if env_var:
+                env_value = os.environ.get(env_var)
+                enabled = (
+                    cmake_bool_is_true(env_value) if env_value is not None else default
+                )
+            else:
+                enabled = default
+
+            if enabled:
+                if not can_build:
+                    print(
+                        f"WARNING: {plugin_id} enabled but toolkit not detected, skipping"
+                    )
+                else:
+                    enabled_plugins.append(plugin_id)
+
+    # Write --iree_compiler_plugins flag (controls what gets built and linked)
+    # Always emit the flag, even for empty list, so Bazel doesn't fall back to defaults.
+    print(f'build --iree_compiler_plugins={",".join(enabled_plugins)}', file=bazelrc)
+
+    # TODO: Enable when torch-mlir Bazel changes land upstream.
+    # If torch is enabled, set IREE_INPUT_TORCH for the repository rule.
+    # This uses --repo_env (visible to repository rules) not --action_env.
+    # if "input_torch" in enabled_plugins:
+    #     print("common --repo_env=IREE_INPUT_TORCH=ON", file=bazelrc)
+
+
 def write_iree_hal_driver_options(bazelrc):
     """Write HAL driver configuration to bazelrc."""
 
@@ -114,10 +291,10 @@ def write_iree_hal_driver_options(bazelrc):
         if enabled:
             enabled_drivers.append(env_var_to_bazel_tag(env_var))
 
-    # Write --iree_drivers flag (controls what gets built and linked)
+    # Write --iree_runtime_drivers flag (controls what gets built and linked)
     if enabled_drivers:
-        print(f'build --iree_drivers={",".join(enabled_drivers)}', file=bazelrc)
-        print(f'test --iree_drivers={",".join(enabled_drivers)}', file=bazelrc)
+        print(f'build --iree_runtime_drivers={",".join(enabled_drivers)}', file=bazelrc)
+        print(f'test --iree_runtime_drivers={",".join(enabled_drivers)}', file=bazelrc)
 
 
 if len(sys.argv) > 1:
@@ -127,5 +304,6 @@ else:
 with open(local_bazelrc, "wt") as bazelrc:
     write_platform(bazelrc)
     write_iree_hal_driver_options(bazelrc)
+    write_iree_plugin_options(bazelrc)
 
 print("Wrote", local_bazelrc)

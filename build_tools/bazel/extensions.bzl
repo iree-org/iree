@@ -7,7 +7,7 @@
 """Bzlmod extension for IREE repository rules."""
 
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
-load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
+load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure", "torch_mlir_auto_configure")
 
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
@@ -91,6 +91,12 @@ def _iree_extension_impl(module_ctx):
     # CUDA auto-configuration
     cuda_auto_configure(
         name = "iree_cuda",
+        iree_repo_alias = "@iree_core",
+    )
+
+    # torch-mlir auto-configuration (conditional on IREE_INPUT_TORCH)
+    torch_mlir_auto_configure(
+        name = "torch-mlir",
         iree_repo_alias = "@iree_core",
     )
 
