@@ -772,6 +772,8 @@ void iree_tokenizer_bpe_backtrack_encode(
       iree_tokenizer_bpe_state_backtrack_stack(state, model);
   uint64_t* bitfield =
       iree_tokenizer_bpe_state_backtrack_bitfield(state, model);
+  iree_tokenizer_bpe_pair_cache_entry_t* pair_cache =
+      iree_tokenizer_bpe_state_pair_cache(state, model);
 
   // Reset only the bitfield words dirtied by the previous segment's
   // backtracking. On the first call, dirty_mask is pre-set to all-ones by
@@ -906,11 +908,23 @@ void iree_tokenizer_bpe_backtrack_encode(
         // via trie lookup, we're matching a complete vocabulary entry directly,
         // not building it through BPE merges. The token is valid because it
         // exists in the vocabulary and matches the input exactly.
-        bool suffixed_pair_ok =
-            first_token ||
-            iree_tokenizer_bpe_is_valid_token_pair(model, (uint32_t)last_token,
-                                                   (uint32_t)suffixed_token_id,
-                                                   pair_deferred_merge_rank);
+        bool suffixed_pair_ok = first_token;
+        if (!suffixed_pair_ok) {
+          uint32_t pi = iree_tokenizer_bpe_pair_cache_index(
+              (uint32_t)last_token, (uint32_t)suffixed_token_id);
+          if (pair_cache[pi].token1 == (uint32_t)last_token &&
+              pair_cache[pi].token2 == (uint32_t)suffixed_token_id) {
+            suffixed_pair_ok = true;
+          } else {
+            suffixed_pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
+                model, (uint32_t)last_token, (uint32_t)suffixed_token_id,
+                pair_deferred_merge_rank);
+            if (suffixed_pair_ok && pair_deferred_merge_rank == 0) {
+              pair_cache[pi].token1 = (uint32_t)last_token;
+              pair_cache[pi].token2 = (uint32_t)suffixed_token_id;
+            }
+          }
+        }
         if (suffixed_pair_ok) {
           // Use the suffixed token directly. This bypasses the normal
           // backtracking loop since we found the optimal final token.
@@ -974,10 +988,26 @@ void iree_tokenizer_bpe_backtrack_encode(
       }
 
       // Check 4: Pair validity - can this token follow the previous one?
-      bool pair_ok =
-          first_token || iree_tokenizer_bpe_is_valid_token_pair(
-                             model, (uint32_t)last_token, (uint32_t)token,
-                             pair_deferred_merge_rank);
+      // Uses a direct-mapped cache to skip repeated decomposition for the
+      // same token pairs across segments. Only "true" results are cached
+      // (safe for any deferred_merge_rank since relaxation is monotonic).
+      bool pair_ok = first_token;
+      if (!pair_ok) {
+        uint32_t pi = iree_tokenizer_bpe_pair_cache_index((uint32_t)last_token,
+                                                          (uint32_t)token);
+        if (pair_cache[pi].token1 == (uint32_t)last_token &&
+            pair_cache[pi].token2 == (uint32_t)token) {
+          pair_ok = true;
+        } else {
+          pair_ok = iree_tokenizer_bpe_is_valid_token_pair(
+              model, (uint32_t)last_token, (uint32_t)token,
+              pair_deferred_merge_rank);
+          if (pair_ok && pair_deferred_merge_rank == 0) {
+            pair_cache[pi].token1 = (uint32_t)last_token;
+            pair_cache[pi].token2 = (uint32_t)token;
+          }
+        }
+      }
 
       // Final decision: accept only if all checks pass.
       bool accept =

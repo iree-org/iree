@@ -202,6 +202,12 @@ typedef struct iree_tokenizer_bpe_model_t {
   iree_host_size_t cache_capacity;
   iree_host_size_t cache_capacity_mask;  // = cache_capacity - 1, or 0.
   iree_host_size_t cache_offset;
+
+  // Pair validation cache capacity and offset.
+  // Memoizes valid (true) pair validation results to avoid repeated
+  // recursive decomposition in the backtracking algorithm.
+  iree_host_size_t pair_cache_capacity;
+  iree_host_size_t pair_cache_offset;
 } iree_tokenizer_bpe_model_t;
 
 //===----------------------------------------------------------------------===//
@@ -283,8 +289,38 @@ typedef struct iree_tokenizer_bpe_state_t {
   // - iree_tokenizer_bpe_backtrack_entry_t backtrack_stack[stack_capacity]
   // - uint64_t backtrack_bitfield[bitfield_capacity]
   // - iree_tokenizer_bpe_cache_entry_t cache_entries[cache_capacity]
-  // - char suffixed_buffer[suffixed_buffer_capacity]
+  // - iree_tokenizer_bpe_pair_cache_entry_t pair_cache[pair_cache_capacity]
 } iree_tokenizer_bpe_state_t;
+
+//===----------------------------------------------------------------------===//
+// Pair Validation Cache
+//===----------------------------------------------------------------------===//
+
+// Direct-mapped cache for pair validation results.
+// Only "true" (valid) results are cached. When a pair is known valid, it
+// remains valid regardless of deferred_merge_rank (relaxation only makes
+// more pairs valid). "False" results depend on deferred_merge_rank and
+// cannot be safely cached.
+//
+// 256 entries × 8 bytes = 2 KB, fits in L1 cache. For CJK text where
+// pair validation takes ~14% of encode time due to multi-byte merged tokens
+// requiring recursive decomposition, caching avoids repeated L2/L3 accesses
+// to the merge hash table and split table.
+
+#define IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY 256
+
+typedef struct iree_tokenizer_bpe_pair_cache_entry_t {
+  uint32_t token1;  // Left token (UINT32_MAX = empty).
+  uint32_t token2;  // Right token.
+} iree_tokenizer_bpe_pair_cache_entry_t;
+
+// Computes the pair cache index for a (token1, token2) pair.
+// Uses a Fibonacci-hashing-style multiplicative hash for good dispersion.
+static inline uint32_t iree_tokenizer_bpe_pair_cache_index(uint32_t token1,
+                                                           uint32_t token2) {
+  return ((token1 * 0x9E3779B9u) ^ token2) &
+         (IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY - 1);
+}
 
 //===----------------------------------------------------------------------===//
 // Whole-Word Cache
@@ -381,6 +417,8 @@ static inline uint32_t iree_tokenizer_bpe_cache_hash(const uint8_t* data,
 // │ backtrack_bitfield[bitfield_capacity] │ (model->backtrack_bitfield_offset)
 // ├───────────────────────────────────────┤
 // │ cache_entries[cache_capacity]         │  (model->cache_offset, if enabled)
+// ├───────────────────────────────────────┤
+// │ pair_cache[pair_cache_capacity]       │  (model->pair_cache_offset)
 // └───────────────────────────────────────┘
 //
 // Total size = model->base.state_size
@@ -427,6 +465,13 @@ static inline iree_tokenizer_bpe_cache_entry_t* iree_tokenizer_bpe_state_cache(
     const iree_tokenizer_bpe_model_t* model) {
   return (iree_tokenizer_bpe_cache_entry_t*)((uint8_t*)state +
                                              model->cache_offset);
+}
+
+static inline iree_tokenizer_bpe_pair_cache_entry_t*
+iree_tokenizer_bpe_state_pair_cache(iree_tokenizer_bpe_state_t* state,
+                                    const iree_tokenizer_bpe_model_t* model) {
+  return (iree_tokenizer_bpe_pair_cache_entry_t*)((uint8_t*)state +
+                                                  model->pair_cache_offset);
 }
 
 //===----------------------------------------------------------------------===//

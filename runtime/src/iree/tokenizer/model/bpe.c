@@ -211,6 +211,11 @@ iree_status_t iree_tokenizer_bpe_model_allocate(
     }
     model->cache_capacity_mask =
         model->cache_capacity > 0 ? model->cache_capacity - 1 : 0;
+
+    // Pair validation cache: always enabled for the backtracking path.
+    // Memoizes valid (true) pair validation results to avoid repeated
+    // recursive decomposition when the same token pairs recur across segments.
+    model->pair_cache_capacity = IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY;
   }
 
   // Compute state size and offsets with overflow-checked math.
@@ -237,7 +242,10 @@ iree_status_t iree_tokenizer_bpe_model_allocate(
                           &model->backtrack_bitfield_offset),
         IREE_STRUCT_FIELD(model->cache_capacity,
                           iree_tokenizer_bpe_cache_entry_t,
-                          &model->cache_offset));
+                          &model->cache_offset),
+        IREE_STRUCT_FIELD(model->pair_cache_capacity,
+                          iree_tokenizer_bpe_pair_cache_entry_t,
+                          &model->pair_cache_offset));
   }
 
   if (iree_status_is_ok(status)) {
@@ -345,6 +353,15 @@ static iree_status_t iree_tokenizer_bpe_state_initialize(
   if (model->cache_capacity > 0) {
     memset(iree_tokenizer_bpe_state_cache(state, model), 0,
            model->cache_capacity * sizeof(iree_tokenizer_bpe_cache_entry_t));
+  }
+
+  // Initialize pair validation cache: set all entries to empty (UINT32_MAX).
+  // Token IDs are bounded by vocab_capacity (< UINT32_MAX), so UINT32_MAX
+  // can never match a real token pair.
+  if (model->pair_cache_capacity > 0) {
+    memset(iree_tokenizer_bpe_state_pair_cache(state, model), 0xFF,
+           model->pair_cache_capacity *
+               sizeof(iree_tokenizer_bpe_pair_cache_entry_t));
   }
 
   *out_state = &state->base;
