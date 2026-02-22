@@ -627,6 +627,11 @@ iree_tokenizer_bpe_backtrack_longest_match(
 iree_status_t iree_tokenizer_bpe_build_backtrack_tables(
     iree_tokenizer_bpe_model_t* model);
 
+// Checks if a token is reachable from its input bytes via BPE merge ordering.
+// Uses the precomputed token_reachable bitmap from model load.
+bool iree_tokenizer_bpe_is_first_token_reachable(
+    const iree_tokenizer_bpe_model_t* model, uint32_t token);
+
 // Checks if a specific decomposition (left + right) of a token is reachable.
 // Used by pair validation during backtracking.
 bool iree_tokenizer_bpe_is_decomposition_reachable(

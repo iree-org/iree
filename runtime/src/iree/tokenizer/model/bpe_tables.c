@@ -111,7 +111,7 @@ static uint32_t iree_tokenizer_bpe_left_boundary_consumed_rank(
 // against). Non-first tokens are validated via is_valid_token_pair.
 //
 // Complexity: O(merge_tree_depth) per call, bounded by max_token_length.
-static bool iree_tokenizer_bpe_is_first_token_reachable(
+bool iree_tokenizer_bpe_is_first_token_reachable(
     const iree_tokenizer_bpe_model_t* model, uint32_t token) {
   // Use the precomputed token_reachable bitmap. This bitmap was built during
   // model compilation using fixed-point iteration through ALL merges, so it

@@ -108,10 +108,10 @@ static iree_status_t iree_tokenizer_bpe_encode_segment(
 
       // Suffix-aware whole-segment match: when end_of_word_suffix is set,
       // check if segment + suffix matches exactly as a vocabulary token.
-      // This bypasses the normal BPE algorithm because:
-      //   - The token exists in vocabulary (we find it in trie)
-      //   - The suffix handling is explicit from tokenizer config
-      //   - No BPE merging is needed when whole segment is a single token
+      // This is NOT gated on BPE reachability because the suffix is appended
+      // by tokenizer config, not by BPE merging — the match is a direct
+      // vocabulary lookup of (segment bytes || suffix bytes), independent of
+      // merge ordering.
       // Example: CLIP's "hello" segment matches "hello</w>" token.
       //
       // SKIP when IGNORE_MERGES: HuggingFace's ignore_merges does longest-match
@@ -144,22 +144,26 @@ static iree_status_t iree_tokenizer_bpe_encode_segment(
         }
       }
 
-      // Fast path: check if entire segment matches a single vocabulary token.
-      // This is only valid when:
-      //   1. segment.size == 1 (single byte, no merges can apply), OR
-      //   2. ignore_merges is set (HuggingFace BPE option to skip merge rules)
-      // When ignore_merges is false (default), multi-byte segments must go
-      // through the full BPE algorithm to respect merge priority order.
-      const bool can_use_fast_path = segment.size == 1 || ignore_merges;
-
-      if (can_use_fast_path) {
+      // Fast path: check if entire segment matches a single reachable token.
+      // A vocabulary token is "reachable" if BPE applied to its constituent
+      // bytes in isolation produces that single token. Not all vocabulary
+      // tokens satisfy this: lower-rank merges at internal boundaries can
+      // block the merge chain. For example, if "abcd" has merges a+b(0),
+      // c+d(2), ab+c(3), abc+d(5), then c+d fires before ab+c can consume
+      // c, so BPE on "abcd" produces [ab, cd] not [abcd].
+      //
+      // Reachability is precomputed at model load via fixed-point iteration
+      // (bpe_tables.c). Single-byte segments are always reachable (base
+      // tokens). When ignore_merges is set, vocabulary lookup is correct
+      // by definition (no merge ordering to respect).
+      {
         int32_t whole_segment_token_id = -1;
         iree_host_size_t match_length = 0;
         iree_host_size_t expected_length = segment.size;
 
-        // Use suffix-aware match for single-byte segments (segment.size == 1)
-        // when end_of_word_suffix is set. For IGNORE_MERGES, always use bare
-        // segment lookup since HuggingFace does longest-match without suffix.
+        // For IGNORE_MERGES, always use bare segment lookup since HuggingFace
+        // does longest-match without suffix. For normal mode with suffix,
+        // the suffix-aware block above already handled it.
         if (model->end_of_word_suffix_length > 0 && !ignore_merges) {
           iree_string_view_t suffix = iree_make_string_view(
               model->end_of_word_suffix, model->end_of_word_suffix_length);
@@ -172,7 +176,9 @@ static iree_status_t iree_tokenizer_bpe_encode_segment(
               model, segment, &whole_segment_token_id, &match_length);
         }
 
-        if (whole_segment_token_id >= 0 && match_length == expected_length) {
+        if (whole_segment_token_id >= 0 && match_length == expected_length &&
+            (ignore_merges || iree_tokenizer_bpe_is_first_token_reachable(
+                                  model, (uint32_t)whole_segment_token_id))) {
           // Emit with original_segment_size for correct offset.
           if (!iree_tokenizer_bpe_emit_and_track(
                   state, &cursor, whole_segment_token_id, 0,
