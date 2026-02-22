@@ -23,6 +23,19 @@ def TensorMaskingOpInterface : OpInterface<"TensorMaskingOpInterface"> {
         "OpBuilder &":$builder,
         "ArrayRef<OpFoldResult>":$padMultiples)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Mask this operation as a producer of an input to another masked
+        operation. Returns the replacement for the result with resultNumber
+        padded to the given padSizes.
+      }],
+      /*retTy=*/"FailureOr<Value>",
+      /*methodName=*/"maskAsProducer",
+      /*args=*/(ins
+        "OpBuilder &":$builder,
+        "unsigned":$resultNumber,
+        "ArrayRef<OpFoldResult>":$padSizes)
+    >,
   ];
 }
 

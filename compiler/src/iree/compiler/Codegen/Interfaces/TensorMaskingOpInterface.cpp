@@ -174,6 +174,47 @@ static void selectNeutralElementForReducedDims(OpBuilder &b, OpOperand &operand,
   operand.set(genericOp.getResult(0));
 }
 
+FailureOr<Value> maskProducerTilingInterfaceOpImpl(
+    Operation *op, OpBuilder &b, AffineMap iterDomainToSizeMap,
+    unsigned resultNumber, ArrayRef<OpFoldResult> sizes) {
+  auto tilingInterfaceOp = cast<TilingInterface>(op);
+  // Determine the new padded iteration domain size.
+  SmallVector<Range> iterDomain = tilingInterfaceOp.getIterationDomain(b);
+  SmallVector<OpFoldResult> paddedDomainSizes =
+      llvm::map_to_vector(iterDomain, [](Range r) { return r.size; });
+  for (auto [expr, paddedSize] :
+       llvm::zip_equal(iterDomainToSizeMap.getResults(), sizes)) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+    if (!dimExpr) {
+      op->emitError("only dim expressions supported in iterDomainToSizeMap");
+      return failure();
+    }
+    unsigned dimPos = dimExpr.getPosition();
+    paddedDomainSizes[dimPos] = paddedSize;
+  }
+  // Use poison for padded values, i.e., values outside the original iteration
+  // domain.
+  auto poison = ub::PoisonAttr::get(b.getContext());
+  SmallVector<Attribute> padValues(op->getNumOperands(), poison);
+  // Dispatch to the interfase-based implementation for actually masking the
+  // operation.
+  linalg::PadTilingInterfaceOptions options =
+      linalg::PadTilingInterfaceOptions()
+          .setPaddingSizes(paddedDomainSizes)
+          .setPaddingValues(padValues)
+          .setPadToMultipleOf(false);
+  FailureOr<linalg::PadTilingInterfaceResult> result =
+      linalg::rewriteAsPaddedOp(b, tilingInterfaceOp, options);
+  if (failed(result)) {
+    op->emitError("failed to pad op");
+    return failure();
+  }
+  // We use the results of the paddedOp directly, because they have the size
+  // we're interested in and not the replacements values that are "unpadded" to
+  // the original size.
+  return result->paddedOp->getResults()[resultNumber];
+}
+
 struct LinalgGenericOpInterface final
     : TensorMaskingOpInterface::ExternalModel<LinalgGenericOpInterface,
                                               linalg::GenericOp> {
@@ -195,6 +236,16 @@ struct LinalgGenericOpInterface final
     return result->replacements;
   }
 
+  FailureOr<Value> maskAsProducer(Operation *op, OpBuilder &builder,
+                                  unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> padSizes) const {
+    auto genericOp = cast<linalg::GenericOp>(op);
+    AffineMap resultMap = genericOp.getMatchingIndexingMap(
+        genericOp.getDpsInitOperand(resultNumber));
+    return maskProducerTilingInterfaceOpImpl(op, builder, resultMap,
+                                             resultNumber, padSizes);
+  }
+
 private:
   /// Mask the poison inputs for reductions by selecting the neutral element on
   /// the masked out-of-bounds iterations.
@@ -202,6 +253,7 @@ private:
   maskReductionsInGenericBody(OpBuilder &builder, linalg::GenericOp oldLinalgOp,
                               linalg::GenericOp paddedLinalgOp) const {
     Location loc = paddedLinalgOp.getLoc();
+    OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(paddedLinalgOp.getBody());
     SmallVector<OpFoldResult> oldBounds =
         getBoundsToGuard(builder, oldLinalgOp, paddedLinalgOp);
@@ -296,6 +348,16 @@ struct OnlineAttentionOpInterface final
                                          *paddedOp.getMaskMap());
     }
     return result->replacements;
+  }
+
+  FailureOr<Value> maskAsProducer(Operation *op, OpBuilder &builder,
+                                  unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> padSizes) const {
+    auto onlineAttentionOp = cast<IREE::LinalgExt::OnlineAttentionOp>(op);
+    AffineMap resultMap = onlineAttentionOp.getMatchingIndexingMap(
+        onlineAttentionOp.getDpsInitOperand(resultNumber));
+    return maskProducerTilingInterfaceOpImpl(op, builder, resultMap,
+                                             resultNumber, padSizes);
   }
 };
 
