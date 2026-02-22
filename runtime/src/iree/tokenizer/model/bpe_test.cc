@@ -2075,8 +2075,8 @@ TEST_F(BPEModelTest, MultiMetaspaceTokensMistralStyle) {
   // Merges in rank order:
   builder.AddMerge(28705, 28705);  // ▁ + ▁ → ▁▁ (rank 0)
   builder.AddMerge(259, 259);      // ▁▁ + ▁▁ → ▁▁▁▁ (rank 1)
-  builder.AddMerge(300, 300);  // ▁▁▁▁ + ▁▁▁▁ → ▁▁▁▁▁▁▁▁ (rank 2)
-  builder.AddMerge(320, 320);  // ▁▁▁▁▁▁▁▁ + ▁▁▁▁▁▁▁▁ → 16 metas (rank 3)
+  builder.AddMerge(300, 300);      // ▁▁▁▁ + ▁▁▁▁ → ▁▁▁▁▁▁▁▁ (rank 2)
+  builder.AddMerge(320, 320);      // ▁▁▁▁▁▁▁▁ + ▁▁▁▁▁▁▁▁ → 16 metas (rank 3)
 
   CreateModel(builder);
 

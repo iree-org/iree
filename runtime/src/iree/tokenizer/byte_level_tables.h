@@ -144,10 +144,9 @@ typedef struct iree_tokenizer_byte_level_utf8_t {
 } iree_tokenizer_byte_level_utf8_t;
 
 // Helper macros for table initialization.
-#define IREE_BL_U1_(cp) \
-  { {(uint8_t)(cp), 0}, 1, 0 }
+#define IREE_BL_U1_(cp) {{(uint8_t)(cp), 0}, 1, 0}
 #define IREE_BL_U2_(cp) \
-  { {(uint8_t)(0xC0 | ((cp) >> 6)), (uint8_t)(0x80 | ((cp) & 0x3F))}, 2, 0 }
+  {{(uint8_t)(0xC0 | ((cp) >> 6)), (uint8_t)(0x80 | ((cp) & 0x3F))}, 2, 0}
 
 // clang-format off
 static const iree_tokenizer_byte_level_utf8_t iree_tokenizer_byte_level_utf8[256] = {
