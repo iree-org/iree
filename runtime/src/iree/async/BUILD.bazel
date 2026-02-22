@@ -118,6 +118,9 @@ iree_runtime_cc_library(
             "//runtime/src/iree/async/platform/io_uring",
             "//runtime/src/iree/async/platform/posix",
         ],
+        "//build_tools/bazel:iree_is_android": [
+            "//runtime/src/iree/async/platform/posix",
+        ],
         "//build_tools/bazel:iree_is_windows": [
             "//runtime/src/iree/async/platform/iocp",
         ],

@@ -45,6 +45,7 @@ iree_runtime_cc_library(
         "worker.h",
     ],
     target_compatible_with = select({
+        "@platforms//os:android": [],
         "@platforms//os:linux": [],
         "@platforms//os:macos": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -66,6 +67,9 @@ iree_runtime_cc_library(
         "//build_tools/bazel:iree_is_linux": [
             "//runtime/src/iree/async/platform/linux:signal",
         ],
+        "//build_tools/bazel:iree_is_android": [
+            "//runtime/src/iree/async/platform/linux:signal",
+        ],
         "//conditions:default": [],
     }),
 )
@@ -75,6 +79,7 @@ iree_runtime_cc_library(
     srcs = ["timer_list.c"],
     hdrs = ["timer_list.h"],
     target_compatible_with = select({
+        "@platforms//os:android": [],
         "@platforms//os:linux": [],
         "@platforms//os:macos": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -89,6 +94,7 @@ iree_runtime_cc_test(
     name = "timer_list_test",
     srcs = ["timer_list_test.cc"],
     target_compatible_with = select({
+        "@platforms//os:android": [],
         "@platforms//os:linux": [],
         "@platforms//os:macos": [],
         "//conditions:default": ["@platforms//:incompatible"],

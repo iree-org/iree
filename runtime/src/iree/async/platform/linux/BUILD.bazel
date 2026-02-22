@@ -18,9 +18,11 @@ iree_runtime_cc_library(
     name = "signal",
     srcs = ["signal.c"],
     hdrs = ["signal.h"],
-    target_compatible_with = [
-        "@platforms//os:linux",
-    ],
+    target_compatible_with = select({
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
     deps = [
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:signal",

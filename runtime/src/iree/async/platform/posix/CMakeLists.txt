@@ -10,9 +10,11 @@
 
 iree_add_all_subdirs()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(_posix_platform_deps "")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(APPEND _posix_platform_deps iree::async::platform::linux::signal)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   list(APPEND _posix_platform_deps iree::async::platform::linux::signal)
 endif()
 iree_cc_library(
@@ -62,7 +64,7 @@ iree_cc_library(
 )
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 iree_cc_library(
   NAME
     timer_list
@@ -77,7 +79,7 @@ iree_cc_library(
 )
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 iree_cc_test(
   NAME
     timer_list_test
