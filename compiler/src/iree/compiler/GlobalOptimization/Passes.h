@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -118,6 +119,13 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       *this,
       "generalize-matmul",
       llvm::cl::desc("Converts linalg named matmul ops to linalg generic ops."),
+      llvm::cl::init(false),
+  };
+  Option<bool> enableConv2DToImg2Col{
+      *this,
+      "enable-conv2d-to-img2col",
+      llvm::cl::desc("Enables conversion of Conv2D operations to img2col + "
+                     "matmul form to leverage optimized matmul implementations."),
       llvm::cl::init(false),
   };
   Option<bool> constExprHoisting{

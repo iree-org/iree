@@ -14,6 +14,15 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
+def ConvertConv2DToImg2ColPass :
+    Pass<"iree-global-opt-convert-conv2d-to-img2col", ""> {
+  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def ConvertStridedContractionToContractionPass:
     Pass<"iree-global-opt-convert-strided-contraction-to-contraction", ""> {
   let summary = "Factors out an extract_slice from contraction-like ops with strided inputs.";

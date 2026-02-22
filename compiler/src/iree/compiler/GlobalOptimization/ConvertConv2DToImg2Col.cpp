@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Preprocessing/Common/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -18,10 +18,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::Preprocessing {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 #define GEN_PASS_DEF_CONVERTCONV2DTOIMG2COLPASS
-#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
+#include "iree/compiler/GlobalOptimization/Passes.h.inc" // IWYU pragma: export
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
@@ -554,7 +554,7 @@ public:
 };
 
 class ConvertConv2DToImg2ColPass
-    : public iree_compiler::Preprocessing::impl::ConvertConv2DToImg2ColPassBase<
+    : public impl::ConvertConv2DToImg2ColPassBase<
           ConvertConv2DToImg2ColPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -569,4 +569,4 @@ class ConvertConv2DToImg2ColPass
 
 } // namespace
 
-} // namespace mlir::iree_compiler::Preprocessing
+} // namespace mlir::iree_compiler::GlobalOptimization

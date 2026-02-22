@@ -2,8 +2,8 @@
 // RUN:   --iree-hal-target-device=local \
 // RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
 // RUN:   --compile-to=preprocessing \
-// RUN:   --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv2d-to-img2col,iree-preprocessing-pad-linalg-ops{pad-size=16}))" \
-// RUN:   --mlir-print-ir-after=iree-preprocessing-convert-conv2d-to-img2col --mlir-print-ir-after=iree-preprocessing-pad-linalg-ops %s 2>&1 \
+// RUN:   --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-pad-linalg-ops{pad-size=16}))" \
+// RUN:   --mlir-print-ir-after=iree-preprocessing-pad-linalg-ops %s 2>&1 \
 // RUN:   | FileCheck %s
 
 func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : tensor<10x30xf32>) -> tensor<10x30xf32> {
@@ -13,7 +13,6 @@ func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : te
 }
 
 // Just check that the pass runs, and that the compilation finishes
-//       CHECK: ConvertConv2DToImg2ColPass (iree-preprocessing-convert-conv2d-to-img2col)
 //       CHECK: PadLinalgOpsPass (iree-preprocessing-pad-linalg-ops)
 // CHECK-LABEL: module
 //       CHECK:   util.func public @test(
