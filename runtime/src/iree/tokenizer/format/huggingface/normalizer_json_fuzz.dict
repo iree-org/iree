@@ -1,0 +1,51 @@
+# Dictionary for normalizer_json_fuzz.
+# Helps the fuzzer generate valid JSON structures.
+
+# JSON syntax
+"{"
+"}"
+"["
+"]"
+":"
+","
+"null"
+"true"
+"false"
+
+# Common keys
+"type"
+"normalizers"
+"pattern"
+"content"
+"prepend"
+
+# Normalizer types
+"Sequence"
+"BertNormalizer"
+"NFC"
+"NFD"
+"NFKC"
+"NFKD"
+"Lowercase"
+"Strip"
+"StripAccents"
+"Prepend"
+"Replace"
+"Precompiled"
+
+# BERT normalizer fields
+"clean_text"
+"handle_chinese_chars"
+"strip_accents"
+"lowercase"
+
+# Strip normalizer fields
+"strip_left"
+"strip_right"
+
+# Replace normalizer fields
+"String"
+"Regex"
+
+# Precompiled normalizer fields
+"precompiled_charsmap"

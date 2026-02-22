@@ -6,540 +6,747 @@
 
 #include "iree/tokenizer/postprocessor.h"
 
-#include <string>
-#include <vector>
-
+#include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
+namespace iree {
+namespace tokenizer {
 namespace {
 
-//===----------------------------------------------------------------------===//
-// Test Helpers
-//===----------------------------------------------------------------------===//
+// Helper to build a template with given prefix/infix/suffix IDs.
+iree_tokenizer_postprocessor_template_t MakeTemplate(
+    std::initializer_list<int32_t> prefix_ids,
+    std::initializer_list<int32_t> infix_ids,
+    std::initializer_list<int32_t> suffix_ids,
+    std::initializer_list<uint8_t> prefix_type_ids = {},
+    std::initializer_list<uint8_t> infix_type_ids = {},
+    std::initializer_list<uint8_t> suffix_type_ids = {},
+    uint8_t sequence_a_type_id = 0, uint8_t sequence_b_type_id = 0) {
+  iree_tokenizer_postprocessor_template_t t = {};
+  t.prefix_count = static_cast<uint8_t>(prefix_ids.size());
+  t.infix_count = static_cast<uint8_t>(infix_ids.size());
+  t.suffix_count = static_cast<uint8_t>(suffix_ids.size());
+  t.sequence_a_type_id = sequence_a_type_id;
+  t.sequence_b_type_id = sequence_b_type_id;
 
-struct TestContext {
-  std::vector<int32_t> tokens;
-  std::vector<std::string> encoded_texts;
-};
+  size_t i = 0;
+  for (int32_t id : prefix_ids) t.token_ids[i++] = id;
+  for (int32_t id : infix_ids) t.token_ids[i++] = id;
+  for (int32_t id : suffix_ids) t.token_ids[i++] = id;
 
-static iree_status_t test_encode_text(void* user_data,
-                                      iree_string_view_t text) {
-  auto* ctx = static_cast<TestContext*>(user_data);
-  ctx->encoded_texts.push_back(std::string(text.data, text.size));
-  return iree_ok_status();
+  i = 0;
+  if (prefix_type_ids.size() > 0) {
+    for (uint8_t tid : prefix_type_ids) t.type_ids[i++] = tid;
+  } else {
+    i += t.prefix_count;
+  }
+  if (infix_type_ids.size() > 0) {
+    for (uint8_t tid : infix_type_ids) t.type_ids[i++] = tid;
+  } else {
+    i += t.infix_count;
+  }
+  if (suffix_type_ids.size() > 0) {
+    for (uint8_t tid : suffix_type_ids) t.type_ids[i++] = tid;
+  }
+
+  return t;
 }
 
-static iree_status_t test_emit_token(void* user_data, int32_t token_id) {
-  auto* ctx = static_cast<TestContext*>(user_data);
-  ctx->tokens.push_back(token_id);
-  return iree_ok_status();
+// Helper to create a default postprocessor for encode state tests.
+// Uses the given template as the single template, no pair.
+iree_tokenizer_postprocessor_t MakePostprocessor(
+    const iree_tokenizer_postprocessor_template_t& single,
+    iree_tokenizer_postprocessor_flags_t flags =
+        IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE) {
+  iree_tokenizer_postprocessor_t pp = {};
+  pp.single = single;
+  pp.flags = flags;
+  return pp;
 }
 
-//===----------------------------------------------------------------------===//
-// NONE Postprocessor Tests
-//===----------------------------------------------------------------------===//
+TEST(PostprocessorTemplate, TotalCount) {
+  iree_tokenizer_postprocessor_template_t t = {};
+  t.prefix_count = 1;
+  t.infix_count = 2;
+  t.suffix_count = 1;
+  EXPECT_EQ(iree_tokenizer_postprocessor_template_total_count(&t), 4);
+}
 
-TEST(PostprocessorTest, NoneInitialize) {
+TEST(PostprocessorTemplate, TotalCountEmpty) {
+  iree_tokenizer_postprocessor_template_t t = {};
+  EXPECT_EQ(iree_tokenizer_postprocessor_template_total_count(&t), 0);
+}
+
+TEST(Postprocessor, InitializeBertSingle) {
+  // BERT single: [CLS] $A [SEP]
+  auto single = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
   iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_none(&pp);
-  EXPECT_EQ(pp.type, IREE_TOKENIZER_POSTPROCESSOR_NONE);
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-TEST(PostprocessorTest, NoneApplySingle) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_none(&pp);
-
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello world"), test_encode_text, test_emit_token, &ctx));
-
-  // NONE should just encode the text, no special tokens.
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello world");
-  EXPECT_TRUE(ctx.tokens.empty());
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-TEST(PostprocessorTest, NoneApplyPair) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_none(&pp);
-
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_pair(
-      &pp, IREE_SV("text a"), IREE_SV("text b"), test_encode_text,
-      test_emit_token, &ctx));
-
-  // NONE should encode both texts, no special tokens.
-  EXPECT_EQ(ctx.encoded_texts.size(), 2);
-  EXPECT_EQ(ctx.encoded_texts[0], "text a");
-  EXPECT_EQ(ctx.encoded_texts[1], "text b");
-  EXPECT_TRUE(ctx.tokens.empty());
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-//===----------------------------------------------------------------------===//
-// RoBERTa Postprocessor Tests
-//===----------------------------------------------------------------------===//
-
-TEST(PostprocessorTest, RobertaInitialize) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_roberta(
-      0, 2, IREE_TOKENIZER_ROBERTA_FLAG_DEFAULT, &pp);
-  EXPECT_EQ(pp.type, IREE_TOKENIZER_POSTPROCESSOR_ROBERTA);
-  EXPECT_EQ(pp.config.roberta.cls_id, 0);
-  EXPECT_EQ(pp.config.roberta.sep_id, 2);
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-TEST(PostprocessorTest, RobertaApplySingle) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_roberta(
-      0, 2, IREE_TOKENIZER_ROBERTA_FLAG_DEFAULT, &pp);
-
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, test_emit_token, &ctx));
-
-  // RoBERTa single: <s> text </s>
-  EXPECT_EQ(ctx.tokens.size(), 2);
-  EXPECT_EQ(ctx.tokens[0], 0);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 2);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello");
+  EXPECT_EQ(pp.single.prefix_count, 1);
+  EXPECT_EQ(pp.single.infix_count, 0);
+  EXPECT_EQ(pp.single.suffix_count, 1);
+  EXPECT_EQ(pp.single.token_ids[0], 101);  // [CLS]
+  EXPECT_EQ(pp.single.token_ids[1], 102);  // [SEP]
+  EXPECT_EQ(pp.single.sequence_a_type_id, 0);
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_tokenizer_postprocessor_supports_pair(&pp));
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-TEST(PostprocessorTest, RobertaApplyPair) {
+TEST(Postprocessor, InitializeBertPair) {
+  // BERT single: [CLS] $A [SEP]
+  auto single = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  // BERT pair: [CLS] $A [SEP] $B [SEP]
+  auto pair = MakeTemplate(
+      /*prefix=*/{101}, /*infix=*/{102}, /*suffix=*/{102},
+      /*prefix_type_ids=*/{0}, /*infix_type_ids=*/{0},
+      /*suffix_type_ids=*/{1},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/1);
+
   iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_roberta(
-      0, 2, IREE_TOKENIZER_ROBERTA_FLAG_DEFAULT, &pp);
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, &pair, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_pair(
-      &pp, IREE_SV("text a"), IREE_SV("text b"), test_encode_text,
-      test_emit_token, &ctx));
+  EXPECT_TRUE(iree_tokenizer_postprocessor_supports_pair(&pp));
 
-  // RoBERTa pair: <s> A </s></s> B </s>
-  EXPECT_EQ(ctx.tokens.size(), 4);
-  EXPECT_EQ(ctx.tokens[0], 0);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 2);  // SEP
-  EXPECT_EQ(ctx.tokens[2], 2);  // SEP (doubled)
-  EXPECT_EQ(ctx.tokens[3], 2);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 2);
-  EXPECT_EQ(ctx.encoded_texts[0], "text a");
-  EXPECT_EQ(ctx.encoded_texts[1], "text b");
+  // Pair template.
+  EXPECT_EQ(pp.pair.prefix_count, 1);
+  EXPECT_EQ(pp.pair.infix_count, 1);
+  EXPECT_EQ(pp.pair.suffix_count, 1);
+  EXPECT_EQ(pp.pair.token_ids[0], 101);  // [CLS] prefix
+  EXPECT_EQ(pp.pair.token_ids[1], 102);  // [SEP] infix
+  EXPECT_EQ(pp.pair.token_ids[2], 102);  // [SEP] suffix
+  EXPECT_EQ(pp.pair.type_ids[0], 0);     // [CLS] type=0
+  EXPECT_EQ(pp.pair.type_ids[1], 0);     // [SEP] infix type=0
+  EXPECT_EQ(pp.pair.type_ids[2], 1);     // [SEP] suffix type=1
+  EXPECT_EQ(pp.pair.sequence_a_type_id, 0);
+  EXPECT_EQ(pp.pair.sequence_b_type_id, 1);
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-//===----------------------------------------------------------------------===//
-// Template Postprocessor Tests
-//===----------------------------------------------------------------------===//
-
-TEST(PostprocessorTest, TemplateApplySingle) {
-  // Create a BERT-style template: [CLS] $A [SEP]
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 3 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  // [CLS] token
-  templates[0].type = IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL;
-  templates[0].token_id = 101;
-  templates[0].type_id = 0;
-  templates[0].reserved = 0;
-
-  // $A sequence
-  templates[1].type = IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A;
-  templates[1].token_id = -1;
-  templates[1].type_id = 0;
-  templates[1].reserved = 0;
-
-  // [SEP] token
-  templates[2].type = IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL;
-  templates[2].token_id = 102;
-  templates[2].type_id = 0;
-  templates[2].reserved = 0;
+TEST(Postprocessor, InitializeLlama) {
+  // LLaMA 2 single: <bos> $A
+  auto single = MakeTemplate(/*prefix=*/{1}, /*infix=*/{}, /*suffix=*/{});
 
   iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 3, 0, iree_allocator_system(), &pp));
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, test_emit_token, &ctx));
-
-  // Should emit: CLS, encode("hello"), SEP
-  EXPECT_EQ(ctx.tokens.size(), 2);
-  EXPECT_EQ(ctx.tokens[0], 101);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 102);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello");
+  EXPECT_EQ(pp.single.prefix_count, 1);
+  EXPECT_EQ(pp.single.infix_count, 0);
+  EXPECT_EQ(pp.single.suffix_count, 0);
+  EXPECT_EQ(pp.single.token_ids[0], 1);  // <bos>
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-TEST(PostprocessorTest, TemplateApplyPair) {
-  // Create a BERT-style template: [CLS] $A [SEP] $B [SEP]
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 8 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  // Single template (3 pieces): [CLS] $A [SEP]
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-
-  // Pair template (5 pieces): [CLS] $A [SEP] $B [SEP]
-  templates[3] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-  templates[4] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[5] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-  templates[6] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_B, 1, 0};
-  templates[7] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 1, 0};
+TEST(Postprocessor, InitializeRobertaPair) {
+  // RoBERTa single: <s> $A </s>
+  auto single = MakeTemplate(/*prefix=*/{0}, /*infix=*/{}, /*suffix=*/{2});
+  // RoBERTa pair: <s> $A </s></s> $B </s>
+  auto pair = MakeTemplate(
+      /*prefix=*/{0}, /*infix=*/{2, 2}, /*suffix=*/{2},
+      /*prefix_type_ids=*/{0}, /*infix_type_ids=*/{0, 0},
+      /*suffix_type_ids=*/{0},
+      /*sequence_a_type_id=*/0, /*sequence_b_type_id=*/0);
 
   iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 3, 5, iree_allocator_system(), &pp));
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, &pair, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_pair(
-      &pp, IREE_SV("text a"), IREE_SV("text b"), test_encode_text,
-      test_emit_token, &ctx));
-
-  // Should emit: CLS, encode("text a"), SEP, encode("text b"), SEP
-  EXPECT_EQ(ctx.tokens.size(), 3);
-  EXPECT_EQ(ctx.tokens[0], 101);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 102);  // SEP
-  EXPECT_EQ(ctx.tokens[2], 102);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 2);
-  EXPECT_EQ(ctx.encoded_texts[0], "text a");
-  EXPECT_EQ(ctx.encoded_texts[1], "text b");
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  EXPECT_TRUE(iree_tokenizer_postprocessor_supports_pair(&pp));
+  EXPECT_EQ(pp.pair.infix_count, 2);
+  EXPECT_EQ(pp.pair.token_ids[1], 2);  // </s> first infix
+  EXPECT_EQ(pp.pair.token_ids[2], 2);  // </s> second infix
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-//===----------------------------------------------------------------------===//
-// ByteLevel Postprocessor Tests
-//===----------------------------------------------------------------------===//
+TEST(Postprocessor, InitializeWhisper) {
+  // Whisper: <|startoftranscript|><|en|><|transcribe|> $A <|endoftext|>
+  auto single = MakeTemplate(/*prefix=*/{50258, 50259, 50360},
+                             /*infix=*/{}, /*suffix=*/{50257});
 
-TEST(PostprocessorTest, ByteLevelApplySingle) {
   iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_byte_level(0, &pp);
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, test_emit_token, &ctx));
-
-  // ByteLevel should just encode the text (no-op for post-processing).
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello");
-  EXPECT_TRUE(ctx.tokens.empty());
+  EXPECT_EQ(pp.single.prefix_count, 3);
+  EXPECT_EQ(pp.single.suffix_count, 1);
+  EXPECT_EQ(pp.single.token_ids[0], 50258);
+  EXPECT_EQ(pp.single.token_ids[1], 50259);
+  EXPECT_EQ(pp.single.token_ids[2], 50360);
+  EXPECT_EQ(pp.single.token_ids[3], 50257);
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-//===----------------------------------------------------------------------===//
-// Sequence Postprocessor Tests
-//===----------------------------------------------------------------------===//
-
-TEST(PostprocessorTest, SequenceApplySingle) {
-  // Create a sequence with ByteLevel + RoBERTa (like Llama 3 but simpler).
-  iree_tokenizer_postprocessor_t* children = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 2 * sizeof(iree_tokenizer_postprocessor_t),
-      (void**)&children));
-
-  iree_tokenizer_postprocessor_initialize_byte_level(0, &children[0]);
-  iree_tokenizer_postprocessor_initialize_roberta(
-      0, 2, IREE_TOKENIZER_ROBERTA_FLAG_DEFAULT, &children[1]);
+TEST(Postprocessor, InitializeByteLevelOnly) {
+  // ByteLevel: no special tokens, no offset trimming.
+  iree_tokenizer_postprocessor_template_t empty = {};
 
   iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_sequence(
-      children, 2, iree_allocator_system(), &pp));
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &empty, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, test_emit_token, &ctx));
-
-  // Sequence finds the first template-based processor (RoBERTa) and uses it.
-  EXPECT_EQ(ctx.tokens.size(), 2);
-  EXPECT_EQ(ctx.tokens[0], 0);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 2);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello");
+  EXPECT_EQ(pp.single.prefix_count, 0);
+  EXPECT_EQ(pp.single.infix_count, 0);
+  EXPECT_EQ(pp.single.suffix_count, 0);
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  EXPECT_FALSE(iree_tokenizer_postprocessor_supports_pair(&pp));
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-TEST(PostprocessorTest, NullPostprocessorPassthrough) {
-  // Test that NULL postprocessor just encodes text.
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      nullptr, IREE_SV("hello"), test_encode_text, test_emit_token, &ctx));
-
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "hello");
-  EXPECT_TRUE(ctx.tokens.empty());
+TEST(Postprocessor, TrimOffsetsStored) {
+  // TRIM_OFFSETS flag is accepted and stored.
+  iree_tokenizer_postprocessor_template_t empty = {};
+  iree_tokenizer_postprocessor_t pp;
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &empty, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS,
+      &pp));
+  EXPECT_TRUE(iree_any_bit_set(pp.flags,
+                               IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-//===----------------------------------------------------------------------===//
-// Extended Template Postprocessor Tests
-//===----------------------------------------------------------------------===//
+TEST(Postprocessor, AddPrefixSpaceStored) {
+  // ADD_PREFIX_SPACE flag is accepted and stored.
+  iree_tokenizer_postprocessor_template_t empty = {};
+  iree_tokenizer_postprocessor_t pp;
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &empty, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE,
+      &pp));
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_TRUE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  iree_tokenizer_postprocessor_deinitialize(&pp);
+}
 
-TEST(TemplateProcessorTest, EmptyInput) {
-  // Test template with empty input text.
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 3 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // [CLS]
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // [SEP]
+TEST(Postprocessor, ValidateMaxPiecesExceeded) {
+  // Build a template that exceeds MAX_PIECES (7).
+  iree_tokenizer_postprocessor_template_t too_many = {};
+  too_many.prefix_count = 4;
+  too_many.infix_count = 2;
+  too_many.suffix_count = 2;  // Total = 8 > 7.
 
   iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 3, 0, iree_allocator_system(), &pp));
+  iree_status_t status = iree_tokenizer_postprocessor_initialize(
+      &too_many, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+}
 
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV(""), test_encode_text, test_emit_token, &ctx));
+TEST(Postprocessor, ValidatePairMaxPiecesExceeded) {
+  iree_tokenizer_postprocessor_template_t single = {};
+  single.prefix_count = 1;
+  single.suffix_count = 1;
 
-  // Should still emit special tokens even with empty input.
-  EXPECT_EQ(ctx.tokens.size(), 2);
-  EXPECT_EQ(ctx.tokens[0], 101);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 102);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 1);
-  EXPECT_EQ(ctx.encoded_texts[0], "");  // Empty text still encoded.
+  iree_tokenizer_postprocessor_template_t pair_too_many = {};
+  pair_too_many.prefix_count = 3;
+  pair_too_many.infix_count = 3;
+  pair_too_many.suffix_count = 3;  // Total = 9 > 7.
+
+  iree_tokenizer_postprocessor_t pp;
+  iree_status_t status = iree_tokenizer_postprocessor_initialize(
+      &single, &pair_too_many, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
+}
+
+TEST(Postprocessor, DeinitializeZeros) {
+  auto single = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_t pp;
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, /*pair=*/NULL, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
+
+  iree_tokenizer_postprocessor_deinitialize(&pp);
+
+  // After deinitialize, struct is zeroed.
+  EXPECT_EQ(pp.single.prefix_count, 0);
+  EXPECT_EQ(pp.single.suffix_count, 0);
+  EXPECT_FALSE(iree_any_bit_set(
+      pp.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+}
+
+TEST(Postprocessor, SupportsPairWithTypeIdsOnly) {
+  // A pair template with no special tokens but different type_ids still counts
+  // as pair-capable (needed for models that only differentiate by type_id).
+  iree_tokenizer_postprocessor_template_t single = {};
+  iree_tokenizer_postprocessor_template_t pair = {};
+  pair.sequence_a_type_id = 0;
+  pair.sequence_b_type_id = 1;
+
+  iree_tokenizer_postprocessor_t pp;
+  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize(
+      &single, &pair, IREE_TOKENIZER_POSTPROCESSOR_FLAG_NONE, &pp));
+
+  EXPECT_TRUE(iree_tokenizer_postprocessor_supports_pair(&pp));
 
   iree_tokenizer_postprocessor_deinitialize(&pp);
 }
 
-TEST(TemplateProcessorTest, SpecialTokensOnly) {
-  // Template with only special tokens, no sequence placeholder.
-  // This is unusual but valid - e.g., a special "reset" template.
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 2 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  templates[0] = {100, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // BOS
-  templates[1] = {200, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // EOS
-
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 2, 0, iree_allocator_system(), &pp));
-
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("ignored"), test_encode_text, test_emit_token, &ctx));
-
-  // Should emit both special tokens, text is ignored (no $A placeholder).
-  EXPECT_EQ(ctx.tokens.size(), 2);
-  EXPECT_EQ(ctx.tokens[0], 100);
-  EXPECT_EQ(ctx.tokens[1], 200);
-  EXPECT_TRUE(ctx.encoded_texts.empty());
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-TEST(TemplateProcessorTest, MultipleSeparatorsBetweenSequences) {
-  // Template: [CLS] $A [SEP][SEP] $B [SEP] (RoBERTa-like double sep).
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 6 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  // Pair template only (6 pieces).
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // CLS
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // SEP
-  templates[3] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};  // SEP
-  templates[4] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_B, 1, 0};
-  templates[5] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 1, 0};  // SEP
-
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 0, 6, iree_allocator_system(), &pp));
-
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_pair(
-      &pp, IREE_SV("first"), IREE_SV("second"), test_encode_text,
-      test_emit_token, &ctx));
-
-  // Should emit: CLS, encode(first), SEP, SEP, encode(second), SEP.
-  EXPECT_EQ(ctx.tokens.size(), 4);
-  EXPECT_EQ(ctx.tokens[0], 101);  // CLS
-  EXPECT_EQ(ctx.tokens[1], 102);  // SEP
-  EXPECT_EQ(ctx.tokens[2], 102);  // SEP (doubled)
-  EXPECT_EQ(ctx.tokens[3], 102);  // SEP
-  EXPECT_EQ(ctx.encoded_texts.size(), 2);
-  EXPECT_EQ(ctx.encoded_texts[0], "first");
-  EXPECT_EQ(ctx.encoded_texts[1], "second");
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-TEST(TemplateProcessorTest, TypeIdAssignment) {
-  // Verify type_id field is set correctly for different segments.
-  // BERT: segment A has type_id 0, segment B has type_id 1.
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 5 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  // Pair template with explicit type_ids.
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0,
-                  0};  // CLS, type 0
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0,
-                  0};  // $A, type 0
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0,
-                  0};  // SEP, type 0
-  templates[3] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_B, 1,
-                  0};  // $B, type 1
-  templates[4] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 1,
-                  0};  // SEP, type 1
-
-  // Verify the type_ids are correctly set in the template.
-  EXPECT_EQ(templates[0].type_id, 0);
-  EXPECT_EQ(templates[1].type_id, 0);
-  EXPECT_EQ(templates[2].type_id, 0);
-  EXPECT_EQ(templates[3].type_id, 1);
-  EXPECT_EQ(templates[4].type_id, 1);
-
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 0, 5, iree_allocator_system(), &pp));
-
-  // The type_ids are stored in the template pieces. We verify the structure.
-  EXPECT_EQ(pp.type, IREE_TOKENIZER_POSTPROCESSOR_TEMPLATE);
-  EXPECT_EQ(pp.config.template_.pair_count, 5);
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
-}
-
-TEST(TemplateProcessorTest, SingleSequenceNoPair) {
-  // Template only defines single, apply_pair should work (common case).
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 3 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
-
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 3, 0, iree_allocator_system(), &pp));
-
-  // Apply pair when only single is defined.
-  TestContext ctx;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_apply_pair(
-      &pp, IREE_SV("first"), IREE_SV("second"), test_encode_text,
-      test_emit_token, &ctx));
-
-  // Should fall back to encoding both sequences without pair template.
-  // Behavior: uses single template for first, then encodes second directly.
-  // Or: encodes both as simple concatenation. Check actual behavior.
-  EXPECT_FALSE(ctx.encoded_texts.empty());
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
+TEST(Postprocessor, DeinitializeNull) {
+  // Should not crash.
+  iree_tokenizer_postprocessor_deinitialize(NULL);
 }
 
 //===----------------------------------------------------------------------===//
-// Callback Error Propagation Tests
+// Encode State Tests
 //===----------------------------------------------------------------------===//
 
-static iree_status_t failing_encode_text(void* user_data,
-                                         iree_string_view_t text) {
-  (void)user_data;
-  (void)text;
-  return iree_make_status(IREE_STATUS_ABORTED, "encode error");
+TEST(PostprocessorEncodeState, InitializeEmptyTemplate) {
+  iree_tokenizer_postprocessor_template_t empty = {};
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(empty);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &empty, &state);
+
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_IDLE);
+  EXPECT_EQ(state.active_template, nullptr);
 }
 
-static iree_status_t failing_emit_token(void* user_data, int32_t token_id) {
-  (void)user_data;
-  (void)token_id;
-  return iree_make_status(IREE_STATUS_CANCELLED, "emit error");
+TEST(PostprocessorEncodeState, InitializeWithPrefix) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX);
+  EXPECT_EQ(state.position, 0);
+  EXPECT_EQ(state.active_template, &tmpl);
 }
 
-TEST(PostprocessorCallbackTest, EncodeTextErrorPropagates) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_roberta(0, 2, 0, &pp);
+TEST(PostprocessorEncodeState, InitializeSuffixOnly) {
+  // Template with no prefix but has suffix — starts in SEQUENCE_A.
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
-  TestContext ctx;
-  iree_status_t status = iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), failing_encode_text, test_emit_token, &ctx);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, status);
-  iree_status_free(status);
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
 }
 
-TEST(PostprocessorCallbackTest, EmitTokenErrorPropagates) {
-  iree_tokenizer_postprocessor_t pp;
-  iree_tokenizer_postprocessor_initialize_roberta(0, 2, 0, &pp);
+TEST(PostprocessorEncodeState, EmitPrefix) {
+  // BERT: [CLS] $A [SEP] — prefix={101}, suffix={102}
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
-  TestContext ctx;
-  iree_status_t status = iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, failing_emit_token, &ctx);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, status);
-  iree_status_free(status);
+  iree_tokenizer_token_id_t token_ids[8] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
 
-  iree_tokenizer_postprocessor_deinitialize(&pp);
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  EXPECT_EQ(emitted, 1u);
+  EXPECT_EQ(token_ids[0], 101);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
 }
 
-TEST(PostprocessorCallbackTest, TemplateCallbackErrorPropagates) {
-  iree_tokenizer_template_piece_t* templates = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(
-      iree_allocator_system(), 3 * sizeof(iree_tokenizer_template_piece_t),
-      (void**)&templates));
+TEST(PostprocessorEncodeState, EmitPrefixMultiple) {
+  // Whisper: 3 prefix tokens.
+  auto tmpl = MakeTemplate(/*prefix=*/{50258, 50259, 50360},
+                           /*infix=*/{}, /*suffix=*/{50257});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
-  templates[0] = {101, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
-  templates[1] = {-1, IREE_TOKENIZER_TEMPLATE_PIECE_SEQUENCE_A, 0, 0};
-  templates[2] = {102, IREE_TOKENIZER_TEMPLATE_PIECE_SPECIAL, 0, 0};
+  iree_tokenizer_token_id_t token_ids[8] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
 
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_template(
-      templates, 3, 0, iree_allocator_system(), &pp));
-
-  // Error on emit_token (first thing called - CLS).
-  TestContext ctx;
-  iree_status_t status = iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), test_encode_text, failing_emit_token, &ctx);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, status);
-  iree_status_free(status);
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  EXPECT_EQ(emitted, 3u);
+  EXPECT_EQ(token_ids[0], 50258);
+  EXPECT_EQ(token_ids[1], 50259);
+  EXPECT_EQ(token_ids[2], 50360);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
 }
 
-TEST(PostprocessorCallbackTest, SequenceCallbackErrorPropagates) {
-  // Error should propagate through Sequence post-processor.
-  iree_tokenizer_postprocessor_t* children = nullptr;
-  IREE_ASSERT_OK(iree_allocator_malloc(iree_allocator_system(),
-                                       sizeof(iree_tokenizer_postprocessor_t),
-                                       (void**)&children));
+TEST(PostprocessorEncodeState, EmitPrefixPartialCapacity) {
+  // 3 prefix tokens but only capacity for 2 — phase stays PREFIX.
+  auto tmpl = MakeTemplate(/*prefix=*/{50258, 50259, 50360},
+                           /*infix=*/{}, /*suffix=*/{50257});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
 
-  iree_tokenizer_postprocessor_initialize_roberta(0, 2, 0, &children[0]);
+  iree_tokenizer_token_id_t token_ids[2] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 2);
 
-  iree_tokenizer_postprocessor_t pp;
-  IREE_ASSERT_OK(iree_tokenizer_postprocessor_initialize_sequence(
-      children, 1, iree_allocator_system(), &pp));
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  EXPECT_EQ(emitted, 2u);
+  EXPECT_EQ(token_ids[0], 50258);
+  EXPECT_EQ(token_ids[1], 50259);
+  // Phase stays PREFIX — not all tokens emitted.
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX);
+  EXPECT_EQ(state.position, 2);
 
-  TestContext ctx;
-  iree_status_t status = iree_tokenizer_postprocessor_apply_single(
-      &pp, IREE_SV("hello"), failing_encode_text, test_emit_token, &ctx);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, status);
-  iree_status_free(status);
-
-  iree_tokenizer_postprocessor_deinitialize(&pp);
+  // Resume with more capacity.
+  iree_tokenizer_token_id_t token_ids2[4] = {};
+  iree_tokenizer_token_output_t output2 =
+      iree_tokenizer_make_token_output(token_ids2, NULL, NULL, 4);
+  emitted = iree_tokenizer_postprocessor_emit_prefix(&state, output2, 0);
+  EXPECT_EQ(emitted, 1u);
+  EXPECT_EQ(token_ids2[0], 50360);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
 }
+
+TEST(PostprocessorEncodeState, EmitPrefixNoOpWhenNotInPrefixPhase) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // Advance past prefix.
+  iree_tokenizer_token_id_t token_ids[8] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
+  iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A);
+
+  // Second call is a no-op.
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_prefix(&state, output, 1);
+  EXPECT_EQ(emitted, 0u);
+}
+
+TEST(PostprocessorEncodeState, EmitSuffix) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[8] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 8);
+
+  // Emit prefix, then transition to suffix.
+  iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  ASSERT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX);
+
+  iree_host_size_t emitted =
+      iree_tokenizer_postprocessor_emit_suffix(&state, output, 1);
+  EXPECT_EQ(emitted, 1u);
+  EXPECT_EQ(token_ids[1], 102);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+}
+
+TEST(PostprocessorEncodeState, BeginSuffixNoSuffix) {
+  // Template with prefix only — begin_suffix transitions directly to DONE.
+  auto tmpl = MakeTemplate(/*prefix=*/{1}, /*infix=*/{}, /*suffix=*/{});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // Skip prefix.
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+}
+
+TEST(PostprocessorEncodeState, AssignTypeIds) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102},
+                           /*prefix_type_ids=*/{}, /*infix_type_ids=*/{},
+                           /*suffix_type_ids=*/{},
+                           /*sequence_a_type_id=*/0);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // Advance to SEQUENCE_A.
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+
+  uint8_t type_ids[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 4);
+
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
+  EXPECT_EQ(type_ids[0], 0);
+  EXPECT_EQ(type_ids[1], 0);
+  EXPECT_EQ(type_ids[2], 0);
+  EXPECT_EQ(type_ids[3], 0xFF);  // Untouched.
+}
+
+TEST(PostprocessorEncodeState, AssignTypeIdsNonZero) {
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{},
+                           /*prefix_type_ids=*/{}, /*infix_type_ids=*/{},
+                           /*suffix_type_ids=*/{},
+                           /*sequence_a_type_id=*/2);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  state.active_template = &tmpl;
+
+  uint8_t type_ids[3] = {};
+  iree_tokenizer_token_id_t token_ids[3] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 3);
+
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 1, 2);
+  EXPECT_EQ(type_ids[0], 0);  // Untouched.
+  EXPECT_EQ(type_ids[1], 2);
+  EXPECT_EQ(type_ids[2], 2);
+}
+
+TEST(PostprocessorEncodeState, AssignTypeIdsNoOpWhenNotSequencePhase) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+  // State is in PREFIX phase.
+
+  uint8_t type_ids[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 4);
+
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
+  // All untouched — wrong phase.
+  EXPECT_EQ(type_ids[0], 0xFF);
+  EXPECT_EQ(type_ids[1], 0xFF);
+  EXPECT_EQ(type_ids[2], 0xFF);
+}
+
+TEST(PostprocessorEncodeState, AssignTypeIdsNoOpNullTypeIds) {
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{},
+                           /*prefix_type_ids=*/{}, /*infix_type_ids=*/{},
+                           /*suffix_type_ids=*/{},
+                           /*sequence_a_type_id=*/1);
+  iree_tokenizer_postprocessor_encode_state_t state = {};
+  state.phase = IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A;
+  state.active_template = &tmpl;
+
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 4);
+
+  // Should not crash.
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 0, 3);
+}
+
+TEST(PostprocessorEncodeState, FullBertFlow) {
+  // BERT: [CLS]=101 $A [SEP]=102, sequence_a_type_id=0
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102},
+                           /*prefix_type_ids=*/{0}, /*infix_type_ids=*/{},
+                           /*suffix_type_ids=*/{0},
+                           /*sequence_a_type_id=*/0);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[8] = {};
+  uint8_t type_ids[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, type_ids, 8);
+
+  iree_host_size_t offset = 0;
+
+  // Prefix: [CLS]
+  offset += iree_tokenizer_postprocessor_emit_prefix(&state, output, offset);
+  EXPECT_EQ(offset, 1u);
+
+  // Simulate model producing 3 tokens at positions 1,2,3.
+  token_ids[1] = 1000;
+  token_ids[2] = 1001;
+  token_ids[3] = 1002;
+  iree_tokenizer_postprocessor_assign_type_ids(&state, output, 1, 3);
+  offset += 3;
+
+  // Suffix: [SEP]
+  iree_tokenizer_postprocessor_begin_suffix(&state);
+  offset += iree_tokenizer_postprocessor_emit_suffix(&state, output, offset);
+  EXPECT_EQ(offset, 5u);
+
+  // Verify final output: [CLS] 1000 1001 1002 [SEP]
+  EXPECT_EQ(token_ids[0], 101);
+  EXPECT_EQ(token_ids[1], 1000);
+  EXPECT_EQ(token_ids[2], 1001);
+  EXPECT_EQ(token_ids[3], 1002);
+  EXPECT_EQ(token_ids[4], 102);
+
+  // Type IDs: all 0 (prefix type=0, sequence_a=0, suffix type=0).
+  EXPECT_EQ(type_ids[0], 0);
+  EXPECT_EQ(type_ids[1], 0);
+  EXPECT_EQ(type_ids[2], 0);
+  EXPECT_EQ(type_ids[3], 0);
+  EXPECT_EQ(type_ids[4], 0);
+
+  EXPECT_EQ(state.phase, IREE_TOKENIZER_POSTPROCESSOR_PHASE_DONE);
+}
+
+TEST(PostprocessorEncodeState, EmitPrefixWithOffsets) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[4] = {};
+  iree_tokenizer_offset_t offsets[4] = {{99, 99}, {99, 99}, {99, 99}, {99, 99}};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 4);
+
+  iree_tokenizer_postprocessor_emit_prefix(&state, output, 0);
+  // Special tokens get zero-length offsets.
+  EXPECT_EQ(offsets[0].start, 0u);
+  EXPECT_EQ(offsets[0].end, 0u);
+  // Other positions untouched.
+  EXPECT_EQ(offsets[1].start, 99u);
+}
+
+//===----------------------------------------------------------------------===//
+// Offset Trimming State Tests
+//===----------------------------------------------------------------------===//
+
+TEST(PostprocessorEncodeState, TrimOffsetsFlagsCached) {
+  auto tmpl = MakeTemplate(/*prefix=*/{101}, /*infix=*/{}, /*suffix=*/{102});
+  iree_tokenizer_postprocessor_encode_state_t state;
+
+  // Test with no flags.
+  auto pp1 = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp1, &tmpl, &state);
+  EXPECT_FALSE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  EXPECT_FALSE(state.first_model_token_trimmed);
+
+  // Test with TRIM_OFFSETS only.
+  auto pp2 =
+      MakePostprocessor(tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp2, &tmpl, &state);
+  EXPECT_TRUE(iree_any_bit_set(state.flags,
+                               IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_FALSE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  EXPECT_FALSE(state.first_model_token_trimmed);
+
+  // Test with both flags.
+  auto pp3 = MakePostprocessor(
+      tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS |
+                IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp3, &tmpl, &state);
+  EXPECT_TRUE(iree_any_bit_set(state.flags,
+                               IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_TRUE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+  EXPECT_FALSE(state.first_model_token_trimmed);
+
+  // Test with ADD_PREFIX_SPACE only.
+  auto pp4 = MakePostprocessor(
+      tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE);
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp4, &tmpl, &state);
+  EXPECT_FALSE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS));
+  EXPECT_TRUE(iree_any_bit_set(
+      state.flags, IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE));
+}
+
+TEST(PostprocessorTrimOffsets, NoOpWhenDisabled) {
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{});
+  auto pp = MakePostprocessor(tmpl);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[2] = {100, 200};
+  iree_tokenizer_offset_t offsets[2] = {{0, 5}, {5, 10}};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 2);
+
+  // With TRIM_OFFSETS unset, offsets should be unchanged (even with NULL
+  // vocab).
+  iree_tokenizer_postprocessor_trim_token_offsets(&state, /*vocab=*/NULL,
+                                                  output, 0, 2);
+  EXPECT_EQ(offsets[0].start, 0u);
+  EXPECT_EQ(offsets[0].end, 5u);
+  EXPECT_EQ(offsets[1].start, 5u);
+  EXPECT_EQ(offsets[1].end, 10u);
+}
+
+TEST(PostprocessorTrimOffsets, NoOpWhenNoOffsets) {
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{});
+  auto pp =
+      MakePostprocessor(tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[2] = {100, 200};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, 2);
+
+  // Should not crash with NULL token_offsets.
+  iree_tokenizer_postprocessor_trim_token_offsets(&state, /*vocab=*/NULL,
+                                                  output, 0, 2);
+}
+
+TEST(PostprocessorTrimOffsets, NoOpWhenNoVocab) {
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{});
+  auto pp =
+      MakePostprocessor(tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  iree_tokenizer_token_id_t token_ids[2] = {100, 200};
+  iree_tokenizer_offset_t offsets[2] = {{0, 5}, {5, 10}};
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, 2);
+
+  // With NULL vocab, offsets should be unchanged (early return).
+  iree_tokenizer_postprocessor_trim_token_offsets(&state, /*vocab=*/NULL,
+                                                  output, 0, 2);
+  EXPECT_EQ(offsets[0].start, 0u);
+  EXPECT_EQ(offsets[0].end, 5u);
+}
+
+TEST(PostprocessorTrimOffsets, FirstTokenTrackedAcrossCalls) {
+  // This test verifies the state tracking logic by manually setting the flag.
+  // With NULL vocab, the function returns early without modifying state, so we
+  // test the flag semantics directly rather than through the function.
+  auto tmpl = MakeTemplate(/*prefix=*/{}, /*infix=*/{}, /*suffix=*/{});
+  auto pp = MakePostprocessor(
+      tmpl, IREE_TOKENIZER_POSTPROCESSOR_FLAG_TRIM_OFFSETS |
+                IREE_TOKENIZER_POSTPROCESSOR_FLAG_ADD_PREFIX_SPACE);
+  iree_tokenizer_postprocessor_encode_state_t state;
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+
+  // Initial state: first_model_token_trimmed is false.
+  EXPECT_FALSE(state.first_model_token_trimmed);
+
+  // Simulate first batch processing (what the function would do with real
+  // vocab). After processing any tokens, first_model_token_trimmed becomes
+  // true.
+  state.first_model_token_trimmed = true;
+  EXPECT_TRUE(state.first_model_token_trimmed);
+
+  // Verify that re-initializing resets the flag (important for encode resets).
+  iree_tokenizer_postprocessor_encode_state_initialize(&pp, &tmpl, &state);
+  EXPECT_FALSE(state.first_model_token_trimmed);
+}
+
+// Full trim_offsets testing with actual token text lookup is performed in
+// tokenizer_huggingface_test.cc where real vocabularies are available.
 
 }  // namespace
+}  // namespace tokenizer
+}  // namespace iree

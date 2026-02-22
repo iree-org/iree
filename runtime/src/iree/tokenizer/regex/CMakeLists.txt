@@ -41,6 +41,7 @@ iree_cc_binary_benchmark(
   SRCS
     "exec_benchmark.cc"
   DEPS
+    ::compile
     ::exec
     benchmark
     iree::base
@@ -173,8 +174,20 @@ iree_cc_test(
   DEPS
     ::compile
     ::exec
+    iree::base::internal::unicode
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_fuzz(
+  NAME
+    regex_fuzz
+  SRCS
+    "regex_fuzz.cc"
+  DEPS
+    ::compile
+    ::exec
+    iree::base
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -1,0 +1,176 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "token",
+    hdrs = ["token.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vocab",
+    srcs = [
+        "vocab.c",
+        "vocab_internal.h",
+    ],
+    hdrs = ["vocab.h"],
+    deps = [
+        ":token",
+        ":vocab_hash",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vocab_test",
+    srcs = ["vocab_test.cc"],
+    deps = [
+        ":vocab",
+        ":vocab_builder",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vocab_builder",
+    srcs = [
+        "vocab_builder.c",
+        "vocab_internal.h",
+    ],
+    hdrs = ["vocab_builder.h"],
+    deps = [
+        ":token",
+        ":vocab",
+        ":vocab_hash",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vocab_builder_test",
+    srcs = ["vocab_builder_test.cc"],
+    deps = [
+        ":vocab_builder",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vocab_hash",
+    srcs = ["vocab_hash.c"],
+    hdrs = ["vocab_hash.h"],
+    deps = [
+        ":token",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "vocab_hash_benchmark",
+    srcs = ["vocab_hash_benchmark.cc"],
+    deps = [
+        ":token",
+        ":vocab_hash",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vocab_hash_test",
+    srcs = ["vocab_hash_test.cc"],
+    deps = [
+        ":token",
+        ":vocab_hash",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vocab_merge_hash",
+    srcs = ["vocab_merge_hash.c"],
+    hdrs = ["vocab_merge_hash.h"],
+    deps = [
+        ":vocab",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vocab_merge_hash_test",
+    srcs = ["vocab_merge_hash_test.cc"],
+    deps = [
+        ":vocab",
+        ":vocab_builder",
+        ":vocab_merge_hash",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "vocab_trie",
+    srcs = ["vocab_trie.c"],
+    hdrs = ["vocab_trie.h"],
+    deps = [
+        ":token",
+        "//runtime/src/iree/base",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "vocab_trie_benchmark",
+    srcs = ["vocab_trie_benchmark.cc"],
+    deps = [
+        ":token",
+        ":vocab_hash",
+        ":vocab_trie",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vocab_trie_test",
+    srcs = ["vocab_trie_test.cc"],
+    deps = [
+        ":token",
+        ":vocab_trie",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "vocab_fuzz",
+    srcs = ["vocab_fuzz.cc"],
+    deps = [
+        ":vocab",
+        ":vocab_builder",
+        "//runtime/src/iree/base",
+    ],
+)

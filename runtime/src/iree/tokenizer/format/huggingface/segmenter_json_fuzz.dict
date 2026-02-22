@@ -1,0 +1,59 @@
+# Dictionary for segmenter_json_fuzz.
+# Helps the fuzzer generate valid JSON structures for pre_tokenizer configs.
+
+# JSON syntax
+"{"
+"}"
+"["
+"]"
+":"
+","
+"null"
+"true"
+"false"
+
+# Common keys
+"type"
+"pretokenizers"
+"pattern"
+"behavior"
+"invert"
+"add_prefix_space"
+"trim_offsets"
+"use_regex"
+"replacement"
+"prepend_scheme"
+"individual_digits"
+
+# Pre-tokenizer types
+"Sequence"
+"ByteLevel"
+"Metaspace"
+"Split"
+"Punctuation"
+"BertPreTokenizer"
+"Whitespace"
+"WhitespaceSplit"
+"Digits"
+
+# Split behaviors
+"Removed"
+"Isolated"
+"MergedWithPrevious"
+"MergedWithNext"
+"Contiguous"
+
+# Metaspace prepend schemes
+"first"
+"never"
+"always"
+
+# Regex patterns
+"Regex"
+"String"
+"\\s"
+"\\p{L}+"
+"\\p{N}+"
+"\\p{P}"
+"[^\\s]+"
+"\\S+"

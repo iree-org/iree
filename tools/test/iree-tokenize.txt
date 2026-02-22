@@ -1,43 +1,48 @@
-// RUN: iree-tokenize %p/iree-tokenize.json "hello world" | \
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json "hello world" | \
 // RUN:   FileCheck %s --check-prefix=BASIC
-// RUN: iree-tokenize %p/iree-tokenize.json --no_special "hello" | \
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --special=false "hello" | \
 // RUN:   FileCheck %s --check-prefix=NOSPEC
-// Unicode test: 日本語テスト (Japanese: "Japanese language test")
-// Uses --json_string with \u escapes for Windows portability.
-// RUN: iree-tokenize %p/iree-tokenize.json --json_string "\u65e5\u672c\u8a9e\u30c6\u30b9\u30c8" | \
-// RUN:   FileCheck %s --check-prefix=UNICODE
-// RUN: iree-tokenize %p/iree-tokenize.json --info | \
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --info | \
 // RUN:   FileCheck %s --check-prefix=INFO
-// RUN: echo "hello" | iree-tokenize %p/iree-tokenize.json --batch | \
-// RUN:   FileCheck %s --check-prefix=BATCH
-// RUN: iree-tokenize %p/iree-tokenize.json --decode "0,5,6,1" | \
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --decode "0,19,21,1" | \
 // RUN:   FileCheck %s --check-prefix=DECODE
-// RUN: iree-tokenize %p/iree-tokenize.json --raw "hello world" | \
-// RUN:   FileCheck %s --check-prefix=RAW
-// RUN: iree-tokenize %p/iree-tokenize.json --raw --no_special "hello" | \
-// RUN:   FileCheck %s --check-prefix=RAW-NOSPEC
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --decode --decode_special "0,19,21,1" | \
+// RUN:   FileCheck %s --check-prefix=DECODE-SPECIAL
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --json "hello world" | \
+// RUN:   FileCheck %s --check-prefix=JSON
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --json --special=false "hello" | \
+// RUN:   FileCheck %s --check-prefix=JSON-NOSPEC
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --offsets "hello world" | \
+// RUN:   FileCheck %s --check-prefix=OFFSETS
+// RUN: iree-tokenize --tokenizer=%p/iree-tokenize.json --offsets --json "hello world" | \
+// RUN:   FileCheck %s --check-prefix=OFFSETS-JSON
 
-// Basic encoding with special tokens.
-// BASIC: {"ids":[0,5,6,1]}
+// Basic encoding with special tokens (BPE: <s> hello Ġworld </s>).
+// BASIC: 0,19,21,1
 
-// Encoding without special tokens.
-// NOSPEC: {"ids":[5]}
+// Encoding without special tokens (BPE: hello).
+// NOSPEC: 19
 
-// Unicode (Japanese) encoding: CJK chars split individually, katakana as word.
-// UNICODE: {"ids":[0,9,10,11,12,1]}
+// Tokenizer info (always JSON).
+// INFO: "vocab_size":22
+// INFO: "model_type":"BPE"
+// INFO: "merge_count":9
 
-// Tokenizer info.
-// INFO: "vocab_size":13
-// INFO: "model_type":"WordPiece"
+// Decoding back to text (default: skip special tokens).
+// DECODE: hello world
 
-// Batch mode from stdin.
-// BATCH: {"ids":[0,5,1]}
+// Decoding with special tokens included (--decode_special).
+// DECODE-SPECIAL: <s>hello world</s>
 
-// Decoding back to text.
-// DECODE: {"text":"[CLS] hello world [SEP]"}
+// JSON output with --json flag.
+// JSON: {"ids":[0,19,21,1]}
 
-// Raw output (comma-separated IDs, no JSON wrapper).
-// RAW: 0,5,6,1
+// JSON output without special tokens.
+// JSON-NOSPEC: {"ids":[19]}
 
-// Raw output without special tokens.
-// RAW-NOSPEC: 5
+// Offsets: special tokens get [0:0], model tokens get byte ranges.
+// OFFSETS: 0[0:0],19[0:5],21[5:11],1[0:0]
+
+// JSON offsets output (split to avoid FileCheck [[regex-var]] parsing).
+// OFFSETS-JSON: {"ids":[0,19,21,1],"offsets":[
+// OFFSETS-JSON-SAME: [0,0],[0,5],[5,11],[0,0]]}

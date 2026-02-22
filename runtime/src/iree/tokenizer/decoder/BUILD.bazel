@@ -1,0 +1,316 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Test Utilities
+#===------------------------------------------------------------------------===#
+
+# Shared test utilities for decoder tests.
+# Provides RAII wrappers and helpers that enforce comprehensive coverage.
+iree_runtime_cc_library(
+    name = "decoder_test_util",
+    testonly = True,
+    srcs = ["decoder_test_util.cc"],
+    hdrs = ["decoder_test_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/tokenizer:decoder",
+        "//runtime/src/iree/tokenizer/testing:test_util",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Test-Only Implementations
+#===------------------------------------------------------------------------===#
+
+# Production code uses NULL decoder for no-op.
+iree_runtime_cc_library(
+    name = "passthrough",
+    testonly = True,
+    srcs = ["passthrough.c"],
+    hdrs = ["passthrough.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "passthrough_test",
+    srcs = ["passthrough_test.cc"],
+    deps = [
+        ":decoder_test_util",
+        ":passthrough",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Decoder Implementations (Token ID -> Text)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "byte_fallback",
+    srcs = ["byte_fallback.c"],
+    hdrs = ["byte_fallback.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "byte_fallback_test",
+    srcs = ["byte_fallback_test.cc"],
+    deps = [
+        ":byte_fallback",
+        ":decoder_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "byte_level",
+    srcs = ["byte_level.c"],
+    hdrs = ["byte_level.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:byte_level_tables",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "byte_level_test",
+    srcs = ["byte_level_test.cc"],
+    deps = [
+        ":byte_level",
+        ":decoder_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "ctc",
+    srcs = ["ctc.c"],
+    hdrs = ["ctc.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "ctc_test",
+    srcs = ["ctc_test.cc"],
+    deps = [
+        ":ctc",
+        ":decoder_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "metaspace",
+    srcs = ["metaspace.c"],
+    hdrs = ["metaspace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "metaspace_test",
+    srcs = ["metaspace_test.cc"],
+    deps = [
+        ":decoder_test_util",
+        ":metaspace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "replace",
+    srcs = ["replace.c"],
+    hdrs = ["replace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "replace_test",
+    srcs = ["replace_test.cc"],
+    deps = [
+        ":decoder_test_util",
+        ":replace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "sequence",
+    srcs = ["sequence.c"],
+    hdrs = ["sequence.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "sequence_test",
+    srcs = ["sequence_test.cc"],
+    deps = [
+        ":byte_fallback",
+        ":decoder_test_util",
+        ":metaspace",
+        ":passthrough",
+        ":replace",
+        ":sequence",
+        ":strip",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "strip",
+    srcs = ["strip.c"],
+    hdrs = ["strip.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "strip_test",
+    srcs = ["strip_test.cc"],
+    deps = [
+        ":decoder_test_util",
+        ":strip",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "wordpiece",
+    srcs = ["wordpiece.c"],
+    hdrs = ["wordpiece.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "wordpiece_test",
+    srcs = ["wordpiece_test.cc"],
+    deps = [
+        ":decoder_test_util",
+        ":wordpiece",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "byte_fallback_fuzz",
+    srcs = ["byte_fallback_fuzz.cc"],
+    deps = [
+        ":byte_fallback",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "byte_level_fuzz",
+    srcs = ["byte_level_fuzz.cc"],
+    deps = [
+        ":byte_level",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "ctc_fuzz",
+    srcs = ["ctc_fuzz.cc"],
+    deps = [
+        ":ctc",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "metaspace_fuzz",
+    srcs = ["metaspace_fuzz.cc"],
+    deps = [
+        ":metaspace",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "replace_fuzz",
+    srcs = ["replace_fuzz.cc"],
+    deps = [
+        ":replace",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "strip_fuzz",
+    srcs = ["strip_fuzz.cc"],
+    deps = [
+        ":strip",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "wordpiece_fuzz",
+    srcs = ["wordpiece_fuzz.cc"],
+    deps = [
+        ":wordpiece",
+        "//runtime/src/iree/base",
+    ],
+)
