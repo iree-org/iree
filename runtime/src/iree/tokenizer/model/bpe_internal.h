@@ -302,12 +302,13 @@ typedef struct iree_tokenizer_bpe_state_t {
 // more pairs valid). "False" results depend on deferred_merge_rank and
 // cannot be safely cached.
 //
-// 256 entries × 8 bytes = 2 KB, fits in L1 cache. For CJK text where
-// pair validation takes ~14% of encode time due to multi-byte merged tokens
-// requiring recursive decomposition, caching avoids repeated L2/L3 accesses
-// to the merge hash table and split table.
+// Default capacity for the pair validation cache. Must be a power of 2.
+// 4096 entries × 8 bytes = 32 KB, which fits in L1 cache on most CPUs.
+// Larger caches (16K+) spill into L2 and regress ASCII/Code throughput;
+// smaller caches (256) have too many collisions for CJK pair sets.
+// Embedded systems with tight memory budgets can reduce this to 256.
 
-#define IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY 256
+#define IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY_DEFAULT 4096
 
 typedef struct iree_tokenizer_bpe_pair_cache_entry_t {
   uint32_t token1;  // Left token (UINT32_MAX = empty).
@@ -316,10 +317,10 @@ typedef struct iree_tokenizer_bpe_pair_cache_entry_t {
 
 // Computes the pair cache index for a (token1, token2) pair.
 // Uses a Fibonacci-hashing-style multiplicative hash for good dispersion.
-static inline uint32_t iree_tokenizer_bpe_pair_cache_index(uint32_t token1,
-                                                           uint32_t token2) {
-  return ((token1 * 0x9E3779B9u) ^ token2) &
-         (IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY - 1);
+// |capacity_mask| must be (capacity - 1) where capacity is a power of 2.
+static inline uint32_t iree_tokenizer_bpe_pair_cache_index(
+    uint32_t token1, uint32_t token2, uint32_t capacity_mask) {
+  return ((token1 * 0x9E3779B9u) ^ token2) & capacity_mask;
 }
 
 //===----------------------------------------------------------------------===//

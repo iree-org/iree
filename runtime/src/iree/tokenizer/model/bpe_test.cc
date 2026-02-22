@@ -84,10 +84,11 @@ TEST_F(BPEModelTest, StateSizeIsReasonable) {
   //   heap: 3 * 8 = 24
   //   backtrack stack: 2048 * 8 = 16,384
   //   backtrack bitfield: 33 * 8 = 264
+  //   pair cache: 4096 * 8 = 32,768
   //   word cache: 0 (disabled, vocab < 256)
   //   struct: ~128
-  //   total: ~16,824
-  EXPECT_LE(state_size, 20480u);
+  //   total: ~49,592
+  EXPECT_LE(state_size, 65536u);
 }
 
 //===----------------------------------------------------------------------===//

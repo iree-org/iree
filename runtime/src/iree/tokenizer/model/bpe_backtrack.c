@@ -774,6 +774,7 @@ void iree_tokenizer_bpe_backtrack_encode(
       iree_tokenizer_bpe_state_backtrack_bitfield(state, model);
   iree_tokenizer_bpe_pair_cache_entry_t* pair_cache =
       iree_tokenizer_bpe_state_pair_cache(state, model);
+  const uint32_t pair_cache_mask = (uint32_t)(model->pair_cache_capacity - 1);
 
   // Reset only the bitfield words dirtied by the previous segment's
   // backtracking. On the first call, dirty_mask is pre-set to all-ones by
@@ -911,7 +912,8 @@ void iree_tokenizer_bpe_backtrack_encode(
         bool suffixed_pair_ok = first_token;
         if (!suffixed_pair_ok) {
           uint32_t pi = iree_tokenizer_bpe_pair_cache_index(
-              (uint32_t)last_token, (uint32_t)suffixed_token_id);
+              (uint32_t)last_token, (uint32_t)suffixed_token_id,
+              pair_cache_mask);
           if (pair_cache[pi].token1 == (uint32_t)last_token &&
               pair_cache[pi].token2 == (uint32_t)suffixed_token_id) {
             suffixed_pair_ok = true;
@@ -993,8 +995,8 @@ void iree_tokenizer_bpe_backtrack_encode(
       // (safe for any deferred_merge_rank since relaxation is monotonic).
       bool pair_ok = first_token;
       if (!pair_ok) {
-        uint32_t pi = iree_tokenizer_bpe_pair_cache_index((uint32_t)last_token,
-                                                          (uint32_t)token);
+        uint32_t pi = iree_tokenizer_bpe_pair_cache_index(
+            (uint32_t)last_token, (uint32_t)token, pair_cache_mask);
         if (pair_cache[pi].token1 == (uint32_t)last_token &&
             pair_cache[pi].token2 == (uint32_t)token) {
           pair_ok = true;

@@ -215,7 +215,7 @@ iree_status_t iree_tokenizer_bpe_model_allocate(
     // Pair validation cache: always enabled for the backtracking path.
     // Memoizes valid (true) pair validation results to avoid repeated
     // recursive decomposition when the same token pairs recur across segments.
-    model->pair_cache_capacity = IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY;
+    model->pair_cache_capacity = IREE_TOKENIZER_BPE_PAIR_CACHE_CAPACITY_DEFAULT;
   }
 
   // Compute state size and offsets with overflow-checked math.
