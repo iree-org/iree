@@ -116,3 +116,79 @@ func.func @forall_gpu_thread_mapping_not_converted() {
 // CHECK-LABEL: @forall_gpu_thread_mapping_not_converted
 // CHECK: scf.forall
 // CHECK-NOT: pcf.loop
+
+// -----
+
+// Test folding split-reduction forall containing workgroup pcf.loop into pcf.generic.
+func.func @fold_split_reduction_into_pcf_generic(%init: tensor<16xf32>, %slice: tensor<1xf32>) -> tensor<16xf32> {
+  %c4 = arith.constant 4 : index
+  %0 = scf.forall (%id) in (4) shared_outs(%iter = %init) -> (tensor<16xf32>) {
+    %tile_init = tensor.extract_slice %iter[%id] [4] [1]
+        : tensor<16xf32> to tensor<4xf32>
+    %loop_result = pcf.loop scope(#iree_codegen.workgroup_scope<linearize>) count(%c4)
+        execute(%ref = %tile_init)[%loop_id: index]
+            : (!pcf.sref<4xf32, sync(#iree_codegen.workgroup_scope<linearize>)>)
+           -> (tensor<4xf32>) {
+      pcf.write_slice %slice into %ref[%loop_id] [1] [1]
+          : tensor<1xf32> into !pcf.sref<4xf32, sync(#iree_codegen.workgroup_scope<linearize>)>
+      pcf.return
+    }
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %loop_result into %iter[%id] [4] [1]
+          : tensor<4xf32> into tensor<16xf32>
+    }
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<0>]}
+  return %0 : tensor<16xf32>
+}
+
+// Total workgroup count = forall iterations (4) * loop count (4).
+// The arith.muli computes the product of the forall upper bound and the loop count.
+// CHECK-LABEL: @fold_split_reduction_into_pcf_generic
+//  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<16xf32>
+//  CHECK-SAME:   %[[SLICE:[A-Za-z0-9_]+]]: tensor<1xf32>
+//   CHECK-DAG:   %[[C4_A:[a-zA-Z0-9_]+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C4_B:[a-zA-Z0-9_]+]] = arith.constant 4 : index
+//       CHECK:   %[[TOTAL:.+]] = arith.muli %[[C4_B]], %[[C4_A]] : index
+//       CHECK:   iree_codegen.workgroup_count_hint(%[[TOTAL]])
+//       CHECK:   %[[GENERIC:.+]] = pcf.generic
+//       CHECK:     scope(#iree_codegen.workgroup_scope<linearize>)
+//       CHECK:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index, %{{.*}}: index]
+//       CHECK:          : (!pcf.sref<16xf32, sync(#iree_codegen.workgroup_scope<linearize>)>)
+//       CHECK:     %[[DELIN:.+]]:2 = affine.delinearize_index %[[GEN_ID]] into
+//       CHECK:     scf.forall (%{{.+}}) = (%[[DELIN]]#0)
+//       CHECK:       scf.forall (%{{.+}}) = (%[[DELIN]]#1)
+//       CHECK:         pcf.write_slice %[[SLICE]] into %[[REF]]{{.*}} [1] [1]
+//  CHECK-SAME:           into !pcf.sref<16xf32, sync(#iree_codegen.workgroup_scope<linearize>)>
+//       CHECK:     pcf.return
+//       CHECK:   return %[[GENERIC]]
+
+// -----
+
+// Non-split-reduction mapping should not be folded by the split-k pattern.
+// The workgroup forall is converted to pcf.loop, but the outer forall (with
+// local mapping) should remain unconverted.
+func.func @non_split_reduction_not_folded(%init: tensor<16xf32>, %slice: tensor<1xf32>) -> tensor<16xf32> {
+  %c4 = arith.constant 4 : index
+  %0 = scf.forall (%id) in (4) shared_outs(%iter = %init) -> (tensor<16xf32>) {
+    %tile_init = tensor.extract_slice %iter[%id] [4] [1]
+        : tensor<16xf32> to tensor<4xf32>
+    %loop_result = pcf.loop scope(#iree_codegen.workgroup_scope<linearize>) count(%c4)
+        execute(%ref = %tile_init)[%loop_id: index]
+            : (!pcf.sref<4xf32, sync(#iree_codegen.workgroup_scope<linearize>)>)
+           -> (tensor<4xf32>) {
+      pcf.write_slice %slice into %ref[%loop_id] [1] [1]
+          : tensor<1xf32> into !pcf.sref<4xf32, sync(#iree_codegen.workgroup_scope<linearize>)>
+      pcf.return
+    }
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %loop_result into %iter[%id] [4] [1]
+          : tensor<4xf32> into tensor<16xf32>
+    }
+  } {mapping = [#iree_codegen.local_mapping<0>]}
+  return %0 : tensor<16xf32>
+}
+
+// CHECK-LABEL: @non_split_reduction_not_folded
+//       CHECK:   scf.forall
+//       CHECK:     pcf.loop
+//   CHECK-NOT:   pcf.generic
