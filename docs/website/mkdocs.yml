@@ -186,8 +186,10 @@ nav:
               - TensorExt: "reference/mlir-dialects/TensorExt.md"
           - Codegen/target-specific:
               - IREECodegen: "reference/mlir-dialects/IREECodegen.md"
+              - IREECPU: "reference/mlir-dialects/IREECPU.md"
               - IREEGPU: "reference/mlir-dialects/IREEGPU.md"
               - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
+              - PCF: "reference/mlir-dialects/PCF.md"
               - VMVX: "reference/mlir-dialects/VMVX.md"
           - Optional modules:
               - Check: "reference/mlir-dialects/Check.md"
@@ -216,6 +218,7 @@ nav:
               - Common/CPU: "reference/mlir-passes/CodegenCommonCPU.md"
               - Common/GPU: "reference/mlir-passes/CodegenCommonGPU.md"
               - Dialect/GPU: "reference/mlir-passes/CodegenDialectGPU.md"
+              - Dialect/PCF: "reference/mlir-passes/CodegenDialectPCF.md"
               - Dialect/VectorExt: "reference/mlir-passes/CodegenDialectVectorExt.md"
               - LLVMCPU: "reference/mlir-passes/CodegenLLVMCPU.md"
               - LLVMGPU: "reference/mlir-passes/CodegenLLVMGPU.md"
