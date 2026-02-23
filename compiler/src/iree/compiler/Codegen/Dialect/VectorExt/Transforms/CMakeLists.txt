@@ -49,7 +49,6 @@ iree_cc_library(
     MLIRTransforms
     MLIRUBDialect
     MLIRVectorDialect
-    MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Dialect::LinalgExt::IR

@@ -72,8 +72,6 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
 
 void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
 
-void populateVectorMaskLoweringPatterns(RewritePatternSet &patterns);
-
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_TRANSFORMS_H_

@@ -282,7 +282,6 @@ void GenericVectorizationPass::runOnOperation() {
   if (enableVectorMasking) {
     vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
         vectorizationPatterns);
-    IREE::VectorExt::populateVectorMaskLoweringPatterns(vectorizationPatterns);
     vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
                               linalg::LinalgCopyVTWForwardingPattern>(
         funcOp.getContext(), /*benefit=*/2);

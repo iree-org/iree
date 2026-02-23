@@ -10,7 +10,6 @@
 include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
-include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -119,7 +118,6 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
 def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
-    DeclareOpInterfaceMethods<MaskableOpInterface>,
     AttrSizedOperandSegments,
     TypesMatchWith<"padding type must match source element type",
                    "base", "padding", "getElementTypeOrSelf($_self)">
@@ -180,9 +178,6 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
   }];
 
   let extraClassDeclaration = [{
-    // MaskableOpInterface methods.
-    bool supportsPassthru() { return true; }
-
     SmallVector<AffineMap> getIndexingMapsArray() {
       return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
     }

@@ -42,7 +42,6 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRControlFlowInterfaces
     MLIRIR
-    MLIRMaskableOpInterface
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect

@@ -13,7 +13,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -399,13 +398,6 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
-Value maskOperation(RewriterBase &rewriter, Operation *op, Value mask) {
-  Value maskedOp =
-      cast<vector::MaskOp>(mlir::vector::maskOperation(rewriter, op, mask))
-          .getResult(0);
-  return maskedOp;
-}
-
 LogicalResult
 vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
                                          IREE::LinalgExt::GatherOp gatherOp,
@@ -453,7 +445,10 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   Value indicesMask = vector::CreateMaskOp::create(
       rewriter, loc, indicesMaskType,
       ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
-  Value indicesVec = maskOperation(rewriter, indicesVecRead, indicesMask);
+  rewriter.modifyOpInPlace(indicesVecRead, [&] {
+    indicesVecRead.getMaskMutable().assign(indicesMask);
+  });
+  Value indicesVec = indicesVecRead.getResult();
   indicesVec =
       arith::IndexCastOp::create(rewriter, loc, indicesVecTy, indicesVec);
 
@@ -485,21 +480,32 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
 
   SmallVector<AffineMap> indexingMaps = {sourceMap, indexVecMap};
 
-  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
-      rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseOffsets,
-      ValueRange{indicesVec}, rewriter.getAffineMapArrayAttr(indexingMaps),
-      padding, /*mask=*/Value());
-
   VectorType gatherMaskType = gatherVectorTy.clone(rewriter.getI1Type());
   Value gatherMask =
       vector::CreateMaskOp::create(rewriter, loc, gatherMaskType, gatherDims);
-  Value maskedGather = maskOperation(rewriter, transferGatherOp, gatherMask);
+
+  // Add a mask indexing map (identity) to the indexing_maps.
+  // TODO: symbolCount is hardcoded to 1 because indexDepth != 1 bails out
+  // above. All indexing maps must share the same symbol count (= number of
+  // index vecs). Update this when indexDepth > 1 is supported.
+  AffineMap maskMap =
+      AffineMap::getMultiDimIdentityMap(vectorRank, rewriter.getContext());
+  maskMap = AffineMap::get(vectorRank, /*symbolCount=*/1, maskMap.getResults(),
+                           rewriter.getContext());
+  indexingMaps.push_back(maskMap);
+
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseOffsets,
+      ValueRange{indicesVec}, rewriter.getAffineMapArrayAttr(indexingMaps),
+      padding, /*mask=*/gatherMask);
   SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
   auto writeOp = vector::TransferWriteOp::create(
-      rewriter, loc, maskedGather, gatherOp.getOutput(), writeIndices);
-  Value maskedWrite = maskOperation(rewriter, writeOp, gatherMask);
+      rewriter, loc, transferGatherOp.getResult(), gatherOp.getOutput(),
+      writeIndices);
+  rewriter.modifyOpInPlace(
+      writeOp, [&] { writeOp.getMaskMutable().assign(gatherMask); });
 
-  rewriter.replaceOp(gatherOp, maskedWrite);
+  rewriter.replaceOp(gatherOp, writeOp.getResult());
   return success();
 }
 
@@ -629,52 +635,6 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
 
   rewriter.replaceOp(argCompareOp, results);
   return success();
-}
-
-/// Lowers vector.mask %mask { iree_vector_ext.transfer_gather }
-///  into
-/// iree_vector_ext.transfer_gather %mask
-///
-/// Ideally, the mask should have just been put on transfer_gather directly,
-/// but this is done this way to match upstream vector.transfer_read masking.
-struct MaskedTransferGatherOpPattern : public OpRewritePattern<vector::MaskOp> {
-public:
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::MaskOp maskOp,
-                                PatternRewriter &rewriter) const override {
-    auto gatherOp = dyn_cast<TransferGatherOp>(maskOp.getMaskableOp());
-    if (!gatherOp) {
-      return failure();
-    }
-    // TODO: The 'vector.mask' passthru is a vector and 'transfer_gather'
-    // expects a scalar. We could only lower one to the other for cases where
-    // the passthru is a broadcast of a scalar.
-    if (maskOp.hasPassthru()) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "can't lower passthru to transfer_gather");
-    }
-    // Add a mask indexing map (identity) to the existing indexing_maps.
-    SmallVector<AffineMap> indexingMaps = gatherOp.getIndexingMapsArray();
-    int64_t vectorRank = gatherOp.getVector().getType().getRank();
-    int64_t numSymbols = gatherOp.getIndexVecs().size();
-    AffineMap maskMap =
-        AffineMap::getMultiDimIdentityMap(vectorRank, rewriter.getContext());
-    maskMap = AffineMap::get(vectorRank, numSymbols, maskMap.getResults(),
-                             rewriter.getContext());
-    indexingMaps.push_back(maskMap);
-
-    rewriter.replaceOpWithNewOp<TransferGatherOp>(
-        maskOp, gatherOp.getVector().getType(), gatherOp.getBase(),
-        gatherOp.getOffsets(), gatherOp.getIndexVecs(),
-        rewriter.getAffineMapArrayAttr(indexingMaps), gatherOp.getPadding(),
-        maskOp.getMask());
-    return success();
-  }
-};
-
-void populateVectorMaskLoweringPatterns(RewritePatternSet &patterns) {
-  patterns.add<MaskedTransferGatherOpPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

@@ -61,12 +61,6 @@ void TransferGatherOp::getEffects(
   }
 }
 
-// MaskableOpInterface methods.
-
-Type TransferGatherOp::getExpectedMaskType() {
-  return getVector().getType().clone(IntegerType::get(getContext(), 1));
-}
-
 // Verifier.
 
 LogicalResult TransferGatherOp::verify() {
