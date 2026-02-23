@@ -1790,10 +1790,14 @@ struct DistributeBatchOuterToLayoutConversions final
   }
 };
 
-// Distributes vector.step across threads/subgroups according to a nested
-// layout. For packed shape [S, B, O, T, E] with row-major strides, each
-// thread gets a vector of B*O*E offsets computed from the batch/outer/element
-// positions, plus runtime contributions from subgroup and thread indices.
+/// Distributes vector.step to:
+///
+/// %elements = vector.step
+/// %batch_outer_strides = arith.constant
+/// %base = %outer_elements + %element_step
+/// %thread_contrib = %thread_id * %thread_stride
+/// %subgroup_contrib = %subgroup_id * %subgroup_stride
+/// %index = %base + %thread_contrib + %subgroup_contrib
 struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
@@ -1832,7 +1836,7 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     int64_t threadStride = E;
 
     int64_t BO = B * O;
-    auto indexType = rewriter.getIndexType();
+    IndexType indexType = rewriter.getIndexType();
     VectorType workType = VectorType::get({BO, E}, indexType);
 
     // Inner element step: preserves contiguity information.
@@ -1860,12 +1864,8 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     Value val = arith::AddIOp::create(rewriter, loc, outerBcast, stepBcast);
 
     // Add runtime subgroup and thread contributions.
-    struct IdStride {
-      Value id;
-      int64_t stride;
-    };
-    for (auto [id, stride] : {IdStride{subgroupIndices[0], sgStride},
-                              IdStride{threadIndices[0], threadStride}}) {
+    for (auto [id, stride] : {std::pair{subgroupIndices[0], sgStride},
+                              std::pair{threadIndices[0], threadStride}}) {
       if (stride == 0) {
         continue;
       }
