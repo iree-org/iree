@@ -70,13 +70,8 @@ static Value extractVecSlice(OpBuilder &b, Location loc, Value vec,
   auto vecType = cast<VectorType>(vec.getType());
   int64_t rank = vecType.getRank();
 
-  if (rank == 1) {
-    // Extracting from rank-1 along axis 0 gives a scalar.
-    return vector::ExtractOp::create(b, loc, vec, SmallVector<int64_t>{idx});
-  }
-
   if (axis == 0) {
-    // vector.extract %vec[idx] drops the leading dim.
+    // Extracting from rank-1 along axis 0 gives a scalar.
     return vector::ExtractOp::create(b, loc, vec, SmallVector<int64_t>{idx});
   }
 
