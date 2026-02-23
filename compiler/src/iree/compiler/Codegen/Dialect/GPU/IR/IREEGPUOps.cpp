@@ -15,6 +15,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -71,6 +72,16 @@ LogicalResult BarrierRegionOp::verifyRegions() {
   }
 
   return success();
+}
+
+SmallVector<Region *> BarrierRegionOp::getHoistableRegions() {
+  return {&getBodyRegion()};
+}
+
+// We only need it to be memory effect free, not speculatable, as this
+// region is guaranteed to execute.
+bool BarrierRegionOp::isHoistable(Operation *op) {
+  return isMemoryEffectFree(op);
 }
 
 //===----------------------------------------------------------------------===//

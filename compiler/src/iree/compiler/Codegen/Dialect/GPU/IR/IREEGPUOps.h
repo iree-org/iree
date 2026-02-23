@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"

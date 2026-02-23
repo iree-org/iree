@@ -16,7 +16,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -737,10 +737,6 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
   //
   // Hoisting is only performed on operations with guaranteed non-zero trip
   // counts.
-  //
-  // TODO: We should really just convert this into an interface. Hoisting
-  // is more general than just loops, because we have so many "inline" region
-  // ops.
   target->walk([&](Operation *hoistable) {
     llvm::TypeSwitch<Operation *>(hoistable)
         .Case<LoopLikeOpInterface>([&](LoopLikeOpInterface loopLike) {
@@ -794,43 +790,18 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
 
           moveLoopInvariantCode(loopLike);
         })
-        .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp) {
-          // linalg.generic operations are also loop-like, but they don't have
-          // LoopLikeOpInterface implemented for them.
-          // Ideally, we should be checking if the linalg.generic op has a trip
-          // count of zero, but while that is possible and can be written using
-          // ValueBoundsConstraintSet, it is usually not needed. Unlike loops,
-          // which can have arbitary operations inside them, the loop invariant
-          // operations inside a linalg.generic operations are usually
-          // operations performed on scalars. Hoisting scalar constants does not
-          // have a big cost even if the trip count is zero.
-          moveLoopInvariantCode(
-              &genericOp.getBodyRegion(),
-              [&](Value value, Region *) {
-                return !genericOp->isAncestor(
-                    value.getParentRegion()->getParentOp());
-              },
-              [&](Operation *op, Region *) {
-                return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
-                       isSpeculatable(op);
-              },
-              [&](Operation *op, Region *) { op->moveBefore(genericOp); });
-        })
-        .Case<IREE::GPU::BarrierRegionOp>(
-            [&](IREE::GPU::BarrierRegionOp barrierRegion) {
+        .Case<IREE::Codegen::HoistableRegionOpInterface>(
+            [&](IREE::Codegen::HoistableRegionOpInterface hoistableOp) {
               moveLoopInvariantCode(
-                  &barrierRegion.getBodyRegion(),
+                  hoistableOp.getHoistableRegions(),
                   [&](Value value, Region *) {
-                    return !barrierRegion->isAncestor(
-                        value.getParentRegion()->getParentOp());
+                    return hoistableOp.isDefinedOutsideOfRegions(value);
                   },
                   [&](Operation *op, Region *) {
-                    // We only need it to be memory effect free, not
-                    // speculatable, as this region always executes.
-                    return isMemoryEffectFree(op);
+                    return hoistableOp.isHoistable(op);
                   },
                   [&](Operation *op, Region *) {
-                    op->moveBefore(barrierRegion);
+                    op->moveBefore(hoistableOp);
                   });
             });
   });
