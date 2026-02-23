@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/PatternMatch.h"
@@ -168,8 +169,7 @@ struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
     }
 
     // Initialize accumulator.
-    Value acc = arith::ConstantOp::create(rewriter, loc, resultType,
-                                          rewriter.getZeroAttr(resultType));
+    Value acc = ub::PoisonOp::create(rewriter, loc, resultType);
 
     for (int64_t i = 0; i < dim0Size; ++i) {
       // Compute new base offsets.
