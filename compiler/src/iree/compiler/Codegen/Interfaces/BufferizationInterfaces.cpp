@@ -718,13 +718,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   // The scalar code support (i.e., `generateScalarImplementation`) is not yet
   // upstreamed, so the lowering path is not working.
   // TODO(#20030): Remove once IREE's pack/unpack ops are fully upstreamed.
-  registry.insert<linalg::LinalgDialect>();
-  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
-    linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
-        *ctx);
-    linalg::UnPackOp::attachInterface<PackUnPackOpInterface<linalg::UnPackOp>>(
-        *ctx);
-  });
+  // registry.insert<linalg::LinalgDialect>();
+  // registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+  //   linalg::PackOp::attachInterface<PackUnPackOpInterface<linalg::PackOp>>(
+  //       *ctx);
+  //   linalg::UnPackOp::attachInterface<PackUnPackOpInterface<linalg::UnPackOp>>(
+  //       *ctx);
+  // });
 
   arith::registerBufferizableOpInterfaceExternalModels(registry);
   linalg::registerBufferizableOpInterfaceExternalModels(registry);
