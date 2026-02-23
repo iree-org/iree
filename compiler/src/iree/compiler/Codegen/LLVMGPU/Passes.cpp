@@ -853,6 +853,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
 
+  // Preprocessing for vector distribution.
+  funcPassManager.addPass(createLLVMGPUResolveVectorMaskingPass());
+
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapStorePass());
