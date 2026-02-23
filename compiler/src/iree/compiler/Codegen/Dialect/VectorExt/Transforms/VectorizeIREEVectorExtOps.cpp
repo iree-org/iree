@@ -418,13 +418,7 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
     return failure();
   }
 
-  // TODO: There is no 1-to-1 conversion between `iree_linalg_ext.gather` and
-  // `iree_vector_ext.transfer_gather` if the batch rank is > 1. Maybe support
-  // unrolling the batch dimension in the future.
-  if (gatherOp.getBatchRank() > 1) {
-    return failure();
-  }
-
+  int64_t batchRank = gatherOp.getBatchRank();
   auto loc = gatherOp.getLoc();
   RewriterBase::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(gatherOp);
@@ -472,16 +466,19 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   for (int64_t i = 1; i < sourceRank; ++i) {
     // Map remaining source dims to corresponding vector dims.
     // The batch dims come first, so source dim i maps to vector dim
-    // (i - 1 + batchRank). For batchRank <= 1 and indexDepth == 1,
-    // source dim i maps to vector dim i.
-    sourceMapExprs.push_back(getAffineDimExpr(i, ctx));
+    // (i - 1 + batchRank).
+    sourceMapExprs.push_back(getAffineDimExpr(i - 1 + batchRank, ctx));
   }
   AffineMap sourceMap =
       AffineMap::get(vectorRank, /*symbolCount=*/1, sourceMapExprs, ctx);
 
-  // Index vec map: (vector_dims)[s0] -> (d0) for batch_rank == 1
-  AffineMap indexVecMap = AffineMap::get(vectorRank, /*symbolCount=*/1,
-                                         {getAffineDimExpr(0, ctx)}, ctx);
+  // Index vec map: (vector_dims)[s0] -> (d0, ..., d_{batchRank-1})
+  SmallVector<AffineExpr> indexVecMapExprs;
+  for (int64_t i = 0; i < batchRank; ++i) {
+    indexVecMapExprs.push_back(getAffineDimExpr(i, ctx));
+  }
+  AffineMap indexVecMap =
+      AffineMap::get(vectorRank, /*symbolCount=*/1, indexVecMapExprs, ctx);
 
   SmallVector<AffineMap> indexingMaps = {sourceMap, indexVecMap};
 

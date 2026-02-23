@@ -100,19 +100,60 @@ func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<1
 
 // -----
 
-func.func @linalg_ext_gather_no_vectorize_multi_batch(%source : tensor<1024x128xi32>, %indices : tensor<32x32xi32>) -> (tensor<32x32x128xi32>) {
+func.func @linalg_ext_gather_multi_batch(%source : tensor<1024x128xi32>, %indices : tensor<32x32xi32>) -> (tensor<32x32x128xi32>) {
   %empty = tensor.empty() : tensor<32x32x128xi32>
   %result = iree_linalg_ext.gather dimension_map = [0]
     ins(%source, %indices : tensor<1024x128xi32>, tensor<32x32xi32>)
     outs(%empty: tensor<32x32x128xi32>)  -> tensor<32x32x128xi32>
   return %result : tensor<32x32x128xi32>
 }
-// CHECK-LABEL: @linalg_ext_gather_no_vectorize_multi_batch
+// CHECK-LABEL: @linalg_ext_gather_multi_batch
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
-//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]]
-//       CHECK:   return %[[GATHER]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[PAD:.+]] = ub.poison
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[ARG1]][%[[C0]], %[[C0]]], %[[PAD]]
+//  CHECK-SAME:     : tensor<32x32xi32>, vector<32x32xi32>
+//       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
+//       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
+//  CHECK-SAME:     [%[[C0]], %[[C0]]] [%[[CAST]] : vector<32x32xindex>]
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
+//  CHECK-SAME:                      affine_map<(d0, d1, d2)[s0] -> (d0, d1)>]
+
+// -----
+
+func.func @linalg_ext_gather_multi_batch_masked(%source : tensor<?x128xi32>, %indices : tensor<?x?xi32>) -> (tensor<?x?x128xi32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim0 = tensor.dim %indices, %c0 : tensor<?x?xi32>
+  %dim1 = tensor.dim %indices, %c1 : tensor<?x?xi32>
+  %dim0_ub = util.assume.int %dim0[<umin = 1, umax = 32>] : index
+  %dim1_ub = util.assume.int %dim1[<umin = 1, umax = 32>] : index
+  %empty = tensor.empty(%dim0_ub, %dim1_ub) : tensor<?x?x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+    ins(%source, %indices : tensor<?x128xi32>, tensor<?x?xi32>)
+    outs(%empty: tensor<?x?x128xi32>) -> tensor<?x?x128xi32>
+  return %result : tensor<?x?x128xi32>
+}
+
+// CHECK-LABEL: @linalg_ext_gather_multi_batch_masked
+//  CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
+//  CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+//  CHECK: %[[DIM0:.+]] = tensor.dim %[[INDICES]], %[[C0]]
+//  CHECK: %[[DIM1:.+]] = tensor.dim %[[INDICES]], %[[C1]]
+//  CHECK: %[[DIM0_UB:.+]] = util.assume.int %[[DIM0]]
+//  CHECK: %[[DIM1_UB:.+]] = util.assume.int %[[DIM1]]
+//  CHECK: %[[INDICES_MASK:.+]] = vector.create_mask %[[DIM0_UB]], %[[DIM1_UB]]
+//  CHECK: vector.transfer_read %[[INDICES]]
+//  CHECK-SAME: %[[INDICES_MASK]]
+//  CHECK: %[[MASK:.+]] = vector.create_mask %[[DIM0_UB]], %[[DIM1_UB]], %[[C128]]
+//  CHECK: iree_vector_ext.transfer_gather %[[SOURCE]]
+//  CHECK-SAME: %[[MASK]]
+//  CHECK-SAME: indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
+//  CHECK-SAME:                  affine_map<(d0, d1, d2)[s0] -> (d0, d1)>,
 
 // -----
 
