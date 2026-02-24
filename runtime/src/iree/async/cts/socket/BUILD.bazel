@@ -1,0 +1,210 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for socket operations.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Socket lifecycle tests: create, bind, listen, connect, accept, send/recv, IPv6.
+iree_runtime_cc_library(
+    name = "lifecycle_test",
+    testonly = True,
+    srcs = ["lifecycle_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Large transfer, concurrent connections, scatter-gather tests.
+iree_runtime_cc_library(
+    name = "tcp_transfer_test",
+    testonly = True,
+    srcs = ["tcp_transfer_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Shutdown, reset, bind/listen error tests.
+iree_runtime_cc_library(
+    name = "tcp_control_test",
+    testonly = True,
+    srcs = ["tcp_control_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Connected and unconnected UDP tests.
+iree_runtime_cc_library(
+    name = "udp_test",
+    testonly = True,
+    srcs = ["udp_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Zero-copy send/recv tests (requires zerocopy tag).
+iree_runtime_cc_library(
+    name = "zerocopy_test",
+    testonly = True,
+    srcs = ["zerocopy_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Multishot accept/recv tests (requires multishot tag).
+iree_runtime_cc_library(
+    name = "multishot_test",
+    testonly = True,
+    srcs = ["multishot_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# POSIX-specific tests (SCM_RIGHTS, etc).
+iree_runtime_cc_library(
+    name = "posix_test",
+    testonly = True,
+    srcs = ["posix_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+        "//runtime/src/iree/base",
+    ],
+    alwayslink = True,
+)
+
+# Send flags tests: zero-copy send (SEND_ZC), MSG_MORE flag behavior.
+iree_runtime_cc_library(
+    name = "send_flags_test",
+    testonly = True,
+    srcs = ["send_flags_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Cross-proactor MESSAGE tests: proactor-to-proactor communication.
+iree_runtime_cc_library(
+    name = "message_test",
+    testonly = True,
+    srcs = ["message_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+    ],
+    alwayslink = True,
+)
+
+# Windows-specific tests (SOCKET handle import, getsockopt verification).
+iree_runtime_cc_library(
+    name = "win32_test",
+    testonly = True,
+    srcs = ["win32_test.cc"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:socket_test_base",
+        "//runtime/src/iree/base",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All socket tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":lifecycle_test",
+        ":message_test",
+        ":multishot_test",
+        ":send_flags_test",
+        ":tcp_control_test",
+        ":tcp_transfer_test",
+        ":udp_test",
+        ":zerocopy_test",
+    ] + select({
+        "@platforms//os:windows": [":win32_test"],
+        "@platforms//os:linux": [":posix_test"],
+        "@platforms//os:macos": [":posix_test"],
+        "//conditions:default": [],
+    }),
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Socket benchmarks: roundtrip latency, throughput, accept rate, zero-copy.
+iree_runtime_cc_library(
+    name = "socket_benchmark",
+    testonly = True,
+    srcs = ["socket_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All socket benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":socket_benchmark",
+    ],
+)

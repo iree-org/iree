@@ -29,6 +29,7 @@ iree_cc_library(
     "Transforms.h"
   SRCS
     "BufferizationInterfaces.cpp"
+    "LowerTransferGatherOps.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"

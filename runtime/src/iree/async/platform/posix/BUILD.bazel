@@ -1,0 +1,107 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# POSIX proactor backend using poll() + worker thread pool.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "posix",
+    srcs = [
+        "event_set_epoll.c",
+        "event_set_kqueue.c",
+        "event_set_poll.c",
+        "fd_map.c",
+        "fence.c",
+        "poll_set.c",
+        "proactor.c",
+        "relay.c",
+        "signal.c",
+        "socket.c",
+        "wake.c",
+        "worker.c",
+    ],
+    hdrs = [
+        "api.h",
+        "compat.h",
+        "event_set.h",
+        "fd_map.h",
+        "fence.h",
+        "poll_set.h",
+        "proactor.h",
+        "relay.h",
+        "signal.h",
+        "socket.h",
+        "wake.h",
+        "worker.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":timer_list",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/util:completion_pool",
+        "//runtime/src/iree/async/util:message_pool",
+        "//runtime/src/iree/async/util:ready_pool",
+        "//runtime/src/iree/async/util:sequence_emulation",
+        "//runtime/src/iree/async/util:signal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
+    ] + select({
+        "//build_tools/bazel:iree_is_linux": [
+            "//runtime/src/iree/async/platform/linux:signal",
+        ],
+        "//build_tools/bazel:iree_is_android": [
+            "//runtime/src/iree/async/platform/linux:signal",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+iree_runtime_cc_library(
+    name = "timer_list",
+    srcs = ["timer_list.c"],
+    hdrs = ["timer_list.h"],
+    target_compatible_with = select({
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "timer_list_test",
+    srcs = ["timer_list_test.cc"],
+    target_compatible_with = select({
+        "@platforms//os:android": [],
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":timer_list",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

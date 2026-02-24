@@ -1,0 +1,103 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS utility infrastructure: registry, test base, benchmark base.
+#
+# This directory contains the shared infrastructure for the Conformance Test
+# Suite (CTS). Test logic lives in separate category directories (socket/,
+# core/, etc.) while this directory provides the foundation.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+# Main entry points for CTS binaries.
+exports_files([
+    "test_main.cc",
+    "benchmark_main.cc",
+])
+
+#===------------------------------------------------------------------------===#
+# Registry system
+#===------------------------------------------------------------------------===#
+
+# CTS registry for link-time test composition.
+# Test suites and backends register at static init time; main() calls
+# InstantiateAll() to create gtest parameterized test instances.
+iree_runtime_cc_library(
+    name = "registry",
+    testonly = True,
+    srcs = ["registry.cc"],
+    hdrs = ["registry.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Test infrastructure
+#===------------------------------------------------------------------------===#
+
+# Socket test initialization helpers. Separated from test_base to allow
+# test_base.h to include it without circular dependencies.
+iree_runtime_cc_library(
+    name = "socket_test_util",
+    testonly = True,
+    hdrs = ["socket_test_util.h"],
+    deps = [
+        "//runtime/src/iree/async",
+    ],
+)
+
+# Header-only test base library: CtsTestBase fixture and helper utilities.
+# For socket tests, use socket_test_base instead (adds socket helpers).
+iree_runtime_cc_library(
+    name = "test_base",
+    testonly = True,
+    hdrs = ["test_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+# Extended test base for socket tests.
+# Adds CreateListener(), EstablishConnection(), and other socket helpers.
+iree_runtime_cc_library(
+    name = "socket_test_base",
+    testonly = True,
+    hdrs = ["socket_test_base.h"],
+    deps = [
+        ":socket_test_util",
+        ":test_base",
+        "//runtime/src/iree/async",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark infrastructure
+#===------------------------------------------------------------------------===#
+
+# Header-only benchmark base library: shared infrastructure for benchmarks.
+iree_runtime_cc_library(
+    name = "benchmark_base",
+    testonly = True,
+    hdrs = ["benchmark_base.h"],
+    deps = [
+        ":registry",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base/threading",
+        "@com_google_benchmark//:benchmark",
+    ],
+)

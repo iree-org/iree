@@ -1770,152 +1770,21 @@ struct DistributeBatchOuterToLayoutConversions final
   }
 };
 
-// This is a helper to extract strides from a given shape
-// E.g. : a shape of 2x3x4 will return strides [12, 4, 1]
-static SmallVector<int64_t> getStrides(ArrayRef<int64_t> shape) {
-  int64_t elementCount = ShapedType::getNumElements(shape);
-  SmallVector<int64_t> strides;
-  int64_t currStride = elementCount;
-  for (int64_t len : shape) {
-    currStride = currStride / len;
-    strides.push_back(currStride);
-  }
-  return strides;
-}
-
+/// Distributes vector.step to:
+///
+/// %elements = vector.step
+/// %batch_outer_strides = arith.constant
+/// %base = %outer_elements + %element_step
+/// %thread_contrib = %thread_id * %thread_stride
+/// %subgroup_contrib = %subgroup_id * %subgroup_stride
+/// %index = %base + %thread_contrib + %subgroup_contrib
 struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   using OpDistributionPattern::OpDistributionPattern;
-
-  // This is a helper aggregate
-  // to hold the information about
-  // a dimension.
-  // For e.g. : 3x4x2 shape will
-  // have lengths = [3, 4, 2]
-  // and strides = [8, 2, 1]
-  struct DimInfo {
-    std::optional<Value> dimIdx;
-    int64_t dimLen;
-    int64_t dimStride;
-  };
-
-  // This is a helper function to extract the remaining
-  // dimensions with their original strides once the
-  // distributed dimensions are extracted out
-  //         threads
-  //          V
-  // E.g. 3 x 4 x 2
-  // This will return back remaining dimensions that
-  // have lengths = [3, 2] and strides = [8, 1]
-  SmallVector<DimInfo> getRemainingDims(ArrayRef<DimInfo> distributedStrides,
-                                        int64_t originalLen) const {
-    SmallVector<DimInfo> remainingDims;
-    int64_t currLen = originalLen;
-    for (const DimInfo &dInfo : distributedStrides) {
-      if (dInfo.dimStride != 0) {
-        int64_t dStride = dInfo.dimStride;
-        int64_t dLen = dInfo.dimLen;
-        int64_t higherStride = dLen * dStride;
-        if (higherStride < currLen) {
-          remainingDims.push_back(
-              {std::nullopt, currLen / higherStride, higherStride});
-        }
-        currLen = dStride;
-      }
-    }
-    remainingDims.push_back({std::nullopt, currLen, 1});
-    return remainingDims;
-  }
-
-  // This is a helper to extract lengths of all dimensions
-  SmallVector<int64_t> getLens(ArrayRef<DimInfo> dimInfos) const {
-    SmallVector<int64_t> lens;
-    lens.reserve(dimInfos.size());
-    for (const DimInfo &dInfo : dimInfos) {
-      lens.push_back(dInfo.dimLen);
-    }
-    return lens;
-  }
-
-  // Once we are in the realm of remaining dimensions,
-  // the strides are not packed. This is a helper to
-  // obtain the packed strides of the remaining dimensions.
-  // (See above for an example of remaining dimensions under
-  //  getRemainingDims)
-  SmallVector<int64_t> getPackedStrides(ArrayRef<DimInfo> dims) const {
-    SmallVector<int64_t> lens = getLens(dims);
-    return getStrides(lens);
-  }
-
-  // This function emulates the slicing of otherwise large constant
-  // across threads and subgroups.
-  VectorValue generateSlicedStep(OpBuilder &builder, Location loc,
-                                 ArrayRef<DimInfo> distributedDims,
-                                 int64_t distributedLen,
-                                 int64_t originalLen) const {
-    SmallVector<DimInfo> remainingDims =
-        getRemainingDims(distributedDims, originalLen);
-    SmallVector<int64_t> remainingPackedStrides =
-        getPackedStrides(remainingDims);
-
-    SmallVector<APInt> offsets;
-    offsets.reserve(distributedLen);
-    // As for a complex example what the following
-    // maths would achieve:
-    //    wave
-    //     |   threads
-    //     V   V
-    // 2 x 3 x 4 x 2 = 0 1 2 .... 48
-    // say vector.step : vector<48xindex> is to be distributed.
-    // --------------------------------------------------------
-    // The the distribution should be as follows:
-    // wave0:
-    // t0: 0 1 24 25
-    // t1: 2 3 26 27
-    // t2: 4 5 28 29
-    // t4: 6 7 30 31
-    //
-    // wave1:
-    // t0: 8 9 32 33
-    // t1: 10 11 34 35
-    // t2: 12 13 36 37
-    // t4: 14 15 38 39
-    // ... etc
-    //
-    // So wave0 & t0 value this constant offset that we generate
-    // below initially. Then followed by thread and subgroup weighted
-    // addition that is weighted by their stride.
-    for (size_t i = 0; i < distributedLen; i++) {
-      int64_t offset = 0;
-      for (const auto &[dimInfo, packedStride] :
-           zip(remainingDims, remainingPackedStrides)) {
-        offset += ((i / packedStride) % dimInfo.dimLen) * dimInfo.dimStride;
-      }
-      offsets.push_back(APInt(/*width=*/64, offset));
-    }
-    VectorType offsetType =
-        VectorType::get({distributedLen}, builder.getIndexType());
-    auto constOffset = arith::ConstantOp::create(
-        builder, loc, DenseElementsAttr::get(offsetType, offsets));
-    Value finalOffset = constOffset;
-    for (const DimInfo &dimInfo : distributedDims) {
-      assert(dimInfo.dimIdx.has_value());
-      if (dimInfo.dimStride != 0) {
-        auto strideVal =
-            arith::ConstantIndexOp::create(builder, loc, dimInfo.dimStride);
-        auto dimIdxOffsetPerElem = arith::MulIOp::create(
-            builder, loc, strideVal, dimInfo.dimIdx.value());
-        auto dimIdxOffset = vector::BroadcastOp::create(
-            builder, loc, offsetType, dimIdxOffsetPerElem);
-        finalOffset =
-            arith::AddIOp::create(builder, loc, finalOffset, dimIdxOffset);
-      }
-    }
-    return cast<VectorValue>(finalOffset);
-  }
 
   DistributeStep(MLIRContext *context, Value threadId, int64_t subgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
+
   LogicalResult matchAndRewrite(vector::StepOp stepOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
@@ -1935,34 +1804,64 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
           stepOp, "warp or thread tiles have overlapping strides");
     }
 
-    SmallVector<int64_t> undistributedShape =
-        resultLayout.getUndistributedPackedShape();
-    SmallVector<int64_t> undistributedStrides = getStrides(undistributedShape);
-    constexpr int64_t subgroupIdx = 0;
-    constexpr int64_t threadIdx = 3;
+    // Packed shape is [S, B, O, T, E] for this rank-1 vector.
+    SmallVector<int64_t> packed = resultLayout.getUndistributedPackedShape();
+    int64_t B = packed[1], O = packed[2];
+    int64_t T = packed[3], E = packed[4];
 
-    ArrayRef<int64_t> subgroupLengths = resultLayout.getSubgroupTile();
-    ArrayRef<int64_t> threadLengths = resultLayout.getThreadTile();
-    // Step op by definition should be single dimensional.
+    // Row-major strides of [S, B, O, T, E].
+    int64_t sgStride = B * O * T * E;
+    int64_t batchStride = O * T * E;
+    int64_t outerStride = T * E;
+    int64_t threadStride = E;
+
+    int64_t BO = B * O;
+    IndexType indexType = rewriter.getIndexType();
+    VectorType workType = VectorType::get({BO, E}, indexType);
+
+    // Inner element step: preserves contiguity information.
+    auto step =
+        vector::StepOp::create(rewriter, loc, VectorType::get({E}, indexType));
+    auto stepBcast = vector::BroadcastOp::create(rewriter, loc, workType, step);
+
+    // Outer (b, o) offsets constant.
+    SmallVector<APInt> outerOffsets;
+    outerOffsets.reserve(BO);
+    for (int64_t b = 0; b < B; ++b) {
+      for (int64_t o = 0; o < O; ++o) {
+        outerOffsets.push_back(APInt(64, b * batchStride + o * outerStride));
+      }
+    }
+    auto outerConst = arith::ConstantOp::create(
+        rewriter, loc,
+        DenseElementsAttr::get(VectorType::get({BO}, indexType), outerOffsets));
+    auto outer2d = vector::ShapeCastOp::create(
+        rewriter, loc, VectorType::get({BO, 1}, indexType), outerConst);
+    auto outerBcast =
+        vector::BroadcastOp::create(rewriter, loc, workType, outer2d);
+
+    // Combine: base = outer_offsets + element_step.
+    Value val = arith::AddIOp::create(rewriter, loc, outerBcast, stepBcast);
+
+    // Add runtime subgroup and thread contributions.
+    for (auto [id, stride] : {std::pair{subgroupIndices[0], sgStride},
+                              std::pair{threadIndices[0], threadStride}}) {
+      if (stride == 0) {
+        continue;
+      }
+      auto strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
+      auto scaled = arith::MulIOp::create(rewriter, loc, strideVal, id);
+      auto bcast = vector::BroadcastOp::create(rewriter, loc, workType, scaled);
+      val = arith::AddIOp::create(rewriter, loc, val, bcast);
+    }
+
+    // Shape-cast from [B*O, E] to distributed shape [B, O, E].
     SmallVector<int64_t> distributedShape =
         signature[result].getDistributedShape();
-
-    int64_t distributedElements = ShapedType::getNumElements(distributedShape);
-    int64_t originalElements = result.getType().getNumElements();
-    SmallVector<DimInfo, 2> distributedDims{
-        {subgroupIndices[0], subgroupLengths[0],
-         undistributedStrides[subgroupIdx]},
-        {threadIndices[0], threadLengths[0], undistributedStrides[threadIdx]}};
-    llvm::sort(distributedDims, [](const DimInfo &lhs, const DimInfo &rhs) {
-      return lhs.dimStride > rhs.dimStride;
-    });
-    VectorValue slicedStepOp = generateSlicedStep(
-        rewriter, loc, distributedDims, distributedElements, originalElements);
-    VectorType finalSlicedStepOpType =
-        VectorType::get({distributedShape}, result.getType().getElementType());
-    auto finalSlicedStepOp = vector::ShapeCastOp::create(
-        rewriter, loc, finalSlicedStepOpType, slicedStepOp);
-    replaceOpWithDistributedValues(rewriter, stepOp, {finalSlicedStepOp});
+    VectorType distType =
+        VectorType::get(distributedShape, result.getType().getElementType());
+    auto shaped = vector::ShapeCastOp::create(rewriter, loc, distType, val);
+    replaceOpWithDistributedValues(rewriter, stepOp, {shaped});
     return success();
   }
 

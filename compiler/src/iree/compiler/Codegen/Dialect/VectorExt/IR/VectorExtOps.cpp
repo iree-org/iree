@@ -491,6 +491,77 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
   }
 };
 
+/// Fold `arith.addi(something, broadcast(scalar))` index vecs by absorbing
+/// the scalar into the base offset. This handles the common pattern after
+/// unrolling where offsets get added to index vectors as broadcasts.
+struct FoldIndexVecAddBroadcast final : OpRewritePattern<TransferGatherOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TransferGatherOp op,
+                                PatternRewriter &rewriter) const override {
+
+    auto indexVecFolder = [&](int64_t index, Value indexVec, AffineMap map,
+                              AffineMap &baseMap) -> IndexingMapFoldResult {
+      auto addOp = indexVec.getDefiningOp<arith::AddIOp>();
+      if (!addOp) {
+        return {indexVec, map, false};
+      }
+
+      // Try both operand orders (addi is commutative).
+      Value scalarSrc;
+      Value remaining;
+      for (auto [lhs, rhs] : {std::pair(addOp.getLhs(), addOp.getRhs()),
+                              std::pair(addOp.getRhs(), addOp.getLhs())}) {
+        auto broadcast = lhs.getDefiningOp<vector::BroadcastOp>();
+        if (broadcast && isa<IndexType>(broadcast.getSourceType())) {
+          scalarSrc = broadcast.getSource();
+          remaining = rhs;
+          break;
+        }
+      }
+      if (!scalarSrc) {
+        return {indexVec, map, false};
+      }
+
+      // Find which source dim this symbol corresponds to.
+      AffineExpr symbolExpr = getAffineSymbolExpr(index, op.getContext());
+      int64_t sourceDim = -1;
+      for (auto [i, expr] : llvm::enumerate(baseMap.getResults())) {
+        if (expr == symbolExpr) {
+          sourceDim = i;
+          break;
+        }
+      }
+      if (sourceDim < 0) {
+        return {indexVec, map, false};
+      }
+
+      // Add the scalar to the corresponding base offset.
+      OpOperand &baseOffset = op.getOffsetsMutable()[sourceDim];
+
+      AffineExpr d0, d1;
+      bindDims(op.getContext(), d0, d1);
+
+      Value newOffset = affine::makeComposedAffineApply(
+                            rewriter, op.getLoc(), d0 + d1,
+                            ArrayRef<OpFoldResult>{baseOffset.get(), scalarSrc})
+                            .getResult();
+      baseOffset.set(newOffset);
+
+      // Replace index vec with the non-broadcast addend.
+      return {remaining, map, true};
+    };
+
+    Value newVal = foldTransferGatherIndexVecs(op, indexVecFolder);
+
+    if (!newVal) {
+      return failure();
+    }
+
+    return success();
+  }
+};
+
 struct FoldContiguousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
   using Base::Base;
@@ -534,8 +605,8 @@ struct FoldContiguousGatherToTransferRead final
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexVec, FoldContiguousGatherToTransferRead>(
-      ctx);
+  results.add<FoldSingleElementIndexVec, FoldIndexVecAddBroadcast,
+              FoldContiguousGatherToTransferRead>(ctx);
 }
 
 //===----------------------------------------------------------------------===//

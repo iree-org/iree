@@ -1,0 +1,132 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# io_uring-based proactor implementation for Linux.
+#
+# Requires kernel 5.1+ with io_uring support. Falls back gracefully on older
+# kernels by returning IREE_STATUS_UNAVAILABLE from the create function.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# io_uring Proactor (Public API)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "io_uring",
+    srcs = [
+        "notification.c",
+        "notification.h",
+        "proactor.c",
+        "proactor.h",
+        "proactor_probe.c",
+        "proactor_registration.c",
+        "proactor_submit.c",
+        "relay.c",
+        "relay.h",
+        "socket.c",
+        "socket.h",
+    ],
+    hdrs = ["api.h"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":buffer_ring",
+        ":defs",
+        ":sparse_table",
+        ":uring",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async:types",
+        "//runtime/src/iree/async/platform/linux:signal",
+        "//runtime/src/iree/async/util:continuation",
+        "//runtime/src/iree/async/util:intrusive_list",
+        "//runtime/src/iree/async/util:message_pool",
+        "//runtime/src/iree/async/util:sequence_emulation",
+        "//runtime/src/iree/async/util:signal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:memory",
+        "//runtime/src/iree/base/threading",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Implementation
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "defs",
+    hdrs = ["defs.h"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "buffer_ring",
+    srcs = ["buffer_ring.c"],
+    hdrs = ["buffer_ring.h"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":defs",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:memory",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "uring",
+    srcs = ["uring.c"],
+    hdrs = ["uring.h"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":defs",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "sparse_table",
+    srcs = ["sparse_table.c"],
+    hdrs = ["sparse_table.h"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/threading",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "sparse_table_test",
+    srcs = ["sparse_table_test.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":sparse_table",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "uring_test",
+    srcs = ["uring_test.cc"],
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":defs",
+        ":uring",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

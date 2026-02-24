@@ -47,6 +47,7 @@ IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipGetDeviceProperties, hipDeviceProp_tR0000*,
 // const char* instead of hipError_t so it uses a different macro.
 IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipGetErrorName, hipError_t)
 IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipGetErrorString, hipError_t)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGetLastError)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGraphAddEmptyNode, hipGraphNode_t*,
                                hipGraph_t, const hipGraphNode_t*, size_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGraphAddEventRecordNode, hipGraphNode_t*,

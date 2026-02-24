@@ -173,6 +173,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-invalid-offsetof" # Technically UB but needed for intrusive ptrs
     "-Wno-unused-const-variable"
     "-Wno-unused-function"
+    "-Wno-unused-lambda-capture"
     "-Wno-unused-private-field"
     "-Wno-pointer-sign"
     "-Wno-char-subscripts"

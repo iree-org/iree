@@ -126,10 +126,22 @@ fi
 #
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
-# We use `bazel query //...` piped to `bazel test` rather than the simpler
+#
+# We use `bazel cquery //...` piped to `bazel test` rather than the simpler
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with tags.
+#
+# The cquery uses Starlark output to solve two problems:
+#   - Clean labels: --output=label includes config hashes (e.g. "(a1b2c3)")
+#     that xargs splits into spurious target patterns causing parse errors.
+#     Starlark's str(target.label) produces clean canonical labels.
+#   - Platform filtering: targets with target_compatible_with for a different
+#     platform (e.g. Windows-only IOCP targets on a Linux host) have
+#     IncompatiblePlatformProvider and are excluded by the Starlark expression.
+#     Without this, the cquery-to-xargs pipeline turns them into explicitly-
+#     listed targets, which Bazel treats as errors (unlike wildcard builds
+#     where incompatible targets are silently skipped).
 #
 # Explicitly list bazelrc so that builds are reproducible and get cache hits
 # when this script is invoked locally.
@@ -172,6 +184,9 @@ BAZEL_TEST_CMD+=(
   --config=generic_clang_ci
 )
 
-"${BAZEL_STARTUP_CMD[@]}" query //... | \
+CQUERY_STARLARK='str(target.label) if "IncompatiblePlatformProvider" not in providers(target) else ""'
+"${BAZEL_STARTUP_CMD[@]}" cquery //... \
+    --output=starlark --starlark:expr="${CQUERY_STARLARK}" 2>/dev/null | \
+  grep -v '^$' | \
   xargs --max-args 1000000 --max-chars 1000000 --exit \
     "${BAZEL_TEST_CMD[@]}"

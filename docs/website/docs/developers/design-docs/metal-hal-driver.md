@@ -205,10 +205,6 @@ preprared GPU executables for a particular device. At the moment the Metal
 HAL driver does not peforming any caching on GPU programs; it simply reads the
 program from the FlatBuffer and hands it over to Metal driver.
 
-### Descriptor set / pipeline layout
-
-See [Resource descriptors](#resource-descriptors) for more details.
-
 ## Compute Pipeline
 
 ### Shader/kernel compilation
