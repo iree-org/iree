@@ -33,27 +33,36 @@ jobs:
           - name: cpu_task
             markers: "cpu"
             config-file: torch_ops_cpu_llvm_sync.json
-            runs-on: ubuntu-24.04
+            cache-dir: /home/nod/iree_tests_cache
+            runs-on:
+              - self-hosted # Must come first.
+              - persistent-cache
+              - Linux
+              - X64
+              - threadripper
           - name: amdgpu_hip_gfx1100_O3
             config-file:  torch_ops_gpu_hip_gfx1100_O3.json
             runs-on: [Linux, X64, gfx1100]
+            cache-dir: /home/nod/iree_tests_cache
           - name: amdgpu_hip_gfx1201_O3
             config-file: torch_ops_gpu_hip_gfx1201_O3.json
             runs-on: [Linux, X64, gfx1201]
+            cache-dir: /home/nod/iree_tests_cache
           - name: amdgpu_vulkan_O3
             config-file: torch_ops_gpu_vulkan_O3.json
             # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
             runs-on: [Linux, X64, rdna3, shark10-ci]
+            cache-dir: /home/nod/iree_tests_cache
           - name: amdgpu_rocm_mi300_gfx942_O3
             config-file: torch_ops_gpu_hip_gfx942_O3.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
+            cache-dir: /shark-cache/data/iree-regression-cache
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
       GH_TOKEN: ${{ github.token }}
       CONFIG_FILE_PATH: tests/external/iree-test-suites/torch_ops/${{ matrix.config-file }}
-      CACHE_DIR: /home/nod/iree_tests_cache
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -98,7 +107,7 @@ jobs:
               --durations=20 \
               --report-log=${LOG_FILE_PATH} \
               --config-files=${CONFIG_FILE_PATH} \
-              --artifact-directory=${CACHE_DIR}/torch_ops/artifacts
+              --artifact-directory=${{ matrix.cache-dir }}/torch_ops/artifacts
 
   tests:
     name: "torch_models tests :: ${{ matrix.name }}"
@@ -113,7 +122,7 @@ jobs:
             cache-dir: /home/nod/iree_tests_cache
             summary-file: torch_models_cpu_task_summary.json
             runs-on:
-              - self-hosted # must come first
+              - self-hosted # Must come first.
               - persistent-cache
               - Linux
               - X64
