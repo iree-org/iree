@@ -539,6 +539,8 @@ typedef struct iree_hal_vulkan_device_t {
 
   BuiltinExecutables* builtin_executables;
 
+  iree_hal_device_topology_info_t topology_info;
+
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
   RENDERDOC_API_LATEST* renderdoc_api;
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
@@ -1507,14 +1509,22 @@ static iree_status_t iree_hal_vulkan_device_query_capabilities(
 
 static const iree_hal_device_topology_info_t*
 iree_hal_vulkan_device_topology_info(iree_hal_device_t* base_device) {
-  IREE_ASSERT(false);  // Not implemented
-  return NULL;
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  return &device->topology_info;
 }
 
 static iree_status_t iree_hal_vulkan_device_refine_topology_edge(
     iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
     iree_hal_topology_edge_t* edge) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_assign_topology_info(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_topology_info_t* topology_info) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  device->topology_info = *topology_info;
+  return iree_ok_status();
 }
 
 // Returns the queue to submit work to based on the |queue_affinity|.
@@ -1904,6 +1914,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.query_capabilities=*/iree_hal_vulkan_device_query_capabilities,
     /*.topology_info=*/iree_hal_vulkan_device_topology_info,
     /*.refine_topology_edge=*/iree_hal_vulkan_device_refine_topology_edge,
+    /*.assign_topology_info=*/iree_hal_vulkan_device_assign_topology_info,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
     /*.create_event=*/iree_hal_vulkan_device_create_event,

@@ -261,6 +261,14 @@ static iree_status_t iree_hal_null_device_refine_topology_edge(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_null_device_assign_topology_info(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_topology_info_t* topology_info) {
+  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
+  device->topology_info = *topology_info;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_null_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
@@ -674,6 +682,7 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .query_capabilities = iree_hal_null_device_query_capabilities,
     .topology_info = iree_hal_null_device_topology_info,
     .refine_topology_edge = iree_hal_null_device_refine_topology_edge,
+    .assign_topology_info = iree_hal_null_device_assign_topology_info,
     .create_channel = iree_hal_null_device_create_channel,
     .create_command_buffer = iree_hal_null_device_create_command_buffer,
     .create_event = iree_hal_null_device_create_event,

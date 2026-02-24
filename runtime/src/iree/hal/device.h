@@ -479,6 +479,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
     iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
     iree_hal_topology_edge_t* edge);
 
+// Assigns topology information to |device| after device group construction.
+// Called exactly once during device group creation. The |topology_info|
+// struct is copied into the device's internal storage. The topology pointer
+// within |topology_info| must remain valid for the lifetime of the device
+// (ensured by the device group retaining all its devices).
+IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
+    iree_hal_device_t* device,
+    const iree_hal_device_topology_info_t* topology_info);
+
 // Queries in what ways the given |semaphore| may be used with |device|.
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
@@ -859,6 +868,10 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* refine_topology_edge)(
       iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
       iree_hal_topology_edge_t* edge);
+
+  iree_status_t(IREE_API_PTR* assign_topology_info)(
+      iree_hal_device_t* device,
+      const iree_hal_device_topology_info_t* topology_info);
 
   iree_status_t(IREE_API_PTR* create_channel)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,

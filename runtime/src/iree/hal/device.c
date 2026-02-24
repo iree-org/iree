@@ -96,6 +96,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
                                                             dst_device, edge);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_assign_topology_info(
+    iree_hal_device_t* device,
+    const iree_hal_device_topology_info_t* topology_info) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(topology_info);
+  return _VTABLE_DISPATCH(device, assign_topology_info)(device, topology_info);
+}
+
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
                                               iree_hal_semaphore_t* semaphore) {
