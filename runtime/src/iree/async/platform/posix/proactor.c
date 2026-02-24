@@ -2253,6 +2253,14 @@ static void iree_async_proactor_posix_process_operation_chain(
   // subsequent sends would also get EAGAIN.
   short blocked_events = 0;
 
+  // Track whether any operation was permanently removed from the chain. Used to
+  // avoid unnecessary event_set_modify calls when the chain is unchanged. On
+  // macOS kqueue, EV_ADD on an already-registered filter can reset the knote's
+  // pending state, causing level-triggered events to be missed if no new state
+  // transition occurs. Multishot MORE (remove + re-add) doesn't count as a
+  // permanent removal because the chain and events are unchanged afterward.
+  bool any_operation_removed = false;
+
   // Process operations in the chain. We maintain a "previous" pointer for
   // unlinking completed operations without searching the chain again.
   iree_async_operation_t* prev = NULL;
@@ -2293,6 +2301,7 @@ static void iree_async_proactor_posix_process_operation_chain(
         prev->next = next;
       }
       current->next = NULL;
+      any_operation_removed = true;
 
       // Decrement the pending cancellation counter (incremented by cancel()).
       iree_atomic_fetch_sub(&proactor->pending_fd_cancellation_count, 1,
@@ -2393,6 +2402,9 @@ static void iree_async_proactor_posix_process_operation_chain(
       continue;
     }
 
+    // Operation permanently removed from chain (not multishot MORE).
+    any_operation_removed = true;
+
     // Push completion.
     iree_async_posix_completion_t* completion =
         iree_async_posix_completion_pool_acquire(&proactor->completion_pool);
@@ -2443,14 +2455,18 @@ static void iree_async_proactor_posix_process_operation_chain(
       iree_status_ignore(iree_async_posix_event_set_modify(
           proactor->event_set, fd, remaining_events));
     }
-  } else {
-    // Chain head unchanged but operations may have been removed from
-    // middle/end. Update event_set if needed.
+  } else if (any_operation_removed) {
+    // Chain head unchanged but operations were removed from middle/end.
+    // Update event_set to reflect remaining operations.
     short remaining_events =
         iree_async_proactor_posix_compute_chain_events(new_chain_head);
     iree_status_ignore(iree_async_posix_event_set_modify(proactor->event_set,
                                                          fd, remaining_events));
   }
+  // else: chain unchanged (e.g., only EAGAIN or multishot MORE continuations).
+  // Skip event_set_modify — the registered events are already correct.
+  // On macOS kqueue, redundant EV_ADD can reset the knote's pending state,
+  // causing level-triggered events to be missed until a new state transition.
 }
 
 // Processes pending notification waits, completing any whose epoch has advanced

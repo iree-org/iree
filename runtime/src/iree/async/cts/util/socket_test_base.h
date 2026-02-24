@@ -17,6 +17,17 @@
 #ifndef IREE_ASYNC_CTS_UTIL_SOCKET_TEST_BASE_H_
 #define IREE_ASYNC_CTS_UTIL_SOCKET_TEST_BASE_H_
 
+#include <string.h>
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif  // WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#else
+#include <sys/socket.h>
+#endif  // IREE_PLATFORM_WINDOWS
+
 #include "iree/async/cts/util/socket_test_util.h"
 #include "iree/async/cts/util/test_base.h"
 #include "iree/async/socket.h"
@@ -117,6 +128,52 @@ class SocketTestBase : public CtsTestBase<BaseType> {
 
     ASSERT_NE(accept_op.accepted_socket, nullptr);
     *out_server = accept_op.accepted_socket;
+  }
+
+  // Releases a socket with LINGER_ZERO (forcing RST instead of FIN) and
+  // submits a recv on the peer to detect the RST and set sticky failure.
+  // After this call, |peer_socket| has sticky failure set and any subsequent
+  // send operations will fail immediately via the eager-send sticky check.
+  //
+  // Accepted sockets inherit the default linger behavior (graceful FIN on
+  // close). When a test needs deterministic error detection after closing one
+  // end of a connection, this helper ensures close sends RST, which the peer
+  // detects via a recv probe. Without this, eager sends can complete
+  // successfully (writev deposits data in the kernel buffer) before the FIN→
+  // RST roundtrip propagates back — making error detection non-deterministic.
+  void ReleaseWithRst(iree_async_socket_t* socket_to_close,
+                      iree_async_socket_t* peer_socket) {
+    // Force LINGER_ZERO so close() sends RST deterministically.
+    struct linger linger_opt;
+    memset(&linger_opt, 0, sizeof(linger_opt));
+    linger_opt.l_onoff = 1;
+    linger_opt.l_linger = 0;
+#if defined(IREE_PLATFORM_WINDOWS)
+    setsockopt((SOCKET)socket_to_close->primitive.value.win32_handle,
+               SOL_SOCKET, SO_LINGER, (const char*)&linger_opt,
+               sizeof(linger_opt));
+#else
+    setsockopt(socket_to_close->primitive.value.fd, SOL_SOCKET, SO_LINGER,
+               &linger_opt, sizeof(linger_opt));
+#endif  // IREE_PLATFORM_WINDOWS
+
+    iree_async_socket_release(socket_to_close);
+
+    // Submit recv on peer to detect RST. On loopback, LINGER_ZERO RST is
+    // delivered synchronously within close(), so readv() fails immediately
+    // with ECONNRESET — setting sticky failure on the peer socket.
+    char rst_probe_buffer[1] = {0};
+    iree_async_span_t rst_probe_span =
+        iree_async_span_from_ptr(rst_probe_buffer, sizeof(rst_probe_buffer));
+    iree_async_socket_recv_operation_t rst_probe_op;
+    CompletionTracker rst_probe_tracker;
+    InitRecvOperation(&rst_probe_op, peer_socket, &rst_probe_span, 1,
+                      CompletionTracker::Callback, &rst_probe_tracker);
+    IREE_ASSERT_OK(
+        iree_async_proactor_submit_one(this->proactor_, &rst_probe_op.base));
+    this->PollUntil(/*min_completions=*/1,
+                    /*total_budget=*/iree_make_duration_ms(5000));
+    iree_status_ignore(rst_probe_tracker.ConsumeStatus());
   }
 
   // Receives up to |expected_length| bytes into |buffer|, returning actual

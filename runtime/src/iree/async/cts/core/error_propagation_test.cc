@@ -40,33 +40,24 @@ TEST_P(ErrorPropagationTest, SendOnClosedConnectionSetsStickyFailure) {
   iree_async_socket_t* listener = nullptr;
   EstablishConnection(&client, &server, &listener);
 
-  // Close server side - this will cause sends from client to fail.
-  iree_async_socket_release(server);
+  // Close server with LINGER_ZERO (RST) and probe client to set sticky failure.
+  ReleaseWithRst(server, client);
+  server = nullptr;
 
-  // Send data from client - should fail because peer is closed.
+  // Send should fail immediately via sticky failure check.
   char data[] = "hello";
   iree_async_span_t span = iree_async_span_from_ptr(data, sizeof(data));
 
-  // First send might succeed (buffered) or fail - keep sending until failure.
+  iree_async_socket_send_operation_t send_op;
   CompletionTracker tracker;
-  bool got_error = false;
-  for (int attempt = 0; attempt < 100 && !got_error; ++attempt) {
-    iree_async_socket_send_operation_t send_op;
-    tracker.Reset();
-    InitSendOperation(&send_op, client, &span, 1,
-                      IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
-                      CompletionTracker::Callback, &tracker);
-    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
-    PollUntil(/*min_completions=*/1,
-              /*total_budget=*/iree_make_duration_ms(1000));
-
-    iree_status_t status = tracker.ConsumeStatus();
-    if (!iree_status_is_ok(status)) {
-      got_error = true;
-      iree_status_ignore(status);
-    }
-  }
-  ASSERT_TRUE(got_error) << "Expected send to fail after peer close";
+  InitSendOperation(&send_op, client, &span, 1,
+                    IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
+                    CompletionTracker::Callback, &tracker);
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(1000));
+  IREE_EXPECT_NOT_OK(tracker.ConsumeStatus())
+      << "Send should fail after peer RST set sticky failure";
 
   // Socket should now have sticky failure.
   IREE_EXPECT_NOT_OK(iree_async_socket_query_failure(client))
@@ -85,32 +76,26 @@ TEST_P(ErrorPropagationTest, StickyFailurePersistsAcrossOperations) {
   iree_async_socket_t* listener = nullptr;
   EstablishConnection(&client, &server, &listener);
 
-  // Close server side to trigger client failures.
-  iree_async_socket_release(server);
+  // Close server with LINGER_ZERO (RST) and probe client to set sticky failure.
+  ReleaseWithRst(server, client);
+  server = nullptr;
 
   char data[] = "test data for send";
   iree_async_span_t span = iree_async_span_from_ptr(data, sizeof(data));
 
-  // Send repeatedly until we get an error.
+  // Verify first send fails (sticky failure from RST probe).
   CompletionTracker tracker;
-  bool first_error_seen = false;
-  for (int attempt = 0; attempt < 100 && !first_error_seen; ++attempt) {
+  {
     iree_async_socket_send_operation_t send_op;
-    tracker.Reset();
     InitSendOperation(&send_op, client, &span, 1,
                       IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
                       CompletionTracker::Callback, &tracker);
     IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
     PollUntil(/*min_completions=*/1,
               /*total_budget=*/iree_make_duration_ms(1000));
-
-    iree_status_t status = tracker.ConsumeStatus();
-    if (!iree_status_is_ok(status)) {
-      first_error_seen = true;
-      iree_status_ignore(status);
-    }
+    IREE_EXPECT_NOT_OK(tracker.ConsumeStatus())
+        << "First send should fail after peer RST";
   }
-  ASSERT_TRUE(first_error_seen) << "Expected send to fail after peer close";
 
   // Now verify that subsequent sends also fail.
   for (int i = 0; i < 3; ++i) {
@@ -145,31 +130,25 @@ TEST_P(ErrorPropagationTest, ProactorContinuesAfterSocketFailure) {
   iree_async_socket_t* listener2 = nullptr;
   EstablishConnection(&client2, &server2, &listener2);
 
-  // Kill connection 1's server to make client1 fail.
-  iree_async_socket_release(server1);
+  // Kill connection 1: close server1 with RST and set client1 sticky failure.
+  ReleaseWithRst(server1, client1);
+  server1 = nullptr;
 
-  // Send on client1 until it fails.
+  // Verify client1 send fails immediately via sticky failure.
   char data[] = "breaking data";
   iree_async_span_t span = iree_async_span_from_ptr(data, sizeof(data));
   CompletionTracker tracker;
-  bool client1_failed = false;
-  for (int attempt = 0; attempt < 100 && !client1_failed; ++attempt) {
+  {
     iree_async_socket_send_operation_t send_op;
-    tracker.Reset();
     InitSendOperation(&send_op, client1, &span, 1,
                       IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
                       CompletionTracker::Callback, &tracker);
     IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
     PollUntil(/*min_completions=*/1,
               /*total_budget=*/iree_make_duration_ms(1000));
-
-    iree_status_t status = tracker.ConsumeStatus();
-    if (!iree_status_is_ok(status)) {
-      client1_failed = true;
-      iree_status_ignore(status);
-    }
+    IREE_EXPECT_NOT_OK(tracker.ConsumeStatus())
+        << "Client1 send should fail after peer RST";
   }
-  ASSERT_TRUE(client1_failed) << "Expected client1 to fail";
 
   // Now verify client2 still works fine.
   // Submit a recv on server2 and send from client2.
@@ -253,19 +232,22 @@ TEST_P(ErrorPropagationTest, MultishotRecvPeerCloseDeliversFinalCallback) {
   PollUntil(/*min_completions=*/1,
             /*total_budget=*/iree_make_duration_ms(2000));
 
-  // Close client using close operation (not just release) for proper shutdown.
-  iree_async_socket_close_operation_t close_op;
-  CompletionTracker close_tracker;
-  InitCloseOperation(&close_op, client, CompletionTracker::Callback,
-                     &close_tracker);
-  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &close_op.base));
+  // Close client. Use release (not a close operation) because the close
+  // operation's completion goes through the completion queue and can satisfy
+  // PollUntil before the FIN propagates through macOS loopback to the server
+  // socket. Release closes the fd directly without a completion.
+  iree_async_socket_release(client);
+  client = nullptr;
 
-  // Wait for close completion.
-  PollUntil(/*min_completions=*/1,
-            /*total_budget=*/iree_make_duration_ms(2000));
-
-  // Drain pending completions. The peer close should terminate multishot recv.
-  DrainPending(iree_make_duration_ms(1000));
+  // Wait for the multishot recv to terminate (EOF from peer close).
+  // On macOS loopback, the FIN from close may take a few microseconds to
+  // propagate. Poll until the recv delivers its final callback (no MORE).
+  {
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(5000);
+    while (!log.final_received && iree_time_now() < deadline) {
+      PollOnce();
+    }
+  }
 
   // Verify multishot terminated (final_received should be true).
   EXPECT_TRUE(log.final_received)
@@ -278,6 +260,14 @@ TEST_P(ErrorPropagationTest, MultishotRecvPeerCloseDeliversFinalCallback) {
         << "Final callback should NOT have MORE flag";
     // Final status could be OK (graceful close with 0 bytes) or error.
     iree_status_ignore(log.ConsumeStatus(final_idx));
+  }
+
+  // Safety: if multishot recv didn't terminate, cancel it to prevent SEGFAULT
+  // during TearDown. The recv_op is stack-local; the proactor's fd chain would
+  // reference dangling memory when processing operations during shutdown.
+  if (!log.final_received) {
+    iree_status_ignore(iree_async_proactor_cancel(proactor_, &recv_op.base));
+    DrainPending();
   }
 
   iree_async_socket_release(server);
@@ -325,31 +315,9 @@ TEST_P(ErrorPropagationTest, OperationAfterSocketError) {
   iree_async_socket_t* listener = nullptr;
   EstablishConnection(&client, &server, &listener);
 
-  // Close server side to trigger client failures.
-  iree_async_socket_release(server);
-
-  // Send repeatedly until we get an error.
-  char data[] = "test data for send";
-  iree_async_span_t span = iree_async_span_from_ptr(data, sizeof(data));
-  CompletionTracker send_tracker;
-  bool send_error_seen = false;
-  for (int attempt = 0; attempt < 100 && !send_error_seen; ++attempt) {
-    iree_async_socket_send_operation_t send_op;
-    send_tracker.Reset();
-    InitSendOperation(&send_op, client, &span, 1,
-                      IREE_ASYNC_SOCKET_SEND_FLAG_NONE,
-                      CompletionTracker::Callback, &send_tracker);
-    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
-    PollUntil(/*min_completions=*/1,
-              /*total_budget=*/iree_make_duration_ms(1000));
-
-    iree_status_t status = send_tracker.ConsumeStatus();
-    if (!iree_status_is_ok(status)) {
-      send_error_seen = true;
-      iree_status_ignore(status);
-    }
-  }
-  ASSERT_TRUE(send_error_seen) << "Expected send to fail after peer close";
+  // Close server with LINGER_ZERO (RST) and probe client to set sticky failure.
+  ReleaseWithRst(server, client);
+  server = nullptr;
 
   // Now submit a recv on the same socket. The peer is gone, so this should
   // complete with an error — not hang indefinitely.

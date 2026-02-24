@@ -72,11 +72,16 @@ TEST_P(MultishotTest, MultishotAccept_MultipleConnections) {
 
     IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
 
-    // Poll for this connection (connect + accept).
-    PollUntil(/*min_completions=*/1,
-              /*total_budget=*/iree_make_duration_ms(2000));
+    // Wait for this specific connect to complete. PollUntil returns when ANY
+    // completion fires (possibly the multishot accept, not our connect), so we
+    // must loop until the connect_tracker confirms our connect is done.
+    // The connect_op is stack-local and must not outlive this iteration.
+    while (connect_tracker.call_count == 0) {
+      PollUntil(/*min_completions=*/1,
+                /*total_budget=*/iree_make_duration_ms(2000));
+    }
 
-    // Note: accepted_socket is overwritten on each completion.
+    // accepted_socket is overwritten on each multishot accept completion.
     // In a real application, the callback would extract it immediately.
     if (accept_op.accepted_socket != nullptr) {
       // Check if this is a new socket (not already in our list).
@@ -115,22 +120,25 @@ TEST_P(MultishotTest, MultishotAccept_MultipleConnections) {
     iree_async_socket_release(accepted);
   }
 
-  // Cancel the multishot accept before closing/releasing.
+  // Cancel the multishot accept and wait for the cancellation completion.
   iree_async_proactor_cancel(proactor_, &accept_op.base);
-
-  // Wait for cancellation to complete.
-  iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
-  while (!accept_log.final_received && iree_time_now() < deadline) {
-    iree_host_size_t completed = 0;
-    iree_status_t status = iree_async_proactor_poll(
-        proactor_, iree_make_timeout_ms(100), &completed);
-    iree_status_ignore(status);
+  {
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
+    while (!accept_log.final_received && iree_time_now() < deadline) {
+      PollOnce();
+    }
   }
 
   EXPECT_TRUE(accept_log.final_received)
       << "Multishot accept should have terminated after cancel";
 
-  // Now safe to release the listener.
+  // Safety: if the cancellation didn't complete above, drain to ensure the
+  // accept_op is removed from the proactor before this stack frame exits.
+  // Without this, TearDown would process operations against destroyed memory.
+  if (!accept_log.final_received) {
+    DrainPending();
+  }
+
   iree_async_socket_release(listener);
 }
 
@@ -166,9 +174,20 @@ TEST_P(MultishotTest, MultishotAccept_ListenerClose) {
 
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
 
-  // Wait for connect and first accept.
-  PollUntil(/*min_completions=*/2,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  // Wait for this specific connect to complete. PollUntil returns when ANY
+  // completion fires (possibly the multishot accept), so we must loop until
+  // the connect_tracker confirms our connect is done. The connect_op is
+  // stack-local and must not outlive this scope.
+  while (connect_tracker.call_count == 0) {
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(5000));
+  }
+
+  // Also wait for at least one accept completion.
+  while (accept_log.entries.empty()) {
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(5000));
+  }
 
   ASSERT_GE(accept_log.entries.size(), 1u);
   IREE_EXPECT_OK(accept_log.ConsumeStatus(0));
@@ -177,22 +196,24 @@ TEST_P(MultishotTest, MultishotAccept_ListenerClose) {
   iree_async_socket_release(accept_op.accepted_socket);
   accept_op.accepted_socket = nullptr;
 
-  // Cancel the multishot accept before closing.
+  // Cancel the multishot accept and wait for the cancellation completion.
   iree_async_proactor_cancel(proactor_, &accept_op.base);
-
-  // Wait for cancellation to complete.
-  iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
-  while (!accept_log.final_received && iree_time_now() < deadline) {
-    iree_host_size_t completed = 0;
-    iree_status_t status = iree_async_proactor_poll(
-        proactor_, iree_make_timeout_ms(100), &completed);
-    iree_status_ignore(status);
+  {
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
+    while (!accept_log.final_received && iree_time_now() < deadline) {
+      PollOnce();
+    }
   }
 
   EXPECT_TRUE(accept_log.final_received)
       << "Multishot accept should have terminated after cancel";
 
-  // Now safe to release all sockets.
+  // Safety: if the cancellation didn't complete above, drain to ensure the
+  // accept_op is removed from the proactor before this stack frame exits.
+  if (!accept_log.final_received) {
+    DrainPending();
+  }
+
   iree_async_socket_release(client);
   iree_async_socket_release(listener);
 }
@@ -244,16 +265,21 @@ TEST_P(MultishotTest, MultishotRecv_MultipleMessages) {
 
     IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op.base));
 
-    // Poll for send completion and potential recv completion.
-    PollUntil(/*min_completions=*/1,
-              /*total_budget=*/iree_make_duration_ms(1000));
+    // Wait for this specific send to complete. PollUntil returns when ANY
+    // completion fires (possibly the multishot recv), so we must loop until
+    // the send_tracker confirms our send is done. The send_op is stack-local
+    // and must not outlive this iteration.
+    while (send_tracker.call_count == 0) {
+      PollUntil(/*min_completions=*/1,
+                /*total_budget=*/iree_make_duration_ms(1000));
+    }
   }
 
   // Give time for receive completions.
   DrainPending(iree_make_duration_ms(500));
 
   // Verify we got at least one recv completion.
-  // Note: TCP may coalesce messages, so we might get fewer completions than
+  // TCP may coalesce messages, so we might get fewer completions than
   // messages sent. The key verification is that multishot mode is active.
   EXPECT_GE(recv_log.entries.size(), 1u)
       << "Expected at least one recv completion";
@@ -266,22 +292,24 @@ TEST_P(MultishotTest, MultishotRecv_MultipleMessages) {
         << "Recv " << i << " should have MORE flag";
   }
 
-  // Cancel the multishot recv before cleanup.
+  // Cancel the multishot recv and wait for the cancellation completion.
   iree_async_proactor_cancel(proactor_, &recv_op.base);
-
-  // Wait for cancellation to complete.
-  iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
-  while (!recv_log.final_received && iree_time_now() < deadline) {
-    iree_host_size_t completed = 0;
-    iree_status_t status = iree_async_proactor_poll(
-        proactor_, iree_make_timeout_ms(100), &completed);
-    iree_status_ignore(status);
+  {
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(2000);
+    while (!recv_log.final_received && iree_time_now() < deadline) {
+      PollOnce();
+    }
   }
 
   EXPECT_TRUE(recv_log.final_received)
       << "Multishot recv should have terminated after cancel";
 
-  // Now safe to release sockets.
+  // Safety: if the cancellation didn't complete above, drain to ensure the
+  // recv_op is removed from the proactor before this stack frame exits.
+  if (!recv_log.final_received) {
+    DrainPending();
+  }
+
   iree_async_socket_release(client);
   iree_async_socket_release(server);
   iree_async_socket_release(listener);
@@ -330,21 +358,22 @@ TEST_P(MultishotTest, MultishotRecv_ConnectionClose) {
   PollUntil(/*min_completions=*/1,
             /*total_budget=*/iree_make_duration_ms(2000));
 
-  // Close the client (sender side). This should cause a peer disconnect
-  // that terminates the multishot recv on the server.
-  iree_async_socket_close_operation_t close_op;
-  CompletionTracker close_tracker;
-  InitCloseOperation(&close_op, client, CompletionTracker::Callback,
-                     &close_tracker);
+  // Close the client (sender side). Use release (not a close operation)
+  // because the close operation's completion goes through the completion queue
+  // and can satisfy PollUntil before the FIN propagates through macOS loopback
+  // to the server socket. Release closes the fd directly without a completion.
+  iree_async_socket_release(client);
+  client = nullptr;
 
-  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &close_op.base));
-
-  // Wait for close completion.
-  PollUntil(/*min_completions=*/1,
-            /*total_budget=*/iree_make_duration_ms(2000));
-
-  // Drain pending completions. The peer close should terminate multishot recv.
-  DrainPending(iree_make_duration_ms(1000));
+  // Wait for the multishot recv to terminate (EOF from peer close).
+  // On macOS loopback, the FIN from close may take a few microseconds to
+  // propagate. Poll until the recv delivers its final callback (no MORE).
+  {
+    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(5000);
+    while (!recv_log.final_received && iree_time_now() < deadline) {
+      PollOnce();
+    }
+  }
 
   // Verify multishot terminated (final_received should be true).
   // The final completion should either be a 0-byte read (EOF) or an error,
@@ -358,21 +387,14 @@ TEST_P(MultishotTest, MultishotRecv_ConnectionClose) {
         << "Final recv should not have MORE flag";
   }
 
-  // If the multishot didn't terminate from peer close, cancel it explicitly.
+  // Safety: if multishot recv didn't terminate, cancel it to prevent SEGFAULT
+  // during TearDown. The recv_op is stack-local; the proactor's fd chain would
+  // reference dangling memory when processing operations during shutdown.
   if (!recv_log.final_received) {
-    iree_async_proactor_cancel(proactor_, &recv_op.base);
-
-    // Wait for cancellation to complete.
-    iree_time_t deadline = iree_time_now() + iree_make_duration_ms(1000);
-    while (!recv_log.final_received && iree_time_now() < deadline) {
-      iree_host_size_t completed = 0;
-      iree_status_t status = iree_async_proactor_poll(
-          proactor_, iree_make_timeout_ms(100), &completed);
-      iree_status_ignore(status);
-    }
+    iree_status_ignore(iree_async_proactor_cancel(proactor_, &recv_op.base));
+    DrainPending();
   }
 
-  // Release sockets. Note: client was consumed by the close operation.
   iree_async_socket_release(server);
   iree_async_socket_release(listener);
 }
