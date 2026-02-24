@@ -171,6 +171,22 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "platform_topology",
+    srcs = [
+        "platform_topology.c",
+        "platform_topology_darwin.c",
+        "platform_topology_fallback.c",
+        "platform_topology_sysfs.c",
+        "platform_topology_win32.c",
+    ],
+    hdrs = ["platform_topology.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:sysfs",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "queue_emulation",
     srcs = ["queue_emulation.c"],
     hdrs = ["queue_emulation.h"],

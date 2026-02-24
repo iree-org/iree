@@ -53,6 +53,9 @@ typedef struct iree_hal_null_device_t {
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
 
+  // Topology information if this device is part of a multi-device topology.
+  iree_hal_device_topology_info_t topology_info;
+
   // + trailing identifier string storage
 } iree_hal_null_device_t;
 
@@ -213,6 +216,49 @@ static iree_status_t iree_hal_null_device_query_i64(
       IREE_STATUS_NOT_FOUND,
       "unknown device configuration key value '%.*s :: %.*s'",
       (int)category.size, category.data, (int)key.size, key.data);
+}
+
+static iree_status_t iree_hal_null_device_query_capabilities(
+    iree_hal_device_t* base_device,
+    iree_hal_device_capabilities_t* out_capabilities) {
+  // TODO(null): populate capabilities based on device features.
+  // For the null driver, we return a zeroed struct indicating no special
+  // hardware capabilities. Implementations should populate this with:
+  // - physical_device_uuid: A unique identifier for the physical device
+  // - flags: Capability bits (timeline semaphores, unified memory, etc.)
+  // - semaphore/buffer import/export types: External handle support
+  // - numa_node: NUMA node assignment for the device
+  // - driver_device_handle: Opaque handle to the underlying device
+  memset(out_capabilities, 0, sizeof(*out_capabilities));
+  return iree_ok_status();
+}
+
+static const iree_hal_device_topology_info_t*
+iree_hal_null_device_topology_info(iree_hal_device_t* base_device) {
+  iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
+  // TODO(null): return topology info if device is part of a multi-device setup.
+  // The topology_info field should be populated during device creation or when
+  // the device joins a topology. For standalone devices, the zeroed struct
+  // indicates the device is not part of a topology.
+  // The returned pointer's lifetime matches the device.
+  return &device->topology_info;
+}
+
+static iree_status_t iree_hal_null_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge) {
+  // TODO(null): refine topology edge based on device-specific information.
+  // This is only called for same-driver device pairs during topology
+  // construction. Implementations can query device-specific properties to:
+  // - Upgrade link class (e.g., detect high-speed interconnects)
+  // - Set precise bandwidth/latency costs
+  // - Enable direct memory access modes (ALIAS instead of COPY)
+  // - Adjust coherency flags based on actual hardware capabilities
+  // For the null driver, we have no hardware-specific refinement.
+  (void)src_device;
+  (void)dst_device;
+  (void)edge;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_null_device_create_channel(
@@ -625,6 +671,9 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .replace_channel_provider = iree_hal_null_replace_channel_provider,
     .trim = iree_hal_null_device_trim,
     .query_i64 = iree_hal_null_device_query_i64,
+    .query_capabilities = iree_hal_null_device_query_capabilities,
+    .topology_info = iree_hal_null_device_topology_info,
+    .refine_topology_edge = iree_hal_null_device_refine_topology_edge,
     .create_channel = iree_hal_null_device_create_channel,
     .create_command_buffer = iree_hal_null_device_create_command_buffer,
     .create_event = iree_hal_null_device_create_event,

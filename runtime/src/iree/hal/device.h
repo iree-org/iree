@@ -415,6 +415,28 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value);
 
+// Queries device capabilities for topology construction.
+// Returns all information needed for cross-driver edge building.
+// If the device doesn't support topology queries, returns OK with zeroed
+// struct.
+IREE_API_EXPORT iree_status_t iree_hal_device_query_capabilities(
+    iree_hal_device_t* device,
+    iree_hal_device_capabilities_t* out_capabilities);
+
+// Returns a pointer to device's topology info populated during device creation.
+// Returns NULL if device is not part of a topology.
+// Pointer lifetime matches device lifetime.
+IREE_API_EXPORT const iree_hal_device_topology_info_t*
+iree_hal_device_topology_info(iree_hal_device_t* device);
+
+// Refines a topology edge from |src_device| to |dst_device|.
+// This is called ONLY for same-driver device pairs during topology
+// construction. If the device doesn't support refinement, returns OK without
+// modification.
+IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge);
+
 // Queries in what ways the given |semaphore| may be used with |device|.
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
@@ -731,28 +753,6 @@ iree_hal_device_profiling_flush(iree_hal_device_t* device);
 IREE_API_EXPORT iree_status_t
 iree_hal_device_profiling_end(iree_hal_device_t* device);
 
-// Query device capabilities for topology construction.
-// Returns all information needed for cross-driver edge building.
-// If the device doesn't support topology queries, returns OK with zeroed
-// struct.
-IREE_API_EXPORT iree_status_t iree_hal_device_query_capabilities(
-    iree_hal_device_t* device,
-    iree_hal_device_capabilities_t* out_capabilities);
-
-// Get pointer to device's topology info (populated during device creation).
-// Returns NULL if device is not part of a topology.
-// Pointer lifetime matches device lifetime.
-IREE_API_EXPORT const iree_hal_device_topology_info_t*
-iree_hal_device_topology_info(iree_hal_device_t* device);
-
-// Refine topology edge from src_device to dst_device.
-// This is called ONLY for same-driver device pairs during topology
-// construction. If the device doesn't support refinement, returns OK without
-// modification.
-IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
-    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
-    iree_hal_topology_edge_t* edge);
-
 //===----------------------------------------------------------------------===//
 // iree_hal_device_list_t
 //===----------------------------------------------------------------------===//
@@ -806,6 +806,17 @@ typedef struct iree_hal_device_vtable_t {
                                          iree_string_view_t category,
                                          iree_string_view_t key,
                                          int64_t* out_value);
+
+  iree_status_t(IREE_API_PTR* query_capabilities)(
+      iree_hal_device_t* device,
+      iree_hal_device_capabilities_t* out_capabilities);
+
+  const iree_hal_device_topology_info_t*(IREE_API_PTR* topology_info)(
+      iree_hal_device_t* device);
+
+  iree_status_t(IREE_API_PTR* refine_topology_edge)(
+      iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+      iree_hal_topology_edge_t* edge);
 
   iree_status_t(IREE_API_PTR* create_channel)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
@@ -932,23 +943,6 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_device_profiling_options_t* options);
   iree_status_t(IREE_API_PTR* profiling_flush)(iree_hal_device_t* device);
   iree_status_t(IREE_API_PTR* profiling_end)(iree_hal_device_t* device);
-
-  // Query device capabilities for topology construction.
-  // If NULL, returns OK with zeroed capabilities.
-  iree_status_t(IREE_API_PTR* query_capabilities)(
-      iree_hal_device_t* device,
-      iree_hal_device_capabilities_t* out_capabilities);
-
-  // Get pointer to device's topology info.
-  // If NULL, returns NULL.
-  const iree_hal_device_topology_info_t*(IREE_API_PTR* topology_info)(
-      iree_hal_device_t* device);
-
-  // Optional: refine topology edge for same-driver device pairs.
-  // If NULL, no refinement is applied.
-  iree_status_t(IREE_API_PTR* refine_topology_edge)(
-      iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
-      iree_hal_topology_edge_t* edge);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

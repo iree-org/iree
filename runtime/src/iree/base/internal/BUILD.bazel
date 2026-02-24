@@ -332,13 +332,19 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "sysfs",
+    srcs = ["sysfs.c"],
+    hdrs = ["sysfs.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "time",
-    srcs = [
-        "time.c",
-    ],
-    hdrs = [
-        "time.h",
-    ],
+    srcs = ["time.c"],
+    hdrs = ["time.h"],
     deps = [
         "//runtime/src/iree/base:core_headers",
     ],

@@ -1499,6 +1499,24 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
+static iree_status_t iree_hal_vulkan_device_query_capabilities(
+    iree_hal_device_t* base_device,
+    iree_hal_device_capabilities_t* out_capabilities) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+}
+
+static const iree_hal_device_topology_info_t*
+iree_hal_vulkan_device_topology_info(iree_hal_device_t* base_device) {
+  IREE_ASSERT(false);  // Not implemented
+  return NULL;
+}
+
+static iree_status_t iree_hal_vulkan_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+}
+
 // Returns the queue to submit work to based on the |queue_affinity|.
 static CommandQueue* iree_hal_vulkan_device_select_queue(
     iree_hal_vulkan_device_t* device,
@@ -1883,6 +1901,9 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.replace_channel_provider=*/iree_hal_vulkan_replace_channel_provider,
     /*.trim=*/iree_hal_vulkan_device_trim,
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
+    /*.query_capabilities=*/iree_hal_vulkan_device_query_capabilities,
+    /*.topology_info=*/iree_hal_vulkan_device_topology_info,
+    /*.refine_topology_edge=*/iree_hal_vulkan_device_refine_topology_edge,
     /*.create_channel=*/iree_hal_vulkan_device_create_channel,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
     /*.create_event=*/iree_hal_vulkan_device_create_event,

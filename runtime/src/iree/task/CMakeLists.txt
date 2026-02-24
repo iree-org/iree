@@ -81,6 +81,7 @@ iree_cc_library(
     iree::base::internal::event_pool
     iree::base::internal::fpu_state
     iree::base::internal::prng
+    iree::base::internal::sysfs
     iree::base::internal::wait_handle
     iree::base::threading
     iree::base::threading::thread
@@ -194,8 +195,6 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "noasan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

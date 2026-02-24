@@ -67,6 +67,8 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // loss" trigger.
   iree_atomic_intptr_t failure_status;
 
+  iree_hal_device_topology_info_t topology_info;
+
   // Count of physical devices.
   iree_host_size_t physical_device_count;
   // One or more physical devices backing the logical device.

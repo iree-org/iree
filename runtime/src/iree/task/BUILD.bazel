@@ -86,6 +86,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal:event_pool",
         "//runtime/src/iree/base/internal:fpu_state",
         "//runtime/src/iree/base/internal:prng",
+        "//runtime/src/iree/base/internal:sysfs",
         "//runtime/src/iree/base/internal:wait_handle",
         "//runtime/src/iree/base/threading",
         "//runtime/src/iree/base/threading:thread",
@@ -189,9 +190,6 @@ iree_runtime_cc_test(
 iree_runtime_cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
-    tags = [
-        "noasan",  # TODO(8469): Does not work on machines with large numbers of cores.
-    ],
     deps = [
         ":task",
         "//runtime/src/iree/base",

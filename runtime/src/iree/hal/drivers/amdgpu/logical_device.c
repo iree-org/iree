@@ -612,6 +612,75 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_query_capabilities(
+    iree_hal_device_t* base_device,
+    iree_hal_device_capabilities_t* out_capabilities) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  memset(out_capabilities, 0, sizeof(*out_capabilities));
+
+  // For single-GPU logical devices, query the first physical device.
+  // TODO(multi-gpu): for multi-GPU logical devices, aggregate capabilities from
+  // all physical devices (take intersection of supported features, lowest
+  // common denominator for limits, etc.).
+  if (logical_device->physical_device_count == 0) {
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "logical device has no physical devices (initialization incomplete)");
+  }
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      logical_device->physical_devices[0];
+  hsa_agent_t gpu_agent = physical_device->device_agent;
+  const iree_hal_amdgpu_libhsa_t* libhsa = &logical_device->system->libhsa;
+
+  // Query device UUID (32-byte from HSA, truncate to 16 for HAL).
+  char uuid_buffer[32];
+  memset(uuid_buffer, 0, sizeof(uuid_buffer));
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), gpu_agent, (hsa_agent_info_t)HSA_AMD_AGENT_INFO_UUID,
+      uuid_buffer));
+  memcpy(out_capabilities->physical_device_uuid, uuid_buffer, 16);
+  out_capabilities->has_physical_device_uuid = true;
+
+  // Query NUMA node from HSA.
+  uint32_t numa_node;
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), gpu_agent, HSA_AGENT_INFO_NODE, &numa_node));
+  out_capabilities->numa_node = (uint8_t)numa_node;
+
+  // External handle types (DMA-BUF support from system info).
+  if (logical_device->system->info.dmabuf_supported) {
+    out_capabilities->buffer_export_types |=
+        IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF;
+    out_capabilities->buffer_import_types |=
+        IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF;
+  }
+
+  // Capability flags.
+  if (logical_device->system->info.svm_accessible_by_default) {
+    out_capabilities->flags |= IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY;
+  }
+
+  // Driver handle (HSA agent handle for same-driver refinement).
+  out_capabilities->driver_device_handle = (uintptr_t)gpu_agent.handle;
+
+  return iree_ok_status();
+}
+
+static const iree_hal_device_topology_info_t*
+iree_hal_amdgpu_logical_device_topology_info(iree_hal_device_t* base_device) {
+  iree_hal_amdgpu_logical_device_t* logical_device =
+      iree_hal_amdgpu_logical_device_cast(base_device);
+  return &logical_device->topology_info;
+}
+
+static iree_status_t iree_hal_amdgpu_logical_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge) {
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_create_channel(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_channel_params_t params, iree_hal_channel_t** out_channel) {
@@ -1086,6 +1155,9 @@ static const iree_hal_device_vtable_t iree_hal_amdgpu_logical_device_vtable = {
     .replace_channel_provider = iree_hal_amdgpu_replace_channel_provider,
     .trim = iree_hal_amdgpu_logical_device_trim,
     .query_i64 = iree_hal_amdgpu_logical_device_query_i64,
+    .query_capabilities = iree_hal_amdgpu_logical_device_query_capabilities,
+    .topology_info = iree_hal_amdgpu_logical_device_topology_info,
+    .refine_topology_edge = iree_hal_amdgpu_logical_device_refine_topology_edge,
     .create_channel = iree_hal_amdgpu_logical_device_create_channel,
     .create_command_buffer =
         iree_hal_amdgpu_logical_device_create_command_buffer,

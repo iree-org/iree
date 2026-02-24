@@ -68,6 +68,34 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
   return _VTABLE_DISPATCH(device, query_i64)(device, category, key, out_value);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_query_capabilities(
+    iree_hal_device_t* device,
+    iree_hal_device_capabilities_t* out_capabilities) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_capabilities);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_IF_ERROR(
+      _VTABLE_DISPATCH(device, query_capabilities)(device, out_capabilities));
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT const iree_hal_device_topology_info_t*
+iree_hal_device_topology_info(iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
+  return _VTABLE_DISPATCH(device, topology_info)(device);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
+    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
+    iree_hal_topology_edge_t* edge) {
+  IREE_ASSERT_ARGUMENT(src_device);
+  IREE_ASSERT_ARGUMENT(dst_device);
+  IREE_ASSERT_ARGUMENT(edge);
+  return _VTABLE_DISPATCH(src_device, refine_topology_edge)(src_device,
+                                                            dst_device, edge);
+}
+
 IREE_API_EXPORT iree_hal_semaphore_compatibility_t
 iree_hal_device_query_semaphore_compatibility(iree_hal_device_t* device,
                                               iree_hal_semaphore_t* semaphore) {
@@ -433,55 +461,6 @@ iree_hal_device_profiling_end(iree_hal_device_t* device) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, profiling_end)(device);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_device_query_capabilities(
-    iree_hal_device_t* device,
-    iree_hal_device_capabilities_t* out_capabilities) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(out_capabilities);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Zero the output first.
-  memset(out_capabilities, 0, sizeof(*out_capabilities));
-
-  // Dispatch to driver-specific implementation if available.
-  iree_status_t status = iree_ok_status();
-  if (_VTABLE_DISPATCH(device, query_capabilities)) {
-    status =
-        _VTABLE_DISPATCH(device, query_capabilities)(device, out_capabilities);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT const iree_hal_device_topology_info_t*
-iree_hal_device_topology_info(iree_hal_device_t* device) {
-  IREE_ASSERT_ARGUMENT(device);
-  if (!_VTABLE_DISPATCH(device, topology_info)) {
-    return NULL;
-  }
-  return _VTABLE_DISPATCH(device, topology_info)(device);
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
-    iree_hal_device_t* src_device, iree_hal_device_t* dst_device,
-    iree_hal_topology_edge_t* edge) {
-  IREE_ASSERT_ARGUMENT(src_device);
-  IREE_ASSERT_ARGUMENT(dst_device);
-  IREE_ASSERT_ARGUMENT(edge);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Dispatch to driver-specific refinement if available.
-  iree_status_t status = iree_ok_status();
-  if (_VTABLE_DISPATCH(src_device, refine_topology_edge)) {
-    status = _VTABLE_DISPATCH(src_device, refine_topology_edge)(
-        src_device, dst_device, edge);
-  }
-
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

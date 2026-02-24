@@ -147,6 +147,7 @@ iree_runtime_cc_test(
         ":topology",
         ":util",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

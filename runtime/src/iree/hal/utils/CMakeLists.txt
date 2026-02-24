@@ -200,6 +200,23 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    platform_topology
+  HDRS
+    "platform_topology.h"
+  SRCS
+    "platform_topology.c"
+    "platform_topology_darwin.c"
+    "platform_topology_fallback.c"
+    "platform_topology_sysfs.c"
+    "platform_topology_win32.c"
+  DEPS
+    iree::base
+    iree::base::internal::sysfs
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     queue_emulation
   HDRS
     "queue_emulation.h"

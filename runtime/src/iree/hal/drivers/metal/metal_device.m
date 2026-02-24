@@ -41,6 +41,8 @@ typedef struct iree_hal_metal_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  iree_hal_device_topology_info_t topology_info;
+
   id<MTLDevice> device;
   // We only expose one single command queue for now. This simplifies synchronization.
   // We can relax this to support multiple queues when needed later.
@@ -234,6 +236,24 @@ static iree_status_t iree_hal_metal_device_query_i64(iree_hal_device_t* base_dev
   return iree_make_status(IREE_STATUS_NOT_FOUND,
                           "unknown device configuration key value '%.*s :: %.*s'",
                           (int)category.size, category.data, (int)key.size, key.data);
+}
+
+static iree_status_t iree_hal_metal_device_query_capabilities(
+    iree_hal_device_t* base_device, iree_hal_device_capabilities_t* out_capabilities) {
+  memset(out_capabilities, 0, sizeof(*out_capabilities));
+  return iree_ok_status();
+}
+
+static const iree_hal_device_topology_info_t* iree_hal_metal_device_topology_info(
+    iree_hal_device_t* base_device) {
+  iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
+  return &device->topology_info;
+}
+
+static iree_status_t iree_hal_metal_device_refine_topology_edge(iree_hal_device_t* src_device,
+                                                                iree_hal_device_t* dst_device,
+                                                                iree_hal_topology_edge_t* edge) {
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_device_create_channel(iree_hal_device_t* base_device,
@@ -608,6 +628,9 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .replace_device_allocator = iree_hal_metal_replace_device_allocator,
     .trim = iree_hal_metal_device_trim,
     .query_i64 = iree_hal_metal_device_query_i64,
+    .query_capabilities = iree_hal_metal_device_query_capabilities,
+    .topology_info = iree_hal_metal_device_topology_info,
+    .refine_topology_edge = iree_hal_metal_device_refine_topology_edge,
     .create_channel = iree_hal_metal_device_create_channel,
     .create_command_buffer = iree_hal_metal_device_create_command_buffer,
     .create_event = iree_hal_metal_device_create_event,

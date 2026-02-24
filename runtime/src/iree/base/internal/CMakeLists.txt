@@ -365,6 +365,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    sysfs
+  HDRS
+    "sysfs.h"
+  SRCS
+    "sysfs.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     time
   HDRS
     "time.h"
