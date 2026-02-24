@@ -11,6 +11,7 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/hal/device.h"
+#include "iree/hal/utils/platform_topology.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_topology_builder_t
@@ -250,9 +251,6 @@ iree_hal_topology_edge_from_capabilities(
 
   // Same driver detection (enables NATIVE mode).
   bool same_driver = iree_string_view_equal(src_driver_name, dst_driver_name);
-  if (same_driver) {
-    edge |= IREE_HAL_TOPOLOGY_CAPABILITY_SAME_RUNTIME_DOMAIN;
-  }
 
   // Physical device UUID matching (cross-driver same-GPU detection).
   bool same_physical_device = false;
@@ -268,14 +266,17 @@ iree_hal_topology_edge_from_capabilities(
   }
 
   // External handle type intersections.
+  // For a directed edge src→dst:
+  //   import_types = what dst can import from src (src exports ∩ dst imports)
+  //   export_types = what src can export to dst (dst exports ∩ src imports)
   uint32_t semaphore_import_types =
-      dst_caps->semaphore_export_types & src_caps->semaphore_import_types;
-  uint32_t semaphore_export_types =
       src_caps->semaphore_export_types & dst_caps->semaphore_import_types;
+  uint32_t semaphore_export_types =
+      dst_caps->semaphore_export_types & src_caps->semaphore_import_types;
   uint32_t buffer_import_types =
-      dst_caps->buffer_export_types & src_caps->buffer_import_types;
-  uint32_t buffer_export_types =
       src_caps->buffer_export_types & dst_caps->buffer_import_types;
+  uint32_t buffer_export_types =
+      dst_caps->buffer_export_types & src_caps->buffer_import_types;
 
   edge = iree_hal_topology_edge_set_semaphore_import_types(
       edge, semaphore_import_types);
@@ -329,6 +330,10 @@ iree_hal_topology_edge_from_capabilities(
   // Capability flags (bitwise AND of device flags).
   iree_hal_topology_capability_t caps = 0;
 
+  if (same_driver) {
+    caps |= IREE_HAL_TOPOLOGY_CAPABILITY_SAME_RUNTIME_DOMAIN;
+  }
+
   if ((src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY) &&
       (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_UNIFIED_MEMORY)) {
     caps |= IREE_HAL_TOPOLOGY_CAPABILITY_UNIFIED_MEMORY;
@@ -372,14 +377,25 @@ iree_hal_topology_edge_from_capabilities(
 
   edge = iree_hal_topology_edge_set_capability_flags(edge, caps);
 
-  // NUMA distance (if different NUMA nodes).
+  // NUMA distance (queried from ACPI SLIT table via platform APIs).
   if (src_caps->numa_node != dst_caps->numa_node) {
-    uint32_t numa_distance = src_caps->numa_node > dst_caps->numa_node
-                                 ? src_caps->numa_node - dst_caps->numa_node
-                                 : dst_caps->numa_node - src_caps->numa_node;
-    numa_distance =
-        numa_distance > 15 ? 15 : numa_distance;  // Clamp to 4 bits.
-    edge = iree_hal_topology_edge_set_numa_distance(edge, numa_distance);
+    uint8_t slit_distance = 0;
+    iree_status_t numa_status = iree_hal_platform_query_numa_distance(
+        src_caps->numa_node, dst_caps->numa_node, &slit_distance);
+    uint32_t scaled_distance;
+    if (iree_status_is_ok(numa_status)) {
+      // Normalize SLIT distance (10=same, 20=1hop, 30=2hop, ...) to 0-15 scale.
+      // Subtract the "same node" base of 10, divide by 2 to compress range.
+      scaled_distance = slit_distance > 10 ? (slit_distance - 10) / 2 : 0;
+    } else {
+      iree_status_ignore(numa_status);
+      // Platform doesn't support SLIT queries; use a conservative default
+      // for cross-node distance. This will be refined by driver-specific logic
+      // via refine_topology_edge.
+      scaled_distance = 3;
+    }
+    scaled_distance = scaled_distance > 15 ? 15 : scaled_distance;
+    edge = iree_hal_topology_edge_set_numa_distance(edge, scaled_distance);
   }
 
   // Default link class (refinement can upgrade).

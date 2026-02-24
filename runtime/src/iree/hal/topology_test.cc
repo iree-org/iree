@@ -4,13 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/topology.h"
-
 #include <cstring>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/topology_builder.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
