@@ -310,18 +310,46 @@ typedef struct iree_hal_device_capabilities_t {
 } iree_hal_device_capabilities_t;
 
 // Device's cached view of topology for fast compatibility checks.
-// This is populated during device creation from the topology.
+//
+// The bitmaps provide O(1) "can I interact with device X?" answers for the
+// common path. For cost-sensitive decisions (e.g., choosing between two
+// compatible devices), the topology pointer gives access to the full edge
+// matrix with cost metrics, latency classes, and handle type negotiation.
+//
+// Populated during device creation. The topology pointer is non-NULL only
+// when the device is part of a multi-device topology group.
 typedef struct iree_hal_device_topology_info_t {
-  iree_hal_topology_edge_scheduling_word_t self_edge;  // Own capabilities.
-  uint32_t topology_index;                             // Index in topology.
-  iree_hal_topology_device_bitmap_t
-      can_wait_from;  // 4/8 bytes - compatible devices.
-  iree_hal_topology_device_bitmap_t
-      can_signal_to;  // 4/8 bytes - compatible devices.
-  iree_hal_topology_device_bitmap_t
-      can_import_from;  // 4/8 bytes - import capable.
-  iree_hal_topology_device_bitmap_t can_p2p_with;  // 4/8 bytes - P2P capable.
+  // Scheduling word from the device's self-edge (edge[i][i].lo).
+  iree_hal_topology_edge_scheduling_word_t self_edge;
+  // Index of this device in the topology (0 to device_count-1).
+  uint32_t topology_index;
+
+  // Pointer to the immutable topology matrix owned by the device group.
+  // NULL for standalone devices not in a topology group.
+  // Lifetime: valid for the lifetime of this device (the topology outlives
+  // all devices in the group).
+  const iree_hal_topology_t* topology;
+
+  // Boolean compatibility bitmaps for O(1) "can I interact?" checks.
+  // Bit i is set if this device can interact with device i in the topology.
+  iree_hal_topology_device_bitmap_t can_wait_from;
+  iree_hal_topology_device_bitmap_t can_signal_to;
+  iree_hal_topology_device_bitmap_t can_import_from;
+  iree_hal_topology_device_bitmap_t can_p2p_with;
 } iree_hal_device_topology_info_t;
+
+// Queries the full 128-bit edge between two devices using their topology info.
+// Returns an empty edge if either device is not in a topology or they are in
+// different topology groups.
+static inline iree_hal_topology_edge_t iree_hal_device_topology_query_edge(
+    const iree_hal_device_topology_info_t* src_info,
+    const iree_hal_device_topology_info_t* dst_info) {
+  if (!src_info->topology || src_info->topology != dst_info->topology) {
+    return iree_hal_topology_edge_empty();
+  }
+  return iree_hal_topology_query_edge(
+      src_info->topology, src_info->topology_index, dst_info->topology_index);
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t

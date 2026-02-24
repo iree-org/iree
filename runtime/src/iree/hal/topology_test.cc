@@ -374,5 +374,103 @@ TEST(TopologyEdge, RdmaHandleTypes) {
               IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
 }
 
+//===----------------------------------------------------------------------===//
+// Topology info cost query tests
+//===----------------------------------------------------------------------===//
+
+// Tests iree_hal_device_topology_query_edge returns the correct edge
+// when both devices share the same topology.
+TEST(TopologyInfo, QueryEdgeSameTopology) {
+  // Build a 2-device topology.
+  iree_hal_topology_builder_t builder;
+  iree_hal_topology_builder_initialize(&builder, 2);
+
+  iree_hal_topology_edge_t cross = iree_hal_topology_edge_make_cross_driver();
+  cross.lo = iree_hal_topology_edge_set_copy_cost(cross.lo, 7);
+  cross.lo = iree_hal_topology_edge_set_link_class(
+      cross.lo, IREE_HAL_TOPOLOGY_LINK_CLASS_NVLINK_IF);
+  cross.hi = iree_hal_topology_edge_set_buffer_import_types(
+      cross.hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF);
+
+  IREE_ASSERT_OK(iree_hal_topology_builder_set_edge(&builder, 0, 1, cross));
+  IREE_ASSERT_OK(iree_hal_topology_builder_set_edge(&builder, 1, 0, cross));
+
+  iree_hal_topology_t topology;
+  IREE_ASSERT_OK(iree_hal_topology_builder_finalize(&builder, &topology));
+
+  // Simulate two devices pointing at the same topology.
+  iree_hal_device_topology_info_t info0 = {0};
+  info0.self_edge = topology.edges[0].lo;
+  info0.topology_index = 0;
+  info0.topology = &topology;
+
+  iree_hal_device_topology_info_t info1 = {0};
+  info1.self_edge = topology.edges[3].lo;
+  info1.topology_index = 1;
+  info1.topology = &topology;
+
+  // Query the edge from device 0 to device 1.
+  iree_hal_topology_edge_t queried =
+      iree_hal_device_topology_query_edge(&info0, &info1);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(queried.lo), 7);
+  EXPECT_EQ(iree_hal_topology_edge_link_class(queried.lo),
+            IREE_HAL_TOPOLOGY_LINK_CLASS_NVLINK_IF);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(queried.hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF);
+
+  // Self-query returns the self-edge.
+  iree_hal_topology_edge_t self =
+      iree_hal_device_topology_query_edge(&info0, &info0);
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(self.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(self.lo), 0);
+}
+
+// Tests that iree_hal_device_topology_query_edge returns empty when devices
+// are in different topologies or not in any topology.
+TEST(TopologyInfo, QueryEdgeDifferentTopologies) {
+  iree_hal_topology_t topology_a = {.device_count = 1};
+  topology_a.edges[0] = iree_hal_topology_edge_make_self();
+
+  iree_hal_topology_t topology_b = {.device_count = 1};
+  topology_b.edges[0] = iree_hal_topology_edge_make_self();
+
+  iree_hal_device_topology_info_t info_a = {0};
+  info_a.topology_index = 0;
+  info_a.topology = &topology_a;
+
+  iree_hal_device_topology_info_t info_b = {0};
+  info_b.topology_index = 0;
+  info_b.topology = &topology_b;
+
+  // Different topologies: should return empty edge.
+  iree_hal_topology_edge_t edge =
+      iree_hal_device_topology_query_edge(&info_a, &info_b);
+  EXPECT_TRUE(iree_hal_topology_edge_is_empty(edge));
+}
+
+// Tests that iree_hal_device_topology_query_edge returns empty when the
+// topology pointer is NULL (standalone device).
+TEST(TopologyInfo, QueryEdgeStandaloneDevice) {
+  iree_hal_device_topology_info_t info_standalone = {0};
+  info_standalone.topology = NULL;
+
+  iree_hal_topology_t topology = {.device_count = 1};
+  topology.edges[0] = iree_hal_topology_edge_make_self();
+  iree_hal_device_topology_info_t info_grouped = {0};
+  info_grouped.topology = &topology;
+
+  // NULL topology: should return empty edge.
+  iree_hal_topology_edge_t edge =
+      iree_hal_device_topology_query_edge(&info_standalone, &info_grouped);
+  EXPECT_TRUE(iree_hal_topology_edge_is_empty(edge));
+
+  // Both NULL: should return empty edge.
+  iree_hal_device_topology_info_t info_standalone2 = {0};
+  edge =
+      iree_hal_device_topology_query_edge(&info_standalone, &info_standalone2);
+  EXPECT_TRUE(iree_hal_topology_edge_is_empty(edge));
+}
+
 }  // namespace
 }  // namespace iree::hal
