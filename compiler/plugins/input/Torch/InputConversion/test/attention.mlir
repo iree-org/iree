@@ -102,3 +102,27 @@ func.func @attention_dyn(%arg0: tensor<?x?x4xf32>, %arg1: tensor<?x?x4xf32>, %ar
 // CHECK:         linalg_ext.yield %[[SCORE]]
 // CHECK: } -> tensor<?x?x4xf32>
 // CHECK:         return %[[ATTN]] : tensor<?x?x4xf32>
+
+// -----
+func.func @attention_fp8(%arg0: tensor<1x3x4xf8E4M3FNUZ>, %arg1: tensor<1x3x4xf8E4M3FNUZ>, %arg2: tensor<1x3x4xf8E4M3FNUZ>, %arg3: tensor<1x3x4xf8E4M3FNUZ>) -> (tensor<1x3x4xf8E4M3FNUZ>) {
+  %0 = tm_tensor.attention ins(%arg0, %arg1, %arg2 : tensor<1x3x4xf8E4M3FNUZ>, tensor<1x3x4xf8E4M3FNUZ>, tensor<1x3x4xf8E4M3FNUZ>) outs(%arg3: tensor<1x3x4xf8E4M3FNUZ>) -> tensor<1x3x4xf8E4M3FNUZ>
+  return %0 : tensor<1x3x4xf8E4M3FNUZ>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+
+// CHECK-LABEL:         func.func @attention_fp8(
+// CHECK-SAME:         %[[ARG0:.*]]: tensor<1x3x4xf8E4M3FNUZ>, %[[ARG1:.*]]: tensor<1x3x4xf8E4M3FNUZ>, %[[ARG2:.*]]: tensor<1x3x4xf8E4M3FNUZ>,
+// CHECK:         %[[ARG3:.*]]: tensor<1x3x4xf8E4M3FNUZ>) -> tensor<1x3x4xf8E4M3FNUZ> {
+// CHECK:         %[[CST:.+]] = arith.constant {{.*}} : f32
+// CHECK:         %[[EMPTY:.*]] = tensor.empty() : tensor<1x3x4xf8E4M3FNUZ>
+// CHECK-NOT:         linalg.generic
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_O]]]} ins(%[[ARG0]], %[[ARG1]], %[[ARG2]] : tensor<1x3x4xf8E4M3FNUZ>, tensor<1x3x4xf8E4M3FNUZ>, tensor<1x3x4xf8E4M3FNUZ>) outs(%[[EMPTY]] : tensor<1x3x4xf8E4M3FNUZ>) {
+// CHECK:    ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK:         %[[SCALED_SCORE:.+]] = arith.mulf %[[SCORE]], %[[CST]] : f32
+// CHECK:         linalg_ext.yield %[[SCALED_SCORE]]
+// CHECK: } -> tensor<1x3x4xf8E4M3FNUZ>
+// CHECK:         return %[[ATTN]] : tensor<1x3x4xf8E4M3FNUZ>
