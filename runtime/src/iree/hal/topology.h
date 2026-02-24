@@ -172,7 +172,7 @@ typedef uint16_t iree_hal_topology_capability_t;
 
 // Unified resource origin for fast compatibility checks.
 //
-// This compact 12-byte structure is embedded in resources (semaphores, buffers)
+// This 16-byte structure is embedded in resources (semaphores, buffers)
 // to enable ultra-fast (1-3ns) compatibility queries. The self_edge encodes
 // the owning device's capabilities, while topology_index identifies the device
 // within its topology group.
