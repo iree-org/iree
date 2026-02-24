@@ -22,8 +22,58 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Validates that maskOp has no passthru and has a vector mask type.
+// Returns the mask value on success, failure otherwise.
+static FailureOr<Value> validateMaskOp(vector::MaskOp maskOp,
+                                       PatternRewriter &rewriter) {
+  if (maskOp.getPassthru()) {
+    return rewriter.notifyMatchFailure(maskOp, "passthru not supported");
+  }
+
+  Value mask = maskOp.getMask();
+  if (!isa<VectorType>(mask.getType())) {
+    return failure();
+  }
+
+  return mask;
+}
+
+// Projects an iterator-space mask to an operand's space by transposing
+// dimensions not present in the indexing map to the front and extracting at
+// position 0. This assumes the mask is rectangular, i.e., uniform along the
+// dropped dimensions.
+static FailureOr<Value> projectMaskToOperand(ImplicitLocOpBuilder &builder,
+                                             Value iterMask,
+                                             AffineMap indexingMap) {
+  int64_t numDims = indexingMap.getNumDims();
+  llvm::SmallSetVector<int64_t, 4> usedDims;
+  for (int64_t i = 0; i < indexingMap.getNumResults(); ++i) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
+    if (!dimExpr) {
+      return failure();
+    }
+    usedDims.insert(dimExpr.getPosition());
+  }
+
+  // Sliced dims in ascending order, followed by the used dims in map order.
+  SmallVector<int64_t> transposePerm;
+  for (int64_t i = 0; i < numDims; ++i) {
+    if (!usedDims.contains(i)) {
+      transposePerm.push_back(i);
+    }
+  }
+  int64_t numSliced = transposePerm.size();
+  transposePerm.append(usedDims.begin(), usedDims.end());
+  Value transposed =
+      vector::TransposeOp::create(builder, iterMask, transposePerm);
+  SmallVector<int64_t> extractPos(numSliced, 0);
+  Value result = vector::ExtractOp::create(builder, transposed, extractPos);
+  return result;
+}
+
 // Creates a mask for an operand by projecting the iterator-space mask to the
-// operand's space using the indexing map.
+// operand's space using the indexing map. Specialized for create_mask: produces
+// a new create_mask with remapped bounds (cleaner IR than transpose+extract).
 static FailureOr<Value> projectMaskForOperand(ImplicitLocOpBuilder &builder,
                                               vector::CreateMaskOp createMask,
                                               VectorType operandType,
@@ -32,8 +82,11 @@ static FailureOr<Value> projectMaskForOperand(ImplicitLocOpBuilder &builder,
   // extract the corresponding bound from the create_mask operation.
   SmallVector<Value> operandBounds;
   for (int64_t i = 0; i < indexingMap.getNumResults(); ++i) {
-    int64_t iterDimPos = indexingMap.getDimPosition(i);
-    operandBounds.push_back(createMask.getOperand(iterDimPos));
+    auto dimExpr = dyn_cast<AffineDimExpr>(indexingMap.getResult(i));
+    if (!dimExpr) {
+      return failure();
+    }
+    operandBounds.push_back(createMask.getOperand(dimExpr.getPosition()));
   }
 
   // Create new mask for this operand
@@ -42,53 +95,64 @@ static FailureOr<Value> projectMaskForOperand(ImplicitLocOpBuilder &builder,
   return maskOp.getResult();
 }
 
-// Unwraps a masked vector.contract by padding operands with identity values
-// and using arith.select to mask them.
-struct UnwrapMaskedContractPattern final : OpRewritePattern<vector::MaskOp> {
+// CRTP base for patterns that unwrap a vector.mask by replacing the masked
+// operation with an unmasked equivalent that operates on identity-padded
+// operands.
+//
+// ConcreteType must implement:
+//   FailureOr<InnerOpType> createUnmaskedReplacement(
+//       ImplicitLocOpBuilder &builder, InnerOpType innerOp,
+//       Value mask, vector::CombiningKind kind) const;
+//
+template <typename ConcreteType, typename InnerOpType>
+struct UnwrapMaskedOpPattern : OpRewritePattern<vector::MaskOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::MaskOp maskOp,
                                 PatternRewriter &rewriter) const override {
-    // Match vector.mask { vector.contract }
-    auto contractOp = dyn_cast<vector::ContractionOp>(maskOp.getMaskableOp());
-    if (!contractOp) {
+    auto innerOp = dyn_cast<InnerOpType>(maskOp.getMaskableOp());
+    if (!innerOp) {
       return failure();
     }
 
-    // Reject masks with passthrough values
-    if (maskOp.getPassthru()) {
-      return rewriter.notifyMatchFailure(maskOp, "passthru not supported");
-    }
-
-    Value mask = maskOp.getMask();
-    auto maskType = dyn_cast<VectorType>(mask.getType());
-    if (!maskType) {
+    auto mask = validateMaskOp(maskOp, rewriter);
+    if (failed(mask)) {
       return failure();
-    }
-
-    // For now, only handle masks coming from vector.create_mask
-    auto createMask = mask.getDefiningOp<vector::CreateMaskOp>();
-    if (!createMask) {
-      return rewriter.notifyMatchFailure(maskOp,
-                                         "mask is not from vector.create_mask");
     }
 
     ImplicitLocOpBuilder builder(maskOp.getLoc(), rewriter);
+    vector::CombiningKind kind = innerOp.getKind();
 
-    // Extract combining kind from contract
-    vector::CombiningKind kind = contractOp.getKind();
+    FailureOr<InnerOpType> maybeNewOp =
+        static_cast<const ConcreteType *>(this)->createUnmaskedReplacement(
+            builder, innerOp, *mask, kind);
+    if (failed(maybeNewOp)) {
+      return maybeNewOp;
+    }
 
-    // Get operand types
+    InnerOpType newOp = *maybeNewOp;
+    // Preserve discardable attributes, e.g., MMA kind on contract.
+    newOp->setDiscardableAttrs(innerOp->getDiscardableAttrDictionary());
+    rewriter.replaceOp(maskOp, newOp);
+    return success();
+  }
+};
+
+struct UnwrapMaskedContractPattern final
+    : UnwrapMaskedOpPattern<UnwrapMaskedContractPattern,
+                            vector::ContractionOp> {
+  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+
+  FailureOr<vector::ContractionOp>
+  createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
+                            vector::ContractionOp contractOp, Value mask,
+                            vector::CombiningKind kind) const {
     auto lhsType = contractOp.getLhsType();
     auto rhsType = contractOp.getRhsType();
 
-    // Get indexing maps
     SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
-    if (indexingMaps.size() != 3) {
-      return failure();
-    }
+    assert(indexingMaps.size() == 3);
 
-    // Generate identity values for LHS and RHS
     Value identityLhs =
         getCombiningIdentityValue(builder.getLoc(), builder, kind, lhsType);
     Value identityRhs =
@@ -97,32 +161,93 @@ struct UnwrapMaskedContractPattern final : OpRewritePattern<vector::MaskOp> {
     AffineMap lhsMap = indexingMaps[0];
     AffineMap rhsMap = indexingMaps[1];
 
-    auto lhsMask = projectMaskForOperand(builder, createMask, lhsType, lhsMap);
-    if (failed(lhsMask)) {
-      return failure();
+    // Try create_mask path first (produces cleaner IR with new create_mask
+    // ops). Fall back to general transpose+extract projection.
+    Value lhsMaskVal, rhsMaskVal;
+    auto createMask = mask.getDefiningOp<vector::CreateMaskOp>();
+    if (createMask) {
+      auto lhsMask =
+          projectMaskForOperand(builder, createMask, lhsType, lhsMap);
+      if (failed(lhsMask)) {
+        return failure();
+      }
+      auto rhsMask =
+          projectMaskForOperand(builder, createMask, rhsType, rhsMap);
+      if (failed(rhsMask)) {
+        return failure();
+      }
+      lhsMaskVal = *lhsMask;
+      rhsMaskVal = *rhsMask;
+    } else {
+      auto lhsMask = projectMaskToOperand(builder, mask, lhsMap);
+      if (failed(lhsMask)) {
+        return failure();
+      }
+      auto rhsMask = projectMaskToOperand(builder, mask, rhsMap);
+      if (failed(rhsMask)) {
+        return failure();
+      }
+      lhsMaskVal = *lhsMask;
+      rhsMaskVal = *rhsMask;
     }
 
-    auto rhsMask = projectMaskForOperand(builder, createMask, rhsType, rhsMap);
-    if (failed(rhsMask)) {
-      return failure();
-    }
-
-    // Create masked operands using arith.select
-    Value lhsMasked = arith::SelectOp::create(builder, *lhsMask,
+    Value lhsMasked = arith::SelectOp::create(builder, lhsMaskVal,
                                               contractOp.getLhs(), identityLhs);
-    Value rhsMasked = arith::SelectOp::create(builder, *rhsMask,
+    Value rhsMasked = arith::SelectOp::create(builder, rhsMaskVal,
                                               contractOp.getRhs(), identityRhs);
 
-    // Create unmasked contract with masked operands
-    auto newContract = vector::ContractionOp::create(
+    return vector::ContractionOp::create(
         builder, lhsMasked, rhsMasked, contractOp.getAcc(),
         contractOp.getIndexingMaps(), contractOp.getIteratorTypes(), kind);
-    // Preserve all discardable attributes (especially iree.gpu.mma)
-    newContract->setDiscardableAttrs(
-        contractOp->getDiscardableAttrDictionary());
+  }
+};
 
-    rewriter.replaceOp(maskOp, newContract);
-    return success();
+struct UnwrapMaskedMultiReductionPattern final
+    : UnwrapMaskedOpPattern<UnwrapMaskedMultiReductionPattern,
+                            vector::MultiDimReductionOp> {
+  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+
+  FailureOr<vector::MultiDimReductionOp>
+  createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
+                            vector::MultiDimReductionOp multiReduceOp,
+                            Value mask, vector::CombiningKind kind) const {
+    auto sourceType = multiReduceOp.getSourceVectorType();
+    auto maskType = cast<VectorType>(mask.getType());
+    if (maskType.getShape() != sourceType.getShape()) {
+      return failure();
+    }
+    Value identitySource =
+        getCombiningIdentityValue(builder.getLoc(), builder, kind, sourceType);
+    Value sourceMasked = arith::SelectOp::create(
+        builder, mask, multiReduceOp.getSource(), identitySource);
+    return vector::MultiDimReductionOp::create(
+        builder, kind, sourceMasked, multiReduceOp.getAcc(),
+        multiReduceOp.getReductionDims());
+  }
+};
+
+struct UnwrapMaskedReductionPattern final
+    : UnwrapMaskedOpPattern<UnwrapMaskedReductionPattern, vector::ReductionOp> {
+  using UnwrapMaskedOpPattern::UnwrapMaskedOpPattern;
+
+  FailureOr<vector::ReductionOp>
+  createUnmaskedReplacement(ImplicitLocOpBuilder &builder,
+                            vector::ReductionOp reductionOp, Value mask,
+                            vector::CombiningKind kind) const {
+    auto sourceType = cast<VectorType>(reductionOp.getVector().getType());
+    auto maskType = cast<VectorType>(mask.getType());
+    if (maskType.getShape() != sourceType.getShape()) {
+      return failure();
+    }
+    Value identitySource =
+        getCombiningIdentityValue(builder.getLoc(), builder, kind, sourceType);
+    Value sourceMasked = arith::SelectOp::create(
+        builder, mask, reductionOp.getVector(), identitySource);
+    if (reductionOp.getAcc()) {
+      return vector::ReductionOp::create(builder, kind, sourceMasked,
+                                         reductionOp.getAcc());
+    }
+    return vector::ReductionOp::create(builder, kind, sourceMasked);
   }
 };
 
@@ -132,7 +257,8 @@ struct LLVMGPUResolveVectorMaskingPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<UnwrapMaskedContractPattern>(context);
+    patterns.add<UnwrapMaskedContractPattern, UnwrapMaskedMultiReductionPattern,
+                 UnwrapMaskedReductionPattern>(context);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
