@@ -354,7 +354,7 @@ static iree_status_t iree_tokenizer_normalizer_sequence_drain_child(
     iree_tokenizer_normalizer_state_t* child_state, const char* input_data,
     iree_host_size_t input_length, char* output_data,
     iree_host_size_t output_capacity, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_written) {
   iree_host_size_t total_written = 0;
   iree_host_size_t remaining = input_length;
   const char* read_ptr = input_data;
@@ -405,7 +405,8 @@ static iree_status_t iree_tokenizer_normalizer_sequence_process_tile(
     iree_tokenizer_normalizer_sequence_state_t* state, iree_string_view_t input,
     uint8_t* scratch, iree_host_size_t scratch_size,
     iree_mutable_string_view_t output, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_consumed, iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_consumed,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   *out_consumed = 0;
   *out_written = 0;
 
@@ -500,7 +501,8 @@ static iree_status_t iree_tokenizer_normalizer_sequence_process_tile(
 static iree_status_t iree_tokenizer_normalizer_sequence_state_process(
     iree_tokenizer_normalizer_state_t* base_state, iree_string_view_t input,
     iree_mutable_string_view_t output, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_consumed, iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_consumed,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   iree_tokenizer_normalizer_sequence_state_t* state =
       (iree_tokenizer_normalizer_sequence_state_t*)base_state;
 
@@ -615,7 +617,7 @@ static iree_status_t iree_tokenizer_normalizer_sequence_finalize_pipe(
     const uint8_t* input_data, iree_host_size_t input_length,
     iree_host_size_t start_stage, iree_tokenizer_normalizer_flags_t flags,
     iree_mutable_string_view_t* remaining_output,
-    iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_written) {
   // Scratch for ping-pong between stages.
   uint8_t scratch[IREE_TOKENIZER_NORMALIZER_SEQUENCE_MIN_BATCH *
                   IREE_TOKENIZER_NORMALIZER_SEQUENCE_SCRATCH_MULTIPLIER];
@@ -705,7 +707,8 @@ static iree_status_t iree_tokenizer_normalizer_sequence_finalize_pipe(
 
 static iree_status_t iree_tokenizer_normalizer_sequence_state_finalize(
     iree_tokenizer_normalizer_state_t* base_state,
-    iree_mutable_string_view_t output, iree_host_size_t* out_written) {
+    iree_mutable_string_view_t output,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   iree_tokenizer_normalizer_sequence_state_t* state =
       (iree_tokenizer_normalizer_sequence_state_t*)base_state;
 

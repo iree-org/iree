@@ -275,8 +275,8 @@ TEST(ResourceOrigin, Initialize) {
   iree_hal_topology_edge_t edge = iree_hal_topology_edge_make_self();
 
   iree_hal_resource_origin_t origin = {
-      .self_edge = edge.lo,
-      .topology_index = 3,
+      /*.self_edge=*/edge.lo,
+      /*.topology_index=*/3,
   };
 
   EXPECT_EQ(origin.self_edge, edge.lo);
@@ -296,12 +296,12 @@ TEST(ResourceOrigin, CompatibilityCheck) {
   lo2 = iree_hal_topology_edge_set_capability_flags(lo2, 0x42);
 
   iree_hal_resource_origin_t origin1 = {
-      .self_edge = edge1.lo,
-      .topology_index = 0,
+      /*.self_edge=*/edge1.lo,
+      /*.topology_index=*/0,
   };
   iree_hal_resource_origin_t origin2 = {
-      .self_edge = lo2,
-      .topology_index = 1,
+      /*.self_edge=*/lo2,
+      /*.topology_index=*/1,
   };
 
   // Self-edges should be different.
@@ -484,10 +484,10 @@ TEST(TopologyInfo, QueryEdgeSameTopology) {
 // Tests that iree_hal_device_topology_query_edge returns empty when devices
 // are in different topologies or not in any topology.
 TEST(TopologyInfo, QueryEdgeDifferentTopologies) {
-  iree_hal_topology_t topology_a = {.device_count = 1};
+  iree_hal_topology_t topology_a = {/*.device_count=*/1};
   topology_a.edges[0] = iree_hal_topology_edge_make_self();
 
-  iree_hal_topology_t topology_b = {.device_count = 1};
+  iree_hal_topology_t topology_b = {/*.device_count=*/1};
   topology_b.edges[0] = iree_hal_topology_edge_make_self();
 
   iree_hal_device_topology_info_t info_a = {0};
@@ -510,7 +510,7 @@ TEST(TopologyInfo, QueryEdgeStandaloneDevice) {
   iree_hal_device_topology_info_t info_standalone = {0};
   info_standalone.topology = NULL;
 
-  iree_hal_topology_t topology = {.device_count = 1};
+  iree_hal_topology_t topology = {/*.device_count=*/1};
   topology.edges[0] = iree_hal_topology_edge_make_self();
   iree_hal_device_topology_info_t info_grouped = {0};
   info_grouped.topology = &topology;

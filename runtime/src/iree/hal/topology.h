@@ -245,8 +245,8 @@ typedef struct iree_hal_resource_origin_t {
 static inline iree_hal_resource_origin_t iree_hal_resource_origin_undefined(
     void) {
   iree_hal_resource_origin_t origin = {
-      /*self_edge=*/0,
-      /*topology_index=*/IREE_HAL_TOPOLOGY_DEVICE_ORDINAL_INVALID,
+      /*.self_edge=*/0,
+      /*.topology_index=*/IREE_HAL_TOPOLOGY_DEVICE_ORDINAL_INVALID,
   };
   return origin;
 }

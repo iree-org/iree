@@ -80,7 +80,8 @@ static void iree_tokenizer_normalizer_passthrough_state_deinitialize(
 static iree_status_t iree_tokenizer_normalizer_passthrough_state_process(
     iree_tokenizer_normalizer_state_t* state, iree_string_view_t input,
     iree_mutable_string_view_t output, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_consumed, iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_consumed,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   (void)flags;  // Passthrough has no state to reset on segment boundaries.
 
   // Copy as much as we can fit.
@@ -96,7 +97,7 @@ static iree_status_t iree_tokenizer_normalizer_passthrough_state_process(
 
 static iree_status_t iree_tokenizer_normalizer_passthrough_state_finalize(
     iree_tokenizer_normalizer_state_t* state, iree_mutable_string_view_t output,
-    iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_written) {
   // No buffering, nothing to flush.
   *out_written = 0;
   return iree_ok_status();

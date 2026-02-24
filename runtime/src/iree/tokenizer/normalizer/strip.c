@@ -240,7 +240,8 @@ static bool iree_tokenizer_normalizer_strip_has_pending_to_emit(
 static iree_status_t iree_tokenizer_normalizer_strip_state_process(
     iree_tokenizer_normalizer_state_t* base_state, iree_string_view_t input,
     iree_mutable_string_view_t output, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_consumed, iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_consumed,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   iree_tokenizer_normalizer_strip_state_t* state =
       (iree_tokenizer_normalizer_strip_state_t*)base_state;
   const iree_tokenizer_normalizer_strip_t* normalizer =
@@ -365,7 +366,8 @@ static iree_status_t iree_tokenizer_normalizer_strip_state_process(
 
 static iree_status_t iree_tokenizer_normalizer_strip_state_finalize(
     iree_tokenizer_normalizer_state_t* base_state,
-    iree_mutable_string_view_t output, iree_host_size_t* out_written) {
+    iree_mutable_string_view_t output,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   iree_tokenizer_normalizer_strip_state_t* state =
       (iree_tokenizer_normalizer_strip_state_t*)base_state;
   (void)output;
