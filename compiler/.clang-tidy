@@ -14,6 +14,7 @@ Checks: >
   -misc-non-private-member-variables-in-classes,
   -misc-unused-parameters,
   -misc-use-anonymous-namespace,
+  -misc-use-internal-linkage,
   -misc-override-with-different-visibility,
   bugprone-*,
   -bugprone-assignment-in-if-condition,
