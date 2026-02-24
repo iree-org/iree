@@ -253,12 +253,13 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     ParallelCombiningOpInterface and must live inside an op implementing
     `InParallelOpInterface`, such as `scf.forall.in_parallel`.
 
-    ## Lowering Paths
+    ## Lowering
 
-    Two lowering strategies are supported:
-    1. Lowers to `amdgpu.gather_to_lds` operations when lowering
-       requirements are met.
-    2. Default lowering using `vector.gather` operations.
+    Lowers to `amdgpu.gather_to_lds` operations via the
+    `AMDGPULowerCoalescedDMAToGatherLDS` pass. The pass requires:
+    - Source memref with `fat_raw_buffer` address space (for OOB clamping)
+    - Contiguous trailing dimensions in the destination memref
+    - Element sizes compatible with target `dma_sizes`
 
     ## Operands and Results
 
