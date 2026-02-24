@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 
 using namespace mlir;
@@ -339,6 +340,34 @@ static Value foldTransferGatherFromStep(TransferGatherOp op) {
 }
 
 OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
+  // Fold all-true splat mask by dropping the mask operand. Since every
+  // position is unmasked, the mask indexing map is irrelevant. This runs
+  // before the index vec folds below; the ordering does not matter because
+  // the index vec folds operate independently of the mask.
+  if (auto maskAttr =
+          dyn_cast_if_present<DenseElementsAttr>(adaptor.getMask())) {
+    if (maskAttr.isSplat() && maskAttr.getSplatValue<bool>()) {
+      int32_t numOffsets = static_cast<int32_t>(getOffsets().size());
+      int32_t numIndexVecs = static_cast<int32_t>(getIndexVecs().size());
+
+      Builder b(getContext());
+      SmallVector<AffineMap> maps = getIndexingMapsArray();
+      maps.pop_back();
+      setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
+
+      SmallVector<Value> operands;
+      operands.push_back(getBase());
+      llvm::append_range(operands, getOffsets());
+      llvm::append_range(operands, getIndexVecs());
+      operands.push_back(getPadding());
+
+      getProperties().setOperandSegmentSizes(
+          {1, numOffsets, numIndexVecs, 1, 0});
+      (*this)->setOperands(operands);
+
+      return getResult();
+    }
+  }
   if (auto res = foldTransferGatherFromBroadcast(*this)) {
     return res;
   }
@@ -556,6 +585,35 @@ struct FoldIndexVecAddBroadcast final : OpRewritePattern<TransferGatherOp> {
   }
 };
 
+/// Replace an all-false masked transfer_gather with a broadcast of the padding.
+/// Only handles splat constants; non-splat all-false constants are expected to
+/// be canonicalized to splat form beforehand.
+struct FoldAllFalseMaskTransferGather final
+    : OpRewritePattern<TransferGatherOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TransferGatherOp op,
+                                PatternRewriter &rewriter) const override {
+    Value mask = op.getMask();
+    if (!mask) {
+      return rewriter.notifyMatchFailure(op, "no mask operand");
+    }
+
+    DenseElementsAttr maskAttr;
+    if (!matchPattern(mask, m_Constant(&maskAttr))) {
+      return rewriter.notifyMatchFailure(op, "mask is not a constant");
+    }
+
+    if (!maskAttr.isSplat() || maskAttr.getSplatValue<bool>()) {
+      return rewriter.notifyMatchFailure(op, "mask is not splat false");
+    }
+
+    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(op, op.getType(),
+                                                     op.getPadding());
+    return success();
+  }
+};
+
 struct FoldContiguousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
   using Base::Base;
@@ -599,8 +657,10 @@ struct FoldContiguousGatherToTransferRead final
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexVec, FoldIndexVecAddBroadcast,
-              FoldContiguousGatherToTransferRead>(ctx);
+  results
+      .add<FoldSingleElementIndexVec, FoldIndexVecAddBroadcast,
+           FoldAllFalseMaskTransferGather, FoldContiguousGatherToTransferRead>(
+          ctx);
 }
 
 //===----------------------------------------------------------------------===//

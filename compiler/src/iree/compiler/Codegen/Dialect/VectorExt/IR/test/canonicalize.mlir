@@ -194,3 +194,56 @@ func.func @transfer_gather_fold_contiguous_load(
 // CHECK-LABEL: @transfer_gather_fold_contiguous_load
 // CHECK: vector.transfer_read
 // CHECK-NOT: transfer_gather
+
+// -----
+
+func.func @transfer_gather_fold_all_true_mask(
+  %source: tensor<4096x64xf16>, %indices: vector<64xindex>)
+  -> vector<64x32xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<true> : vector<64x32xi1>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<64xindex>], %cst0, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
+
+  return %out : vector<64x32xf16>
+}
+
+// CHECK-DAG: #[[$SMAP:.*]] = affine_map<(d0, d1)[s0] -> (s0, d1)>
+// CHECK-DAG: #[[$IVMAP:.*]] = affine_map<(d0, d1)[s0] -> (d0)>
+// CHECK-LABEL: @transfer_gather_fold_all_true_mask
+// CHECK: iree_vector_ext.transfer_gather
+// CHECK-SAME: indexing_maps = [#[[$SMAP]], #[[$IVMAP]]]
+// CHECK-SAME: : tensor<4096x64xf16>, vector<64x32xf16>
+// CHECK-NOT: vector<64x32xi1>
+
+// -----
+
+func.func @transfer_gather_fold_all_false_mask(
+  %source: tensor<4096x64xf16>, %indices: vector<64xindex>)
+  -> vector<64x32xf16> {
+
+  %cst0 = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %mask = arith.constant dense<false> : vector<64x32xi1>
+
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<64xindex>], %cst0, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
+
+  return %out : vector<64x32xf16>
+}
+
+// CHECK-LABEL: @transfer_gather_fold_all_false_mask
+// CHECK: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<64x32xf16>
+// CHECK: return %[[CST]]
+// CHECK-NOT: transfer_gather
