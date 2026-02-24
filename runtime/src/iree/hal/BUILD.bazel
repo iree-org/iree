@@ -47,6 +47,8 @@ iree_runtime_cc_library(
         "detail.h",
         "device.c",
         "device.h",
+        "device_group.c",
+        "device_group.h",
         "driver.c",
         "driver.h",
         "driver_registry.c",
@@ -114,6 +116,18 @@ iree_runtime_cc_test(
     deps = [
         ":hal",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "device_group_test",
+    srcs = ["device_group_test.cc"],
+    deps = [
+        ":hal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/testing:mock_device",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
