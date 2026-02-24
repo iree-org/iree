@@ -19,13 +19,13 @@ namespace mlir::iree_compiler::IREE::GPU {
 LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig,
-    int64_t prefetchNumStages = -1);
+    std::optional<int64_t> prefetchNumStages);
 
 /// Helper for setting up a convolution config using direct convolution based on
 /// the specified target.
 LogicalResult setDirectConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, int64_t prefetchNumStages = -1);
+    Operation *op, std::optional<int64_t> prefetchNumStages);
 
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
@@ -33,16 +33,16 @@ LogicalResult setDirectConvolutionLoweringConfig(
 /// kind. Add support for a fallback direct lowering path.
 LogicalResult setIGEMMConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, bool useDirectLoad = false, bool padConv = false,
-    int64_t prefetchNumStages = -1);
+    Operation *op, bool useDirectLoad, bool padConv,
+    std::optional<int64_t> prefetchNumStages);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
 LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
-                                      Operation *op, bool useDirectLoad = false,
-                                      int64_t prefetchNumStages = -1);
+                                      Operation *op, bool useDirectLoad,
+                                      std::optional<int64_t> prefetchNumStages);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.

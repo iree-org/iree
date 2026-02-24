@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_UTILS_FLAG_UTILS_H
 #define IREE_COMPILER_UTILS_FLAG_UTILS_H
 
+#include <optional>
+
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Passes/OptimizationLevel.h"
@@ -80,6 +82,23 @@ struct Deprecated {
   explicit Deprecated(llvm::StringRef msg) : message(msg) {}
   template <class Opt>
   void apply(Opt &) const {}
+};
+
+// Custom parser for llvm::cl::opt<std::optional<int64_t>>. Allows a flag to be
+// truly optional: unset on the command line means std::nullopt, while a
+// user-provided integer is stored in the optional.
+struct OptionalInt64Parser : public llvm::cl::parser<std::optional<int64_t>> {
+  OptionalInt64Parser(llvm::cl::Option &O)
+      : llvm::cl::parser<std::optional<int64_t>>(O) {}
+  bool parse(llvm::cl::Option &O, llvm::StringRef, llvm::StringRef arg,
+             std::optional<int64_t> &v) {
+    long long w;
+    if (llvm::getAsSignedInteger(arg, 10, w)) {
+      return O.error("Invalid argument '" + arg + "'");
+    }
+    v = w;
+    return false;
+  }
 };
 
 // Base class that can bind named options to fields of structs.

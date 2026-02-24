@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -44,21 +45,6 @@ enum class CompileMode {
   // IREE's precompilation pipeline, which does input preprocessing and
   // pre-fusion global optimizations.
   precompile,
-};
-
-struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
-  BytecodeVersionParser(llvm::cl::Option &O)
-      : llvm::cl::parser<std::optional<int64_t>>(O) {}
-  bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
-             std::optional<int64_t> &v) {
-    long long w;
-    if (llvm::getAsSignedInteger(arg, 10, w)) {
-      return O.error("Invalid argument '" + arg +
-                     "', only integer is supported.");
-    }
-    v = w;
-    return false;
-  }
 };
 
 } // namespace
@@ -146,7 +132,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           "Emit bytecode when generating compile-to or VM MLIR output."),
       llvm::cl::init(false));
   llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
-                mlir::iree_compiler::BytecodeVersionParser>
+                mlir::iree_compiler::OptionalInt64Parser>
       emitMLIRBytecodeVersion(
           "emit-mlir-bytecode-version",
           llvm::cl::desc("Use specified bytecode version when "

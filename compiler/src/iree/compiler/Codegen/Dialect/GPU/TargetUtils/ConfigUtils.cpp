@@ -53,7 +53,7 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig,
-    int64_t prefetchNumStages) {
+    std::optional<int64_t> prefetchNumStages) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
@@ -113,7 +113,7 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   // By default, don't add any special padding or prefetching, since the
   // data-tiled layout is already what we want.
   SmallVector<NamedAttribute, 1> pipelineAttrs;
-  int64_t prefetchStages = prefetchNumStages >= 0 ? prefetchNumStages : 0;
+  int64_t prefetchStages = prefetchNumStages.value_or(0);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchNumStages=*/prefetchStages,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
@@ -1014,11 +1014,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   return std::pair{loweringConfig, flatWorkgroupSize};
 }
 
-LogicalResult
-setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  Operation *op, bool useDirectLoad,
-                                  bool padConv, int64_t prefetchNumStages) {
+LogicalResult setIGEMMConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, bool useDirectLoad, bool padConv,
+    std::optional<int64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -1105,7 +1104,7 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   // Default to 2 stages if not specified.
-  int64_t prefetchStages = prefetchNumStages >= 0 ? prefetchNumStages : 2;
+  int64_t prefetchStages = prefetchNumStages.value_or(2);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
@@ -1125,10 +1124,11 @@ setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
-LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
-                                      mlir::FunctionOpInterface entryPoint,
-                                      Operation *op, bool useDirectLoad,
-                                      int64_t prefetchNumStages) {
+LogicalResult
+setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
+                        mlir::FunctionOpInterface entryPoint, Operation *op,
+                        bool useDirectLoad,
+                        std::optional<int64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp ||
       (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -1180,7 +1180,7 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   // Default to 2 stages if not specified.
-  int64_t prefetchStages = prefetchNumStages >= 0 ? prefetchNumStages : 2;
+  int64_t prefetchStages = prefetchNumStages.value_or(2);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       linalgOp->getContext(),
       /*prefetchNumStages=*/prefetchStages,
@@ -1790,10 +1790,9 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
       {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
 }
 
-LogicalResult
-setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op, int64_t prefetchNumStages) {
+LogicalResult setDirectConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, std::optional<int64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -2039,7 +2038,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   // By default, prefetch shared memory is kept off.
-  int64_t prefetchStages = prefetchNumStages >= 0 ? prefetchNumStages : 0;
+  int64_t prefetchStages = prefetchNumStages.value_or(0);
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
       context, /*prefetchNumStages=*/prefetchStages,
       /*no_reduce_shared_memory_bank_conflicts=*/false,

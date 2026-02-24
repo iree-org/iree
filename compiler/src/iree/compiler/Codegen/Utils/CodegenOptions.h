@@ -45,11 +45,6 @@ struct CPUCodegenOptions : CodegenOptions {
 };
 
 struct GPUCodegenOptions : CodegenOptions {
-  // Number of software pipelining stages for shared memory prefetching.
-  // -1 (default) uses heuristic, 0-1 no pipelining, 2 or more enables
-  // pipelining.
-  int64_t prefetchNumStages = -1;
-
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GPUCodegenOptions>;
 };
