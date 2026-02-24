@@ -345,6 +345,10 @@
          <lastmod>2026-02-24</lastmod>
     </url>
     <url>
+         <loc>https://iree.dev/reference/mlir-dialects/IREECPU/</loc>
+         <lastmod>2026-02-24</lastmod>
+    </url>
+    <url>
          <loc>https://iree.dev/reference/mlir-dialects/IREECodegen/</loc>
          <lastmod>2026-02-24</lastmod>
     </url>

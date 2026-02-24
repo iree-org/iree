@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://iree.dev/reference/mlir-dialects/IREEGPU/">
       
       
-        <link rel="prev" href="../IREECodegen/">
+        <link rel="prev" href="../IREECPU/">
       
       
         <link rel="next" href="../IREEVectorExt/">
@@ -2206,6 +2206,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2266,6 +2270,34 @@
     
   
     IREECodegen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../IREECPU/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IREECPU
   
 
     
@@ -3188,6 +3220,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PCF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PCF
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../VMVX/" class="md-nav__link">
         
   
@@ -4076,6 +4136,8 @@
       
         
       
+        
+      
     
     
     
@@ -4222,6 +4284,34 @@
     
   
     Dialect/GPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-passes/CodegenDialectPCF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dialect/PCF
   
 
     
@@ -7678,7 +7768,7 @@ and flexible.
     potentially more difficult.
   - Allows the option of non-vector based lowering paths.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>HoistableRegionOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
