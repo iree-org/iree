@@ -2204,10 +2204,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -2290,34 +2286,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREECPU/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    IREECPU
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../mlir-dialects/IREEGPU/" class="md-nav__link">
         
   
@@ -2354,34 +2322,6 @@
     
   
     IREEVectorExt
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-dialects/PCF/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PCF
   
 
     
@@ -3273,8 +3213,6 @@
   
     
     
-      
-        
       
         
       
@@ -5090,34 +5028,6 @@
     
   
     Dialect/GPU
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../CodegenDialectPCF/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Dialect/PCF
   
 
     
@@ -9248,10 +9158,10 @@ iree_tensor_ext.dispatch.tensor.store ops to iree_codegen.store_to_buffer.</p>
 <h3 id="-iree-codegen-cleanup-buffer-alloc-view"><code>-iree-codegen-cleanup-buffer-alloc-view</code><a class="headerlink" href="#-iree-codegen-cleanup-buffer-alloc-view" title="Permanent link">link</a></h3>
 <p><em>Performs cleanups over HAL interface/buffer allocation/view operations</em></p>
 <h3 id="-iree-codegen-combine-result-layout-transformation"><code>-iree-codegen-combine-result-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-result-layout-transformation" title="Permanent link">link</a></h3>
-<p><em>Combines layout transformation operations into a single map_store operation.</em></p>
+<p><em>Combines layout transformation operations into a single map_scatter operation.</em></p>
 <p>Starting from the specified leaf ops, iteratively combine producer
 layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
-etc.) into a single iree_linalg_ext.map_store operation. For tensor.pad
+etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
 ops, the writing of pad values is distributed to workgroups, and then the
 padding values are written directly to the output buffer of the
 store_to_buffer op.</p>
@@ -9259,11 +9169,11 @@ store_to_buffer op.</p>
 <div class="highlight"><pre><span></span><code>-scope : Specify the roots for layout transformation combination.
 </code></pre></div>
 <h3 id="-iree-codegen-combine-source-layout-transformation"><code>-iree-codegen-combine-source-layout-transformation</code><a class="headerlink" href="#-iree-codegen-combine-source-layout-transformation" title="Permanent link">link</a></h3>
-<p><em>Combines layout transformation operations into a single map_load operation.</em></p>
+<p><em>Combines layout transformation operations into a single map_gather operation.</em></p>
 <p>Starting from <code>iree_codegen.load_from_buffer</code> ops, iteratively combine
 consumer layout/indexing transformation ops (linalg.transpose,
 tensor.collapse_shape, tensor.expand_shape, tensor.extract_slice,
-tensor.pad, etc.) into a single iree_linalg_ext.map_load operation.</p>
+tensor.pad, etc.) into a single iree_linalg_ext.map_gather operation.</p>
 <h3 id="-iree-codegen-concretize-pad-result-shape"><code>-iree-codegen-concretize-pad-result-shape</code><a class="headerlink" href="#-iree-codegen-concretize-pad-result-shape" title="Permanent link">link</a></h3>
 <p><em>Concretizes tensor.pad op's result shape if its source opimplements OffsetSizeAndStrideOpInterface.</em></p>
 <h3 id="-iree-codegen-config-tracking-canonicalize"><code>-iree-codegen-config-tracking-canonicalize</code><a class="headerlink" href="#-iree-codegen-config-tracking-canonicalize" title="Permanent link">link</a></h3>

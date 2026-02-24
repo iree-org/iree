@@ -2330,10 +2330,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extmap_load-linalgextmaploadop" class="md-nav__link">
+  <a href="#iree_linalg_extmap_gather-linalgextmapgatherop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        iree_linalg_ext.map_load (LinalgExt::MapLoadOp)
+        iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)
       
     </span>
   </a>
@@ -2341,10 +2341,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extmap_store-linalgextmapstoreop" class="md-nav__link">
+  <a href="#iree_linalg_extmap_scatter-linalgextmapscatterop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        iree_linalg_ext.map_store (LinalgExt::MapStoreOp)
+        iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)
       
     </span>
   </a>
@@ -2612,10 +2612,6 @@
       
         
       
-        
-      
-        
-      
     
     
     
@@ -2698,34 +2694,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../IREECPU/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    IREECPU
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../IREEGPU/" class="md-nav__link">
         
   
@@ -2762,34 +2730,6 @@
     
   
     IREEVectorExt
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../PCF/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PCF
   
 
     
@@ -3698,8 +3638,6 @@
       
         
       
-        
-      
     
     
     
@@ -3846,34 +3784,6 @@
     
   
     Dialect/GPU
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenDialectPCF/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Dialect/PCF
   
 
     
@@ -6479,10 +6389,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extmap_load-linalgextmaploadop" class="md-nav__link">
+  <a href="#iree_linalg_extmap_gather-linalgextmapgatherop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        iree_linalg_ext.map_load (LinalgExt::MapLoadOp)
+        iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)
       
     </span>
   </a>
@@ -6490,10 +6400,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_linalg_extmap_store-linalgextmapstoreop" class="md-nav__link">
+  <a href="#iree_linalg_extmap_scatter-linalgextmapscatterop" class="md-nav__link">
     <span class="md-ellipsis">
       
-        iree_linalg_ext.map_store (LinalgExt::MapStoreOp)
+        iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)
       
     </span>
   </a>
@@ -6747,8 +6657,8 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#iree_linalg_extfft-linalgextfftop">iree_linalg_ext.fft (LinalgExt::FftOp)</a></li>
 <li><a href="#iree_linalg_extgather-linalgextgatherop">iree_linalg_ext.gather (LinalgExt::GatherOp)</a></li>
 <li><a href="#iree_linalg_extim2col-linalgextim2colop">iree_linalg_ext.im2col (LinalgExt::Im2colOp)</a></li>
-<li><a href="#iree_linalg_extmap_load-linalgextmaploadop">iree_linalg_ext.map_load (LinalgExt::MapLoadOp)</a></li>
-<li><a href="#iree_linalg_extmap_store-linalgextmapstoreop">iree_linalg_ext.map_store (LinalgExt::MapStoreOp)</a></li>
+<li><a href="#iree_linalg_extmap_gather-linalgextmapgatherop">iree_linalg_ext.map_gather (LinalgExt::MapGatherOp)</a></li>
+<li><a href="#iree_linalg_extmap_scatter-linalgextmapscatterop">iree_linalg_ext.map_scatter (LinalgExt::MapScatterOp)</a></li>
 <li><a href="#iree_linalg_extonline_attention-linalgextonlineattentionop">iree_linalg_ext.online_attention (LinalgExt::OnlineAttentionOp)</a></li>
 <li><a href="#iree_linalg_extscan-linalgextscanop">iree_linalg_ext.scan (LinalgExt::ScanOp)</a></li>
 <li><a href="#iree_linalg_extscatter-linalgextscatterop">iree_linalg_ext.scatter (LinalgExt::ScatterOp)</a></li>
@@ -7704,10 +7614,10 @@ applying the permutation to the <code>BxMxK</code> layout. For instance, an
 </tr>
 </tbody>
 </table>
-<h4 id="iree_linalg_extmap_load-linalgextmaploadop"><code>iree_linalg_ext.map_load</code> (LinalgExt::MapLoadOp)<a class="headerlink" href="#iree_linalg_extmap_load-linalgextmaploadop" title="Permanent link">link</a></h4>
-<p><em>Load with a mapping from result indices to source indices.</em></p>
+<h4 id="iree_linalg_extmap_gather-linalgextmapgatherop"><code>iree_linalg_ext.map_gather</code> (LinalgExt::MapGatherOp)<a class="headerlink" href="#iree_linalg_extmap_gather-linalgextmapgatherop" title="Permanent link">link</a></h4>
+<p><em>Gather with a mapping from result indices to source indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_load` attr-dict $source `into` $output
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_gather` attr-dict $source `into` $output
               $transformation_region
               `:` type($source) `into` type($output) (`-&gt;` type($results)^)?
 </code></pre></div>
@@ -7760,10 +7670,10 @@ represents the value to use if the computed source indices are out of bounds.</p
 </tr>
 </tbody>
 </table>
-<h4 id="iree_linalg_extmap_store-linalgextmapstoreop"><code>iree_linalg_ext.map_store</code> (LinalgExt::MapStoreOp)<a class="headerlink" href="#iree_linalg_extmap_store-linalgextmapstoreop" title="Permanent link">link</a></h4>
-<p><em>Store with a mapping from source indices to result indices.</em></p>
+<h4 id="iree_linalg_extmap_scatter-linalgextmapscatterop"><code>iree_linalg_ext.map_scatter</code> (LinalgExt::MapScatterOp)<a class="headerlink" href="#iree_linalg_extmap_scatter-linalgextmapscatterop" title="Permanent link">link</a></h4>
+<p><em>Scatter with a mapping from source indices to result indices.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_store` attr-dict $input `into` $output
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.map_scatter` attr-dict $input `into` $output
               $transformation_region
               `:` type($input) `into` type($output) (`-&gt;` type($results)^)?
 </code></pre></div>
