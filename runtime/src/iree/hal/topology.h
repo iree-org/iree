@@ -106,16 +106,23 @@ static inline bool iree_hal_topology_edge_is_empty(
 // Interop modes describing how resources can be shared between devices.
 // Lower values indicate more efficient sharing.
 enum iree_hal_topology_interop_mode_bits_t {
-  // Native access within the same runtime domain.
-  // Resources can be directly accessed without any translation.
+  // Load/store addressable — no transfer or import needed.
+  // The resource is directly accessible in the destination's address space.
+  // For buffers: shaders and host code can load/store directly.
+  // Examples: unified memory, same device, NVLink with large BAR mapping.
+  // Only set when PEER_ADDRESSABLE is reported by the device.
   IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE = 0,
-  // Import/export via external handles (fd, HANDLE, etc.).
-  // Requires handle export from source and import to destination.
+  // Import via external handle — one-time setup, then directly usable.
+  // Requires exporting a handle from source and importing at destination.
+  // Examples: DMA-BUF import, Win32 shared handle, RDMA memory registration.
   IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT = 1,
-  // Host staging required for transfer.
-  // Data must be copied through host memory.
+  // Transfer command required — must allocate on destination and copy.
+  // Covers both P2P DMA (direct device-to-device) and host-staged transfers.
+  // The copy_cost, link_class, and P2P_COPY capability flag distinguish
+  // the actual transfer mechanism and its cost. P2P DMA avoids host memory
+  // but still requires the scheduler to issue a transfer command.
   IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY = 2,
-  // Not supported - no interop possible.
+  // Not supported — no interop possible.
   // Operations will fail if attempted.
   IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE = 3,
 };
@@ -361,15 +368,15 @@ iree_hal_topology_edge_signal_mode(
 // Returns the buffer read interop mode from a scheduling word.
 // This describes how the destination device can read from a buffer allocated
 // by the source device. Critical for understanding data transfer requirements:
-// - NATIVE: Direct memory access, peer-to-peer or unified memory (fastest)
-// - IMPORT: Import buffer handle, map to destination address space (P2P)
-// - COPY: Must copy through staging buffer (no direct access, PCIe/fabric)
-// - NONE: Cannot read (isolated memory spaces, requires explicit transfers)
+// - NATIVE: Load/store addressable (unified memory, large BAR P2P mapping)
+// - IMPORT: Import buffer handle, map to destination address space
+// - COPY: Transfer command required (P2P DMA or host-staged; see copy_cost)
+// - NONE: Cannot read (isolated memory spaces)
 //
-// Implementations should set this based on memory visibility. GPUs with
-// NVLink/Infinity Fabric typically use NATIVE. GPUs across PCIe roots may need
-// COPY. NUMA effects should be considered: reading non-local memory may be
-// possible but slow.
+// NATIVE requires PEER_ADDRESSABLE — not just P2P_COPY. P2P_COPY means the
+// DMA engine can copy between devices, but shader/host load/store may fault
+// if the BARs are not mapped. Implementations should report PEER_ADDRESSABLE
+// only when the full address space is accessible (e.g., NVLink large BAR).
 static inline iree_hal_topology_interop_mode_t
 iree_hal_topology_edge_buffer_read_mode(
     iree_hal_topology_edge_scheduling_word_t word) {
@@ -379,14 +386,14 @@ iree_hal_topology_edge_buffer_read_mode(
 // Returns the buffer write interop mode from a scheduling word.
 // This describes how the destination device can write to a buffer allocated
 // by the source device. Often asymmetric from read mode due to coherency:
-// - NATIVE: Direct write access with coherency guarantees (unified memory)
-// - IMPORT: Can write but may need flushes/invalidates (peer-to-peer)
-// - COPY: Must stage writes through intermediate buffer (no direct access)
-// - NONE: Cannot write (isolated memory, read-only access)
+// - NATIVE: Load/store writable with coherency guarantees (unified memory)
+// - IMPORT: Can write after handle import (may need flushes/invalidates)
+// - COPY: Transfer command required (P2P DMA or host-staged; see copy_cost)
+// - NONE: Cannot write (isolated memory)
 //
-// Implementations should consider cache coherency protocols. CPU->GPU writes
-// may require host cache flushes. GPU->GPU writes across NUMA domains may need
-// explicit synchronization. Coherency guarantees should be documented.
+// Same PEER_ADDRESSABLE requirement as buffer_read_mode. Implementations
+// should consider cache coherency: CPU->GPU writes may require host cache
+// flushes, GPU->GPU writes across NUMA domains may need explicit sync.
 static inline iree_hal_topology_interop_mode_t
 iree_hal_topology_edge_buffer_write_mode(
     iree_hal_topology_edge_scheduling_word_t word) {

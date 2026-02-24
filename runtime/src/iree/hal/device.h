@@ -262,8 +262,18 @@ enum iree_hal_device_capability_bits_e {
   IREE_HAL_DEVICE_CAPABILITY_PEER_COHERENT = 1ull << 3,  // Same-driver.
 
   // Transfer capabilities.
+  // P2P DMA engine can copy directly between this device and peers.
+  // Does NOT imply load/store addressability — see PEER_ADDRESSABLE.
   IREE_HAL_DEVICE_CAPABILITY_P2P_COPY = 1ull << 4,
   IREE_HAL_DEVICE_CAPABILITY_HOST_ZERO_COPY_OK = 1ull << 5,
+  // Peer memory is load/store addressable (mapped BARs, unified memory, etc.).
+  // When set with P2P_COPY, buffers on this device can be directly accessed
+  // by peer devices without issuing a transfer command (NATIVE mode).
+  // When P2P_COPY is set without this flag, only the DMA engine can access
+  // peer memory — shader/host load/store will fault.
+  // Example: NVLink with large BAR → PEER_ADDRESSABLE + P2P_COPY.
+  // Example: PCIe P2P without BAR mapping → P2P_COPY only.
+  IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE = 1ull << 10,
 
   // Concurrency and atomics.
   IREE_HAL_DEVICE_CAPABILITY_CONCURRENT_SAFE = 1ull << 6,

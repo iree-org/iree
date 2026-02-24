@@ -312,16 +312,37 @@ iree_hal_topology_edge_from_capabilities(
   lo = iree_hal_topology_edge_set_wait_mode(lo, wait_mode);
   lo = iree_hal_topology_edge_set_signal_mode(lo, signal_mode);
 
-  // Buffer modes (similar logic).
+  // Buffer modes.
+  //
+  // NATIVE: memory is load/store addressable across the link (unified memory,
+  //   large BAR P2P). Scheduler can reference the buffer directly in
+  //   dispatches.
+  // IMPORT: buffer handle can be imported. Scheduler imports then uses
+  // directly. COPY: a transfer command is required (P2P DMA or host-staged).
+  // Scheduler
+  //   must allocate on dst and issue a copy. Cost distinguishes P2P from host.
+  //
+  // P2P_COPY alone means the DMA engine can move data directly between devices,
+  // but shader/host load/store may fault on the remote memory. Only when
+  // PEER_ADDRESSABLE is also set can we safely use NATIVE mode.
+  bool peer_addressable =
+      (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE) &&
+      (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_PEER_ADDRESSABLE);
+  bool p2p_copy = (src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY) &&
+                  (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY);
+
   iree_hal_topology_interop_mode_t buffer_read_mode, buffer_write_mode;
-  if ((src_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY) &&
-      (dst_caps->flags & IREE_HAL_DEVICE_CAPABILITY_P2P_COPY) && same_driver) {
+  if (peer_addressable && same_driver) {
+    // Load/store addressable: scheduler can reference the buffer directly.
     buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
     buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE;
   } else if (buffer_import_types != 0) {
+    // Can import buffer handles for sharing.
     buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
     buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT;
   } else {
+    // Must issue a transfer command (P2P DMA if p2p_copy, otherwise
+    // host-staged). The copy_cost and link_class encode the actual cost.
     buffer_read_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
     buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
   }
@@ -423,18 +444,22 @@ iree_hal_topology_edge_from_capabilities(
       : (signal_mode == IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT) ? 3
                                                                : 10;
 
-  // Copy cost based on link class:
+  // Copy cost based on link class and P2P capability:
   // SAME_DIE: 0-3 (very low, >500GB/s direct access)
-  // PCIE_SAME_ROOT: 8-11 (moderate, ~30GB/s PCIe)
+  // P2P DMA: 5-7 (direct device-to-device DMA, no host bounce)
+  // PCIE_SAME_ROOT: 8-11 (moderate, ~30GB/s PCIe, may need host staging)
   // HOST_STAGED: 12-14 (high, <10GB/s with host bounce)
   uint32_t copy_cost = 0;
   uint32_t latency_class = 0;
   if (same_physical_device) {
     copy_cost = 0;      // Zero-copy same device.
     latency_class = 0;  // <10ns same device.
+  } else if (p2p_copy && same_driver) {
+    copy_cost = 5;      // P2P DMA (~100GB/s NVLink, ~30GB/s PCIe P2P).
+    latency_class = 5;  // ~1us P2P DMA round-trip.
   } else if (same_driver) {
-    copy_cost = 9;      // PCIe Gen4x16 (~30GB/s).
-    latency_class = 8;  // <10us PCIe round-trip.
+    copy_cost = 9;      // PCIe without P2P (~30GB/s with driver staging).
+    latency_class = 8;  // <10us driver-managed transfer.
   } else {
     copy_cost = 13;      // Host staging (<10GB/s).
     latency_class = 11;  // 10-100us host bounce.
