@@ -18,12 +18,8 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Bitfield layout constants for iree_hal_topology_edge_t
+// Scheduling word (lo) layout constants
 //===----------------------------------------------------------------------===//
-
-// These constants define the bit positions and masks for packing/unpacking
-// edge descriptors. They are only needed when constructing or modifying edges,
-// not when querying them (the getter functions in topology.h handle unpacking).
 
 #define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_SHIFT 0
 #define IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK 0x3ull
@@ -37,203 +33,229 @@ extern "C" {
 #define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT 6
 #define IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK 0x3ull
 
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT 8
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK 0xFull
+#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT 8
+#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK 0xFFFFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT 12
-#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT 16
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT 20
-#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK 0xFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT 24
-#define IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK 0x7FFull
-
-#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT 35
+#define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT 24
 #define IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK 0xFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT 39
+#define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT 28
 #define IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK 0xFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT 43
+#define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT 32
 #define IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK 0xFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT 47
+#define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT 36
 #define IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK 0xFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT 51
+#define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT 40
 #define IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK 0xFull
 
-#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT 55
+#define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT 44
 #define IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK 0x7ull
 
 //===----------------------------------------------------------------------===//
-// iree_hal_topology_edge_t setter functions
+// Interop word (hi) layout constants
 //===----------------------------------------------------------------------===//
 
-// Sets the wait interop mode in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_wait_mode(
-    iree_hal_topology_edge_t edge, iree_hal_topology_interop_mode_t mode) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT 0
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK 0xFFull
+
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT 8
+#define IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK 0xFFull
+
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT 16
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK 0xFFull
+
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT 24
+#define IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK 0xFFull
+
+//===----------------------------------------------------------------------===//
+// Scheduling word (lo) setters
+//===----------------------------------------------------------------------===//
+
+// Sets the wait interop mode in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_wait_mode(
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK
             << IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_SHIFT);
-  edge |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK)
+  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_WAIT_MODE_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets the signal interop mode in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_signal_mode(
-    iree_hal_topology_edge_t edge, iree_hal_topology_interop_mode_t mode) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK
+// Sets the signal interop mode in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_signal_mode(
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK
             << IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_SHIFT);
-  edge |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK)
+  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_SIGNAL_MODE_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets the buffer read interop mode in an edge.
-static inline iree_hal_topology_edge_t
+// Sets the buffer read interop mode in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
 iree_hal_topology_edge_set_buffer_read_mode(
-    iree_hal_topology_edge_t edge, iree_hal_topology_interop_mode_t mode) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK
             << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_SHIFT);
-  edge |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK)
+  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_BUFFER_READ_MODE_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets the buffer write interop mode in an edge.
-static inline iree_hal_topology_edge_t
+// Sets the buffer write interop mode in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
 iree_hal_topology_edge_set_buffer_write_mode(
-    iree_hal_topology_edge_t edge, iree_hal_topology_interop_mode_t mode) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_interop_mode_t mode) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK
             << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT);
-  edge |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK)
+  word |= ((uint64_t)mode & IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_BUFFER_WRITE_MODE_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets the link class in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_link_class(
-    iree_hal_topology_edge_t edge, iree_hal_topology_link_class_t link_class) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK
-            << IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT);
-  edge |= ((uint64_t)link_class & IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK)
-          << IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT;
-  return edge;
-}
-
-// Sets capability flags in an edge.
-static inline iree_hal_topology_edge_t
+// Sets capability flags in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
 iree_hal_topology_edge_set_capability_flags(
-    iree_hal_topology_edge_t edge, iree_hal_topology_capability_t flags) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_capability_t flags) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK
             << IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT);
-  edge |= ((uint64_t)flags & IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK)
+  word |= ((uint64_t)flags & IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_CAPABILITY_FLAGS_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets wait cost in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_wait_cost(
-    iree_hal_topology_edge_t edge, uint8_t cost) {
+// Sets wait cost in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_wait_cost(
+    iree_hal_topology_edge_scheduling_word_t word, uint8_t cost) {
   cost = iree_min(cost, 15);  // Clamp to 4 bits.
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK
             << IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT);
-  edge |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK)
+  word |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_WAIT_COST_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets signal cost in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_signal_cost(
-    iree_hal_topology_edge_t edge, uint8_t cost) {
+// Sets signal cost in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_signal_cost(
+    iree_hal_topology_edge_scheduling_word_t word, uint8_t cost) {
   cost = iree_min(cost, 15);  // Clamp to 4 bits.
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK
             << IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT);
-  edge |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK)
+  word |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_SIGNAL_COST_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets copy/transfer cost in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_copy_cost(
-    iree_hal_topology_edge_t edge, uint8_t cost) {
+// Sets copy/transfer cost in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_copy_cost(
+    iree_hal_topology_edge_scheduling_word_t word, uint8_t cost) {
   cost = iree_min(cost, 15);  // Clamp to 4 bits.
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK
             << IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT);
-  edge |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK)
+  word |= ((uint64_t)cost & IREE_HAL_TOPOLOGY_EDGE_COPY_COST_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_COPY_COST_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets latency class in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_latency_class(
-    iree_hal_topology_edge_t edge, uint8_t latency_class) {
+// Sets latency class in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_latency_class(
+    iree_hal_topology_edge_scheduling_word_t word, uint8_t latency_class) {
   latency_class = iree_min(latency_class, 15);  // Clamp to 4 bits.
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK
             << IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT);
-  edge |= ((uint64_t)latency_class & IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK)
+  word |= ((uint64_t)latency_class & IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_LATENCY_CLASS_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets NUMA distance in an edge.
-static inline iree_hal_topology_edge_t iree_hal_topology_edge_set_numa_distance(
-    iree_hal_topology_edge_t edge, uint8_t distance) {
+// Sets NUMA distance in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_numa_distance(
+    iree_hal_topology_edge_scheduling_word_t word, uint8_t distance) {
   distance = iree_min(distance, 15);  // Clamp to 4 bits.
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK
             << IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT);
-  edge |= ((uint64_t)distance & IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK)
+  word |= ((uint64_t)distance & IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_NUMA_DISTANCE_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets semaphore import handle types in an edge.
-static inline iree_hal_topology_edge_t
+// Sets the link class in a scheduling word.
+static inline iree_hal_topology_edge_scheduling_word_t
+iree_hal_topology_edge_set_link_class(
+    iree_hal_topology_edge_scheduling_word_t word,
+    iree_hal_topology_link_class_t link_class) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK
+            << IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT);
+  word |= ((uint64_t)link_class & IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_MASK)
+          << IREE_HAL_TOPOLOGY_EDGE_LINK_CLASS_SHIFT;
+  return word;
+}
+
+//===----------------------------------------------------------------------===//
+// Interop word (hi) setters
+//===----------------------------------------------------------------------===//
+
+// Sets semaphore import handle types in an interop word.
+static inline iree_hal_topology_edge_interop_word_t
 iree_hal_topology_edge_set_semaphore_import_types(
-    iree_hal_topology_edge_t edge, iree_hal_topology_handle_type_t types) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK
+    iree_hal_topology_edge_interop_word_t word,
+    iree_hal_topology_handle_type_t types) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK
             << IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT);
-  edge |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK)
+  word |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_IMPORT_TYPES_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets semaphore export handle types in an edge.
-static inline iree_hal_topology_edge_t
+// Sets semaphore export handle types in an interop word.
+static inline iree_hal_topology_edge_interop_word_t
 iree_hal_topology_edge_set_semaphore_export_types(
-    iree_hal_topology_edge_t edge, iree_hal_topology_handle_type_t types) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK
+    iree_hal_topology_edge_interop_word_t word,
+    iree_hal_topology_handle_type_t types) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK
             << IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT);
-  edge |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK)
+  word |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_SEMAPHORE_EXPORT_TYPES_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets buffer import handle types in an edge.
-static inline iree_hal_topology_edge_t
+// Sets buffer import handle types in an interop word.
+static inline iree_hal_topology_edge_interop_word_t
 iree_hal_topology_edge_set_buffer_import_types(
-    iree_hal_topology_edge_t edge, iree_hal_topology_handle_type_t types) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK
+    iree_hal_topology_edge_interop_word_t word,
+    iree_hal_topology_handle_type_t types) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK
             << IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT);
-  edge |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK)
+  word |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_BUFFER_IMPORT_TYPES_SHIFT;
-  return edge;
+  return word;
 }
 
-// Sets buffer export handle types in an edge.
-static inline iree_hal_topology_edge_t
+// Sets buffer export handle types in an interop word.
+static inline iree_hal_topology_edge_interop_word_t
 iree_hal_topology_edge_set_buffer_export_types(
-    iree_hal_topology_edge_t edge, iree_hal_topology_handle_type_t types) {
-  edge &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK
+    iree_hal_topology_edge_interop_word_t word,
+    iree_hal_topology_handle_type_t types) {
+  word &= ~(IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK
             << IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT);
-  edge |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK)
+  word |= ((uint64_t)types & IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_MASK)
           << IREE_HAL_TOPOLOGY_EDGE_BUFFER_EXPORT_TYPES_SHIFT;
-  return edge;
+  return word;
 }
 
 //===----------------------------------------------------------------------===//

@@ -59,7 +59,7 @@ iree_status_t iree_hal_topology_builder_set_edge(
   if (src_ordinal == dst_ordinal) {
     // Allow some flexibility in self-edges but ensure basic requirements.
     iree_hal_topology_interop_mode_t wait_mode =
-        iree_hal_topology_edge_wait_mode(edge);
+        iree_hal_topology_edge_wait_mode(edge.lo);
     if (wait_mode != IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -116,9 +116,9 @@ static iree_status_t iree_hal_topology_builder_validate(
       uint32_t ji_idx = j * device_count + i;
 
       iree_hal_topology_link_class_t ij_link =
-          iree_hal_topology_edge_link_class(builder->topology.edges[ij_idx]);
+          iree_hal_topology_edge_link_class(builder->topology.edges[ij_idx].lo);
       iree_hal_topology_link_class_t ji_link =
-          iree_hal_topology_edge_link_class(builder->topology.edges[ji_idx]);
+          iree_hal_topology_edge_link_class(builder->topology.edges[ji_idx].lo);
 
       if (ij_link != ji_link) {
         IREE_TRACE_ZONE_END(z0);
@@ -157,21 +157,22 @@ iree_status_t iree_hal_topology_builder_finalize(
 //===----------------------------------------------------------------------===//
 
 iree_hal_topology_edge_t iree_hal_topology_edge_make_self(void) {
-  iree_hal_topology_edge_t edge = 0;
+  iree_hal_topology_edge_scheduling_word_t lo = 0;
+  iree_hal_topology_edge_interop_word_t hi = 0;
 
   // Optimal self-edge settings.
-  edge = iree_hal_topology_edge_set_wait_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  edge = iree_hal_topology_edge_set_signal_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  edge = iree_hal_topology_edge_set_buffer_read_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  edge = iree_hal_topology_edge_set_buffer_write_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_wait_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_signal_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_buffer_read_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  lo = iree_hal_topology_edge_set_buffer_write_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
 
   // Set link class to same die.
-  edge = iree_hal_topology_edge_set_link_class(
-      edge, IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
+  lo = iree_hal_topology_edge_set_link_class(
+      lo, IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
 
   // Set all capability flags for self.
   iree_hal_topology_capability_t caps =
@@ -184,61 +185,63 @@ iree_hal_topology_edge_t iree_hal_topology_edge_make_self(void) {
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_DEVICE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_SYSTEM |
       IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
-  edge = iree_hal_topology_edge_set_capability_flags(edge, caps);
+  lo = iree_hal_topology_edge_set_capability_flags(lo, caps);
 
   // Zero cost for all operations on self.
-  edge = iree_hal_topology_edge_set_wait_cost(edge, 0);
-  edge = iree_hal_topology_edge_set_signal_cost(edge, 0);
-  edge = iree_hal_topology_edge_set_copy_cost(edge, 0);
-  edge = iree_hal_topology_edge_set_latency_class(edge, 0);
-  edge = iree_hal_topology_edge_set_numa_distance(edge, 0);
+  lo = iree_hal_topology_edge_set_wait_cost(lo, 0);
+  lo = iree_hal_topology_edge_set_signal_cost(lo, 0);
+  lo = iree_hal_topology_edge_set_copy_cost(lo, 0);
+  lo = iree_hal_topology_edge_set_latency_class(lo, 0);
+  lo = iree_hal_topology_edge_set_numa_distance(lo, 0);
 
   // Set handle types to native.
-  edge = iree_hal_topology_edge_set_semaphore_import_types(
-      edge, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
-  edge = iree_hal_topology_edge_set_semaphore_export_types(
-      edge, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
-  edge = iree_hal_topology_edge_set_buffer_import_types(
-      edge, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
-  edge = iree_hal_topology_edge_set_buffer_export_types(
-      edge, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  hi = iree_hal_topology_edge_set_semaphore_import_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  hi = iree_hal_topology_edge_set_semaphore_export_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  hi = iree_hal_topology_edge_set_buffer_import_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  hi = iree_hal_topology_edge_set_buffer_export_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
 
+  iree_hal_topology_edge_t edge = {lo, hi};
   return edge;
 }
 
 iree_hal_topology_edge_t iree_hal_topology_edge_make_cross_driver(void) {
-  iree_hal_topology_edge_t edge = 0;
+  iree_hal_topology_edge_scheduling_word_t lo = 0;
+  iree_hal_topology_edge_interop_word_t hi = 0;
 
   // Default cross-driver settings require import/export.
-  edge = iree_hal_topology_edge_set_wait_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  edge = iree_hal_topology_edge_set_signal_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  edge = iree_hal_topology_edge_set_buffer_read_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  edge = iree_hal_topology_edge_set_buffer_write_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  lo = iree_hal_topology_edge_set_wait_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
+  lo = iree_hal_topology_edge_set_signal_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
+  lo = iree_hal_topology_edge_set_buffer_read_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  lo = iree_hal_topology_edge_set_buffer_write_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 
   // Assume PCIe link by default.
-  edge = iree_hal_topology_edge_set_link_class(
-      edge, IREE_HAL_TOPOLOGY_LINK_CLASS_PCIE_SAME_ROOT);
+  lo = iree_hal_topology_edge_set_link_class(
+      lo, IREE_HAL_TOPOLOGY_LINK_CLASS_PCIE_SAME_ROOT);
 
   // No special capabilities for cross-driver.
-  edge = iree_hal_topology_edge_set_capability_flags(
-      edge, IREE_HAL_TOPOLOGY_CAPABILITY_NONE);
+  lo = iree_hal_topology_edge_set_capability_flags(
+      lo, IREE_HAL_TOPOLOGY_CAPABILITY_NONE);
 
   // Moderate costs for cross-driver operations.
-  edge = iree_hal_topology_edge_set_wait_cost(edge, 5);
-  edge = iree_hal_topology_edge_set_signal_cost(edge, 5);
-  edge = iree_hal_topology_edge_set_copy_cost(edge, 10);
-  edge =
-      iree_hal_topology_edge_set_latency_class(edge, 8);  // PCIe range (<10us).
-  edge = iree_hal_topology_edge_set_numa_distance(edge, 2);
+  lo = iree_hal_topology_edge_set_wait_cost(lo, 5);
+  lo = iree_hal_topology_edge_set_signal_cost(lo, 5);
+  lo = iree_hal_topology_edge_set_copy_cost(lo, 10);
+  lo = iree_hal_topology_edge_set_latency_class(lo, 8);  // PCIe range (<10us).
+  lo = iree_hal_topology_edge_set_numa_distance(lo, 2);
 
   // NOTE: we could add default OPAQUE_FD/etc per platform here but only if we
   // know for certain every HAL supports it. We don't currently mandate a common
   // required primitive so we avoid setting it at all.
 
+  iree_hal_topology_edge_t edge = {lo, hi};
   return edge;
 }
 
@@ -247,7 +250,8 @@ iree_hal_topology_edge_from_capabilities(
     const iree_hal_device_capabilities_t* src_caps,
     const iree_hal_device_capabilities_t* dst_caps,
     iree_string_view_t src_driver_name, iree_string_view_t dst_driver_name) {
-  iree_hal_topology_edge_t edge = 0;
+  iree_hal_topology_edge_scheduling_word_t lo = 0;
+  iree_hal_topology_edge_interop_word_t hi = 0;
 
   // Same driver detection (enables NATIVE mode).
   bool same_driver = iree_string_view_equal(src_driver_name, dst_driver_name);
@@ -260,8 +264,8 @@ iree_hal_topology_edge_from_capabilities(
                                    dst_caps->physical_device_uuid, 16) == 0);
     if (same_physical_device) {
       // Same physical GPU! Upgrade link class even if different drivers.
-      edge = iree_hal_topology_edge_set_link_class(
-          edge, IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
+      lo = iree_hal_topology_edge_set_link_class(
+          lo, IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
     }
   }
 
@@ -278,14 +282,12 @@ iree_hal_topology_edge_from_capabilities(
   uint32_t buffer_export_types =
       dst_caps->buffer_export_types & src_caps->buffer_import_types;
 
-  edge = iree_hal_topology_edge_set_semaphore_import_types(
-      edge, semaphore_import_types);
-  edge = iree_hal_topology_edge_set_semaphore_export_types(
-      edge, semaphore_export_types);
-  edge =
-      iree_hal_topology_edge_set_buffer_import_types(edge, buffer_import_types);
-  edge =
-      iree_hal_topology_edge_set_buffer_export_types(edge, buffer_export_types);
+  hi = iree_hal_topology_edge_set_semaphore_import_types(
+      hi, semaphore_import_types);
+  hi = iree_hal_topology_edge_set_semaphore_export_types(
+      hi, semaphore_export_types);
+  hi = iree_hal_topology_edge_set_buffer_import_types(hi, buffer_import_types);
+  hi = iree_hal_topology_edge_set_buffer_export_types(hi, buffer_export_types);
 
   // Derive interop modes from handle types and flags.
   iree_hal_topology_interop_mode_t wait_mode, signal_mode;
@@ -307,8 +309,8 @@ iree_hal_topology_edge_from_capabilities(
     signal_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
   }
 
-  edge = iree_hal_topology_edge_set_wait_mode(edge, wait_mode);
-  edge = iree_hal_topology_edge_set_signal_mode(edge, signal_mode);
+  lo = iree_hal_topology_edge_set_wait_mode(lo, wait_mode);
+  lo = iree_hal_topology_edge_set_signal_mode(lo, signal_mode);
 
   // Buffer modes (similar logic).
   iree_hal_topology_interop_mode_t buffer_read_mode, buffer_write_mode;
@@ -324,8 +326,8 @@ iree_hal_topology_edge_from_capabilities(
     buffer_write_mode = IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY;
   }
 
-  edge = iree_hal_topology_edge_set_buffer_read_mode(edge, buffer_read_mode);
-  edge = iree_hal_topology_edge_set_buffer_write_mode(edge, buffer_write_mode);
+  lo = iree_hal_topology_edge_set_buffer_read_mode(lo, buffer_read_mode);
+  lo = iree_hal_topology_edge_set_buffer_write_mode(lo, buffer_write_mode);
 
   // Capability flags (bitwise AND of device flags).
   iree_hal_topology_capability_t caps = 0;
@@ -375,7 +377,7 @@ iree_hal_topology_edge_from_capabilities(
     caps |= IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
   }
 
-  edge = iree_hal_topology_edge_set_capability_flags(edge, caps);
+  lo = iree_hal_topology_edge_set_capability_flags(lo, caps);
 
   // NUMA distance (queried from ACPI SLIT table via platform APIs).
   if (src_caps->numa_node != dst_caps->numa_node) {
@@ -395,7 +397,7 @@ iree_hal_topology_edge_from_capabilities(
       scaled_distance = 3;
     }
     scaled_distance = scaled_distance > 15 ? 15 : scaled_distance;
-    edge = iree_hal_topology_edge_set_numa_distance(edge, scaled_distance);
+    lo = iree_hal_topology_edge_set_numa_distance(lo, scaled_distance);
   }
 
   // Default link class (refinement can upgrade).
@@ -408,7 +410,7 @@ iree_hal_topology_edge_from_capabilities(
   } else {
     link_class = IREE_HAL_TOPOLOGY_LINK_CLASS_HOST_STAGED;
   }
-  edge = iree_hal_topology_edge_set_link_class(edge, link_class);
+  lo = iree_hal_topology_edge_set_link_class(lo, link_class);
 
   // Default costs (refinement can adjust).
   // Derive from interop modes and link class for accurate scheduling hints.
@@ -438,10 +440,11 @@ iree_hal_topology_edge_from_capabilities(
     latency_class = 11;  // 10-100us host bounce.
   }
 
-  edge = iree_hal_topology_edge_set_wait_cost(edge, wait_cost);
-  edge = iree_hal_topology_edge_set_signal_cost(edge, signal_cost);
-  edge = iree_hal_topology_edge_set_copy_cost(edge, copy_cost);
-  edge = iree_hal_topology_edge_set_latency_class(edge, latency_class);
+  lo = iree_hal_topology_edge_set_wait_cost(lo, wait_cost);
+  lo = iree_hal_topology_edge_set_signal_cost(lo, signal_cost);
+  lo = iree_hal_topology_edge_set_copy_cost(lo, copy_cost);
+  lo = iree_hal_topology_edge_set_latency_class(lo, latency_class);
 
+  iree_hal_topology_edge_t edge = {lo, hi};
   return edge;
 }

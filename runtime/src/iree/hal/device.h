@@ -312,8 +312,8 @@ typedef struct iree_hal_device_capabilities_t {
 // Device's cached view of topology for fast compatibility checks.
 // This is populated during device creation from the topology.
 typedef struct iree_hal_device_topology_info_t {
-  iree_hal_topology_edge_t self_edge;  // 8 bytes - own capabilities.
-  uint32_t topology_index;             // 4 bytes - index in topology.
+  iree_hal_topology_edge_scheduling_word_t self_edge;  // Own capabilities.
+  uint32_t topology_index;                             // Index in topology.
   iree_hal_topology_device_bitmap_t
       can_wait_from;  // 4/8 bytes - compatible devices.
   iree_hal_topology_device_bitmap_t

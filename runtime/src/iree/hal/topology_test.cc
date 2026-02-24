@@ -20,62 +20,108 @@ using ::testing::Eq;
 using ::testing::Ne;
 
 //===----------------------------------------------------------------------===//
-// Bitfield overlap tests
+// Scheduling word bitfield overlap tests
 //===----------------------------------------------------------------------===//
 
-// Verifies that our bitfields don't overlap and that all fields can be
-// independently set without corrupting other fields.
-TEST(TopologyEdge, BitfieldOverlap) {
-  iree_hal_topology_edge_t edge = 0;
+// Verifies that scheduling word bitfields don't overlap and that all fields
+// can be independently set without corrupting other fields.
+TEST(TopologyEdge, SchedulingWordBitfieldOverlap) {
+  iree_hal_topology_edge_scheduling_word_t lo = 0;
 
   // Set each field to its maximum value.
-  edge = iree_hal_topology_edge_set_wait_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  edge = iree_hal_topology_edge_set_signal_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  edge = iree_hal_topology_edge_set_buffer_read_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  edge = iree_hal_topology_edge_set_buffer_write_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  edge = iree_hal_topology_edge_set_wait_cost(edge, 15);
-  edge = iree_hal_topology_edge_set_signal_cost(edge, 15);
-  edge = iree_hal_topology_edge_set_copy_cost(edge, 15);
-  edge = iree_hal_topology_edge_set_capability_flags(edge, 0x7FF);  // 11 bits
-  edge = iree_hal_topology_edge_set_link_class(edge, 7);            // 3 bits
+  lo = iree_hal_topology_edge_set_wait_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_signal_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_buffer_read_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_buffer_write_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_capability_flags(lo, 0xFFFF);  // 16 bits
+  lo = iree_hal_topology_edge_set_wait_cost(lo, 15);
+  lo = iree_hal_topology_edge_set_signal_cost(lo, 15);
+  lo = iree_hal_topology_edge_set_copy_cost(lo, 15);
+  lo = iree_hal_topology_edge_set_latency_class(lo, 15);
+  lo = iree_hal_topology_edge_set_numa_distance(lo, 15);
+  lo = iree_hal_topology_edge_set_link_class(lo, 7);  // 3 bits
 
   // Verify all fields retained their values.
-  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_signal_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_wait_cost(edge), 15);
-  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge), 15);
-  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge), 15);
-  EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge), 0x7FF);
-  EXPECT_EQ(iree_hal_topology_edge_link_class(edge), 7);
+  EXPECT_EQ(iree_hal_topology_edge_capability_flags(lo), 0xFFFF);
+  EXPECT_EQ(iree_hal_topology_edge_wait_cost(lo), 15);
+  EXPECT_EQ(iree_hal_topology_edge_signal_cost(lo), 15);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(lo), 15);
+  EXPECT_EQ(iree_hal_topology_edge_latency_class(lo), 15);
+  EXPECT_EQ(iree_hal_topology_edge_numa_distance(lo), 15);
+  EXPECT_EQ(iree_hal_topology_edge_link_class(lo), 7);
 }
 
-// Verifies that setting each field independently doesn't affect others.
-TEST(TopologyEdge, BitfieldIndependence) {
-  iree_hal_topology_edge_t edge = 0;
+// Verifies that interop word bitfields don't overlap.
+TEST(TopologyEdge, InteropWordBitfieldOverlap) {
+  iree_hal_topology_edge_interop_word_t hi = 0;
+
+  // Set each handle type field to its maximum value (8 bits = 0xFF).
+  hi = iree_hal_topology_edge_set_semaphore_import_types(hi, 0xFF);
+  hi = iree_hal_topology_edge_set_semaphore_export_types(hi, 0xFF);
+  hi = iree_hal_topology_edge_set_buffer_import_types(hi, 0xFF);
+  hi = iree_hal_topology_edge_set_buffer_export_types(hi, 0xFF);
+
+  // Verify all fields retained their values.
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_import_types(hi), 0xFF);
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_export_types(hi), 0xFF);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(hi), 0xFF);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_export_types(hi), 0xFF);
+}
+
+// Verifies that setting each scheduling field independently doesn't affect
+// others.
+TEST(TopologyEdge, SchedulingWordBitfieldIndependence) {
+  iree_hal_topology_edge_scheduling_word_t lo = 0;
 
   // Set wait mode and verify only it changes.
-  edge = iree_hal_topology_edge_set_wait_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge),
+  lo = iree_hal_topology_edge_set_wait_mode(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_signal_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
 
-  // Set signal cost and verify wait mode unchanged (costs are 4-bit, max 15).
-  edge = iree_hal_topology_edge_set_signal_cost(edge, 13);
-  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge), 13);
-  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge),
+  // Set signal cost and verify wait mode unchanged.
+  lo = iree_hal_topology_edge_set_signal_cost(lo, 13);
+  EXPECT_EQ(iree_hal_topology_edge_signal_cost(lo), 13);
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+}
+
+// Verifies that setting interop fields independently doesn't affect others.
+TEST(TopologyEdge, InteropWordBitfieldIndependence) {
+  iree_hal_topology_edge_interop_word_t hi = 0;
+
+  // Set semaphore import types.
+  hi = iree_hal_topology_edge_set_semaphore_import_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_FD |
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR);
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_import_types(hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_FD |
+                IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR);
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_export_types(hi), 0);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(hi), 0);
+
+  // Set buffer export types and verify semaphore import unchanged.
+  hi = iree_hal_topology_edge_set_buffer_export_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_export_types(hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF);
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_import_types(hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_FD |
+                IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR);
 }
 
 //===----------------------------------------------------------------------===//
@@ -87,21 +133,21 @@ TEST(TopologyEdge, CreateSelf) {
   iree_hal_topology_edge_t edge = iree_hal_topology_edge_make_self();
 
   // Self-edges should have NATIVE mode for all operations.
-  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
 
   // Self-edges should have zero cost.
-  EXPECT_EQ(iree_hal_topology_edge_wait_cost(edge), 0);
-  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge), 0);
-  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge), 0);
-  EXPECT_EQ(iree_hal_topology_edge_latency_class(edge), 0);
-  EXPECT_EQ(iree_hal_topology_edge_numa_distance(edge), 0);
+  EXPECT_EQ(iree_hal_topology_edge_wait_cost(edge.lo), 0);
+  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge.lo), 0);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+  EXPECT_EQ(iree_hal_topology_edge_latency_class(edge.lo), 0);
+  EXPECT_EQ(iree_hal_topology_edge_numa_distance(edge.lo), 0);
 
   // Self-edges have all capability flags set.
   iree_hal_topology_capability_t expected_caps =
@@ -114,11 +160,21 @@ TEST(TopologyEdge, CreateSelf) {
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_DEVICE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_SYSTEM |
       IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
-  EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge), expected_caps);
+  EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge.lo), expected_caps);
 
   // Self-edges use SAME_DIE link class.
-  EXPECT_EQ(iree_hal_topology_edge_link_class(edge),
+  EXPECT_EQ(iree_hal_topology_edge_link_class(edge.lo),
             IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
+
+  // Self-edges should have NATIVE handle types.
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_import_types(edge.hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_export_types(edge.hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(edge.hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_export_types(edge.hi),
+            IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE);
 }
 
 // Tests creation of a cross-driver edge.
@@ -126,29 +182,33 @@ TEST(TopologyEdge, CreateCrossDriver) {
   iree_hal_topology_edge_t edge = iree_hal_topology_edge_make_cross_driver();
 
   // Cross-driver edges use IMPORT for semaphores, COPY for buffers.
-  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 
   // Cross-driver has moderate costs.
-  EXPECT_EQ(iree_hal_topology_edge_wait_cost(edge), 5);
-  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge), 5);
-  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge), 10);
-  EXPECT_EQ(iree_hal_topology_edge_latency_class(edge), 8);
-  EXPECT_EQ(iree_hal_topology_edge_numa_distance(edge), 2);
+  EXPECT_EQ(iree_hal_topology_edge_wait_cost(edge.lo), 5);
+  EXPECT_EQ(iree_hal_topology_edge_signal_cost(edge.lo), 5);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge.lo), 10);
+  EXPECT_EQ(iree_hal_topology_edge_latency_class(edge.lo), 8);
+  EXPECT_EQ(iree_hal_topology_edge_numa_distance(edge.lo), 2);
 
   // No special capabilities for cross-driver.
-  EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge),
+  EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge.lo),
             IREE_HAL_TOPOLOGY_CAPABILITY_NONE);
 
   // Cross-driver uses PCIe link class by default.
-  EXPECT_EQ(iree_hal_topology_edge_link_class(edge),
+  EXPECT_EQ(iree_hal_topology_edge_link_class(edge.lo),
             IREE_HAL_TOPOLOGY_LINK_CLASS_PCIE_SAME_ROOT);
+
+  // No handle types set by default for cross-driver.
+  EXPECT_EQ(iree_hal_topology_edge_semaphore_import_types(edge.hi), 0);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(edge.hi), 0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,14 +217,14 @@ TEST(TopologyEdge, CreateCrossDriver) {
 
 // Tests resource origin initialization.
 TEST(ResourceOrigin, Initialize) {
-  iree_hal_topology_edge_t self_edge = iree_hal_topology_edge_make_self();
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_make_self();
 
   iree_hal_resource_origin_t origin = {
-      .self_edge = self_edge,
+      .self_edge = edge.lo,
       .topology_index = 3,
   };
 
-  EXPECT_EQ(origin.self_edge, self_edge);
+  EXPECT_EQ(origin.self_edge, edge.lo);
   EXPECT_EQ(origin.topology_index, 3);
 
   // Check size is as expected (16 bytes with padding).
@@ -174,15 +234,18 @@ TEST(ResourceOrigin, Initialize) {
 // Tests compatibility checking between resources.
 TEST(ResourceOrigin, CompatibilityCheck) {
   iree_hal_topology_edge_t edge1 = iree_hal_topology_edge_make_self();
-  iree_hal_topology_edge_t edge2 = iree_hal_topology_edge_make_cross_driver();
-  edge2 = iree_hal_topology_edge_set_capability_flags(edge2, 0x42);
+
+  iree_hal_topology_edge_scheduling_word_t lo2 = 0;
+  lo2 = iree_hal_topology_edge_set_wait_mode(
+      lo2, IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
+  lo2 = iree_hal_topology_edge_set_capability_flags(lo2, 0x42);
 
   iree_hal_resource_origin_t origin1 = {
-      .self_edge = edge1,
+      .self_edge = edge1.lo,
       .topology_index = 0,
   };
   iree_hal_resource_origin_t origin2 = {
-      .self_edge = edge2,
+      .self_edge = lo2,
       .topology_index = 1,
   };
 
@@ -212,9 +275,9 @@ TEST(TopologyEdge, Formatting) {
 
   // Test cross-driver edge formatting.
   edge = iree_hal_topology_edge_make_cross_driver();
-  edge = iree_hal_topology_edge_set_wait_mode(
-      edge, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  edge = iree_hal_topology_edge_set_copy_cost(edge, 13);  // 4-bit, max 15
+  edge.lo = iree_hal_topology_edge_set_wait_mode(
+      edge.lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  edge.lo = iree_hal_topology_edge_set_copy_cost(edge.lo, 13);
 
   iree_string_builder_reset(&sb);
   IREE_ASSERT_OK(iree_hal_topology_edge_format(edge, &sb));
@@ -238,8 +301,8 @@ TEST(Topology, MatrixFormatting) {
       if (i != j) {
         iree_hal_topology_edge_t edge =
             iree_hal_topology_edge_make_cross_driver();
-        edge = iree_hal_topology_edge_set_link_class(
-            edge, IREE_HAL_TOPOLOGY_LINK_CLASS_NVLINK_IF);
+        edge.lo = iree_hal_topology_edge_set_link_class(
+            edge.lo, IREE_HAL_TOPOLOGY_LINK_CLASS_NVLINK_IF);
         IREE_ASSERT_OK(
             iree_hal_topology_builder_set_edge(&builder, i, j, edge));
       }
@@ -256,6 +319,59 @@ TEST(Topology, MatrixFormatting) {
   printf("%.*s\n", (int)iree_string_builder_size(&sb),
          iree_string_builder_buffer(&sb));
   iree_string_builder_deinitialize(&sb);
+}
+
+//===----------------------------------------------------------------------===//
+// New handle type tests
+//===----------------------------------------------------------------------===//
+
+// Tests that new handle types (RDMA_MR, SHM, etc.) can be set and retrieved.
+TEST(TopologyEdge, NewHandleTypes) {
+  iree_hal_topology_edge_interop_word_t hi = 0;
+
+  // Set all 8 handle type bits.
+  iree_hal_topology_handle_type_t all_types =
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_NATIVE |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_FD |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_WIN32 |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_METAL_IOSURFACE |
+      IREE_HAL_TOPOLOGY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER;
+
+  hi = iree_hal_topology_edge_set_buffer_import_types(hi, all_types);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(hi), all_types);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_import_types(hi), 0xFF);
+}
+
+// Tests RDMA-specific handle types in a realistic configuration.
+TEST(TopologyEdge, RdmaHandleTypes) {
+  iree_hal_topology_edge_interop_word_t hi = 0;
+
+  // An RDMA-capable edge would support MR for buffers and SHM for semaphores.
+  hi = iree_hal_topology_edge_set_buffer_import_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR |
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
+  hi = iree_hal_topology_edge_set_buffer_export_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR |
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
+  hi = iree_hal_topology_edge_set_semaphore_import_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
+  hi = iree_hal_topology_edge_set_semaphore_export_types(
+      hi, IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
+
+  // Verify RDMA_MR is set for buffers but not semaphores.
+  EXPECT_TRUE(iree_hal_topology_edge_buffer_import_types(hi) &
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR);
+  EXPECT_FALSE(iree_hal_topology_edge_semaphore_import_types(hi) &
+               IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR);
+
+  // Verify SHM is set for both.
+  EXPECT_TRUE(iree_hal_topology_edge_buffer_import_types(hi) &
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
+  EXPECT_TRUE(iree_hal_topology_edge_semaphore_import_types(hi) &
+              IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM);
 }
 
 }  // namespace

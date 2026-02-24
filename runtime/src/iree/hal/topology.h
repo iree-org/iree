@@ -45,34 +45,63 @@ typedef uint32_t iree_hal_topology_device_bitmap_t;
 typedef uint64_t iree_hal_topology_device_bitmap_t;
 #endif
 
-// 64-bit packed edge descriptor encoding directional device capabilities.
+// Scheduling word: interop modes, capability flags, cost metrics, link class.
+// This is the hot-path data read on every placement and scheduling decision.
+// Cached in iree_hal_resource_origin_t (8 bytes) for 1-3ns lookups.
+//
+// Layout (64 bits):
+//  Bits  0-1:  wait_mode (2 bits) - how dst can wait on src semaphores
+//  Bits  2-3:  signal_mode (2 bits) - how src can signal to dst
+//  Bits  4-5:  buffer_read_mode (2 bits) - how dst can read src buffers
+//  Bits  6-7:  buffer_write_mode (2 bits) - how dst can write src buffers
+//  Bits  8-23: capability_flags (16 bits) - hardware capabilities
+//  Bits 24-27: wait_cost (4 bits, 0-15) - relative cost to wait
+//  Bits 28-31: signal_cost (4 bits, 0-15) - relative cost to signal
+//  Bits 32-35: copy_cost (4 bits, 0-15) - relative cost to copy data
+//  Bits 36-39: latency_class (4 bits, 0-15) - latency category
+//  Bits 40-43: numa_distance (4 bits, 0-15) - NUMA distance
+//  Bits 44-46: link_class (3 bits) - physical link type
+//  Bits 47-63: reserved (17 bits) - must be zero
+typedef uint64_t iree_hal_topology_edge_scheduling_word_t;
+
+// Interop word: external handle type bitmasks for resource sharing.
+// This is cold-path data read only during resource import/export negotiation.
+//
+// Layout (64 bits):
+//  Bits  0-7:  semaphore_import_types (8 bits) - handle types dst can import
+//  Bits  8-15: semaphore_export_types (8 bits) - handle types src can export
+//  Bits 16-23: buffer_import_types (8 bits) - buffer types dst can import
+//  Bits 24-31: buffer_export_types (8 bits) - buffer types src can export
+//  Bits 32-63: reserved (32 bits) - must be zero
+typedef uint64_t iree_hal_topology_edge_interop_word_t;
+
+// 128-bit packed edge descriptor encoding directional device capabilities.
 //
 // Each edge in the topology matrix describes the relationship from a source
-// device to a destination device. The edge encodes:
-//  - Interop modes: How synchronization and buffers can be shared
-//  - External handle types: What import/export mechanisms are supported
-//  - Capability flags: Hardware features available on this path
-//  - Cost metrics: Relative costs for operations (0-15 scale)
-//  - Link class: Physical interconnect type
+// device to a destination device. The edge is split into two 64-bit words
+// optimized for different access patterns:
 //
-// Bitfield layout (64 bits total):
-//  Bits 0-1:   wait_mode (2 bits) - how dst can wait on src semaphores
-//  Bits 2-3:   signal_mode (2 bits) - how src can signal to dst
-//  Bits 4-5:   buffer_read_mode (2 bits) - how dst can read src buffers
-//  Bits 6-7:   buffer_write_mode (2 bits) - how dst can write src buffers
-//  Bits 8-11:  semaphore_import_types (4 bits) - handle types dst can import
-//  Bits 12-15: semaphore_export_types (4 bits) - handle types src can export
-//  Bits 16-19: buffer_import_types (4 bits) - buffer types dst can import
-//  Bits 20-23: buffer_export_types (4 bits) - buffer types src can export
-//  Bits 24-34: capability_flags (11 bits) - hardware capabilities
-//  Bits 35-38: wait_cost (4 bits, 0-15) - relative cost to wait
-//  Bits 39-42: signal_cost (4 bits, 0-15) - relative cost to signal
-//  Bits 43-46: copy_cost (4 bits, 0-15) - relative cost to copy data
-//  Bits 47-50: latency_class (4 bits, 0-15) - latency category
-//  Bits 51-54: numa_distance (4 bits, 0-15) - NUMA distance
-//  Bits 55-57: link_class (3 bits) - physical link type
-//  Bits 58-63: reserved (6 bits) - must be zero
-typedef uint64_t iree_hal_topology_edge_t;
+//  Scheduling word (lo) — read on every placement decision (nanosecond path).
+//  Interop word (hi) — read during resource import/export (microsecond path).
+//
+// This split allows iree_hal_resource_origin_t to cache only the scheduling
+// word (8 bytes) while the full 128-bit edge lives in the topology matrix.
+typedef struct iree_hal_topology_edge_t {
+  iree_hal_topology_edge_scheduling_word_t lo;
+  iree_hal_topology_edge_interop_word_t hi;
+} iree_hal_topology_edge_t;
+
+// Returns an empty (zero-initialized) edge.
+static inline iree_hal_topology_edge_t iree_hal_topology_edge_empty(void) {
+  iree_hal_topology_edge_t edge = {0, 0};
+  return edge;
+}
+
+// Returns true if the edge is empty (both words zero).
+static inline bool iree_hal_topology_edge_is_empty(
+    iree_hal_topology_edge_t edge) {
+  return edge.lo == 0 && edge.hi == 0;
+}
 
 // Interop modes describing how resources can be shared between devices.
 // Lower values indicate more efficient sharing.
@@ -122,7 +151,9 @@ enum iree_hal_topology_link_class_bits_t {
 typedef uint8_t iree_hal_topology_link_class_t;
 
 // External handle type bits for import/export operations.
-// These map to platform-specific handle types.
+// These map to platform-specific handle types used for cross-device and
+// cross-driver resource sharing. Each bit represents a handle format that
+// may be supported for semaphore or buffer import/export.
 enum iree_hal_topology_handle_type_bits_t {
   // No external handle support.
   IREE_HAL_TOPOLOGY_HANDLE_TYPE_NONE = 0,
@@ -134,6 +165,14 @@ enum iree_hal_topology_handle_type_bits_t {
   IREE_HAL_TOPOLOGY_HANDLE_TYPE_OPAQUE_WIN32 = 1u << 2,
   // DMA-BUF file descriptor (Linux).
   IREE_HAL_TOPOLOGY_HANDLE_TYPE_DMA_BUF = 1u << 3,
+  // RDMA memory region handle (InfiniBand/RoCE verbs).
+  IREE_HAL_TOPOLOGY_HANDLE_TYPE_RDMA_MR = 1u << 4,
+  // POSIX shared memory segment (shm_open/mmap).
+  IREE_HAL_TOPOLOGY_HANDLE_TYPE_SHM = 1u << 5,
+  // Apple Metal IOSurface.
+  IREE_HAL_TOPOLOGY_HANDLE_TYPE_METAL_IOSURFACE = 1u << 6,
+  // Android HardwareBuffer (AHB).
+  IREE_HAL_TOPOLOGY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER = 1u << 7,
 };
 typedef uint8_t iree_hal_topology_handle_type_t;
 
@@ -161,8 +200,12 @@ enum iree_hal_topology_capability_bits_t {
   IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE = 1u << 8,
   // Binary semaphore emulation required.
   IREE_HAL_TOPOLOGY_CAPABILITY_BINARY_SEMAPHORE_ONLY = 1u << 9,
-  // Reserved for future use.
-  IREE_HAL_TOPOLOGY_CAPABILITY_RESERVED = 1u << 10,
+  // RDMA (Remote Direct Memory Access) supported across this link.
+  // Enables zero-copy network transfers via InfiniBand/RoCE verbs.
+  IREE_HAL_TOPOLOGY_CAPABILITY_REMOTE_DMA = 1u << 10,
+  // Shared virtual addressing (SVA/SVM) across this link.
+  // Both devices can use the same virtual addresses for shared memory.
+  IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS = 1u << 11,
 };
 typedef uint16_t iree_hal_topology_capability_t;
 
@@ -173,17 +216,22 @@ typedef uint16_t iree_hal_topology_capability_t;
 // Unified resource origin for fast compatibility checks.
 //
 // This 16-byte structure is embedded in resources (semaphores, buffers)
-// to enable ultra-fast (1-3ns) compatibility queries. The self_edge encodes
-// the owning device's capabilities, while topology_index identifies the device
-// within its topology group.
+// to enable ultra-fast (1-3ns) compatibility queries. The self_edge caches
+// the scheduling word (lo) from the owning device's diagonal topology entry,
+// while topology_index identifies the device within its topology group.
+//
+// Only the scheduling word is cached because the fast-path compatibility
+// check only needs mode/capability/cost information. Handle type negotiation
+// (the interop word) is a cold path that looks up the full 128-bit edge from
+// the topology matrix.
 typedef struct iree_hal_resource_origin_t {
-  // Device capabilities encoded as a self-edge.
-  // This is the edge[i][i] diagonal entry from the topology matrix.
-  iree_hal_topology_edge_t self_edge;  // 8 bytes
+  // Scheduling word from the device's self-edge (edge[i][i].lo).
+  // Contains interop modes, capability flags, costs, and link class.
+  iree_hal_topology_edge_scheduling_word_t self_edge;
 
   // Index of the device in the topology (0 to device_count-1).
   // IREE_HAL_TOPOLOGY_DEVICE_ORDINAL_INVALID if not in a group.
-  uint32_t topology_index;  // 4 bytes
+  uint32_t topology_index;
 } iree_hal_resource_origin_t;
 
 // Returns an undefined resource origin.
@@ -253,7 +301,7 @@ static inline uint32_t iree_hal_topology_device_count(
 }
 
 // Queries the edge from |src_ordinal| to |dst_ordinal|.
-// Returns 0 if either ordinal is out of range.
+// Returns an empty edge if either ordinal is out of range.
 static inline iree_hal_topology_edge_t iree_hal_topology_query_edge(
     const iree_hal_topology_t* topology, uint32_t src_ordinal,
     uint32_t dst_ordinal) {
@@ -261,16 +309,21 @@ static inline iree_hal_topology_edge_t iree_hal_topology_query_edge(
   IREE_ASSERT_LT(dst_ordinal, topology->device_count);
   if (src_ordinal >= topology->device_count ||
       dst_ordinal >= topology->device_count) {
-    return 0;
+    iree_hal_topology_edge_t empty = {0, 0};
+    return empty;
   }
   return topology->edges[src_ordinal * topology->device_count + dst_ordinal];
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_topology_edge_t pack/unpack helpers
+// Scheduling word (lo) getters
 //===----------------------------------------------------------------------===//
+//
+// These getters operate on the scheduling word (edge.lo or
+// resource_origin.self_edge). They extract fields used for placement and
+// scheduling decisions.
 
-// Returns the wait interop mode from an edge.
+// Returns the wait interop mode from a scheduling word.
 // This describes how a semaphore created by the source device can be waited on
 // by the destination device. The mode determines what mechanism is required:
 // - NATIVE: Direct hardware wait, optimal performance (same driver/device)
@@ -283,11 +336,11 @@ static inline iree_hal_topology_edge_t iree_hal_topology_query_edge(
 // depend on whether one can import the other driver's semaphore handles
 // (IMPORT) or need staging.
 static inline iree_hal_topology_interop_mode_t iree_hal_topology_edge_wait_mode(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 0) & 0x3ull;
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 0) & 0x3ull;
 }
 
-// Returns the signal interop mode from an edge.
+// Returns the signal interop mode from a scheduling word.
 // This describes how the destination device can signal a semaphore that will
 // be consumed by the source device. Asymmetric from wait mode as signal and
 // wait may have different hardware capabilities:
@@ -300,11 +353,12 @@ static inline iree_hal_topology_interop_mode_t iree_hal_topology_edge_wait_mode(
 // that other drivers can observe. GPU->GPU may support IMPORT while GPU->CPU
 // might require COPY via host-visible memory or callbacks.
 static inline iree_hal_topology_interop_mode_t
-iree_hal_topology_edge_signal_mode(iree_hal_topology_edge_t edge) {
-  return (edge >> 2) & 0x3ull;
+iree_hal_topology_edge_signal_mode(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 2) & 0x3ull;
 }
 
-// Returns the buffer read interop mode from an edge.
+// Returns the buffer read interop mode from a scheduling word.
 // This describes how the destination device can read from a buffer allocated
 // by the source device. Critical for understanding data transfer requirements:
 // - NATIVE: Direct memory access, peer-to-peer or unified memory (fastest)
@@ -317,11 +371,12 @@ iree_hal_topology_edge_signal_mode(iree_hal_topology_edge_t edge) {
 // COPY. NUMA effects should be considered: reading non-local memory may be
 // possible but slow.
 static inline iree_hal_topology_interop_mode_t
-iree_hal_topology_edge_buffer_read_mode(iree_hal_topology_edge_t edge) {
-  return (edge >> 4) & 0x3ull;
+iree_hal_topology_edge_buffer_read_mode(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 4) & 0x3ull;
 }
 
-// Returns the buffer write interop mode from an edge.
+// Returns the buffer write interop mode from a scheduling word.
 // This describes how the destination device can write to a buffer allocated
 // by the source device. Often asymmetric from read mode due to coherency:
 // - NATIVE: Direct write access with coherency guarantees (unified memory)
@@ -333,11 +388,127 @@ iree_hal_topology_edge_buffer_read_mode(iree_hal_topology_edge_t edge) {
 // may require host cache flushes. GPU->GPU writes across NUMA domains may need
 // explicit synchronization. Coherency guarantees should be documented.
 static inline iree_hal_topology_interop_mode_t
-iree_hal_topology_edge_buffer_write_mode(iree_hal_topology_edge_t edge) {
-  return (edge >> 6) & 0x3ull;
+iree_hal_topology_edge_buffer_write_mode(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 6) & 0x3ull;
 }
 
-// Returns the link class from an edge.
+// Returns capability flags from a scheduling word.
+// This bitfield describes advanced interop capabilities between devices that
+// affect synchronization, memory access patterns, and performance optimization:
+// - SAME_RUNTIME_DOMAIN: Shared command submission, can batch operations
+// - UNIFIED_MEMORY: Single address space, no translation needed (HMM/UVM)
+// - PEER_COHERENT: Hardware cache coherency between devices (no flush/inval)
+// - HOST_COHERENT: CPU can observe device writes without explicit sync
+// - P2P_COPY: Hardware DMA between devices (bypasses host)
+// - CONCURRENT_SAFE: Can safely access same memory concurrently (no races)
+// - ATOMIC_DEVICE: Atomic operations visible across devices
+// - ATOMIC_SYSTEM: Atomic operations visible system-wide (CPU + all devices)
+// - TIMELINE_SEMAPHORE: Supports timeline semaphores for fine-grained sync
+// - REMOTE_DMA: RDMA transfers supported across this link
+// - SHARED_VIRTUAL_ADDRESS: SVA/SVM across this link
+//
+// Implementations should be conservative - only set flags that hardware truly
+// guarantees. ATOMIC_SYSTEM requires platform support (PCIe atomics, vendor
+// extensions). Check CUDA unified addressing, ROCm fine-grained memory, etc.
+static inline iree_hal_topology_capability_t
+iree_hal_topology_edge_capability_flags(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 8) & 0xFFFFull;
+}
+
+// Returns wait cost from a scheduling word (0-15, lower is better).
+// Relative cost metric for waiting on semaphores across this edge. Used by the
+// scheduler to estimate synchronization overhead:
+// - 0: Zero cost (same device, hardware wait queue)
+// - 1-3: Very low (same driver, native semaphore, <100ns)
+// - 4-7: Low (imported semaphore, <1us)
+// - 8-11: Moderate (polling/callbacks, <10us)
+// - 12-14: High (host staging, >10us)
+// - 15: Maximum (avoid if possible)
+//
+// Implementations should measure actual wait latency. Native waits are
+// typically 0-1. Cross-driver imports are 3-5. Host polling is 8+. Consider
+// CPU cost: polling wastes cycles even if latency is acceptable.
+static inline uint8_t iree_hal_topology_edge_wait_cost(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 24) & 0xFull;
+}
+
+// Returns signal cost from a scheduling word (0-15, lower is better).
+// Relative cost metric for signaling semaphores across this edge. Often
+// asymmetric from wait cost due to different hardware mechanisms:
+// - 0: Zero cost (same device, single instruction)
+// - 1-3: Very low (native signal, write-once)
+// - 4-7: Low (exported semaphore, some bookkeeping)
+// - 8-11: Moderate (host notification callback)
+// - 12-14: High (host must poll and signal separately)
+// - 15: Maximum (avoid if possible)
+//
+// Implementations should consider signal overhead. GPU signals are typically
+// cheap (0-2), but callbacks to signal other drivers may be expensive (5-8).
+// Host signaling GPU semaphores may require kernel transitions (6-10).
+static inline uint8_t iree_hal_topology_edge_signal_cost(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 28) & 0xFull;
+}
+
+// Returns copy/transfer cost from a scheduling word (0-15, lower is better).
+// Relative cost metric for transferring data between devices on this edge.
+// Combines bandwidth and latency into a single metric for scheduling:
+// - 0: Zero cost (same device, pointer passing)
+// - 1-3: Very low (same die, direct memory access, >500GB/s)
+// - 4-7: Low (NVLink/Infinity Fabric, peer-to-peer DMA, >100GB/s)
+// - 8-11: Moderate (PCIe Gen4x16, ~30GB/s)
+// - 12-14: High (cross-NUMA, host staging, <10GB/s)
+// - 15: Maximum (network fabric, avoid if possible)
+//
+// Implementations should consider both bandwidth and transfer setup cost. Large
+// transfers care about bandwidth (PCIe=8). Small transfers care about latency
+// (P2P=4, staged=12). Measure with realistic workload sizes (1MB-1GB).
+static inline uint8_t iree_hal_topology_edge_copy_cost(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 32) & 0xFull;
+}
+
+// Returns latency class from a scheduling word (0-15, lower is better).
+// Categorizes round-trip latency for operations across this edge, independent
+// of bandwidth. Used for latency-sensitive workloads like real-time inference:
+// - 0: Same device (<10ns, cache/register latency)
+// - 1-3: Same die/package (<100ns, L3 cache)
+// - 4-6: Local NUMA node (<1us, peer-to-peer)
+// - 7-9: Cross-NUMA/PCIe (<10us)
+// - 10-12: Host staging (10-100us)
+// - 13-15: Network fabric (>100us)
+//
+// Implementations should measure with small ping-pong transfers (<1KB). Latency
+// matters for small operations and pipelined kernels. Don't confuse with
+// bandwidth: NVLink has great bandwidth but still 4-5us latency.
+static inline uint8_t iree_hal_topology_edge_latency_class(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 36) & 0xFull;
+}
+
+// Returns NUMA distance from a scheduling word (0-15, lower is better).
+// NUMA (Non-Uniform Memory Access) distance between devices, affecting memory
+// access latency and bandwidth. Corresponds to ACPI SLIT (System Locality
+// Information Table) values, normalized to 4 bits:
+// - 0: Same NUMA node (local memory, optimal)
+// - 1-3: Adjacent NUMA nodes (1 hop, still good)
+// - 4-7: Near nodes (2 hops, noticeable penalty)
+// - 8-11: Far nodes (3+ hops, significant penalty)
+// - 12-15: Remote/cross-socket (avoid if possible)
+//
+// Implementations should query OS NUMA topology. On Linux check
+// /sys/devices/system/node/, on Windows use GetNumaProximityNodeEx(). For GPUs,
+// map to CPU NUMA node via PCIe root complex. Crucial for multi-socket systems
+// where cross-socket access is 2-3x slower. Self-edges should always be 0.
+static inline uint8_t iree_hal_topology_edge_numa_distance(
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 40) & 0xFull;
+}
+
+// Returns the link class from a scheduling word.
 // This categorizes the physical interconnect between devices, which determines
 // bandwidth, latency, and coherency characteristics. Used by the scheduler to
 // make data placement and transfer decisions:
@@ -354,168 +525,67 @@ iree_hal_topology_edge_buffer_write_mode(iree_hal_topology_edge_t edge) {
 // provides PCIe topology, vendor APIs (ROCm/CUDA) expose GPU links. This field
 // must be symmetric: link_class(i,j) must equal link_class(j,i).
 static inline iree_hal_topology_link_class_t iree_hal_topology_edge_link_class(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 55) & 0x7ull;
+    iree_hal_topology_edge_scheduling_word_t word) {
+  return (word >> 44) & 0x7ull;
 }
 
-// Returns capability flags from an edge.
-// This bitfield describes advanced interop capabilities between devices that
-// affect synchronization, memory access patterns, and performance optimization:
-// - SAME_RUNTIME_DOMAIN: Shared command submission, can batch operations
-// - UNIFIED_MEMORY: Single address space, no translation needed (HMM/UVM)
-// - PEER_COHERENT: Hardware cache coherency between devices (no flush/inval)
-// - HOST_COHERENT: CPU can observe device writes without explicit sync
-// - P2P_COPY: Hardware DMA between devices (bypasses host)
-// - CONCURRENT_SAFE: Can safely access same memory concurrently (no races)
-// - ATOMIC_DEVICE: Atomic operations visible across devices
-// - ATOMIC_SYSTEM: Atomic operations visible system-wide (CPU + all devices)
-// - TIMELINE_SEMAPHORE: Supports timeline semaphores for fine-grained sync
+//===----------------------------------------------------------------------===//
+// Interop word (hi) getters
+//===----------------------------------------------------------------------===//
 //
-// Implementations should be conservative - only set flags that hardware truly
-// guarantees. ATOMIC_SYSTEM requires platform support (PCIe atomics, vendor
-// extensions). Check CUDA unified addressing, ROCm fine-grained memory, etc.
-static inline iree_hal_topology_capability_t
-iree_hal_topology_edge_capability_flags(iree_hal_topology_edge_t edge) {
-  return (edge >> 24) & 0x7FFull;
-}
+// These getters operate on the interop word (edge.hi). They extract handle
+// type bitmasks used during resource import/export negotiation.
 
-// Returns wait cost from an edge (0-15, lower is better).
-// Relative cost metric for waiting on semaphores across this edge. Used by the
-// scheduler to estimate synchronization overhead:
-// - 0: Zero cost (same device, hardware wait queue)
-// - 1-3: Very low (same driver, native semaphore, <100ns)
-// - 4-7: Low (imported semaphore, <1us)
-// - 8-11: Moderate (polling/callbacks, <10us)
-// - 12-14: High (host staging, >10us)
-// - 15: Maximum (avoid if possible)
-//
-// Implementations should measure actual wait latency. Native waits are
-// typically 0-1. Cross-driver imports are 3-5. Host polling is 8+. Consider
-// CPU cost: polling wastes cycles even if latency is acceptable.
-static inline uint8_t iree_hal_topology_edge_wait_cost(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 35) & 0xFull;
-}
-
-// Returns signal cost from an edge (0-15, lower is better).
-// Relative cost metric for signaling semaphores across this edge. Often
-// asymmetric from wait cost due to different hardware mechanisms:
-// - 0: Zero cost (same device, single instruction)
-// - 1-3: Very low (native signal, write-once)
-// - 4-7: Low (exported semaphore, some bookkeeping)
-// - 8-11: Moderate (host notification callback)
-// - 12-14: High (host must poll and signal separately)
-// - 15: Maximum (avoid if possible)
-//
-// Implementations should consider signal overhead. GPU signals are typically
-// cheap (0-2), but callbacks to signal other drivers may be expensive (5-8).
-// Host signaling GPU semaphores may require kernel transitions (6-10).
-static inline uint8_t iree_hal_topology_edge_signal_cost(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 39) & 0xFull;
-}
-
-// Returns copy/transfer cost from an edge (0-15, lower is better).
-// Relative cost metric for transferring data between devices on this edge.
-// Combines bandwidth and latency into a single metric for scheduling:
-// - 0: Zero cost (same device, pointer passing)
-// - 1-3: Very low (same die, direct memory access, >500GB/s)
-// - 4-7: Low (NVLink/Infinity Fabric, peer-to-peer DMA, >100GB/s)
-// - 8-11: Moderate (PCIe Gen4x16, ~30GB/s)
-// - 12-14: High (cross-NUMA, host staging, <10GB/s)
-// - 15: Maximum (network fabric, avoid if possible)
-//
-// Implementations should consider both bandwidth and transfer setup cost. Large
-// transfers care about bandwidth (PCIe=8). Small transfers care about latency
-// (P2P=4, staged=12). Measure with realistic workload sizes (1MB-1GB).
-static inline uint8_t iree_hal_topology_edge_copy_cost(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 43) & 0xFull;
-}
-
-// Returns latency class from an edge (0-15, lower is better).
-// Categorizes round-trip latency for operations across this edge, independent
-// of bandwidth. Used for latency-sensitive workloads like real-time inference:
-// - 0: Same device (<10ns, cache/register latency)
-// - 1-3: Same die/package (<100ns, L3 cache)
-// - 4-6: Local NUMA node (<1us, peer-to-peer)
-// - 7-9: Cross-NUMA/PCIe (<10us)
-// - 10-12: Host staging (10-100us)
-// - 13-15: Network fabric (>100us)
-//
-// Implementations should measure with small ping-pong transfers (<1KB). Latency
-// matters for small operations and pipelined kernels. Don't confuse with
-// bandwidth: NVLink has great bandwidth but still 4-5us latency.
-static inline uint8_t iree_hal_topology_edge_latency_class(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 47) & 0xFull;
-}
-
-// Returns NUMA distance from an edge (0-15, lower is better).
-// NUMA (Non-Uniform Memory Access) distance between devices, affecting memory
-// access latency and bandwidth. Corresponds to ACPI SLIT (System Locality
-// Information Table) values, normalized to 4 bits:
-// - 0: Same NUMA node (local memory, optimal)
-// - 1-3: Adjacent NUMA nodes (1 hop, still good)
-// - 4-7: Near nodes (2 hops, noticeable penalty)
-// - 8-11: Far nodes (3+ hops, significant penalty)
-// - 12-15: Remote/cross-socket (avoid if possible)
-//
-// Implementations should query OS NUMA topology. On Linux check
-// /sys/devices/system/node/, on Windows use GetNumaProximityNodeEx(). For GPUs,
-// map to CPU NUMA node via PCIe root complex. Crucial for multi-socket systems
-// where cross-socket access is 2-3x slower. Self-edges should always be 0.
-static inline uint8_t iree_hal_topology_edge_numa_distance(
-    iree_hal_topology_edge_t edge) {
-  return (edge >> 51) & 0xFull;
-}
-
-// Returns semaphore import handle types from an edge.
+// Returns semaphore import handle types from an interop word.
 // Bitfield of iree_hal_topology_handle_type_t values indicating which external
 // semaphore handle types can be imported for waiting by the destination device.
-// Common values include OPAQUE_FD (Linux), OPAQUE_WIN32_HANDLE (Windows), or
-// SYNC_FD for timeline semaphores.
+// Common values include OPAQUE_FD (Linux), OPAQUE_WIN32 (Windows), or
+// RDMA_MR for remote memory regions.
 //
 // Implementations should query platform capabilities (e.g., Vulkan/CUDA/ROCm
 // external semaphore support) and set corresponding bits for supported types.
 static inline iree_hal_topology_handle_type_t
-iree_hal_topology_edge_semaphore_import_types(iree_hal_topology_edge_t edge) {
-  return (edge >> 8) & 0xFull;
+iree_hal_topology_edge_semaphore_import_types(
+    iree_hal_topology_edge_interop_word_t word) {
+  return (word >> 0) & 0xFFull;
 }
 
-// Returns semaphore export handle types from an edge.
+// Returns semaphore export handle types from an interop word.
 // Bitfield of iree_hal_topology_handle_type_t values indicating which external
 // semaphore handle types can be exported for signaling by the source device.
 //
 // Implementations should advertise handle types that other drivers can import.
 // Asymmetric from import types when devices have different export capabilities.
 static inline iree_hal_topology_handle_type_t
-iree_hal_topology_edge_semaphore_export_types(iree_hal_topology_edge_t edge) {
-  return (edge >> 12) & 0xFull;
+iree_hal_topology_edge_semaphore_export_types(
+    iree_hal_topology_edge_interop_word_t word) {
+  return (word >> 8) & 0xFFull;
 }
 
-// Returns buffer import handle types from an edge.
+// Returns buffer import handle types from an interop word.
 // Bitfield of iree_hal_topology_handle_type_t values indicating which external
 // buffer handle types can be imported for access by the destination device.
 // Critical for zero-copy buffer sharing across drivers.
 //
-// Implementations should check for DMA-BUF (Linux), D3D12 resources (Windows),
-// or vendor-specific handles (CUDA IPC, HIP IPC). Only set bits for handles
-// that provide actual memory access, not just metadata transfer.
+// Implementations should check for DMA-BUF (Linux), RDMA memory regions,
+// shared memory, or vendor-specific handles (CUDA IPC, HIP IPC). Only set bits
+// for handles that provide actual memory access, not just metadata transfer.
 static inline iree_hal_topology_handle_type_t
-iree_hal_topology_edge_buffer_import_types(iree_hal_topology_edge_t edge) {
-  return (edge >> 16) & 0xFull;
+iree_hal_topology_edge_buffer_import_types(
+    iree_hal_topology_edge_interop_word_t word) {
+  return (word >> 16) & 0xFFull;
 }
 
-// Returns buffer export handle types from an edge.
+// Returns buffer export handle types from an interop word.
 // Bitfield of iree_hal_topology_handle_type_t values indicating which external
 // buffer handle types can be exported from the source device for sharing.
 //
 // Implementations should advertise handle types supported by their allocator.
 // May differ from import types if device can consume more formats than produce.
 static inline iree_hal_topology_handle_type_t
-iree_hal_topology_edge_buffer_export_types(iree_hal_topology_edge_t edge) {
-  return (edge >> 20) & 0xFull;
+iree_hal_topology_edge_buffer_export_types(
+    iree_hal_topology_edge_interop_word_t word) {
+  return (word >> 24) & 0xFFull;
 }
 
 //===----------------------------------------------------------------------===//

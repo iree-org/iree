@@ -35,24 +35,24 @@ iree_status_t iree_hal_topology_edge_format(iree_hal_topology_edge_t edge,
   // Format wait mode.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "wait="));
   IREE_RETURN_IF_ERROR(iree_bitfield_format(
-      iree_hal_topology_edge_wait_mode(edge),
+      iree_hal_topology_edge_wait_mode(edge.lo),
       IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
 
   // Format signal mode.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, " signal="));
   IREE_RETURN_IF_ERROR(iree_bitfield_format(
-      iree_hal_topology_edge_signal_mode(edge),
+      iree_hal_topology_edge_signal_mode(edge.lo),
       IREE_ARRAYSIZE(interop_mode_mappings), interop_mode_mappings, builder));
 
   // Format link class.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, " link="));
   IREE_RETURN_IF_ERROR(iree_bitfield_format(
-      iree_hal_topology_edge_link_class(edge),
+      iree_hal_topology_edge_link_class(edge.lo),
       IREE_ARRAYSIZE(link_class_mappings), link_class_mappings, builder));
 
   // Format costs.
-  uint8_t wait_cost = iree_hal_topology_edge_wait_cost(edge);
-  uint8_t copy_cost = iree_hal_topology_edge_copy_cost(edge);
+  uint8_t wait_cost = iree_hal_topology_edge_wait_cost(edge.lo);
+  uint8_t copy_cost = iree_hal_topology_edge_copy_cost(edge.lo);
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
       builder, " wait_cost=%u copy_cost=%u", wait_cost, copy_cost));
 
@@ -85,7 +85,7 @@ iree_status_t iree_hal_topology_dump_matrix(const iree_hal_topology_t* topology,
 
       // Simplified display showing wait mode.
       char mode_char = '?';
-      switch (iree_hal_topology_edge_wait_mode(edge)) {
+      switch (iree_hal_topology_edge_wait_mode(edge.lo)) {
         case IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE:
           mode_char = 'N';
           break;
