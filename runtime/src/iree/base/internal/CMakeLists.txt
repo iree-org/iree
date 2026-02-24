@@ -318,6 +318,32 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    shm
+  HDRS
+    "shm.h"
+  SRCS
+    "shm_posix.c"
+    "shm_win32.c"
+  DEPS
+    ::internal
+    ::memory
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    shm_test
+  SRCS
+    "shm_test.cc"
+  DEPS
+    ::shm
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     span
   HDRS
     "span.h"

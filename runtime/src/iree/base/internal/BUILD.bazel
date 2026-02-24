@@ -295,6 +295,30 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "shm",
+    srcs = [
+        "shm_posix.c",
+        "shm_win32.c",
+    ],
+    hdrs = ["shm.h"],
+    deps = [
+        ":internal",
+        ":memory",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "shm_test",
+    srcs = ["shm_test.cc"],
+    deps = [
+        ":shm",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "span",
     hdrs = ["span.h"],
 )
