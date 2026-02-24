@@ -174,38 +174,33 @@ struct AttentionOpConversion
     FloatType targetType = cast<FloatType>(elementType);
 
     // Pre-apply scale to query. Include log2(e) factor since decomposition
-    // uses exp2. For high precision: Q * (1/sqrt(d) * log2(e))
-    // For low precision: Q / (sqrt(d) / log2(e)) to avoid overflow in fp8.
+    // uses exp2: Q * (1/sqrt(d) * log2(e)).
+    // For low precision (fp8): scale is applied post-matmul in the region body
+    // to avoid losing precision due to the limited dynamic range of fp8.
     double dk = static_cast<double>(headDim);
-    double scaleVal;
-    if (lowPrecision) {
-      scaleVal = std::sqrt(dk) / M_LOG2E;
-    } else {
-      scaleVal = (1.0 / std::sqrt(dk)) * M_LOG2E;
-    }
-    Value scaleConst = arith::ConstantOp::create(
-        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, scaleVal));
+    double scaleVal = (1.0 / std::sqrt(dk)) * M_LOG2E;
 
-    auto queryType = cast<RankedTensorType>(query.getType());
-    AffineMap identityMap =
-        rewriter.getMultiDimIdentityMap(queryType.getRank());
-    AffineMap scalarMap =
-        AffineMap::get(queryType.getRank(), /*symbolCount=*/0, ctx);
-    SmallVector<utils::IteratorType> iteratorTypes(
-        queryType.getRank(), utils::IteratorType::parallel);
-    auto genericOp = linalg::GenericOp::create(
-        rewriter, loc, queryType, scaleConst, query,
-        SmallVector<AffineMap>{scalarMap, identityMap}, iteratorTypes,
-        [&](OpBuilder &b, Location loc, ValueRange args) {
-          Value result;
-          if (lowPrecision) {
-            result = arith::DivFOp::create(b, loc, args[1], args[0]);
-          } else {
-            result = arith::MulFOp::create(b, loc, args[1], args[0]);
-          }
-          linalg::YieldOp::create(b, loc, result);
-        });
-    query = genericOp.getResult(0);
+    if (!lowPrecision) {
+      Value scaleConst = arith::ConstantOp::create(
+          rewriter, loc, targetType,
+          rewriter.getFloatAttr(targetType, scaleVal));
+
+      auto queryType = cast<RankedTensorType>(query.getType());
+      AffineMap identityMap =
+          rewriter.getMultiDimIdentityMap(queryType.getRank());
+      AffineMap scalarMap =
+          AffineMap::get(queryType.getRank(), /*symbolCount=*/0, ctx);
+      SmallVector<utils::IteratorType> iteratorTypes(
+          queryType.getRank(), utils::IteratorType::parallel);
+      auto genericOp = linalg::GenericOp::create(
+          rewriter, loc, queryType, scaleConst, query,
+          SmallVector<AffineMap>{scalarMap, identityMap}, iteratorTypes,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value result = arith::MulFOp::create(b, loc, args[1], args[0]);
+            linalg::YieldOp::create(b, loc, result);
+          });
+      query = genericOp.getResult(0);
+    }
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
@@ -229,7 +224,15 @@ struct AttentionOpConversion
       block->addArgument(rewriter.getF32Type(), loc);
       rewriter.setInsertionPoint(block, block->begin());
 
-      IREE::LinalgExt::YieldOp::create(rewriter, loc, block->getArgument(0));
+      Value score = block->getArgument(0);
+      if (lowPrecision) {
+        // For fp8: apply scale post-matmul in the region body on f32 scores.
+        Value regionScale =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF32Type(),
+                                      rewriter.getF32FloatAttr(scaleVal));
+        score = arith::MulFOp::create(rewriter, loc, score, regionScale);
+      }
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, score);
     }
 
     rewriter.replaceOp(op, attention.getResult(0));

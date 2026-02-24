@@ -1,8 +1,8 @@
 func.func @attention1x3x4() {
   %init = tensor.empty() : tensor<1x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
-                                            [0.25, 0.3, 0.35, 0.4],
-                                            [0.45, 0.5, 0.55, 0.6]]]> : tensor<1x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.0721, 0.1443, 0.2164, 0.2885],
+                                            [0.3607, 0.4328, 0.5049, 0.5771],
+                                            [0.6492, 0.7213, 0.7935, 0.8656]]]> : tensor<1x3x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -30,9 +30,9 @@ func.func @attention1x3x4() {
 
 func.func @causal_attention1x3x4() {
   %init = tensor.empty() : tensor<1x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
-                                            [0.25, 0.3, 0.35, 0.4],
-                                            [0.45, 0.5, 0.55, 0.6]]]> : tensor<1x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.0721, 0.1443, 0.2164, 0.2885],
+                                            [0.3607, 0.4328, 0.5049, 0.5771],
+                                            [0.6492, 0.7213, 0.7935, 0.8656]]]> : tensor<1x3x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -64,10 +64,10 @@ func.func @causal_attention1x3x4() {
 
 func.func @attention1x4x4_i1_mask_all_ones() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
-                                            [0.25, 0.3, 0.35, 0.4],
-                                            [0.45, 0.5, 0.55, 0.6],
-                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.0721, 0.1443, 0.2164, 0.2885],
+                                            [0.3607, 0.4328, 0.5049, 0.5771],
+                                            [0.6492, 0.7213, 0.7935, 0.8656],
+                                            [0.9378, 1.0099, 1.0820, 1.1542]]]> : tensor<1x4x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -105,9 +105,9 @@ func.func @attention1x4x4_i1_mask_all_ones() {
 
 func.func @softcap_attention1x3x4() {
   %init = tensor.empty() : tensor<1x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[-0.6523,  0.7802, -0.6770, -0.9474],
-                                            [ 0.6822,  0.8594,  0.1035, -0.5115],
-                                            [-0.7860, -0.5562, -0.2750, -0.0973]]]> : tensor<1x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[-0.9411,  1.1256, -0.9767, -1.3668],
+                                            [ 0.9842,  1.2399,  0.1493, -0.7379],
+                                            [-1.1340, -0.8024, -0.3967, -0.1404]]]> : tensor<1x3x4xf32>
 
   %key = util.unfoldable_constant dense<[[[-0.3457,  0.5223, -0.0553,  0.5851],
                                           [ 0.4057, -0.8352,  0.1931,  0.1678],
@@ -138,10 +138,10 @@ func.func @softcap_attention1x3x4() {
 
 func.func @attention1x4x4() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
-                                            [0.25, 0.3, 0.35, 0.4],
-                                            [0.45, 0.5, 0.55, 0.6],
-                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.0721, 0.1443, 0.2164, 0.2885],
+                                            [0.3607, 0.4328, 0.5049, 0.5771],
+                                            [0.6492, 0.7213, 0.7935, 0.8656],
+                                            [0.9378, 1.0099, 1.0820, 1.1542]]]> : tensor<1x4x4xf32>
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
                                           [0.9, 1.0, 1.1, 1.2],
@@ -171,15 +171,15 @@ func.func @attention1x4x4() {
 
 func.func @attention3x3x4() {
   %init = tensor.empty() : tensor<3x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[-0.7628, -0.3751, -0.3270, -0.80475],
-                                            [-0.3046, -0.4899, -0.80455, -0.35605],
-                                            [ 0.2338, -0.3485, -0.5804,  0.34975]],
-                                           [[ 0.43285,  0.1222, -0.33145,  0.40365],
-                                            [-0.08795, -1.1228, -0.72325,  0.0306],
-                                            [-0.38675,  0.09955,  0.02285,  0.0765]],
-                                           [[-0.0555,  0.14635, -0.0789, -0.0144],
-                                            [ 0.5711, 0.1243,  -0.8877, -0.01275],
-                                            [ 0.80515, -0.3520, -0.09265, -0.4981]]]> : tensor<3x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[-1.1005, -0.5412, -0.4718, -1.1610],
+                                            [-0.4394, -0.7068, -1.1607, -0.5137],
+                                            [ 0.3373, -0.5028, -0.8373,  0.5046]],
+                                           [[ 0.6245,  0.1763, -0.4782,  0.5823],
+                                            [-0.1269, -1.6199, -1.0434,  0.0441],
+                                            [-0.5580,  0.1436,  0.0330,  0.1104]],
+                                           [[-0.0801,  0.2111, -0.1138, -0.0208],
+                                            [ 0.8239,  0.1793, -1.2807, -0.0184],
+                                            [ 1.1616, -0.5078, -0.1337, -0.7186]]]> : tensor<3x3x4xf32>
   %key = util.unfoldable_constant dense<[[[-0.6092, -0.9798, -1.6091, -0.7121],
                                           [-0.7773, -0.2515, -0.2223,  1.6871],
                                           [ 0.4676, -0.6970, -1.1608,  0.6995]],

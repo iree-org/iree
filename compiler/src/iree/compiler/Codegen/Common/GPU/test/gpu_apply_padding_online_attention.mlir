@@ -95,8 +95,6 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
 
 // CHECK-LABEL: func.func @online_attention_tile_then_pad_bool_mask
 func.func @online_attention_tile_then_pad_bool_mask(%query: tensor<192x1024x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>, %mask: tensor<192x1024x?xi1>) -> tensor<192x1024x64xf32> {
-  %scale = arith.constant 1.0 : f32
-
   %output_empty = tensor.empty() : tensor<192x1024x64xf32>
   %row_red_empty = tensor.empty() : tensor<192x1024xf32>
 
@@ -110,13 +108,13 @@ func.func @online_attention_tile_then_pad_bool_mask(%query: tensor<192x1024x64xf
   //         CHECK: arith.constant false
   // CHECK-COUNT-3: tensor.pad
   //         CHECK: iree_linalg_ext.online_attention
-  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xi1>)
+  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, tensor<192x1024x32xi1>)
   %out:3 = iree_linalg_ext.online_attention
         {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
+          indexing_maps = [#mapQ, #mapK, #mapV, #mapM, #mapO, #mapR, #mapR],
           lowering_config = #lowering_config
         }
-        ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<192x1024x?xi1>)
+        ins(%query, %key, %value, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, tensor<192x1024x?xi1>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         {
           ^bb0(%score: f32):
@@ -154,7 +152,7 @@ func.func @online_attention_tile_then_pad_i8_mask(%query: tensor<192x1024x64xf32
   //         CHECK: arith.constant 0 : i8
   // CHECK-COUNT-3: tensor.pad
   //         CHECK: iree_linalg_ext.online_attention
-  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xi8>)
+  //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, tensor<192x1024x32xi8>)
   %out:3 = iree_linalg_ext.online_attention
         {
           indexing_maps = [#mapQ, #mapK, #mapV, #mapM, #mapO, #mapR, #mapR],
