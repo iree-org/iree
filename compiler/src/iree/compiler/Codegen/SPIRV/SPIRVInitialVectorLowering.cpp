@@ -391,7 +391,11 @@ public:
         return WalkResult::advance();
       });
       RewritePatternSet patterns(context);
-      vector::populateVectorMultiReductionLoweringPatterns(
+      vector::populateVectorMultiReductionReorderAndExpandPatterns(
+          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+      vector::populateVectorMultiReductionFlatteningPatterns(
+          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+      vector::populateVectorMultiReductionUnrollingPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       if (failed(applyOpPatternsGreedily(reductionOps, std::move(patterns)))) {
         funcOp.emitOpError("vector lowering failed");

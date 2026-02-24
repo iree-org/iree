@@ -32,6 +32,7 @@ on:
   push:
     branches:
       - main
+      - shared/iree-therock-mainline
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
