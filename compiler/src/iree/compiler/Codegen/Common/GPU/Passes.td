@@ -83,12 +83,13 @@ def GPUConvertToCoalescedDMAPass :
 
 def AMDGPULowerCoalescedDMAToGatherLDSPass :
     InterfacePass<"iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds", "mlir::FunctionOpInterface"> {
-  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds.";
+  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds with vector fallback.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
     "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::vector::VectorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
