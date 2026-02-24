@@ -1,10 +1,10 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
+// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target{for-rocdl=true})))))" \
 // RUN:   %s | FileCheck %s
 
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
+// RUN:   --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target{for-rocdl=true})))))" \
 // RUN:   %s | FileCheck %s --check-prefix=MEMORY
 

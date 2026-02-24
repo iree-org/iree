@@ -67,10 +67,12 @@ void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE GPU Codegen Options");
   CodegenOptions::bindOptions(binder);
 
-  binder.opt<bool>(
-      "iree-llvmgpu-enable-prefetch", enablePrefetch,
-      llvm::cl::desc("Enable prefetch in the vector distribute pipeline."),
-      llvm::cl::cat(category));
+  binder.opt<int64_t>(
+      "iree-llvmgpu-prefetch-num-stages", prefetchNumStages,
+      llvm::cl::desc("Number of pipelining stages for shared memory "
+                     "prefetching (-1=use heuristic default per code path, "
+                     "0-1=no pipelining, 2 or more=enable)."),
+      llvm::cl::cat(category), llvm::cl::init(-1));
 }
 
 } // namespace mlir::iree_compiler
