@@ -109,11 +109,11 @@ struct iree_tokenizer_normalizer_vtable_t {
                                  iree_string_view_t input,
                                  iree_mutable_string_view_t output,
                                  iree_tokenizer_normalizer_flags_t flags,
-                                 iree_host_size_t* out_consumed,
-                                 iree_host_size_t* out_written);
+                                 iree_host_size_t* IREE_RESTRICT out_consumed,
+                                 iree_host_size_t* IREE_RESTRICT out_written);
   iree_status_t (*state_finalize)(iree_tokenizer_normalizer_state_t* state,
                                   iree_mutable_string_view_t output,
-                                  iree_host_size_t* out_written);
+                                  iree_host_size_t* IREE_RESTRICT out_written);
   bool (*state_has_pending)(const iree_tokenizer_normalizer_state_t* state);
 };
 
@@ -172,7 +172,8 @@ static inline void iree_tokenizer_normalizer_state_deinitialize(
 static inline iree_status_t iree_tokenizer_normalizer_state_process(
     iree_tokenizer_normalizer_state_t* state, iree_string_view_t input,
     iree_mutable_string_view_t output, iree_tokenizer_normalizer_flags_t flags,
-    iree_host_size_t* out_consumed, iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_consumed,
+    iree_host_size_t* IREE_RESTRICT out_written) {
   return state->normalizer->vtable->state_process(state, input, output, flags,
                                                   out_consumed, out_written);
 }
@@ -182,7 +183,7 @@ static inline iree_status_t iree_tokenizer_normalizer_state_process(
 // May need multiple calls if output buffer is too small for buffered data.
 static inline iree_status_t iree_tokenizer_normalizer_state_finalize(
     iree_tokenizer_normalizer_state_t* state, iree_mutable_string_view_t output,
-    iree_host_size_t* out_written) {
+    iree_host_size_t* IREE_RESTRICT out_written) {
   return state->normalizer->vtable->state_finalize(state, output, out_written);
 }
 
