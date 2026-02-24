@@ -17,7 +17,7 @@
 #include <windows.h>
 namespace {
 using DlHandle = HMODULE;
-DlHandle loadLibrary(const char *libraryPath) {
+DlHandle loadLibrary(const char* libraryPath) {
   HMODULE lib = LoadLibraryExA(libraryPath, nullptr, 0);
   if (lib) return lib;
   DWORD errorMessageID = GetLastError();
@@ -34,19 +34,19 @@ DlHandle loadLibrary(const char *libraryPath) {
   LocalFree(messageBuffer);
   return nullptr;
 }
-void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
-  return (void *)GetProcAddress(lib, symbol);
+void* lookupLibrarySymbol(DlHandle lib, const char* symbol) {
+  return (void*)GetProcAddress(lib, symbol);
 }
 }  // namespace
 #else
 // Posix impl
 #include <dlfcn.h>
 namespace {
-using DlHandle = void *;
-DlHandle loadLibrary(const char *libraryPath) {
+using DlHandle = void*;
+DlHandle loadLibrary(const char* libraryPath) {
   DlHandle lib = dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL);
   if (!lib) {
-    const char *reason = dlerror();
+    const char* reason = dlerror();
     if (!reason) reason = "";
     fprintf(
         stderr,
@@ -56,7 +56,7 @@ DlHandle loadLibrary(const char *libraryPath) {
   }
   return lib;
 }
-void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
+void* lookupLibrarySymbol(DlHandle lib, const char* symbol) {
   // note: on macOS, dlsym already prepends CDECL_SYMBOL_PREFIX _
   return dlsym(lib, symbol);
 }
@@ -66,7 +66,7 @@ void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
 namespace {
 DlHandle libraryHandle = nullptr;
 
-#define HANDLE_SYMBOL(fn_name) decltype(fn_name) *__##fn_name = nullptr;
+#define HANDLE_SYMBOL(fn_name) decltype(fn_name)* __##fn_name = nullptr;
 #define HANDLE_VERSIONED_SYMBOL(fn_name, major, minor) HANDLE_SYMBOL(fn_name)
 #include "./handle_symbols.inc"
 #undef HANDLE_SYMBOL
@@ -82,7 +82,7 @@ void assertLoaded() {
 }
 }  // namespace
 
-bool openxlaPartitionerLoadLibrary(const char *libraryPath) {
+bool openxlaPartitionerLoadLibrary(const char* libraryPath) {
   if (libraryHandle) {
     fprintf(stderr, "ERROR: OpenXLA partitioner stub already initialized\n");
     return false;
@@ -132,13 +132,13 @@ bool openxlaPartitionerLoadLibrary(const char *libraryPath) {
 // Trampoline functions.
 ////////////////////////////////////////////////////////////////////////////////
 
-void openxlaPartitionerErrorDestroy(openxla_partitioner_error_t *error) {
+void openxlaPartitionerErrorDestroy(openxla_partitioner_error_t* error) {
   assertLoaded();
   return __openxlaPartitionerErrorDestroy(error);
 }
 
-const char *openxlaPartitionerErrorGetMessage(
-    openxla_partitioner_error_t *error) {
+const char* openxlaPartitionerErrorGetMessage(
+    openxla_partitioner_error_t* error) {
   assertLoaded();
   return __openxlaPartitionerErrorGetMessage(error);
 }
@@ -153,7 +153,7 @@ void openxlaPartitionerGlobalInitialize() {
   __openxlaPartitionerGlobalInitialize();
 }
 
-const char *openxlaPartitionerGetRevision() {
+const char* openxlaPartitionerGetRevision() {
   assertLoaded();
   if (__openxlaPartitionerGetRevision) {
     return __openxlaPartitionerGetRevision();
@@ -162,8 +162,8 @@ const char *openxlaPartitionerGetRevision() {
   }
 }
 
-void openxlaPartitionerSetupGlobalCL(int argc, const char **argv,
-                                     const char *banner,
+void openxlaPartitionerSetupGlobalCL(int argc, const char** argv,
+                                     const char* banner,
                                      bool installSignalHandlers) {
   assertLoaded();
   __openxlaPartitionerSetupGlobalCL(argc, argv, banner, installSignalHandlers);
@@ -174,32 +174,32 @@ void openxlaPartitionerGlobalShutdown() {
   __openxlaPartitionerGlobalShutdown();
 }
 
-openxla_partitioner_session_t *openxlaPartitionerSessionCreate() {
+openxla_partitioner_session_t* openxlaPartitionerSessionCreate() {
   assertLoaded();
   return __openxlaPartitionerSessionCreate();
 }
 
-void openxlaPartitionerSessionDestroy(openxla_partitioner_session_t *session) {
+void openxlaPartitionerSessionDestroy(openxla_partitioner_session_t* session) {
   assertLoaded();
   __openxlaPartitionerSessionDestroy(session);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerSessionSetFlags(
-    openxla_partitioner_session_t *session, int argc, const char *const *argv) {
+openxla_partitioner_error_t* openxlaPartitionerSessionSetFlags(
+    openxla_partitioner_session_t* session, int argc, const char* const* argv) {
   assertLoaded();
   return __openxlaPartitionerSessionSetFlags(session, argc, argv);
 }
 
 void openxlaPartitionerSessionGetFlags(
-    openxla_partitioner_session_t *session, bool nonDefaultOnly,
-    void (*onFlag)(const char *flag, size_t length, void *), void *userData) {
+    openxla_partitioner_session_t* session, bool nonDefaultOnly,
+    void (*onFlag)(const char* flag, size_t length, void*), void* userData) {
   assertLoaded();
   return __openxlaPartitionerSessionGetFlags(session, nonDefaultOnly, onFlag,
                                              userData);
 }
 
-openxla_partitioner_invocation_t *openxlaPartitionerInvocationCreate(
-    openxla_partitioner_session_t *session) {
+openxla_partitioner_invocation_t* openxlaPartitionerInvocationCreate(
+    openxla_partitioner_session_t* session) {
   assertLoaded();
   return __openxlaPartitionerInvocationCreate(session);
 }
@@ -216,110 +216,110 @@ openxla_partitioner_invocation_t *openxlaPartitionerInvocationCreate(
 // }
 
 void openxlaPartitionerInvocationEnableConsoleDiagnostics(
-    openxla_partitioner_invocation_t *run) {
+    openxla_partitioner_invocation_t* run) {
   assertLoaded();
   __openxlaPartitionerInvocationEnableConsoleDiagnostics(run);
 }
 
 void openxlaPartitionerInvocationDestroy(
-    openxla_partitioner_invocation_t *run) {
+    openxla_partitioner_invocation_t* run) {
   assertLoaded();
   __openxlaPartitionerInvocationDestroy(run);
 }
 
 void openxlaPartitionerInvocationSetCrashHandler(
-    openxla_partitioner_invocation_t *inv, bool genLocalReproducer,
-    openxla_partitioner_error_t *(*onCrashCallback)(
-        openxla_partitioner_output_t **outOutput, void *userData),
-    void *userData) {
+    openxla_partitioner_invocation_t* inv, bool genLocalReproducer,
+    openxla_partitioner_error_t* (*onCrashCallback)(
+        openxla_partitioner_output_t** outOutput, void* userData),
+    void* userData) {
   assertLoaded();
   __openxlaPartitionerInvocationSetCrashHandler(inv, genLocalReproducer,
                                                 onCrashCallback, userData);
 }
 
 bool openxlaPartitionerInvocationParseSource(
-    openxla_partitioner_invocation_t *run,
-    openxla_partitioner_source_t *source) {
+    openxla_partitioner_invocation_t* run,
+    openxla_partitioner_source_t* source) {
   assertLoaded();
   return __openxlaPartitionerInvocationParseSource(run, source);
 }
 
 void openxlaPartitionerInvocationSetVerifyIR(
-    openxla_partitioner_invocation_t *run, bool enable) {
+    openxla_partitioner_invocation_t* run, bool enable) {
   assertLoaded();
   __openxlaPartitionerInvocationSetVerifyIR(run, enable);
 }
 
-bool openxlaPartitionerInvocationPipeline(openxla_partitioner_invocation_t *run,
-                                          const char *pipeline) {
+bool openxlaPartitionerInvocationPipeline(openxla_partitioner_invocation_t* run,
+                                          const char* pipeline) {
   assertLoaded();
   return __openxlaPartitionerInvocationPipeline(run, pipeline);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerInvocationOutputIR(
-    openxla_partitioner_invocation_t *run,
-    openxla_partitioner_output_t *output) {
+openxla_partitioner_error_t* openxlaPartitionerInvocationOutputIR(
+    openxla_partitioner_invocation_t* run,
+    openxla_partitioner_output_t* output) {
   assertLoaded();
   return __openxlaPartitionerInvocationOutputIR(run, output);
 }
 
-void openxlaPartitionerSourceDestroy(openxla_partitioner_source_t *source) {
+void openxlaPartitionerSourceDestroy(openxla_partitioner_source_t* source) {
   assertLoaded();
   __openxlaPartitionerSourceDestroy(source);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerSourceOpenFile(
-    openxla_partitioner_session_t *session, const char *filePath,
-    openxla_partitioner_source_t **out_source) {
+openxla_partitioner_error_t* openxlaPartitionerSourceOpenFile(
+    openxla_partitioner_session_t* session, const char* filePath,
+    openxla_partitioner_source_t** out_source) {
   assertLoaded();
   return __openxlaPartitionerSourceOpenFile(session, filePath, out_source);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerSourceWrapBuffer(
-    openxla_partitioner_session_t *session, const char *bufferName,
-    const char *buffer, size_t length, bool isNullTerminated,
-    openxla_partitioner_source_t **out_source) {
+openxla_partitioner_error_t* openxlaPartitionerSourceWrapBuffer(
+    openxla_partitioner_session_t* session, const char* bufferName,
+    const char* buffer, size_t length, bool isNullTerminated,
+    openxla_partitioner_source_t** out_source) {
   assertLoaded();
   return __openxlaPartitionerSourceWrapBuffer(
       session, bufferName, buffer, length, isNullTerminated, out_source);
 }
 
-void openxlaPartitionerOutputDestroy(openxla_partitioner_output_t *output) {
+void openxlaPartitionerOutputDestroy(openxla_partitioner_output_t* output) {
   assertLoaded();
   __openxlaPartitionerOutputDestroy(output);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerOutputOpenFile(
-    const char *filePath, openxla_partitioner_output_t **out_output) {
+openxla_partitioner_error_t* openxlaPartitionerOutputOpenFile(
+    const char* filePath, openxla_partitioner_output_t** out_output) {
   assertLoaded();
   return __openxlaPartitionerOutputOpenFile(filePath, out_output);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerOutputOpenFD(
-    int fd, openxla_partitioner_output_t **out_output) {
+openxla_partitioner_error_t* openxlaPartitionerOutputOpenFD(
+    int fd, openxla_partitioner_output_t** out_output) {
   assertLoaded();
   return __openxlaPartitionerOutputOpenFD(fd, out_output);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerOutputOpenMembuffer(
-    openxla_partitioner_output_t **out_output) {
+openxla_partitioner_error_t* openxlaPartitionerOutputOpenMembuffer(
+    openxla_partitioner_output_t** out_output) {
   assertLoaded();
   return __openxlaPartitionerOutputOpenMembuffer(out_output);
 }
 
-void openxlaPartitionerOutputKeep(openxla_partitioner_output_t *output) {
+void openxlaPartitionerOutputKeep(openxla_partitioner_output_t* output) {
   assertLoaded();
   __openxlaPartitionerOutputKeep(output);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerOutputMapMemory(
-    openxla_partitioner_output_t *output, void **contents, uint64_t *size) {
+openxla_partitioner_error_t* openxlaPartitionerOutputMapMemory(
+    openxla_partitioner_output_t* output, void** contents, uint64_t* size) {
   assertLoaded();
   return __openxlaPartitionerOutputMapMemory(output, contents, size);
 }
 
-openxla_partitioner_error_t *openxlaPartitionerOutputWrite(
-    openxla_partitioner_output_t *output, const void *data, size_t length) {
+openxla_partitioner_error_t* openxlaPartitionerOutputWrite(
+    openxla_partitioner_output_t* output, const void* data, size_t length) {
   assertLoaded();
   return __openxlaPartitionerOutputWrite(output, data, length);
 }

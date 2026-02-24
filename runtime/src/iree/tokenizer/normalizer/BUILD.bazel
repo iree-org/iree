@@ -1,0 +1,476 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Test Utilities
+#===------------------------------------------------------------------------===#
+
+# Shared test utilities for normalizer tests.
+# Provides RAII wrappers and helpers that enforce comprehensive coverage.
+iree_runtime_cc_library(
+    name = "normalizer_test_util",
+    testonly = True,
+    srcs = ["normalizer_test_util.cc"],
+    hdrs = ["normalizer_test_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/tokenizer:normalizer",
+        "//runtime/src/iree/tokenizer/testing:test_util",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Test-Only Implementations
+#===------------------------------------------------------------------------===#
+
+# Production code uses NULL normalizer for no-op.
+iree_runtime_cc_library(
+    name = "passthrough",
+    testonly = True,
+    srcs = ["passthrough.c"],
+    hdrs = ["passthrough.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+# See deferred.h for documentation.
+iree_runtime_cc_library(
+    name = "deferred",
+    testonly = True,
+    srcs = ["deferred.c"],
+    hdrs = ["deferred.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "passthrough_test",
+    srcs = ["passthrough_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":passthrough",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Normalizer Implementations
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "bert",
+    srcs = ["bert.c"],
+    hdrs = ["bert.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bert_test",
+    srcs = ["bert_test.cc"],
+    deps = [
+        ":bert",
+        ":normalizer_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "lowercase",
+    srcs = ["lowercase.c"],
+    hdrs = ["lowercase.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "lowercase_test",
+    srcs = ["lowercase_test.cc"],
+    deps = [
+        ":lowercase",
+        ":normalizer_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "nfc",
+    srcs = ["nfc.c"],
+    hdrs = ["nfc.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "nfc_test",
+    srcs = ["nfc_test.cc"],
+    deps = [
+        ":nfc",
+        ":normalizer_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "nfd",
+    srcs = ["nfd.c"],
+    hdrs = ["nfd.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "nfd_test",
+    srcs = ["nfd_test.cc"],
+    deps = [
+        ":nfd",
+        ":normalizer_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "nfkd",
+    srcs = ["nfkd.c"],
+    hdrs = ["nfkd.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "nfkd_test",
+    srcs = ["nfkd_test.cc"],
+    deps = [
+        ":nfkd",
+        ":normalizer_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "precompiled",
+    srcs = ["precompiled.c"],
+    hdrs = ["precompiled.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "precompiled_test",
+    srcs = ["precompiled_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":precompiled",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "prepend",
+    srcs = ["prepend.c"],
+    hdrs = ["prepend.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "prepend_test",
+    srcs = ["prepend_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":prepend",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "replace",
+    srcs = ["replace.c"],
+    hdrs = ["replace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "replace_test",
+    srcs = ["replace_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":replace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "regex_replace",
+    srcs = ["regex_replace.c"],
+    hdrs = ["regex_replace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+        "//runtime/src/iree/tokenizer/regex:compile",
+        "//runtime/src/iree/tokenizer/regex:exec",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "regex_replace_test",
+    srcs = ["regex_replace_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":regex_replace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "sequence",
+    srcs = ["sequence.c"],
+    hdrs = ["sequence.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "sequence_test",
+    srcs = ["sequence_test.cc"],
+    deps = [
+        ":deferred",
+        ":normalizer_test_util",
+        ":passthrough",
+        ":prepend",
+        ":replace",
+        ":sequence",
+        ":strip",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "strip",
+    srcs = ["strip.c"],
+    hdrs = ["strip.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "strip_test",
+    srcs = ["strip_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":strip",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "strip_accents",
+    srcs = ["strip_accents.c"],
+    hdrs = ["strip_accents.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "strip_accents_test",
+    srcs = ["strip_accents_test.cc"],
+    deps = [
+        ":normalizer_test_util",
+        ":strip_accents",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "bert_fuzz",
+    srcs = ["bert_fuzz.cc"],
+    deps = [
+        ":bert",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "lowercase_fuzz",
+    srcs = ["lowercase_fuzz.cc"],
+    deps = [
+        ":lowercase",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "nfc_fuzz",
+    srcs = ["nfc_fuzz.cc"],
+    deps = [
+        ":nfc",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "nfd_fuzz",
+    srcs = ["nfd_fuzz.cc"],
+    deps = [
+        ":nfd",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "nfkd_fuzz",
+    srcs = ["nfkd_fuzz.cc"],
+    deps = [
+        ":nfkd",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "precompiled_format_fuzz",
+    srcs = ["precompiled_format_fuzz.cc"],
+    deps = [
+        ":precompiled",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "precompiled_normalize_fuzz",
+    srcs = ["precompiled_normalize_fuzz.cc"],
+    deps = [
+        ":precompiled",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "prepend_fuzz",
+    srcs = ["prepend_fuzz.cc"],
+    deps = [
+        ":prepend",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "regex_replace_fuzz",
+    srcs = ["regex_replace_fuzz.cc"],
+    deps = [
+        ":regex_replace",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "replace_fuzz",
+    srcs = ["replace_fuzz.cc"],
+    deps = [
+        ":replace",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "strip_accents_fuzz",
+    srcs = ["strip_accents_fuzz.cc"],
+    deps = [
+        ":strip_accents",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "strip_fuzz",
+    srcs = ["strip_fuzz.cc"],
+    deps = [
+        ":strip",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)

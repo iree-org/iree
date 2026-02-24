@@ -112,14 +112,13 @@ getOuterReductionSizes(PartialReductionOpInterface op,
   return tileSizes;
 }
 
-/// Determines split reduction sizes for weight backward convolutions.
-/// These convolutions have a special CHWN or CNHW layout, where the filter
-/// sizes (corresponding to output image sizes in forward convolutions) are
-/// typically large, while the output spatial dimensions are small. This makes
-/// the split reduction strategy particularly effective.
+/// Determines split reduction sizes for convolutions. Analyzes the convolution
+/// structure to find reduction dimensions that can be split to improve
+/// parallelism. Splitting can be applied across multiple reduction dimensions,
+/// with tile sizes varying according to the output (parallel dimension) sizes.
 static std::optional<SmallVector<int64_t>>
-getWeightBackwardReductionSizes(PartialReductionOpInterface op,
-                                int64_t splitReductionTargetSize) {
+getConvolutionReductionSizes(PartialReductionOpInterface op,
+                             int64_t splitReductionTargetSize) {
   // First check if the input op is a convolution with static shapes.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
@@ -193,17 +192,6 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
     return std::nullopt;
   }
 
-  // Only apply to weight backward convolutions with CHWN or CNHW layout.
-  if (batchPos.front() == 0) {
-    LDBG() << "skipping op; not apply to batch first layout";
-    return std::nullopt;
-  }
-
-  if (!inputChannelPos.empty() && inputChannelPos.front() > filterPos.back()) {
-    LDBG() << "skipping op; not apply to channel last layout";
-    return std::nullopt;
-  }
-
   std::optional<SmallVector<int64_t>> maybeSizes =
       getReductionDimSizes(op.getOperation());
   if (!maybeSizes) {
@@ -228,16 +216,18 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
   int64_t depthSize = getSizeAt(outputShape, depthPos);
 
   // The constants below are determined based on empirical data.
-  const int64_t largeParallelSize = 512;
+  const int64_t largeParallelSize = 640000;
   const int64_t largeReductionSize = 8192;
   const int64_t ratioThreshold = 64;
 
-  // When the batch and output channel sizes are large, the workload tends
-  // to distributed across many workgroups, making split reduction little to
-  // no effect.
-  if (outputChannelSize >= largeParallelSize &&
-      batchSize >= largeParallelSize) {
-    LDBG() << "skipping op; large output channel or batch size";
+  // When the parallel dimension sizes are large, the workload tends to
+  // distributed across many workgroups, making split reduction little to no
+  // effect.
+  bool isBatchFirstLayout = batchPos.front() == 0;
+  int64_t mainDistributedSize = isBatchFirstLayout ? imageSize : batchSize;
+  int64_t parallelSize = outputChannelSize * mainDistributedSize;
+  if (parallelSize >= largeParallelSize) {
+    LDBG() << "skipping op; large parallel dimension sizes";
     return std::nullopt;
   }
 
@@ -245,7 +235,7 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
   // reduction often has no effect or even degrades performance.
   SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
   int64_t reductionSize = llvm::product_of(tileSizes);
-  int64_t ratio = reductionSize / std::sqrt(outputChannelSize * batchSize);
+  int64_t ratio = reductionSize / std::sqrt(parallelSize);
   if (ratio <= ratioThreshold && reductionSize < largeReductionSize) {
     LDBG() << "skipping op; small reduction size";
     return std::nullopt;
@@ -256,6 +246,8 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
   // workgroups, thereby reducing the need for extensive splitting along the
   // reduction dimensions.
   int64_t outputSize = outputChannelSize * batchSize * imageSize * depthSize;
+  int64_t startTileSize =
+      isBatchFirstLayout ? tileSizes.back() : tileSizes.front();
   int64_t limitParallelLoops;
   if (outputSize < 32 * 32) {
     limitParallelLoops = 2048;
@@ -266,12 +258,16 @@ getWeightBackwardReductionSizes(PartialReductionOpInterface op,
   } else if (outputSize < 512 * 512) {
     limitParallelLoops = 16;
   } else {
-    limitParallelLoops = std::min<int64_t>(16, tileSizes[0]);
+    limitParallelLoops = std::min<int64_t>(8, startTileSize);
   }
 
-  // Based on the limitParallelLoops, assign tile size from the outermost
-  // dimension to the innermost.
-  for (int64_t i = 0; i < tileSizes.size(); i++) {
+  // Based on the limitParallelLoops, assign tile size. For batch-first layout,
+  // go from the innermost dimension to the outermost; otherwise, go from the
+  // outermost to the innermost.
+  int64_t start = isBatchFirstLayout ? tileSizes.size() - 1 : 0;
+  int64_t end = isBatchFirstLayout ? -1 : tileSizes.size();
+  int64_t step = isBatchFirstLayout ? -1 : 1;
+  for (int64_t i = start; i != end; i += step) {
     int64_t lowerBound = llvm::divideCeil(tileSizes[i], limitParallelLoops);
     std::optional<int64_t> maybeTileSize =
         findSmallestFactorWithLowerBound(tileSizes[i], lowerBound);
@@ -478,8 +474,8 @@ struct SetSplitReductionSizesPass final
         return;
       }
 
-      // --- Case 2: Generic weight backward convolution ---
-      if (auto tileSizes = getWeightBackwardReductionSizes(
+      // --- Case 2: Generic convolution ---
+      if (auto tileSizes = getConvolutionReductionSizes(
               tilingOp, splitReductionTargetSize)) {
         IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
         return;

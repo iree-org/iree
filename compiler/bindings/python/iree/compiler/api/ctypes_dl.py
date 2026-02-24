@@ -190,8 +190,7 @@ def _is_mlir_bytecode(view: memoryview):
 
 
 class SessionObject:
-    def close(self):
-        ...
+    def close(self): ...
 
 
 class Session:

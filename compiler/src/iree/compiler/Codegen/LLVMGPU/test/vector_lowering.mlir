@@ -222,3 +222,81 @@ func.func @int_contract_add_no_chain_fma(
 // CHECK-LABEL: func.func @int_contract_add_no_chain_fma
 // CHECK-NOT:  math.fma
 // CHECK:  return %{{.*}} : vector<3x2xi32>
+
+// -----
+
+// Test unrolling of a 2D transfer_gather representing an embedding lookup:
+// outer dim is gathered (indices), inner dim is contiguous.
+
+func.func @transfer_gather_unroll_embedding_lookup(
+  %source: memref<4096x64xf16>,
+  %indices: vector<4xindex>) -> vector<4x64xf16> {
+  %cst = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<4xindex>], %cst {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : memref<4096x64xf16>, vector<4x64xf16>
+  return %out : vector<4x64xf16>
+}
+
+// After unrolling + canonicalization, the 2D gather becomes 4 contiguous loads.
+// CHECK-LABEL: func.func @transfer_gather_unroll_embedding_lookup
+// CHECK-NOT: transfer_gather
+// CHECK-COUNT-4: vector.load
+// CHECK-NOT: transfer_gather
+
+// -----
+
+// Test unrolling of a masked 2D transfer_gather.
+// Same embedding lookup shape but with a mask on the result.
+
+func.func @transfer_gather_unroll_masked(
+  %source: memref<4096x64xf16>,
+  %indices: vector<4xindex>,
+  %mask: vector<4x64xi1>) -> vector<4x64xf16> {
+  %cst = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<4xindex>], %cst, %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : memref<4096x64xf16>, vector<4x64xf16>, vector<4x64xi1>
+  return %out : vector<4x64xf16>
+}
+
+// After unrolling, mask slices are passed to each sub-gather.
+// The masked rank-1 gathers lower to vector.maskedload ops.
+// CHECK-LABEL: func.func @transfer_gather_unroll_masked
+// CHECK-NOT: transfer_gather
+// CHECK-COUNT-4: vector.maskedload
+// CHECK-NOT: transfer_gather
+
+// -----
+
+// Test unrolling of a 3D transfer_gather with a transposed 2D index vector.
+// The first two output dims (d0=4, d1=8) are both gathered via a single
+// index vec of shape 8x4 (note: d1 before d0, i.e. "transposed").
+// The inner dim (d2=64) is contiguous.
+
+func.func @transfer_gather_unroll_transposed_index(
+  %source: memref<4096x64xf16>,
+  %indices: vector<8x4xindex>) -> vector<4x8x64xf16> {
+  %cst = arith.constant 0.0 : f16
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<8x4xindex>], %cst {
+    indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
+                     affine_map<(d0, d1, d2)[s0] -> (d1, d0)>]
+  } : memref<4096x64xf16>, vector<4x8x64xf16>
+  return %out : vector<4x8x64xf16>
+}
+
+// After two rounds of unrolling (d0=4 then d1=8) + canonicalization,
+// the 3D gather becomes 4*8=32 contiguous loads.
+// CHECK-LABEL: func.func @transfer_gather_unroll_transposed_index
+// CHECK-NOT: transfer_gather
+// CHECK-COUNT-32: vector.load
+// CHECK-NOT: transfer_gather

@@ -7,12 +7,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
+#include "iree/tokenizer/regex/compile.h"
 #include "iree/tokenizer/regex/exec.h"
 
 // DFA regex executor benchmarks.
@@ -54,8 +56,8 @@ class TestDfaBuilder {
     std::vector<uint8_t> data(total_size, 0);
 
     auto* header = (iree_tokenizer_regex_dfa_header_t*)data.data();
-    header->magic = IREE_TOKENIZER_REGEX_DFA_MAGIC;
-    header->version = IREE_TOKENIZER_REGEX_DFA_VERSION;
+    header->magic = IREE_TOKENIZER_UTIL_REGEX_DFA_MAGIC;
+    header->version = IREE_TOKENIZER_UTIL_REGEX_DFA_VERSION;
     header->flags = flags_;
     header->num_states = num_states_;
     header->num_accepting = (uint16_t)accepting_.size();
@@ -63,7 +65,7 @@ class TestDfaBuilder {
 
     auto* trans = (uint16_t*)(data.data() + header_size);
     for (size_t i = 0; i < (size_t)num_states_ * 256; ++i) {
-      trans[i] = IREE_TOKENIZER_REGEX_NO_TRANSITION;
+      trans[i] = IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION;
     }
     for (const auto& t : transitions_) {
       trans[(size_t)t.state * 256 + t.byte] = t.next_state;
@@ -398,9 +400,8 @@ BENCHMARK_DEFINE_F(StreamingBenchmark, ChunkSize)(benchmark::State& state) {
       size_t length = std::min((size_t)chunk_size_, text_1m_.size() - offset);
       iree_tokenizer_regex_exec_feed(
           &dfa, &exec_state,
-          iree_make_const_byte_span((const uint8_t*)text_1m_.data() + offset,
-                                    length),
-          offset, CountCallback, &count);
+          iree_make_string_view(text_1m_.data() + offset, length), offset,
+          /*stride=*/NULL, CountCallback, &count);
     }
     iree_tokenizer_regex_exec_finalize(&dfa, &exec_state, text_1m_.size(),
                                        CountCallback, &count);
@@ -431,5 +432,350 @@ void BM_DfaLoad(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_DfaLoad);
+
+//===----------------------------------------------------------------------===//
+// Compiled Pattern Benchmarks
+//===----------------------------------------------------------------------===//
+
+// RAII wrapper for compiled regex patterns.
+// Handles allocation and cleanup of DFA binary data.
+class CompiledPattern {
+ public:
+  explicit CompiledPattern(const char* pattern) {
+    iree_tokenizer_regex_compile_error_t error = {0};
+    iree_status_t status = iree_tokenizer_regex_compile(
+        iree_make_cstring_view(pattern),
+        IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_NONE, iree_allocator_system(),
+        &data_, &size_, &error);
+    if (!iree_status_is_ok(status)) {
+      fprintf(stderr, "Failed to compile pattern '%s' at position %zu: %s\n",
+              pattern, error.position, error.message);
+      iree_status_ignore(status);
+      data_ = nullptr;
+      size_ = 0;
+      return;
+    }
+
+    status = iree_tokenizer_regex_dfa_load(
+        iree_make_const_byte_span(data_, size_), &dfa_);
+    if (!iree_status_is_ok(status)) {
+      fprintf(stderr, "Failed to load compiled DFA for '%s'\n", pattern);
+      iree_status_ignore(status);
+      iree_allocator_free(iree_allocator_system(), data_);
+      data_ = nullptr;
+      size_ = 0;
+    }
+  }
+
+  ~CompiledPattern() {
+    if (data_) {
+      iree_allocator_free(iree_allocator_system(), data_);
+    }
+  }
+
+  // Non-copyable.
+  CompiledPattern(const CompiledPattern&) = delete;
+  CompiledPattern& operator=(const CompiledPattern&) = delete;
+
+  // Moveable.
+  CompiledPattern(CompiledPattern&& other) noexcept
+      : data_(other.data_), size_(other.size_), dfa_(other.dfa_) {
+    other.data_ = nullptr;
+    other.size_ = 0;
+  }
+  CompiledPattern& operator=(CompiledPattern&& other) noexcept {
+    if (this != &other) {
+      if (data_) iree_allocator_free(iree_allocator_system(), data_);
+      data_ = other.data_;
+      size_ = other.size_;
+      dfa_ = other.dfa_;
+      other.data_ = nullptr;
+      other.size_ = 0;
+    }
+    return *this;
+  }
+
+  bool valid() const { return data_ != nullptr; }
+  const iree_tokenizer_regex_dfa_t* dfa() const {
+    return valid() ? &dfa_ : nullptr;
+  }
+
+ private:
+  uint8_t* data_ = nullptr;
+  iree_host_size_t size_ = 0;
+  iree_tokenizer_regex_dfa_t dfa_ = {};
+};
+
+// GPT-2 pre-tokenizer pattern (used by GPT-2, RoBERTa, BART, etc).
+static const char kGPT2Pattern[] =
+    "'s|'t|'re|'ve|'m|'ll|'d| ?\\p{L}+| ?\\p{N}+| "
+    "?[^\\s\\p{L}\\p{N}]+|\\s+(?!\\S)|\\s+";
+
+// Llama/Mistral pattern (case-insensitive contractions, multi-digit numbers).
+static const char kLlamaPattern[] =
+    "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|"
+    "\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+";
+
+// Simple word pattern (just Unicode letters).
+static const char kSimpleWordPattern[] = "\\p{L}+";
+
+// Whitespace split pattern.
+static const char kWhitespaceSplitPattern[] = "\\S+";
+
+class CompiledPatternBenchmark : public benchmark::Fixture {
+ public:
+  void SetUp(benchmark::State& state) override {
+    // Compile patterns on first use.
+    if (!gpt2_pattern_) {
+      gpt2_pattern_ = std::make_unique<CompiledPattern>(kGPT2Pattern);
+      if (!gpt2_pattern_->valid()) {
+        state.SkipWithError("Failed to compile GPT-2 pattern");
+        return;
+      }
+    }
+    if (!llama_pattern_) {
+      llama_pattern_ = std::make_unique<CompiledPattern>(kLlamaPattern);
+    }
+    if (!simple_word_pattern_) {
+      simple_word_pattern_ =
+          std::make_unique<CompiledPattern>(kSimpleWordPattern);
+    }
+    if (!whitespace_pattern_) {
+      whitespace_pattern_ =
+          std::make_unique<CompiledPattern>(kWhitespaceSplitPattern);
+    }
+
+    if (shakespeare_.empty()) {
+      shakespeare_ = GenerateWords(1000000, 5);
+    }
+  }
+
+ protected:
+  static std::unique_ptr<CompiledPattern> gpt2_pattern_;
+  static std::unique_ptr<CompiledPattern> llama_pattern_;
+  static std::unique_ptr<CompiledPattern> simple_word_pattern_;
+  static std::unique_ptr<CompiledPattern> whitespace_pattern_;
+  static std::string shakespeare_;
+};
+
+std::unique_ptr<CompiledPattern> CompiledPatternBenchmark::gpt2_pattern_;
+std::unique_ptr<CompiledPattern> CompiledPatternBenchmark::llama_pattern_;
+std::unique_ptr<CompiledPattern> CompiledPatternBenchmark::simple_word_pattern_;
+std::unique_ptr<CompiledPattern> CompiledPatternBenchmark::whitespace_pattern_;
+std::string CompiledPatternBenchmark::shakespeare_;
+
+// GPT-2 pattern on Shakespeare text - measures real-world tokenizer perf.
+BENCHMARK_DEFINE_F(CompiledPatternBenchmark, GPT2Pattern)
+(benchmark::State& state) {
+  if (!gpt2_pattern_ || !gpt2_pattern_->valid()) {
+    state.SkipWithError("GPT-2 pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(shakespeare_.data(), shakespeare_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_status_t status =
+        iree_tokenizer_regex_count_matches(gpt2_pattern_->dfa(), text, &count);
+    benchmark::DoNotOptimize(count);
+    if (!iree_status_is_ok(status)) {
+      state.SkipWithError("exec failed");
+      iree_status_ignore(status);
+      return;
+    }
+  }
+  state.SetBytesProcessed(state.iterations() * shakespeare_.size());
+}
+BENCHMARK_REGISTER_F(CompiledPatternBenchmark, GPT2Pattern)
+    ->Unit(benchmark::kMillisecond);
+
+// Llama/Mistral pattern - more complex than GPT-2.
+BENCHMARK_DEFINE_F(CompiledPatternBenchmark, LlamaPattern)
+(benchmark::State& state) {
+  if (!llama_pattern_ || !llama_pattern_->valid()) {
+    state.SkipWithError("Llama pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(shakespeare_.data(), shakespeare_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_tokenizer_regex_count_matches(llama_pattern_->dfa(), text, &count);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetBytesProcessed(state.iterations() * shakespeare_.size());
+}
+BENCHMARK_REGISTER_F(CompiledPatternBenchmark, LlamaPattern)
+    ->Unit(benchmark::kMillisecond);
+
+// Simple \p{L}+ pattern - baseline for Unicode category matching.
+BENCHMARK_DEFINE_F(CompiledPatternBenchmark, SimpleWordPattern)
+(benchmark::State& state) {
+  if (!simple_word_pattern_ || !simple_word_pattern_->valid()) {
+    state.SkipWithError("Simple word pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(shakespeare_.data(), shakespeare_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_tokenizer_regex_count_matches(simple_word_pattern_->dfa(), text,
+                                       &count);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetBytesProcessed(state.iterations() * shakespeare_.size());
+}
+BENCHMARK_REGISTER_F(CompiledPatternBenchmark, SimpleWordPattern)
+    ->Unit(benchmark::kMillisecond);
+
+// \S+ pattern - simple non-whitespace splitting.
+BENCHMARK_DEFINE_F(CompiledPatternBenchmark, WhitespaceSplit)
+(benchmark::State& state) {
+  if (!whitespace_pattern_ || !whitespace_pattern_->valid()) {
+    state.SkipWithError("Whitespace pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(shakespeare_.data(), shakespeare_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_tokenizer_regex_count_matches(whitespace_pattern_->dfa(), text,
+                                       &count);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetBytesProcessed(state.iterations() * shakespeare_.size());
+}
+BENCHMARK_REGISTER_F(CompiledPatternBenchmark, WhitespaceSplit)
+    ->Unit(benchmark::kMillisecond);
+
+//===----------------------------------------------------------------------===//
+// Pathological Pattern Benchmarks
+//===----------------------------------------------------------------------===//
+
+// Pattern with many '.' (any byte) metacharacters. Each '.' creates 256
+// transitions in the DFA, and sequences of dots can cause state explosion
+// during compilation or slow execution due to the large transition tables.
+static const char kPathologicalDotPattern[] = "..*.......................";
+
+// Simpler version isolating the core issue: repeated '.' metacharacters.
+static const char kRepeatedDotPattern[] = "....................";
+
+// Pattern with alternation and dots. Tests whether alternation combined with
+// wildcards causes additional slowdown beyond the dot expansion itself.
+static const char kDotAlternationPattern[] = ".*a|.*b|.*c";
+
+class PathologicalBenchmark : public benchmark::Fixture {
+ public:
+  void SetUp(benchmark::State& state) override {
+    if (!dot_pattern_) {
+      dot_pattern_ = std::make_unique<CompiledPattern>(kPathologicalDotPattern);
+    }
+    if (!repeated_dot_pattern_) {
+      repeated_dot_pattern_ =
+          std::make_unique<CompiledPattern>(kRepeatedDotPattern);
+    }
+    if (!dot_alternation_pattern_) {
+      dot_alternation_pattern_ =
+          std::make_unique<CompiledPattern>(kDotAlternationPattern);
+    }
+    if (binary_input_.empty()) {
+      // Generate binary input similar to the fuzzer's slow-unit input.
+      binary_input_.resize(1000);
+      for (size_t i = 0; i < binary_input_.size(); ++i) {
+        binary_input_[i] = static_cast<char>((i * 37 + 0xe5) % 256);
+      }
+    }
+  }
+
+ protected:
+  static std::unique_ptr<CompiledPattern> dot_pattern_;
+  static std::unique_ptr<CompiledPattern> repeated_dot_pattern_;
+  static std::unique_ptr<CompiledPattern> dot_alternation_pattern_;
+  static std::string binary_input_;
+};
+
+std::unique_ptr<CompiledPattern> PathologicalBenchmark::dot_pattern_;
+std::unique_ptr<CompiledPattern> PathologicalBenchmark::repeated_dot_pattern_;
+std::unique_ptr<CompiledPattern>
+    PathologicalBenchmark::dot_alternation_pattern_;
+std::string PathologicalBenchmark::binary_input_;
+
+// Measures performance with many '.' metacharacters.
+BENCHMARK_DEFINE_F(PathologicalBenchmark, ManyDots)(benchmark::State& state) {
+  if (!dot_pattern_ || !dot_pattern_->valid()) {
+    state.SkipWithError("Dot pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(binary_input_.data(), binary_input_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_status_t status =
+        iree_tokenizer_regex_count_matches(dot_pattern_->dfa(), text, &count);
+    benchmark::DoNotOptimize(count);
+    if (!iree_status_is_ok(status)) {
+      state.SkipWithError("exec failed");
+      iree_status_ignore(status);
+      return;
+    }
+  }
+  state.SetBytesProcessed(state.iterations() * binary_input_.size());
+}
+BENCHMARK_REGISTER_F(PathologicalBenchmark, ManyDots)
+    ->Unit(benchmark::kMillisecond);
+
+// Repeated dots pattern baseline.
+BENCHMARK_DEFINE_F(PathologicalBenchmark, RepeatedDots)
+(benchmark::State& state) {
+  if (!repeated_dot_pattern_ || !repeated_dot_pattern_->valid()) {
+    state.SkipWithError("Repeated dot pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(binary_input_.data(), binary_input_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_tokenizer_regex_count_matches(repeated_dot_pattern_->dfa(), text,
+                                       &count);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetBytesProcessed(state.iterations() * binary_input_.size());
+}
+BENCHMARK_REGISTER_F(PathologicalBenchmark, RepeatedDots)
+    ->Unit(benchmark::kMillisecond);
+
+// Dot alternation pattern - tests alternation with wildcards.
+BENCHMARK_DEFINE_F(PathologicalBenchmark, DotAlternation)
+(benchmark::State& state) {
+  if (!dot_alternation_pattern_ || !dot_alternation_pattern_->valid()) {
+    state.SkipWithError("Dot alternation pattern not compiled");
+    return;
+  }
+
+  iree_string_view_t text =
+      iree_make_string_view(binary_input_.data(), binary_input_.size());
+
+  for (auto _ : state) {
+    iree_host_size_t count = 0;
+    iree_tokenizer_regex_count_matches(dot_alternation_pattern_->dfa(), text,
+                                       &count);
+    benchmark::DoNotOptimize(count);
+  }
+  state.SetBytesProcessed(state.iterations() * binary_input_.size());
+}
+BENCHMARK_REGISTER_F(PathologicalBenchmark, DotAlternation)
+    ->Unit(benchmark::kMillisecond);
 
 }  // namespace

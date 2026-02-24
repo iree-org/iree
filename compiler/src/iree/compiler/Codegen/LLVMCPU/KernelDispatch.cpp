@@ -2402,13 +2402,18 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     vecTileSizeBounds[i] = distTileSizes[i] ? distTileSizes[i] : ubs[i];
   }
 
+  // K1 dimensions (head_dim) are typically small. Per AttentionOpDetail docs
+  // (IndexingUtils.h), K1 is generally 64 or 128. When K1 is static and within
+  // this typical range, we leave it untiled. However, for dynamic K1 or
+  // unusually large K1, we must tile to avoid unbounded allocations.
+  constexpr int64_t kTypicalK1Threshold = 128;
   SmallVector<int64_t> vecTileSizes(vecTileSizeBounds.size(), 1);
-  // Due to the way attention works, K1 dimensions cannot be tiled. Mark k1
-  // reduction dimensions not to distribute.
   for (int i : opInfo.getK1Dims()) {
-    vecTileSizes[i] = 0;
+    int64_t k1Size = ubs[i];
+    if (ShapedType::isStatic(k1Size) && k1Size <= kTypicalK1Threshold) {
+      vecTileSizes[i] = 0;
+    }
   }
-
   for (auto i : llvm::seq<int64_t>(0, vecTileSizeBounds.size())) {
     if (vecTileSizes[i] == 0) {
       continue;
@@ -4088,7 +4093,7 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 ///   - Ops inside a `CustomOp` that already have a lowering config.
 ///   - Ops with no loops (e.g., a `linalg.generic` with a scalar element type.
 ///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
-///     as they will be lowered together into a `map_scatter` later in the
+///     as they will be lowered together into a `map_store` later in the
 ///     pipeline.
 ///   - `linalg.pack` ops whose producer is a `linalg.unpack`. It is hard to
 ///     propagate lowering configs because the tile size is scaled with

@@ -236,20 +236,20 @@ func.func @scatter(%arg0: tensor<3x32x16xf32>, %arg1: tensor<3x1xi32>, %arg2: te
 // -----
 
 #config = #iree_gpu.derived_thread_config
-func.func @map_scatter(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tensor<64x256xf32>
+func.func @map_store(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tensor<64x256xf32>
     attributes {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32] subgroup_size = 64>
     } {
   %true = arith.constant true
-  %1 = iree_linalg_ext.map_scatter {lowering_config = #config} %arg0 into %arg1 {
+  %1 = iree_linalg_ext.map_store {lowering_config = #config} %arg0 into %arg1 {
   ^bb0(%arg2: index, %arg3: index):
     iree_linalg_ext.yield %arg2, %arg3, %true : index, index, i1
   } : tensor<2x32xf32> into tensor<64x256xf32> -> tensor<64x256xf32>
   return %1 : tensor<64x256xf32>
 }
 
-// CHECK-LABEL: @map_scatter
+// CHECK-LABEL: @map_store
 //       CHECK: scf.forall ({{.*}}) = (0, 0) to (2, 32) step (1, 4)
-//       CHECK:   iree_linalg_ext.map_scatter
+//       CHECK:   iree_linalg_ext.map_store
 //       CHECK:     tensor<1x4xf32> into tensor<64x256xf32>
 //       CHECK:   scf.forall.in_parallel

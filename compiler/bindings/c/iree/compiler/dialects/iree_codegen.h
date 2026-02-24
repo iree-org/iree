@@ -67,6 +67,15 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenCompilationInfoAttrGet(
 MLIR_CAPI_EXPORTED ireeCodegenCompilationInfoParameters
 ireeCodegenCompilationInfoAttrGetParameters(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED bool ireeAttributeIsACodegenRootOpAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenRootOpAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenRootOpAttrGet(MlirContext mlirCtx,
+                                                          int64_t set);
+
+MLIR_CAPI_EXPORTED int64_t ireeCodegenRootOpAttrGetSet(MlirAttribute attr);
+
 MLIR_CAPI_EXPORTED void
 ireeCodegenGetExecutableVariantOps(MlirModule module, size_t *numOps,
                                    MlirOperation *executableOps);

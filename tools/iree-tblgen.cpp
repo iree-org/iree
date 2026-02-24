@@ -103,7 +103,7 @@ static std::string cleanAssemblyFormat(StringRef format) {
 
   std::string result = format.str();
   // Replace all newlines with spaces.
-  for (char &c : result) {
+  for (char& c : result) {
     if (c == '\n') {
       c = ' ';
     }
@@ -143,7 +143,7 @@ static std::string cleanAssemblyFormat(StringRef format) {
 // repository root. Note: Assumes IREE-style repo structure with "compiler/src/"
 // directory.
 static std::string resolveRelativePath(StringRef relativePath,
-                                       const Record *definingRecord) {
+                                       const Record* definingRecord) {
   if (relativePath.empty()) {
     return "";
   }
@@ -163,7 +163,7 @@ static std::string resolveRelativePath(StringRef relativePath,
   }
 
   // Get .td file path from buffer.
-  const MemoryBuffer *buffer = llvm::SrcMgr.getMemoryBuffer(bufferID);
+  const MemoryBuffer* buffer = llvm::SrcMgr.getMemoryBuffer(bufferID);
   if (!buffer) {
     // Defensive: buffer should exist if bufferID != 0, but check anyway.
     return relativePath.str();
@@ -229,8 +229,8 @@ static std::string resolveRelativePath(StringRef relativePath,
 // Emits source location information for a record.
 // Gracefully degrades: if location can't be determined, emits nothing.
 // This is acceptable as source location is supplementary information.
-static void emitSourceLocation(const Record *def, const RecordKeeper &records,
-                               json::OStream &J) {
+static void emitSourceLocation(const Record* def, const RecordKeeper& records,
+                               json::OStream& J) {
   (void)records;  // Not needed - using global llvm::SrcMgr.
 
   // Get the primary location (first element of location array).
@@ -250,7 +250,7 @@ static void emitSourceLocation(const Record *def, const RecordKeeper &records,
   }
 
   // Get the file path from buffer.
-  const MemoryBuffer *buffer = llvm::SrcMgr.getMemoryBuffer(bufferID);
+  const MemoryBuffer* buffer = llvm::SrcMgr.getMemoryBuffer(bufferID);
   if (!buffer) {
     // Defensive: buffer should exist if bufferID != 0, but check anyway.
     return;
@@ -271,13 +271,13 @@ static void emitSourceLocation(const Record *def, const RecordKeeper &records,
 
 // Emits parameters for a type or attribute.
 static void emitParameters(ArrayRef<AttrOrTypeParameter> params,
-                           json::OStream &J) {
+                           json::OStream& J) {
   if (params.empty()) {
     return;
   }
 
   J.attributeArray("parameters", [&] {
-    for (const auto &param : params) {
+    for (const auto& param : params) {
       J.object([&] {
         if (!param.isAnonymous()) {
           J.attribute("name", param.getName());
@@ -314,18 +314,18 @@ static void emitParameters(ArrayRef<AttrOrTypeParameter> params,
 }
 
 // Emits traits for a type or attribute.
-static void emitTraits(ArrayRef<Trait> traits, json::OStream &J) {
+static void emitTraits(ArrayRef<Trait> traits, json::OStream& J) {
   if (traits.empty()) {
     return;
   }
 
   J.attributeArray("traits", [&] {
-    for (const Trait &trait : traits) {
+    for (const Trait& trait : traits) {
       J.object([&] {
-        if (const auto *nt = dyn_cast<NativeTrait>(&trait)) {
+        if (const auto* nt = dyn_cast<NativeTrait>(&trait)) {
           J.attribute("kind", "NativeTrait");
           J.attribute("trait", nt->getFullyQualifiedTraitName());
-        } else if (const auto *it = dyn_cast<InterfaceTrait>(&trait)) {
+        } else if (const auto* it = dyn_cast<InterfaceTrait>(&trait)) {
           J.attribute("kind", "Interface");
           J.attribute("trait", it->getFullyQualifiedTraitName());
         } else {
@@ -337,17 +337,17 @@ static void emitTraits(ArrayRef<Trait> traits, json::OStream &J) {
 }
 
 // Emits builders for an operation.
-static void emitBuilders(ArrayRef<Builder> builders, json::OStream &J) {
+static void emitBuilders(ArrayRef<Builder> builders, json::OStream& J) {
   if (builders.empty()) {
     return;
   }
 
   J.attributeArray("builders", [&] {
-    for (const Builder &builder : builders) {
+    for (const Builder& builder : builders) {
       J.object([&] {
         // Emit parameters.
         J.attributeArray("parameters", [&] {
-          for (const Builder::Parameter &param : builder.getParameters()) {
+          for (const Builder::Parameter& param : builder.getParameters()) {
             J.object([&] {
               J.attribute("type", param.getCppType());
 
@@ -374,19 +374,19 @@ static void emitBuilders(ArrayRef<Builder> builders, json::OStream &J) {
 
 // Emits interface methods.
 static void emitInterfaceMethods(ArrayRef<InterfaceMethod> methods,
-                                 json::OStream &J) {
+                                 json::OStream& J) {
   if (methods.empty()) {
     return;
   }
 
   J.attributeArray("methods", [&] {
-    for (const InterfaceMethod &method : methods) {
+    for (const InterfaceMethod& method : methods) {
       J.object([&] {
         J.attribute("name", method.getName());
         J.attribute("returnType", method.getReturnType());
 
         J.attributeArray("arguments", [&] {
-          for (const auto &arg : method.getArguments()) {
+          for (const auto& arg : method.getArguments()) {
             J.object([&] {
               J.attribute("type", arg.type);
               J.attribute("name", arg.name);
@@ -409,15 +409,15 @@ static void emitInterfaceMethods(ArrayRef<InterfaceMethod> methods,
 }
 
 // Returns all operation definitions.
-static std::vector<const Record *> getOpDefinitions(
-    const RecordKeeper &records) {
-  const Record *classDef = records.getClass("Op");
+static std::vector<const Record*> getOpDefinitions(
+    const RecordKeeper& records) {
+  const Record* classDef = records.getClass("Op");
   if (!classDef) {
     return {};
   }
 
-  std::vector<const Record *> defs;
-  for (const auto &def : records.getDefs()) {
+  std::vector<const Record*> defs;
+  for (const auto& def : records.getDefs()) {
     if (def.second->isSubClassOf(classDef)) {
       defs.push_back(def.second.get());
     }
@@ -426,15 +426,15 @@ static std::vector<const Record *> getOpDefinitions(
 }
 
 // Returns all type definitions.
-static std::vector<const Record *> getTypeDefinitions(
-    const RecordKeeper &records) {
-  const Record *classDef = records.getClass("TypeDef");
+static std::vector<const Record*> getTypeDefinitions(
+    const RecordKeeper& records) {
+  const Record* classDef = records.getClass("TypeDef");
   if (!classDef) {
     return {};
   }
 
-  std::vector<const Record *> defs;
-  for (const auto &def : records.getDefs()) {
+  std::vector<const Record*> defs;
+  for (const auto& def : records.getDefs()) {
     if (def.second->isSubClassOf(classDef)) {
       defs.push_back(def.second.get());
     }
@@ -443,15 +443,15 @@ static std::vector<const Record *> getTypeDefinitions(
 }
 
 // Returns all attribute definitions.
-static std::vector<const Record *> getAttrDefinitions(
-    const RecordKeeper &records) {
-  const Record *classDef = records.getClass("AttrDef");
+static std::vector<const Record*> getAttrDefinitions(
+    const RecordKeeper& records) {
+  const Record* classDef = records.getClass("AttrDef");
   if (!classDef) {
     return {};
   }
 
-  std::vector<const Record *> defs;
-  for (const auto &def : records.getDefs()) {
+  std::vector<const Record*> defs;
+  for (const auto& def : records.getDefs()) {
     if (def.second->isSubClassOf(classDef)) {
       defs.push_back(def.second.get());
     }
@@ -460,19 +460,19 @@ static std::vector<const Record *> getAttrDefinitions(
 }
 
 // Returns all interface definitions (Op, Type, and Attr interfaces).
-static std::vector<const Record *> getInterfaceDefinitions(
-    const RecordKeeper &records) {
-  std::vector<const Record *> defs;
+static std::vector<const Record*> getInterfaceDefinitions(
+    const RecordKeeper& records) {
+  std::vector<const Record*> defs;
 
   // OpInterface, AttrInterface, TypeInterface.
-  for (const char *className :
+  for (const char* className :
        {"OpInterface", "AttrInterface", "TypeInterface"}) {
-    const Record *classDef = records.getClass(className);
+    const Record* classDef = records.getClass(className);
     if (!classDef) {
       continue;
     }
 
-    for (const auto &def : records.getDefs()) {
+    for (const auto& def : records.getDefs()) {
       if (def.second->isSubClassOf(classDef)) {
         // Skip anonymous records generated by DeclareInterfaceMethods helpers.
         // These are implementation details that duplicate named interfaces.
@@ -488,11 +488,11 @@ static std::vector<const Record *> getInterfaceDefinitions(
 }
 
 // Returns all dialect definitions.
-static std::vector<Dialect> getDialects(const RecordKeeper &records) {
+static std::vector<Dialect> getDialects(const RecordKeeper& records) {
   auto dialectDefs = records.getAllDerivedDefinitions("Dialect");
   std::vector<Dialect> dialects;
   dialects.reserve(dialectDefs.size());
-  for (const Record *def : dialectDefs) {
+  for (const Record* def : dialectDefs) {
     dialects.emplace_back(def);
   }
   return dialects;
@@ -552,9 +552,9 @@ static std::optional<std::string> extractDialectFromNamespace(StringRef fqn) {
 
 // Emits structured constraint information for type unions.
 // Extracts the allowedTypes list from AnyTypeOf/AllOfType constraints.
-static void emitConstraintMetadata(const tblgen::Constraint &constraint,
-                                   json::OStream &J) {
-  const Record &def = constraint.getDef();
+static void emitConstraintMetadata(const tblgen::Constraint& constraint,
+                                   json::OStream& J) {
+  const Record& def = constraint.getDef();
 
   // Check if this is a union-type constraint (AnyTypeOf, AllOfType, etc.).
   // These constraints have an "allowedTypes" field with the constituent types.
@@ -562,7 +562,7 @@ static void emitConstraintMetadata(const tblgen::Constraint &constraint,
     return;  // Not a union constraint, nothing to emit.
   }
 
-  std::vector<const Record *> allowedTypes =
+  std::vector<const Record*> allowedTypes =
       def.getValueAsListOfDefs("allowedTypes");
   if (allowedTypes.empty()) {
     return;  // No types listed, skip emission.
@@ -583,7 +583,7 @@ static void emitConstraintMetadata(const tblgen::Constraint &constraint,
 
     // Emit the list of allowed type names.
     J.attributeArray("allowedTypes", [&] {
-      for (const Record *typeRecord : allowedTypes) {
+      for (const Record* typeRecord : allowedTypes) {
         J.value(typeRecord->getName());
       }
     });
@@ -591,9 +591,9 @@ static void emitConstraintMetadata(const tblgen::Constraint &constraint,
 }
 
 // Emits common metadata fields (used by types, attrs, interfaces).
-static void emitCommonMetadata(const Record *metadata,
-                               const Record *definingRecord, json::OStream &J,
-                               const char *relatedListName) {
+static void emitCommonMetadata(const Record* metadata,
+                               const Record* definingRecord, json::OStream& J,
+                               const char* relatedListName) {
   if (!metadata) {
     return;
   }
@@ -649,9 +649,9 @@ static void emitCommonMetadata(const Record *metadata,
 }
 
 // Emits a single operation as JSON.
-static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
-                             json::OStream &J) {
-  const Record &def = op.getDef();
+static void emitOperatorJSON(const Operator& op, const RecordKeeper& records,
+                             json::OStream& J) {
+  const Record& def = op.getDef();
 
   J.object([&] {
     J.attribute("name", op.getOperationName());
@@ -680,10 +680,10 @@ static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
     }
 
     // Custom metadata extraction (Util_OpDocMetadata).
-    if (const Record *metadata = def.getValueAsOptionalDef("docMetadata")) {
+    if (const Record* metadata = def.getValueAsOptionalDef("docMetadata")) {
       J.attributeObject("metadata", [&] {
         // Extract category from OpDocGroup if present.
-        if (const Record *docGroup =
+        if (const Record* docGroup =
                 metadata->getValueAsOptionalDef("docGroup")) {
           if (StringRef summary = docGroup->getValueAsString("summary");
               !summary.empty()) {
@@ -738,7 +738,7 @@ static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
 
     // Operands.
     J.attributeArray("operands", [&] {
-      for (const auto &operand : op.getOperands()) {
+      for (const auto& operand : op.getOperands()) {
         J.object([&] {
           J.attribute("name", operand.name);
 
@@ -779,7 +779,7 @@ static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
 
     // Results.
     J.attributeArray("results", [&] {
-      for (const auto &result : op.getResults()) {
+      for (const auto& result : op.getResults()) {
         J.object([&] {
           J.attribute("name", result.name);
 
@@ -820,10 +820,10 @@ static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
 
     // Traits.
     J.attributeArray("traits", [&] {
-      for (const Trait &trait : op.getTraits()) {
-        if (const auto *nt = dyn_cast<NativeTrait>(&trait)) {
+      for (const Trait& trait : op.getTraits()) {
+        if (const auto* nt = dyn_cast<NativeTrait>(&trait)) {
           J.value(nt->getFullyQualifiedTraitName());
-        } else if (const auto *it = dyn_cast<InterfaceTrait>(&trait)) {
+        } else if (const auto* it = dyn_cast<InterfaceTrait>(&trait)) {
           J.value(it->getFullyQualifiedTraitName());
         }
       }
@@ -835,8 +835,8 @@ static void emitOperatorJSON(const Operator &op, const RecordKeeper &records,
 }
 
 // Emits a single type as JSON.
-static void emitTypeJSON(const Record &def, const RecordKeeper &records,
-                         json::OStream &J) {
+static void emitTypeJSON(const Record& def, const RecordKeeper& records,
+                         json::OStream& J) {
   // Wrap in TypeDef to access TableGen APIs.
   TypeDef type(&def);
 
@@ -890,7 +890,7 @@ static void emitTypeJSON(const Record &def, const RecordKeeper &records,
 
     // Emit custom metadata (only if the field exists).
     if (def.getValue("docMetadata")) {
-      if (const Record *metadata = def.getValueAsOptionalDef("docMetadata")) {
+      if (const Record* metadata = def.getValueAsOptionalDef("docMetadata")) {
         emitCommonMetadata(metadata, &def, J, "relatedTypes");
       }
     }
@@ -898,8 +898,8 @@ static void emitTypeJSON(const Record &def, const RecordKeeper &records,
 }
 
 // Emits a single attribute as JSON.
-static void emitAttrJSON(const Record &def, const RecordKeeper &records,
-                         json::OStream &J) {
+static void emitAttrJSON(const Record& def, const RecordKeeper& records,
+                         json::OStream& J) {
   // Wrap in AttrDef to access TableGen APIs.
   AttrDef attr(&def);
 
@@ -953,7 +953,7 @@ static void emitAttrJSON(const Record &def, const RecordKeeper &records,
 
     // Emit custom metadata (only if the field exists).
     if (def.getValue("docMetadata")) {
-      if (const Record *metadata = def.getValueAsOptionalDef("docMetadata")) {
+      if (const Record* metadata = def.getValueAsOptionalDef("docMetadata")) {
         emitCommonMetadata(metadata, &def, J, "relatedAttrs");
       }
     }
@@ -961,8 +961,8 @@ static void emitAttrJSON(const Record &def, const RecordKeeper &records,
 }
 
 // Emits a single interface as JSON.
-static void emitInterfaceJSON(const Record &def, const RecordKeeper &records,
-                              json::OStream &J) {
+static void emitInterfaceJSON(const Record& def, const RecordKeeper& records,
+                              json::OStream& J) {
   // Wrap in Interface to access TableGen APIs.
   Interface interface(&def);
 
@@ -1018,7 +1018,7 @@ static void emitInterfaceJSON(const Record &def, const RecordKeeper &records,
     auto baseInterfaces = interface.getBaseInterfaces();
     if (!baseInterfaces.empty()) {
       J.attributeArray("baseInterfaces", [&] {
-        for (const Interface &base : baseInterfaces) {
+        for (const Interface& base : baseInterfaces) {
           J.value(base.getFullyQualifiedName());
         }
       });
@@ -1029,7 +1029,7 @@ static void emitInterfaceJSON(const Record &def, const RecordKeeper &records,
 
     // Emit custom metadata (only if the field exists).
     if (def.getValue("docMetadata")) {
-      if (const Record *metadata = def.getValueAsOptionalDef("docMetadata")) {
+      if (const Record* metadata = def.getValueAsOptionalDef("docMetadata")) {
         emitCommonMetadata(metadata, &def, J, "relatedInterfaces");
       }
     }
@@ -1037,7 +1037,7 @@ static void emitInterfaceJSON(const Record &def, const RecordKeeper &records,
 }
 
 // Main JSON generation function.
-static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
+static bool emitDialectJSON(const RecordKeeper& records, raw_ostream& os) {
   // Get all definitions.
   auto dialects = getDialects(records);
   auto opDefs = getOpDefinitions(records);
@@ -1047,9 +1047,9 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
 
   // Collect categories from operations.
   std::map<std::string, std::string> categories;
-  for (const Record *def : opDefs) {
-    if (const Record *metadata = def->getValueAsOptionalDef("docMetadata")) {
-      if (const Record *docGroup =
+  for (const Record* def : opDefs) {
+    if (const Record* metadata = def->getValueAsOptionalDef("docMetadata")) {
+      if (const Record* docGroup =
               metadata->getValueAsOptionalDef("docGroup")) {
         StringRef categoryName = docGroup->getValueAsString("summary");
         StringRef categoryDesc = docGroup->getValueAsString("description");
@@ -1066,7 +1066,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Dialects.
     if (!dialects.empty()) {
       J.attributeObject("dialects", [&] {
-        for (const Dialect &dialect : dialects) {
+        for (const Dialect& dialect : dialects) {
           J.attributeObject(dialect.getName(), [&] {
             // C++ class names.
             J.attribute("cppClassName", dialect.getCppClassName());
@@ -1122,7 +1122,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Categories.
     if (!categories.empty()) {
       J.attributeObject("categories", [&] {
-        for (const auto &category : categories) {
+        for (const auto& category : categories) {
           J.attributeObject(category.first, [&] {
             if (!category.second.empty()) {
               J.attribute("description", category.second);
@@ -1135,7 +1135,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Operations.
     if (!opDefs.empty()) {
       J.attributeArray("operations", [&] {
-        for (const Record *def : opDefs) {
+        for (const Record* def : opDefs) {
           emitOperatorJSON(Operator(def), records, J);
         }
       });
@@ -1144,7 +1144,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Types.
     if (!typeDefs.empty()) {
       J.attributeArray("types", [&] {
-        for (const Record *def : typeDefs) {
+        for (const Record* def : typeDefs) {
           emitTypeJSON(*def, records, J);
         }
       });
@@ -1153,7 +1153,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Attributes.
     if (!attrDefs.empty()) {
       J.attributeArray("attributes", [&] {
-        for (const Record *def : attrDefs) {
+        for (const Record* def : attrDefs) {
           emitAttrJSON(*def, records, J);
         }
       });
@@ -1162,7 +1162,7 @@ static bool emitDialectJSON(const RecordKeeper &records, raw_ostream &os) {
     // Interfaces.
     if (!interfaceDefs.empty()) {
       J.attributeArray("interfaces", [&] {
-        for (const Record *def : interfaceDefs) {
+        for (const Record* def : interfaceDefs) {
           emitInterfaceJSON(*def, records, J);
         }
       });
@@ -1183,10 +1183,10 @@ GenRegistration genDialectJSON("gen-dialect-json",
 
 // Generator that prints records.
 GenRegistration genPrintRecords("print-records", "Print all records to stdout",
-                                [](const RecordKeeper &records,
-                                   raw_ostream &os) {
+                                [](const RecordKeeper& records,
+                                   raw_ostream& os) {
                                   os << records;
                                   return false;
                                 });
 
-int main(int argc, char **argv) { return MlirTblgenMain(argc, argv); }
+int main(int argc, char** argv) { return MlirTblgenMain(argc, argv); }

@@ -1,0 +1,294 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Test Utilities
+#===------------------------------------------------------------------------===#
+
+# Shared test utilities for segmenter tests.
+# Provides RAII wrappers and helpers that enforce comprehensive coverage.
+iree_runtime_cc_library(
+    name = "segmenter_test_util",
+    testonly = True,
+    srcs = ["segmenter_test_util.cc"],
+    hdrs = ["segmenter_test_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/tokenizer:segmenter",
+        "//runtime/src/iree/tokenizer/testing:test_util",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Test-Only Implementations
+#===------------------------------------------------------------------------===#
+
+# Production code uses NULL segmenter for no-op.
+iree_runtime_cc_library(
+    name = "passthrough",
+    testonly = True,
+    srcs = ["passthrough.c"],
+    hdrs = ["passthrough.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "passthrough_test",
+    srcs = ["passthrough_test.cc"],
+    deps = [
+        ":passthrough",
+        ":segmenter_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Segmenter Implementations
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "bert",
+    srcs = ["bert.c"],
+    hdrs = ["bert.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bert_test",
+    srcs = ["bert_test.cc"],
+    deps = [
+        ":bert",
+        ":segmenter_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "digits",
+    srcs = ["digits.c"],
+    hdrs = ["digits.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "digits_test",
+    srcs = ["digits_test.cc"],
+    deps = [
+        ":digits",
+        ":segmenter_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "metaspace",
+    srcs = ["metaspace.c"],
+    hdrs = ["metaspace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "metaspace_test",
+    srcs = ["metaspace_test.cc"],
+    deps = [
+        ":metaspace",
+        ":segmenter_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "punctuation",
+    srcs = ["punctuation.c"],
+    hdrs = ["punctuation.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/tokenizer:segmenter",
+        "//runtime/src/iree/tokenizer/regex:exec",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "punctuation_test",
+    srcs = ["punctuation_test.cc"],
+    deps = [
+        ":punctuation",
+        ":segmenter_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "sequence",
+    srcs = ["sequence.c"],
+    hdrs = ["sequence.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "sequence_test",
+    srcs = ["sequence_test.cc"],
+    deps = [
+        ":metaspace",
+        ":punctuation",
+        ":segmenter_test_util",
+        ":sequence",
+        ":split",
+        ":whitespace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer/regex:compile",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "split",
+    srcs = ["split.c"],
+    hdrs = ["split.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+        "//runtime/src/iree/tokenizer/regex:exec",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "split_test",
+    srcs = ["split_test.cc"],
+    deps = [
+        ":segmenter_test_util",
+        ":split",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer/regex:compile",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "whitespace",
+    srcs = ["whitespace.c"],
+    hdrs = ["whitespace.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "whitespace_test",
+    srcs = ["whitespace_test.cc"],
+    deps = [
+        ":segmenter_test_util",
+        ":whitespace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "bert_fuzz",
+    srcs = ["bert_fuzz.cc"],
+    deps = [
+        ":bert",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "digits_fuzz",
+    srcs = ["digits_fuzz.cc"],
+    deps = [
+        ":digits",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "metaspace_fuzz",
+    srcs = ["metaspace_fuzz.cc"],
+    deps = [
+        ":metaspace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "punctuation_fuzz",
+    srcs = ["punctuation_fuzz.cc"],
+    deps = [
+        ":punctuation",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "split_fuzz",
+    srcs = ["split_fuzz.cc"],
+    deps = [
+        ":split",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+        "//runtime/src/iree/tokenizer/regex:compile",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "whitespace_fuzz",
+    srcs = ["whitespace_fuzz.cc"],
+    deps = [
+        ":whitespace",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)

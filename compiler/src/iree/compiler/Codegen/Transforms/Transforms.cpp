@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -730,81 +731,79 @@ void populateFoldSplitReductionAndWorkgroupMappingLoops(
 //===---------------------------------------------------------------------===//
 
 void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
-  // Walk through all loops in a function in innermost-loop-first order. This
-  // way, we first LICM from the inner loop, and place the ops in
-  // the outer loop, which in turn can be further LICM'ed.
+  // Walk through all operations in a function in innermost-op-first order. This
+  // way, we first LICM from the inner operation, and place the ops in
+  // the outer operation, which in turn can be further LICM'ed.
   //
-  // Hoisting is only performed on loops with guaranteed non-zero trip counts.
-  // `scf.forall` ops with mapping attributes can never be proven to have a
-  // non-zero trip count until the loop is resolved and is blanket included
-  // here.
-  target->walk([&](LoopLikeOpInterface loopLike) {
-    if (auto forallOp = dyn_cast<scf::ForallOp>(*loopLike)) {
-      if (forallOp.getMapping()) {
-        return;
-      }
-    }
+  // Hoisting is only performed on operations with guaranteed non-zero trip
+  // counts.
+  target->walk([&](Operation *hoistable) {
+    llvm::TypeSwitch<Operation *>(hoistable)
+        .Case<LoopLikeOpInterface>([&](LoopLikeOpInterface loopLike) {
+          // `scf.forall` ops with mapping attributes can never be proven to
+          // have a non-zero trip count until the loop is resolved and is
+          // blanket included here.
+          if (auto forallOp = dyn_cast<scf::ForallOp>(*loopLike)) {
+            if (forallOp.getMapping()) {
+              return;
+            }
+          }
 
-    // Skip loops without lower/upper bounds. There is no generic way to verify
-    // whether a loop has at least one trip so new loop types of interest can be
-    // added as needed. For example, `scf.while` needs non-trivial analysis of
-    // its condition region to know that it has at least one trip.
-    std::optional<SmallVector<OpFoldResult>> maybeLowerBounds =
-        loopLike.getLoopLowerBounds();
-    std::optional<SmallVector<OpFoldResult>> maybeUpperBounds =
-        loopLike.getLoopUpperBounds();
-    std::optional<SmallVector<Value>> maybeIvs =
-        loopLike.getLoopInductionVars();
-    if (!maybeLowerBounds || !maybeUpperBounds || !maybeIvs) {
-      return;
-    }
+          // Skip loops without lower/upper bounds. There is no generic way to
+          // verify whether a loop has at least one trip so new loop types of
+          // interest can be added as needed. For example, `scf.while` needs
+          // non-trivial analysis of its condition region to know that it has at
+          // least one trip.
+          std::optional<SmallVector<OpFoldResult>> maybeLowerBounds =
+              loopLike.getLoopLowerBounds();
+          std::optional<SmallVector<OpFoldResult>> maybeUpperBounds =
+              loopLike.getLoopUpperBounds();
+          std::optional<SmallVector<Value>> maybeIvs =
+              loopLike.getLoopInductionVars();
+          if (!maybeLowerBounds || !maybeUpperBounds || !maybeIvs) {
+            return;
+          }
 
-    // If any lower + upper bound pair cannot be definitely verified as lb < ub
-    // then the loop may have a zero trip count.
-    for (auto [lb, ub, iv] :
-         llvm::zip_equal(*maybeLowerBounds, *maybeUpperBounds, *maybeIvs)) {
-      if (iv.getType().isIndex()) {
-        if (!ValueBoundsConstraintSet::compare(lb, ValueBoundsConstraintSet::LT,
-                                               ub)) {
-          return;
-        }
-      } else {
-        // Weaker test for non-`index` operands to some loops
-        // like scf.for, since the value bounds interface requires index types.
-        auto maybeLb = getConstantIntValue(lb);
-        auto maybeUb = getConstantIntValue(ub);
-        if (!maybeLb || !maybeUb) {
-          return;
-        }
-        if (*maybeLb >= *maybeUb) {
-          return;
-        }
-      }
-    }
+          // If any lower + upper bound pair cannot be definitely verified as lb
+          // < ub then the loop may have a zero trip count.
+          for (auto [lb, ub, iv] : llvm::zip_equal(
+                   *maybeLowerBounds, *maybeUpperBounds, *maybeIvs)) {
+            if (iv.getType().isIndex()) {
+              if (!ValueBoundsConstraintSet::compare(
+                      lb, ValueBoundsConstraintSet::LT, ub)) {
+                return;
+              }
+            } else {
+              // Weaker test for non-`index` operands to some loops
+              // like scf.for, since the value bounds interface requires index
+              // types.
+              auto maybeLb = getConstantIntValue(lb);
+              auto maybeUb = getConstantIntValue(ub);
+              if (!maybeLb || !maybeUb) {
+                return;
+              }
+              if (*maybeLb >= *maybeUb) {
+                return;
+              }
+            }
+          }
 
-    moveLoopInvariantCode(loopLike);
-  });
-
-  // linalg.generic operations are also loop-like, but they don't have
-  // LoopLikeOpInterface implemented for them.
-  target->walk([&](linalg::GenericOp genericOp) {
-    // Ideally, we should be checking if the linalg.generic op has a trip count
-    // of zero, but while that is possible and can be written using
-    // ValueBoundsConstraintSet, it is usually not needed. Unlike loops, which
-    // can have arbitary operations inside them, the loop invariant operations
-    // inside a linalg.generic operations are usually operations performed on
-    // scalars. Hoisting scalar constants does not have a big cost even if the
-    // trip count is zero.
-    moveLoopInvariantCode(
-        &genericOp.getBodyRegion(),
-        [&](Value value, Region *) {
-          return !genericOp->isAncestor(value.getParentRegion()->getParentOp());
-        },
-        [&](Operation *op, Region *) {
-          return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
-                 isSpeculatable(op);
-        },
-        [&](Operation *op, Region *) { op->moveBefore(genericOp); });
+          moveLoopInvariantCode(loopLike);
+        })
+        .Case<IREE::Codegen::HoistableRegionOpInterface>(
+            [&](IREE::Codegen::HoistableRegionOpInterface hoistableOp) {
+              moveLoopInvariantCode(
+                  hoistableOp.getHoistableRegions(),
+                  [&](Value value, Region *) {
+                    return hoistableOp.isDefinedOutsideOfRegions(value);
+                  },
+                  [&](Operation *op, Region *) {
+                    return hoistableOp.isHoistable(op);
+                  },
+                  [&](Operation *op, Region *) {
+                    op->moveBefore(hoistableOp);
+                  });
+            });
   });
 }
 
@@ -1068,7 +1067,8 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
                                          [](int64_t i) { return i == 1; });
 
     // Step 2. Collect the set of tensor.parallel_insert_slice ops in the
-    // terminator and their paired extract_slice ops from the for loop iter arg.
+    // terminator and their paired extract_slice ops from the for loop iter
+    // arg.
     SmallVector<Operation *> sliceOperandProducers;
 
     BackwardSliceOptions backwardOptions;
@@ -1109,8 +1109,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       }
 
       // Verify they operate on equivalent subsets, ensuring the slices are
-      // hoistable. It is still possible to hoist the loop if this is not true,
-      // however in such cases we likely formed the loops in the wrong order.
+      // hoistable. It is still possible to hoist the loop if this is not
+      // true, however in such cases we likely formed the loops in the wrong
+      // order.
       if (destSlice && !cast<SubsetOpInterface>(*destSlice)
                             .operatesOnEquivalentSubset(
                                 cast<SubsetOpInterface>(*parallelInsert),
@@ -1194,10 +1195,11 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           loop, "Slice operand producers not safe to hoist out of loop");
     }
 
-    // Sort the backwards slice of the producers for the insertion/extraction
-    // indices by the block order in the scf.forall body. This ensures that we
-    // hoist operations in the same order they started. Any topological ordering
-    // would work too because the operations are speculatable.
+    // Sort the backwards slice of the producers for the
+    // insertion/extraction indices by the block order in the scf.forall
+    // body. This ensures that we hoist operations in the same order they
+    // started. Any topological ordering would work too because the
+    // operations are speculatable.
     slice = mlir::topologicalSort(slice);
 
     // Step 3. Create the ForallOp.
@@ -1230,7 +1232,8 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
                              [](OpBuilder &, Location, Value, ValueRange) {});
 
       {
-        // Step 5. Inline the body of the original forall into the new for loop.
+        // Step 5. Inline the body of the original forall into the new for
+        // loop.
         OpBuilder::InsertionGuard g2(rewriter);
         SmallVector<Value> argReplacements(newForallOp.getInductionVars());
         for (auto [forallIterArg, forIterArg, maybeSlice] :
@@ -1266,8 +1269,8 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
         scf::YieldOp::create(rewriter, loop.getLoc(), newYields);
       }
 
-      // Move all producers for the indices of the slices outside of the body
-      // of the loop (and the extract_slice ops themselves).
+      // Move all producers for the indices of the slices outside of the
+      // body of the loop (and the extract_slice ops themselves).
       for (auto sliceOperandProducer : slice) {
         rewriter.moveOpBefore(sliceOperandProducer, newLoop);
       }
@@ -1277,8 +1280,8 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
         }
       }
 
-      // Create the new terminator for the hoisted forall loop using the results
-      // of the new for loop.
+      // Create the new terminator for the hoisted forall loop using the
+      // results of the new for loop.
       rewriter.setInsertionPointToEnd(newForallOp.getTerminator().getBody());
       for (auto [parallelSlice, source, dest] :
            llvm::zip_equal(terminators, newLoop.getResults(),
@@ -1313,10 +1316,9 @@ void populateForallLoopHoistingPattern(RewritePatternSet &patterns) {
 
 namespace {
 /// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
-/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
-/// are the same.
-/// This seems generally desirable as a folding but may be too intrusive, so we
-/// only apply it selectively for now.
+/// `linalg.fill(cst, empty)` when the padding constant and the fill
+/// constant are the same. This seems generally desirable as a folding but
+/// may be too intrusive, so we only apply it selectively for now.
 // TODO: atm hardcoded on linalg.fill but we could take any result of any
 // generic that yields a constant in that result.
 struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {

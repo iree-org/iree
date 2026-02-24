@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --iree-llvmcpu-disable-distribution --split-input-file %s | FileCheck %s
 
-// Test that iree_linalg_ext.map_scatter op is not generated when distribution
+// Test that iree_linalg_ext.map_store op is not generated when distribution
 // is disabled. The op is used in the fallback solution when the pack op is not
 // fusible in consumer fusion. We do not expect the op if the distribution is
 // disabled. For more details, see
@@ -20,7 +20,7 @@ func.func @pack_without_distribution() attributes {hal.executable.target = #exec
 }
 // CHECK-LABEL: func.func @pack_without_distribution
 // CHECK-NOT:     scf.forall
-// CHECK-NOT:     iree_linalg_ext.map_scatter
+// CHECK-NOT:     iree_linalg_ext.map_store
 
 // -----
 

@@ -33,11 +33,11 @@ def GPUCheckResourceUsagePass :
 def GPUCombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-gpu-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
-    "Combines layout transformation operations into a single map_scatter operation.";
+    "Combines layout transformation operations into a single map_store operation.";
   let description = [{
     Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
-    etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
+    etc.) into a single iree_linalg_ext.map_store operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups and threads, and
     then the padding values are written directly to the output buffer of the
     store_to_buffer op.

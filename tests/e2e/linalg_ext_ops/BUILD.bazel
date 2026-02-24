@@ -18,9 +18,10 @@ ALL_SRCS = enforce_glob(
         "arg_compare.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "dynamic_attention.mlir",
         "gather.mlir",
-        "map_gather.mlir",
-        "map_scatter.mlir",
+        "map_load.mlir",
+        "map_store.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -49,9 +50,10 @@ VMVX_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
+        "dynamic_attention.mlir",
         "gather.mlir",
-        "map_gather.mlir",
-        "map_scatter.mlir",
+        "map_load.mlir",
+        "map_store.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -88,8 +90,9 @@ LLVM_GPU_SRCS = enforce_glob(
     exclude = [
         "attention.mlir",
         "attention_i1_mask.mlir",
-        "map_gather.mlir",
-        "map_scatter.mlir",
+        "dynamic_attention.mlir",
+        "map_load.mlir",
+        "map_store.mlir",
     ],
 )
 
@@ -115,8 +118,8 @@ ROCM_HIP_SRCS = enforce_glob(
         "arg_compare.mlir",
         "attention.mlir",
         "gather.mlir",
-        "map_gather.mlir",
-        "map_scatter.mlir",
+        "map_load.mlir",
+        "map_store.mlir",
         "scan.mlir",
         "scatter.mlir",
         "sort.mlir",
@@ -127,6 +130,7 @@ ROCM_HIP_SRCS = enforce_glob(
     exclude = [
         "top-k.mlir",
         "attention_i1_mask.mlir",
+        "dynamic_attention.mlir",
     ],
 )
 
@@ -154,8 +158,9 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
-            "map_gather.mlir",
-            "map_scatter.mlir",
+            "dynamic_attention.mlir",
+            "map_load.mlir",
+            "map_store.mlir",
             "top-k.mlir",
         ],
     ),
@@ -170,8 +175,8 @@ iree_check_single_backend_test_suite(
         [
             "arg_compare.mlir",
             "gather.mlir",
-            "map_gather.mlir",
-            "map_scatter.mlir",
+            "map_load.mlir",
+            "map_store.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
@@ -183,6 +188,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "dynamic_attention.mlir",
         ],
     ),
     driver = "vulkan",

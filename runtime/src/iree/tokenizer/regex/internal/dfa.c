@@ -90,8 +90,8 @@ static bool iree_tokenizer_regex_nfa_state_set_has_consuming(
   for (uint32_t i = 0; i < nfa->state_count; ++i) {
     if (!iree_tokenizer_regex_nfa_state_set_contains(set, i)) continue;
     const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_MATCH_BYTE ||
-        state->type == IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_BYTE ||
+        state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS) {
       return true;
     }
   }
@@ -163,18 +163,18 @@ static void iree_tokenizer_regex_epsilon_closure_single_with_anchors(
     iree_tokenizer_regex_nfa_state_set_add(out_set, state->id);
 
     // Track accept states reached via end anchor.
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT && through_end_anchor &&
-        anchor_info && anchor_info->end_anchor_accepts) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT &&
+        through_end_anchor && anchor_info && anchor_info->end_anchor_accepts) {
       iree_tokenizer_regex_nfa_state_set_add(anchor_info->end_anchor_accepts,
                                              state->id);
     }
 
     // Follow epsilon-like transitions by pushing to worklist.
-    // NOTE: We check if successors are already visited BEFORE pushing to avoid
+    // We check if successors are already visited before pushing to avoid
     // redundant worklist entries. This prevents overflow with dense epsilon
     // graphs (e.g., from `(a?){100}` where each state has 2 epsilon
     // successors).
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_EPSILON) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON) {
       if (state->data.epsilon.out1 &&
           !iree_tokenizer_regex_nfa_state_set_contains(
               out_set, state->data.epsilon.out1->id)) {
@@ -191,7 +191,7 @@ static void iree_tokenizer_regex_epsilon_closure_single_with_anchors(
             .through_end_anchor = through_end_anchor,
         };
       }
-    } else if (state->type == IREE_TOKENIZER_REGEX_NFA_ANCHOR_START) {
+    } else if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START) {
       // Start anchor can only be traversed at position 0 (beginning of input).
       // After consuming any character, we're at position > 0, so start anchor
       // transitions become dead ends. This makes patterns like `a^b` correctly
@@ -204,7 +204,7 @@ static void iree_tokenizer_regex_epsilon_closure_single_with_anchors(
             .through_end_anchor = through_end_anchor,
         };
       }
-    } else if (state->type == IREE_TOKENIZER_REGEX_NFA_ANCHOR_END) {
+    } else if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_END) {
       // End anchor - mark that subsequent accept states require end anchor.
       if (state->data.anchor_out &&
           !iree_tokenizer_regex_nfa_state_set_contains(
@@ -277,7 +277,7 @@ static void iree_tokenizer_regex_epsilon_closure_single_ignoring_end_anchor(
     iree_tokenizer_regex_nfa_state_set_add(out_set, state->id);
 
     // Follow epsilon-like transitions EXCEPT ANCHOR_END.
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_EPSILON) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON) {
       if (state->data.epsilon.out1 &&
           !iree_tokenizer_regex_nfa_state_set_contains(
               out_set, state->data.epsilon.out1->id)) {
@@ -288,7 +288,7 @@ static void iree_tokenizer_regex_epsilon_closure_single_ignoring_end_anchor(
               out_set, state->data.epsilon.out2->id)) {
         worklist[worklist_tail++] = state->data.epsilon.out2->id;
       }
-    } else if (state->type == IREE_TOKENIZER_REGEX_NFA_ANCHOR_START) {
+    } else if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START) {
       // Start anchor: same rules as full closure.
       if (at_start && state->data.anchor_out &&
           !iree_tokenizer_regex_nfa_state_set_contains(
@@ -327,7 +327,7 @@ static void iree_tokenizer_regex_compute_end_anchor_accepts(
   for (uint32_t i = 0; i < nfa->state_count; ++i) {
     if (!iree_tokenizer_regex_nfa_state_set_contains(full_closure, i)) continue;
     const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
-    if (state->type != IREE_TOKENIZER_REGEX_NFA_ACCEPT) continue;
+    if (state->type != IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) continue;
     // Accept is in full closure. Is it also reachable without ANCHOR_END?
     if (!iree_tokenizer_regex_nfa_state_set_contains(unanchored_closure, i)) {
       // Only reachable via anchored path - requires end anchor.
@@ -353,21 +353,21 @@ static void iree_tokenizer_regex_nfa_move(
 
     const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
     switch (state->type) {
-      case IREE_TOKENIZER_REGEX_NFA_MATCH_BYTE:
+      case IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_BYTE:
         if (state->data.match_byte.byte == byte) {
           iree_tokenizer_regex_nfa_state_set_add(
               out_set, state->data.match_byte.out->id);
         }
         break;
 
-      case IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS: {
+      case IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS: {
         bool matches = false;
         if (byte < 0x80) {
           // Regular byte: check bitmap.
           matches = (state->data.match_class.bitmap[byte / 8] &
                      (1 << (byte % 8))) != 0;
         } else if (byte >= 0x80 &&
-                   byte < 0x80 + IREE_TOKENIZER_REGEX_PSEUDO_COUNT) {
+                   byte < 0x80 + IREE_TOKENIZER_UTIL_REGEX_PSEUDO_COUNT) {
           // Pseudo-byte: check pseudo_mask.
           matches =
               (state->data.match_class.pseudo_mask & (1 << (byte - 0x80))) != 0;
@@ -497,14 +497,16 @@ static iree_status_t iree_tokenizer_regex_dfa_state_create(
     iree_arena_allocator_t* arena,
     const iree_tokenizer_regex_nfa_state_set_t* nfa_states, uint32_t id,
     iree_tokenizer_regex_dfa_state_t** out_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_tokenizer_regex_dfa_state_t* state;
-  IREE_RETURN_IF_ERROR(iree_arena_allocate(
-      arena, sizeof(iree_tokenizer_regex_dfa_state_t), (void**)&state));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(arena, sizeof(iree_tokenizer_regex_dfa_state_t),
+                              (void**)&state));
 
   state->id = id;
   state->is_accepting = false;
   state->has_lookahead = false;
-  state->lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+  state->lookahead_type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
   state->lookahead_data = 0;
   state->has_fallback = false;
   state->has_early_no_lookahead = false;
@@ -522,12 +524,13 @@ static iree_status_t iree_tokenizer_regex_dfa_state_create(
   // Copy NFA state set.
   state->nfa_states.nfa_state_count = nfa_states->nfa_state_count;
   state->nfa_states.capacity = nfa_states->capacity;
-  IREE_RETURN_IF_ERROR(
-      iree_arena_allocate(arena, nfa_states->capacity * sizeof(uint64_t),
-                          (void**)&state->nfa_states.bits));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(arena, nfa_states->capacity * sizeof(uint64_t),
+                              (void**)&state->nfa_states.bits));
   iree_tokenizer_regex_nfa_state_set_copy(&state->nfa_states, nfa_states);
 
   *out_state = state;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -551,7 +554,7 @@ static iree_status_t iree_tokenizer_regex_compute_branch_reachability(
   // Initialize: accept states can reach their own branch.
   for (uint32_t i = 0; i < nfa->state_count; ++i) {
     reachable[i] = 0;
-    if (nfa->states[i]->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT) {
+    if (nfa->states[i]->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) {
       reachable[i] = (1ULL << nfa->states[i]->data.accept.branch_index);
     }
   }
@@ -563,12 +566,12 @@ static iree_status_t iree_tokenizer_regex_compute_branch_reachability(
   bool changed = true;
   uint32_t iterations = 0;
   while (changed) {
-    if (++iterations > IREE_TOKENIZER_REGEX_DFA_MAX_ITERATIONS) {
+    if (++iterations > IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_ITERATIONS) {
       return iree_make_status(
           IREE_STATUS_RESOURCE_EXHAUSTED,
           "branch reachability exceeded iteration limit (%d); "
           "pattern may be pathological",
-          IREE_TOKENIZER_REGEX_DFA_MAX_ITERATIONS);
+          IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_ITERATIONS);
     }
     changed = false;
     for (uint32_t i = 0; i < nfa->state_count; ++i) {
@@ -576,7 +579,7 @@ static iree_status_t iree_tokenizer_regex_compute_branch_reachability(
       const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
 
       switch (state->type) {
-        case IREE_TOKENIZER_REGEX_NFA_EPSILON:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON:
           if (state->data.epsilon.out1) {
             reachable[i] |= reachable[state->data.epsilon.out1->id];
           }
@@ -584,23 +587,23 @@ static iree_status_t iree_tokenizer_regex_compute_branch_reachability(
             reachable[i] |= reachable[state->data.epsilon.out2->id];
           }
           break;
-        case IREE_TOKENIZER_REGEX_NFA_MATCH_BYTE:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_BYTE:
           if (state->data.match_byte.out) {
             reachable[i] |= reachable[state->data.match_byte.out->id];
           }
           break;
-        case IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS:
           if (state->data.match_class.out) {
             reachable[i] |= reachable[state->data.match_class.out->id];
           }
           break;
-        case IREE_TOKENIZER_REGEX_NFA_ANCHOR_START:
-        case IREE_TOKENIZER_REGEX_NFA_ANCHOR_END:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_END:
           if (state->data.anchor_out) {
             reachable[i] |= reachable[state->data.anchor_out->id];
           }
           break;
-        case IREE_TOKENIZER_REGEX_NFA_ACCEPT:
+        case IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT:
           // Accept states don't have outgoing transitions.
           break;
       }
@@ -630,7 +633,7 @@ static void iree_tokenizer_regex_compute_branch_masks(
     dfa_state->alive_branches |= nfa_reachable_branches[i];
 
     // If it's an accept state, add its branch to accepting_branches.
-    if (nfa->states[i]->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT) {
+    if (nfa->states[i]->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) {
       dfa_state->accepting_branches |=
           (1ULL << nfa->states[i]->data.accept.branch_index);
     }
@@ -666,14 +669,14 @@ static iree_status_t iree_tokenizer_regex_extract_lookahead(
   uint8_t min_lookahead_branch = UINT8_MAX;
   uint8_t min_no_lookahead_branch = UINT8_MAX;
   iree_tokenizer_regex_lookahead_type_t first_lookahead_type =
-      IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+      IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
   uint8_t first_lookahead_data = 0;
 
   for (uint32_t i = 0; i < nfa->state_count; ++i) {
     if (!iree_tokenizer_regex_nfa_state_set_contains(nfa_states, i)) continue;
 
     const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) {
       dfa_state->is_accepting = true;
 
       if (state->data.accept.has_lookahead) {
@@ -723,17 +726,17 @@ static iree_status_t iree_tokenizer_regex_extract_lookahead(
       dfa_state->has_early_no_lookahead =
           min_no_lookahead_branch < min_lookahead_branch;
       switch (first_lookahead_type) {
-        case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR:
+        case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR:
           dfa_state->lookahead_type =
-              IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK;
+              IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK;
           break;
-        case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND:
+        case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND:
           dfa_state->lookahead_type =
-              IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK;
+              IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK;
           break;
-        case IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS:
+        case IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS:
           dfa_state->lookahead_type =
-              IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK;
+              IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS_WITH_FALLBACK;
           break;
         default:
           dfa_state->lookahead_type = first_lookahead_type;
@@ -771,7 +774,7 @@ static void iree_tokenizer_regex_extract_end_anchor(
     if (!iree_tokenizer_regex_nfa_state_set_contains(nfa_states, i)) continue;
 
     const iree_tokenizer_regex_nfa_state_t* state = nfa->states[i];
-    if (state->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT) {
+    if (state->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) {
       if (iree_tokenizer_regex_nfa_state_set_contains(end_anchor_accepts, i)) {
         found_accept_with_end_anchor = true;
       } else {
@@ -918,7 +921,7 @@ iree_status_t iree_tokenizer_regex_dfa_build(
   // states with no way to consume input, so it's effectively a dead-end.
   if (nfa->has_anchors) {
     if (nfa->start &&
-        nfa->start->type == IREE_TOKENIZER_REGEX_NFA_ANCHOR_START) {
+        nfa->start->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START) {
       start_state->requires_start_anchor = true;
     } else if (!iree_tokenizer_regex_nfa_state_set_has_consuming(
                    nfa, &unanchored_set)) {
@@ -970,11 +973,11 @@ iree_status_t iree_tokenizer_regex_dfa_build(
 
   while (worklist_head < out_dfa->state_count) {
     // Safety limit to prevent hangs from pathological patterns.
-    if (++iterations > IREE_TOKENIZER_REGEX_DFA_MAX_ITERATIONS) {
+    if (++iterations > IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_ITERATIONS) {
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "DFA construction exceeded iteration limit (%d); "
                               "pattern may cause exponential state growth",
-                              IREE_TOKENIZER_REGEX_DFA_MAX_ITERATIONS);
+                              IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_ITERATIONS);
     }
 
     iree_tokenizer_regex_dfa_state_t* current_dfa_state =
@@ -985,7 +988,7 @@ iree_status_t iree_tokenizer_regex_dfa_build(
     for (int byte = 0; byte < 256; ++byte) {
       // Skip continuation bytes (0x8C-0xBF) that aren't pseudo-bytes.
       // These can't appear as standalone input.
-      if (byte >= 0x80 + IREE_TOKENIZER_REGEX_PSEUDO_COUNT && byte <= 0xBF)
+      if (byte >= 0x80 + IREE_TOKENIZER_UTIL_REGEX_PSEUDO_COUNT && byte <= 0xBF)
         continue;
       // Also skip invalid lead bytes (0xC0, 0xC1, 0xF5-0xFF).
       if (byte == 0xC0 || byte == 0xC1) continue;
@@ -1014,14 +1017,19 @@ iree_status_t iree_tokenizer_regex_dfa_build(
 
       if (!target_state) {
         // Check state limit.
-        if (out_dfa->state_count >= IREE_TOKENIZER_REGEX_DFA_MAX_STATES) {
+        if (out_dfa->state_count >= IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES) {
           return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                                   "DFA state limit exceeded (%d max)",
-                                  IREE_TOKENIZER_REGEX_DFA_MAX_STATES);
+                                  IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES);
         }
 
         // Expand state array if needed.
         if (out_dfa->state_count >= out_dfa->state_capacity) {
+          // Overflow is impossible: MAX_STATES (65534) bounds state_count,
+          // so capacity never exceeds 131072 (next power of 2), far below
+          // UINT32_MAX/2. The initial capacity of 256 ensures non-zero.
+          IREE_ASSERT(out_dfa->state_capacity > 0 &&
+                      out_dfa->state_capacity <= UINT32_MAX / 2);
           uint32_t new_capacity = out_dfa->state_capacity * 2;
           iree_tokenizer_regex_dfa_state_t** new_states;
           IREE_RETURN_IF_ERROR(iree_arena_allocate(
@@ -1073,7 +1081,8 @@ iree_status_t iree_tokenizer_regex_dfa_build(
         continue;
 
       const iree_tokenizer_regex_nfa_state_t* nfa_state = nfa->states[i];
-      if (nfa_state->type != IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS) continue;
+      if (nfa_state->type != IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS)
+        continue;
       if (nfa_state->data.match_class.range_count == 0) continue;
 
       // This NFA state has exact ranges. Compute the target DFA state.
@@ -1092,14 +1101,19 @@ iree_status_t iree_tokenizer_regex_dfa_build(
 
       if (!range_target) {
         // Check state limit.
-        if (out_dfa->state_count >= IREE_TOKENIZER_REGEX_DFA_MAX_STATES) {
+        if (out_dfa->state_count >= IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES) {
           return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                                   "DFA state limit exceeded (%d max)",
-                                  IREE_TOKENIZER_REGEX_DFA_MAX_STATES);
+                                  IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES);
         }
 
         // Expand state array if needed.
         if (out_dfa->state_count >= out_dfa->state_capacity) {
+          // Overflow is impossible: MAX_STATES (65534) bounds state_count,
+          // so capacity never exceeds 131072 (next power of 2), far below
+          // UINT32_MAX/2. The initial capacity of 256 ensures non-zero.
+          IREE_ASSERT(out_dfa->state_capacity > 0 &&
+                      out_dfa->state_capacity <= UINT32_MAX / 2);
           uint32_t new_capacity = out_dfa->state_capacity * 2;
           iree_tokenizer_regex_dfa_state_t** new_states;
           IREE_RETURN_IF_ERROR(iree_arena_allocate(
@@ -1160,10 +1174,11 @@ iree_status_t iree_tokenizer_regex_dfa_build(
 
         if (!found) {
           if (current_dfa_state->range_count >=
-              IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES) {
-            return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                    "DFA state exceeds %d range transitions",
-                                    IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES);
+              IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES) {
+            return iree_make_status(
+                IREE_STATUS_RESOURCE_EXHAUSTED,
+                "DFA state exceeds %d range transitions",
+                IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES);
           }
           uint8_t idx = current_dfa_state->range_count++;
           current_dfa_state->range_transitions[idx].start = nfa_range->start;
@@ -1186,10 +1201,10 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
     const iree_tokenizer_regex_dfa_build_t* dfa, iree_allocator_t allocator,
     uint8_t** out_data, iree_host_size_t* out_size) {
   // Validate state count fits in uint16_t.
-  if (dfa->state_count > IREE_TOKENIZER_REGEX_DFA_MAX_STATES) {
+  if (dfa->state_count > IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED, "DFA has too many states: %u > %u",
-        dfa->state_count, IREE_TOKENIZER_REGEX_DFA_MAX_STATES);
+        dfa->state_count, IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES);
   }
 
   // Count accepting states, ranges, and build header flags.
@@ -1197,20 +1212,21 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   uint16_t num_accepting = 0;
   uint16_t num_ranges = 0;
   bool has_branch_tracking = false;
-  iree_tokenizer_regex_dfa_flags_t flags = IREE_TOKENIZER_REGEX_DFA_FLAG_NONE;
+  iree_tokenizer_regex_dfa_flags_t flags =
+      IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_NONE;
   if (dfa->uses_unicode) {
-    flags |= IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE;
+    flags |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_UNICODE;
   }
   for (uint32_t i = 0; i < dfa->state_count; ++i) {
     if (dfa->states[i]->is_accepting) {
       num_accepting++;
       if (dfa->states[i]->has_lookahead) {
-        flags |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
+        flags |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
       }
     }
     if (dfa->states[i]->requires_start_anchor ||
         dfa->states[i]->requires_end_anchor) {
-      flags |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS;
+      flags |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS;
     }
     // Check if branch tracking is needed (more than one branch alive).
     if (iree_math_count_ones_u64(dfa->states[i]->alive_branches) > 1) {
@@ -1220,15 +1236,56 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
     num_ranges += dfa->states[i]->range_count;
   }
   if (has_branch_tracking) {
-    flags |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_BRANCHES;
+    flags |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_BRANCHES;
   }
   if (num_ranges > 0) {
-    flags |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_RANGES;
+    flags |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_RANGES;
   }
 
-  // Calculate total size.
-  iree_host_size_t total_size =
-      iree_tokenizer_regex_dfa_binary_size(num_states, flags, num_ranges);
+  // Calculate layout with overflow checking.
+  // Conditional counts: 0 disables the section.
+  iree_host_size_t bitmap_qwords = iree_host_align(num_states, 64) / 64;
+  iree_host_size_t lookahead_count =
+      (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD) ? num_states
+                                                                 : 0;
+  iree_host_size_t anchor_bitmap_count =
+      (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) ? 2 : 0;
+  iree_host_size_t branch_array_count =
+      (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_BRANCHES) ? 2 : 0;
+  iree_host_size_t range_header_count =
+      (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_RANGES) ? 1 : 0;
+  iree_host_size_t range_array_count =
+      (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_RANGES) ? num_ranges : 0;
+
+  iree_host_size_t total_size = 0;
+  iree_host_size_t transitions_offset = 0;
+  iree_host_size_t accepting_bitmap_offset = 0;
+  iree_host_size_t lookahead_offset = 0;
+  iree_host_size_t anchor_bitmaps_offset = 0;
+  iree_host_size_t branches_offset = 0;
+  iree_host_size_t range_header_offset = 0;
+  iree_host_size_t range_transitions_offset = 0;
+  IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+      sizeof(iree_tokenizer_regex_dfa_header_t), &total_size,
+      // Transitions: num_states rows of 256 uint16_t values.
+      IREE_STRUCT_ARRAY_FIELD(num_states, 256, uint16_t, &transitions_offset),
+      // Accepting bitmap: ceil(num_states/64) qwords.
+      IREE_STRUCT_FIELD(bitmap_qwords, uint64_t, &accepting_bitmap_offset),
+      // Lookahead (optional): one entry per state.
+      IREE_STRUCT_FIELD(lookahead_count, iree_tokenizer_regex_lookahead_t,
+                        &lookahead_offset),
+      // Anchor bitmaps (optional): 2 bitmaps of bitmap_qwords each.
+      IREE_STRUCT_ARRAY_FIELD(anchor_bitmap_count, bitmap_qwords, uint64_t,
+                              &anchor_bitmaps_offset),
+      // Branches (optional): 2 arrays of num_states each.
+      IREE_STRUCT_ARRAY_FIELD(branch_array_count, num_states, uint64_t,
+                              &branches_offset),
+      // Range header (optional): num_ranges + reserved.
+      IREE_STRUCT_FIELD(range_header_count, uint32_t, &range_header_offset),
+      // Range transitions (optional).
+      IREE_STRUCT_FIELD(range_array_count,
+                        iree_tokenizer_regex_dfa_range_transition_t,
+                        &range_transitions_offset)));
 
   // Allocate output buffer.
   uint8_t* data;
@@ -1239,8 +1296,8 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   // Write header.
   iree_tokenizer_regex_dfa_header_t* header =
       (iree_tokenizer_regex_dfa_header_t*)data;
-  header->magic = IREE_TOKENIZER_REGEX_DFA_MAGIC;
-  header->version = IREE_TOKENIZER_REGEX_DFA_VERSION;
+  header->magic = IREE_TOKENIZER_UTIL_REGEX_DFA_MAGIC;
+  header->version = IREE_TOKENIZER_UTIL_REGEX_DFA_VERSION;
   header->flags = flags;
   header->num_states = num_states;
   header->num_accepting = num_accepting;
@@ -1248,14 +1305,13 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   header->unanchored_start_state = (uint16_t)dfa->unanchored_start->id;
 
   // Write transition table.
-  uint16_t* transitions =
-      (uint16_t*)(data + sizeof(iree_tokenizer_regex_dfa_header_t));
+  uint16_t* transitions = (uint16_t*)(data + transitions_offset);
   for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
     const iree_tokenizer_regex_dfa_state_t* state = dfa->states[state_idx];
     uint16_t* state_trans = &transitions[state_idx * 256];
     for (int byte = 0; byte < 256; ++byte) {
       if (state->transitions[byte] == UINT32_MAX) {
-        state_trans[byte] = IREE_TOKENIZER_REGEX_NO_TRANSITION;
+        state_trans[byte] = IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION;
       } else {
         state_trans[byte] = (uint16_t)state->transitions[byte];
       }
@@ -1263,25 +1319,17 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   }
 
   // Write accepting bitmap.
-  uint64_t* bitmap =
-      (uint64_t*)(data + sizeof(iree_tokenizer_regex_dfa_header_t) +
-                  (iree_host_size_t)num_states * 256 * sizeof(uint16_t));
+  uint64_t* accepting_bitmap = (uint64_t*)(data + accepting_bitmap_offset);
   for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
     if (dfa->states[state_idx]->is_accepting) {
-      bitmap[state_idx / 64] |= (1ULL << (state_idx % 64));
+      accepting_bitmap[state_idx / 64] |= (1ULL << (state_idx % 64));
     }
   }
 
   // Write lookahead table (if any).
-  iree_host_size_t bitmap_qwords = iree_host_align(num_states, 64) / 64;
-  iree_host_size_t offset_after_bitmap =
-      sizeof(iree_tokenizer_regex_dfa_header_t) +
-      (iree_host_size_t)num_states * 256 * sizeof(uint16_t) +
-      bitmap_qwords * sizeof(uint64_t);
-
-  if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
+  if (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
     iree_tokenizer_regex_lookahead_t* lookahead =
-        (iree_tokenizer_regex_lookahead_t*)(data + offset_after_bitmap);
+        (iree_tokenizer_regex_lookahead_t*)(data + lookahead_offset);
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       const iree_tokenizer_regex_dfa_state_t* state = dfa->states[state_idx];
       if (state->has_lookahead) {
@@ -1290,27 +1338,23 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
         // Serialize PCRE-compatibility flag for match selection.
         lookahead[state_idx].flags =
             state->has_early_no_lookahead
-                ? IREE_TOKENIZER_REGEX_LOOKAHEAD_FLAG_HAS_EARLY_NO_LOOKAHEAD
-                : IREE_TOKENIZER_REGEX_LOOKAHEAD_FLAG_NONE;
+                ? IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_FLAG_HAS_EARLY_NO_LOOKAHEAD
+                : IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_FLAG_NONE;
         lookahead[state_idx].reserved = 0;
       } else {
-        lookahead[state_idx].type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+        lookahead[state_idx].type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
         lookahead[state_idx].data = 0;
-        lookahead[state_idx].flags = IREE_TOKENIZER_REGEX_LOOKAHEAD_FLAG_NONE;
+        lookahead[state_idx].flags =
+            IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_FLAG_NONE;
         lookahead[state_idx].reserved = 0;
       }
     }
   }
 
   // Write anchor bitmaps (if any).
-  if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) {
-    iree_host_size_t anchor_offset = offset_after_bitmap;
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
-      anchor_offset += num_states * sizeof(iree_tokenizer_regex_lookahead_t);
-    }
-
+  if (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) {
     // Start anchor bitmap: states that require match to start at position 0.
-    uint64_t* start_anchor_bitmap = (uint64_t*)(data + anchor_offset);
+    uint64_t* start_anchor_bitmap = (uint64_t*)(data + anchor_bitmaps_offset);
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       if (dfa->states[state_idx]->requires_start_anchor) {
         start_anchor_bitmap[state_idx / 64] |= (1ULL << (state_idx % 64));
@@ -1318,8 +1362,9 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
     }
 
     // End anchor bitmap: accepting states that require match at end of input.
-    uint64_t* end_anchor_bitmap =
-        (uint64_t*)(data + anchor_offset + bitmap_qwords * sizeof(uint64_t));
+    // Follows immediately after start anchor bitmap.
+    uint64_t* end_anchor_bitmap = (uint64_t*)(data + anchor_bitmaps_offset +
+                                              bitmap_qwords * sizeof(uint64_t));
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       if (dfa->states[state_idx]->requires_end_anchor) {
         end_anchor_bitmap[state_idx / 64] |= (1ULL << (state_idx % 64));
@@ -1328,24 +1373,17 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   }
 
   // Write branch tracking arrays (if any).
-  if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_BRANCHES) {
-    iree_host_size_t branch_offset = offset_after_bitmap;
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
-      branch_offset += num_states * sizeof(iree_tokenizer_regex_lookahead_t);
-    }
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) {
-      branch_offset += 2 * bitmap_qwords * sizeof(uint64_t);
-    }
-
+  if (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_BRANCHES) {
     // Write alive_branches array (one uint64_t per state).
-    uint64_t* alive_branches = (uint64_t*)(data + branch_offset);
+    uint64_t* alive_branches = (uint64_t*)(data + branches_offset);
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       alive_branches[state_idx] = dfa->states[state_idx]->alive_branches;
     }
 
     // Write accepting_branches array (one uint64_t per state).
+    // Follows immediately after alive_branches.
     uint64_t* accepting_branches =
-        (uint64_t*)(data + branch_offset +
+        (uint64_t*)(data + branches_offset +
                     (iree_host_size_t)num_states * sizeof(uint64_t));
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       accepting_branches[state_idx] =
@@ -1354,36 +1392,25 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
   }
 
   // Write range transitions (if any).
-  if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_RANGES) {
-    iree_host_size_t range_offset = offset_after_bitmap;
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) {
-      range_offset += num_states * sizeof(iree_tokenizer_regex_lookahead_t);
-    }
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) {
-      range_offset += 2 * bitmap_qwords * sizeof(uint64_t);
-    }
-    if (flags & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_BRANCHES) {
-      range_offset += 2 * (iree_host_size_t)num_states * sizeof(uint64_t);
-    }
-
+  if (flags & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_RANGES) {
     // Write range header: num_ranges (u16) + reserved (u16).
-    uint16_t* range_header = (uint16_t*)(data + range_offset);
+    uint16_t* range_header = (uint16_t*)(data + range_header_offset);
     range_header[0] = num_ranges;
     range_header[1] = 0;  // Reserved.
-    range_offset += sizeof(uint32_t);
 
     // Write range transitions as flat array.
-    iree_tokenizer_regex_dfa_range_transition_t* range_array =
-        (iree_tokenizer_regex_dfa_range_transition_t*)(data + range_offset);
+    iree_tokenizer_regex_dfa_range_transition_t* range_transitions =
+        (iree_tokenizer_regex_dfa_range_transition_t*)(data +
+                                                       range_transitions_offset);
     uint16_t range_idx = 0;
     for (uint32_t state_idx = 0; state_idx < dfa->state_count; ++state_idx) {
       const iree_tokenizer_regex_dfa_state_t* state = dfa->states[state_idx];
       for (uint8_t r = 0; r < state->range_count; ++r) {
-        range_array[range_idx].from_state = (uint16_t)state_idx;
-        range_array[range_idx].target_state =
+        range_transitions[range_idx].from_state = (uint16_t)state_idx;
+        range_transitions[range_idx].target_state =
             (uint16_t)state->range_transitions[r].target_id;
-        range_array[range_idx].start = state->range_transitions[r].start;
-        range_array[range_idx].end = state->range_transitions[r].end;
+        range_transitions[range_idx].start = state->range_transitions[r].start;
+        range_transitions[range_idx].end = state->range_transitions[r].end;
         ++range_idx;
       }
     }

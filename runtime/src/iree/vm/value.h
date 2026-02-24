@@ -89,7 +89,7 @@ static inline iree_vm_value_t iree_vm_value_make_i32(int32_t value) {
 }
 
 // TODO(#5542): check the value type before accessing the union.
-static inline int32_t iree_vm_value_get_i32(iree_vm_value_t *value) {
+static inline int32_t iree_vm_value_get_i32(iree_vm_value_t* value) {
   return value->i32;
 }
 
@@ -101,7 +101,7 @@ static inline iree_vm_value_t iree_vm_value_make_i64(int64_t value) {
 }
 
 // TODO(#5542): check the value type before accessing the union.
-static inline int64_t iree_vm_value_get_i64(iree_vm_value_t *value) {
+static inline int64_t iree_vm_value_get_i64(iree_vm_value_t* value) {
   return value->i64;
 }
 
@@ -113,7 +113,7 @@ static inline iree_vm_value_t iree_vm_value_make_f32(float value) {
 }
 
 // TODO(#5542): check the value type before accessing the union.
-static inline float iree_vm_value_get_f32(iree_vm_value_t *value) {
+static inline float iree_vm_value_get_f32(iree_vm_value_t* value) {
   return value->f32;
 }
 
@@ -125,7 +125,7 @@ static inline iree_vm_value_t iree_vm_value_make_f64(double value) {
 }
 
 // TODO(#5542): check the value type before accessing the union.
-static inline double iree_vm_value_get_f64(iree_vm_value_t *value) {
+static inline double iree_vm_value_get_f64(iree_vm_value_t* value) {
   return value->f64;
 }
 

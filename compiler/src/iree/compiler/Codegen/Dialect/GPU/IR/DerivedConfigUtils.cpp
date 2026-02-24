@@ -174,18 +174,17 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
                                                 vectorSize);
       })
-      .Case(
-          [&](IREE::LinalgExt::MapScatterOp scatterOp) -> SmallVector<int64_t> {
-            ShapedType inputType = scatterOp.getInputType();
-            if (!inputType.hasStaticShape()) {
-              return {};
-            }
-            ArrayRef<int64_t> loopBounds = inputType.getShape();
-            int64_t elemBits = inputType.getElementTypeBitWidth();
-            int64_t vectorSize = kPreferredCopyNumBits / elemBits;
-            return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
-                                                    vectorSize);
-          })
+      .Case([&](IREE::LinalgExt::MapStoreOp storeOp) -> SmallVector<int64_t> {
+        ShapedType inputType = storeOp.getInputType();
+        if (!inputType.hasStaticShape()) {
+          return {};
+        }
+        ArrayRef<int64_t> loopBounds = inputType.getShape();
+        int64_t elemBits = inputType.getElementTypeBitWidth();
+        int64_t vectorSize = kPreferredCopyNumBits / elemBits;
+        return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
+                                                vectorSize);
+      })
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 

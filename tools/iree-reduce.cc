@@ -16,4 +16,4 @@
 
 #include "iree/compiler/tool_entry_points_api.h"
 
-int main(int argc, char **argv) { return ireeReduceRunMain(argc, argv); }
+int main(int argc, char** argv) { return ireeReduceRunMain(argc, argv); }

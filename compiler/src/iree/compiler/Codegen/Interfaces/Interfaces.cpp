@@ -11,8 +11,11 @@
 #include "iree/compiler/Codegen/Dialect/PCF/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 // TODO: Remove this dependency once the transform dialect extensions
 // have a better registration mechanism.
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
@@ -46,6 +49,35 @@
 
 namespace mlir::iree_compiler {
 
+namespace {
+
+// linalg.generic operations are also loop-like, but they don't have
+// LoopLikeOpInterface implemented for them.
+// Ideally, we should be checking if the linalg.generic op has a trip
+// count of zero, but while that is possible and can be written using
+// ValueBoundsConstraintSet, it is usually not needed. Unlike loops,
+// which can have arbitrary operations inside them, the loop invariant
+// operations inside a linalg.generic operation are usually
+// operations performed on scalars. Hoisting scalar constants does not
+// have a big cost even if the trip count is zero.
+struct LinalgGenericHoistableRegionModel final
+    : IREE::Codegen::HoistableRegionOpInterface::ExternalModel<
+          LinalgGenericHoistableRegionModel, linalg::GenericOp> {
+  SmallVector<Region *> getHoistableRegions(Operation *op) const {
+    return {&cast<linalg::GenericOp>(op).getBodyRegion()};
+  }
+
+  bool isHoistable(Operation *self, Operation *op) const {
+    // linalg.index is marked Pure but is semantically tied to the enclosing
+    // iteration space, so it must not be hoisted despite passing the
+    // memory-effect and speculatability checks.
+    return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
+           isSpeculatable(op);
+  }
+};
+
+} // namespace
+
 void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
@@ -58,6 +90,9 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   // TODO: when warranted, move to its own file.
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
+  });
   registerPartitionableLoopsInterfaceModels(registry);
   registerTransformDialectCommonExtension(registry);
   registerTransformDialectIREEGPUExtension(registry);

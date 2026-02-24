@@ -7,6 +7,8 @@
 #include <cstdint>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -233,11 +235,11 @@ static LogicalResult populateWarpAndThreadIndices(
   return success();
 }
 
-static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
-                                         Location loc,
-                                         ArrayRef<int64_t> offsets,
-                                         NestedLayoutAttr vectorLayout,
-                                         VectorValue mask) {
+static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
+                                          Location loc,
+                                          ArrayRef<int64_t> offsets,
+                                          NestedLayoutAttr vectorLayout,
+                                          VectorValue mask) {
   SmallVector<int64_t> sliceMaskOffsets =
       getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
   SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
@@ -245,19 +247,6 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
       rewriter, loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(),
       strides);
   return slicedMask;
-}
-
-static VectorValue getSlicedIndexVec(PatternRewriter &rewriter, Location loc,
-                                     ArrayRef<int64_t> offsets,
-                                     NestedLayoutAttr vectorLayout,
-                                     VectorValue indexVec) {
-  SmallVector<int64_t> sliceMaskOffsets =
-      getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
-  SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
-  VectorValue slicedIndexVec = vector::ExtractStridedSliceOp::create(
-      rewriter, loc, indexVec, sliceMaskOffsets, vectorLayout.getElementTile(),
-      strides);
-  return slicedIndexVec;
 }
 
 /// Project a vector based on a provided projection map.
@@ -393,8 +382,8 @@ struct DistributeTransferRead final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, readOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       VectorValue slicedRead = vector::TransferReadOp::create(
@@ -576,8 +565,8 @@ struct DistributeTransferWrite final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, writeOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       vector::TransferWriteOp::create(rewriter, writeOp.getLoc(), slicedVector,
@@ -676,9 +665,14 @@ struct DistributeTransferGather final
           gatherOp, "warp or thread tiles have overlapping strides");
     }
 
-    ValueRange indices = gatherOp.getIndices();
-    AffineMap permMap = gatherOp.getPermutationMap();
+    ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
+
+    // getPermutationMap inverts the source map, mapping gathered (symbol) and
+    // broadcast (constant) dims to constant 0. This is correct here because
+    // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
+    // leaving the original base offset unchanged for gathered dimensions.
+    AffineMap permMap = gatherOp.getPermutationMap();
 
     SmallVector<SmallVector<int64_t>> allMaskOffsets;
     std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
@@ -696,22 +690,11 @@ struct DistributeTransferGather final
           StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
     }
 
-    SmallVector<bool> indexed =
-        llvm::to_vector(gatherOp.getIndexed().getAsValueRange<BoolAttr>());
-
     for (auto [idx, offsets] :
          llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
-
-      // Only take the sliced indices for the non-indexed values.
-      for (auto [dim, slicedIndex, index] :
-           llvm::enumerate(slicedIndices, indices)) {
-        if (indexed[dim]) {
-          slicedIndex = index;
-        }
-      }
 
       // Extract offset from index_vecs.
       SmallVector<Value> slicedIndexVecs;
@@ -720,7 +703,7 @@ struct DistributeTransferGather final
         SmallVector<int64_t> offsets =
             llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
         ++allIndexVecOffsets[indexVecIdx];
-        VectorValue slicedIndexVec = getSlicedIndexVec(
+        VectorValue slicedIndexVec = getSlicedPermutedValue(
             rewriter, gatherOp.getLoc(), offsets, layout, disIndexVec);
         slicedIndexVecs.push_back(slicedIndexVec);
       }
@@ -731,15 +714,14 @@ struct DistributeTransferGather final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, gatherOp.getLoc(),
-                                           maskOffsets, maskLayout, mask);
+        slicedMask = getSlicedPermutedValue(rewriter, gatherOp.getLoc(),
+                                            maskOffsets, maskLayout, mask);
       }
 
       VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
           rewriter, gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
-          slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
-          gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
-          gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
+          slicedIndices, slicedIndexVecs, gatherOp.getIndexingMapsAttr(),
+          gatherOp.getPadding(), slicedMask);
 
       if (acc.getType().getRank() == 0) {
         // TODO: This should really be a folding pattern in
@@ -760,33 +742,32 @@ struct DistributeTransferGather final
   int64_t subgroupSize;
 };
 
-/// Pattern to distribute `iree_linalg_ext.map_scatter` ops with nested layouts.
+/// Pattern to distribute `iree_linalg_ext.map_store` ops with nested layouts.
 /// Only the input is distributed, since the output is never a vector. The
 /// distribution of the input is similar to that of a vector.transfer_write.
-struct DistributeMapScatter final
-    : OpDistributionPattern<IREE::LinalgExt::MapScatterOp> {
+struct DistributeMapStore final
+    : OpDistributionPattern<IREE::LinalgExt::MapStoreOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeMapScatter(MLIRContext *context, Value threadId,
-                       int64_t subgroupSize)
+  DistributeMapStore(MLIRContext *context, Value threadId, int64_t subgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    auto input = dyn_cast<VectorValue>(mapScatterOp.getInput());
+    auto input = dyn_cast<VectorValue>(mapStoreOp.getInput());
     if (!input) {
-      return rewriter.notifyMatchFailure(mapScatterOp, "input is not a vector");
+      return rewriter.notifyMatchFailure(mapStoreOp, "input is not a vector");
     }
     NestedLayoutAttr vectorLayout =
         dyn_cast<NestedLayoutAttr>(signature[input]);
     if (!vectorLayout) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
-                                         "non-nested map_scatter layout");
+      return rewriter.notifyMatchFailure(mapStoreOp,
+                                         "non-nested map_store layout");
     }
-    if (!isa<MemRefType>(mapScatterOp.getOutput().getType())) {
-      return rewriter.notifyMatchFailure(mapScatterOp,
+    if (!isa<MemRefType>(mapStoreOp.getOutput().getType())) {
+      return rewriter.notifyMatchFailure(mapStoreOp,
                                          "distribution expects memrefs");
     }
     SmallVector<Value> warpIndices, threadIndices;
@@ -794,12 +775,12 @@ struct DistributeMapScatter final
                                             vectorLayout, warpIndices,
                                             threadIndices))) {
       return rewriter.notifyMatchFailure(
-          mapScatterOp, "warp or thread tiles have overlapping strides");
+          mapStoreOp, "warp or thread tiles have overlapping strides");
     }
 
     Value distributedVector = getDistributed(rewriter, input, vectorLayout);
 
-    Location loc = mapScatterOp.getLoc();
+    Location loc = mapStoreOp.getLoc();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
@@ -813,7 +794,7 @@ struct DistributeMapScatter final
           rewriter, loc, distributedVector,
           offsetArray.take_front(vectorLayout.getRank() * 2));
 
-      // Clone the map_scatter op with the "element vector" as the input, and
+      // Clone the map_store op with the "element vector" as the input, and
       // adjust the transformation region to account for the distributed
       // offsets.
       AffineMap permutationMap =
@@ -823,17 +804,17 @@ struct DistributeMapScatter final
           getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
                                              vectorLayout, permutationMap,
                                              warpIndices, threadIndices);
-      IREE::LinalgExt::MapScatterOp distributedMapScatter =
-          clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
-                {distributedInput, mapScatterOp.getOutput()});
+      IREE::LinalgExt::MapStoreOp distributedMapStore =
+          clone(rewriter, mapStoreOp, mapStoreOp.getResultTypes(),
+                {distributedInput, mapStoreOp.getOutput()});
       int64_t sliceRank = distributedInput.getType().getRank();
       int64_t rankDiff = input.getType().getRank() - sliceRank;
-      // Add the distributed offsets in the map_scatter transformation body.
+      // Add the distributed offsets in the map_store transformation body.
       auto transformationBuilder = [&](ArrayRef<BlockArgument> newIndices) {
         SmallVector<Value> replacementIndices(distributedOffsets);
         for (auto [i, replacementIdx] : llvm::enumerate(replacementIndices)) {
           // Rank-reduced dimensions can be directly replaced by the distributed
-          // index, since their size is 1 in the new map_scatter input.
+          // index, since their size is 1 in the new map_store input.
           if (i < rankDiff) {
             continue;
           }
@@ -846,11 +827,11 @@ struct DistributeMapScatter final
         }
         return replacementIndices;
       };
-      distributedMapScatter.insertTransformationAtStart(
+      distributedMapStore.insertTransformationAtStart(
           rewriter, transformationBuilder, sliceRank);
     }
 
-    rewriter.eraseOp(mapScatterOp);
+    rewriter.eraseOp(mapStoreOp);
     return success();
   }
 
@@ -1788,152 +1769,21 @@ struct DistributeBatchOuterToLayoutConversions final
   }
 };
 
-// This is a helper to extract strides from a given shape
-// E.g. : a shape of 2x3x4 will return strides [12, 4, 1]
-static SmallVector<int64_t> getStrides(ArrayRef<int64_t> shape) {
-  int64_t elementCount = ShapedType::getNumElements(shape);
-  SmallVector<int64_t> strides;
-  int64_t currStride = elementCount;
-  for (int64_t len : shape) {
-    currStride = currStride / len;
-    strides.push_back(currStride);
-  }
-  return strides;
-}
-
+/// Distributes vector.step to:
+///
+/// %elements = vector.step
+/// %batch_outer_strides = arith.constant
+/// %base = %outer_elements + %element_step
+/// %thread_contrib = %thread_id * %thread_stride
+/// %subgroup_contrib = %subgroup_id * %subgroup_stride
+/// %index = %base + %thread_contrib + %subgroup_contrib
 struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   using OpDistributionPattern::OpDistributionPattern;
-
-  // This is a helper aggregate
-  // to hold the information about
-  // a dimension.
-  // For e.g. : 3x4x2 shape will
-  // have lengths = [3, 4, 2]
-  // and strides = [8, 2, 1]
-  struct DimInfo {
-    std::optional<Value> dimIdx;
-    int64_t dimLen;
-    int64_t dimStride;
-  };
-
-  // This is a helper function to extract the remaining
-  // dimensions with their original strides once the
-  // distributed dimensions are extracted out
-  //         threads
-  //          V
-  // E.g. 3 x 4 x 2
-  // This will return back remaining dimensions that
-  // have lengths = [3, 2] and strides = [8, 1]
-  SmallVector<DimInfo> getRemainingDims(ArrayRef<DimInfo> distributedStrides,
-                                        int64_t originalLen) const {
-    SmallVector<DimInfo> remainingDims;
-    int64_t currLen = originalLen;
-    for (const DimInfo &dInfo : distributedStrides) {
-      if (dInfo.dimStride != 0) {
-        int64_t dStride = dInfo.dimStride;
-        int64_t dLen = dInfo.dimLen;
-        int64_t higherStride = dLen * dStride;
-        if (higherStride < currLen) {
-          remainingDims.push_back(
-              {std::nullopt, currLen / higherStride, higherStride});
-        }
-        currLen = dStride;
-      }
-    }
-    remainingDims.push_back({std::nullopt, currLen, 1});
-    return remainingDims;
-  }
-
-  // This is a helper to extract lengths of all dimensions
-  SmallVector<int64_t> getLens(ArrayRef<DimInfo> dimInfos) const {
-    SmallVector<int64_t> lens;
-    lens.reserve(dimInfos.size());
-    for (const DimInfo &dInfo : dimInfos) {
-      lens.push_back(dInfo.dimLen);
-    }
-    return lens;
-  }
-
-  // Once we are in the realm of remaining dimensions,
-  // the strides are not packed. This is a helper to
-  // obtain the packed strides of the remaining dimensions.
-  // (See above for an example of remaining dimensions under
-  //  getRemainingDims)
-  SmallVector<int64_t> getPackedStrides(ArrayRef<DimInfo> dims) const {
-    SmallVector<int64_t> lens = getLens(dims);
-    return getStrides(lens);
-  }
-
-  // This function emulates the slicing of otherwise large constant
-  // across threads and subgroups.
-  VectorValue generateSlicedStep(OpBuilder &builder, Location loc,
-                                 ArrayRef<DimInfo> distributedDims,
-                                 int64_t distributedLen,
-                                 int64_t originalLen) const {
-    SmallVector<DimInfo> remainingDims =
-        getRemainingDims(distributedDims, originalLen);
-    SmallVector<int64_t> remainingPackedStrides =
-        getPackedStrides(remainingDims);
-
-    SmallVector<APInt> offsets;
-    offsets.reserve(distributedLen);
-    // As for a complex example what the following
-    // maths would achieve:
-    //    wave
-    //     |   threads
-    //     V   V
-    // 2 x 3 x 4 x 2 = 0 1 2 .... 48
-    // say vector.step : vector<48xindex> is to be distributed.
-    // --------------------------------------------------------
-    // The the distribution should be as follows:
-    // wave0:
-    // t0: 0 1 24 25
-    // t1: 2 3 26 27
-    // t2: 4 5 28 29
-    // t4: 6 7 30 31
-    //
-    // wave1:
-    // t0: 8 9 32 33
-    // t1: 10 11 34 35
-    // t2: 12 13 36 37
-    // t4: 14 15 38 39
-    // ... etc
-    //
-    // So wave0 & t0 value this constant offset that we generate
-    // below initially. Then followed by thread and subgroup weighted
-    // addition that is weighted by their stride.
-    for (size_t i = 0; i < distributedLen; i++) {
-      int64_t offset = 0;
-      for (const auto &[dimInfo, packedStride] :
-           zip(remainingDims, remainingPackedStrides)) {
-        offset += ((i / packedStride) % dimInfo.dimLen) * dimInfo.dimStride;
-      }
-      offsets.push_back(APInt(/*width=*/64, offset));
-    }
-    VectorType offsetType =
-        VectorType::get({distributedLen}, builder.getIndexType());
-    auto constOffset = arith::ConstantOp::create(
-        builder, loc, DenseElementsAttr::get(offsetType, offsets));
-    Value finalOffset = constOffset;
-    for (const DimInfo &dimInfo : distributedDims) {
-      assert(dimInfo.dimIdx.has_value());
-      if (dimInfo.dimStride != 0) {
-        auto strideVal =
-            arith::ConstantIndexOp::create(builder, loc, dimInfo.dimStride);
-        auto dimIdxOffsetPerElem = arith::MulIOp::create(
-            builder, loc, strideVal, dimInfo.dimIdx.value());
-        auto dimIdxOffset = vector::BroadcastOp::create(
-            builder, loc, offsetType, dimIdxOffsetPerElem);
-        finalOffset =
-            arith::AddIOp::create(builder, loc, finalOffset, dimIdxOffset);
-      }
-    }
-    return cast<VectorValue>(finalOffset);
-  }
 
   DistributeStep(MLIRContext *context, Value threadId, int64_t subgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
         subgroupSize(subgroupSize) {}
+
   LogicalResult matchAndRewrite(vector::StepOp stepOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
@@ -1953,34 +1803,64 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
           stepOp, "warp or thread tiles have overlapping strides");
     }
 
-    SmallVector<int64_t> undistributedShape =
-        resultLayout.getUndistributedPackedShape();
-    SmallVector<int64_t> undistributedStrides = getStrides(undistributedShape);
-    constexpr int64_t subgroupIdx = 0;
-    constexpr int64_t threadIdx = 3;
+    // Packed shape is [S, B, O, T, E] for this rank-1 vector.
+    SmallVector<int64_t> packed = resultLayout.getUndistributedPackedShape();
+    int64_t B = packed[1], O = packed[2];
+    int64_t T = packed[3], E = packed[4];
 
-    ArrayRef<int64_t> subgroupLengths = resultLayout.getSubgroupTile();
-    ArrayRef<int64_t> threadLengths = resultLayout.getThreadTile();
-    // Step op by definition should be single dimensional.
+    // Row-major strides of [S, B, O, T, E].
+    int64_t sgStride = B * O * T * E;
+    int64_t batchStride = O * T * E;
+    int64_t outerStride = T * E;
+    int64_t threadStride = E;
+
+    int64_t BO = B * O;
+    IndexType indexType = rewriter.getIndexType();
+    VectorType workType = VectorType::get({BO, E}, indexType);
+
+    // Inner element step: preserves contiguity information.
+    auto step =
+        vector::StepOp::create(rewriter, loc, VectorType::get({E}, indexType));
+    auto stepBcast = vector::BroadcastOp::create(rewriter, loc, workType, step);
+
+    // Outer (b, o) offsets constant.
+    SmallVector<APInt> outerOffsets;
+    outerOffsets.reserve(BO);
+    for (int64_t b = 0; b < B; ++b) {
+      for (int64_t o = 0; o < O; ++o) {
+        outerOffsets.push_back(APInt(64, b * batchStride + o * outerStride));
+      }
+    }
+    auto outerConst = arith::ConstantOp::create(
+        rewriter, loc,
+        DenseElementsAttr::get(VectorType::get({BO}, indexType), outerOffsets));
+    auto outer2d = vector::ShapeCastOp::create(
+        rewriter, loc, VectorType::get({BO, 1}, indexType), outerConst);
+    auto outerBcast =
+        vector::BroadcastOp::create(rewriter, loc, workType, outer2d);
+
+    // Combine: base = outer_offsets + element_step.
+    Value val = arith::AddIOp::create(rewriter, loc, outerBcast, stepBcast);
+
+    // Add runtime subgroup and thread contributions.
+    for (auto [id, stride] : {std::pair{subgroupIndices[0], sgStride},
+                              std::pair{threadIndices[0], threadStride}}) {
+      if (stride == 0) {
+        continue;
+      }
+      auto strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
+      auto scaled = arith::MulIOp::create(rewriter, loc, strideVal, id);
+      auto bcast = vector::BroadcastOp::create(rewriter, loc, workType, scaled);
+      val = arith::AddIOp::create(rewriter, loc, val, bcast);
+    }
+
+    // Shape-cast from [B*O, E] to distributed shape [B, O, E].
     SmallVector<int64_t> distributedShape =
         signature[result].getDistributedShape();
-
-    int64_t distributedElements = ShapedType::getNumElements(distributedShape);
-    int64_t originalElements = result.getType().getNumElements();
-    SmallVector<DimInfo, 2> distributedDims{
-        {subgroupIndices[0], subgroupLengths[0],
-         undistributedStrides[subgroupIdx]},
-        {threadIndices[0], threadLengths[0], undistributedStrides[threadIdx]}};
-    llvm::sort(distributedDims, [](const DimInfo &lhs, const DimInfo &rhs) {
-      return lhs.dimStride > rhs.dimStride;
-    });
-    VectorValue slicedStepOp = generateSlicedStep(
-        rewriter, loc, distributedDims, distributedElements, originalElements);
-    VectorType finalSlicedStepOpType =
-        VectorType::get({distributedShape}, result.getType().getElementType());
-    auto finalSlicedStepOp = vector::ShapeCastOp::create(
-        rewriter, loc, finalSlicedStepOpType, slicedStepOp);
-    replaceOpWithDistributedValues(rewriter, stepOp, {finalSlicedStepOp});
+    VectorType distType =
+        VectorType::get(distributedShape, result.getType().getElementType());
+    auto shaped = vector::ShapeCastOp::create(rewriter, loc, distType, val);
+    replaceOpWithDistributedValues(rewriter, stepOp, {shaped});
     return success();
   }
 
@@ -2236,14 +2116,117 @@ struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
   }
 };
 
+/// Distributes an iree_codegen.inner_tiled operation to a distributed
+/// iree_codegen.inner_tiled operation with distributed semantics.
+///
+/// The pattern assumes that the inputs have the correct layouts and distributes
+/// the operations according to the operation intrinsic and semantics.
+struct DistributeInnerTiled final
+    : OpDistributionPattern<IREE::Codegen::InnerTiledOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    if (tiledOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(tiledOp, "requires vector semantics");
+    }
+    auto semantics =
+        dyn_cast<IREE::GPU::InnerTiledSemanticsAttr>(tiledOp.getSemantics());
+    if (!semantics) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "expected GPU inner tiled semantics");
+    }
+    if (semantics.getDistributed()) {
+      return rewriter.notifyMatchFailure(tiledOp,
+                                         "already distributed inner tiled op");
+    }
+
+    Location loc = tiledOp.getLoc();
+    MLIRContext *ctx = tiledOp.getContext();
+
+    // Get layouts, distributed forms, and unpacked forms for all inputs.
+    SmallVector<Value> unpackedInputs;
+    for (Value input : tiledOp.getInputs()) {
+      auto vec = dyn_cast<VectorValue>(input);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed input");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for input");
+      }
+      VectorValue dist = getDistributed(rewriter, vec, layout);
+      unpackedInputs.push_back(
+          getDeinterleavedUnpackedForm(rewriter, dist, layout));
+    }
+
+    // Get layouts, distributed forms, and unpacked forms for all outputs.
+    SmallVector<Value> unpackedOutputs;
+    SmallVector<NestedLayoutAttr> resultLayouts;
+    for (Value output : tiledOp.getOutputs()) {
+      auto vec = dyn_cast<VectorValue>(output);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed output");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for output");
+      }
+      VectorValue dist = getDistributed(rewriter, vec, layout);
+      unpackedOutputs.push_back(
+          getDeinterleavedUnpackedForm(rewriter, dist, layout));
+    }
+
+    // Collect result layouts.
+    for (Value result : tiledOp->getResults()) {
+      auto vec = dyn_cast<VectorValue>(result);
+      if (!vec) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "expected vector-typed result");
+      }
+      auto layout = dyn_cast_if_present<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(tiledOp,
+                                           "missing nested layout for result");
+      }
+      resultLayouts.push_back(layout);
+    }
+
+    // Create distributed inner_tiled op.
+    auto newSemantics = IREE::GPU::InnerTiledSemanticsAttr::get(
+        ctx, /*distributed=*/true, semantics.getOpaque());
+
+    auto newOp = IREE::Codegen::InnerTiledOp::create(
+        rewriter, loc, unpackedInputs, unpackedOutputs,
+        tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
+        tiledOp.getKind(), newSemantics, tiledOp.getPermutations());
+
+    // Convert results back to interleaved distributed form.
+    SmallVector<Value> distributedResults;
+    for (auto [result, layout] :
+         llvm::zip_equal(newOp->getResults(), resultLayouts)) {
+      distributedResults.push_back(getInterleavedPackedForm(
+          rewriter, cast<VectorValue>(result), layout));
+    }
+
+    replaceOpWithDistributedValues(rewriter, tiledOp, distributedResults);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferGather,
-               DistributeMapScatter>(patterns.getContext(), threadId,
-                                     subgroupSize);
+               DistributeMapStore>(patterns.getContext(), threadId,
+                                   subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
@@ -2252,6 +2235,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
                                          maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
+  patterns.add<DistributeInnerTiled>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeCreateMask, DistributeConstantMask>(
       patterns.getContext(), threadId, subgroupSize);

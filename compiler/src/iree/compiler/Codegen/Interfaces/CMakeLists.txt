@@ -19,6 +19,7 @@ iree_cc_library(
     "Interfaces.cpp"
   DEPS
     ::BufferizationInterfaces
+    ::HoistableRegionOpInterface
     ::PartitionableLoopsInterface
     ::ProcessorOpInterfaces
     ::TensorMaskingOpInterface
@@ -39,6 +40,7 @@ iree_cc_library(
     MLIRMemRefTransformOps
     MLIRSCFDialect
     MLIRSCFTransformOps
+    MLIRSideEffectInterfaces
     MLIRTensorDialect
     MLIRTensorTransformOps
     MLIRTensorTransforms
@@ -89,6 +91,32 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::TensorExt::IR
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    HoistableRegionOpInterface
+  HDRS
+    "HoistableRegionOpInterface.h"
+  TEXTUAL_HDRS
+    "HoistableRegionOpInterface.cpp.inc"
+    "HoistableRegionOpInterface.h.inc"
+  SRCS
+    "HoistableRegionOpInterface.cpp"
+  DEPS
+    ::HoistableRegionOpInterfaceGen
+    MLIRIR
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    HoistableRegionOpInterfaceGen
+  TD_FILE
+    "HoistableRegionOpInterface.td"
+  OUTS
+    --gen-op-interface-decls HoistableRegionOpInterface.h.inc
+    --gen-op-interface-defs HoistableRegionOpInterface.cpp.inc
 )
 
 iree_cc_library(

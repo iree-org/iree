@@ -66,6 +66,7 @@ iree_lit_test_suite(
             "generic_vectorization.mlir",
             "hoist_statically_bound_allocations.mlir",
             "hoist_unrolled_vector_extract_insert_slice.mlir",
+            "insert_batch_dim_for_batchless_conv.mlir",
             "iree_codegen_canonicalize.mlir",
             "iree_comprehensive_bufferize.mlir",
             "iree_expand_strided_metadata.mlir",

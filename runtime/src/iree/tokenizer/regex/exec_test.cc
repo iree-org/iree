@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace {
 
@@ -26,6 +27,12 @@ class TestDfaBuilder {
 
   void SetNumStates(uint16_t num_states) { num_states_ = num_states; }
   void SetStartState(uint16_t start) { start_state_ = start; }
+  // Set unanchored start state (for position > 0, excludes ^ paths).
+  // If not called, defaults to same as start_state.
+  void SetUnanchoredStartState(uint16_t start) {
+    unanchored_start_state_ = start;
+    has_unanchored_start_ = true;
+  }
   void SetFlags(uint16_t flags) { flags_ = flags; }
 
   // Add a transition: state --byte--> next_state.
@@ -45,37 +52,39 @@ class TestDfaBuilder {
 
   // Set lookahead for a state (negative character lookahead).
   void SetLookaheadNegChar(uint16_t state, uint8_t reject_char) {
-    lookahead_[state] = {IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR, reject_char};
-    flags_ |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
+    lookahead_[state] = {IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR,
+                         reject_char};
+    flags_ |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
   }
 
   // Set lookahead for a state (negative shorthand class).
   void SetLookaheadNegShorthand(uint16_t state,
                                 iree_tokenizer_regex_shorthand_t shorthand) {
-    lookahead_[state] = {IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND,
+    lookahead_[state] = {IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND,
                          (uint8_t)shorthand};
-    flags_ |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
+    flags_ |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
   }
 
   // Set lookahead for a state with fallback (for patterns like a+(?!b)|a+).
   void SetLookaheadNegCharWithFallback(uint16_t state, uint8_t reject_char) {
-    lookahead_[state] = {IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK,
-                         reject_char};
-    flags_ |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
+    lookahead_[state] = {
+        IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR_WITH_FALLBACK,
+        reject_char};
+    flags_ |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
   }
 
   // Set lookahead for a state with fallback (shorthand class).
   void SetLookaheadNegShorthandWithFallback(
       uint16_t state, iree_tokenizer_regex_shorthand_t shorthand) {
     lookahead_[state] = {
-        IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK,
+        IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND_WITH_FALLBACK,
         (uint8_t)shorthand};
-    flags_ |= IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
+    flags_ |= IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD;
   }
 
   std::vector<uint8_t> Build() {
     bool has_lookahead =
-        (flags_ & IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) != 0;
+        (flags_ & IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD) != 0;
 
     // Calculate sizes.
     size_t header_size = sizeof(iree_tokenizer_regex_dfa_header_t);
@@ -91,18 +100,19 @@ class TestDfaBuilder {
 
     // Fill header.
     auto* header = (iree_tokenizer_regex_dfa_header_t*)data.data();
-    header->magic = IREE_TOKENIZER_REGEX_DFA_MAGIC;
-    header->version = IREE_TOKENIZER_REGEX_DFA_VERSION;
+    header->magic = IREE_TOKENIZER_UTIL_REGEX_DFA_MAGIC;
+    header->version = IREE_TOKENIZER_UTIL_REGEX_DFA_VERSION;
     header->flags = flags_;
     header->num_states = num_states_;
     header->num_accepting = (uint16_t)accepting_.size();
     header->start_state = start_state_;
-    header->unanchored_start_state = start_state_;
+    header->unanchored_start_state =
+        has_unanchored_start_ ? unanchored_start_state_ : start_state_;
 
     // Fill transition table (default to NO_TRANSITION).
     auto* trans = (uint16_t*)(data.data() + header_size);
     for (size_t i = 0; i < (size_t)num_states_ * 256; ++i) {
-      trans[i] = IREE_TOKENIZER_REGEX_NO_TRANSITION;
+      trans[i] = IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION;
     }
     for (const auto& t : transitions_) {
       trans[(size_t)t.state * 256 + t.byte] = t.next_state;
@@ -123,7 +133,7 @@ class TestDfaBuilder {
         if (it != lookahead_.end()) {
           la[i] = it->second;
         } else {
-          la[i] = {IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE, 0};
+          la[i] = {IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE, 0};
         }
       }
     }
@@ -140,6 +150,8 @@ class TestDfaBuilder {
 
   uint16_t num_states_ = 0;
   uint16_t start_state_ = 0;
+  uint16_t unanchored_start_state_ = 0;
+  bool has_unanchored_start_ = false;
   uint16_t flags_ = 0;
   std::vector<Transition> transitions_;
   std::set<uint16_t> accepting_;
@@ -177,7 +189,7 @@ std::vector<uint8_t> BuildLowerAlphaUnicodeDfa() {
   TestDfaBuilder builder;
   builder.SetNumStates(2);
   builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
+  builder.SetFlags(IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_UNICODE);
   builder.AddTransitionRange(0, 'a', 'z', 1);
   builder.AddTransitionRange(1, 'a', 'z', 1);
   builder.SetAccepting(1);
@@ -252,8 +264,8 @@ struct MatchCollector {
 TEST(DfaLoad, ValidDfa) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   EXPECT_EQ(iree_tokenizer_regex_dfa_state_count(&dfa), 4);
   EXPECT_EQ(iree_tokenizer_regex_dfa_start_state(&dfa), 0);
@@ -268,8 +280,7 @@ TEST(DfaLoad, TooSmall) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data, sizeof(data)), &dfa);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
 }
 
 TEST(DfaLoad, InvalidMagic) {
@@ -279,8 +290,7 @@ TEST(DfaLoad, InvalidMagic) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_failed_precondition(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_FAILED_PRECONDITION, status);
 }
 
 TEST(DfaLoad, UnsupportedVersion) {
@@ -291,8 +301,7 @@ TEST(DfaLoad, UnsupportedVersion) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_unimplemented(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED, status);
 }
 
 TEST(DfaLoad, TruncatedData) {
@@ -301,8 +310,7 @@ TEST(DfaLoad, TruncatedData) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size() / 2), &dfa);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
 }
 
 TEST(DfaLoad, UnalignedDataRejected) {
@@ -319,8 +327,7 @@ TEST(DfaLoad, UnalignedDataRejected) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(unaligned.data() + offset, data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -330,8 +337,8 @@ TEST(DfaLoad, UnalignedDataRejected) {
 TEST(DfaValidate, ValidDfa) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 }
 
 TEST(DfaValidate, AcceptingCountMismatch) {
@@ -343,8 +350,7 @@ TEST(DfaValidate, AcceptingCountMismatch) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_data_loss(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DATA_LOSS, status);
 }
 
 TEST(DfaValidate, LookaheadNegClassRejected) {
@@ -354,7 +360,7 @@ TEST(DfaValidate, LookaheadNegClassRejected) {
   builder.SetStartState(0);
   builder.AddTransition(0, 'a', 1);
   builder.SetAccepting(1);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
+  builder.SetFlags(IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
   auto data = builder.Build();
 
   // Manually patch the lookahead type to NEG_CLASS.
@@ -364,14 +370,13 @@ TEST(DfaValidate, LookaheadNegClassRejected) {
   auto* lookahead =
       (iree_tokenizer_regex_lookahead_t*)(data.data() + header_size +
                                           trans_size + bitmap_size);
-  lookahead[1].type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CLASS;
+  lookahead[1].type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CLASS;
   lookahead[1].data = 0;
 
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_unimplemented(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED, status);
 }
 
 TEST(DfaValidate, EmptyStringMatchRejected) {
@@ -385,8 +390,7 @@ TEST(DfaValidate, EmptyStringMatchRejected) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
 }
 
 TEST(DfaLoad, SentinelCollisionRejected) {
@@ -406,8 +410,7 @@ TEST(DfaLoad, SentinelCollisionRejected) {
   iree_tokenizer_regex_dfa_t dfa;
   iree_status_t status = iree_tokenizer_regex_dfa_load(
       iree_make_const_byte_span(data.data(), data.size()), &dfa);
-  EXPECT_TRUE(iree_status_is_invalid_argument(status));
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
 }
 
 //===----------------------------------------------------------------------===//
@@ -417,19 +420,20 @@ TEST(DfaLoad, SentinelCollisionRejected) {
 TEST(DfaStep, BasicTransitions) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // Follow the "abc" path.
-  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 0, 'a'), 1);
-  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 1, 'b'), 2);
-  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 2, 'c'), 3);
+  // For ASCII bytes, codepoint == byte.
+  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 0, 'a', 'a'), 1);
+  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 1, 'b', 'b'), 2);
+  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 2, 'c', 'c'), 3);
 
   // Non-matching transitions.
-  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 0, 'x'),
-            IREE_TOKENIZER_REGEX_NO_TRANSITION);
-  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 1, 'a'),
-            IREE_TOKENIZER_REGEX_NO_TRANSITION);
+  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 0, 'x', 'x'),
+            IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION);
+  EXPECT_EQ(iree_tokenizer_regex_dfa_step(&dfa, 1, 'a', 'a'),
+            IREE_TOKENIZER_UTIL_REGEX_NO_TRANSITION);
 }
 
 //===----------------------------------------------------------------------===//
@@ -439,13 +443,13 @@ TEST(DfaStep, BasicTransitions) {
 TEST(DfaExec, ExactMatch) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("abc");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -455,13 +459,13 @@ TEST(DfaExec, ExactMatch) {
 TEST(DfaExec, MultipleMatches) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("abcXabc");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -473,13 +477,13 @@ TEST(DfaExec, MultipleMatches) {
 TEST(DfaExec, Digits) {
   auto data = BuildDigitsDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("abc123xyz456");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[0].first, 3);
@@ -491,13 +495,13 @@ TEST(DfaExec, Digits) {
 TEST(DfaExec, NoMatch) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("xyz");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   EXPECT_EQ(collector.matches.size(), 0);
 }
@@ -505,13 +509,13 @@ TEST(DfaExec, NoMatch) {
 TEST(DfaExec, EmptyInput) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   EXPECT_EQ(collector.matches.size(), 0);
 }
@@ -519,14 +523,14 @@ TEST(DfaExec, EmptyInput) {
 TEST(DfaExec, PartialMatch) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   // "ab" is a partial match for "abc" - should not match.
   iree_string_view_t text = IREE_SVL("ab");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   EXPECT_EQ(collector.matches.size(), 0);
 }
@@ -534,13 +538,13 @@ TEST(DfaExec, PartialMatch) {
 TEST(DfaExec, LeftmostLongestMatching) {
   auto data = BuildLowerAlphaDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("hello world");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   // Should match "hello" and "world", not individual letters.
   ASSERT_EQ(collector.matches.size(), 2);
@@ -553,13 +557,13 @@ TEST(DfaExec, LeftmostLongestMatching) {
 TEST(DfaExec, Alternation) {
   auto data = BuildAltDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("aXbYc");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 3);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -590,13 +594,13 @@ TEST(DfaExec, ResumeAfterEmitAtCorrectPosition) {
   // Expected: matches "a" at [0,1) and "b" at [1,2)
   auto data = BuildAOrAbcOrBDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("abd");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   // Without the fix, only "a" is found (skips "b" at position 1).
   // With the fix, both "a" and "b" are found.
@@ -614,8 +618,8 @@ TEST(DfaExec, ResumeAfterEmitAtCorrectPosition) {
 TEST(DfaStreaming, ChunkedInput) {
   auto data = BuildLowerAlphaDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // Feed "hello world" in two chunks: "hello " and "world".
   MatchCollector collector;
@@ -623,10 +627,9 @@ TEST(DfaStreaming, ChunkedInput) {
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   const char* chunk1 = "hello ";
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state,
-      iree_make_const_byte_span((const uint8_t*)chunk1, strlen(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(chunk1, strlen(chunk1)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // "hello" should be emitted after processing the space.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -634,18 +637,17 @@ TEST(DfaStreaming, ChunkedInput) {
   EXPECT_EQ(collector.matches[0].second, 5);
 
   const char* chunk2 = "world";
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state,
-      iree_make_const_byte_span((const uint8_t*)chunk2, strlen(chunk2)),
-      strlen(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(chunk2, strlen(chunk2)),
+      strlen(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // "world" hasn't been emitted yet (no terminator seen).
   EXPECT_EQ(collector.matches.size(), 1);
 
   // Finalize to flush pending match.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, strlen(chunk1) + strlen(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[1].first, 6);
@@ -655,33 +657,33 @@ TEST(DfaStreaming, ChunkedInput) {
 TEST(DfaStreaming, MatchAcrossChunks) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // Feed "abc" as "a", "b", "c".
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"a", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("a", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
   EXPECT_EQ(collector.matches.size(), 0);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"b", 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("b", 1), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
   EXPECT_EQ(collector.matches.size(), 0);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"c", 1), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("c", 1), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
   // Still no match emitted - we're in accepting state but waiting for more.
   EXPECT_EQ(collector.matches.size(), 0);
 
   // Finalize emits the match.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 3, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -695,182 +697,37 @@ TEST(DfaStreaming, MatchAcrossChunks) {
 TEST(DfaCountMatches, Basic) {
   auto data = BuildLowerAlphaDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   iree_host_size_t count = 0;
   iree_string_view_t text = IREE_SVL("one two three");
-  EXPECT_TRUE(iree_status_is_ok(
-      iree_tokenizer_regex_count_matches(&dfa, text, &count)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_count_matches(&dfa, text, &count));
   EXPECT_EQ(count, 3);
 }
 
 TEST(DfaHasMatch, Found) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   bool has_match = false;
   iree_string_view_t text = IREE_SVL("XXXabcYYY");
-  EXPECT_TRUE(iree_status_is_ok(
-      iree_tokenizer_regex_has_match(&dfa, text, &has_match)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_has_match(&dfa, text, &has_match));
   EXPECT_TRUE(has_match);
 }
 
 TEST(DfaHasMatch, NotFound) {
   auto data = BuildAbcDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   bool has_match = false;
   iree_string_view_t text = IREE_SVL("XXXYYY");
-  EXPECT_TRUE(iree_status_is_ok(
-      iree_tokenizer_regex_has_match(&dfa, text, &has_match)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_has_match(&dfa, text, &has_match));
   EXPECT_FALSE(has_match);
-}
-
-//===----------------------------------------------------------------------===//
-// UTF-8 Streaming Tests
-//===----------------------------------------------------------------------===//
-
-// Build a DFA that matches \p{L}+ (one or more letters) with Unicode flag.
-// Uses pseudo-byte PSEUDO_LETTER (0x80) for non-ASCII letters.
-std::vector<uint8_t> BuildUnicodeLettersDfa() {
-  TestDfaBuilder builder;
-  builder.SetNumStates(2);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  // ASCII letters.
-  builder.AddTransitionRange(0, 'a', 'z', 1);
-  builder.AddTransitionRange(0, 'A', 'Z', 1);
-  builder.AddTransitionRange(1, 'a', 'z', 1);
-  builder.AddTransitionRange(1, 'A', 'Z', 1);
-  // Unicode letters via pseudo-byte.
-  builder.AddTransition(0, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 1);
-  builder.AddTransition(1, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 1);
-  builder.SetAccepting(1);
-  return builder.Build();
-}
-
-TEST(Streaming, SplitUtf8_TwoByte) {
-  // Test: Split 2-byte UTF-8 sequence (é = 0xC3 0xA9) across chunks.
-  // Input: "café" split as "caf\xC3" + "\xA9"
-  // Expected: Match "café" as single word (positions 0-5, since é is 2 bytes).
-  auto data = BuildUnicodeLettersDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Feed "caf" + first byte of é.
-  const uint8_t chunk1[] = {'c', 'a', 'f', 0xC3};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Feed second byte of é.
-  const uint8_t chunk2[] = {0xA9};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
-
-  // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
-
-  // Should have matched "café" (5 bytes: c, a, f, 0xC3, 0xA9).
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 5);
-}
-
-TEST(Streaming, SplitUtf8_ThreeByte) {
-  // Test: Split 3-byte UTF-8 sequence (中 = 0xE4 0xB8 0xAD) across chunks.
-  // Input: "hi中" split as "hi\xE4\xB8" + "\xAD"
-  auto data = BuildUnicodeLettersDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Feed "hi" + first two bytes of 中.
-  const uint8_t chunk1[] = {'h', 'i', 0xE4, 0xB8};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Feed last byte of 中.
-  const uint8_t chunk2[] = {0xAD};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
-
-  // Should have matched "hi中" (5 bytes: h, i, 0xE4, 0xB8, 0xAD).
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 5);
-}
-
-TEST(Streaming, SplitUtf8_FourByte) {
-  // Test: Split 4-byte UTF-8 sequence (😀 = 0xF0 0x9F 0x98 0x80) across chunks.
-  // Feed each byte in a separate chunk.
-  auto data = BuildUnicodeLettersDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Feed "hi" + each byte of 😀 separately.
-  const uint8_t chunk1[] = {'h', 'i', 0xF0};
-  const uint8_t chunk2[] = {0x9F};
-  const uint8_t chunk3[] = {0x98};
-  const uint8_t chunk4[] = {0x80};
-
-  size_t offset = 0;
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), offset,
-      MatchCollector::Callback, &collector)));
-  offset += sizeof(chunk1);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)), offset,
-      MatchCollector::Callback, &collector)));
-  offset += sizeof(chunk2);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk3, sizeof(chunk3)), offset,
-      MatchCollector::Callback, &collector)));
-  offset += sizeof(chunk3);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk4, sizeof(chunk4)), offset,
-      MatchCollector::Callback, &collector)));
-  offset += sizeof(chunk4);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, offset, MatchCollector::Callback, &collector)));
-
-  // 😀 is category Symbol (Emoticons), not Letter, so won't match.
-  // "hi" should match (2 bytes).
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 2);
 }
 
 //===----------------------------------------------------------------------===//
@@ -895,26 +752,26 @@ TEST(Streaming, LookaheadAcrossChunk_Reject) {
   // Expected: NO match (b follows a)
   auto data = BuildANotFollowedByBDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed "a".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"a", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("a", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Feed "b".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"b", 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("b", 1), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Should NOT match - 'b' follows 'a'.
   EXPECT_EQ(collector.matches.size(), 0);
@@ -926,26 +783,26 @@ TEST(Streaming, LookaheadAcrossChunk_Accept) {
   // Expected: match "a" at [0,1)
   auto data = BuildANotFollowedByBDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed "a".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"a", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("a", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Feed "c".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"c", 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("c", 1), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Should match "a" - 'c' doesn't reject the lookahead.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -959,21 +816,21 @@ TEST(Streaming, LookaheadAtRealEOS) {
   // Expected: match "a" at [0,1) - EOS means no 'b' follows.
   auto data = BuildANotFollowedByBDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed "a".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"a", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("a", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Finalize (no more input).
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 1, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 1, MatchCollector::Callback, &collector));
 
   // Should match "a" - at EOS, negative lookahead passes.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -999,7 +856,7 @@ std::vector<uint8_t> BuildWhitespaceNotFollowedByNonWhitespaceDfa() {
   builder.AddTransition(1, '\n', 1);
   builder.AddTransition(1, '\r', 1);
   builder.SetAccepting(1);
-  builder.SetLookaheadNegShorthand(1, IREE_TOKENIZER_REGEX_SHORTHAND_S);
+  builder.SetLookaheadNegShorthand(1, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S);
   return builder.Build();
 }
 
@@ -1018,26 +875,26 @@ TEST(Streaming, WhitespaceNegLookahead_Reject) {
   // Expected: match " " at [0,1) - the first space is followed by whitespace.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed "  " (two spaces).
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  ", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  ", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Feed "x".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"x", 1), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("x", 1), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 3, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
 
   // DFA matches the first space (followed by whitespace, not non-whitespace).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1051,21 +908,21 @@ TEST(Streaming, WhitespaceNegLookahead_AtEOS) {
   // Expected: match "  " at [0,2) - EOS means no non-whitespace follows.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed "  ".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  ", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  ", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Should match "  " - at EOS, negative lookahead for \S passes.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1079,18 +936,18 @@ TEST(Streaming, WhitespaceNegLookahead_ImmediateEval) {
   // Expected: match " " at [0,1) - first space passes lookahead (followed by
   // space), second space fails lookahead (followed by x).
   //
-  // This tests immediate lookahead evaluation when next char is available
-  // within the same chunk. Critical regression test for the fix that evaluates
-  // lookahead at EACH accepting state, not just the final one.
+  // Tests that lookahead is evaluated at each accepting state, not just the
+  // final one. Immediate lookahead when next char is available within the
+  // same chunk.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("  x");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   // First space only - second space's lookahead failed.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1104,13 +961,13 @@ TEST(Streaming, WhitespaceNegLookahead_AllFail) {
   // Expected: no matches - the only space is followed by non-whitespace.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL(" x");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 0);
 }
@@ -1123,13 +980,13 @@ TEST(Streaming, WhitespaceNegLookahead_MultipleSections) {
   //   - "  " at [4,6) - at EOS, both spaces pass
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("a  b  ");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[0].first, 1);
@@ -1144,13 +1001,13 @@ TEST(Streaming, WhitespaceNegLookahead_ManySpacesBeforeNonWS) {
   // Expected: match "    " at [0,4) - first 4 spaces pass, 5th fails.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("     x");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -1163,28 +1020,28 @@ TEST(Streaming, WhitespaceNegLookahead_ChunkBoundaryVariants) {
   // Test chunk boundary handling with immediate lookahead evaluation.
   auto data = BuildWhitespaceNotFollowedByNonWhitespaceDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // First chunk: single space at boundary (can't evaluate lookahead).
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" ", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" ", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Second chunk: "  x"
   // When this arrives:
   // - Pending lookahead from chunk 1 is resolved: next is ' ' (passes)
   // - Then we process two more spaces and x.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  x", 3), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  x", 3), 1,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 4, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
 
   // The first two spaces pass lookahead, third space fails.
   // So we get match at [0, 2).
@@ -1216,13 +1073,13 @@ TEST(Matching, OverlappingPartialMatch) {
   // but the second 'a' starts a new match that succeeds.
   auto data = BuildAbDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("aab");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 1);
@@ -1247,13 +1104,13 @@ TEST(Matching, RepeatedPrefixFailure) {
   // Expected: match at [2,5) = "abc"
   auto data = BuildAbcOnlyDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("ababc");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 2);
@@ -1278,13 +1135,13 @@ TEST(Matching, MultipleFalseStarts) {
   // Expected: match at [2,5) = "aab"
   auto data = BuildAabDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("aaaab");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 2);
@@ -1295,138 +1152,6 @@ TEST(Matching, MultipleFalseStarts) {
 // Review Round 2 Test Cases (Codex + Gemini 3 Pro)
 //===----------------------------------------------------------------------===//
 
-// Build a DFA that matches PSEUDO_LETTER (Unicode letters via \p{L}).
-std::vector<uint8_t> BuildUnicodeLetterDfa() {
-  TestDfaBuilder builder;
-  builder.SetNumStates(2);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  // Match any Unicode letter (pseudo-byte 0x80).
-  builder.AddTransition(0, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 1);
-  builder.AddTransition(1, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 1);
-  builder.SetAccepting(1);
-  return builder.Build();
-}
-
-// Partial UTF-8 transition failure should retry from start state.
-TEST(Streaming, SplitUtf8TransitionFailure_Retry) {
-  // Pattern: \p{L}+ (Unicode letters)
-  // Input: "1é" where '1' doesn't match \p{L}, but 'é' does.
-  // Split: chunk1 = "1\xC3", chunk2 = "\xA9" (é = 0xC3 0xA9)
-  // Expected: match "é" at position 1 (bytes 1-3).
-  //
-  // Bug scenario (before fix):
-  // - '1' at pos 0: no transition from start, skip
-  // - partial 0xC3 buffered at chunk end
-  // - chunk2: complete é decoded, but we're at start state
-  // - transition succeeds (letter), but if it had failed from a partial match,
-  //   we need to retry from start.
-  //
-  // More specific test: "x" starts a match that "é" fails, then "é" should
-  // start a new match.
-
-  // Build DFA: matches "x" followed by ASCII letter, OR just Unicode letter.
-  // State 0 (start) --'x'--> State 1
-  // State 1 --[a-z]--> State 2 (accepting)
-  // State 0 --PSEUDO_LETTER--> State 3 (accepting)
-  TestDfaBuilder builder;
-  builder.SetNumStates(4);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  builder.AddTransition(0, 'x', 1);
-  builder.AddTransitionRange(1, 'a', 'z', 2);  // x followed by lowercase
-  builder.AddTransition(0, IREE_TOKENIZER_REGEX_PSEUDO_LETTER,
-                        3);  // Or just letter
-  builder.SetAccepting(2);
-  builder.SetAccepting(3);
-  auto data = builder.Build();
-
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  // Input: "x" + "é" (split). 'x' starts match, 'é' fails (not a-z),
-  // but 'é' should start new match as PSEUDO_LETTER.
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Chunk 1: "x\xC3" (x + first byte of é)
-  const uint8_t chunk1[] = {'x', 0xC3};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Chunk 2: "\xA9" (second byte of é)
-  const uint8_t chunk2[] = {0xA9};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
-
-  // Should match "é" at position 1 (bytes 1-3).
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 1);   // Start at byte 1
-  EXPECT_EQ(collector.matches[0].second, 3);  // End at byte 3
-}
-
-// Lookahead peek on split UTF-8 should defer, not decode as replacement.
-TEST(Streaming, LookaheadPeekSplitUtf8_Defer) {
-  // Pattern: a(?!\p{L}) - 'a' not followed by Unicode letter
-  // Input: "aé" where é = 0xC3 0xA9
-  // Split: chunk1 = "a\xC3", chunk2 = "\xA9"
-  //
-  // At end of chunk1: 'a' is accepting with lookahead (?!\p{L})
-  // Next byte is 0xC3 (incomplete UTF-8).
-  // Bug: If we decode 0xC3 alone, we get replacement char (not a letter),
-  //      so lookahead passes incorrectly.
-  // Fix: Detect incomplete UTF-8 and defer lookahead to next chunk.
-  // Expected: NO match (é IS a letter, so lookahead rejects).
-
-  // Build DFA: matches 'a' with negative lookahead for PSEUDO_LETTER.
-  TestDfaBuilder builder;
-  builder.SetNumStates(2);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE |
-                   IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
-  builder.AddTransition(0, 'a', 1);
-  builder.SetAccepting(1);
-  // Negative lookahead: reject if next char is PSEUDO_LETTER (0x80).
-  // The letter 'é' maps to PSEUDO_LETTER, so this tests rejection.
-  builder.SetLookaheadNegChar(1, IREE_TOKENIZER_REGEX_PSEUDO_LETTER);
-  auto data = builder.Build();
-
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Chunk 1: "a\xC3" (a + first byte of é)
-  const uint8_t chunk1[] = {'a', 0xC3};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Chunk 2: "\xA9" (second byte of é)
-  const uint8_t chunk2[] = {0xA9};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
-
-  // Should have NO matches: 'a' followed by letter 'é', lookahead rejects.
-  EXPECT_EQ(collector.matches.size(), 0);
-}
-
 // Test "aaab" overlap - requires proper backtracking to match_start + 1.
 TEST(Matching, OverlappingPrefixBacktrack) {
   // Pattern: aab
@@ -1436,13 +1161,13 @@ TEST(Matching, OverlappingPrefixBacktrack) {
   // We must restart from position 1 (not position 2) to find the match.
   auto data = BuildAabDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("aaab");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 1);
@@ -1466,13 +1191,13 @@ TEST(Matching, AcceptThenFailLater) {
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_string_view_t text = IREE_SVL("ac");
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   // Should match "a" at [0,1). The 'c' causes transition failure from state 1,
   // but we had an accept at state 1, so we emit that match.
@@ -1494,8 +1219,8 @@ TEST(Streaming, AcceptThenFailAcrossChunk) {
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -1503,19 +1228,19 @@ TEST(Streaming, AcceptThenFailAcrossChunk) {
 
   // Chunk 1: "a" (in accepting state 1)
   const uint8_t chunk1[] = {'a'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, sizeof(chunk1)),
+      0, /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Chunk 2: "c" (fails transition from state 1)
   const uint8_t chunk2[] = {'c'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk2, sizeof(chunk2)),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   // Should match "a" at [0,1).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1533,22 +1258,22 @@ TEST(Lookahead, NegCharAscii) {
   TestDfaBuilder builder;
   builder.SetNumStates(2);
   builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
+  builder.SetFlags(IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
   builder.AddTransition(0, 'a', 1);
   builder.SetAccepting(1);
   builder.SetLookaheadNegChar(1, 'b');
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // "ab" - should NOT match (b follows a)
   {
     MatchCollector collector;
     iree_string_view_t text = IREE_SVL("ab");
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-        &dfa, text, MatchCollector::Callback, &collector)));
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+        &dfa, text, MatchCollector::Callback, &collector));
     EXPECT_EQ(collector.matches.size(), 0);
   }
 
@@ -1556,8 +1281,8 @@ TEST(Lookahead, NegCharAscii) {
   {
     MatchCollector collector;
     iree_string_view_t text = IREE_SVL("ac");
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-        &dfa, text, MatchCollector::Callback, &collector)));
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec(
+        &dfa, text, MatchCollector::Callback, &collector));
     ASSERT_EQ(collector.matches.size(), 1);
     EXPECT_EQ(collector.matches[0].first, 0);
     EXPECT_EQ(collector.matches[0].second, 1);
@@ -1570,15 +1295,15 @@ TEST(Matching, UnicodeBacktrack) {
   TestDfaBuilder builder;
   builder.SetNumStates(3);
   builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  builder.AddTransition(0, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 1);
-  builder.AddTransition(1, IREE_TOKENIZER_REGEX_PSEUDO_LETTER, 2);
+  builder.SetFlags(IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_UNICODE);
+  builder.AddTransition(0, IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER, 1);
+  builder.AddTransition(1, IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER, 2);
   builder.SetAccepting(2);
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // Input: "1é2éé" - should match "éé" at end
   // '1' = 1 byte, 'é' = 2 bytes, '2' = 1 byte, 'é' = 2 bytes, 'é' = 2 bytes
@@ -1587,8 +1312,8 @@ TEST(Matching, UnicodeBacktrack) {
   MatchCollector collector;
   const uint8_t input[] = {'1', 0xC3, 0xA9, '2', 0xC3, 0xA9, 0xC3, 0xA9};
   iree_string_view_t text = {(const char*)input, sizeof(input)};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec(
-      &dfa, text, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, text, MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 4);
@@ -1599,8 +1324,8 @@ TEST(Matching, UnicodeBacktrack) {
 TEST(Streaming, EmptyChunk) {
   auto data = BuildLowerAlphaDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -1608,99 +1333,28 @@ TEST(Streaming, EmptyChunk) {
 
   // Feed: "ab" then empty then "cd"
   const uint8_t chunk1[] = {'a', 'b'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, sizeof(chunk1)),
+      0, /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Empty chunk (pass nullptr with 0 length)
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, 0), sizeof(chunk1),
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, 0),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   const uint8_t chunk2[] = {'c', 'd'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk2, sizeof(chunk2)),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   // Should match "abcd" at [0,4)
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 0);
   EXPECT_EQ(collector.matches[0].second, 4);
-}
-
-// Test 4-byte UTF-8 split in various ways.
-TEST(Streaming, FourByteUtf8SplitVariants) {
-  // Pattern: matches Unicode letters
-  auto data = BuildUnicodeLetterDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  // 𝄞 (Musical G Clef) = U+1D11E = F0 9D 84 9E (4 bytes)
-  // Note: U+1D11E is in the "Symbol" category, not "Letter", so won't match.
-  // Use 𐀀 (U+10000) = F0 90 80 80, also Symbol/Other.
-  // Let's use a CJK character: 𠀀 (U+20000) = F0 A0 80 80, which is a Letter.
-  const uint8_t cjk[] = {0xF0, 0xA0, 0x80, 0x80};
-
-  // Split 1-3
-  {
-    MatchCollector collector;
-    iree_tokenizer_regex_exec_state_t state;
-    iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk, 1), 0,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk + 1, 3), 1,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-        &dfa, &state, 4, MatchCollector::Callback, &collector)));
-
-    ASSERT_EQ(collector.matches.size(), 1);
-    EXPECT_EQ(collector.matches[0].first, 0);
-    EXPECT_EQ(collector.matches[0].second, 4);
-  }
-
-  // Split 2-2
-  {
-    MatchCollector collector;
-    iree_tokenizer_regex_exec_state_t state;
-    iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk, 2), 0,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk + 2, 2), 2,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-        &dfa, &state, 4, MatchCollector::Callback, &collector)));
-
-    ASSERT_EQ(collector.matches.size(), 1);
-  }
-
-  // Split 3-1
-  {
-    MatchCollector collector;
-    iree_tokenizer_regex_exec_state_t state;
-    iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk, 3), 0,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(cjk + 3, 1), 3,
-        MatchCollector::Callback, &collector)));
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-        &dfa, &state, 4, MatchCollector::Callback, &collector)));
-
-    ASSERT_EQ(collector.matches.size(), 1);
-  }
 }
 
 // Test multiple consecutive lookahead deferrals.
@@ -1710,15 +1364,15 @@ TEST(Streaming, MultipleLookaheadDefers) {
   TestDfaBuilder builder;
   builder.SetNumStates(2);
   builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
+  builder.SetFlags(IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD);
   builder.AddTransition(0, 'a', 1);
   builder.SetAccepting(1);
   builder.SetLookaheadNegChar(1, 'b');
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -1726,20 +1380,20 @@ TEST(Streaming, MultipleLookaheadDefers) {
 
   // Feed 'a' alone - should defer lookahead
   const uint8_t a[] = {'a'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(a, 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)a, 1), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
   EXPECT_EQ(collector.matches.size(), 0);  // Not emitted yet
 
   // Feed 'c' - lookahead passes (c != b), should emit match
   const uint8_t c[] = {'c'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(c, 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)c, 1), 1,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Finalize
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Should have match "a" at [0,1)
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1755,8 +1409,8 @@ TEST(Streaming, MultipleLookaheadDefers) {
 TEST(Utf8Validation, InvalidContinuationByte) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0xC3 expects continuation (0x80-0xBF), but we give 0x40 ('@').
   // Should decode as replacement char (doesn't match), then '@' (doesn't
@@ -1767,11 +1421,11 @@ TEST(Utf8Validation, InvalidContinuationByte) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // 0xC3 becomes replacement char (no match), 0x40='@' (no match), "bc"
   // matches.
@@ -1784,8 +1438,8 @@ TEST(Utf8Validation, InvalidContinuationByte) {
 TEST(Utf8Validation, OverlongTwoByte) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0xC0 0x80 is overlong encoding of U+0000 (NUL).
   // 0xC1 0xBF is overlong encoding of U+007F (DEL).
@@ -1796,11 +1450,11 @@ TEST(Utf8Validation, OverlongTwoByte) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // Overlong sequence becomes replacement char (no match), then "ab" matches.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1812,8 +1466,8 @@ TEST(Utf8Validation, OverlongTwoByte) {
 TEST(Utf8Validation, OverlongThreeByte) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0xE0 0x80 0x80 is overlong encoding of U+0000.
   // Valid 3-byte sequences start at U+0800, so 0xE0 must have 2nd byte >= 0xA0.
@@ -1823,11 +1477,11 @@ TEST(Utf8Validation, OverlongThreeByte) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // Overlong becomes replacement char, then "xy" matches.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1839,8 +1493,8 @@ TEST(Utf8Validation, OverlongThreeByte) {
 TEST(Utf8Validation, SurrogateCodepoint) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0xED 0xA0 0x80 encodes U+D800 (high surrogate start).
   // 0xED 0xBF 0xBF encodes U+DFFF (low surrogate end).
@@ -1851,11 +1505,11 @@ TEST(Utf8Validation, SurrogateCodepoint) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // Surrogate becomes replacement char, then "z" matches.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1863,65 +1517,12 @@ TEST(Utf8Validation, SurrogateCodepoint) {
   EXPECT_EQ(collector.matches[0].second, 4);
 }
 
-// Partial UTF-8 at end of stream should become replacement char.
-TEST(Utf8Validation, PartialAtEOS) {
-  auto data = BuildLowerAlphaUnicodeDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  // 'a' 'b' then incomplete 2-byte sequence (0xC3 alone).
-  const uint8_t input[] = {'a', 'b', 0xC3};
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  // Finalize should handle the partial UTF-8.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
-
-  // "ab" should match at [0,2). The partial 0xC3 becomes replacement char.
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 2);
-}
-
-// Partial 3-byte UTF-8 at end of stream.
-TEST(Utf8Validation, PartialThreeByteAtEOS) {
-  auto data = BuildLowerAlphaUnicodeDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  // Incomplete 3-byte sequence (0xE4 0xB8 without third byte).
-  const uint8_t input[] = {'x', 0xE4, 0xB8};
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
-
-  // "x" matches at [0,1). Partial sequence becomes replacement char.
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 1);
-}
-
 // Invalid leading byte (0xFF is never valid in UTF-8).
 TEST(Utf8Validation, InvalidLeadingByte) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0xFF and 0xFE are never valid UTF-8 leading bytes.
   const uint8_t input[] = {0xFF, 0xFE, 'a', 'b'};
@@ -1930,11 +1531,11 @@ TEST(Utf8Validation, InvalidLeadingByte) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // 0xFF and 0xFE become replacement chars, then "ab" matches.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -1946,8 +1547,8 @@ TEST(Utf8Validation, InvalidLeadingByte) {
 TEST(Utf8Validation, StrayContiunationByte) {
   auto data = BuildLowerAlphaUnicodeDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   // 0x80 alone is invalid (continuation byte without leader).
   const uint8_t input[] = {0x80, 0x85, 'c', 'd'};
@@ -1956,191 +1557,16 @@ TEST(Utf8Validation, StrayContiunationByte) {
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(input, sizeof(input)), 0,
-      MatchCollector::Callback, &collector)));
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)input, sizeof(input)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, sizeof(input), MatchCollector::Callback, &collector));
 
   // Each stray continuation byte becomes replacement char, then "cd" matches.
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 2);
   EXPECT_EQ(collector.matches[0].second, 4);
-}
-
-//===----------------------------------------------------------------------===//
-// Multi-Chunk UTF-8 Lookahead Tests
-//===----------------------------------------------------------------------===//
-
-// Build a DFA for "a(?!b)" with Unicode mode enabled.
-// This allows testing lookahead evaluation when the lookahead character
-// is a multi-byte UTF-8 sequence split across chunks.
-std::vector<uint8_t> BuildANotFollowedByBUnicodeDfa() {
-  TestDfaBuilder builder;
-  builder.SetNumStates(2);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  builder.AddTransition(0, 'a', 1);
-  builder.SetAccepting(1);
-  builder.SetLookaheadNegChar(1, 'b');
-  return builder.Build();
-}
-
-TEST(Streaming, LookaheadWithUtf8SplitAcrossThreeChunks) {
-  // When pending lookahead needs to peek at the next character, and that
-  // character is a multi-byte UTF-8 sequence split across more than 2 chunks,
-  // we must wait until the sequence is complete before evaluating the
-  // lookahead.
-  //
-  // Pattern: a(?!b) in Unicode mode
-  // Input: "a" + 😀 (4-byte emoji: 0xF0 0x9F 0x98 0x80)
-  // Split: chunk1 = "a\xF0", chunk2 = "\x9F", chunk3 = "\x98\x80"
-  //
-  // After chunk1: 'a' accepted with pending lookahead, 0xF0 buffered
-  // After chunk2: Can't complete sequence yet (have 2 of 4 bytes)
-  // After chunk3: Complete emoji, evaluate lookahead (emoji != 'b'), accept
-  //
-  // The bug (before fix): chunk2 would use REPLACEMENT_CHAR and clear
-  // pending_lookahead prematurely.
-  auto data = BuildANotFollowedByBUnicodeDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Chunk 1: "a" + first byte of 4-byte emoji.
-  const uint8_t chunk1[] = {'a', 0xF0};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // No match yet - lookahead pending.
-  EXPECT_EQ(collector.matches.size(), 0);
-  EXPECT_TRUE(state.pending_lookahead);
-
-  // Chunk 2: second byte of emoji - still incomplete (2 of 4 bytes).
-  const uint8_t chunk2[] = {0x9F};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
-
-  // Still no match - lookahead should still be pending (this is the bug test).
-  EXPECT_EQ(collector.matches.size(), 0);
-  EXPECT_TRUE(state.pending_lookahead);  // Lookahead still deferred
-
-  // Chunk 3: remaining bytes of emoji (bytes 3-4).
-  const uint8_t chunk3[] = {0x98, 0x80};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk3, sizeof(chunk3)),
-      sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback, &collector)));
-
-  // Now lookahead should be resolved (emoji != 'b', so passes).
-  EXPECT_FALSE(state.pending_lookahead);
-
-  // Finalize.
-  size_t total = sizeof(chunk1) + sizeof(chunk2) + sizeof(chunk3);
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, total, MatchCollector::Callback, &collector)));
-
-  // Should match "a" at [0,1).
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 1);
-}
-
-//===----------------------------------------------------------------------===//
-// EOS Lookahead with Invalid UTF-8 Tests
-//===----------------------------------------------------------------------===//
-
-// Build a DFA for "a(?!\S)" - 'a' NOT followed by non-whitespace.
-// With Unicode mode enabled for UTF-8 handling.
-std::vector<uint8_t> BuildANotFollowedByNonWhitespaceUnicodeDfa() {
-  TestDfaBuilder builder;
-  builder.SetNumStates(2);
-  builder.SetStartState(0);
-  builder.SetFlags(IREE_TOKENIZER_REGEX_DFA_FLAG_UNICODE);
-  builder.AddTransition(0, 'a', 1);
-  builder.SetAccepting(1);
-  builder.SetLookaheadNegShorthand(1, IREE_TOKENIZER_REGEX_SHORTHAND_S);
-  return builder.Build();
-}
-
-TEST(Streaming, EOSLookaheadWithIncompleteUtf8_Rejects) {
-  // When there's incomplete UTF-8 at EOS and a pending lookahead, the
-  // lookahead must be evaluated against REPLACEMENT_CHAR, not unconditionally
-  // passed.
-  //
-  // Pattern: a(?!\S) - 'a' NOT followed by non-whitespace
-  // Input: "a" + 0xC3 (incomplete 2-byte UTF-8 sequence)
-  //
-  // At finalize:
-  // - Incomplete UTF-8 becomes REPLACEMENT_CHAR
-  // - REPLACEMENT_CHAR is non-whitespace (maps to PSEUDO_OTHER)
-  // - Lookahead (?!\S) means "not followed by non-whitespace"
-  // - REPLACEMENT_CHAR IS non-whitespace, so lookahead REJECTS
-  //
-  // Before fix: Lookahead unconditionally passed at EOS, giving a match (wrong)
-  // After fix: Lookahead evaluated against REPLACEMENT_CHAR, rejects, no match
-  auto data = BuildANotFollowedByNonWhitespaceUnicodeDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Feed "a" + incomplete UTF-8 lead byte.
-  const uint8_t chunk[] = {'a', 0xC3};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk, sizeof(chunk)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Verify state: lookahead pending, partial UTF-8 buffered.
-  EXPECT_TRUE(state.pending_lookahead);
-  EXPECT_EQ(state.utf8_partial_length, 1);
-
-  // Finalize with incomplete UTF-8.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk), MatchCollector::Callback, &collector)));
-
-  // Should NOT match - REPLACEMENT_CHAR (non-whitespace) rejects the lookahead.
-  EXPECT_EQ(collector.matches.size(), 0);
-}
-
-TEST(Streaming, EOSLookaheadWithIncompleteUtf8_Accepts) {
-  // Complementary test: (?!b) should PASS when incomplete UTF-8 at EOS,
-  // because REPLACEMENT_CHAR (via codepoint_to_byte -> PSEUDO_OTHER) != 'b'.
-  //
-  // Pattern: a(?!b) - 'a' NOT followed by 'b'
-  // Input: "a" + 0xC3 (incomplete 2-byte UTF-8)
-  // Expected: Match "a" - REPLACEMENT_CHAR != 'b'
-  auto data = BuildANotFollowedByBUnicodeDfa();
-  iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
-
-  MatchCollector collector;
-  iree_tokenizer_regex_exec_state_t state;
-  iree_tokenizer_regex_exec_initialize(&state, &dfa);
-
-  // Feed "a" + incomplete UTF-8.
-  const uint8_t chunk[] = {'a', 0xC3};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk, sizeof(chunk)), 0,
-      MatchCollector::Callback, &collector)));
-
-  // Finalize.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, sizeof(chunk), MatchCollector::Callback, &collector)));
-
-  // Should match "a" at [0,1) - REPLACEMENT_CHAR != 'b', lookahead passes.
-  ASSERT_EQ(collector.matches.size(), 1);
-  EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2160,8 +1586,8 @@ TEST(CrossChunkBacktrack, AabPatternCrossChunk) {
   // Expected: match "aab" at [1,4)
   auto data = BuildAabDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -2169,19 +1595,19 @@ TEST(CrossChunkBacktrack, AabPatternCrossChunk) {
 
   // Chunk 1: "aa"
   const uint8_t chunk1[] = {'a', 'a'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, sizeof(chunk1)),
+      0, /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Chunk 2: "ab"
   const uint8_t chunk2[] = {'a', 'b'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk2, sizeof(chunk2)),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   // Should match "aab" at [1,4).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -2212,8 +1638,8 @@ TEST(CrossChunkBacktrack, AbaPatternCrossChunk) {
   auto data = builder.Build();
 
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -2221,19 +1647,19 @@ TEST(CrossChunkBacktrack, AbaPatternCrossChunk) {
 
   // Chunk 1: "ab"
   const uint8_t chunk1[] = {'a', 'b'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, sizeof(chunk1)),
+      0, /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Chunk 2: "aba"
   const uint8_t chunk2[] = {'a', 'b', 'a'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk2, sizeof(chunk2)),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   // Should match "aba" at [0,3) from chunk1 "ab" + chunk2 first 'a'.
   // After emitting this match, we continue from position 3.
@@ -2251,8 +1677,8 @@ TEST(CrossChunkBacktrack, SingleByteChunks) {
   // Tests that the rewind buffer correctly accumulates across many chunks.
   auto data = BuildAabDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -2262,14 +1688,14 @@ TEST(CrossChunkBacktrack, SingleByteChunks) {
   size_t offset = 0;
   const uint8_t bytes[] = {'a', 'a', 'a', 'b'};
   for (size_t i = 0; i < sizeof(bytes); ++i) {
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span(&bytes[i], 1), offset,
-        MatchCollector::Callback, &collector)));
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view((const char*)&bytes[i], 1), offset,
+        /*stride=*/NULL, MatchCollector::Callback, &collector));
     offset += 1;
   }
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, offset, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, offset, MatchCollector::Callback, &collector));
 
   // Should match "aab" at [1,4).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -2283,8 +1709,8 @@ TEST(CrossChunkBacktrack, BacktrackMultipleTimes) {
   // This requires multiple backtracks to find the match.
   auto data = BuildAabDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -2292,19 +1718,19 @@ TEST(CrossChunkBacktrack, BacktrackMultipleTimes) {
 
   // Chunk 1: "aaa"
   const uint8_t chunk1[] = {'a', 'a', 'a'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk1, sizeof(chunk1)), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk1, sizeof(chunk1)),
+      0, /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Chunk 2: "ab"
   const uint8_t chunk2[] = {'a', 'b'};
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span(chunk2, sizeof(chunk2)),
-      sizeof(chunk1), MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view((const char*)chunk2, sizeof(chunk2)),
+      sizeof(chunk1), /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
       &dfa, &state, sizeof(chunk1) + sizeof(chunk2), MatchCollector::Callback,
-      &collector)));
+      &collector));
 
   // Should match "aab" at [2,5).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -2313,13 +1739,13 @@ TEST(CrossChunkBacktrack, BacktrackMultipleTimes) {
 }
 
 //===----------------------------------------------------------------------===//
-// Backtrack State Reset Tests (regression tests for loom-djxu)
+// Backtrack State Reset Tests
 //===----------------------------------------------------------------------===//
 
 // These tests verify that executor state is properly reset on backtrack.
-// Bug: The within-chunk and within-buffer backtrack paths were not clearing
-// has_accept_fallback and best_branch_idx/best_match_end, which could cause
-// stale state to leak into subsequent match attempts.
+// Both within-chunk and within-buffer backtrack paths must clear state like
+// has_accept_fallback and best_branch_idx/best_match_end to prevent stale
+// state from leaking into subsequent match attempts.
 
 // Build a DFA that matches a+(?!X)|a+ (one or more 'a' with lookahead and
 // fallback).
@@ -2366,7 +1792,7 @@ std::vector<uint8_t> BuildWhitespaceWithFallbackDfa() {
   builder.SetAccepting(1);
   // (?!\S) with fallback to |\s+.
   builder.SetLookaheadNegShorthandWithFallback(
-      1, IREE_TOKENIZER_REGEX_SHORTHAND_S);
+      1, IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S);
   return builder.Build();
 }
 
@@ -2389,13 +1815,13 @@ TEST(BacktrackStateReset, WithinChunkBacktrackClearsFallback) {
   // with the second match. This test verifies the fix works correctly.
   auto data = BuildOnePlusAWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
-  EXPECT_TRUE(iree_status_is_ok(
-      iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("aXab"),
-                                MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("aXab"),
+                                           MatchCollector::Callback,
+                                           &collector));
 
   // Should have two matches: [0,1) and [2,3).
   ASSERT_EQ(collector.matches.size(), 2);
@@ -2403,6 +1829,34 @@ TEST(BacktrackStateReset, WithinChunkBacktrackClearsFallback) {
   EXPECT_EQ(collector.matches[0].second, 1);
   EXPECT_EQ(collector.matches[1].first, 2);
   EXPECT_EQ(collector.matches[1].second, 3);
+}
+
+TEST(BacktrackStateReset, SingleChunkAaXa) {
+  // Pattern: a+(?!X)|a+ on input "aaXa" (single chunk).
+  //
+  // This is the single-chunk reference for StreamingBacktrackWithFallback.
+  // Expected matches:
+  // - [0,1): Position 0 'a' followed by 'a' (not 'X') → lookahead passes
+  // - [1,2): Position 1 'a' followed by 'X' → lookahead fails, use fallback
+  // - [3,4): Position 3 'a' at EOS → lookahead passes
+  auto data = BuildOnePlusAWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("aaXa"),
+                                           MatchCollector::Callback,
+                                           &collector));
+
+  // Should have three matches.
+  ASSERT_EQ(collector.matches.size(), 3);
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+  EXPECT_EQ(collector.matches[2].first, 3);
+  EXPECT_EQ(collector.matches[2].second, 4);
 }
 
 TEST(BacktrackStateReset, BacktrackAfterFailedLookahead) {
@@ -2418,13 +1872,13 @@ TEST(BacktrackStateReset, BacktrackAfterFailedLookahead) {
   // This verifies fallback state doesn't leak across multiple backtracks.
   auto data = BuildOnePlusAWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
-  EXPECT_TRUE(iree_status_is_ok(
+  IREE_EXPECT_OK(
       iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("aXaXab"),
-                                MatchCollector::Callback, &collector)));
+                                MatchCollector::Callback, &collector));
 
   // Should have three matches.
   ASSERT_EQ(collector.matches.size(), 3);
@@ -2437,52 +1891,57 @@ TEST(BacktrackStateReset, BacktrackAfterFailedLookahead) {
 }
 
 TEST(BacktrackStateReset, StreamingBacktrackWithFallback) {
-  // Pattern: a+(?!X)|a+
+  // Pattern: a+(?!X)|a+ on input "aa" + "Xa" (split across chunks).
   //
-  // Input: "aa" + "Xa" (split across chunks)
+  // This is the streaming version of SingleChunkAaXa - both must produce
+  // the same 3 matches. The split tests cross-chunk resume handling.
   //
   // Processing:
-  // - Position 0: 'a' matches, lookahead checks position 1 ('a' != 'X') → PASS
-  //   Record last_accept = 1
-  // - Position 1: 'a' matches, lookahead needs position 2 → DEFER to next chunk
-  // - Chunk 2: Pending lookahead checks position 2 ('X' == 'X') → FAIL
-  //   Emit using last successful accept [0,1)
-  // - Position 2: 'X' doesn't match
+  // - Position 0: 'a' matches, lookahead checks 'a' at 1 (not 'X') → PASS [0,1)
+  // - Position 1: 'a' matches, lookahead needs position 2 → DEFER
+  // - Chunk 2: Pending lookahead checks 'X' at 2 → FAIL, emit [0,1)
+  // - Resume from position 1 via rewind buffer (cross-chunk resume)
+  // - Position 1: 'a' matches, lookahead checks 'X' at 2 → FAIL via fallback
+  // - Position 2: 'X' → NO_TRANSITION, emit [1,2) via fallback
+  // - Position 2: 'X' doesn't match from start
   // - Position 3: 'a' matches, EOS lookahead passes → emit [3,4)
   auto data = BuildOnePlusAWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: "aa".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"aa", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("aa", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: "Xa".
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"Xa", 2), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("Xa", 2), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 4, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
 
-  // Should have two matches:
-  // - [0,1): First 'a' where lookahead passed (second 'a' is not 'X')
-  // - [3,4): Final 'a' where EOS lookahead passes
-  ASSERT_EQ(collector.matches.size(), 2);
+  // Should have three matches (same as SingleChunkAaXa):
+  // - [0,1): Position 0 'a' where lookahead passed
+  // - [1,2): Position 1 'a' where lookahead failed, use fallback
+  // - [3,4): Position 3 'a' where EOS lookahead passes
+  ASSERT_EQ(collector.matches.size(), 3);
   EXPECT_EQ(collector.matches[0].first, 0);
   EXPECT_EQ(collector.matches[0].second, 1);
-  EXPECT_EQ(collector.matches[1].first, 3);
-  EXPECT_EQ(collector.matches[1].second, 4);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+  EXPECT_EQ(collector.matches[2].first, 3);
+  EXPECT_EQ(collector.matches[2].second, 4);
 }
 
 //===----------------------------------------------------------------------===//
-// Shorthand Fallback Streaming Tests (regression tests for loom-mg68)
+// Shorthand Fallback Streaming Tests
 //===----------------------------------------------------------------------===//
 
 // These tests verify streaming behavior for patterns with shorthand-class
@@ -2530,25 +1989,25 @@ TEST(ShorthandFallbackStreaming, ChunkBoundaryMidWhitespaceRun) {
   // behavior
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: two spaces.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  ", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  ", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: space then 'x'.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" x", 2), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" x", 2), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 4, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
 
   // Two matches: lookahead-passed match, then fallback for final space.
   ASSERT_EQ(collector.matches.size(), 2);
@@ -2575,25 +2034,25 @@ TEST(ShorthandFallbackStreaming, LookaheadDeferredThenFails) {
   // Expected: [0,1)
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: single space at chunk boundary.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" ", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" ", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: 'x' causes deferred lookahead to fail.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"x", 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("x", 1), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Single space matches via fallback.
   ASSERT_EQ(collector.matches.size(), 1);
@@ -2617,25 +2076,25 @@ TEST(ShorthandFallbackStreaming, LookaheadDeferredThenPasses) {
   // Expected: [0,2)
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: single space.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" ", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" ", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: another space.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" ", 1), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" ", 1), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 2, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 2, MatchCollector::Callback, &collector));
 
   // Both spaces match (lookahead passed).
   ASSERT_EQ(collector.matches.size(), 1);
@@ -2644,12 +2103,10 @@ TEST(ShorthandFallbackStreaming, LookaheadDeferredThenPasses) {
 }
 
 TEST(ShorthandFallbackStreaming, BacktrackAcrossChunksWithFallback) {
-  // Pattern: \s+(?!\S)|\s+
-  // Input: "  " + "xy  " (backtrack after lookahead fails, then new match)
+  // Pattern: \s+(?!\S)|\s+ on input "  xy  ".
   //
-  // CRITICAL STREAMING BEHAVIOR: Once a chunk is consumed, we cannot restart
-  // within it. After emitting [0,1), we'd want to restart at pos 1 but chunk 1
-  // is gone. We continue from chunk 2's first available position (pos 2).
+  // After emitting [0,1), the rewind buffer allows restart at position 1.
+  // Streaming must produce same results as single-chunk processing.
   //
   // Processing:
   // - Chunk 1 "  ":
@@ -2657,133 +2114,103 @@ TEST(ShorthandFallbackStreaming, BacktrackAcrossChunksWithFallback) {
   //   - Pos 1: ' ', lookahead needs pos 2 -> DEFER
   // - Chunk 2 "xy  ":
   //   - Resolve deferred: 'x' at pos 2 IS \S -> FAIL
-  //   - Emit [0,1) using last_accept=1
-  //   - Cannot restart at pos 1 (chunk 1 consumed), skip to pos 2
+  //   - Emit [0,1) using last_accept
+  //   - Resume at pos 1 via rewind buffer
+  //   - Pos 1: ' ', lookahead at 2 ('x' IS \S) -> FAIL, emit [1,2) via fallback
   //   - Pos 2,3: 'xy' don't match
-  //   - Pos 4: ' ', lookahead at 5 (' ' not \S) -> PASS, last_accept=5
-  //   - Pos 5: ' ', lookahead needs pos 6 -> DEFER
-  // - Finalize: EOS not \S -> PASS, last_accept=6, emit [4,6)
-  //
-  // Expected: [0,1), [4,6) - only two matches (second space in chunk 1 is lost)
+  //   - Pos 4,5: ' ' matches, last at EOS
+  // - Finalize: EOS -> PASS, emit [4,6)
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: two spaces.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  ", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  ", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: "xy  " - non-whitespace then whitespace.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"xy  ", 4), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("xy  ", 4), 2,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 6, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 6, MatchCollector::Callback, &collector));
 
-  // Two matches: first space (lookahead passed), trailing spaces at EOS.
-  // Second space in chunk 1 is lost - cannot restart within consumed chunk.
-  ASSERT_EQ(collector.matches.size(), 2);
+  // Three matches (same as single-chunk "  xy  "):
+  ASSERT_EQ(collector.matches.size(), 3);
   EXPECT_EQ(collector.matches[0].first, 0);
   EXPECT_EQ(collector.matches[0].second, 1);  // Lookahead passed at pos 0.
-  EXPECT_EQ(collector.matches[1].first, 4);
-  EXPECT_EQ(collector.matches[1].second, 6);  // Trailing spaces at EOS.
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);  // Fallback at pos 1.
+  EXPECT_EQ(collector.matches[2].first, 4);
+  EXPECT_EQ(collector.matches[2].second, 6);  // Trailing spaces at EOS.
 }
 
 TEST(ShorthandFallbackStreaming, MultipleSectionsAcrossManyChunks) {
-  // Pattern: \s+(?!\S)|\s+
-  // Input: "a " + " b" + "  " + "c" = "a  b  c" (multiple whitespace sections)
+  // Pattern: \s+(?!\S)|\s+ on input "a  b  c".
   //
-  // STREAMING BEHAVIOR: Cannot restart within consumed chunks.
-  //
-  // Processing:
-  // - Chunk 1 "a ": 'a' skipped, pos 1 ' ' matches, lookahead needs 2 -> DEFER
-  // - Chunk 2 " b":
-  //   - Resolve deferred: pos 2 ' ' not \S -> PASS, last_accept=2
-  //   - Pos 2: ' ', lookahead at 3 ('b' is \S) -> FAIL
-  //   - Pos 3: 'b' NO_TRANSITION -> emit [1,2)
-  //   - Restart at pos 2 (in current chunk) -> works!
-  //   - Pos 2: ' ', lookahead at 3 ('b') -> FAIL
-  //   - Pos 3: NO_TRANSITION -> emit [2,3) via fallback
-  //   - 'b' skipped
-  // - Chunk 3 "  ":
-  //   - Pos 4: ' ', lookahead at 5 (' ') -> PASS, last_accept=5
-  //   - Pos 5: ' ', lookahead needs 6 -> DEFER
-  // - Chunk 4 "c":
-  //   - Resolve deferred: 'c' is \S -> FAIL
-  //   - Emit [4,5) using last_accept
-  //   - Cannot restart at pos 5 (chunk 3 consumed)
-  //
-  // Expected: [1,2), [2,3), [4,5) - three matches (pos 5 space lost)
+  // Streaming must produce same results as single-chunk processing.
+  // The rewind buffer allows restart at any position in a previous chunk.
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Feed chunks one at a time.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"a ", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("a ", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" b", 2), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" b", 2), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"  ", 2), 4,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("  ", 2), 4, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"c", 1), 6,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("c", 1), 6, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 7, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 7, MatchCollector::Callback, &collector));
 
-  // Three matches - last space at pos 5 is lost (chunk 3 consumed).
-  ASSERT_EQ(collector.matches.size(), 3);
+  // Four matches (same as single-chunk "a  b  c"):
+  // - [1,2): first space after 'a' (lookahead passed: next is ' ')
+  // - [2,3): second space (fallback: next is 'b')
+  // - [4,5): first space of "  " section (lookahead passed: next is ' ')
+  // - [5,6): second space (fallback: next is 'c')
+  ASSERT_EQ(collector.matches.size(), 4);
   EXPECT_EQ(collector.matches[0].first, 1);
-  EXPECT_EQ(collector.matches[0].second, 2);  // Lookahead passed at pos 1.
+  EXPECT_EQ(collector.matches[0].second, 2);
   EXPECT_EQ(collector.matches[1].first, 2);
-  EXPECT_EQ(collector.matches[1].second, 3);  // Fallback for space before 'b'.
+  EXPECT_EQ(collector.matches[1].second, 3);
   EXPECT_EQ(collector.matches[2].first, 4);
-  EXPECT_EQ(collector.matches[2].second, 5);  // Lookahead passed at pos 4.
+  EXPECT_EQ(collector.matches[2].second, 5);
+  EXPECT_EQ(collector.matches[3].first, 5);
+  EXPECT_EQ(collector.matches[3].second, 6);
 }
 
 TEST(ShorthandFallbackStreaming, SingleByteChunksStressTest) {
-  // Pattern: \s+(?!\S)|\s+
-  // Input: "  x  " fed byte-by-byte
+  // Pattern: \s+(?!\S)|\s+ on input "  x  " fed byte-by-byte.
   //
-  // STREAMING BEHAVIOR: With single-byte chunks, we can NEVER restart within
-  // a consumed chunk. After emitting [0,1), we cannot restart at pos 1.
-  //
-  // Processing:
-  // - Chunk 0 ' ': lookahead needs 1 -> DEFER
-  // - Chunk 1 ' ': resolve deferred (PASSES), last_accept=1, lookahead needs 2
-  //   -> DEFER
-  // - Chunk 2 'x': resolve deferred (FAILS), emit [0,1) using last_accept
-  //   - Cannot restart at pos 1 (chunk consumed)
-  //   - 'x' doesn't match
-  // - Chunk 3 ' ': lookahead needs 4 -> DEFER
-  // - Chunk 4 ' ': resolve deferred (PASSES), last_accept=4, lookahead needs 5
-  //   -> DEFER
-  // - Finalize: EOS -> PASS, last_accept=5, emit [3,5)
-  //
-  // Expected: [0,1), [3,5) - only two matches (second space at pos 1 is lost)
+  // Streaming must produce same results as single-chunk processing.
+  // The rewind buffer preserves bytes for cross-chunk resume.
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
@@ -2791,26 +2218,30 @@ TEST(ShorthandFallbackStreaming, SingleByteChunksStressTest) {
 
   const char* input = "  x  ";
   for (size_t i = 0; i < 5; ++i) {
-    EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-        &dfa, &state, iree_make_const_byte_span((const uint8_t*)&input[i], 1),
-        i, MatchCollector::Callback, &collector)));
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector));
   }
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 5, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 5, MatchCollector::Callback, &collector));
 
-  // Two matches - second space at pos 1 is lost (cannot restart in consumed
-  // chunk).
-  ASSERT_EQ(collector.matches.size(), 2);
+  // Three matches (same as single-chunk "  x  "):
+  // - [0,1): first space (lookahead passed: next is ' ')
+  // - [1,2): second space (fallback: next is 'x')
+  // - [3,5): trailing spaces at EOS
+  ASSERT_EQ(collector.matches.size(), 3);
   EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 1);  // Lookahead passed at pos 0.
-  EXPECT_EQ(collector.matches[1].first, 3);
-  EXPECT_EQ(collector.matches[1].second, 5);  // Trailing spaces at EOS.
+  EXPECT_EQ(collector.matches[0].second, 1);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+  EXPECT_EQ(collector.matches[2].first, 3);
+  EXPECT_EQ(collector.matches[2].second, 5);
 }
 
 TEST(ShorthandFallbackStreaming, FallbackStateNotLeakedOnBacktrack) {
   // Pattern: \s+(?!\S)|\s+
-  // Input: " x y" (regression test for loom-djxu with shorthand)
+  // Input: " x y"
   //
   // This specifically tests that fallback state from a failed match doesn't
   // leak into subsequent match attempts. The executor must properly reset:
@@ -2830,13 +2261,13 @@ TEST(ShorthandFallbackStreaming, FallbackStateNotLeakedOnBacktrack) {
   // Expected: [0,1), [2,3)
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
-  EXPECT_TRUE(iree_status_is_ok(
-      iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view(" x y"),
-                                MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view(" x y"),
+                                           MatchCollector::Callback,
+                                           &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -2855,30 +2286,30 @@ TEST(ShorthandFallbackStreaming, StreamingFallbackStateNotLeaked) {
   // Expected: [0,1), [2,3)
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: space with deferred lookahead.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)" ", 1), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(" ", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 2: 'x' fails lookahead, then ' ' starts new match.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"x ", 2), 1,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("x ", 2), 1, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
   // Chunk 3: 'y' fails lookahead for second match.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"y", 1), 3,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("y", 1), 3, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 4, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
 
   ASSERT_EQ(collector.matches.size(), 2);
   EXPECT_EQ(collector.matches[0].first, 0);
@@ -2888,52 +2319,524 @@ TEST(ShorthandFallbackStreaming, StreamingFallbackStateNotLeaked) {
 }
 
 TEST(ShorthandFallbackStreaming, TabAndNewlineHandling) {
-  // Pattern: \s+(?!\S)|\s+
-  // Input: "\t\n" + "x" (tab and newline, then non-whitespace)
+  // Pattern: \s+(?!\S)|\s+ on input "\t\nx".
   //
   // Verify that shorthand \s correctly matches tab/newline, not just space.
-  //
-  // STREAMING BEHAVIOR: After emitting [0,1), we cannot restart at pos 1
-  // because chunk 1 ("\t\n") is consumed.
-  //
-  // Processing:
-  // - Chunk 1 "\t\n":
-  //   - pos 0: '\t' matches, lookahead at 1 ('\n' not \S) -> PASS,
-  //   last_accept=1
-  //   - pos 1: '\n' matches, lookahead needs 2 -> DEFER
-  // - Chunk 2 "x":
-  //   - Resolve deferred: 'x' is \S -> FAIL
-  //   - Emit [0,1) using last_accept
-  //   - Cannot restart at pos 1 (chunk 1 consumed)
-  //   - 'x' doesn't match
-  //
-  // Expected: [0,1) - only one match (newline at pos 1 is lost)
+  // Streaming must produce same results as single-chunk processing.
   auto data = BuildWhitespaceWithFallbackDfa();
   iree_tokenizer_regex_dfa_t dfa;
-  ASSERT_TRUE(iree_status_is_ok(iree_tokenizer_regex_dfa_load(
-      iree_make_const_byte_span(data.data(), data.size()), &dfa)));
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
 
   MatchCollector collector;
   iree_tokenizer_regex_exec_state_t state;
   iree_tokenizer_regex_exec_initialize(&state, &dfa);
 
   // Chunk 1: tab + newline.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"\t\n", 2), 0,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("\t\n", 2), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
 
   // Chunk 2: 'x'.
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_feed(
-      &dfa, &state, iree_make_const_byte_span((const uint8_t*)"x", 1), 2,
-      MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("x", 1), 2, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
 
-  EXPECT_TRUE(iree_status_is_ok(iree_tokenizer_regex_exec_finalize(
-      &dfa, &state, 3, MatchCollector::Callback, &collector)));
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
 
-  // One match - newline at pos 1 is lost (cannot restart in consumed chunk).
+  // Two matches (same as single-chunk "\t\nx"):
+  // - [0,1): tab (lookahead passed: next is '\n', not \S)
+  // - [1,2): newline (fallback: next is 'x', which IS \S)
+  ASSERT_EQ(collector.matches.size(), 2);
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+}
+
+//===----------------------------------------------------------------------===//
+// Anchor State Tests
+//===----------------------------------------------------------------------===//
+
+// Build a DFA that matches "^Hello" - "Hello" only at start of input.
+// States: 0 (start at pos 0) --H-e-l-l-o--> 5 (accept)
+//         1 (dead state for pos > 0, no transitions)
+//
+// The key is start_state=0 but unanchored_start_state=1 (dead state).
+// This ensures ^ anchor semantics: only matches at position 0.
+std::vector<uint8_t> BuildStartAnchoredHelloDfa() {
+  TestDfaBuilder builder;
+  builder.SetNumStates(7);  // 0-5 for path, 6 for dead state.
+  builder.SetStartState(0);
+  builder.SetUnanchoredStartState(6);  // Dead state for pos > 0.
+  // Note: No HAS_ANCHORS flag needed - the different start states alone give
+  // us start anchor semantics. HAS_ANCHORS is for per-state anchor bitmaps.
+
+  // Path: 0 --'H'--> 1 --'e'--> 2 --'l'--> 3 --'l'--> 4 --'o'--> 5 (accept)
+  builder.AddTransition(0, 'H', 1);
+  builder.AddTransition(1, 'e', 2);
+  builder.AddTransition(2, 'l', 3);
+  builder.AddTransition(3, 'l', 4);
+  builder.AddTransition(4, 'o', 5);
+  builder.SetAccepting(5);
+
+  // State 6 is the dead state: no transitions, not accepting.
+  // Any character from state 6 leads to NO_TRANSITION.
+
+  return builder.Build();
+}
+
+TEST(AnchorState, StartAnchorResetsInMatch) {
+  // After matching a start-anchored pattern (^), the executor must reset
+  // in_match=false so callers don't incorrectly believe they're mid-match
+  // when processing subsequent input.
+  auto data = BuildStartAnchoredHelloDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  // Feed "Hello World" - should match "Hello" at position 0.
+  const char* text = "Hello World";
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view(text, strlen(text)), 0,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+
+  // Critical assertion: After processing, in_match must be false.
+  // The match at [0,5) was emitted; there's no ongoing partial match.
+  EXPECT_FALSE(state.in_match) << "in_match should be false after anchored "
+                                  "match completes";
+
+  // Verify the match was found correctly.
   ASSERT_EQ(collector.matches.size(), 1);
   EXPECT_EQ(collector.matches[0].first, 0);
-  EXPECT_EQ(collector.matches[0].second, 1);  // Tab (lookahead passed).
+  EXPECT_EQ(collector.matches[0].second, 5);  // "Hello"
+
+  // Finalize should not produce additional matches.
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, strlen(text), MatchCollector::Callback, &collector));
+  EXPECT_EQ(collector.matches.size(), 1);  // Still just one match.
+}
+
+TEST(AnchorState, StartAnchorStreamingResetsInMatch) {
+  // Streaming variant: Feed input in chunks, verify state is correct.
+  // Pattern: ^Hello
+  // Input: "He" + "llo World"
+  auto data = BuildStartAnchoredHelloDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  // Chunk 1: "He" - partial match, in_match should be true.
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("He", 2), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
+  EXPECT_TRUE(state.in_match) << "Should be mid-match after 'He'";
+  EXPECT_EQ(collector.matches.size(), 0) << "No match emitted yet";
+
+  // Chunk 2: "llo World" - completes match, in_match should become false.
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("llo World", 9), 2,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+
+  // Critical: After match completes, in_match must be false.
+  EXPECT_FALSE(state.in_match) << "in_match should be false after anchored "
+                                  "match completes (streaming)";
+
+  // Verify match.
+  ASSERT_EQ(collector.matches.size(), 1);
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 5);  // "Hello"
+}
+
+//===----------------------------------------------------------------------===//
+// Consecutive Newline Tests
+//===----------------------------------------------------------------------===//
+
+// These tests verify that consecutive newlines are matched SEPARATELY when
+// followed by non-whitespace, as required by patterns like \s+(?!\S)|\s+.
+//
+// Pattern: \s+(?!\S)|\s+
+// Input: "\n\nA" (two newlines followed by 'A')
+//
+// Expected behavior:
+// - First '\n': lookahead checks next char ('\n'), which is NOT \S -> PASS
+//   Record accept at position 1, continue matching
+// - Second '\n': lookahead checks next char ('A'), which IS \S -> FAIL
+//   Don't update last_accept, but record fallback at position 2
+// - 'A': NO_TRANSITION from whitespace state
+//   Emit match at last_accept (position 1, NOT 2)
+// - Resume at position 1, match second '\n'
+// - 'A': NO_TRANSITION, emit fallback match at position 2
+//
+// Result: Two separate matches [0,1) and [1,2), NOT one combined [0,2)
+
+TEST(ConsecutiveNewlines, TwoNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\nA"
+  //
+  // First '\n' passes lookahead (followed by whitespace).
+  // Second '\n' fails lookahead (followed by 'A'), uses fallback.
+  // Result: two separate matches.
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  IREE_EXPECT_OK(
+      iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("\n\nA"),
+                                MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,1) and [1,2)
+  // NOT one combined match [0,2)
+  ASSERT_EQ(collector.matches.size(), 2)
+      << "Consecutive newlines before text should produce separate matches";
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);  // First '\n'
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);  // Second '\n'
+}
+
+TEST(ConsecutiveNewlines, TwoNewlinesAtEndOfInput) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "A\n\n"
+  //
+  // At EOS, negative lookahead (?!\S) passes (no character = not \S).
+  // So both newlines should be combined into one match.
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  IREE_EXPECT_OK(
+      iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("A\n\n"),
+                                MatchCollector::Callback, &collector));
+
+  // Should have ONE match for both newlines: [1,3)
+  // (At EOS, lookahead passes for all positions)
+  ASSERT_EQ(collector.matches.size(), 1);
+  EXPECT_EQ(collector.matches[0].first, 1);
+  EXPECT_EQ(collector.matches[0].second, 3);  // Both '\n\n'
+}
+
+TEST(ConsecutiveNewlines, ThreeNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\n\nA"
+  //
+  // Expected:
+  // - First two '\n': lookahead passes (followed by whitespace)
+  // - Third '\n': lookahead fails (followed by 'A')
+  // Result: Match [0,2) for first two, then [2,3) for third
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  IREE_EXPECT_OK(
+      iree_tokenizer_regex_exec(&dfa, iree_make_cstring_view("\n\n\nA"),
+                                MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,2) and [2,3)
+  ASSERT_EQ(collector.matches.size(), 2);
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 2);  // First two '\n\n'
+  EXPECT_EQ(collector.matches[1].first, 2);
+  EXPECT_EQ(collector.matches[1].second, 3);  // Third '\n'
+}
+
+TEST(ConsecutiveNewlines, StreamingTwoNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n" + "\nA" (split across chunks)
+  //
+  // This tests the streaming case where the lookahead decision is deferred.
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  // Chunk 1: first '\n' - lookahead deferred (at chunk boundary).
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("\n", 1), 0, /*stride=*/NULL,
+      MatchCollector::Callback, &collector));
+
+  // Chunk 2: second '\n' followed by 'A'.
+  // Deferred lookahead resolves: next char is '\n' (passes).
+  // Second '\n' fails lookahead (followed by 'A').
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+      &dfa, &state, iree_make_string_view("\nA", 2), 1,
+      /*stride=*/NULL, MatchCollector::Callback, &collector));
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,1) and [1,2)
+  ASSERT_EQ(collector.matches.size(), 2)
+      << "Streaming consecutive newlines should produce separate matches";
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);  // First '\n'
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);  // Second '\n'
+}
+
+//===----------------------------------------------------------------------===//
+// Byte-by-Byte Streaming Tests
+//===----------------------------------------------------------------------===//
+
+// These tests verify that the regex executor produces correct results when
+// processing input one byte at a time. This is the most challenging case for
+// streaming because every character boundary is also a chunk boundary.
+
+TEST(StreamingByteByByte, TwoNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\nA" fed byte-by-byte
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  // Feed each byte separately.
+  const char* input = "\n\nA";
+  for (size_t i = 0; i < 3; ++i) {
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector))
+        << "Failed at byte " << i;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,1) and [1,2)
+  ASSERT_EQ(collector.matches.size(), 2)
+      << "Byte-by-byte: consecutive newlines should produce separate matches";
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+}
+
+TEST(StreamingByteByByte, ThreeNewlinesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "\n\n\nA" fed byte-by-byte
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  // Feed each byte separately.
+  const char* input = "\n\n\nA";
+  for (size_t i = 0; i < 4; ++i) {
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector))
+        << "Failed at byte " << i;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,2) and [2,3)
+  // First two newlines pass lookahead, third fails.
+  ASSERT_EQ(collector.matches.size(), 2)
+      << "Byte-by-byte: three newlines should produce two matches";
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 2);  // First two '\n\n'
+  EXPECT_EQ(collector.matches[1].first, 2);
+  EXPECT_EQ(collector.matches[1].second, 3);  // Third '\n'
+}
+
+TEST(StreamingByteByByte, TwoSpacesBeforeText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "  x" fed byte-by-byte
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  const char* input = "  x";
+  for (size_t i = 0; i < 3; ++i) {
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector))
+        << "Failed at byte " << i;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [0,1) and [1,2)
+  ASSERT_EQ(collector.matches.size(), 2)
+      << "Byte-by-byte: two spaces before text should produce separate matches";
+  EXPECT_EQ(collector.matches[0].first, 0);
+  EXPECT_EQ(collector.matches[0].second, 1);
+  EXPECT_EQ(collector.matches[1].first, 1);
+  EXPECT_EQ(collector.matches[1].second, 2);
+}
+
+TEST(StreamingByteByByte, TrailingWhitespace) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "A  " fed byte-by-byte
+  // At EOS, lookahead passes for all whitespace.
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  const char* input = "A  ";
+  for (size_t i = 0; i < 3; ++i) {
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector))
+        << "Failed at byte " << i;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 3, MatchCollector::Callback, &collector));
+
+  // Should have ONE match: [1,3) - both trailing spaces combined.
+  ASSERT_EQ(collector.matches.size(), 1);
+  EXPECT_EQ(collector.matches[0].first, 1);
+  EXPECT_EQ(collector.matches[0].second, 3);
+}
+
+TEST(StreamingByteByByte, MixedWhitespaceAndText) {
+  // Pattern: \s+(?!\S)|\s+
+  // Input: "a  b" fed byte-by-byte
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  MatchCollector collector;
+  iree_tokenizer_regex_exec_state_t state;
+  iree_tokenizer_regex_exec_initialize(&state, &dfa);
+
+  const char* input = "a  b";
+  for (size_t i = 0; i < 4; ++i) {
+    IREE_EXPECT_OK(iree_tokenizer_regex_exec_feed(
+        &dfa, &state, iree_make_string_view(&input[i], 1), i,
+        /*stride=*/NULL, MatchCollector::Callback, &collector))
+        << "Failed at byte " << i;
+  }
+
+  IREE_EXPECT_OK(iree_tokenizer_regex_exec_finalize(
+      &dfa, &state, 4, MatchCollector::Callback, &collector));
+
+  // Should have TWO matches: [1,2) and [2,3)
+  // First space passes lookahead (next is space), second fails (next is 'b').
+  ASSERT_EQ(collector.matches.size(), 2);
+  EXPECT_EQ(collector.matches[0].first, 1);
+  EXPECT_EQ(collector.matches[0].second, 2);
+  EXPECT_EQ(collector.matches[1].first, 2);
+  EXPECT_EQ(collector.matches[1].second, 3);
+}
+
+//===----------------------------------------------------------------------===//
+// Streaming with Various Chunk Sizes
+//===----------------------------------------------------------------------===//
+
+// Helper to test a pattern with various chunk sizes.
+void TestWithChunkSizes(
+    const iree_tokenizer_regex_dfa_t* dfa, const char* input,
+    const std::vector<std::pair<size_t, size_t>>& expected_matches,
+    const std::vector<size_t>& chunk_sizes) {
+  size_t input_len = strlen(input);
+
+  for (size_t chunk_size : chunk_sizes) {
+    MatchCollector collector;
+    iree_tokenizer_regex_exec_state_t state;
+    iree_tokenizer_regex_exec_initialize(&state, dfa);
+
+    size_t offset = 0;
+    while (offset < input_len) {
+      size_t remaining = input_len - offset;
+      size_t this_chunk = (chunk_size < remaining) ? chunk_size : remaining;
+      IREE_ASSERT_OK(iree_tokenizer_regex_exec_feed(
+          dfa, &state, iree_make_string_view(input + offset, this_chunk),
+          offset, /*stride=*/NULL, MatchCollector::Callback, &collector))
+          << "Failed at offset " << offset << " with chunk_size " << chunk_size;
+      offset += this_chunk;
+    }
+
+    IREE_ASSERT_OK(iree_tokenizer_regex_exec_finalize(
+        dfa, &state, input_len, MatchCollector::Callback, &collector))
+        << "Finalize failed with chunk_size " << chunk_size;
+
+    ASSERT_EQ(collector.matches.size(), expected_matches.size())
+        << "Wrong match count with chunk_size " << chunk_size;
+    for (size_t i = 0; i < expected_matches.size(); ++i) {
+      EXPECT_EQ(collector.matches[i].first, expected_matches[i].first)
+          << "Match " << i << " start mismatch with chunk_size " << chunk_size;
+      EXPECT_EQ(collector.matches[i].second, expected_matches[i].second)
+          << "Match " << i << " end mismatch with chunk_size " << chunk_size;
+    }
+  }
+}
+
+TEST(StreamingChunkSizes, TwoNewlinesBeforeText) {
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  // Expected: [0,1) and [1,2)
+  std::vector<std::pair<size_t, size_t>> expected = {{0, 1}, {1, 2}};
+  TestWithChunkSizes(&dfa, "\n\nA", expected, {1, 2, 3, 4, 5, 10, 100});
+}
+
+TEST(StreamingChunkSizes, ThreeNewlinesBeforeText) {
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  // Expected: [0,2) and [2,3)
+  std::vector<std::pair<size_t, size_t>> expected = {{0, 2}, {2, 3}};
+  TestWithChunkSizes(&dfa, "\n\n\nA", expected, {1, 2, 3, 4, 5, 10, 100});
+}
+
+TEST(StreamingChunkSizes, MixedContent) {
+  auto data = BuildWhitespaceWithFallbackDfa();
+  iree_tokenizer_regex_dfa_t dfa;
+  IREE_ASSERT_OK(iree_tokenizer_regex_dfa_load(
+      iree_make_const_byte_span(data.data(), data.size()), &dfa));
+
+  // "a  b  " -> matches at [1,2), [2,3), [4,6)
+  // First space passes (next is space), second fails (next is 'b').
+  // Trailing spaces all pass (at EOS).
+  std::vector<std::pair<size_t, size_t>> expected = {{1, 2}, {2, 3}, {4, 6}};
+  TestWithChunkSizes(&dfa, "a  b  ", expected, {1, 2, 3, 4, 5, 6, 10});
 }
 
 }  // namespace

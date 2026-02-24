@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOKENIZER_REGEX_INTERNAL_NFA_H_
-#define IREE_TOKENIZER_REGEX_INTERNAL_NFA_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_INTERNAL_NFA_H_
+#define IREE_TOKENIZER_UTIL_REGEX_INTERNAL_NFA_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
@@ -22,23 +22,23 @@ extern "C" {
 
 typedef enum iree_tokenizer_regex_nfa_state_type_e {
   // Epsilon transition(s) - no input consumed.
-  IREE_TOKENIZER_REGEX_NFA_EPSILON,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON,
   // Match a single byte.
-  IREE_TOKENIZER_REGEX_NFA_MATCH_BYTE,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_BYTE,
   // Match a character class (bitmap + pseudo-byte mask).
-  IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS,
   // Accepting state.
-  IREE_TOKENIZER_REGEX_NFA_ACCEPT,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT,
   // Start anchor (^).
-  IREE_TOKENIZER_REGEX_NFA_ANCHOR_START,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START,
   // End anchor ($).
-  IREE_TOKENIZER_REGEX_NFA_ANCHOR_END,
+  IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_END,
 } iree_tokenizer_regex_nfa_state_type_t;
 
 // Maximum number of alternation branches supported.
 // Limited to 255 because branch_index is uint8_t for memory efficiency.
 // Patterns with >255 branches should use a trie-based approach instead.
-#define IREE_TOKENIZER_REGEX_MAX_ALTERNATION_BRANCHES 255
+#define IREE_TOKENIZER_UTIL_REGEX_MAX_ALTERNATION_BRANCHES 255
 
 //===----------------------------------------------------------------------===//
 // NFA State Structure
@@ -63,7 +63,7 @@ typedef struct iree_tokenizer_regex_nfa_state_t {
 
     // NFA_MATCH_CLASS: character class matching data.
     //
-    // Cache-optimized layout (76 bytes total):
+    // Cache-optimized layout (fits in 2 cache lines):
     //   - out pointer at offset 0 (always accessed first)
     //   - bitmap at offset 8 (ASCII matching)
     //   - pseudo_mask + range_count at offset 40 (fits in 4 bytes)
@@ -71,19 +71,20 @@ typedef struct iree_tokenizer_regex_nfa_state_t {
     //   present)
     //
     // The common case (0 ranges) accesses bytes 0-43, fitting in one cache
-    // line. With 1-2 ranges (bytes 0-59), still one cache line. With 3-4 ranges
-    // (bytes 0-75), two cache lines.
+    // line. Full structure with max ranges still fits in 2 cache lines.
     //
     // Ranges are stored sorted by start codepoint to enable early-exit:
     // if codepoint < ranges[i].start, it cannot match any remaining ranges.
     struct {
       struct iree_tokenizer_regex_nfa_state_t* out;  // Next state on match.
-      uint8_t bitmap[32];    // 256-bit bitmap for bytes 0-255.
-      uint16_t pseudo_mask;  // Mask for pseudo-bytes 0x80-0x87.
-      uint8_t range_count;   // Number of exact codepoint ranges (0-4).
-      uint8_t reserved;      // Padding/future flags.
+      // 256-bit bitmap for bytes 0-255.
+      uint8_t bitmap[32];
+      uint16_t pseudo_mask;  // Pseudo-bytes 0x80-0x87.
+      // Number of exact codepoint ranges.
+      uint8_t range_count;
+      uint8_t reserved;  // Padding.
       iree_tokenizer_regex_codepoint_range_t
-          ranges[IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES];
+          ranges[IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES];
     } match_class;
 
     // NFA_ACCEPT: optional lookahead with PCRE-compatible branch tracking.
@@ -156,7 +157,8 @@ typedef struct iree_tokenizer_regex_nfa_t {
   uint32_t state_capacity;
 
   // Flags derived from AST analysis.
-  bool uses_unicode;   // Any \p{} or non-ASCII matching.
+  // Any \p{} or non-ASCII matching.
+  bool uses_unicode;
   bool has_lookahead;  // Any (?!...) patterns.
   bool has_anchors;    // Any ^ or $ anchors.
 
@@ -190,4 +192,4 @@ iree_status_t iree_tokenizer_regex_nfa_build(
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_INTERNAL_NFA_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_INTERNAL_NFA_H_

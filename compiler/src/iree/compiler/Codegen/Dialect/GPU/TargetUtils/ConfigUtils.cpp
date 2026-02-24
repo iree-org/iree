@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -590,7 +591,7 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
 
 /// Helper to check if a linalg operation has elementwise users that have
 /// additional operands beyond the result of the linalg operation.
-/// This function a workaround until we have map_gather op that
+/// This function a workaround until we have map_load op that
 /// can allow us to codegen without c promotion for such elementwise ops
 /// we will track progress of this in
 /// https://github.com/iree-org/iree/issues/23038
@@ -618,7 +619,7 @@ static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
 
 /// Returns true if any of the DPS init operands of the `dpsOp` are produced by
 /// a LinalgOp or LinalgExtOp. This is a workaround constraint for C promotion
-/// in cases that will require map_gather to codegen without C promotion.
+/// in cases that will require map_load to codegen without C promotion.
 /// Progress is being tracked in https://github.com/iree-org/iree/issues/23038.
 static bool
 checkForDPSOperandComputeOpProducers(DestinationStyleOpInterface dpsOp) {
@@ -963,6 +964,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // If needed then add C operand which would be operand 2 or 4 for unscaled
     // and scaled GEMM respectively.
     promotionList.push_back(promotionList.size());
+    // Use default config attribute for the C promotion.
+    if (!promotionArray.empty()) {
+      promotionArray.push_back(
+          IREE::GPU::DerivedThreadConfigAttr::get(context));
+    }
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
                                            ? ArrayRef<Attribute>(promotionArray)
@@ -1095,7 +1101,8 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchNumStages=*/2,
+      linalgOp->getContext(),
+      /*prefetchNumStages=*/useDirectLoad ? 0 : 2,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1166,7 +1173,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
-      linalgOp->getContext(), /*prefetchNumStages=*/2,
+      linalgOp->getContext(),
+      /*prefetchNumStages=*/useDirectLoad ? 0 : 2,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
@@ -1324,16 +1332,16 @@ getSupportedPartitionableLoops(linalg::LinalgOp linalgOp) {
 
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   DistributionInfo distInfo;
-  // MapScatterOp doesn't fit the LinalgOp interface, so use special case logic
+  // MapStoreOp doesn't fit the LinalgOp interface, so use special case logic
   // to get the distribution info.
-  if (auto mapScatterOp = dyn_cast<IREE::LinalgExt::MapScatterOp>(op)) {
+  if (auto mapStoreOp = dyn_cast<IREE::LinalgExt::MapStoreOp>(op)) {
     distInfo.partitionableLoops =
-        llvm::to_vector(llvm::seq<unsigned int>(mapScatterOp.getInputRank()));
+        llvm::to_vector(llvm::seq<unsigned int>(mapStoreOp.getInputRank()));
     distInfo.vectorizable = false;
-    distInfo.minBitwidth = mapScatterOp.getInputType().getElementTypeBitWidth();
+    distInfo.minBitwidth = mapStoreOp.getInputType().getElementTypeBitWidth();
     distInfo.representativeBitWidth = distInfo.minBitwidth;
     distInfo.loopBounds =
-        SmallVector<int64_t>(mapScatterOp.getInputType().getShape());
+        SmallVector<int64_t>(mapStoreOp.getInputType().getShape());
     return distInfo;
   }
 

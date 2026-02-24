@@ -48,7 +48,7 @@ class ThreadInfo {
   ~ThreadInfo();
 
   // Public hook: start of a new call.
-  void beginCall(const char *name);
+  void beginCall(const char* name);
 
   // Public hook: end of call started by the last beginCall().
   void endCall();
@@ -71,12 +71,12 @@ class ThreadInfo {
   // Types of events to query.
   std::vector<PerfEventType> perf_event_types_;
   // If not null, will dump CSV there.
-  const char *output_csv_ = nullptr;
+  const char* output_csv_ = nullptr;
 
   // Helper: show stats.
   void printStats();
   // Helper: dump CSV data file.
-  void printCsv(const char *path_base);
+  void printCsv(const char* path_base);
 };
 
 // Returns the number of microseconds between `start` and `end`.
@@ -92,15 +92,15 @@ std::string getThreadName() {
 }
 
 ThreadInfo::ThreadInfo() {
-  const char *name_filter_env = getenv("IREE_HOOK_FILTER_NAME");
+  const char* name_filter_env = getenv("IREE_HOOK_FILTER_NAME");
   if (name_filter_env) {
     name_filter_ = name_filter_env;
   }
-  const char *skip_start_ms_env = getenv("IREE_HOOK_SKIP_START_MS");
+  const char* skip_start_ms_env = getenv("IREE_HOOK_SKIP_START_MS");
   if (skip_start_ms_env) {
     skip_start_ms_ = strtof(skip_start_ms_env, nullptr);
   }
-  const char *perf_event_types_env = getenv("IREE_HOOK_PERF_EVENT_TYPES");
+  const char* perf_event_types_env = getenv("IREE_HOOK_PERF_EVENT_TYPES");
   if (perf_event_types_env) {
     perf_event_types_ = parsePerfEventTypes(perf_event_types_env);
     for (PerfEventType perf_event_type : perf_event_types_) {
@@ -135,9 +135,9 @@ ThreadInfo::~ThreadInfo() {
 void ThreadInfo::printStats() {
   // duration_us is the 0-th data_vector.
   const size_t data_vectors_count = perf_event_types_.size() + 1;
-  std::vector<const char *> data_vector_names(data_vectors_count);
+  std::vector<const char*> data_vector_names(data_vectors_count);
   std::vector<std::vector<float>> data_vectors(data_vectors_count);
-  for (const auto &entry : entries_) {
+  for (const auto& entry : entries_) {
     data_vector_names[0] = "duration_ms";
     data_vectors[0].push_back(entry.duration_us);
     for (size_t i = 0; i < perf_event_types_.size(); ++i) {
@@ -145,7 +145,7 @@ void ThreadInfo::printStats() {
       data_vectors[i + 1].push_back(entry.perf_event_counts[i]);
     }
   }
-  const char *bucket_count_env = getenv("IREE_HOOK_BUCKET_COUNT");
+  const char* bucket_count_env = getenv("IREE_HOOK_BUCKET_COUNT");
   int bucket_count =
       bucket_count_env ? strtol(bucket_count_env, nullptr, 10) : 16;
   std::vector<std::vector<float>> data_vector_bucket_means(data_vectors_count);
@@ -160,7 +160,7 @@ void ThreadInfo::printStats() {
   printf("Statistics for thread %s:\n", thread_name.c_str());
   printf("  %zu matching calls, of which:\n", entries_.size());
   std::map<unsigned int, int> cpu_counts;
-  for (const auto &entry : entries_) {
+  for (const auto& entry : entries_) {
     if (cpu_counts.count(entry.cpu))
       cpu_counts[entry.cpu]++;
     else
@@ -201,12 +201,12 @@ void ThreadInfo::printStats() {
   }
 }
 
-void ThreadInfo::printCsv(const char *path_base) {
+void ThreadInfo::printCsv(const char* path_base) {
   char path[256];
   std::string thread_name = getThreadName();
   snprintf(path, sizeof path, "%s/iree_hook_%s.csv", path_base,
            thread_name.c_str());
-  FILE *file = fopen(path, "w");
+  FILE* file = fopen(path, "w");
   if (!file) {
     fprintf(stderr, "Failed to open %s for write.\n", path);
     exit(1);
@@ -216,7 +216,7 @@ void ThreadInfo::printCsv(const char *path_base) {
     fprintf(file, ",%s", perf_event_types.name);
   }
   fprintf(file, "\n");
-  for (const auto &entry : entries_) {
+  for (const auto& entry : entries_) {
     fprintf(file, "%s,%u,%u,%g", thread_name.c_str(), entry.cpu, entry.node,
             entry.duration_us);
     for (int64_t event_count : entry.perf_event_counts) {
@@ -227,7 +227,7 @@ void ThreadInfo::printCsv(const char *path_base) {
   fclose(file);
 }
 
-void ThreadInfo::beginCall(const char *name) {
+void ThreadInfo::beginCall(const char* name) {
   if (!name_filter_.empty() && name_filter_ != std::string(name)) {
     return;
   }
@@ -236,10 +236,10 @@ void ThreadInfo::beginCall(const char *name) {
       skip_start_ms_ * 1000.f) {
     return;
   }
-  for (auto &perf_event_fd : perf_event_fds_) {
+  for (auto& perf_event_fd : perf_event_fds_) {
     perf_event_fd.reset();
   }
-  for (auto &perf_event_fd : perf_event_fds_) {
+  for (auto& perf_event_fd : perf_event_fds_) {
     perf_event_fd.enable();
   }
   recording_call_ = true;
@@ -253,7 +253,7 @@ void ThreadInfo::endCall() {
   CallInfo entry;
   entry.duration_us =
       elapsedMicroseconds(current_call_start_time_, Clock::now());
-  for (auto &perf_event_fd : perf_event_fds_) {
+  for (auto& perf_event_fd : perf_event_fds_) {
     perf_event_fd.disable();
   }
   for (size_t i = 0; i < perf_event_fds_.size(); ++i) {
@@ -265,7 +265,7 @@ void ThreadInfo::endCall() {
 }
 
 // Returns a thread-specific singleton object.
-ThreadInfo &ThreadInfoSingleton() {
+ThreadInfo& ThreadInfoSingleton() {
   static thread_local ThreadInfo singleton;
   return singleton;
 }
@@ -280,12 +280,12 @@ ThreadInfo &ThreadInfoSingleton() {
 
 IREE_HOOK_EXPORT void iree_hal_executable_library_call_hook_begin(
     iree_string_view_t executable_identifier,
-    const iree_hal_executable_library_v0_t *library, iree_host_size_t ordinal) {
+    const iree_hal_executable_library_v0_t* library, iree_host_size_t ordinal) {
   ThreadInfoSingleton().beginCall(library->exports.names[ordinal]);
 }
 
 IREE_HOOK_EXPORT void iree_hal_executable_library_call_hook_end(
     iree_string_view_t executable_identifier,
-    const iree_hal_executable_library_v0_t *library, iree_host_size_t ordinal) {
+    const iree_hal_executable_library_v0_t* library, iree_host_size_t ordinal) {
   ThreadInfoSingleton().endCall();
 }

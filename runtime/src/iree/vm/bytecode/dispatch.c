@@ -168,7 +168,7 @@ static void iree_vm_bytecode_stack_frame_cleanup(iree_vm_stack_frame_t* frame) {
 static iree_status_t iree_vm_bytecode_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_string_view_t cconv_results,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   iree_vm_bytecode_module_t* module =
       (iree_vm_bytecode_module_t*)function.module->self;
@@ -245,7 +245,7 @@ static iree_status_t iree_vm_bytecode_external_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t function,
     iree_string_view_t cconv_arguments, iree_byte_span_t arguments,
     iree_string_view_t cconv_results,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Enter the bytecode function and allocate registers.
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
@@ -348,7 +348,7 @@ static iree_status_t iree_vm_bytecode_internal_enter(
     iree_vm_stack_t* stack, iree_vm_module_t* module, int32_t function_ordinal,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_callee_frame,
     iree_vm_registers_t* out_callee_registers) {
   // Stash the destination register list for result values on the caller.
   iree_vm_bytecode_frame_storage_t* caller_storage =
@@ -406,7 +406,7 @@ static iree_status_t iree_vm_bytecode_internal_leave(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* callee_frame,
     const iree_vm_registers_t callee_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Remaps registers from source to destination across frames.
   // Registers from the |src_regs| will be copied/moved to |dst_regs| with the
@@ -677,7 +677,7 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
     const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
     iree_string_view_t cconv_results,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Call external function.
   iree_status_t call_status =
@@ -782,7 +782,7 @@ static iree_status_t iree_vm_bytecode_call_import(
     uint32_t import_ordinal, const iree_vm_registers_t caller_registers,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;
@@ -819,7 +819,7 @@ static iree_status_t iree_vm_bytecode_call_import_variadic(
     const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
     const iree_vm_register_list_t* IREE_RESTRICT src_reg_list,
     const iree_vm_register_list_t* IREE_RESTRICT dst_reg_list,
-    iree_vm_stack_frame_t* IREE_RESTRICT* out_caller_frame,
+    iree_vm_stack_frame_t * IREE_RESTRICT * out_caller_frame,
     iree_vm_registers_t* out_caller_registers) {
   // Prepare |call| by looking up the import information.
   const iree_vm_bytecode_import_t* import = NULL;

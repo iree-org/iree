@@ -41,7 +41,7 @@ in manually recreating the LLVM compilation so that you no longer have to
 route any changes through IREE.
 
 For more details and other related flags, see
-[the documentation on dumping intermediate files](../general/developer-tips/#dumping-executable-files).
+[the documentation on dumping intermediate files](../general/developer-tips.md#dumping-executable-files).
 
 !!! tip
 

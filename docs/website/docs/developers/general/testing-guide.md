@@ -198,7 +198,7 @@ and is not supported by Bazel rules.
 
 ### Code Coverage
 
-Use the [IREE_ENABLE_RUNTIME_COVERAGE](../../building/cmake-options/#iree_enable_runtime_coverage)
+Use the [IREE_ENABLE_RUNTIME_COVERAGE](../building/cmake-options.md#iree_enable_runtime_coverage)
 CMake option to enable code coverage instrumentation and add synthetic targets
 for managing profiling state. Tests run with coverage enabled with automatically
 write profiles to the build directory and then the

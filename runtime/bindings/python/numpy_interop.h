@@ -25,8 +25,8 @@ py::object DescrNewFromType(int typenum);
 int TypenumFromDescr(py::handle dtype);
 
 // Delegates to PyArray_SimpleNewFromData and sets the base_object.
-py::object SimpleNewFromData(int nd, intptr_t const *dims, int typenum,
-                             void *data, py::handle base_object);
+py::object SimpleNewFromData(int nd, intptr_t const* dims, int typenum,
+                             void* data, py::handle base_object);
 
 }  // namespace iree::python::numpy
 

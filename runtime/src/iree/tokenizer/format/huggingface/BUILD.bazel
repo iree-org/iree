@@ -1,0 +1,285 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# HuggingFace Tokenizers JSON Format
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "types",
+    hdrs = ["types.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "added_tokens_json",
+    srcs = ["added_tokens_json.c"],
+    hdrs = ["added_tokens_json.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:types",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "added_tokens_json_test",
+    srcs = ["added_tokens_json_test.cc"],
+    deps = [
+        ":added_tokens_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "decoder_json",
+    srcs = ["decoder_json.c"],
+    hdrs = ["decoder_json.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:decoder",
+        "//runtime/src/iree/tokenizer/decoder:byte_fallback",
+        "//runtime/src/iree/tokenizer/decoder:byte_level",
+        "//runtime/src/iree/tokenizer/decoder:ctc",
+        "//runtime/src/iree/tokenizer/decoder:metaspace",
+        "//runtime/src/iree/tokenizer/decoder:replace",
+        "//runtime/src/iree/tokenizer/decoder:sequence",
+        "//runtime/src/iree/tokenizer/decoder:strip",
+        "//runtime/src/iree/tokenizer/decoder:wordpiece",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "decoder_json_test",
+    srcs = ["decoder_json_test.cc"],
+    deps = [
+        ":decoder_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "model_json",
+    srcs = ["model_json.c"],
+    hdrs = ["model_json.h"],
+    deps = [
+        ":added_tokens_json",
+        ":types",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer:types",
+        "//runtime/src/iree/tokenizer/model:bpe",
+        "//runtime/src/iree/tokenizer/model:unigram",
+        "//runtime/src/iree/tokenizer/model:wordpiece",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "model_json_test",
+    srcs = ["model_json_test.cc"],
+    deps = [
+        ":added_tokens_json",
+        ":model_json",
+        ":types",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer/vocab",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "normalizer_json",
+    srcs = ["normalizer_json.c"],
+    hdrs = ["normalizer_json.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:normalizer",
+        "//runtime/src/iree/tokenizer/normalizer:bert",
+        "//runtime/src/iree/tokenizer/normalizer:lowercase",
+        "//runtime/src/iree/tokenizer/normalizer:nfc",
+        "//runtime/src/iree/tokenizer/normalizer:nfd",
+        "//runtime/src/iree/tokenizer/normalizer:nfkd",
+        "//runtime/src/iree/tokenizer/normalizer:precompiled",
+        "//runtime/src/iree/tokenizer/normalizer:prepend",
+        "//runtime/src/iree/tokenizer/normalizer:regex_replace",
+        "//runtime/src/iree/tokenizer/normalizer:replace",
+        "//runtime/src/iree/tokenizer/normalizer:sequence",
+        "//runtime/src/iree/tokenizer/normalizer:strip",
+        "//runtime/src/iree/tokenizer/normalizer:strip_accents",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "normalizer_json_test",
+    srcs = ["normalizer_json_test.cc"],
+    deps = [
+        ":normalizer_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "postprocessor_json",
+    srcs = ["postprocessor_json.c"],
+    hdrs = ["postprocessor_json.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:postprocessor",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "postprocessor_json_test",
+    srcs = ["postprocessor_json_test.cc"],
+    deps = [
+        ":postprocessor_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "segmenter_json",
+    srcs = ["segmenter_json.c"],
+    hdrs = ["segmenter_json.h"],
+    deps = [
+        ":types",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer:segmenter",
+        "//runtime/src/iree/tokenizer/regex:compile",
+        "//runtime/src/iree/tokenizer/segmenter:bert",
+        "//runtime/src/iree/tokenizer/segmenter:digits",
+        "//runtime/src/iree/tokenizer/segmenter:metaspace",
+        "//runtime/src/iree/tokenizer/segmenter:punctuation",
+        "//runtime/src/iree/tokenizer/segmenter:sequence",
+        "//runtime/src/iree/tokenizer/segmenter:split",
+        "//runtime/src/iree/tokenizer/segmenter:whitespace",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "segmenter_json_test",
+    srcs = ["segmenter_json_test.cc"],
+    deps = [
+        ":segmenter_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "tokenizer_json",
+    srcs = ["tokenizer_json.c"],
+    hdrs = ["tokenizer_json.h"],
+    deps = [
+        ":added_tokens_json",
+        ":decoder_json",
+        ":model_json",
+        ":normalizer_json",
+        ":postprocessor_json",
+        ":segmenter_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/tokenizer",
+        "//runtime/src/iree/tokenizer:special_tokens",
+        "//runtime/src/iree/tokenizer/normalizer:prepend",
+        "//runtime/src/iree/tokenizer/normalizer:regex_replace",
+        "//runtime/src/iree/tokenizer/normalizer:replace",
+        "//runtime/src/iree/tokenizer/normalizer:sequence",
+        "//runtime/src/iree/tokenizer/normalizer:strip",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "tokenizer_json_test",
+    srcs = ["tokenizer_json_test.cc"],
+    deps = [
+        ":tokenizer_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "decoder_json_fuzz",
+    srcs = ["decoder_json_fuzz.cc"],
+    deps = [
+        ":decoder_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:decoder",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "model_json_fuzz",
+    srcs = ["model_json_fuzz.cc"],
+    deps = [
+        ":added_tokens_json",
+        ":model_json",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "normalizer_json_fuzz",
+    srcs = ["normalizer_json_fuzz.cc"],
+    deps = [
+        ":normalizer_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:normalizer",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "segmenter_json_fuzz",
+    srcs = ["segmenter_json_fuzz.cc"],
+    deps = [
+        ":segmenter_json",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:segmenter",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tokenizer_json_fuzz",
+    srcs = ["tokenizer_json_fuzz.cc"],
+    deps = [
+        ":tokenizer_json",
+        "//runtime/src/iree/base",
+    ],
+)

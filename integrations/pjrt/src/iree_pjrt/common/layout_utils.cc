@@ -11,7 +11,7 @@
 namespace iree::pjrt {
 
 void ApiMemoryLayout::InitializeDenseRowMajorStrided(size_t rank,
-                                                     const int64_t *dims,
+                                                     const int64_t* dims,
                                                      size_t unit_stride_bytes) {
   memset(&c_layout_, 0, sizeof(c_layout_));
   int64_t stride = unit_stride_bytes;

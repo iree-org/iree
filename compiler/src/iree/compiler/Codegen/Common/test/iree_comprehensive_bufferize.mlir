@@ -3109,8 +3109,10 @@ func.func @cache_swizzle_resource_cast(%stride: index) {
 func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>) -> vector<8x64xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
-  %out = iree_vector_ext.transfer_gather %source[%c0, %c0][%indices: vector<8xindex>, None], %cst {
-    indexed_maps = [affine_map<(d0, d1) -> (d0)>]
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
+  [%indices : vector<8xindex>], %cst {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
   } : tensor<?x64xf16>, vector<8x64xf16>
   return %out : vector<8x64xf16>
 }
@@ -3119,7 +3121,7 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 // CHECK-SAME: %[[SOURCE:.+]]: tensor<?x64xf16>, %[[INDICES:.+]]: vector<8xindex>
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.+]] = bufferization.to_buffer %[[SOURCE]]
-// CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]][%[[INDICES]]: vector<8xindex>, None]
+// CHECK: iree_vector_ext.transfer_gather %[[BUFFER]][%[[C0]], %[[C0]]] [%[[INDICES]] : vector<8xindex>]
 
 // -----
 
@@ -3223,10 +3225,10 @@ func.func @drop_fusion_barrier() -> memref<6xf32> {
 
 // -----
 
-// Test bufferization of map_scatter with mixed tensor-buffer semantics.
+// Test bufferization of map_store with mixed tensor-buffer semantics.
 // The tensor input should be bufferized while the memref output stays as-is.
-func.func @map_scatter_mixed_semantics(%input: tensor<16xf32>, %output: memref<16xf32>) {
-  iree_linalg_ext.map_scatter %input into %output {
+func.func @map_store_mixed_semantics(%input: tensor<16xf32>, %output: memref<16xf32>) {
+  iree_linalg_ext.map_store %input into %output {
     ^bb0(%idx0: index):
       %mask = arith.constant true
       iree_linalg_ext.yield %idx0, %mask : index, i1
@@ -3234,10 +3236,10 @@ func.func @map_scatter_mixed_semantics(%input: tensor<16xf32>, %output: memref<1
   return
 }
 
-// CHECK-LABEL: func.func @map_scatter_mixed_semantics
+// CHECK-LABEL: func.func @map_store_mixed_semantics
 //  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<16xf32>
 //  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<16xf32>
 //       CHECK:   %[[INPUT_BUF:.+]] = bufferization.to_buffer %[[INPUT]]
-//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT_BUF]] into %[[OUTPUT]]
+//       CHECK:   iree_linalg_ext.map_store %[[INPUT_BUF]] into %[[OUTPUT]]
 //       CHECK:   } : memref<16xf32> into memref<16xf32>
 //       CHECK:   return

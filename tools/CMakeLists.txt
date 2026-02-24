@@ -290,10 +290,10 @@ iree_cc_binary(
     iree::base
     iree::base::internal::flags
     iree::base::internal::json
-    iree::base::internal::unicode
     iree::io::file_handle
     iree::tokenizer::tokenizer
-    iree::tokenizer::huggingface::tokenizer_json
+    iree::tokenizer::format::huggingface::tokenizer_json
+    iree::tokenizer::vocab
   COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )

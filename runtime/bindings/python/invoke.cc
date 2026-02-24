@@ -23,9 +23,9 @@ namespace {
 
 class InvokeContext {
  public:
-  InvokeContext(HalDevice &device) : device_(device) {}
+  InvokeContext(HalDevice& device) : device_(device) {}
 
-  HalDevice &device() { return device_; }
+  HalDevice& device() { return device_; }
   HalAllocator allocator() {
     // TODO: Unfortunate that we inc ref here but that is how our object model
     // is set up.
@@ -37,7 +37,7 @@ class InvokeContext {
 };
 
 using PackCallback =
-    std::function<void(InvokeContext &, iree_vm_list_t *, py::handle)>;
+    std::function<void(InvokeContext&, iree_vm_list_t*, py::handle)>;
 
 class InvokeStatics {
  public:
@@ -77,16 +77,16 @@ class InvokeStatics {
   py::str kAttrBufferView = py::str("_buffer_view");
 
   // Module 'numpy'.
-  py::module_ &numpy_module() { return numpy_module_; }
+  py::module_& numpy_module() { return numpy_module_; }
 
-  py::object &runtime_module() {
+  py::object& runtime_module() {
     if (!runtime_module_) {
       runtime_module_ = py::module_::import_("iree.runtime");
     }
     return *runtime_module_;
   }
 
-  py::module_ &array_interop_module() {
+  py::module_& array_interop_module() {
     if (!array_interop_module_) {
       array_interop_module_ =
           py::module_::import_("iree.runtime.array_interop");
@@ -94,19 +94,19 @@ class InvokeStatics {
     return *array_interop_module_;
   }
 
-  py::object &device_array_type() {
+  py::object& device_array_type() {
     if (!device_array_type_) {
       device_array_type_ = runtime_module().attr("DeviceArray");
     }
     return *device_array_type_;
   }
 
-  py::type_object &hal_buffer_view_type() { return hal_buffer_view_type_; }
+  py::type_object& hal_buffer_view_type() { return hal_buffer_view_type_; }
 
-  py::object MapElementAbiTypeToDtype(py::object &element_abi_type) {
+  py::object MapElementAbiTypeToDtype(py::object& element_abi_type) {
     try {
       return abi_type_to_dtype_[element_abi_type];
-    } catch (std::exception &) {
+    } catch (std::exception&) {
       std::string msg("could not map abi type ");
       msg.append(py::cast<std::string>(py::repr(element_abi_type)));
       msg.append(" to numpy dtype");
@@ -124,7 +124,7 @@ class InvokeStatics {
         throw std::invalid_argument("mapping not found");
       }
       return py::cast<enum iree_hal_element_types_t>(element_type);
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
       std::string msg("could not map dtype ");
       msg.append(py::cast<std::string>(py::repr(dtype)));
       msg.append(" to element type: ");
@@ -163,22 +163,22 @@ class InvokeStatics {
         auto hal_element_type = MapDtypeToElementType(target_dtype);
 
         return [this, target_dtype = std::move(target_dtype), hal_element_type,
-                abi_shape = std::move(abi_shape)](InvokeContext &c,
-                                                  iree_vm_list_t *list,
+                abi_shape = std::move(abi_shape)](InvokeContext& c,
+                                                  iree_vm_list_t* list,
                                                   py::handle py_value) {
           IREE_TRACE_SCOPE_NAMED("ArgumentPacker::ReflectionNdarray");
-          HalBufferView *bv = nullptr;
+          HalBufferView* bv = nullptr;
           py::object retained_bv;
           if (is_instance_of_type_object(py_value, device_array_type())) {
             // Short-circuit: If a DeviceArray is provided, assume it is
             // correct.
             IREE_TRACE_SCOPE_NAMED("PackDeviceArray");
-            bv = py::cast<HalBufferView *>(py_value.attr(kAttrBufferView));
+            bv = py::cast<HalBufferView*>(py_value.attr(kAttrBufferView));
           } else if (is_instance_of_type_object(py_value,
                                                 hal_buffer_view_type())) {
             // Short-circuit: If a HalBufferView is provided directly.
             IREE_TRACE_SCOPE_NAMED("PackBufferView");
-            bv = py::cast<HalBufferView *>(py_value);
+            bv = py::cast<HalBufferView*>(py_value);
           } else {
             // Fall back to the array protocol to generate a host side
             // array and then convert that.
@@ -187,7 +187,7 @@ class InvokeStatics {
             try {
               host_array = numpy_module().attr(kAsArray)(py_value, target_dtype,
                                                          kContiguousArg);
-            } catch (std::exception &e) {
+            } catch (std::exception& e) {
               std::string msg("could not convert value to numpy array: dtype=");
               msg.append(py::cast<std::string>(py::repr(target_dtype)));
               msg.append(", error='");
@@ -201,7 +201,7 @@ class InvokeStatics {
                 IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
                 IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_MAPPING,
                 c.device(), host_array, hal_element_type);
-            bv = py::cast<HalBufferView *>(retained_bv);
+            bv = py::cast<HalBufferView*>(retained_bv);
           }
 
           // TODO: Add some shape verification. Not strictly necessary as the VM
@@ -225,8 +225,8 @@ class InvokeStatics {
         for (size_t i = 0; i < sub_packers.size(); i++) {
           sub_packers[i] = AbiTypeToPackCallback(desc[py::int_(i + 1)]);
         }
-        return [sub_packers = std::move(sub_packers)](InvokeContext &c,
-                                                      iree_vm_list_t *list,
+        return [sub_packers = std::move(sub_packers)](InvokeContext& c,
+                                                      iree_vm_list_t* list,
                                                       py::handle py_value) {
           if (py::len(py_value) != sub_packers.size()) {
             std::string msg("expected a sequence with ");
@@ -240,7 +240,7 @@ class InvokeStatics {
             py::object item_py_value;
             try {
               item_py_value = py_value[py::int_(i)];
-            } catch (std::exception &e) {
+            } catch (std::exception& e) {
               std::string msg("could not get item ");
               msg.append(std::to_string(i));
               msg.append(" from: ");
@@ -270,8 +270,8 @@ class InvokeStatics {
           sub_packers[i] =
               std::make_pair(std::move(key), AbiTypeToPackCallback(value_desc));
         }
-        return [sub_packers = std::move(sub_packers)](InvokeContext &c,
-                                                      iree_vm_list_t *list,
+        return [sub_packers = std::move(sub_packers)](InvokeContext& c,
+                                                      iree_vm_list_t* list,
                                                       py::handle py_value) {
           if (py::len(py_value) != sub_packers.size()) {
             std::string msg("expected a dict with ");
@@ -285,7 +285,7 @@ class InvokeStatics {
             py::object item_py_value;
             try {
               item_py_value = py_value[sub_packers[i].first];
-            } catch (std::exception &e) {
+            } catch (std::exception& e) {
               std::string msg("could not get item ");
               msg.append(py::cast<std::string>(py::repr(sub_packers[i].first)));
               msg.append(" from: ");
@@ -312,7 +312,7 @@ class InvokeStatics {
       py::str prim_type = py::cast<py::str>(desc);
       if (prim_type.equal(kF32)) {
         // f32
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_f32(py::cast<float>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -320,7 +320,7 @@ class InvokeStatics {
         };
       } else if (prim_type.equal(kF64)) {
         // f64
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_f64(py::cast<double>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -328,7 +328,7 @@ class InvokeStatics {
         };
       } else if (prim_type.equal(kI32)) {
         // i32.
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_i32(py::cast<int32_t>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -336,7 +336,7 @@ class InvokeStatics {
         };
       } else if (prim_type.equal(kI64)) {
         // i64.
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_i64(py::cast<int64_t>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -344,7 +344,7 @@ class InvokeStatics {
         };
       } else if (prim_type.equal(kI8)) {
         // i8.
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_i8(py::cast<int8_t>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -352,7 +352,7 @@ class InvokeStatics {
         };
       } else if (prim_type.equal(kI16)) {
         // i16.
-        return [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        return [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_i16(py::cast<int16_t>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -383,13 +383,13 @@ class InvokeStatics {
 
  private:
   PackCallback GetGenericPackCallbackForNdarray() {
-    return [this](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+    return [this](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
       IREE_TRACE_SCOPE_NAMED("ArgumentPacker::GenericNdarray");
       py::object host_array;
       try {
         host_array = numpy_module().attr(kAsArray)(
             py_value, /*dtype=*/py::none(), kContiguousArg);
-      } catch (std::exception &e) {
+      } catch (std::exception& e) {
         std::string msg("could not convert value to numpy array: ");
         msg.append("error='");
         msg.append(e.what());
@@ -406,7 +406,7 @@ class InvokeStatics {
           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           IREE_HAL_BUFFER_USAGE_DEFAULT | IREE_HAL_BUFFER_USAGE_MAPPING,
           c.device(), host_array, hal_element_type);
-      HalBufferView *bv = py::cast<HalBufferView *>(retained_bv);
+      HalBufferView* bv = py::cast<HalBufferView*>(retained_bv);
 
       // TODO: If adding further manipulation here, please make this common
       // with the reflection access case.
@@ -425,7 +425,7 @@ class InvokeStatics {
     // floats and let the VM take care of it. There isn't much else we can do.
     AddPackCallback(
         py::cast(1).type(),
-        [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_i64(py::cast<int64_t>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -434,7 +434,7 @@ class InvokeStatics {
 
     AddPackCallback(
         py::cast(1.0).type(),
-        [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
+        [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
           iree_vm_value_t vm_value =
               iree_vm_value_make_f64(py::cast<double>(py_value));
           CheckApiStatus(iree_vm_list_push_value(list, &vm_value),
@@ -442,7 +442,7 @@ class InvokeStatics {
         });
 
     // List/tuple.
-    auto sequence_callback = [this](InvokeContext &c, iree_vm_list_t *list,
+    auto sequence_callback = [this](InvokeContext& c, iree_vm_list_t* list,
                                     py::handle py_value) {
       auto py_seq = py::cast<py::sequence>(py_value);
       VmVariantList item_list = VmVariantList::Create(py::len(py_seq));
@@ -463,7 +463,7 @@ class InvokeStatics {
     AddPackCallback((create_empty_tuple()).type(), sequence_callback);
 
     // Dict.
-    auto dict_callback = [this](InvokeContext &c, iree_vm_list_t *list,
+    auto dict_callback = [this](InvokeContext& c, iree_vm_list_t* list,
                                 py::handle py_value) {
       // Gets all dict items and sorts (by key).
       auto py_dict = py::cast<py::dict>(py_value);
@@ -493,8 +493,8 @@ class InvokeStatics {
     // HalBufferView.
     AddPackCallback(
         py::type<HalBufferView>(),
-        [](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
-          HalBufferView *bv = py::cast<HalBufferView *>(py_value);
+        [](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
+          HalBufferView* bv = py::cast<HalBufferView*>(py_value);
           iree_vm_ref_t buffer_view_ref =
               iree_hal_buffer_view_retain_ref(bv->raw_ptr());
           CheckApiStatus(iree_vm_list_push_ref_move(list, &buffer_view_ref),
@@ -504,9 +504,9 @@ class InvokeStatics {
     // DeviceArray.
     AddPackCallback(
         device_array_type(),
-        [this](InvokeContext &c, iree_vm_list_t *list, py::handle py_value) {
-          HalBufferView *bv =
-              py::cast<HalBufferView *>(py_value.attr(kAttrBufferView));
+        [this](InvokeContext& c, iree_vm_list_t* list, py::handle py_value) {
+          HalBufferView* bv =
+              py::cast<HalBufferView*>(py_value.attr(kAttrBufferView));
           iree_vm_ref_t buffer_view_ref =
               iree_hal_buffer_view_retain_ref(bv->raw_ptr());
           CheckApiStatus(iree_vm_list_push_ref_move(list, &buffer_view_ref),
@@ -543,7 +543,7 @@ class InvokeStatics {
 
   // Maps Python type to a PackCallback that can generically code it.
   // This will have inc_ref() called on them when added.
-  std::unordered_map<PyObject *, PackCallback> py_type_to_pack_callbacks_;
+  std::unordered_map<PyObject*, PackCallback> py_type_to_pack_callbacks_;
 
   // Dict of str (ABI dtype like 'f32') to numpy dtype.
   py::dict abi_type_to_dtype_ = BuildAbiTypeToDtype();
@@ -553,7 +553,7 @@ class InvokeStatics {
 /// function.
 class ArgumentPacker {
  public:
-  ArgumentPacker(InvokeStatics &statics, std::optional<py::list> arg_descs)
+  ArgumentPacker(InvokeStatics& statics, std::optional<py::list> arg_descs)
       : statics_(statics) {
     IREE_TRACE_SCOPE_NAMED("ArgumentPacker::Init");
     if (!arg_descs) {
@@ -595,7 +595,7 @@ class ArgumentPacker {
 
   /// Packs positional/kw arguments into a suitable VmVariantList and returns
   /// it.
-  VmVariantList Pack(InvokeContext &invoke_context, py::sequence pos_args,
+  VmVariantList Pack(InvokeContext& invoke_context, py::sequence pos_args,
                      py::dict kw_args) {
     // Dynamic dispatch.
     if (dynamic_dispatch_) {
@@ -644,7 +644,7 @@ class ArgumentPacker {
         int found_index;
         try {
           found_index = py::cast<int>(kwarg_to_index_[it.first]);
-        } catch (std::exception &) {
+        } catch (std::exception&) {
           std::string message("specified kwarg '");
           message.append(py::cast<std::string>(it.first));
           message.append("' is unknown");
@@ -682,7 +682,7 @@ class ArgumentPacker {
   }
 
  private:
-  InvokeStatics &statics_;
+  InvokeStatics& statics_;
 
   int pos_only_arg_count_ = 0;
 
@@ -700,11 +700,11 @@ class ArgumentPacker {
 
 }  // namespace
 
-void SetupInvokeBindings(nanobind::module_ &m) {
+void SetupInvokeBindings(nanobind::module_& m) {
   py::class_<InvokeStatics>(m, "_InvokeStatics");
-  py::class_<InvokeContext>(m, "InvokeContext").def(py::init<HalDevice &>());
+  py::class_<InvokeContext>(m, "InvokeContext").def(py::init<HalDevice&>());
   py::class_<ArgumentPacker>(m, "ArgumentPacker")
-      .def(py::init<InvokeStatics &, std::optional<py::list>>(),
+      .def(py::init<InvokeStatics&, std::optional<py::list>>(),
            py::arg("statics"), py::arg("arg_descs") = py::none())
       .def("pack", &ArgumentPacker::Pack);
 

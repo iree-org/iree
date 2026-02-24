@@ -134,10 +134,9 @@ static inline iree_string_pair_list_t iree_string_pair_list_empty(void) {
   return v;
 }
 
-#define iree_string_view_literal(str)        \
-  { /*.data=*/                               \
-    (str), /*.size=*/IREE_ARRAYSIZE(str) - 1 \
-  }
+#define iree_string_view_literal(str) \
+  {/*.data=*/                         \
+   (str), /*.size=*/IREE_ARRAYSIZE(str) - 1}
 
 // Returns a string view initialized with the given cstring.
 #define IREE_SV(cstr) iree_make_cstring_view(cstr)

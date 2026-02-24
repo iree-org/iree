@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOKENIZER_REGEX_INTERNAL_DFA_H_
-#define IREE_TOKENIZER_REGEX_INTERNAL_DFA_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_INTERNAL_DFA_H_
+#define IREE_TOKENIZER_UTIL_REGEX_INTERNAL_DFA_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
@@ -23,9 +23,12 @@ extern "C" {
 // A set of NFA states, represented as a bitset.
 // Used during subset construction to track which NFA states are active.
 typedef struct iree_tokenizer_regex_nfa_state_set_t {
-  uint64_t* bits;            // Bitset storage (1 bit per NFA state).
-  uint32_t capacity;         // Number of uint64_t elements in bits array.
-  uint32_t nfa_state_count;  // Total NFA states for bounds checking.
+  // Bitset storage (1 bit per NFA state).
+  uint64_t* bits;
+  // Number of uint64_t elements in bits array.
+  uint32_t capacity;
+  // Total NFA states for bounds checking.
+  uint32_t nfa_state_count;
 } iree_tokenizer_regex_nfa_state_set_t;
 
 //===----------------------------------------------------------------------===//
@@ -70,19 +73,21 @@ typedef struct iree_tokenizer_regex_dfa_state_t {
   // Branch tracking for PCRE-compatible alternation priority.
   // Each bit represents an alternation branch (bit 0 = highest priority).
   // Used to implement left-to-right alternation precedence in DFA execution.
-  uint64_t alive_branches;      // Which branches can reach this state.
-  uint64_t accepting_branches;  // Which branches accept at this state.
+  // Which branches can reach this state.
+  uint64_t alive_branches;
+  // Which branches accept at this state.
+  uint64_t accepting_branches;
 
   // Exact codepoint range transitions.
   // These are checked BEFORE pseudo-byte fallback at runtime.
   // Each entry maps a codepoint range to a target DFA state.
-  uint8_t range_count;  // Number of range transitions (0-MAX).
+  uint8_t range_count;  // Range count (0-MAX).
   struct {
     uint32_t start;  // Range start codepoint (inclusive).
     uint32_t end;    // Range end codepoint (inclusive).
-    uint32_t
-        target_id;  // Target DFA state ID (UINT32_MAX if not yet resolved).
-  } range_transitions[IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES];
+    // Target DFA state ID (UINT32_MAX if not yet resolved).
+    uint32_t target_id;
+  } range_transitions[IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES];
 
   // The NFA state set this DFA state represents (for deduplication).
   iree_tokenizer_regex_nfa_state_set_t nfa_states;
@@ -118,13 +123,15 @@ typedef struct iree_tokenizer_regex_dfa_build_t {
 //===----------------------------------------------------------------------===//
 
 // Maximum number of DFA states (limited by 16-bit state IDs in binary format).
-#define IREE_TOKENIZER_REGEX_DFA_MAX_STATES 65534
+#define IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_STATES 65534
 
 // Maximum iterations for DFA construction loop.
 // This is a safety limit to prevent hangs from pathological patterns that
-// might slip past parse-time validation. Set conservatively high enough to
-// allow complex legitimate patterns while preventing minute-long hangs.
-#define IREE_TOKENIZER_REGEX_DFA_MAX_ITERATIONS 100000
+// might slip past parse-time validation. Legitimate tokenizer patterns (GPT-2,
+// Llama-3, etc.) compile in ~6ms and need only ~200-500 iterations. This limit
+// allows 10x headroom while preventing multi-second hangs from adversarial
+// patterns that cause exponential state explosion.
+#define IREE_TOKENIZER_UTIL_REGEX_DFA_MAX_ITERATIONS 5000
 
 // Builds a DFA from an NFA using subset construction.
 //
@@ -161,4 +168,4 @@ iree_status_t iree_tokenizer_regex_dfa_serialize(
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_INTERNAL_DFA_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_INTERNAL_DFA_H_

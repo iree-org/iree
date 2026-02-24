@@ -21,17 +21,17 @@ namespace iree::python {
 // PyBuffer_Release().
 class PyBufferRequest {
  public:
-  PyBufferRequest(py::object &exporter, int flags) {
+  PyBufferRequest(py::object& exporter, int flags) {
     int rc = PyObject_GetBuffer(exporter.ptr(), &view_, flags);
     if (rc != 0) {
       throw py::python_error();
     }
   }
   ~PyBufferRequest() { PyBuffer_Release(&view_); }
-  PyBufferRequest(const PyBufferRequest &) = delete;
-  void operator=(const PyBufferRequest &) = delete;
+  PyBufferRequest(const PyBufferRequest&) = delete;
+  void operator=(const PyBufferRequest&) = delete;
 
-  Py_buffer &view() { return view_; }
+  Py_buffer& view() { return view_; }
 
  private:
   Py_buffer view_;

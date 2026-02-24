@@ -11,7 +11,7 @@
 
 namespace iree::python {
 
-void SetupLoopBindings(py::module_ &m);
+void SetupLoopBindings(py::module_& m);
 
 }  // namespace iree::python
 

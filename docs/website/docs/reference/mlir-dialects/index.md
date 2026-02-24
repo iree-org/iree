@@ -27,9 +27,11 @@ Dialect                     | Description
 [HAL/Loader](./HALLoader.md) | HAL inline executable loader runtime module dialect
 [IO/Parameters](./IOParameters.md) | External parameter resource management APIs
 [IREECodegen](./IREECodegen.md) | Common functionality used by IREE code generation
+[IREECPU](./IREECPU.md) | Common functionality used by CPU and VMVX focused IREE code generation
 [IREEGPU](./IREEGPU.md) | Common functionality used by GPU focused IREE code generation
 [IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 [LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
+[PCF](./PCF.md) | A dialect designed to model parallel control flow.
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
 [TensorExt](./TensorExt.md) | Extensions to the Tensor dialect for specific operations
 [Util](./Util.md)           | Types and ops common across IREE subdialects

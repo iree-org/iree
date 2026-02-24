@@ -12,12 +12,113 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    types
+    byte_level_tables
   HDRS
-    "types.h"
+    "byte_level_tables.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    model
+  HDRS
+    "model.h"
+  SRCS
+    "model.c"
+  DEPS
+    ::segmenter
+    ::types
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    decoder
+  HDRS
+    "decoder.h"
+  SRCS
+    "decoder.c"
   DEPS
     iree::base
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    normalizer
+  HDRS
+    "normalizer.h"
+  SRCS
+    "normalizer.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    postprocessor
+  HDRS
+    "postprocessor.h"
+  SRCS
+    "postprocessor.c"
+  DEPS
+    ::types
+    iree::base
+    iree::tokenizer::vocab
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    postprocessor_test
+  SRCS
+    "postprocessor_test.cc"
+  DEPS
+    ::postprocessor
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    segmenter
+  HDRS
+    "segmenter.h"
+  SRCS
+    "segmenter.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    special_tokens
+  HDRS
+    "special_tokens.h"
+  SRCS
+    "special_tokens.c"
+  DEPS
+    ::types
+    iree::base
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    special_tokens_test
+  SRCS
+    "special_tokens_test.cc"
+  DEPS
+    ::special_tokens
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -28,14 +129,40 @@ iree_cc_library(
   SRCS
     "tokenizer.c"
   DEPS
-    ::decoders
-    ::literals
-    ::postprocessors
+    ::decoder
+    ::model
+    ::normalizer
+    ::postprocessor
+    ::segmenter
+    ::special_tokens
     ::types
-    ::vocab
     iree::base
-    iree::tokenizer::regex::exec
-    iree::tokenizer::transforms
+    iree::base::internal
+    iree::base::internal::unicode
+    iree::tokenizer::decoder::byte_fallback
+    iree::tokenizer::vocab
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    tokenizer_test_util
+  HDRS
+    "tokenizer_test_util.h"
+  DEPS
+    ::tokenizer
+    iree::base
+    iree::testing::gtest
+    iree::tokenizer::model::bpe
+    iree::tokenizer::model::wordpiece
+    iree::tokenizer::normalizer::bert
+    iree::tokenizer::segmenter::bert
+    iree::tokenizer::segmenter::punctuation
+    iree::tokenizer::segmenter::whitespace
+    iree::tokenizer::testing::test_util
+    iree::tokenizer::vocab
+    iree::tokenizer::vocab::vocab_builder
+  TESTONLY
   PUBLIC
 )
 
@@ -45,147 +172,92 @@ iree_cc_test(
   SRCS
     "tokenizer_test.cc"
   DEPS
-    ::bpe
-    ::decoders
-    ::literals
-    ::normalizers
-    ::postprocessors
     ::tokenizer
-    ::vocab_builder
-    ::wordpiece
+    ::tokenizer_test_util
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::tokenizer::transforms
-)
-
-iree_cc_library(
-  NAME
-    vocab
-  HDRS
-    "vocab.h"
-  SRCS
-    "vocab.c"
-    "vocab_internal.h"
-  DEPS
-    ::types
-    ::vocab_hash
-    iree::base
-  PUBLIC
 )
 
 iree_cc_test(
   NAME
-    vocab_test
+    tokenizer_encode_test
   SRCS
-    "vocab_test.cc"
+    "tokenizer_encode_test.cc"
   DEPS
-    ::vocab
-    ::vocab_builder
+    ::special_tokens
+    ::tokenizer
+    ::tokenizer_test_util
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    vocab_builder
-  HDRS
-    "vocab_builder.h"
-  SRCS
-    "vocab_builder.c"
-    "vocab_internal.h"
-  DEPS
-    ::types
-    ::vocab
-    ::vocab_hash
-    iree::base
-  PUBLIC
+    iree::tokenizer::model::unigram
+    iree::tokenizer::model::wordpiece
+    iree::tokenizer::normalizer::bert
+    iree::tokenizer::normalizer::lowercase
+    iree::tokenizer::normalizer::nfc
+    iree::tokenizer::normalizer::nfd
+    iree::tokenizer::normalizer::prepend
+    iree::tokenizer::normalizer::regex_replace
+    iree::tokenizer::normalizer::replace
+    iree::tokenizer::normalizer::sequence
+    iree::tokenizer::normalizer::strip
+    iree::tokenizer::normalizer::strip_accents
+    iree::tokenizer::regex::compile
+    iree::tokenizer::segmenter::bert
+    iree::tokenizer::segmenter::metaspace
+    iree::tokenizer::segmenter::punctuation
+    iree::tokenizer::segmenter::sequence
+    iree::tokenizer::segmenter::split
+    iree::tokenizer::segmenter::whitespace
 )
 
 iree_cc_test(
   NAME
-    vocab_builder_test
+    tokenizer_decode_test
   SRCS
-    "vocab_builder_test.cc"
+    "tokenizer_decode_test.cc"
   DEPS
-    ::vocab_builder
+    ::tokenizer
+    ::tokenizer_test_util
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    vocab_hash
-  HDRS
-    "vocab_hash.h"
-  SRCS
-    "vocab_hash.c"
-  DEPS
-    ::types
-    iree::base
-    iree::base::internal
-  PUBLIC
+    iree::tokenizer::decoder::byte_fallback
+    iree::tokenizer::decoder::byte_level
+    iree::tokenizer::decoder::metaspace
+    iree::tokenizer::decoder::replace
+    iree::tokenizer::decoder::sequence
+    iree::tokenizer::decoder::wordpiece
 )
 
 iree_cc_test(
   NAME
-    vocab_hash_test
+    tokenizer_huggingface_test
   SRCS
-    "vocab_hash_test.cc"
+    "tokenizer_huggingface_test.cc"
   DEPS
-    ::vocab_hash
+    ::tokenizer
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_binary_benchmark(
-  NAME
-    vocab_hash_benchmark
-  SRCS
-    "vocab_hash_benchmark.cc"
-  DEPS
-    ::vocab_hash
-    iree::base
-    iree::testing::benchmark
-    iree::testing::benchmark_main
-  TESTONLY
-)
-
-iree_cc_library(
-  NAME
-    vocab_trie
-  HDRS
-    "vocab_trie.h"
-  SRCS
-    "vocab_trie.c"
-  DEPS
-    ::types
-    iree::base
-  PUBLIC
+    iree::tokenizer::format::huggingface::tokenizer_json
+    iree::tokenizer::testdata::streaming_testdata
 )
 
 iree_cc_test(
   NAME
-    vocab_trie_test
+    tokenizer_consistency_test
   SRCS
-    "vocab_trie_test.cc"
+    "tokenizer_consistency_test.cc"
   DEPS
-    ::vocab_trie
+    ::tokenizer
+    ::tokenizer_test_util
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_binary_benchmark(
-  NAME
-    vocab_trie_benchmark
-  SRCS
-    "vocab_trie_benchmark.cc"
-  DEPS
-    ::vocab_hash
-    ::vocab_trie
-    benchmark
-    iree::base
-    iree::testing::benchmark_main
-  TESTONLY
+    iree::tokenizer::regex::compile
+    iree::tokenizer::segmenter::split
 )
 
 iree_cc_binary_benchmark(
@@ -198,191 +270,109 @@ iree_cc_binary_benchmark(
     benchmark
     iree::base
     iree::testing::benchmark_main
-    iree::tokenizer::huggingface::tokenizer_json
-    iree::tokenizer::testdata::tokenizer_testdata
+    iree::tokenizer::decoder::byte_level
+    iree::tokenizer::model::bpe
+    iree::tokenizer::segmenter::whitespace
+    iree::tokenizer::vocab
+    iree::tokenizer::vocab::vocab_builder
   TESTONLY
 )
 
 iree_cc_library(
   NAME
-    literals
+    types
   HDRS
-    "literals.h"
-  SRCS
-    "literals.c"
-  DEPS
-    ::types
-    iree::base
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    literals_test
-  SRCS
-    "literals_test.cc"
-  DEPS
-    ::literals
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    decoders
-  HDRS
-    "decoder.h"
-  SRCS
-    "decoder.c"
-  DEPS
-    ::types
-    iree::base
-    iree::base::internal::unicode
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    decoder_test
-  SRCS
-    "decoder_test.cc"
-  DEPS
-    ::decoders
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    normalizers
-  HDRS
-    "normalizer.h"
-  SRCS
-    "normalizer.c"
-  DEPS
-    iree::base
-    iree::base::internal::unicode
-    iree::tokenizer::regex::exec
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    normalizer_test
-  SRCS
-    "normalizer_test.cc"
-  DEPS
-    ::normalizers
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::tokenizer::regex::compile
-)
-
-iree_cc_library(
-  NAME
-    postprocessors
-  HDRS
-    "postprocessor.h"
-  SRCS
-    "postprocessor.c"
+    "types.h"
   DEPS
     iree::base
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_fuzz(
   NAME
-    postprocessor_test
+    tokenizer_encode_fuzz
   SRCS
-    "postprocessor_test.cc"
-  DEPS
-    ::postprocessors
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    bpe
-  HDRS
-    "bpe.h"
-  SRCS
-    "bpe.c"
+    "tokenizer_encode_fuzz.cc"
   DEPS
     ::tokenizer
-    ::types
-    ::vocab
     iree::base
-  PUBLIC
+    iree::tokenizer::testing::fuzzing_util
 )
 
-iree_cc_test(
+iree_cc_fuzz(
   NAME
-    bpe_test
+    tokenizer_decode_fuzz
   SRCS
-    "bpe_test.cc"
-  DEPS
-    ::bpe
-    ::vocab_builder
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    wordpiece
-  HDRS
-    "wordpiece.h"
-  SRCS
-    "wordpiece.c"
+    "tokenizer_decode_fuzz.cc"
   DEPS
     ::tokenizer
-    ::types
-    ::vocab
     iree::base
-  PUBLIC
+    iree::tokenizer::testing::fuzzing_util
 )
 
-iree_cc_test(
+iree_cc_fuzz(
   NAME
-    wordpiece_test
+    tokenizer_ringbuffer_fuzz
   SRCS
-    "wordpiece_test.cc"
-  DEPS
-    ::vocab_builder
-    ::wordpiece
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    unigram
-  HDRS
-    "unigram.h"
-  SRCS
-    "unigram.c"
-    "vocab_internal.h"
+    "tokenizer_ringbuffer_fuzz.cc"
   DEPS
     ::tokenizer
-    ::types
-    ::vocab
-    ::vocab_hash
-    ::vocab_trie
     iree::base
-  PUBLIC
+    iree::tokenizer::testing::fuzzing_util
 )
 
-iree_cc_test(
+iree_cc_fuzz(
   NAME
-    unigram_test
+    tokenizer_roundtrip_fuzz
   SRCS
-    "unigram_test.cc"
+    "tokenizer_roundtrip_fuzz.cc"
   DEPS
-    ::unigram
-    ::vocab_builder
-    iree::testing::gtest
-    iree::testing::gtest_main
+    ::tokenizer
+    iree::base
+    iree::tokenizer::testing::fuzzing_util
+)
+
+iree_cc_fuzz(
+  NAME
+    tokenizer_batch_encode_fuzz
+  SRCS
+    "tokenizer_batch_encode_fuzz.cc"
+  DEPS
+    ::tokenizer
+    iree::base
+    iree::tokenizer::testing::fuzzing_util
+)
+
+iree_cc_fuzz(
+  NAME
+    tokenizer_batch_decode_fuzz
+  SRCS
+    "tokenizer_batch_decode_fuzz.cc"
+  DEPS
+    ::tokenizer
+    iree::base
+    iree::tokenizer::testing::fuzzing_util
+)
+
+iree_cc_fuzz(
+  NAME
+    postprocessor_fuzz
+  SRCS
+    "postprocessor_fuzz.cc"
+  DEPS
+    ::postprocessor
+    ::types
+    iree::base
+)
+
+iree_cc_fuzz(
+  NAME
+    special_tokens_fuzz
+  SRCS
+    "special_tokens_fuzz.cc"
+  DEPS
+    ::special_tokens
+    iree::base
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

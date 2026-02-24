@@ -1,0 +1,74 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Tests for async futex operations (FUTEX_WAIT/FUTEX_WAKE).
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Individual test libraries (alwayslink for static init registration)
+#===------------------------------------------------------------------------===#
+
+# Futex tests: async wait/wake, cross-thread signaling, cancellation.
+iree_runtime_cc_library(
+    name = "futex_test",
+    testonly = True,
+    srcs = ["futex_test.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/async/cts/util:test_base",
+        "//runtime/src/iree/base/threading",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Convenience targets
+#===------------------------------------------------------------------------===#
+
+# All futex tests (link with backend library and main.cc for test binary).
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":futex_test",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+# Futex benchmarks: async wake, cross-thread wait/wake.
+iree_runtime_cc_library(
+    name = "futex_benchmark",
+    testonly = True,
+    srcs = ["futex_benchmark.cc"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/async/cts/util:benchmark_base",
+        "//runtime/src/iree/async/cts/util:registry",
+        "//runtime/src/iree/base/threading",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = True,
+)
+
+# All futex benchmarks (link with backend library and benchmark_main.cc).
+iree_runtime_cc_library(
+    name = "all_benchmarks",
+    testonly = True,
+    deps = [
+        ":futex_benchmark",
+    ],
+)

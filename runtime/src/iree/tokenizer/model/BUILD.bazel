@@ -1,0 +1,208 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Test Utilities
+#===------------------------------------------------------------------------===#
+
+# Shared test utilities for model tests.
+# Provides RAII wrappers and helpers that enforce comprehensive coverage.
+iree_runtime_cc_library(
+    name = "model_test_util",
+    testonly = True,
+    srcs = ["model_test_util.cc"],
+    hdrs = ["model_test_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer/testing:test_util",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Models
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "bpe",
+    srcs = [
+        "bpe.c",
+        "bpe_backtrack.c",
+        "bpe_cache.c",
+        "bpe_encode.c",
+        "bpe_tables.c",
+        "bpe_window.c",
+    ],
+    hdrs = [
+        "bpe.h",
+        "bpe_internal.h",
+    ],
+    deps = [
+        ":bpe_heap",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/tokenizer:byte_level_tables",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer:types",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_merge_hash",
+        "//runtime/src/iree/tokenizer/vocab:vocab_trie",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bpe_test",
+    srcs = ["bpe_test.cc"],
+    deps = [
+        ":bpe",
+        ":model_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bpe_backtrack_test",
+    srcs = ["bpe_backtrack_test.cc"],
+    deps = [
+        ":bpe",
+        ":model_test_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "bpe_heap",
+    srcs = ["bpe_heap.c"],
+    hdrs = ["bpe_heap.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bpe_heap_test",
+    srcs = ["bpe_heap_test.cc"],
+    deps = [
+        ":bpe_heap",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "bpe_heap_benchmark",
+    srcs = ["bpe_heap_benchmark.cc"],
+    deps = [
+        ":bpe_heap",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "wordpiece",
+    srcs = ["wordpiece.c"],
+    hdrs = ["wordpiece.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer:types",
+        "//runtime/src/iree/tokenizer/vocab",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "wordpiece_test",
+    srcs = ["wordpiece_test.cc"],
+    deps = [
+        ":model_test_util",
+        ":wordpiece",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "unigram",
+    srcs = ["unigram.c"],
+    hdrs = ["unigram.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer:model",
+        "//runtime/src/iree/tokenizer:types",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_trie",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "unigram_test",
+    srcs = ["unigram_test.cc"],
+    deps = [
+        ":model_test_util",
+        ":unigram",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz Targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "bpe_fuzz",
+    srcs = ["bpe_fuzz.cc"],
+    deps = [
+        ":bpe",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "unigram_fuzz",
+    srcs = ["unigram_fuzz.cc"],
+    deps = [
+        ":unigram",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "wordpiece_fuzz",
+    srcs = ["wordpiece_fuzz.cc"],
+    deps = [
+        ":wordpiece",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)

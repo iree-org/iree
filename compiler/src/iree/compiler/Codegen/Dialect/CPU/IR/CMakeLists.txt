@@ -60,4 +60,15 @@ iree_tablegen_library(
     --gen-attrdef-defs IREECPUAttrs.cpp.inc
 )
 
+iree_tablegen_doc(
+  NAME
+    IREECPUDialectDocGen
+  CATEGORY
+    "Dialects"
+  TD_FILE
+    "IREECPUAttrs.td"
+  OUTS
+    --gen-dialect-doc --dialect=iree_cpu IREECPUDialect.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

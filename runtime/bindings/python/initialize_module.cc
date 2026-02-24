@@ -54,7 +54,7 @@ NB_MODULE(_runtime, m) {
     // Make a new set of strings at the back of the cache
     alloced_flag_cache.emplace_back(
         std::make_unique<std::vector<std::string>>(std::vector<std::string>()));
-    auto &alloced_flags = *alloced_flag_cache.back();
+    auto& alloced_flags = *alloced_flag_cache.back();
 
     // Add the given python strings to the std::string set.
     alloced_flags.push_back("python");
@@ -67,13 +67,13 @@ NB_MODULE(_runtime, m) {
     // with the std::strings responsible for maintaining the storage.
     // Must build pointer vector after filling std::strings so pointers are
     // stable.
-    std::vector<char *> flag_ptrs;
-    for (auto &alloced_flag : alloced_flags) {
-      flag_ptrs.push_back(const_cast<char *>(alloced_flag.c_str()));
+    std::vector<char*> flag_ptrs;
+    for (auto& alloced_flag : alloced_flags) {
+      flag_ptrs.push_back(const_cast<char*>(alloced_flag.c_str()));
     }
 
     // Send the flags to the C API
-    char **argv = &flag_ptrs[0];
+    char** argv = &flag_ptrs[0];
     int argc = flag_ptrs.size();
     CheckApiStatus(iree_flags_parse(IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                                     &argc, &argv),
@@ -83,11 +83,11 @@ NB_MODULE(_runtime, m) {
   m.def("disable_leak_checker", []() { py::set_leak_warnings(false); });
 
   py::intrusive_init(
-      [](PyObject *o) noexcept {
+      [](PyObject* o) noexcept {
         py::gil_scoped_acquire guard;
         Py_INCREF(o);
       },
-      [](PyObject *o) noexcept {
+      [](PyObject* o) noexcept {
         py::gil_scoped_acquire guard;
         Py_DECREF(o);
       });

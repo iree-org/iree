@@ -112,11 +112,9 @@ extern "C" {
 #if IREE_TRACING_FEATURES
 
 #ifdef __cplusplus
-#define iree_tracing_make_zone_ctx(zone_id) \
-  TracyCZoneCtx { zone_id, 1 }
+#define iree_tracing_make_zone_ctx(zone_id) TracyCZoneCtx{zone_id, 1}
 #else
-#define iree_tracing_make_zone_ctx(zone_id) \
-  (TracyCZoneCtx) { zone_id, 1 }
+#define iree_tracing_make_zone_ctx(zone_id) (TracyCZoneCtx){zone_id, 1}
 #endif  // __cplusplus
 
 void iree_tracing_tracy_initialize();

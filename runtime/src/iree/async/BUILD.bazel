@@ -1,0 +1,227 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Proactor-based async I/O system.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+#===------------------------------------------------------------------------===#
+# Header-only types (for embedding in HAL buffers without link dependency)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "types",
+    hdrs = ["types.h"],
+    deps = ["//runtime/src/iree/base"],
+)
+
+#===------------------------------------------------------------------------===#
+# Core async library
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "async",
+    srcs = [
+        "address.c",
+        "address_generic.c",
+        "address_impl.h",
+        "address_posix.c",
+        "address_win32.c",
+        "buffer_pool.c",
+        "event.c",
+        "file.c",
+        "frontier.c",
+        "frontier_tracker.c",
+        "notification.c",
+        "operation.c",
+        "proactor.c",
+        "region.c",
+        "semaphore.c",
+        "slab.c",
+        "socket.c",
+    ],
+    hdrs = [
+        "address.h",
+        "affinity.h",
+        "api.h",
+        "buffer_pool.h",
+        "event.h",
+        "file.h",
+        "frontier.h",
+        "frontier_tracker.h",
+        "notification.h",
+        "operation.h",
+        "operations/file.h",
+        "operations/futex.h",
+        "operations/message.h",
+        "operations/net.h",
+        "operations/scheduling.h",
+        "operations/semaphore.h",
+        "primitive.h",
+        "proactor.h",
+        "region.h",
+        "relay.h",
+        "semaphore.h",
+        "slab.h",
+        "socket.h",
+        "span.h",
+    ],
+    deps = [
+        ":types",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:atomic_freelist",
+        "//runtime/src/iree/base/internal:memory",
+        "//runtime/src/iree/base/threading",
+        "//runtime/src/iree/base/threading:thread",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Event pool (high-performance pooling for async events)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/threading",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Platform-optimal backend
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "platform",
+    srcs = ["proactor_platform.c"],
+    hdrs = ["proactor_platform.h"],
+    deps = [
+        ":async",
+    ] + select({
+        "//build_tools/bazel:iree_is_linux": [
+            "//runtime/src/iree/async/platform/io_uring",
+            "//runtime/src/iree/async/platform/posix",
+        ],
+        "//build_tools/bazel:iree_is_android": [
+            "//runtime/src/iree/async/platform/posix",
+        ],
+        "//build_tools/bazel:iree_is_windows": [
+            "//runtime/src/iree/async/platform/iocp",
+        ],
+        "//conditions:default": [
+            "//runtime/src/iree/async/platform/posix",
+        ],
+    }),
+)
+
+#===------------------------------------------------------------------------===#
+# Tests
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "address_test",
+    srcs = ["address_test.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "event_pool_test",
+    srcs = ["event_pool_test.cc"],
+    deps = [
+        ":event_pool",
+        ":platform",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "frontier_test",
+    srcs = ["frontier_test.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "frontier_tracker_test",
+    srcs = ["frontier_tracker_test.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "semaphore_test",
+    srcs = ["semaphore_test.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmarks
+#===------------------------------------------------------------------------===#
+
+cc_binary_benchmark(
+    name = "frontier_benchmark",
+    srcs = ["frontier_benchmark.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "frontier_tracker_benchmark",
+    srcs = ["frontier_tracker_benchmark.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/testing:benchmark_main",
+        "@com_google_benchmark//:benchmark",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Fuzz targets
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_fuzz(
+    name = "address_fuzz",
+    srcs = ["address_fuzz.cc"],
+    deps = [
+        ":async",
+        "//runtime/src/iree/base",
+    ],
+)

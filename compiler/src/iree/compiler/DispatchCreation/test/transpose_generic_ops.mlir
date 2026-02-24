@@ -79,3 +79,127 @@ util.func public @interchange(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>
   } -> tensor<?x?x?xf32>
   util.return %0 : tensor<?x?x?xf32>
 }
+
+//  -----
+
+//      CHECK: util.func public @swap_two_reduction_dims
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d2, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+util.func public @swap_two_reduction_dims(%arg0: tensor<16x2x48x32x288xbf16>, %arg1: tensor<288x2x288xbf16>, %arg2: tensor<16x48x32x288xf32>) -> tensor<16x48x32x288xf32> {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d2, d4)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d5, d4)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+  ins(%arg0, %arg1 : tensor<16x2x48x32x288xbf16>, tensor<288x2x288xbf16>)
+  outs(%arg2 : tensor<16x48x32x288xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x48x32x288xf32>
+  util.return %0 : tensor<16x48x32x288xf32>
+}
+
+//  -----
+
+//      CHECK: util.func public @already_sorted_reductions
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d2, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+util.func public @already_sorted_reductions(%arg0: tensor<16x2x48x32x288xbf16>, %arg1: tensor<288x2x288xbf16>, %arg2: tensor<16x48x32x288xf32>) -> tensor<16x48x32x288xf32> {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d2, d5)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
+  ins(%arg0, %arg1 : tensor<16x2x48x32x288xbf16>, tensor<288x2x288xbf16>)
+  outs(%arg2 : tensor<16x48x32x288xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x48x32x288xf32>
+  util.return %0 : tensor<16x48x32x288xf32>
+}
+
+//  -----
+
+//      CHECK: util.func public @single_reduction_dim
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+util.func public @single_reduction_dim(%arg0: tensor<4x8x16xf32>, %arg1: tensor<32x8xf32>, %arg2: tensor<4x16x32xf32>) -> tensor<4x16x32xf32> {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+    affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+  ins(%arg0, %arg1 : tensor<4x8x16xf32>, tensor<32x8xf32>)
+  outs(%arg2 : tensor<4x16x32xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<4x16x32xf32>
+  util.return %0 : tensor<4x16x32xf32>
+}
+
+//  -----
+
+//      CHECK: util.func public @three_reduction_dims_swap_middle
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d4, d5)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+util.func public @three_reduction_dims_swap_middle(%arg0: tensor<4x8x16x32xf32>, %arg1: tensor<64x8x16x32xf32>, %arg2: tensor<4x64x128xf32>) -> tensor<4x64x128xf32> {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d5, d4)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d3, d5, d4)>,
+    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+  ins(%arg0, %arg1 : tensor<4x8x16x32xf32>, tensor<64x8x16x32xf32>)
+  outs(%arg2 : tensor<4x64x128xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<4x64x128xf32>
+  util.return %0 : tensor<4x64x128xf32>
+}
+
+//  -----
+
+//      CHECK: util.func public @non_contiguous_reductions_swap
+//      CHECK:   linalg.generic {indexing_maps = [
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d4)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3, d4)>,
+// CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+// CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+util.func public @non_contiguous_reductions_swap(%arg0: tensor<8x16x32x64xf32>, %arg1: tensor<128x16x32x64xf32>, %arg2: tensor<8x128xf32>) -> tensor<8x128xf32> {
+  %0 = linalg.generic {indexing_maps = [
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4, d3)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d2, d1, d4, d3)>,
+    affine_map<(d0, d1, d2, d3, d4) -> (d0, d2)>],
+    iterator_types = ["parallel", "reduction", "parallel", "reduction", "reduction"]}
+  ins(%arg0, %arg1 : tensor<8x16x32x64xf32>, tensor<128x16x32x64xf32>)
+  outs(%arg2 : tensor<8x128xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<8x128xf32>
+  util.return %0 : tensor<8x128xf32>
+}

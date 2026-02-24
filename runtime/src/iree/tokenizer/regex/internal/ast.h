@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOKENIZER_REGEX_INTERNAL_AST_H_
-#define IREE_TOKENIZER_REGEX_INTERNAL_AST_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_INTERNAL_AST_H_
+#define IREE_TOKENIZER_UTIL_REGEX_INTERNAL_AST_H_
 
 #include "iree/base/api.h"
 #include "iree/tokenizer/regex/exec.h"
@@ -20,21 +20,21 @@ extern "C" {
 
 typedef enum iree_tokenizer_regex_ast_type_e {
   // Leaf nodes.
-  IREE_TOKENIZER_REGEX_AST_EMPTY,         // Empty expression.
-  IREE_TOKENIZER_REGEX_AST_LITERAL,       // Single byte literal.
-  IREE_TOKENIZER_REGEX_AST_DOT,           // . (any character except newline)
-  IREE_TOKENIZER_REGEX_AST_CHAR_CLASS,    // Character class [abc].
-  IREE_TOKENIZER_REGEX_AST_SHORTHAND,     // \d, \w, \s, etc.
-  IREE_TOKENIZER_REGEX_AST_UNICODE_PROP,  // \p{L}, \p{N}, etc.
-  IREE_TOKENIZER_REGEX_AST_ANCHOR_START,  // ^
-  IREE_TOKENIZER_REGEX_AST_ANCHOR_END,    // $
+  IREE_TOKENIZER_UTIL_REGEX_AST_EMPTY,       // Empty expression.
+  IREE_TOKENIZER_UTIL_REGEX_AST_LITERAL,     // Single byte literal.
+  IREE_TOKENIZER_UTIL_REGEX_AST_DOT,         // . (any character except newline)
+  IREE_TOKENIZER_UTIL_REGEX_AST_CHAR_CLASS,  // Character class [abc].
+  IREE_TOKENIZER_UTIL_REGEX_AST_SHORTHAND,   // \d, \w, \s, etc.
+  IREE_TOKENIZER_UTIL_REGEX_AST_UNICODE_PROP,  // \p{L}, \p{N}, etc.
+  IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_START,  // ^
+  IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_END,    // $
 
   // Compound nodes.
-  IREE_TOKENIZER_REGEX_AST_CONCAT,         // AB (sequence).
-  IREE_TOKENIZER_REGEX_AST_ALTERNATION,    // A|B.
-  IREE_TOKENIZER_REGEX_AST_QUANTIFIER,     // A*, A+, A?, A{n,m}.
-  IREE_TOKENIZER_REGEX_AST_GROUP,          // (?:A) or (A).
-  IREE_TOKENIZER_REGEX_AST_NEG_LOOKAHEAD,  // (?!A).
+  IREE_TOKENIZER_UTIL_REGEX_AST_CONCAT,         // AB (sequence).
+  IREE_TOKENIZER_UTIL_REGEX_AST_ALTERNATION,    // A|B.
+  IREE_TOKENIZER_UTIL_REGEX_AST_QUANTIFIER,     // A*, A+, A?, A{n,m}.
+  IREE_TOKENIZER_UTIL_REGEX_AST_GROUP,          // (?:A) or (A).
+  IREE_TOKENIZER_UTIL_REGEX_AST_NEG_LOOKAHEAD,  // (?!A).
 } iree_tokenizer_regex_ast_type_t;
 
 //===----------------------------------------------------------------------===//
@@ -61,12 +61,14 @@ typedef struct iree_tokenizer_regex_ast_node_t {
 
     // AST_CHAR_CLASS: bitmap + pseudo-byte mask + exact codepoint ranges.
     struct {
-      uint8_t bitmap[32];    // 256-bit bitmap for bytes 0-255.
-      uint16_t pseudo_mask;  // Mask for pseudo-bytes 0x80-0x87.
-      uint8_t range_count;   // Number of exact codepoint ranges (0-4).
+      // 256-bit bitmap for bytes 0-255.
+      uint8_t bitmap[32];
+      uint16_t pseudo_mask;  // Pseudo-bytes 0x80-0x87.
+      // Number of exact codepoint ranges.
+      uint8_t range_count;
       bool negated;
       iree_tokenizer_regex_codepoint_range_t
-          ranges[IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES];
+          ranges[IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES];
     } char_class;
 
     // AST_SHORTHAND: which shorthand class.
@@ -103,4 +105,4 @@ typedef struct iree_tokenizer_regex_ast_node_t {
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_INTERNAL_AST_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_INTERNAL_AST_H_

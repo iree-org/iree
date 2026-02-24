@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -39,6 +40,8 @@ static ArrayAttr getIndexArrayAttr(MLIRContext *context,
         return IntegerAttr::get(IndexType::get(context), APInt(64, value));
       }));
 }
+
+bool shouldSetTunerAttributes() { return CodegenOptions::setTunerAttributes; }
 
 } // namespace mlir::iree_compiler
 
@@ -865,12 +868,13 @@ void eraseCompilationInfo(Operation *op) {
 // Helpers for setting attributes for tuner.
 // ===----------------------------------------------------------------------===//
 
-void setRootOpInfo(Operation *op) {
-  op->setAttr(kRootOpInfoAttrName, UnitAttr::get(op->getContext()));
+void setRootOpInfo(Operation *op, int64_t set) {
+  op->setAttr(kRootOpInfoAttrName,
+              IREE::Codegen::RootOpAttr::get(op->getContext(), set));
 }
 
 bool hasRootOpInfo(Operation *op) {
-  return op->hasAttrOfType<UnitAttr>(kRootOpInfoAttrName);
+  return op->hasAttrOfType<IREE::Codegen::RootOpAttr>(kRootOpInfoAttrName);
 }
 
 //===----------------------------------------------------------------------===//

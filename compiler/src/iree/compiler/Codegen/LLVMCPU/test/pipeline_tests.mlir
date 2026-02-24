@@ -480,8 +480,8 @@ func.func @mmt4d_unpack_elementwise() attributes {hal.executable.target = #execu
 // -----
 
 // This tests that the pack op is not fusible in distribution, and it falls back
-// to the iree_linalg_ext.map_scatter solution. The check ensures that the
-// iree_linalg_ext.map_scatter op is fused within scf.forall op.
+// to the iree_linalg_ext.map_store solution. The check ensures that the
+// iree_linalg_ext.map_store op is fused within scf.forall op.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
@@ -501,13 +501,13 @@ func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.e
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
 // CHECK:         scf.forall
-// CHECK:           iree_linalg_ext.map_scatter
+// CHECK:           iree_linalg_ext.map_store
 // CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
 // Similar to the above test, but the pack has padding semantics. After folding
-// the padding into iree_linalg_ext.map_scatter op, it creates an additional
+// the padding into iree_linalg_ext.map_store op, it creates an additional
 // scf.forall to fill the padding values.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
@@ -529,7 +529,7 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
 // CHECK:         scf.forall
-// CHECK:           iree_linalg_ext.map_scatter
+// CHECK:           iree_linalg_ext.map_store
 // CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 // CHECK:         scf.forall
 

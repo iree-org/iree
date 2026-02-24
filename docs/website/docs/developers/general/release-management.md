@@ -266,7 +266,8 @@ request that some feature make the cut.
 
 1. Create a new branch.
 
-    Checkout the corresponding stable release and create a branch for the patch release:
+    Checkout the corresponding stable release and create a branch
+    for the patch release:
 
     <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
 

@@ -73,6 +73,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Codegen::Interfaces::HoistableRegionOpInterface
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR

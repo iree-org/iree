@@ -53,12 +53,12 @@ typedef struct openxla_partitioner_output_t openxla_partitioner_output_t;
 // Destroys an error. Only non-nullptr errors must be destroyed, but it is
 // legal to destroy nullptr.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerErrorDestroy(
-    openxla_partitioner_error_t *error);
+    openxla_partitioner_error_t* error);
 
 // Gets the message associated with the error as a C-string. The string will be
 // valid until the error is destroyed.
-OPENXLA_PARTITIONER_EMBED_EXPORTED const char *
-openxlaPartitionerErrorGetMessage(openxla_partitioner_error_t *error);
+OPENXLA_PARTITIONER_EMBED_EXPORTED const char*
+openxlaPartitionerErrorGetMessage(openxla_partitioner_error_t* error);
 
 //===----------------------------------------------------------------------===//
 // Global initialization.
@@ -89,7 +89,7 @@ OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerGlobalInitialize();
 // will be a string with the build tag. In development builds, it may be an
 // empty string. The returned is valid for as long as the partitioner is
 // initialized.
-OPENXLA_PARTITIONER_EMBED_EXPORTED const char *openxlaPartitionerGetRevision();
+OPENXLA_PARTITIONER_EMBED_EXPORTED const char* openxlaPartitionerGetRevision();
 
 // Initializes the command line environment from an explicit argc/argv
 // (typically the result of a prior call to openxlaPartitionerGetProcessCLArgs).
@@ -102,7 +102,7 @@ OPENXLA_PARTITIONER_EMBED_EXPORTED const char *openxlaPartitionerGetRevision();
 // subordinating builtin command line options to a higher level integration
 // by tunneling global options into the initialization sequence.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerSetupGlobalCL(
-    int argc, const char **argv, const char *banner,
+    int argc, const char** argv, const char* banner,
     bool installSignalHandlers);
 
 // Destroys any process level resources that the partitioner may have created.
@@ -121,24 +121,24 @@ OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerGlobalShutdown();
 
 // Creates a new session (which must be destroyed by
 // openxlaPartitionerSessionDestroy).
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_session_t *
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_session_t*
 openxlaPartitionerSessionCreate();
 
 // Destroys a session.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerSessionDestroy(
-    openxla_partitioner_session_t *session);
+    openxla_partitioner_session_t* session);
 
 // Sets session-local flags. These are a subset of flags supported by CLI
 // tools and are privately scoped.
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerSessionSetFlags(openxla_partitioner_session_t *session,
-                                  int argc, const char *const *argv);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerSessionSetFlags(openxla_partitioner_session_t* session,
+                                  int argc, const char* const* argv);
 
 // Gets textual flags actually in effect from any source. Optionally, only
 // calls back for non-default valued flags.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerSessionGetFlags(
-    openxla_partitioner_session_t *session, bool nonDefaultOnly,
-    void (*onFlag)(const char *flag, size_t length, void *), void *userData);
+    openxla_partitioner_session_t* session, bool nonDefaultOnly,
+    void (*onFlag)(const char* flag, size_t length, void*), void* userData);
 
 //===----------------------------------------------------------------------===//
 // Run management.
@@ -153,8 +153,8 @@ enum openxla_partitioner_diagnostic_severity_t {
   OPENXLA_PARTITIONER_DIAGNOSTIC_SEVERITY_REMARK = 3,
 };
 
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_invocation_t *
-openxlaPartitionerInvocationCreate(openxla_partitioner_session_t *session);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_invocation_t*
+openxlaPartitionerInvocationCreate(openxla_partitioner_session_t* session);
 
 // Enables a callback to receive diagnostics. This is targeted at API use of
 // the partitioner, allowing fine grained collection of formatted diagnostic
@@ -172,21 +172,21 @@ openxlaPartitionerInvocationCreate(openxla_partitioner_session_t *session);
 // the callback and the |messageSize| does not include a terminator nul.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void
 openxlaPartitionerInvocationEnableCallbackDiagnostics(
-    openxla_partitioner_invocation_t *inv, int flags,
+    openxla_partitioner_invocation_t* inv, int flags,
     void (*callback)(enum openxla_partitioner_diagnostic_severity_t severity,
-                     const char *message, size_t messageSize, void *userData),
-    void *userData);
+                     const char* message, size_t messageSize, void* userData),
+    void* userData);
 
 // Enables default, pretty-printed diagnostics to the console. This is usually
 // the right thing to do for command-line tools, but other mechanisms are
 // preferred for library use.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void
 openxlaPartitionerInvocationEnableConsoleDiagnostics(
-    openxla_partitioner_invocation_t *inv);
+    openxla_partitioner_invocation_t* inv);
 
 // Destroys a run.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerInvocationDestroy(
-    openxla_partitioner_invocation_t *inv);
+    openxla_partitioner_invocation_t* inv);
 
 // Sets a crash handler on the invocation. In the event of a crash, the callback
 // will be invoked to create an output which will receive the crash dump.
@@ -196,31 +196,31 @@ OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerInvocationDestroy(
 // |openxlaPartitionerOutputKeep| on the output.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void
 openxlaPartitionerInvocationSetCrashHandler(
-    openxla_partitioner_invocation_t *inv, bool genLocalReproducer,
-    openxla_partitioner_error_t *(*onCrashCallback)(
-        openxla_partitioner_output_t **outOutput, void *userData),
-    void *userData);
+    openxla_partitioner_invocation_t* inv, bool genLocalReproducer,
+    openxla_partitioner_error_t* (*onCrashCallback)(
+        openxla_partitioner_output_t** outOutput, void* userData),
+    void* userData);
 
 // Parses a source into this instance in preparation for performing a
 // compilation action.
 // Returns false and emits diagnostics on failure.
 OPENXLA_PARTITIONER_EMBED_EXPORTED bool openxlaPartitionerInvocationParseSource(
-    openxla_partitioner_invocation_t *inv,
-    openxla_partitioner_source_t *source);
+    openxla_partitioner_invocation_t* inv,
+    openxla_partitioner_source_t* source);
 
 // Enables/disables verification of IR after each pass. Defaults to enabled.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerInvocationSetVerifyIR(
-    openxla_partitioner_invocation_t *inv, bool enable);
+    openxla_partitioner_invocation_t* inv, bool enable);
 
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
 OPENXLA_PARTITIONER_EMBED_EXPORTED bool openxlaPartitionerInvocationPipeline(
-    openxla_partitioner_invocation_t *inv, const char *pipeline_name);
+    openxla_partitioner_invocation_t* inv, const char* pipeline_name);
 
 // Outputs the current partitioner state as textual IR to the output.
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerInvocationOutputIR(openxla_partitioner_invocation_t *inv,
-                                     openxla_partitioner_output_t *output);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerInvocationOutputIR(openxla_partitioner_invocation_t* inv,
+                                     openxla_partitioner_output_t* output);
 
 //===----------------------------------------------------------------------===//
 // Sources.
@@ -235,26 +235,26 @@ openxlaPartitionerInvocationOutputIR(openxla_partitioner_invocation_t *inv,
 
 // Destroy source instances.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerSourceDestroy(
-    openxla_partitioner_source_t *source);
+    openxla_partitioner_source_t* source);
 
 // Opens the source from a file. This is used for normal text assembly file
 // sources.
 // Must be destroyed with openxlaPartitionerSourceDestroy().
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerSourceOpenFile(openxla_partitioner_session_t *session,
-                                 const char *filePath,
-                                 openxla_partitioner_source_t **out_source);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerSourceOpenFile(openxla_partitioner_session_t* session,
+                                 const char* filePath,
+                                 openxla_partitioner_source_t** out_source);
 
 // Wraps an existing buffer in memory.
 // If |isNullTerminated| is true, then the null must be accounted for in the
 // length. This is required for text buffers and it is permitted for binary
 // buffers.
 // Must be destroyed with openxlaPartitionerSourceDestroy().
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerSourceWrapBuffer(openxla_partitioner_session_t *session,
-                                   const char *bufferName, const char *buffer,
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerSourceWrapBuffer(openxla_partitioner_session_t* session,
+                                   const char* bufferName, const char* buffer,
                                    size_t length, bool isNullTerminated,
-                                   openxla_partitioner_source_t **out_source);
+                                   openxla_partitioner_source_t** out_source);
 
 //===----------------------------------------------------------------------===//
 // Outputs.
@@ -270,47 +270,47 @@ openxlaPartitionerSourceWrapBuffer(openxla_partitioner_session_t *session,
 
 // Destroy output instances.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerOutputDestroy(
-    openxla_partitioner_output_t *output);
+    openxla_partitioner_output_t* output);
 
 // Opens a file for the output.
 // Must be destroyed via openxlaPartitionerOutputDestroy().
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerOutputOpenFile(const char *filePath,
-                                 openxla_partitioner_output_t **out_output);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerOutputOpenFile(const char* filePath,
+                                 openxla_partitioner_output_t** out_output);
 
 // Opens a file descriptor for output.
 // Must be destroyed via openxlaPartitionerOutputDestroy().
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
 openxlaPartitionerOutputOpenFD(int fd,
-                               openxla_partitioner_output_t **out_output);
+                               openxla_partitioner_output_t** out_output);
 
 // Opens an output to in-memory storage. Use the API
 // |openxlaPartitionerOutputMapMemory| to access the mapped contents once all
 // output has been written.
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
 openxlaPartitionerOutputOpenMembuffer(
-    openxla_partitioner_output_t **out_output);
+    openxla_partitioner_output_t** out_output);
 
 // Maps the contents of a partitioner output opened via
 // |openxlaPartitionerOutputOpenMembuffer|. This may be something obtained via
 // mmap or a more ordinary temporary buffer. This may fail in platform
 // specific ways unless if the output was created via
 // |openxlaPartitionerOutputOpenMembuffer|.
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerOutputMapMemory(openxla_partitioner_output_t *output,
-                                  void **contents, uint64_t *size);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerOutputMapMemory(openxla_partitioner_output_t* output,
+                                  void** contents, uint64_t* size);
 
 // For file or other persistent outputs, by default they will be deleted on
 // |openxlaPartitionerOutputDestroy| (or exit). It is necessary to call
 // |openxlaPartitionerOutputKeep| in order to have them committed to their
 // accessible place.
 OPENXLA_PARTITIONER_EMBED_EXPORTED void openxlaPartitionerOutputKeep(
-    openxla_partitioner_output_t *output);
+    openxla_partitioner_output_t* output);
 
 // Writes arbitrary data to the output.
-OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t *
-openxlaPartitionerOutputWrite(openxla_partitioner_output_t *output,
-                              const void *data, size_t length);
+OPENXLA_PARTITIONER_EMBED_EXPORTED openxla_partitioner_error_t*
+openxlaPartitionerOutputWrite(openxla_partitioner_output_t* output,
+                              const void* data, size_t length);
 
 #ifdef __cplusplus
 }

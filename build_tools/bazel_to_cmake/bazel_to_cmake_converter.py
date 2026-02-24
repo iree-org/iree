@@ -100,10 +100,12 @@ class BuildFileFunctions(object):
         converter: "Converter",
         targets: bazel_to_cmake_targets.TargetConverter,
         build_dir: str,
+        repo_root: str = "",
     ):
         self._converter = converter
         self._targets = targets
         self._build_dir = build_dir
+        self._repo_root = repo_root
         self._custom_initialize()
 
     def _custom_initialize(self):
@@ -152,6 +154,29 @@ class BuildFileFunctions(object):
         """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
         if not target_compatible_with:
             return
+
+        # Handle PlatformSelect from select() in target_compatible_with.
+        # Example: select({"@platforms//os:linux": [], "@platforms//os:macos": [],
+        #                  "//conditions:default": ["@platforms//:incompatible"]})
+        # Platforms with empty list are compatible; default with incompatible means
+        # "only build on the explicitly listed platforms".
+        if isinstance(target_compatible_with, PlatformSelect):
+            compatible_platforms = []
+            for label, value in target_compatible_with.conditions.items():
+                if label == "//conditions:default":
+                    continue
+                # Empty list means compatible on this platform.
+                if value == []:
+                    cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(label)
+                    if cmake_name:
+                        compatible_platforms.append(
+                            f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
+                        )
+            if compatible_platforms:
+                combined = " OR ".join(compatible_platforms)
+                self._converter.body += f"if({combined})\n"
+            return
+
         # target_compatible_with is a list of constraints (typically one).
         conditions = []
         for label in target_compatible_with:
@@ -169,6 +194,20 @@ class BuildFileFunctions(object):
         """Emits endif() to close a target_compatible_with guard."""
         if not target_compatible_with:
             return
+
+        # Handle PlatformSelect: check if any compatible platforms were found.
+        if isinstance(target_compatible_with, PlatformSelect):
+            has_compatible = any(
+                label != "//conditions:default"
+                and value == []
+                and label in _PLATFORM_CMAKE_SYSTEM_NAME
+                for label, value in target_compatible_with.conditions.items()
+            )
+            if has_compatible:
+                self._converter.body = self._converter.body.rstrip("\n") + "\n"
+                self._converter.body += f"endif()\n\n"
+            return
+
         # Only emit if all labels are recognized (same check as begin).
         if all(
             label in _PLATFORM_CMAKE_SYSTEM_NAME for label in target_compatible_with
@@ -307,7 +346,10 @@ class BuildFileFunctions(object):
         src = src.lstrip("/").lstrip(":").replace(":", "/")
         if not pkg_root_relative_label:
             return src
-        elif os.path.exists(os.path.join(self._build_dir, src)):
+        # Repo-root-relative labels (//pkg:file) resolve from the repo root,
+        # not from the current package directory.
+        check_dir = self._repo_root if self._repo_root else self._build_dir
+        if os.path.exists(os.path.join(check_dir, src)):
             return f"${{PROJECT_SOURCE_DIR}}/{src}"
         else:
             return f"${{PROJECT_BINARY_DIR}}/{src}"
@@ -581,6 +623,7 @@ class BuildFileFunctions(object):
         linkopts=None,
         includes=None,
         system_includes=None,
+        alwayslink=None,
         target_compatible_with=None,
         **kwargs,
     ):
@@ -599,6 +642,7 @@ class BuildFileFunctions(object):
         data_block = self._convert_target_list_block("DATA", data)
         deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
+        alwayslink_block = self._convert_option_block("ALWAYSLINK", alwayslink)
         includes_block = self._convert_includes_block(includes)
         system_includes_block = self._convert_string_list_block(
             "SYSTEM_INCLUDES", system_includes
@@ -618,6 +662,7 @@ class BuildFileFunctions(object):
             f"{deps_block}"
             f"{defines_block}"
             f"{testonly_block}"
+            f"{alwayslink_block}"
             f"{includes_block}"
             f"{system_includes_block}"
             f"  PUBLIC\n)\n\n"
@@ -1342,7 +1387,11 @@ def GetDict(obj):
 
 
 def convert_build_file(
-    build_file_code, repo_cfg, build_dir, allow_partial_conversion=False
+    build_file_code,
+    repo_cfg,
+    build_dir,
+    allow_partial_conversion=False,
+    repo_root="",
 ):
     converter = Converter()
     # Allow overrides of TargetConverter and BuildFileFunctions from repo cfg.
@@ -1352,7 +1401,12 @@ def convert_build_file(
     )(repo_map=repo_map)
     build_file_functions = getattr(
         repo_cfg, "CustomBuildFileFunctions", BuildFileFunctions
-    )(converter=converter, targets=target_converter, build_dir=build_dir)
+    )(
+        converter=converter,
+        targets=target_converter,
+        build_dir=build_dir,
+        repo_root=repo_root,
+    )
 
     exec(build_file_code, GetDict(build_file_functions))
     converted_text = converter.convert()

@@ -304,22 +304,22 @@ iree_struct_layout_calculate(iree_host_size_t base_size,
 
 // Field descriptor for an unaligned array.
 #define IREE_STRUCT_FIELD(count_expr, type, out_offset_ptr) \
-  { {(count_expr), 1}, sizeof(type), 0, (out_offset_ptr) }
+  {{(count_expr), 1}, sizeof(type), 0, (out_offset_ptr)}
 
 // Field descriptor for an unaligned 2D array (count1 * count2 elements).
 // Both count multiplications are overflow-checked.
 #define IREE_STRUCT_ARRAY_FIELD(count1, count2, type, out_offset_ptr) \
-  { {(count1), (count2)}, sizeof(type), 0, (out_offset_ptr) }
+  {{(count1), (count2)}, sizeof(type), 0, (out_offset_ptr)}
 
 // Field descriptor for an aligned array.
 #define IREE_STRUCT_FIELD_ALIGNED(count_expr, type, align, out_offset_ptr) \
-  { {(count_expr), 1}, sizeof(type), (align), (out_offset_ptr) }
+  {{(count_expr), 1}, sizeof(type), (align), (out_offset_ptr)}
 
 // Field descriptor for a flexible array member (FAM). FAMs are accessed via
 // the struct member (e.g., foo->bar[]) so no offset is needed. The alignment
 // ensures the FAM starts at an address suitable for its element type.
 #define IREE_STRUCT_FIELD_FAM(count_expr, type) \
-  { {(count_expr), 1}, sizeof(type), iree_alignof(type), NULL }
+  {{(count_expr), 1}, sizeof(type), iree_alignof(type), NULL}
 
 // Calculates struct layout using inline field descriptors.
 // C++ version uses a lambda to create a local array (compound literals are a

@@ -79,19 +79,18 @@ IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
             var buf = new Uint8Array(Module.HEAPU8.buffer, $0, $1);
             crypto.getRandomValues(buf);
             return 0;
-          } catch (e) {
-            return 1;
-          }
-        },
+  }
+  catch(e) { return 1; }
+},
         buffer.data + offset, chunk_size);
 
-    if (result != 0) {
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "crypto.getRandomValues failed");
-    }
-    offset += chunk_size;
-  }
-  return iree_ok_status();
+if (result != 0) {
+  return iree_make_status(IREE_STATUS_INTERNAL,
+                          "crypto.getRandomValues failed");
+}
+offset += chunk_size;
+}
+return iree_ok_status();
 }
 
 #else

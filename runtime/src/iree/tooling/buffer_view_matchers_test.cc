@@ -123,7 +123,7 @@ class Handle {
 
   // Support boolean expression evaluation ala unique_ptr/shared_ptr:
   // https://en.cppreference.com/w/cpp/memory/shared_ptr/operator_bool
-  typedef T* Handle::*unspecified_bool_type;
+  typedef T* Handle::* unspecified_bool_type;
   constexpr operator unspecified_bool_type() const noexcept {
     return value_ ? &Handle::value_ : nullptr;
   }

@@ -12,18 +12,15 @@ iree_add_all_subdirs()
 
 iree_c_embed_data(
   NAME
-    tokenizer_testdata
+    streaming_testdata
   SRCS
-    "benchmark_bert.json"
-    "benchmark_bpe.json"
-    "bpe_sequence_pretokenizer.json"
-    "wordpiece_bert_minimal.json"
+    "bpe_bytelevel_minimal.json"
   C_FILE_OUTPUT
-    "tokenizer_testdata.c"
+    "streaming_testdata.c"
   H_FILE_OUTPUT
-    "tokenizer_testdata.h"
+    "streaming_testdata.h"
   IDENTIFIER
-    "iree_tokenizer_testdata"
+    "iree_tokenizer_streaming_testdata"
   TESTONLY
   FLATTEN
   PUBLIC

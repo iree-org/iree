@@ -16,8 +16,13 @@ extern const iree_host_size_t iree_unicode_category_ranges_count;
 extern const uint32_t iree_unicode_whitespace_codepoints[];
 extern const iree_host_size_t iree_unicode_whitespace_count;
 
-extern const iree_unicode_case_mapping_t iree_unicode_case_mappings[];
-extern const iree_host_size_t iree_unicode_case_mappings_count;
+extern const iree_unicode_case_mapping_simple_t
+    iree_unicode_lowercase_mappings[];
+extern const iree_host_size_t iree_unicode_lowercase_mappings_count;
+
+extern const iree_unicode_case_mapping_simple_t
+    iree_unicode_uppercase_mappings[];
+extern const iree_host_size_t iree_unicode_uppercase_mappings_count;
 
 extern const iree_unicode_nfd_mapping_t iree_unicode_nfd_mappings[];
 extern const iree_host_size_t iree_unicode_nfd_mappings_count;
@@ -28,89 +33,18 @@ extern const iree_host_size_t iree_unicode_ccc_entries_count;
 extern const iree_unicode_nfc_pair_t iree_unicode_nfc_pairs[];
 extern const iree_host_size_t iree_unicode_nfc_pairs_count;
 
+extern const iree_unicode_nfc_decomp_t iree_unicode_nfc_decompositions[];
+extern const iree_host_size_t iree_unicode_nfc_decompositions_count;
+
+extern const iree_unicode_nfkd_mapping_t iree_unicode_nfkd_mappings[];
+extern const iree_host_size_t iree_unicode_nfkd_mappings_count;
+
+extern const uint32_t iree_unicode_nfkd_overflow[];
+extern const iree_host_size_t iree_unicode_nfkd_overflow_count;
+
 //===----------------------------------------------------------------------===//
 // UTF-8 Codec
 //===----------------------------------------------------------------------===//
-
-uint32_t iree_unicode_utf8_decode(iree_string_view_t text,
-                                  iree_host_size_t* position) {
-  if (*position >= text.size) {
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  const uint8_t* data = (const uint8_t*)text.data;
-  uint8_t first_byte = data[*position];
-
-  // Single byte (ASCII): 0xxxxxxx
-  if ((first_byte & 0x80) == 0) {
-    (*position)++;
-    return first_byte;
-  }
-
-  // Determine sequence length from leading byte.
-  iree_host_size_t sequence_length;
-  uint32_t codepoint;
-  if ((first_byte & 0xE0) == 0xC0) {
-    // Two bytes: 110xxxxx 10xxxxxx
-    sequence_length = 2;
-    codepoint = first_byte & 0x1F;
-  } else if ((first_byte & 0xF0) == 0xE0) {
-    // Three bytes: 1110xxxx 10xxxxxx 10xxxxxx
-    sequence_length = 3;
-    codepoint = first_byte & 0x0F;
-  } else if ((first_byte & 0xF8) == 0xF0) {
-    // Four bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-    sequence_length = 4;
-    codepoint = first_byte & 0x07;
-  } else {
-    // Invalid leading byte.
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  // Check we have enough bytes remaining.
-  if (*position + sequence_length > text.size) {
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  // Decode continuation bytes.
-  for (iree_host_size_t i = 1; i < sequence_length; ++i) {
-    uint8_t continuation_byte = data[*position + i];
-    if ((continuation_byte & 0xC0) != 0x80) {
-      // Invalid continuation byte.
-      (*position)++;
-      return IREE_UNICODE_REPLACEMENT_CHAR;
-    }
-    codepoint = (codepoint << 6) | (continuation_byte & 0x3F);
-  }
-
-  // Validate codepoint range and overlong sequences.
-  bool valid = true;
-  if (codepoint > IREE_UNICODE_MAX_CODEPOINT) {
-    valid = false;
-  } else if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
-    // Surrogate pairs are invalid in UTF-8.
-    valid = false;
-  } else if (sequence_length == 2 && codepoint < 0x80) {
-    // Overlong 2-byte sequence.
-    valid = false;
-  } else if (sequence_length == 3 && codepoint < 0x800) {
-    // Overlong 3-byte sequence.
-    valid = false;
-  } else if (sequence_length == 4 && codepoint < 0x10000) {
-    // Overlong 4-byte sequence.
-    valid = false;
-  }
-
-  if (!valid) {
-    (*position)++;
-    return IREE_UNICODE_REPLACEMENT_CHAR;
-  }
-
-  *position += sequence_length;
-  return codepoint;
-}
 
 int iree_unicode_utf8_encode(uint32_t codepoint, char* out_buffer) {
   if (codepoint > IREE_UNICODE_MAX_CODEPOINT ||
@@ -197,24 +131,8 @@ iree_host_size_t iree_unicode_utf8_incomplete_tail_length(
     // Continuation bytes (10xxxxxx) are not lead bytes - keep scanning.
     if ((byte & 0xC0) == 0x80) continue;
 
-    // Found a lead byte. Determine expected sequence length.
-    iree_host_size_t expected_length;
-    if ((byte & 0x80) == 0x00) {
-      // ASCII (0xxxxxxx) - 1 byte, always complete.
-      expected_length = 1;
-    } else if ((byte & 0xE0) == 0xC0) {
-      // 2-byte sequence (110xxxxx).
-      expected_length = 2;
-    } else if ((byte & 0xF0) == 0xE0) {
-      // 3-byte sequence (1110xxxx).
-      expected_length = 3;
-    } else if ((byte & 0xF8) == 0xF0) {
-      // 4-byte sequence (11110xxx).
-      expected_length = 4;
-    } else {
-      // Invalid lead byte (0xFF, 0xFE, or overlong) - treat as complete.
-      return 0;
-    }
+    // Found a lead byte. Use the sequence length helper.
+    iree_host_size_t expected_length = iree_unicode_utf8_sequence_length(byte);
 
     // Available bytes from lead to end of buffer.
     iree_host_size_t available = i;
@@ -237,8 +155,7 @@ iree_host_size_t iree_unicode_utf8_incomplete_tail_length(
 
 // Binary search for codepoint in category ranges.
 // Returns OTHER for valid but unassigned codepoints (Cn category).
-static iree_unicode_category_t iree_unicode_category_lookup(
-    uint32_t codepoint) {
+iree_unicode_category_t iree_unicode_category_lookup(uint32_t codepoint) {
   if (iree_unicode_category_ranges_count == 0) {
     return IREE_UNICODE_CATEGORY_OTHER;
   }
@@ -262,7 +179,7 @@ static iree_unicode_category_t iree_unicode_category_lookup(
 }
 
 // Binary search for codepoint in whitespace list.
-static bool iree_unicode_whitespace_lookup(uint32_t codepoint) {
+bool iree_unicode_whitespace_lookup(uint32_t codepoint) {
   iree_host_size_t low = 0;
   iree_host_size_t high = iree_unicode_whitespace_count;
   while (low < high) {
@@ -279,15 +196,35 @@ static bool iree_unicode_whitespace_lookup(uint32_t codepoint) {
   return false;
 }
 
-// Binary search for codepoint in case mappings.
-static const iree_unicode_case_mapping_t* iree_unicode_case_lookup(
+// Binary search for codepoint in lowercase mappings.
+static const iree_unicode_case_mapping_simple_t* iree_unicode_lowercase_lookup(
     uint32_t codepoint) {
   iree_host_size_t low = 0;
-  iree_host_size_t high = iree_unicode_case_mappings_count;
+  iree_host_size_t high = iree_unicode_lowercase_mappings_count;
   while (low < high) {
     iree_host_size_t mid = low + (high - low) / 2;
-    const iree_unicode_case_mapping_t* mapping =
-        &iree_unicode_case_mappings[mid];
+    const iree_unicode_case_mapping_simple_t* mapping =
+        &iree_unicode_lowercase_mappings[mid];
+    if (codepoint < mapping->codepoint) {
+      high = mid;
+    } else if (codepoint > mapping->codepoint) {
+      low = mid + 1;
+    } else {
+      return mapping;
+    }
+  }
+  return NULL;
+}
+
+// Binary search for codepoint in uppercase mappings.
+static const iree_unicode_case_mapping_simple_t* iree_unicode_uppercase_lookup(
+    uint32_t codepoint) {
+  iree_host_size_t low = 0;
+  iree_host_size_t high = iree_unicode_uppercase_mappings_count;
+  while (low < high) {
+    iree_host_size_t mid = low + (high - low) / 2;
+    const iree_unicode_case_mapping_simple_t* mapping =
+        &iree_unicode_uppercase_mappings[mid];
     if (codepoint < mapping->codepoint) {
       high = mid;
     } else if (codepoint > mapping->codepoint) {
@@ -322,61 +259,93 @@ static const iree_unicode_nfd_mapping_t* iree_unicode_nfd_lookup(
 // Unicode Categories
 //===----------------------------------------------------------------------===//
 
-iree_unicode_category_t iree_unicode_category(uint32_t codepoint) {
-  // Fast path for ASCII.
-  if (codepoint < 0x80) {
-    if (codepoint >= 'A' && codepoint <= 'Z') {
-      return IREE_UNICODE_CATEGORY_LETTER;
-    }
-    if (codepoint >= 'a' && codepoint <= 'z') {
-      return IREE_UNICODE_CATEGORY_LETTER;
-    }
-    if (codepoint >= '0' && codepoint <= '9') {
-      return IREE_UNICODE_CATEGORY_NUMBER;
-    }
-    if (codepoint < 0x20 || codepoint == 0x7F) {
-      return IREE_UNICODE_CATEGORY_OTHER;  // Control
-    }
-    if (codepoint == ' ') {
-      return IREE_UNICODE_CATEGORY_SEPARATOR;
-    }
-    // ASCII punctuation and symbols.
-    if ((codepoint >= '!' && codepoint <= '/') ||
-        (codepoint >= ':' && codepoint <= '@') ||
-        (codepoint >= '[' && codepoint <= '`') ||
-        (codepoint >= '{' && codepoint <= '~')) {
-      // Mix of punctuation and symbols - check specific ranges.
-      if (codepoint == '$' || codepoint == '+' || codepoint == '<' ||
-          codepoint == '=' || codepoint == '>' || codepoint == '^' ||
-          codepoint == '`' || codepoint == '|' || codepoint == '~') {
-        return IREE_UNICODE_CATEGORY_SYMBOL;
-      }
-      return IREE_UNICODE_CATEGORY_PUNCTUATION;
-    }
-  }
-  return iree_unicode_category_lookup(codepoint);
-}
-
-bool iree_unicode_is_whitespace(uint32_t codepoint) {
-  // Fast path for common whitespace.
-  if (codepoint == ' ' || codepoint == '\t' || codepoint == '\n' ||
-      codepoint == '\r' || codepoint == '\f' || codepoint == '\v') {
-    return true;
-  }
-  // Check the full whitespace table for non-ASCII.
-  if (codepoint >= 0x80) {
-    return iree_unicode_whitespace_lookup(codepoint);
-  }
-  return false;
-}
+// Direct lookup table for Latin-1 Supplement (U+0080-U+00FF).
+// Eliminates binary search (~9 comparisons) for the most common non-ASCII
+// range. This is the hot path for ByteLevel pre-tokenizers (GPT-2, Llama-3,
+// etc.) which map raw bytes 0x80-0xFF to codepoints in this range.
+//
+// Categories from Unicode 15.0 General_Category property:
+//   U+0080-009F: Cc (Control)           → OTHER
+//   U+00A0:      Zs (Space Separator)   → SEPARATOR
+//   U+00A1-00BF: Mixed Po/Sc/So/Sk/Sm/Pi/Pf/No/Lo/Cf
+//   U+00C0-00D6: Lu (Uppercase Letter)  → LETTER
+//   U+00D7:      Sm (Math Symbol)       → SYMBOL  (×)
+//   U+00D8-00F6: Lu/Ll (Letter)         → LETTER
+//   U+00F7:      Sm (Math Symbol)       → SYMBOL  (÷)
+//   U+00F8-00FF: Ll (Lowercase Letter)  → LETTER
+// clang-format off
+const uint8_t iree_unicode_latin1_categories[128] = {
+    // U+0080-008F: C1 Controls (Cc).
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    // U+0090-009F: C1 Controls (Cc).
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
+    // U+00A0-00AF:
+    //   A0=Zs  A1=Po  A2=Sc  A3=Sc  A4=Sc  A5=Sc  A6=So  A7=Po
+    //   A8=Sk  A9=So  AA=Lo  AB=Pi  AC=Sm  AD=Cf  AE=So  AF=Sk
+    0x20, 0x08, 0x10, 0x10, 0x10, 0x10, 0x10, 0x08,
+    0x10, 0x10, 0x01, 0x08, 0x10, 0x40, 0x10, 0x10,
+    // U+00B0-00BF:
+    //   B0=So  B1=Sm  B2=No  B3=No  B4=Sk  B5=Ll  B6=So  B7=Po
+    //   B8=Sk  B9=No  BA=Lo  BB=Pf  BC=No  BD=No  BE=No  BF=Po
+    0x10, 0x10, 0x04, 0x04, 0x10, 0x01, 0x10, 0x08,
+    0x10, 0x04, 0x01, 0x08, 0x04, 0x04, 0x04, 0x08,
+    // U+00C0-00CF: Lu (Uppercase Letter).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00D0-00DF: Lu except D7=Sm (×).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x10,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00E0-00EF: Ll (Lowercase Letter).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    // U+00F0-00FF: Ll except F7=Sm (÷).
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x10,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+};
+// clang-format on
 
 bool iree_unicode_is_control(uint32_t codepoint) {
   // Cc category: C0 controls (0x00-0x1F), DEL (0x7F), C1 controls (0x80-0x9F).
   return codepoint <= 0x1F || (codepoint >= 0x7F && codepoint <= 0x9F);
 }
 
-bool iree_unicode_is_cjk(uint32_t codepoint) {
-  // CJK Unified Ideographs and related blocks.
+bool iree_unicode_is_invisible_format(uint32_t codepoint) {
+  // Zero-width and invisible Unicode Format (Cf) characters that should be
+  // stripped during BERT-style text cleaning. These characters are used for
+  // text layout/formatting but have no visible representation.
+  //
+  // HuggingFace's BERT tokenizer strips these when clean_text=true.
+  switch (codepoint) {
+    // Zero-width characters (U+200B-U+200F).
+    case 0x200B:  // Zero Width Space (ZWSP)
+    case 0x200C:  // Zero Width Non-Joiner (ZWNJ)
+    case 0x200D:  // Zero Width Joiner (ZWJ)
+    case 0x200E:  // Left-to-Right Mark (LRM)
+    case 0x200F:  // Right-to-Left Mark (RLM)
+    // Directional formatting (U+202A-U+202E).
+    case 0x202A:  // Left-to-Right Embedding (LRE)
+    case 0x202B:  // Right-to-Left Embedding (RLE)
+    case 0x202C:  // Pop Directional Formatting (PDF)
+    case 0x202D:  // Left-to-Right Override (LRO)
+    case 0x202E:  // Right-to-Left Override (RLO)
+    // Word joiner and invisible operators (U+2060-U+2064).
+    case 0x2060:  // Word Joiner (WJ)
+    case 0x2061:  // Function Application (invisible)
+    case 0x2062:  // Invisible Times
+    case 0x2063:  // Invisible Separator
+    case 0x2064:  // Invisible Plus
+    // Byte Order Mark (U+FEFF).
+    case 0xFEFF:  // BOM / Zero Width No-Break Space (ZWNBSP)
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool iree_unicode_is_han(uint32_t codepoint) {
+  // Han (Chinese) characters: CJK Unified Ideographs and related blocks.
   return (codepoint >= 0x4E00 &&
           codepoint <= 0x9FFF) ||  // CJK Unified Ideographs
          (codepoint >= 0x3400 && codepoint <= 0x4DBF) ||    // CJK Extension A
@@ -409,20 +378,35 @@ bool iree_unicode_is_hangul(uint32_t codepoint) {
 // Case Folding
 //===----------------------------------------------------------------------===//
 
-uint32_t iree_unicode_to_lower(uint32_t codepoint) {
-  // Fast path for ASCII.
+iree_host_size_t iree_unicode_to_lower(uint32_t codepoint, uint32_t out[2]) {
+  // Fast path for ASCII (most common case).
   if (codepoint >= 'A' && codepoint <= 'Z') {
-    return codepoint + ('a' - 'A');
+    out[0] = codepoint + ('a' - 'A');
+    return 1;
   }
   if (codepoint < 0x80) {
-    return codepoint;
+    out[0] = codepoint;
+    return 1;
   }
-  const iree_unicode_case_mapping_t* mapping =
-      iree_unicode_case_lookup(codepoint);
-  if (mapping && mapping->lowercase != 0) {
-    return mapping->lowercase;
+
+  // Special case: U+0130 (İ) → i + combining dot (U+0069 U+0307).
+  // This is the ONLY unconditional 1:N lowercase mapping in Unicode.
+  // See: https://www.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt
+  if (codepoint == 0x0130) {
+    out[0] = 0x0069;  // LATIN SMALL LETTER I
+    out[1] = 0x0307;  // COMBINING DOT ABOVE
+    return 2;
   }
-  return codepoint;
+
+  // Table lookup for non-ASCII.
+  const iree_unicode_case_mapping_simple_t* mapping =
+      iree_unicode_lowercase_lookup(codepoint);
+  if (mapping) {
+    out[0] = mapping->target;
+    return 1;
+  }
+  out[0] = codepoint;
+  return 1;
 }
 
 uint32_t iree_unicode_to_upper(uint32_t codepoint) {
@@ -433,10 +417,10 @@ uint32_t iree_unicode_to_upper(uint32_t codepoint) {
   if (codepoint < 0x80) {
     return codepoint;
   }
-  const iree_unicode_case_mapping_t* mapping =
-      iree_unicode_case_lookup(codepoint);
-  if (mapping && mapping->uppercase != 0) {
-    return mapping->uppercase;
+  const iree_unicode_case_mapping_simple_t* mapping =
+      iree_unicode_uppercase_lookup(codepoint);
+  if (mapping) {
+    return mapping->target;
   }
   return codepoint;
 }
@@ -446,16 +430,101 @@ uint32_t iree_unicode_to_upper(uint32_t codepoint) {
 //===----------------------------------------------------------------------===//
 
 uint32_t iree_unicode_nfd_base(uint32_t codepoint) {
-  // ASCII has no decomposition.
-  if (codepoint < 0x80) {
-    return codepoint;
-  }
-  const iree_unicode_nfd_mapping_t* mapping =
-      iree_unicode_nfd_lookup(codepoint);
-  if (mapping) {
-    return mapping->base;
+  // Recursively decompose until we reach ASCII or a character with no further
+  // decomposition. This handles characters like Vietnamese ử (U+1EED) which
+  // decompose in multiple levels: U+1EED → U+1B0 (ư) → U+0075 (u).
+  while (codepoint >= 0x80) {
+    const iree_unicode_nfd_mapping_t* mapping =
+        iree_unicode_nfd_lookup(codepoint);
+    if (!mapping) {
+      // No further decomposition available.
+      break;
+    }
+    // Mask off the singleton flag to get the actual base codepoint.
+    uint32_t base = mapping->base & IREE_UNICODE_NFD_BASE_MASK;
+    if (base == codepoint) {
+      // Self-referential mapping (shouldn't happen, but guard against loops).
+      break;
+    }
+    codepoint = base;
   }
   return codepoint;
+}
+
+//===----------------------------------------------------------------------===//
+// Full NFD Decomposition (including Hangul)
+//===----------------------------------------------------------------------===//
+
+// Hangul syllable decomposition constants (Unicode Standard, Chapter 3.12).
+// Hangul syllables are algorithmically composed from Jamo components:
+//   Syllable = (L * VCount + V) * TCount + T + SBase
+// Where L=leading consonant, V=vowel, T=trailing consonant (optional).
+#define IREE_UNICODE_HANGUL_S_BASE 0xAC00  // First Hangul syllable: 가
+#define IREE_UNICODE_HANGUL_L_BASE 0x1100  // First leading consonant (Choseong)
+#define IREE_UNICODE_HANGUL_V_BASE 0x1161  // First vowel (Jungseong): ᅡ
+#define IREE_UNICODE_HANGUL_T_BASE 0x11A7  // Trailing consonant base
+#define IREE_UNICODE_HANGUL_L_COUNT 19     // Number of leading consonants
+#define IREE_UNICODE_HANGUL_V_COUNT 21     // Number of vowels
+#define IREE_UNICODE_HANGUL_T_COUNT 28     // Number of trailing consonants
+#define IREE_UNICODE_HANGUL_N_COUNT \
+  (IREE_UNICODE_HANGUL_V_COUNT * IREE_UNICODE_HANGUL_T_COUNT)  // 588
+#define IREE_UNICODE_HANGUL_S_COUNT \
+  (IREE_UNICODE_HANGUL_L_COUNT * IREE_UNICODE_HANGUL_N_COUNT)  // 11172
+
+iree_host_size_t iree_unicode_decompose(uint32_t codepoint,
+                                        uint32_t* out_codepoints) {
+  // ASCII has no decomposition.
+  if (codepoint < 0x80) {
+    out_codepoints[0] = codepoint;
+    return 1;
+  }
+
+  // Hangul syllable decomposition (algorithmic).
+  // Hangul syllables in U+AC00-U+D7A3 decompose to 2-3 Jamo.
+  if (codepoint >= IREE_UNICODE_HANGUL_S_BASE) {
+    uint32_t s_index = codepoint - IREE_UNICODE_HANGUL_S_BASE;
+    if (s_index < IREE_UNICODE_HANGUL_S_COUNT) {
+      // Leading consonant (Choseong).
+      out_codepoints[0] =
+          IREE_UNICODE_HANGUL_L_BASE + (s_index / IREE_UNICODE_HANGUL_N_COUNT);
+      // Vowel (Jungseong).
+      out_codepoints[1] = IREE_UNICODE_HANGUL_V_BASE +
+                          ((s_index % IREE_UNICODE_HANGUL_N_COUNT) /
+                           IREE_UNICODE_HANGUL_T_COUNT);
+      // Trailing consonant (Jongseong) - may be absent.
+      uint32_t t_index = s_index % IREE_UNICODE_HANGUL_T_COUNT;
+      if (t_index > 0) {
+        out_codepoints[2] = IREE_UNICODE_HANGUL_T_BASE + t_index;
+        return 3;
+      }
+      return 2;
+    }
+  }
+
+  // Table-based decomposition for other scripts.
+  // Look up the decomposition in the NFD table. The table stores both the base
+  // character and the combining mark (if any).
+  const iree_unicode_nfd_mapping_t* mapping =
+      iree_unicode_nfd_lookup(codepoint);
+  if (!mapping) {
+    // No decomposition available - return unchanged.
+    out_codepoints[0] = codepoint;
+    return 1;
+  }
+
+  // Get the base codepoint (masking off the singleton flag).
+  uint32_t base = mapping->base & IREE_UNICODE_NFD_BASE_MASK;
+
+  // Recursively decompose the base if needed (handles multi-level decomposition
+  // like Vietnamese ử: U+1EED → U+01B0 + U+0309, then U+01B0 → u + U+031B).
+  iree_host_size_t count = iree_unicode_decompose(base, out_codepoints);
+
+  // Append the combining mark if present.
+  if (mapping->combining != 0) {
+    out_codepoints[count++] = mapping->combining;
+  }
+
+  return count;
 }
 
 //===----------------------------------------------------------------------===//
@@ -513,6 +582,42 @@ static uint32_t iree_unicode_nfc_pair_lookup(uint32_t base,
 }
 
 uint32_t iree_unicode_compose_pair(uint32_t base, uint32_t combining) {
+  // Hangul composition (algorithmic, Unicode Standard Chapter 3.12).
+  // This is the inverse of the algorithmic decomposition in nfd_decompose.
+
+  // Case 1: L + V → LV syllable.
+  // L (leading consonant): U+1100..U+1112
+  // V (vowel): U+1161..U+1175
+  if (base >= IREE_UNICODE_HANGUL_L_BASE &&
+      base < IREE_UNICODE_HANGUL_L_BASE + IREE_UNICODE_HANGUL_L_COUNT) {
+    if (combining >= IREE_UNICODE_HANGUL_V_BASE &&
+        combining < IREE_UNICODE_HANGUL_V_BASE + IREE_UNICODE_HANGUL_V_COUNT) {
+      uint32_t l_index = base - IREE_UNICODE_HANGUL_L_BASE;
+      uint32_t v_index = combining - IREE_UNICODE_HANGUL_V_BASE;
+      return IREE_UNICODE_HANGUL_S_BASE +
+             (l_index * IREE_UNICODE_HANGUL_N_COUNT) +
+             (v_index * IREE_UNICODE_HANGUL_T_COUNT);
+    }
+  }
+
+  // Case 2: LV + T → LVT syllable.
+  // LV syllable: a syllable with no trailing consonant (s_index % T_COUNT == 0)
+  // T (trailing consonant): U+11A8..U+11C2
+  if (base >= IREE_UNICODE_HANGUL_S_BASE) {
+    uint32_t s_index = base - IREE_UNICODE_HANGUL_S_BASE;
+    if (s_index < IREE_UNICODE_HANGUL_S_COUNT &&
+        (s_index % IREE_UNICODE_HANGUL_T_COUNT) == 0) {
+      // It's an LV syllable.
+      if (combining > IREE_UNICODE_HANGUL_T_BASE &&
+          combining <=
+              IREE_UNICODE_HANGUL_T_BASE + IREE_UNICODE_HANGUL_T_COUNT - 1) {
+        uint32_t t_index = combining - IREE_UNICODE_HANGUL_T_BASE;
+        return base + t_index;
+      }
+    }
+  }
+
+  // Fall back to table lookup for non-Hangul compositions.
   return iree_unicode_nfc_pair_lookup(base, combining);
 }
 
@@ -596,7 +701,8 @@ static iree_host_size_t iree_unicode_compose_codepoints(
 #define IREE_UNICODE_MAX_COMBINING_SEQUENCE 32
 
 // Flushes a combining sequence: applies canonical ordering and composition,
-// then encodes to output. Returns the number of bytes written, or 0 on error.
+// then encodes to output. Returns the number of bytes written on success, or
+// IREE_HOST_SIZE_MAX if the output buffer would overflow.
 static iree_host_size_t iree_unicode_flush_sequence(
     uint32_t* sequence, iree_host_size_t sequence_count, char* out_buffer,
     iree_host_size_t capacity, iree_host_size_t output_position) {
@@ -613,7 +719,7 @@ static iree_host_size_t iree_unicode_flush_sequence(
     iree_host_size_t encoded_length =
         iree_unicode_utf8_encoded_length(sequence[i]);
     if (output_position + bytes_written + encoded_length > capacity) {
-      return 0;  // Would overflow.
+      return IREE_HOST_SIZE_MAX;  // Would overflow.
     }
     bytes_written += iree_unicode_utf8_encode(
         sequence[i], out_buffer + output_position + bytes_written);
@@ -659,7 +765,7 @@ iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
       // New starter: flush the previous sequence.
       iree_host_size_t bytes_written = iree_unicode_flush_sequence(
           sequence, sequence_count, out_buffer, capacity, output_position);
-      if (bytes_written == 0 && sequence_count > 0) {
+      if (bytes_written == IREE_HOST_SIZE_MAX) {
         return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
       }
       output_position += bytes_written;
@@ -677,7 +783,7 @@ iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
   if (sequence_count > 0) {
     iree_host_size_t bytes_written = iree_unicode_flush_sequence(
         sequence, sequence_count, out_buffer, capacity, output_position);
-    if (bytes_written == 0 && sequence_count > 0) {
+    if (bytes_written == IREE_HOST_SIZE_MAX) {
       return iree_status_from_code(IREE_STATUS_RESOURCE_EXHAUSTED);
     }
     output_position += bytes_written;
@@ -685,4 +791,283 @@ iree_status_t iree_unicode_compose(iree_string_view_t input, char* out_buffer,
 
   *out_length = output_position;
   return iree_ok_status();
+}
+
+iree_host_size_t iree_unicode_decompose_singleton(uint32_t codepoint,
+                                                  uint32_t* out_codepoints) {
+  // Fast path: ASCII has no decomposition.
+  if (codepoint < 0x80) {
+    out_codepoints[0] = codepoint;
+    return 1;
+  }
+
+  // Hangul syllable algorithmic decomposition (U+AC00-U+D7A3).
+  // Decomposes to 2-3 Jamo which will be recomposed by NFC composition step.
+  if (codepoint >= IREE_UNICODE_HANGUL_S_BASE &&
+      codepoint < IREE_UNICODE_HANGUL_S_BASE + IREE_UNICODE_HANGUL_S_COUNT) {
+    uint32_t s_index = codepoint - IREE_UNICODE_HANGUL_S_BASE;
+    out_codepoints[0] =
+        IREE_UNICODE_HANGUL_L_BASE + (s_index / IREE_UNICODE_HANGUL_N_COUNT);
+    out_codepoints[1] =
+        IREE_UNICODE_HANGUL_V_BASE +
+        ((s_index % IREE_UNICODE_HANGUL_N_COUNT) / IREE_UNICODE_HANGUL_T_COUNT);
+    uint32_t t_index = s_index % IREE_UNICODE_HANGUL_T_COUNT;
+    if (t_index > 0) {
+      out_codepoints[2] = IREE_UNICODE_HANGUL_T_BASE + t_index;
+      return 3;
+    }
+    return 2;
+  }
+
+  // Check table for singleton decomposition only (e.g., CJK Compatibility).
+  // Non-singleton decompositions (like é) are NOT applied since those
+  // characters are already in NFC form.
+  const iree_unicode_nfd_mapping_t* mapping =
+      iree_unicode_nfd_lookup(codepoint);
+  if (mapping && (mapping->base & IREE_UNICODE_NFD_SINGLETON_FLAG)) {
+    out_codepoints[0] = mapping->base & IREE_UNICODE_NFD_BASE_MASK;
+    return 1;
+  }
+
+  // No decomposition needed - return unchanged.
+  out_codepoints[0] = codepoint;
+  return 1;
+}
+
+// Binary search for an NFC decomposition entry by codepoint.
+static const iree_unicode_nfc_decomp_t* iree_unicode_nfc_decomp_lookup(
+    uint32_t codepoint) {
+  iree_host_size_t low = 0;
+  iree_host_size_t high = iree_unicode_nfc_decompositions_count;
+  while (low < high) {
+    iree_host_size_t mid = (low + high) / 2;
+    const iree_unicode_nfc_decomp_t* entry =
+        &iree_unicode_nfc_decompositions[mid];
+    if (entry->codepoint < codepoint) {
+      low = mid + 1;
+    } else if (entry->codepoint > codepoint) {
+      high = mid;
+    } else {
+      return entry;
+    }
+  }
+  return NULL;
+}
+
+iree_host_size_t iree_unicode_decompose_nfc_canonical(
+    uint32_t codepoint, uint32_t* out_codepoints) {
+  // Fast path: ASCII has no decomposition.
+  if (codepoint < 0x80) {
+    out_codepoints[0] = codepoint;
+    return 1;
+  }
+
+  // Hangul syllable algorithmic decomposition (U+AC00-U+D7A3).
+  if (codepoint >= IREE_UNICODE_HANGUL_S_BASE &&
+      codepoint < IREE_UNICODE_HANGUL_S_BASE + IREE_UNICODE_HANGUL_S_COUNT) {
+    uint32_t s_index = codepoint - IREE_UNICODE_HANGUL_S_BASE;
+    out_codepoints[0] =
+        IREE_UNICODE_HANGUL_L_BASE + (s_index / IREE_UNICODE_HANGUL_N_COUNT);
+    out_codepoints[1] =
+        IREE_UNICODE_HANGUL_V_BASE +
+        ((s_index % IREE_UNICODE_HANGUL_N_COUNT) / IREE_UNICODE_HANGUL_T_COUNT);
+    uint32_t t_index = s_index % IREE_UNICODE_HANGUL_T_COUNT;
+    if (t_index > 0) {
+      out_codepoints[2] = IREE_UNICODE_HANGUL_T_BASE + t_index;
+      return 3;
+    }
+    return 2;
+  }
+
+  // Check the NFC_QC=No decomposition table (covers singleton and
+  // multi-codepoint canonical decompositions not handled elsewhere).
+  const iree_unicode_nfc_decomp_t* decomp =
+      iree_unicode_nfc_decomp_lookup(codepoint);
+  if (decomp) {
+    iree_host_size_t count = 0;
+    for (iree_host_size_t i = 0; i < 3 && decomp->target[i] != 0; ++i) {
+      out_codepoints[count++] = decomp->target[i];
+    }
+    return count;
+  }
+
+  // Check the existing NFD singleton table (CJK Compatibility Ideographs, etc.)
+  const iree_unicode_nfd_mapping_t* mapping =
+      iree_unicode_nfd_lookup(codepoint);
+  if (mapping && (mapping->base & IREE_UNICODE_NFD_SINGLETON_FLAG)) {
+    out_codepoints[0] = mapping->base & IREE_UNICODE_NFD_BASE_MASK;
+    return 1;
+  }
+
+  // No decomposition needed - return unchanged.
+  out_codepoints[0] = codepoint;
+  return 1;
+}
+
+iree_status_t iree_unicode_nfc(iree_string_view_t input,
+                               iree_host_size_t out_capacity, char* out_buffer,
+                               iree_host_size_t* out_length) {
+  // Fast path: ASCII-only input needs no normalization.
+  bool all_ascii = true;
+  for (iree_host_size_t i = 0; i < input.size && all_ascii; ++i) {
+    if ((uint8_t)input.data[i] > 0x7F) all_ascii = false;
+  }
+  if (all_ascii) {
+    if (input.size > out_capacity) {
+      return iree_make_status(
+          IREE_STATUS_RESOURCE_EXHAUSTED,
+          "NFC output buffer too small for ASCII input (need %" PRIhsz
+          ", have %" PRIhsz ")",
+          input.size, out_capacity);
+    }
+    memcpy(out_buffer, input.data, input.size);
+    *out_length = input.size;
+    return iree_ok_status();
+  }
+
+  // Unlike compose(), NFC can expand intermediate output (Hangul syllables
+  // decompose to 2-3 Jamo), but after composition the output typically shrinks.
+  // We need enough capacity for the intermediate decomposed form.
+  // Worst case: every input byte becomes 4 output bytes (if all Hangul).
+  // In practice, most text is already NFC so little expansion occurs.
+
+  // Process combining sequences one at a time using a small fixed buffer.
+  // A combining sequence is a starter (CCC=0) followed by combining marks.
+  uint32_t sequence[IREE_UNICODE_MAX_COMBINING_SEQUENCE];
+  iree_host_size_t sequence_count = 0;
+  iree_host_size_t input_position = 0;
+  iree_host_size_t output_position = 0;
+
+  while (input_position < input.size) {
+    uint32_t codepoint = iree_unicode_utf8_decode(input, &input_position);
+
+    // Canonical decomposition for NFC: decomposes Hangul, CJK compatibility,
+    // and all NFC_QC=No characters. Precomposed characters like é are left
+    // unchanged (they are already in NFC form).
+    uint32_t decomposed[4];
+    iree_host_size_t decomposed_count =
+        iree_unicode_decompose_nfc_canonical(codepoint, decomposed);
+
+    // Process each decomposed codepoint.
+    for (iree_host_size_t d = 0; d < decomposed_count; ++d) {
+      uint32_t cp = decomposed[d];
+      uint8_t ccc = iree_unicode_ccc(cp);
+
+      if (ccc == 0 && sequence_count > 0) {
+        // New starter encountered. Before flushing, try to compose with the
+        // last codepoint in the sequence. This handles Hangul Jamo composition
+        // where L+V and LV+T are both compositions of two starters (CCC 0).
+        uint32_t last_cp = sequence[sequence_count - 1];
+        uint32_t composition = iree_unicode_compose_pair(last_cp, cp);
+        if (composition != 0) {
+          // Composition succeeded - replace last codepoint, skip adding cp.
+          sequence[sequence_count - 1] = composition;
+          continue;
+        }
+
+        // Composition failed - flush the previous sequence and start fresh.
+        iree_host_size_t bytes_written =
+            iree_unicode_flush_sequence(sequence, sequence_count, out_buffer,
+                                        out_capacity, output_position);
+        if (bytes_written == IREE_HOST_SIZE_MAX) {
+          return iree_make_status(
+              IREE_STATUS_RESOURCE_EXHAUSTED,
+              "NFC output buffer overflow while flushing sequence at position "
+              "%" PRIhsz,
+              output_position);
+        }
+        output_position += bytes_written;
+        sequence_count = 0;
+      }
+
+      // Add decomposed codepoint to current sequence.
+      if (sequence_count >= IREE_UNICODE_MAX_COMBINING_SEQUENCE) {
+        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "NFC combining sequence exceeds maximum length "
+                                "(%d codepoints) at input position %" PRIhsz,
+                                IREE_UNICODE_MAX_COMBINING_SEQUENCE,
+                                input_position);
+      }
+      sequence[sequence_count++] = cp;
+    }
+  }
+
+  // Flush any remaining sequence.
+  if (sequence_count > 0) {
+    iree_host_size_t bytes_written = iree_unicode_flush_sequence(
+        sequence, sequence_count, out_buffer, out_capacity, output_position);
+    if (bytes_written == IREE_HOST_SIZE_MAX) {
+      return iree_make_status(
+          IREE_STATUS_RESOURCE_EXHAUSTED,
+          "NFC output buffer overflow while flushing final sequence at "
+          "position %" PRIhsz,
+          output_position);
+    }
+    output_position += bytes_written;
+  }
+
+  *out_length = output_position;
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// NFKD Decomposition
+//===----------------------------------------------------------------------===//
+
+// Binary search for codepoint in NFKD mappings.
+static const iree_unicode_nfkd_mapping_t* iree_unicode_nfkd_lookup(
+    uint32_t codepoint) {
+  iree_host_size_t low = 0;
+  iree_host_size_t high = iree_unicode_nfkd_mappings_count;
+  while (low < high) {
+    iree_host_size_t mid = low + (high - low) / 2;
+    const iree_unicode_nfkd_mapping_t* mapping =
+        &iree_unicode_nfkd_mappings[mid];
+    if (codepoint < mapping->codepoint) {
+      high = mid;
+    } else if (codepoint > mapping->codepoint) {
+      low = mid + 1;
+    } else {
+      return mapping;
+    }
+  }
+  return NULL;
+}
+
+iree_host_size_t iree_unicode_decompose_nfkd(uint32_t codepoint,
+                                             uint32_t* out_codepoints) {
+  // ASCII has no decomposition.
+  if (codepoint < 0x80) {
+    out_codepoints[0] = codepoint;
+    return 1;
+  }
+
+  // Look up NFKD compatibility decomposition.
+  const iree_unicode_nfkd_mapping_t* mapping =
+      iree_unicode_nfkd_lookup(codepoint);
+  if (mapping) {
+    // Found a compatibility decomposition.
+    // The table already contains the fully-expanded NFKD form (compatibility +
+    // canonical decompositions applied recursively by the generator).
+    iree_host_size_t length = mapping->length;
+    if (length <= 4) {
+      // Inline storage.
+      for (iree_host_size_t i = 0; i < length; ++i) {
+        out_codepoints[i] = mapping->inline_targets[i];
+      }
+    } else {
+      // Overflow storage.
+      const uint32_t* targets = iree_unicode_nfkd_overflow + mapping->offset;
+      for (iree_host_size_t i = 0; i < length; ++i) {
+        out_codepoints[i] = targets[i];
+      }
+    }
+    return length;
+  }
+
+  // No compatibility decomposition - apply canonical (NFD) decomposition.
+  // This handles:
+  // - Hangul syllables (algorithmic decomposition)
+  // - Precomposed characters like é → e + combining acute
+  return iree_unicode_decompose(codepoint, out_codepoints);
 }

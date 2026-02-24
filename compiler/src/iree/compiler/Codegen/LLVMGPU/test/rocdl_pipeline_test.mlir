@@ -146,14 +146,14 @@ hal.executable @ceildiv_expand_dispatch {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable public @matmul_map_scatter {
+hal.executable public @matmul_map_store {
 hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @matmul_map_scatter layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+  hal.executable.export public @matmul_map_store layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @matmul_map_scatter() {
+    func.func @matmul_map_store() {
       %true = arith.constant true
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
@@ -169,7 +169,7 @@ hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
       %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<256x256xf32>) -> tensor<256x256xf32>
       %10 = linalg.matmul ins(%6, %7 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%9 : tensor<256x256xf32>) -> tensor<256x256xf32>
       %11 = tensor.empty() : tensor<2x16x8x4x4x4x4xf32>
-      %12 = iree_linalg_ext.map_scatter %10 into %11 {
+      %12 = iree_linalg_ext.map_store %10 into %11 {
       ^bb0(%arg0: index, %arg1: index):
         %13:2 = affine.delinearize_index %arg0 into (2, 128) : index, index
         %14:2 = affine.delinearize_index %arg1 into (16, 16) : index, index
@@ -183,9 +183,9 @@ hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
   }
 }
 }
-// Verify that the map_scatter indexing arithmetic has been optimized to i32
+// Verify that the map_store indexing arithmetic has been optimized to i32
 
-// CDNA3-LABEL: hal.executable public @matmul_map_scatter
+// CDNA3-LABEL: hal.executable public @matmul_map_store
 //       CDNA3:   hal.executable.variant public @rocm
 //   CDNA3-NOT:     llvm.add {{.*}} : vector<{{[0-9x]*}}xi64>
 //   CDNA3-NOT:     llvm.mul {{.*}} : vector<{{[0-9x]*}}xi64>

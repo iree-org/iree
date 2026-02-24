@@ -95,7 +95,7 @@ endfunction()
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB"
+    "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB;ALWAYSLINK"
     "PACKAGE;NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;SYSTEM_INCLUDES"
     ${ARGN}
@@ -154,7 +154,8 @@ function(iree_cc_library)
     list(APPEND _RULE_DEPS ${IREE_IMPLICIT_DEFS_CC_DEPS})
   endif()
 
-  if(NOT _RULE_IS_INTERFACE)
+  if(NOT _RULE_IS_INTERFACE AND NOT _RULE_ALWAYSLINK)
+    # Normal library: OBJECT for compilation, STATIC (or SHARED) for linking.
     add_library(${_OBJECTS_NAME} OBJECT)
     if(_RULE_SHARED OR BUILD_SHARED_LIBS)
       add_library(${_NAME} SHARED "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
@@ -275,8 +276,108 @@ function(iree_cc_library)
     # set here.
     set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
     set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+  elseif(NOT _RULE_IS_INTERFACE AND _RULE_ALWAYSLINK)
+    # ALWAYSLINK library: OBJECT for compilation, INTERFACE for propagation.
+    # The INTERFACE library propagates $<TARGET_OBJECTS:...> directly, ensuring
+    # all objects are always included in the final binary. STATIC archives let
+    # the linker strip unreferenced objects (dropping static init registrations);
+    # propagating objects directly bypasses the archive and eliminates that
+    # problem. This is the CMake equivalent of Bazel's alwayslink = True.
+    add_library(${_OBJECTS_NAME} OBJECT)
+    add_library(${_NAME} INTERFACE)
+
+    target_sources(${_OBJECTS_NAME}
+      PRIVATE
+        ${_RULE_SRCS}
+        ${_RULE_TEXTUAL_HDRS}
+        ${_RULE_HDRS}
+    )
+
+    set_property(TARGET ${_NAME} PROPERTY
+      INTERFACE_IREE_TRANSITIVE_OBJECTS "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
+    _iree_cc_library_add_object_deps(${_NAME} ${_RULE_DEPS})
+
+    # INTERFACE library propagates objects and link dependencies to consumers.
+    target_link_libraries(${_NAME}
+      INTERFACE
+        $<TARGET_OBJECTS:${_OBJECTS_NAME}>
+        ${_RULE_DEPS}
+        ${IREE_THREADS_DEPS}
+    )
+    target_include_directories(${_NAME}
+      INTERFACE
+        "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
+        "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
+        ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM INTERFACE
+        ${_RULE_SYSTEM_INCLUDES}
+    )
+    target_link_options(${_NAME}
+      INTERFACE
+        ${IREE_DEFAULT_LINKOPTS}
+        ${_RULE_LINKOPTS}
+    )
+    target_compile_definitions(${_NAME}
+      INTERFACE
+        ${_RULE_DEFINES}
+    )
+
+    # OBJECT library needs compile-related properties for building the sources.
+    # Compile options go directly on the OBJECT library (INTERFACE libraries
+    # cannot have PRIVATE properties).
+    target_compile_options(${_OBJECTS_NAME}
+      PRIVATE
+        ${IREE_DEFAULT_COPTS}
+        ${_RULE_COPTS}
+    )
+
+    # Forward transitive compile properties from the INTERFACE library's
+    # dependency chain to the OBJECT library so sources see all transitive
+    # include directories and definitions.
+    target_include_directories(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
+    )
+    target_include_directories(${_OBJECTS_NAME} SYSTEM
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+    )
+    target_compile_definitions(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_COMPILE_DEFINITIONS>
+    )
+    # Forward deps to the OBJECT library for transitive compile definitions.
+    # We forward deps directly rather than $<TARGET_PROPERTY:INTERFACE_LINK_LIBRARIES>
+    # because the latter contains $<TARGET_OBJECTS:${_OBJECTS_NAME}> which would
+    # create a circular reference.
+    target_link_libraries(${_OBJECTS_NAME}
+      PUBLIC
+        ${_RULE_DEPS}
+    )
+
+    iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
+
+    if(BUILD_SHARED_LIBS AND IREE_SUPPORTS_VISIBILITY_DEFAULT)
+      target_compile_options(${_OBJECTS_NAME} PRIVATE
+        "-fvisibility=default"
+      )
+    endif()
+
+    if(_RULE_PUBLIC)
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
+    elseif(_RULE_TESTONLY)
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
+    else()
+      set_property(TARGET ${_OBJECTS_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/internal)
+    endif()
+
+    set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
+    set_property(TARGET ${_OBJECTS_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
   else()
-    # Generating header-only library.
+    # Generating header-only library (no sources, or ALWAYSLINK on header-only
+    # which is meaningless since there are no objects).
     add_library(${_NAME} INTERFACE)
     target_include_directories(${_NAME}
       INTERFACE

@@ -24,9 +24,9 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
         "expected operation that implements LinalgExtInterface to also "
         "implement DestinationStyleOpInterface");
   }
-  // MapScatterOp allows mixed semantics (tensor input with memref output, or
+  // MapStoreOp allows mixed semantics (tensor input with memref output, or
   // memref input with tensor output).
-  if (!isa<MapScatterOp>(op)) {
+  if (!isa<MapStoreOp>(op)) {
     if (!dpsOp.hasPureBufferSemantics() && !dpsOp.hasPureTensorSemantics()) {
       return op->emitOpError(
           "expected operation that implements LinalgExtInterface to have "

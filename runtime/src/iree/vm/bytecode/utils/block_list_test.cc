@@ -107,7 +107,9 @@ TEST(BlockListTest, Valid) {
 
   // Verify blocks are all defined and have block markers.
   std::vector<uint8_t> bytecode_data = {
-      IREE_VM_OP_CORE_Block, IREE_VM_OP_CORE_Block, IREE_VM_OP_CORE_Block,
+      IREE_VM_OP_CORE_Block,
+      IREE_VM_OP_CORE_Block,
+      IREE_VM_OP_CORE_Block,
       IREE_VM_OP_CORE_AbsI32,  // need at least one op in a block
   };
   IREE_EXPECT_OK(iree_vm_bytecode_block_list_verify(

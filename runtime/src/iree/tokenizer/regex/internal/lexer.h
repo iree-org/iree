@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_TOKENIZER_REGEX_INTERNAL_LEXER_H_
-#define IREE_TOKENIZER_REGEX_INTERNAL_LEXER_H_
+#ifndef IREE_TOKENIZER_UTIL_REGEX_INTERNAL_LEXER_H_
+#define IREE_TOKENIZER_UTIL_REGEX_INTERNAL_LEXER_H_
 
 #include "iree/base/api.h"
 #include "iree/tokenizer/regex/exec.h"
@@ -20,45 +20,45 @@ extern "C" {
 
 typedef enum iree_tokenizer_regex_token_type_e {
   // Literal byte value (after escape processing).
-  IREE_TOKENIZER_REGEX_TOKEN_LITERAL,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_LITERAL,
 
   // Meta-characters.
-  IREE_TOKENIZER_REGEX_TOKEN_DOT,       // .
-  IREE_TOKENIZER_REGEX_TOKEN_CARET,     // ^
-  IREE_TOKENIZER_REGEX_TOKEN_DOLLAR,    // $
-  IREE_TOKENIZER_REGEX_TOKEN_PIPE,      // |
-  IREE_TOKENIZER_REGEX_TOKEN_STAR,      // *
-  IREE_TOKENIZER_REGEX_TOKEN_PLUS,      // +
-  IREE_TOKENIZER_REGEX_TOKEN_QUESTION,  // ?
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOT,       // .
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_CARET,     // ^
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOLLAR,    // $
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_PIPE,      // |
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_STAR,      // *
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_PLUS,      // +
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUESTION,  // ?
 
   // Grouping.
-  IREE_TOKENIZER_REGEX_TOKEN_LPAREN,  // (
-  IREE_TOKENIZER_REGEX_TOKEN_RPAREN,  // )
-  IREE_TOKENIZER_REGEX_TOKEN_LBRACE,  // {
-  IREE_TOKENIZER_REGEX_TOKEN_RBRACE,  // }
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_LPAREN,  // (
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN,  // )
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_LBRACE,  // {
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_RBRACE,  // }
 
   // Special group types (detected by lexer).
-  IREE_TOKENIZER_REGEX_TOKEN_GROUP_NC,      // (?:
-  IREE_TOKENIZER_REGEX_TOKEN_GROUP_CASE_I,  // (?i:
-  IREE_TOKENIZER_REGEX_TOKEN_GROUP_NEG_LA,  // (?!
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NC,      // (?:
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_CASE_I,  // (?i:
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NEG_LA,  // (?!
 
   // Character class (parsed to bitmap in lexer).
-  IREE_TOKENIZER_REGEX_TOKEN_CHAR_CLASS,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_CHAR_CLASS,
 
   // Shorthand classes (\d, \D, \w, \W, \s, \S).
-  IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND,
 
   // Unicode property (\p{L}, \p{N}, etc.).
-  IREE_TOKENIZER_REGEX_TOKEN_UNICODE_PROP,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_UNICODE_PROP,
 
   // Quantifier with bounds {n}, {n,}, {n,m}.
-  IREE_TOKENIZER_REGEX_TOKEN_QUANTIFIER,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUANTIFIER,
 
   // End of input.
-  IREE_TOKENIZER_REGEX_TOKEN_EOF,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_EOF,
 
   // Lexer error (message in error field).
-  IREE_TOKENIZER_REGEX_TOKEN_ERROR,
+  IREE_TOKENIZER_UTIL_REGEX_TOKEN_ERROR,
 } iree_tokenizer_regex_token_type_t;
 
 //===----------------------------------------------------------------------===//
@@ -90,12 +90,14 @@ typedef struct iree_tokenizer_regex_token_t {
 
     // For TOKEN_CHAR_CLASS: bitmap + pseudo-byte mask + exact codepoint ranges.
     struct {
-      uint8_t bitmap[32];    // Bitmap for ASCII bytes 0-255.
-      uint16_t pseudo_mask;  // Mask for pseudo-bytes 0x80-0x87.
-      uint8_t range_count;   // Number of exact codepoint ranges (0-4).
+      // Bitmap for ASCII bytes 0-255.
+      uint8_t bitmap[32];
+      uint16_t pseudo_mask;  // Pseudo-bytes 0x80-0x87.
+      // Number of exact codepoint ranges.
+      uint8_t range_count;
       bool negated;
       iree_tokenizer_regex_codepoint_range_t
-          ranges[IREE_TOKENIZER_REGEX_MAX_CHAR_CLASS_RANGES];
+          ranges[IREE_TOKENIZER_UTIL_REGEX_MAX_CHAR_CLASS_RANGES];
     } char_class;
 
     // For TOKEN_ERROR: error message (static string).
@@ -138,4 +140,4 @@ iree_host_size_t iree_tokenizer_regex_lexer_position(
 }  // extern "C"
 #endif
 
-#endif  // IREE_TOKENIZER_REGEX_INTERNAL_LEXER_H_
+#endif  // IREE_TOKENIZER_UTIL_REGEX_INTERNAL_LEXER_H_

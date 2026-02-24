@@ -117,13 +117,13 @@ void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns) {
 
 namespace {
 
-struct FoldRelayoutOpIntoMapScatterPattern
-    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+struct FoldRelayoutOpIntoMapStorePattern
+    : public OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
   using Base::Base;
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
                                 PatternRewriter &rewriter) const override {
-    Operation *op = mapScatterOp.getInput().getDefiningOp();
+    Operation *op = mapStoreOp.getInput().getDefiningOp();
     if (!op) {
       return failure();
     }
@@ -131,30 +131,30 @@ struct FoldRelayoutOpIntoMapScatterPattern
     if (!isSupportedSingleInputRelayoutOp(op) || isa<tensor::PadOp>(op)) {
       return failure();
     }
-    if (failed(foldIntoMapScatter(rewriter, op, mapScatterOp))) {
+    if (failed(foldIntoMapStore(rewriter, op, mapStoreOp))) {
       return failure();
     }
     return success();
   }
 };
 
-struct FoldPadOpIntoMapScatterPattern
-    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+struct FoldPadOpIntoMapStorePattern
+    : public OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
   using Base::Base;
-  FoldPadOpIntoMapScatterPattern(MLIRContext *context,
-                                 PadDistributionConfigFn configFn,
-                                 PatternBenefit benefit = 1)
-      : OpRewritePattern<IREE::LinalgExt::MapScatterOp>(context, benefit),
+  FoldPadOpIntoMapStorePattern(MLIRContext *context,
+                               PadDistributionConfigFn configFn,
+                               PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapStoreOp>(context, benefit),
         padDistributionConfigFn(std::move(configFn)) {}
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
                                 PatternRewriter &rewriter) const override {
-    auto padOp = mapScatterOp.getInput().getDefiningOp<tensor::PadOp>();
+    auto padOp = mapStoreOp.getInput().getDefiningOp<tensor::PadOp>();
     if (!padOp) {
       return failure();
     }
-    if (failed(foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
-                                     padDistributionConfigFn))) {
+    if (failed(foldPadIntoMapStore(rewriter, padOp, mapStoreOp,
+                                   padDistributionConfigFn))) {
       return failure();
     }
     return success();
@@ -169,10 +169,10 @@ private:
 void populateCombineRelayoutOpPatterns(
     RewritePatternSet &patterns,
     PadDistributionConfigFn padDistributionConfigFn) {
-  patterns.add<FoldRelayoutOpIntoMapScatterPattern>(patterns.getContext());
+  patterns.add<FoldRelayoutOpIntoMapStorePattern>(patterns.getContext());
   if (padDistributionConfigFn) {
-    patterns.add<FoldPadOpIntoMapScatterPattern>(patterns.getContext(),
-                                                 padDistributionConfigFn);
+    patterns.add<FoldPadOpIntoMapStorePattern>(patterns.getContext(),
+                                               padDistributionConfigFn);
   }
 }
 

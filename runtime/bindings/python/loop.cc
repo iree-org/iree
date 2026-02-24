@@ -65,7 +65,7 @@ class HalDeviceLoopBridge {
 
     // Cancel all futures.
     iree_slim_mutex_lock(&mu_);
-    for (auto &entry : next_pending_futures_) {
+    for (auto& entry : next_pending_futures_) {
       iree_hal_semaphore_release(std::get<0>(entry));
       py::handle future = std::get<2>(entry);
       py::handle value = std::get<3>(entry);
@@ -98,18 +98,18 @@ class HalDeviceLoopBridge {
     IREE_PY_TRACEF("HalDeviceLoopBridge::Run(%p)", this);
     py::gil_scoped_release gil_release;
     // Wait list.
-    std::vector<iree_hal_semaphore_t *> wait_semaphores;
+    std::vector<iree_hal_semaphore_t*> wait_semaphores;
     std::vector<uint64_t> wait_payloads;
     wait_semaphores.reserve(5);
     wait_payloads.reserve(5);
     // Pending futures that are actively being waited on. Owned by Run().
     std::vector<
-        std::tuple<iree_hal_semaphore_t *, uint64_t, py::handle, py::handle>>
+        std::tuple<iree_hal_semaphore_t*, uint64_t, py::handle, py::handle>>
         pending_futures;
     // Scratch pad of pending futures that we must keep waiting on. Owned by
     // Run().
     std::vector<
-        std::tuple<iree_hal_semaphore_t *, uint64_t, py::handle, py::handle>>
+        std::tuple<iree_hal_semaphore_t*, uint64_t, py::handle, py::handle>>
         scratch_pending_futures;
     pending_futures.reserve(next_pending_futures_.capacity());
 
@@ -137,9 +137,9 @@ class HalDeviceLoopBridge {
       // can not do anything that toggles reference counts or calls Python yet.
       iree_status_t status;
       for (size_t i = 0; i < pending_futures.size(); ++i) {
-        auto &entry = pending_futures[i];
+        auto& entry = pending_futures[i];
         uint64_t current_payload;
-        iree_hal_semaphore_t *semaphore = std::get<0>(entry);
+        iree_hal_semaphore_t* semaphore = std::get<0>(entry);
         status = iree_hal_semaphore_query(semaphore, &current_payload);
         if (iree_status_is_ok(status)) {
           if (current_payload >= std::get<1>(entry)) {
@@ -192,7 +192,7 @@ class HalDeviceLoopBridge {
 
     // Cancel all pending futures.
     {
-      for (auto &entry : pending_futures) {
+      for (auto& entry : pending_futures) {
         iree_hal_semaphore_release(std::get<0>(entry));
         py::handle future = std::get<2>(entry);
         py::handle value = std::get<3>(entry);
@@ -208,7 +208,7 @@ class HalDeviceLoopBridge {
     py::gil_scoped_acquire acquire_gil;
     try {
       future.attr("cancel")();
-    } catch (py::python_error &e) {
+    } catch (py::python_error& e) {
       ReportUncaughtException(e);
     }
     future.dec_ref();
@@ -239,9 +239,9 @@ class HalDeviceLoopBridge {
                                       value_owned = std::move(value_owned),
                                       message = std::move(message)]() {
       PyErr_SetString(PyExc_RuntimeError, message.c_str());
-      PyObject *exc_type;
-      PyObject *exc_value;
-      PyObject *exc_tb;
+      PyObject* exc_type;
+      PyObject* exc_value;
+      PyObject* exc_tb;
       PyErr_Fetch(&exc_type, &exc_value, &exc_tb);
       future_owned.attr("set_exception")(exc_value);
       Py_XDECREF(exc_type);
@@ -270,7 +270,7 @@ class HalDeviceLoopBridge {
   // Certain calls into Futures may raise exceptions because of illegal states.
   // There is really not much we can do about this, so we attempt to report.
   // TODO: Have some kind of fatal exception hook.
-  void ReportUncaughtException(py::python_error &e) {
+  void ReportUncaughtException(py::python_error& e) {
     e.discard_as_unraisable(py::str(__func__));
   }
 
@@ -279,7 +279,7 @@ class HalDeviceLoopBridge {
   py::object loop_;
   py::object thread_;
   py::object loop_call_soon_;
-  iree_hal_semaphore_t *control_sem_ = nullptr;
+  iree_hal_semaphore_t* control_sem_ = nullptr;
   uint64_t control_next_ = 1;
   bool shutdown_signaled_ = false;
 
@@ -291,13 +291,13 @@ class HalDeviceLoopBridge {
   // must be returned when retired.
   // Fields: Semaphore, wait_payload_value, future, future_value
   std::vector<
-      std::tuple<iree_hal_semaphore_t *, uint64_t, py::handle, py::handle>>
+      std::tuple<iree_hal_semaphore_t*, uint64_t, py::handle, py::handle>>
       next_pending_futures_;
 };
 
 }  // namespace
 
-void SetupLoopBindings(py::module_ &m) {
+void SetupLoopBindings(py::module_& m) {
   py::class_<HalDeviceLoopBridge>(m, "HalDeviceLoopBridge")
       .def(py::init<HalDevice, py::object>(), py::arg("device"),
            py::arg("loop"))

@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Core type definitions for the IREE tokenizer library.
+// Common types shared across tokenizer pipeline stages.
 //
-// This header defines the fundamental data structures used throughout the
-// tokenizer: token entries, merge rules, special token IDs, encoding options,
-// and result structures. All types are designed for cache efficiency and
-// minimal memory footprint.
+// This header defines types used by multiple pipeline components (normalizer,
+// segmenter, model, decoder) to avoid circular dependencies.
+//
+// Adding types to this file is an anti-pattern. This file exists only for
+// fundamental types (token IDs, offsets) that must be shared across many
+// disparate APIs. Format-specific types (HuggingFace, SentencePiece, etc.)
+// belong in their respective format/ subdirectories, not here.
 
 #ifndef IREE_TOKENIZER_TYPES_H_
 #define IREE_TOKENIZER_TYPES_H_
@@ -21,127 +24,81 @@ extern "C" {
 #endif
 
 //===----------------------------------------------------------------------===//
-// Token Attributes
+// Token IDs
 //===----------------------------------------------------------------------===//
 
-// Token attribute flags (may be combined).
-enum iree_tokenizer_token_attr_bits_e {
-  IREE_TOKENIZER_TOKEN_ATTR_NONE = 0u,
-  IREE_TOKENIZER_TOKEN_ATTR_UNKNOWN = 1u << 0,  // [UNK] token
-  IREE_TOKENIZER_TOKEN_ATTR_CONTROL = 1u << 1,  // Control token (not in text)
-  IREE_TOKENIZER_TOKEN_ATTR_BYTE = 1u << 2,     // Single byte fallback <0xNN>
-  IREE_TOKENIZER_TOKEN_ATTR_SPECIAL = 1u << 3,  // Special token (BOS/EOS/etc)
-  IREE_TOKENIZER_TOKEN_ATTR_UNUSED = 1u << 4,   // Placeholder/unused slot
-};
-typedef uint16_t iree_tokenizer_token_attr_t;
+// Token ID type. Valid token IDs are non-negative integers corresponding to
+// vocabulary indices. The value IREE_TOKENIZER_TOKEN_ID_INVALID (-1) indicates
+// "not found" or "not present" and must be checked before using as an index.
+typedef int32_t iree_tokenizer_token_id_t;
 
-//===----------------------------------------------------------------------===//
-// Token Entry (8 bytes, cache-friendly)
-//===----------------------------------------------------------------------===//
+// Sentinel value indicating an invalid or missing token ID.
+#define IREE_TOKENIZER_TOKEN_ID_INVALID ((iree_tokenizer_token_id_t) - 1)
 
-// Single token entry in the vocabulary table.
-// Designed for cache-efficient sequential access during tokenization.
-typedef struct iree_tokenizer_token_t {
-  uint32_t string_offset;                  // Offset into string table.
-  uint16_t string_length;                  // UTF-8 byte length.
-  iree_tokenizer_token_attr_t attributes;  // Attribute flags.
-} iree_tokenizer_token_t;
-static_assert(sizeof(iree_tokenizer_token_t) == 8,
-              "token entry must be 8 bytes");
+// List of token IDs (const pointer + count).
+// Used for decode input where we pass a sequence of tokens to decode.
+typedef struct iree_tokenizer_token_id_list_t {
+  iree_host_size_t count;
+  const iree_tokenizer_token_id_t* values;
+} iree_tokenizer_token_id_list_t;
 
-//===----------------------------------------------------------------------===//
-// BPE Merge Entry (8 bytes)
-//===----------------------------------------------------------------------===//
-
-// BPE merge rule: left_id + right_id merged to form a new token.
-// Stored in rank order (index 0 = highest priority merge).
-typedef struct iree_tokenizer_merge_t {
-  uint32_t left_id;   // Left token ID.
-  uint32_t right_id;  // Right token ID.
-} iree_tokenizer_merge_t;
-static_assert(sizeof(iree_tokenizer_merge_t) == 8,
-              "merge entry must be 8 bytes");
-
-//===----------------------------------------------------------------------===//
-// Special Token IDs
-//===----------------------------------------------------------------------===//
-
-// Special token type enum (for builder API).
-typedef enum iree_tokenizer_special_token_e {
-  IREE_TOKENIZER_SPECIAL_TOKEN_UNK = 0,   // Unknown token.
-  IREE_TOKENIZER_SPECIAL_TOKEN_BOS = 1,   // Beginning of sequence.
-  IREE_TOKENIZER_SPECIAL_TOKEN_EOS = 2,   // End of sequence.
-  IREE_TOKENIZER_SPECIAL_TOKEN_PAD = 3,   // Padding.
-  IREE_TOKENIZER_SPECIAL_TOKEN_SEP = 4,   // Separator (BERT [SEP]).
-  IREE_TOKENIZER_SPECIAL_TOKEN_CLS = 5,   // Classification (BERT [CLS]).
-  IREE_TOKENIZER_SPECIAL_TOKEN_MASK = 6,  // Mask token (BERT [MASK]).
-  IREE_TOKENIZER_SPECIAL_TOKEN_COUNT = 7,
-} iree_tokenizer_special_token_t;
-
-// Well-known special token IDs. Value of -1 indicates not present.
-typedef struct iree_tokenizer_special_ids_t {
-  int32_t bos;   // Beginning of sequence.
-  int32_t eos;   // End of sequence.
-  int32_t unk;   // Unknown token.
-  int32_t pad;   // Padding.
-  int32_t sep;   // Separator (BERT [SEP]).
-  int32_t cls;   // Classification (BERT [CLS]).
-  int32_t mask;  // Mask token (BERT [MASK]).
-} iree_tokenizer_special_ids_t;
-
-// Returns special IDs initialized to -1 (not present).
-static inline iree_tokenizer_special_ids_t iree_tokenizer_special_ids_none(
+// Returns an empty token ID list.
+static inline iree_tokenizer_token_id_list_t iree_tokenizer_token_id_list_empty(
     void) {
-  iree_tokenizer_special_ids_t ids = {-1, -1, -1, -1, -1, -1, -1};
-  return ids;
+  iree_tokenizer_token_id_list_t list = {0, NULL};
+  return list;
+}
+
+// Creates a token ID list from a pointer and count.
+static inline iree_tokenizer_token_id_list_t iree_tokenizer_make_token_id_list(
+    const iree_tokenizer_token_id_t* values, iree_host_size_t count) {
+  iree_tokenizer_token_id_list_t list = {count, values};
+  return list;
 }
 
 //===----------------------------------------------------------------------===//
-// Unicode Constants
+// Offset Tracking
 //===----------------------------------------------------------------------===//
 
-// Default Metaspace replacement character: ▁ (Lower One Eighth Block, U+2581).
-// Used by SentencePiece and BPE tokenizers to mark word boundaries.
-// Spaces are replaced with this character during encoding, and restored during
-// decoding. This allows the model to learn word boundaries explicitly.
-#define IREE_TOKENIZER_METASPACE_REPLACEMENT 0x2581u
+// Offset pair mapping a token back to original input bytes.
+typedef struct iree_tokenizer_offset_t {
+  // Start byte in original input.
+  iree_host_size_t start;
+  // End byte (exclusive) in original input.
+  iree_host_size_t end;
+} iree_tokenizer_offset_t;
 
 //===----------------------------------------------------------------------===//
-// Streaming Callback API
+// Token Output
 //===----------------------------------------------------------------------===//
 
-// Stack buffer sizes for batched string processing. Tune based on stack budget.
-// 16 strings × 16 bytes = 256 bytes for string views.
-// With 4KB data buffer, ~4.25KB per processing level.
-#ifndef IREE_TOKENIZER_STRING_BATCH_CAPACITY
-#define IREE_TOKENIZER_STRING_BATCH_CAPACITY 16
-#endif
-#ifndef IREE_TOKENIZER_DATA_BATCH_CAPACITY
-#define IREE_TOKENIZER_DATA_BATCH_CAPACITY (4 * 1024)
-#endif
+// Output buffer for token encoding operations.
+// Groups capacity, token IDs array, and optional auxiliary arrays together.
+// All optional arrays (if non-NULL) must have the same capacity as token_ids,
+// enforced by using a single capacity field.
+typedef struct iree_tokenizer_token_output_t {
+  // Maximum number of tokens that can be written.
+  iree_host_size_t capacity;
+  // Output array for token IDs (must have capacity elements).
+  iree_tokenizer_token_id_t* token_ids;
+  // Optional output array for byte offsets into original input (NULL to skip,
+  // otherwise must have capacity elements).
+  iree_tokenizer_offset_t* token_offsets;
+  // Optional output array for type IDs / segment IDs (NULL to skip, otherwise
+  // must have capacity elements). Used by post-processors to indicate which
+  // sequence each token belongs to (e.g., 0 for sentence A, 1 for sentence B).
+  uint8_t* type_ids;
+} iree_tokenizer_token_output_t;
 
-// Callback invoked with batches of strings during encode/decode.
-// |strings| contains views that are valid only for the duration of the call.
-// Return non-OK status to abort processing.
-typedef iree_status_t (*iree_tokenizer_string_callback_fn_t)(
-    void* user_data, iree_string_view_list_t strings);
-
-// Batched token ID list (matches iree_string_view_list_t pattern).
-// 64 tokens × 4 bytes = 256 bytes, matching string batch stack budget.
-typedef struct iree_tokenizer_id_list_t {
-  iree_host_size_t count;
-  const int32_t* values;
-} iree_tokenizer_id_list_t;
-
-#ifndef IREE_TOKENIZER_TOKEN_BATCH_CAPACITY
-#define IREE_TOKENIZER_TOKEN_BATCH_CAPACITY 64
-#endif
-
-// Callback invoked with batches of token IDs during encoding.
-// |ids| contains values valid only for the duration of the call.
-// Return non-OK status to abort processing.
-typedef iree_status_t (*iree_tokenizer_token_callback_fn_t)(
-    void* user_data, iree_tokenizer_id_list_t ids);
+// Creates a token output buffer. Pass NULL for optional arrays to skip them.
+static inline iree_tokenizer_token_output_t iree_tokenizer_make_token_output(
+    iree_tokenizer_token_id_t* token_ids,
+    iree_tokenizer_offset_t* token_offsets, uint8_t* type_ids,
+    iree_host_size_t capacity) {
+  iree_tokenizer_token_output_t output = {capacity, token_ids, token_offsets,
+                                          type_ids};
+  return output;
+}
 
 #ifdef __cplusplus
 }  // extern "C"

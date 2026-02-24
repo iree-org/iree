@@ -1,0 +1,52 @@
+# Dictionary for decoder_json_fuzz.
+# Helps the fuzzer generate valid JSON structures for decoder configs.
+
+# JSON syntax
+"{"
+"}"
+"["
+"]"
+":"
+","
+"null"
+"true"
+"false"
+
+# Common keys
+"type"
+"decoders"
+"content"
+"pattern"
+"replacement"
+"add_prefix_space"
+"trim_offsets"
+"prefix"
+"suffix"
+"left"
+"right"
+
+# Decoder types
+"Sequence"
+"ByteFallback"
+"ByteLevel"
+"CTC"
+"Metaspace"
+"Replace"
+"Strip"
+"WordPiece"
+"Fuse"
+
+# CTC-specific fields
+"pad_token"
+"word_delimiter_token"
+"cleanup"
+
+# Replace pattern types
+"String"
+"Regex"
+
+# Metaspace/ByteLevel options
+"prepend_scheme"
+"first"
+"never"
+"always"

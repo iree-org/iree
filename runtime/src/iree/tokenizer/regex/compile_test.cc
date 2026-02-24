@@ -17,6 +17,7 @@
 #include <string>
 
 #include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 #include "iree/tokenizer/regex/internal/parser.h"
 
 namespace {
@@ -41,10 +42,10 @@ class CompiledPattern {
   }
 
   ~CompiledPattern() {
-    if (storage_) {
-      iree_tokenizer_regex_compiled_free(storage_, iree_allocator_system());
-    }
     iree_status_ignore(status_);
+    if (storage_) {
+      iree_allocator_free(iree_allocator_system(), storage_);
+    }
   }
 
   bool ok() const { return iree_status_is_ok(status_); }
@@ -434,8 +435,7 @@ TEST(Compile, DfaValidates) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   iree_status_t validation = iree_tokenizer_regex_dfa_validate(pat.dfa());
-  EXPECT_TRUE(iree_status_is_ok(validation));
-  iree_status_ignore(validation);
+  IREE_EXPECT_OK(validation);
 }
 
 TEST(Compile, DfaUnicodeFlag) {
@@ -457,7 +457,7 @@ TEST(Compile, CaseInsensitiveCompiles) {
   // Note: The DFA flag is informational only - the compiler handles case
   // expansion in the transitions, not at runtime.
   CompiledPattern pat("abc",
-                      IREE_TOKENIZER_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
+                      IREE_TOKENIZER_UTIL_REGEX_COMPILE_FLAG_CASE_INSENSITIVE);
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 }
 
@@ -468,7 +468,7 @@ TEST(Compile, StartAnchorSetsDfaFlag) {
 
   // Verify the DFA has the anchor flag set.
   EXPECT_TRUE((pat.dfa()->header->flags &
-               IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
+               IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
       << "DFA should have HAS_ANCHORS flag set for ^abc";
   EXPECT_NE(pat.dfa()->start_anchor_bitmap, nullptr)
       << "start_anchor_bitmap should be non-null";
@@ -487,7 +487,7 @@ TEST(Compile, EndAnchorSetsDfaFlag) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   EXPECT_TRUE((pat.dfa()->header->flags &
-               IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
+               IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
       << "DFA should have HAS_ANCHORS flag set for abc$";
   EXPECT_NE(pat.dfa()->end_anchor_bitmap, nullptr)
       << "end_anchor_bitmap should be non-null";
@@ -498,7 +498,7 @@ TEST(Compile, LookaheadSetsDfaFlag) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   EXPECT_TRUE((pat.dfa()->header->flags &
-               IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_LOOKAHEAD) != 0)
+               IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_LOOKAHEAD) != 0)
       << "DFA should have HAS_LOOKAHEAD flag set for \\s+(?!\\S)";
   EXPECT_NE(pat.dfa()->lookahead, nullptr)
       << "lookahead table should be non-null";
@@ -634,8 +634,7 @@ TEST(Parse, NullArenaReturnsError) {
   iree_tokenizer_regex_parse_error_t error = {};
   iree_status_t status =
       iree_tokenizer_regex_parse(IREE_SV("abc"), nullptr, &ast, &error);
-  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INVALID_ARGUMENT);
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
   EXPECT_EQ(ast, nullptr);
 }
 
@@ -647,30 +646,28 @@ TEST(Parse, NullOutAstReturnsError) {
   iree_tokenizer_regex_parse_error_t error = {};
   iree_status_t status =
       iree_tokenizer_regex_parse(IREE_SV("abc"), &arena, nullptr, &error);
-  EXPECT_EQ(iree_status_code(status), IREE_STATUS_INVALID_ARGUMENT);
-  iree_status_ignore(status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
   iree_arena_deinitialize(&arena);
   iree_arena_block_pool_deinitialize(&block_pool);
 }
 
 //===----------------------------------------------------------------------===//
-// End Anchor Bitmap Tests (loom-yvnn)
+// End Anchor Bitmap Tests
 //
 // These tests verify that end_anchor_bitmap is correctly computed when
 // an accept state is reachable via both anchored ($) and unanchored paths.
 //===----------------------------------------------------------------------===//
 
 // Helper to check if a state is in the end_anchor_bitmap.
-static bool IsInEndAnchorBitmap(const iree_tokenizer_regex_dfa_t* dfa,
-                                uint16_t state_id) {
+bool IsInEndAnchorBitmap(const iree_tokenizer_regex_dfa_t* dfa,
+                         uint16_t state_id) {
   if (!dfa->end_anchor_bitmap) return false;
   return (dfa->end_anchor_bitmap[state_id / 64] & (1ULL << (state_id % 64))) !=
          0;
 }
 
 // Helper to check if a state is accepting.
-static bool IsAccepting(const iree_tokenizer_regex_dfa_t* dfa,
-                        uint16_t state_id) {
+bool IsAccepting(const iree_tokenizer_regex_dfa_t* dfa, uint16_t state_id) {
   return (dfa->accepting_bitmap[state_id / 64] & (1ULL << (state_id % 64))) !=
          0;
 }
@@ -685,7 +682,7 @@ TEST(Compile, EndAnchorBitmapOptionalAnchor) {
   // HAS_ANCHORS flag should NOT be set because no state requires anchors.
   // The pattern contains `$`, but the accept is reachable without it.
   EXPECT_FALSE((pat.dfa()->header->flags &
-                IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
+                IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
       << "DFA should NOT have HAS_ANCHORS flag (no state requires anchor)";
 
   // If HAS_ANCHORS is set for some reason, verify no accepts are in bitmap.
@@ -708,7 +705,7 @@ TEST(Compile, EndAnchorBitmapOptionalAnchorReversed) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   EXPECT_FALSE((pat.dfa()->header->flags &
-                IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
+                IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
       << "DFA should NOT have HAS_ANCHORS flag (no state requires anchor)";
 
   if (pat.dfa()->end_anchor_bitmap) {
@@ -729,7 +726,7 @@ TEST(Compile, EndAnchorBitmapAllAnchored) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   EXPECT_TRUE((pat.dfa()->header->flags &
-               IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0);
+               IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0);
 
   // All accepting states should require end anchor.
   bool found_accepting = false;
@@ -753,7 +750,7 @@ TEST(Compile, EndAnchorBitmapTransitive) {
   ASSERT_TRUE(pat.ok()) << pat.error_message();
 
   EXPECT_FALSE((pat.dfa()->header->flags &
-                IREE_TOKENIZER_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
+                IREE_TOKENIZER_UTIL_REGEX_DFA_FLAG_HAS_ANCHORS) != 0)
       << "DFA should NOT have HAS_ANCHORS flag (no state requires anchor)";
 
   if (pat.dfa()->end_anchor_bitmap) {

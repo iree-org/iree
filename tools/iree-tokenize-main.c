@@ -6,30 +6,39 @@
 
 // Tokenizes text using HuggingFace tokenizer.json files.
 //
-// Example encoding text to token IDs:
-//   iree-tokenize tokenizer.json "Hello, world!"
+// Example encoding text to token IDs (default: comma-separated):
+//   iree-tokenize --tokenizer=tokenizer.json "Hello, world!"
+//   # Output: 101,7592,1010,2088,999,102
+//
+// Example JSON output:
+//   iree-tokenize --tokenizer=tokenizer.json --json "Hello, world!"
 //   # Output: {"ids":[101,7592,1010,2088,999,102]}
 //
 // Example encoding without special tokens:
-//   iree-tokenize tokenizer.json --no_special "Hello, world!"
-//   # Output: {"ids":[7592,1010,2088,999]}
+//   iree-tokenize --tokenizer=tokenizer.json --special=false "Hello, world!"
+//   # Output: 7592,1010,2088,999
+//
+// Example with offset tracking:
+//   iree-tokenize --tokenizer=tokenizer.json --offsets "Hello, world!"
+//   # Output: 7592[0:5],1010[5:6],2088[7:12],999[12:13]
 //
 // Example decoding token IDs to text:
-//   iree-tokenize tokenizer.json --decode "101,7592,1010,2088,999,102"
-//   # Output: {"text":"Hello, world!"}
+//   iree-tokenize --tokenizer=tokenizer.json --decode
+//   "101,7592,1010,2088,999,102"
+//   # Output: Hello, world!
 //
 // Example batch mode (one line per input):
-//   echo -e "Hello\nWorld" | iree-tokenize tokenizer.json --batch
-//   # Output: {"ids":[...]}
-//   #         {"ids":[...]}
+//   echo -e "Hello\nWorld" | iree-tokenize --tokenizer=tokenizer.json --batch
+//   # Output: 101,7592,...
+//   #         101,2088,...
 //
-// Example showing tokenizer info:
-//   iree-tokenize tokenizer.json --info
+// Example showing tokenizer info (always JSON):
+//   iree-tokenize --tokenizer=tokenizer.json --info
 //   # Output: {"vocab_size":30522,"model_type":"BPE",...}
 //
-// Example raw output for iree-run-module integration:
-//   iree-tokenize tokenizer.json --raw "Hello, world!"
-//   # Output: 101,7592,1010,2088,999,102
+// Example benchmarking:
+//   iree-tokenize --tokenizer=tokenizer.json --benchmark=oneshot "Hello,
+//   world!" # Output: timing stats to stderr, token IDs to stdout
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,158 +48,236 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/json.h"
 #include "iree/io/file_contents.h"
-#include "iree/tokenizer/huggingface/tokenizer_json.h"
+#include "iree/tokenizer/format/huggingface/tokenizer_json.h"
 #include "iree/tokenizer/tokenizer.h"
+#include "iree/tokenizer/vocab/vocab.h"
 
 //===----------------------------------------------------------------------===//
 // Flags
 //===----------------------------------------------------------------------===//
 
 IREE_FLAG(bool, decode, false, "Decode mode: input is comma-separated IDs.");
-IREE_FLAG(bool, no_special, false, "Don't add special tokens (BOS/EOS).");
+IREE_FLAG(bool, decode_special, false,
+          "Include special tokens (BOS/EOS) in decode output.");
+IREE_FLAG(bool, special, true, "Add special tokens (BOS/EOS, CLS/SEP).");
 IREE_FLAG(bool, batch, false, "Batch mode: read lines from stdin.");
 IREE_FLAG(bool, stream, false, "Stream stdin continuously (not line-by-line).");
 IREE_FLAG(int32_t, max_length, 0, "Max output length (0 = unlimited).");
 IREE_FLAG(bool, info, false, "Show tokenizer info instead of encoding.");
-IREE_FLAG(bool, raw, false,
-          "Output comma-separated IDs only (no JSON), for iree-run-module.");
+IREE_FLAG(bool, json, false,
+          "Output JSON format (default: comma-separated IDs).");
 IREE_FLAG(bool, json_string, false,
           "Input is a JSON-encoded string (handles \\uXXXX escapes).");
-
+IREE_FLAG(string, tokenizer, "", "Path to HuggingFace tokenizer.json file.");
+IREE_FLAG(bool, offsets, false, "Show token-to-byte offset mappings.");
+IREE_FLAG(string, benchmark, "",
+          "Benchmark mode: oneshot, batch, stream, or decode.");
+IREE_FLAG(int32_t, benchmark_iterations, 100,
+          "Number of timed iterations for benchmarking.");
+IREE_FLAG(int32_t, benchmark_warmup, 5,
+          "Number of warmup iterations before timing.");
+IREE_FLAG(int32_t, benchmark_chunk_size, 4096,
+          "Chunk size in bytes for stream benchmark.");
 //===----------------------------------------------------------------------===//
-// Input Processing Flags
-//===----------------------------------------------------------------------===//
-
-typedef uint32_t iree_tooling_encode_flags_t;
-enum iree_tooling_encode_flag_bits_t {
-  IREE_TOOLING_ENCODE_FLAG_DEFAULT = 0,
-  // Input is a JSON-encoded string with \uXXXX escapes.
-  IREE_TOOLING_ENCODE_FLAG_JSON_STRING = 1u << 0,
-};
-
-//===----------------------------------------------------------------------===//
-// JSON Output Helpers
+// Output Helpers
 //===----------------------------------------------------------------------===//
 
-// Prints a JSON array of int32 IDs.
-static void iree_tooling_print_json_ids(const int32_t* ids,
-                                        iree_host_size_t count) {
-  fputc('[', stdout);
+// Prints a token ID with optional offset annotation.
+static void iree_tooling_print_token(iree_tokenizer_token_id_t token_id,
+                                     const iree_tokenizer_offset_t* offset,
+                                     bool first) {
+  if (!first) fputc(',', stdout);
+  fprintf(stdout, "%" PRId32, token_id);
+  if (offset) {
+    fprintf(stdout, "[%zu:%zu]", (size_t)offset->start, (size_t)offset->end);
+  }
+}
+
+// Prints a token sequence with optional offsets.
+static void iree_tooling_print_tokens(
+    const iree_tokenizer_token_id_t* token_ids,
+    const iree_tokenizer_offset_t* offsets, iree_host_size_t count,
+    bool* first) {
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    iree_tooling_print_token(token_ids[i], offsets ? &offsets[i] : NULL,
+                             *first);
+    *first = false;
+  }
+}
+
+// Prints a JSON array of token IDs with optional offsets.
+static void iree_tooling_print_json_tokens(
+    const iree_tokenizer_token_id_t* token_ids,
+    const iree_tokenizer_offset_t* offsets, iree_host_size_t count) {
+  fputs("{\"ids\":[", stdout);
   for (iree_host_size_t i = 0; i < count; ++i) {
     if (i > 0) fputc(',', stdout);
-    fprintf(stdout, "%" PRId32, ids[i]);
+    fprintf(stdout, "%" PRId32, token_ids[i]);
   }
   fputc(']', stdout);
-}
-
-//===----------------------------------------------------------------------===//
-// Encode (streaming)
-//===----------------------------------------------------------------------===//
-
-// Context for streaming encode output.
-typedef struct {
-  bool first_token;
-} iree_tooling_encode_context_t;
-
-// Callback that prints token IDs as they arrive.
-static iree_status_t iree_tooling_encode_callback(
-    void* user_data, iree_tokenizer_id_list_t ids) {
-  iree_tooling_encode_context_t* ctx = user_data;
-  for (iree_host_size_t i = 0; i < ids.count; ++i) {
-    if (!ctx->first_token) fputc(',', stdout);
-    ctx->first_token = false;
-    fprintf(stdout, "%" PRId32, ids.values[i]);
+  if (offsets) {
+    fputs(",\"offsets\":[", stdout);
+    for (iree_host_size_t i = 0; i < count; ++i) {
+      if (i > 0) fputc(',', stdout);
+      fprintf(stdout, "[%zu,%zu]", (size_t)offsets[i].start,
+              (size_t)offsets[i].end);
+    }
+    fputc(']', stdout);
   }
-  return iree_ok_status();
+  fputs("}\n", stdout);
 }
 
-static iree_status_t iree_tooling_tokenize_encode(iree_tokenizer_t* tokenizer,
-                                                  iree_string_view_t text) {
+// Writes decoded text to stdout with JSON escaping if needed.
+static void iree_tooling_print_text(const char* data, iree_host_size_t length,
+                                    bool json_escape) {
+  if (!json_escape) {
+    fwrite(data, 1, length, stdout);
+    return;
+  }
+  for (iree_host_size_t i = 0; i < length; ++i) {
+    char c = data[i];
+    switch (c) {
+      case '"':
+        fputs("\\\"", stdout);
+        break;
+      case '\\':
+        fputs("\\\\", stdout);
+        break;
+      case '\b':
+        fputs("\\b", stdout);
+        break;
+      case '\f':
+        fputs("\\f", stdout);
+        break;
+      case '\n':
+        fputs("\\n", stdout);
+        break;
+      case '\r':
+        fputs("\\r", stdout);
+        break;
+      case '\t':
+        fputs("\\t", stdout);
+        break;
+      default:
+        if ((unsigned char)c < 0x20) {
+          fprintf(stdout, "\\u%04x", (unsigned char)c);
+        } else {
+          fputc(c, stdout);
+        }
+        break;
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Encode (one-shot with retry)
+//===----------------------------------------------------------------------===//
+
+// Builds encode flags from CLI flags.
+static iree_tokenizer_encode_flags_t iree_tooling_encode_flags(void) {
+  iree_tokenizer_encode_flags_t flags =
+      IREE_TOKENIZER_ENCODE_FLAG_AT_INPUT_START;
+  if (FLAG_special) flags |= IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
+  if (FLAG_offsets) flags |= IREE_TOKENIZER_ENCODE_FLAG_TRACK_OFFSETS;
+  return flags;
+}
+
+static iree_status_t iree_tooling_tokenize_encode(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_tokenizer_encode_flags_t flags =
-      FLAG_no_special ? IREE_TOKENIZER_ENCODE_FLAG_DEFAULT
-                      : IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
+  iree_tokenizer_encode_flags_t flags = iree_tooling_encode_flags();
 
-  // Use buffer-based API when truncation is requested (streaming ignores it).
-  if (FLAG_max_length > 0) {
-    iree_tokenizer_encode_options_t options = {
-        .flags = flags,
-        .max_length = (iree_host_size_t)FLAG_max_length,
-    };
-    int32_t ids[8192];
-    iree_host_size_t count = 0;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_tokenizer_encode(tokenizer, text, options, ids,
-                                  IREE_ARRAYSIZE(ids), &count));
-    if (FLAG_raw) {
-      // Raw mode: comma-separated IDs only.
-      for (iree_host_size_t i = 0; i < count; ++i) {
-        if (i > 0) fputc(',', stdout);
-        fprintf(stdout, "%" PRId32, ids[i]);
-      }
-      fputc('\n', stdout);
-    } else {
-      fputs("{\"ids\":", stdout);
-      iree_tooling_print_json_ids(ids, count);
-      fputs("}\n", stdout);
+  // Allocate combined output buffer. Use fixed capacity - the streaming encode
+  // API operates in bounded memory and should never need retries.
+  iree_host_size_t capacity = 8192;
+  iree_host_size_t total_size = 0;
+  iree_host_size_t token_ids_offset = 0;
+  iree_host_size_t offsets_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              0, &total_size,
+              IREE_STRUCT_FIELD(capacity, iree_tokenizer_token_id_t,
+                                &token_ids_offset),
+              IREE_STRUCT_FIELD(FLAG_offsets ? capacity : 0,
+                                iree_tokenizer_offset_t, &offsets_offset)));
+  uint8_t* storage = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&storage));
+
+  iree_tokenizer_token_id_t* token_ids =
+      (iree_tokenizer_token_id_t*)(storage + token_ids_offset);
+  iree_tokenizer_offset_t* offsets =
+      FLAG_offsets ? (iree_tokenizer_offset_t*)(storage + offsets_offset)
+                   : NULL;
+  iree_host_size_t token_count = 0;
+
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, offsets, NULL, capacity);
+  iree_status_t status = iree_tokenizer_encode(tokenizer, text, flags, output,
+                                               allocator, &token_count);
+
+  if (iree_status_is_ok(status)) {
+    // Apply max_length truncation.
+    if (FLAG_max_length > 0 &&
+        token_count > (iree_host_size_t)FLAG_max_length) {
+      token_count = (iree_host_size_t)FLAG_max_length;
     }
-    IREE_TRACE_ZONE_END(z0);
-    return iree_ok_status();
+
+    if (FLAG_json) {
+      iree_tooling_print_json_tokens(token_ids, offsets, token_count);
+    } else {
+      bool first = true;
+      iree_tooling_print_tokens(token_ids, offsets, token_count, &first);
+      fputc('\n', stdout);
+    }
   }
 
-  // Stream tokens directly to stdout (no output buffer limit).
-  if (!FLAG_raw) fputs("{\"ids\":[", stdout);
-  iree_tooling_encode_context_t ctx = {.first_token = true};
-  iree_status_t status = iree_tokenizer_encode_streaming(
-      tokenizer, text, flags, iree_tooling_encode_callback, &ctx);
-  if (FLAG_raw) {
-    fputc('\n', stdout);
-  } else {
-    fputs("]}\n", stdout);
-  }
+  iree_allocator_free(allocator, storage);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 //===----------------------------------------------------------------------===//
-// Decode (streaming)
+// Decode (one-shot with retry)
 //===----------------------------------------------------------------------===//
 
 // Parses comma-separated IDs from a string.
 static iree_status_t iree_tooling_parse_ids(iree_string_view_t text,
-                                            int32_t* out_ids,
+                                            iree_tokenizer_token_id_t* out_ids,
                                             iree_host_size_t max_ids,
                                             iree_host_size_t* out_count) {
   *out_count = 0;
   if (text.size == 0) return iree_ok_status();
 
-  iree_host_size_t pos = 0;
-  while (pos < text.size) {
+  iree_host_size_t position = 0;
+  while (position < text.size) {
     // Skip whitespace.
-    while (pos < text.size &&
-           (text.data[pos] == ' ' || text.data[pos] == '\t')) {
-      ++pos;
+    while (position < text.size &&
+           (text.data[position] == ' ' || text.data[position] == '\t')) {
+      ++position;
     }
-    if (pos >= text.size) break;
+    if (position >= text.size) break;
 
     // Parse number.
     bool negative = false;
-    if (text.data[pos] == '-') {
+    if (text.data[position] == '-') {
       negative = true;
-      ++pos;
+      ++position;
     }
     int32_t value = 0;
     bool found_digit = false;
-    while (pos < text.size && text.data[pos] >= '0' && text.data[pos] <= '9') {
-      value = value * 10 + (text.data[pos] - '0');
+    while (position < text.size && text.data[position] >= '0' &&
+           text.data[position] <= '9') {
+      value = value * 10 + (text.data[position] - '0');
       found_digit = true;
-      ++pos;
+      ++position;
     }
     if (!found_digit) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "expected number at position %zu", pos);
+                              "expected number at position %zu", position);
     }
     if (negative) value = -value;
 
@@ -201,85 +288,70 @@ static iree_status_t iree_tooling_parse_ids(iree_string_view_t text,
     out_ids[(*out_count)++] = value;
 
     // Skip comma.
-    while (pos < text.size &&
-           (text.data[pos] == ' ' || text.data[pos] == '\t')) {
-      ++pos;
+    while (position < text.size &&
+           (text.data[position] == ' ' || text.data[position] == '\t')) {
+      ++position;
     }
-    if (pos < text.size && text.data[pos] == ',') {
-      ++pos;
-    }
-  }
-  return iree_ok_status();
-}
-
-// Callback that prints decoded text as JSON-escaped strings.
-static iree_status_t iree_tooling_decode_callback(
-    void* user_data, iree_string_view_list_t strings) {
-  (void)user_data;
-  for (iree_host_size_t i = 0; i < strings.count; ++i) {
-    iree_string_view_t text = strings.values[i];
-    for (iree_host_size_t j = 0; j < text.size; ++j) {
-      char c = text.data[j];
-      switch (c) {
-        case '"':
-          fputs("\\\"", stdout);
-          break;
-        case '\\':
-          fputs("\\\\", stdout);
-          break;
-        case '\b':
-          fputs("\\b", stdout);
-          break;
-        case '\f':
-          fputs("\\f", stdout);
-          break;
-        case '\n':
-          fputs("\\n", stdout);
-          break;
-        case '\r':
-          fputs("\\r", stdout);
-          break;
-        case '\t':
-          fputs("\\t", stdout);
-          break;
-        default:
-          if ((unsigned char)c < 0x20) {
-            fprintf(stdout, "\\u%04x", (unsigned char)c);
-          } else {
-            fputc(c, stdout);
-          }
-          break;
-      }
+    if (position < text.size && text.data[position] == ',') {
+      ++position;
     }
   }
   return iree_ok_status();
 }
 
-static iree_status_t iree_tooling_tokenize_decode(iree_tokenizer_t* tokenizer,
-                                                  iree_string_view_t input) {
+static iree_status_t iree_tooling_tokenize_decode(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t input,
+    iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Parse IDs into stack buffer.
-  int32_t ids[8192];
+  iree_tokenizer_token_id_t ids[8192];
   iree_host_size_t id_count = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_tooling_parse_ids(input, ids, IREE_ARRAYSIZE(ids), &id_count));
 
-  iree_tokenizer_decode_flags_t decode_flags =
-      FLAG_no_special ? IREE_TOKENIZER_DECODE_FLAG_SKIP_SPECIAL_TOKENS
-                      : IREE_TOKENIZER_DECODE_FLAG_DEFAULT;
+  iree_tokenizer_token_id_list_t tokens =
+      iree_tokenizer_make_token_id_list(ids, id_count);
 
-  // Start JSON output.
-  fputs("{\"text\":\"", stdout);
+  // Decode with retry on RESOURCE_EXHAUSTED.
+  iree_host_size_t text_capacity = 65536;
+  char* text_buffer = NULL;
+  iree_host_size_t text_length = 0;
+  iree_status_t status = iree_ok_status();
 
-  // Stream decoded text directly to stdout (no output buffer limit).
-  iree_status_t status =
-      iree_tokenizer_decode_streaming(tokenizer, ids, id_count, decode_flags,
-                                      iree_tooling_decode_callback, NULL);
+  for (;;) {
+    status =
+        iree_allocator_malloc(allocator, text_capacity, (void**)&text_buffer);
+    if (!iree_status_is_ok(status)) break;
 
-  // Close JSON.
-  fputs("\"}\n", stdout);
+    iree_mutable_string_view_t text_output = {text_buffer, text_capacity};
+    iree_tokenizer_decode_flags_t decode_flags =
+        FLAG_decode_special ? IREE_TOKENIZER_DECODE_FLAG_NONE
+                            : IREE_TOKENIZER_DECODE_FLAG_SKIP_SPECIAL_TOKENS;
+    status = iree_tokenizer_decode(tokenizer, tokens, decode_flags, text_output,
+                                   allocator, &text_length);
+    if (iree_status_is_resource_exhausted(status)) {
+      iree_status_ignore(status);
+      iree_allocator_free(allocator, text_buffer);
+      text_buffer = NULL;
+      text_capacity *= 2;
+      continue;
+    }
+    break;
+  }
 
+  if (iree_status_is_ok(status)) {
+    if (FLAG_json) {
+      fputs("{\"text\":\"", stdout);
+      iree_tooling_print_text(text_buffer, text_length, /*json_escape=*/true);
+      fputs("\"}\n", stdout);
+    } else {
+      iree_tooling_print_text(text_buffer, text_length, /*json_escape=*/false);
+      fputc('\n', stdout);
+    }
+  }
+
+  iree_allocator_free(allocator, text_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -288,7 +360,8 @@ static iree_status_t iree_tooling_tokenize_decode(iree_tokenizer_t* tokenizer,
 // Info
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_tooling_tokenize_info(iree_tokenizer_t* tokenizer) {
+static iree_status_t iree_tooling_tokenize_info(
+    const iree_tokenizer_t* tokenizer) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   const iree_tokenizer_vocab_t* vocab = iree_tokenizer_vocab(tokenizer);
@@ -296,12 +369,10 @@ static iree_status_t iree_tooling_tokenize_info(iree_tokenizer_t* tokenizer) {
   iree_host_size_t merge_count = iree_tokenizer_vocab_merge_count(vocab);
   iree_tokenizer_special_ids_t special =
       iree_tokenizer_vocab_special_ids(vocab);
+  iree_string_view_t model_type = iree_tokenizer_model_type_name(tokenizer);
 
-  // Determine model type.
-  const char* model_type = merge_count > 0 ? "BPE" : "WordPiece";
-
-  fprintf(stdout, "{\"vocab_size\":%zu,\"model_type\":\"%s\"",
-          (size_t)vocab_size, model_type);
+  fprintf(stdout, "{\"vocab_size\":%zu,\"model_type\":\"%.*s\"",
+          (size_t)vocab_size, (int)model_type.size, model_type.data);
 
   if (merge_count > 0) {
     fprintf(stdout, ",\"merge_count\":%zu", (size_t)merge_count);
@@ -327,72 +398,121 @@ static iree_status_t iree_tooling_tokenize_info(iree_tokenizer_t* tokenizer) {
 //===----------------------------------------------------------------------===//
 
 // Streams stdin, reading chunks and emitting tokens incrementally.
-// Uses the streaming encode API which handles all boundary conditions:
+// Uses the pull-based streaming encode API which handles all boundary
+// conditions:
 // - Incomplete UTF-8 sequences at chunk boundaries
 // - Literals (added_tokens) that span chunks
 // - Transform segments that span chunks
-// - BOS/EOS token emission
+// - BOS/EOS token emission (via postprocessor)
 static iree_status_t iree_tooling_tokenize_stdin_streaming(
-    iree_tokenizer_t* tokenizer) {
+    const iree_tokenizer_t* tokenizer, iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_tokenizer_encode_flags_t flags =
-      FLAG_no_special ? IREE_TOKENIZER_ENCODE_FLAG_DEFAULT
-                      : IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS;
+  iree_tokenizer_encode_flags_t flags = iree_tooling_encode_flags();
 
-  // Start output (JSON wrapper or raw).
-  if (!FLAG_raw) fputs("{\"ids\":[", stdout);
-  iree_tooling_encode_context_t ctx = {.first_token = true};
+  // Calculate state storage requirements.
+  iree_host_size_t state_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_tokenizer_encode_state_calculate_size(tokenizer, &state_size));
 
-  // Initialize streaming state (~8.5KB, stack allocated).
-  iree_tokenizer_encode_stream_state_t state;
-  iree_tokenizer_encode_stream_initialize(&state, tokenizer, flags);
+  // Allocate combined state and transform buffer.
+  iree_host_size_t transform_size =
+      iree_tokenizer_transform_buffer_recommended_size(8192);
+  iree_host_size_t total_size = 0;
+  iree_host_size_t state_offset = 0;
+  iree_host_size_t transform_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(
+          0, &total_size, IREE_STRUCT_FIELD(state_size, uint8_t, &state_offset),
+          IREE_STRUCT_FIELD(transform_size, uint8_t, &transform_offset)));
+  uint8_t* storage = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&storage));
 
-  // Read and feed chunks until EOF.
-  char buffer[8192];
-  size_t bytes_read;
-  while ((bytes_read = fread(buffer, 1, sizeof(buffer), stdin)) > 0) {
-    iree_string_view_t chunk = iree_make_string_view(buffer, bytes_read);
-    iree_status_t status = iree_tokenizer_encode_stream_feed(
-        &state, chunk, iree_tooling_encode_callback, &ctx);
-    if (!iree_status_is_ok(status)) {
-      if (FLAG_raw) {
-        fputc('\n', stdout);
-      } else {
-        fputs("]}\n", stdout);
-      }
-      IREE_TRACE_ZONE_END(z0);
-      return status;
-    }
-  }
+  iree_byte_span_t state_span = {storage + state_offset, state_size};
+  iree_byte_span_t transform_span = {storage + transform_offset,
+                                     transform_size};
 
-  // Finalize: flush any pending state and emit EOS if configured.
-  iree_status_t status = iree_tokenizer_encode_stream_finalize(
-      &state, iree_tooling_encode_callback, &ctx);
+  // Initialize streaming state.
+  iree_tokenizer_encode_state_t* state = NULL;
+  iree_status_t status = iree_tokenizer_encode_state_initialize(
+      tokenizer, state_span, transform_span,
+      iree_tokenizer_offset_run_list_empty(), flags, &state);
+
   if (!iree_status_is_ok(status)) {
-    if (FLAG_raw) {
-      fputc('\n', stdout);
-    } else {
-      fputs("]}\n", stdout);
-    }
+    iree_allocator_free(allocator, storage);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
-  // Close output.
-  if (FLAG_raw) {
-    fputc('\n', stdout);
-  } else {
-    fputs("]}\n", stdout);
+  // Token output buffer (reused each feed call).
+  iree_tokenizer_token_id_t token_buffer[1024];
+  iree_tokenizer_token_output_t output = iree_tokenizer_make_token_output(
+      token_buffer, NULL, NULL, IREE_ARRAYSIZE(token_buffer));
+
+  // Start output.
+  if (FLAG_json) fputs("{\"ids\":[", stdout);
+  bool first_token = true;
+
+  // Read and feed chunks until EOF.
+  char read_buffer[8192];
+  size_t bytes_read;
+  while (iree_status_is_ok(status) &&
+         (bytes_read = fread(read_buffer, 1, sizeof(read_buffer), stdin)) > 0) {
+    iree_string_view_t chunk = iree_make_string_view(read_buffer, bytes_read);
+    while (chunk.size > 0 && iree_status_is_ok(status)) {
+      iree_host_size_t bytes_consumed = 0;
+      iree_host_size_t token_count = 0;
+      status = iree_tokenizer_encode_state_feed(state, chunk, output,
+                                                &bytes_consumed, &token_count);
+      if (iree_status_is_ok(status)) {
+        iree_tooling_print_tokens(token_buffer, NULL, token_count,
+                                  &first_token);
+        chunk.data += bytes_consumed;
+        chunk.size -= bytes_consumed;
+      }
+    }
   }
 
+  // Finalize: flush any pending state.
+  if (iree_status_is_ok(status)) {
+    iree_host_size_t token_count = 0;
+    status = iree_tokenizer_encode_state_finalize(state, output, &token_count);
+    if (iree_status_is_ok(status)) {
+      iree_tooling_print_tokens(token_buffer, NULL, token_count, &first_token);
+    }
+  }
+
+  // Close output.
+  if (FLAG_json) {
+    fputs("]}\n", stdout);
+  } else {
+    fputc('\n', stdout);
+  }
+
+  iree_tokenizer_encode_state_deinitialize(state);
+  iree_allocator_free(allocator, storage);
+
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
 // Batch Mode (line-by-line)
 //===----------------------------------------------------------------------===//
+
+// Strips the trailing LF line terminator from a string view.
+// Only strips \n - does NOT strip \r, which could be content.
+// The batch protocol uses \n as delimiter (via Python's "\n".join()), so any
+// \r before the \n is content that must be preserved.
+static iree_string_view_t iree_tooling_string_view_strip_trailing_newline(
+    iree_string_view_t text) {
+  if (text.size > 0 && text.data[text.size - 1] == '\n') {
+    --text.size;
+  }
+  return text;
+}
 
 // Portable getline implementation that dynamically grows the buffer.
 // Returns the line length (excluding null terminator), or -1 on EOF/error.
@@ -436,7 +556,7 @@ static intptr_t iree_tooling_getline(char** line_ptr,
 }
 
 static iree_status_t iree_tooling_tokenize_batch(
-    iree_tokenizer_t* tokenizer, iree_allocator_t host_allocator) {
+    const iree_tokenizer_t* tokenizer, iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   char* line = NULL;
@@ -444,96 +564,391 @@ static iree_status_t iree_tooling_tokenize_batch(
   intptr_t line_length;
 
   while ((line_length = iree_tooling_getline(&line, &line_capacity, stdin,
-                                             host_allocator)) != -1) {
-    // Remove trailing newline.
-    while (line_length > 0 &&
-           (line[line_length - 1] == '\n' || line[line_length - 1] == '\r')) {
-      line[--line_length] = '\0';
-    }
-
-    iree_string_view_t text =
-        iree_make_string_view(line, (iree_host_size_t)line_length);
+                                             allocator)) != -1) {
+    iree_string_view_t text = iree_tooling_string_view_strip_trailing_newline(
+        iree_make_string_view(line, (iree_host_size_t)line_length));
     iree_status_t status;
     if (FLAG_decode) {
-      status = iree_tooling_tokenize_decode(tokenizer, text);
+      status = iree_tooling_tokenize_decode(tokenizer, text, allocator);
     } else {
-      status = iree_tooling_tokenize_encode(tokenizer, text);
+      status = iree_tooling_tokenize_encode(tokenizer, text, allocator);
     }
     if (!iree_status_is_ok(status)) {
-      iree_allocator_free(host_allocator, line);
+      iree_allocator_free(allocator, line);
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
   }
 
-  iree_allocator_free(host_allocator, line);
+  iree_allocator_free(allocator, line);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
-// Single Input Processing
+// Benchmark Mode
 //===----------------------------------------------------------------------===//
 
-// Processes text input for encoding, handling JSON escapes if requested.
-static iree_status_t iree_tooling_process_encode(
-    iree_tokenizer_t* tokenizer, iree_string_view_t raw_input,
-    iree_tooling_encode_flags_t flags, iree_allocator_t allocator) {
+typedef struct {
+  iree_time_t min_ns;
+  iree_time_t max_ns;
+  iree_time_t total_ns;
+  int32_t iterations;
+  iree_host_size_t total_input_bytes;
+  iree_host_size_t total_tokens;
+  iree_host_size_t peak_memory;
+} iree_tooling_benchmark_stats_t;
+
+static void iree_tooling_benchmark_stats_initialize(
+    iree_tooling_benchmark_stats_t* stats) {
+  memset(stats, 0, sizeof(*stats));
+  stats->min_ns = INT64_MAX;
+}
+
+static void iree_tooling_benchmark_stats_record(
+    iree_tooling_benchmark_stats_t* stats, iree_time_t elapsed_ns,
+    iree_host_size_t input_bytes, iree_host_size_t tokens) {
+  if (elapsed_ns < stats->min_ns) stats->min_ns = elapsed_ns;
+  if (elapsed_ns > stats->max_ns) stats->max_ns = elapsed_ns;
+  stats->total_ns += elapsed_ns;
+  stats->iterations++;
+  stats->total_input_bytes += input_bytes;
+  stats->total_tokens += tokens;
+}
+
+static void iree_tooling_benchmark_stats_print(
+    const iree_tooling_benchmark_stats_t* stats, const char* mode) {
+  iree_time_t average_ns = stats->total_ns / stats->iterations;
+  double tokens_per_sec =
+      (double)stats->total_tokens / ((double)stats->total_ns / 1e9);
+  double mb_per_sec =
+      (double)stats->total_input_bytes / ((double)stats->total_ns / 1e9) / 1e6;
+
+  if (FLAG_json) {
+    fprintf(stdout,
+            "{\"mode\":\"%s\",\"iterations\":%d,"
+            "\"total_input_bytes\":%zu,\"total_tokens\":%zu,"
+            "\"min_ns\":%" PRId64 ",\"avg_ns\":%" PRId64 ",\"max_ns\":%" PRId64
+            ","
+            "\"tokens_per_sec\":%.1f,\"mb_per_sec\":%.3f,"
+            "\"peak_memory_bytes\":%zu}\n",
+            mode, stats->iterations, (size_t)stats->total_input_bytes,
+            (size_t)stats->total_tokens, stats->min_ns, average_ns,
+            stats->max_ns, tokens_per_sec, mb_per_sec,
+            (size_t)stats->peak_memory);
+  } else {
+    fprintf(stderr,
+            "Benchmark: %s\n"
+            "  Iterations:    %d\n"
+            "  Input bytes:   %zu total\n"
+            "  Tokens:        %zu total\n"
+            "  Latency (ns):  min=%" PRId64 " avg=%" PRId64 " max=%" PRId64
+            "\n"
+            "  Throughput:    %.1f tokens/sec, %.3f MB/sec\n"
+            "  Peak memory:   %zu bytes\n",
+            mode, stats->iterations, (size_t)stats->total_input_bytes,
+            (size_t)stats->total_tokens, stats->min_ns, average_ns,
+            stats->max_ns, tokens_per_sec, mb_per_sec,
+            (size_t)stats->peak_memory);
+  }
+}
+
+static iree_status_t iree_tooling_benchmark_oneshot(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_string_view_t input = raw_input;
-  char* decoded_buffer = NULL;
+  iree_tokenizer_encode_flags_t flags = iree_tooling_encode_flags();
 
-  // Decode JSON escapes if requested.
-  if (iree_any_bit_set(flags, IREE_TOOLING_ENCODE_FLAG_JSON_STRING)) {
-    // Strip surrounding quotes if present.
-    iree_string_view_t escaped = raw_input;
-    if (escaped.size >= 2 && escaped.data[0] == '"' &&
-        escaped.data[escaped.size - 1] == '"') {
-      escaped = iree_string_view_substr(escaped, 1, escaped.size - 2);
-    }
+  // Allocate output buffer sized to text length (generous).
+  iree_host_size_t capacity = iree_max(text.size, (iree_host_size_t)8192);
+  iree_tokenizer_token_id_t* token_ids = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator,
+                                capacity * sizeof(iree_tokenizer_token_id_t),
+                                (void**)&token_ids));
 
-    // First pass: compute required size.
-    iree_host_size_t decoded_length = 0;
-    iree_status_t status =
-        iree_json_unescape_string(escaped, 0, NULL, &decoded_length);
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, capacity);
+
+  iree_tooling_benchmark_stats_t stats;
+  iree_tooling_benchmark_stats_initialize(&stats);
+  stats.peak_memory = capacity * sizeof(iree_tokenizer_token_id_t);
+
+  // Warmup.
+  for (int32_t i = 0; i < FLAG_benchmark_warmup; ++i) {
+    iree_host_size_t token_count = 0;
+    iree_status_t status = iree_tokenizer_encode(tokenizer, text, flags, output,
+                                                 allocator, &token_count);
     if (!iree_status_is_ok(status)) {
+      iree_allocator_free(allocator, token_ids);
       IREE_TRACE_ZONE_END(z0);
       return status;
     }
-
-    // Allocate and decode.
-    status = iree_allocator_malloc(allocator, decoded_length + 1,
-                                   (void**)&decoded_buffer);
-    if (!iree_status_is_ok(status)) {
-      IREE_TRACE_ZONE_END(z0);
-      return status;
-    }
-    status = iree_json_unescape_string(escaped, decoded_length + 1,
-                                       decoded_buffer, &decoded_length);
-    if (!iree_status_is_ok(status)) {
-      iree_allocator_free(allocator, decoded_buffer);
-      IREE_TRACE_ZONE_END(z0);
-      return status;
-    }
-    decoded_buffer[decoded_length] = '\0';
-    input = iree_make_string_view(decoded_buffer, decoded_length);
   }
 
-  iree_status_t status = iree_tooling_tokenize_encode(tokenizer, input);
+  // Timed iterations.
+  for (int32_t i = 0; i < FLAG_benchmark_iterations; ++i) {
+    iree_host_size_t token_count = 0;
+    iree_time_t start = iree_time_now();
+    iree_status_t status = iree_tokenizer_encode(tokenizer, text, flags, output,
+                                                 allocator, &token_count);
+    iree_time_t end = iree_time_now();
+    if (!iree_status_is_ok(status)) {
+      iree_allocator_free(allocator, token_ids);
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
+    iree_tooling_benchmark_stats_record(&stats, end - start, text.size,
+                                        token_count);
+  }
 
-  iree_allocator_free(allocator, decoded_buffer);
+  iree_tooling_benchmark_stats_print(&stats, "oneshot");
+  iree_allocator_free(allocator, token_ids);
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_benchmark_stream(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_allocator_t allocator) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_tokenizer_encode_flags_t flags = iree_tooling_encode_flags();
+  iree_host_size_t chunk_size = (iree_host_size_t)FLAG_benchmark_chunk_size;
+
+  // Allocate combined state and transform buffer.
+  iree_host_size_t state_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_tokenizer_encode_state_calculate_size(tokenizer, &state_size));
+  iree_host_size_t transform_size =
+      iree_tokenizer_transform_buffer_recommended_size(chunk_size);
+  iree_host_size_t total_size = 0;
+  iree_host_size_t state_offset = 0;
+  iree_host_size_t transform_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      IREE_STRUCT_LAYOUT(
+          0, &total_size, IREE_STRUCT_FIELD(state_size, uint8_t, &state_offset),
+          IREE_STRUCT_FIELD(transform_size, uint8_t, &transform_offset)));
+  uint8_t* storage = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&storage));
+
+  // Token output buffer.
+  iree_tokenizer_token_id_t token_buffer[1024];
+  iree_tokenizer_token_output_t output = iree_tokenizer_make_token_output(
+      token_buffer, NULL, NULL, IREE_ARRAYSIZE(token_buffer));
+
+  iree_byte_span_t state_span = {storage + state_offset, state_size};
+  iree_byte_span_t transform_span = {storage + transform_offset,
+                                     transform_size};
+
+  iree_tooling_benchmark_stats_t stats;
+  iree_tooling_benchmark_stats_initialize(&stats);
+  stats.peak_memory = total_size + sizeof(token_buffer);
+
+  iree_status_t status = iree_ok_status();
+  int32_t total_iterations = FLAG_benchmark_warmup + FLAG_benchmark_iterations;
+  for (int32_t iteration = 0;
+       iteration < total_iterations && iree_status_is_ok(status); ++iteration) {
+    bool is_warmup = (iteration < FLAG_benchmark_warmup);
+    iree_time_t start = iree_time_now();
+    iree_host_size_t iteration_tokens = 0;
+
+    // Initialize state for this iteration.
+    iree_tokenizer_encode_state_t* state = NULL;
+    status = iree_tokenizer_encode_state_initialize(
+        tokenizer, state_span, transform_span,
+        iree_tokenizer_offset_run_list_empty(), flags, &state);
+    if (!iree_status_is_ok(status)) break;
+
+    // Feed text in chunks.
+    iree_host_size_t text_position = 0;
+    while (text_position < text.size && iree_status_is_ok(status)) {
+      iree_host_size_t remaining = text.size - text_position;
+      iree_host_size_t this_chunk = iree_min(remaining, chunk_size);
+      iree_string_view_t chunk =
+          iree_make_string_view(text.data + text_position, this_chunk);
+      while (chunk.size > 0 && iree_status_is_ok(status)) {
+        iree_host_size_t bytes_consumed = 0;
+        iree_host_size_t token_count = 0;
+        status = iree_tokenizer_encode_state_feed(
+            state, chunk, output, &bytes_consumed, &token_count);
+        if (iree_status_is_ok(status)) {
+          iteration_tokens += token_count;
+          chunk.data += bytes_consumed;
+          chunk.size -= bytes_consumed;
+        }
+      }
+      text_position += this_chunk;
+    }
+
+    // Finalize.
+    if (iree_status_is_ok(status)) {
+      iree_host_size_t token_count = 0;
+      status =
+          iree_tokenizer_encode_state_finalize(state, output, &token_count);
+      if (iree_status_is_ok(status)) {
+        iteration_tokens += token_count;
+      }
+    }
+
+    iree_tokenizer_encode_state_deinitialize(state);
+
+    if (iree_status_is_ok(status) && !is_warmup) {
+      iree_time_t end = iree_time_now();
+      iree_tooling_benchmark_stats_record(&stats, end - start, text.size,
+                                          iteration_tokens);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_tooling_benchmark_stats_print(&stats, "stream");
+  }
+
+  iree_allocator_free(allocator, storage);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-// Processes comma-separated IDs for decoding back to text.
-static iree_status_t iree_tooling_process_decode(iree_tokenizer_t* tokenizer,
-                                                 iree_string_view_t input) {
+static iree_status_t iree_tooling_benchmark_decode(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_allocator_t allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = iree_tooling_tokenize_decode(tokenizer, input);
+
+  // First, encode the text to get tokens.
+  iree_tokenizer_encode_flags_t flags = iree_tooling_encode_flags();
+  iree_host_size_t capacity = iree_max(text.size, (iree_host_size_t)8192);
+  iree_tokenizer_token_id_t* token_ids = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator,
+                                capacity * sizeof(iree_tokenizer_token_id_t),
+                                (void**)&token_ids));
+
+  iree_tokenizer_token_output_t output =
+      iree_tokenizer_make_token_output(token_ids, NULL, NULL, capacity);
+  iree_host_size_t token_count = 0;
+  iree_status_t status = iree_tokenizer_encode(tokenizer, text, flags, output,
+                                               allocator, &token_count);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(allocator, token_ids);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_tokenizer_token_id_list_t tokens =
+      iree_tokenizer_make_token_id_list(token_ids, token_count);
+
+  // Allocate decode output buffer.
+  iree_host_size_t text_capacity = 65536;
+  char* text_buffer = NULL;
+  status =
+      iree_allocator_malloc(allocator, text_capacity, (void**)&text_buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(allocator, token_ids);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  iree_mutable_string_view_t text_output = {text_buffer, text_capacity};
+
+  iree_tooling_benchmark_stats_t stats;
+  iree_tooling_benchmark_stats_initialize(&stats);
+  stats.peak_memory =
+      capacity * sizeof(iree_tokenizer_token_id_t) + text_capacity;
+
+  // Decode flags for benchmark iterations.
+  iree_tokenizer_decode_flags_t decode_flags =
+      FLAG_decode_special ? IREE_TOKENIZER_DECODE_FLAG_NONE
+                          : IREE_TOKENIZER_DECODE_FLAG_SKIP_SPECIAL_TOKENS;
+
+  // Warmup.
+  for (int32_t i = 0; i < FLAG_benchmark_warmup && iree_status_is_ok(status);
+       ++i) {
+    iree_host_size_t text_length = 0;
+    status = iree_tokenizer_decode(tokenizer, tokens, decode_flags, text_output,
+                                   allocator, &text_length);
+  }
+
+  // Timed iterations.
+  for (int32_t i = 0;
+       i < FLAG_benchmark_iterations && iree_status_is_ok(status); ++i) {
+    iree_host_size_t text_length = 0;
+    iree_time_t start = iree_time_now();
+    status = iree_tokenizer_decode(tokenizer, tokens, decode_flags, text_output,
+                                   allocator, &text_length);
+    iree_time_t end = iree_time_now();
+    if (iree_status_is_ok(status)) {
+      iree_tooling_benchmark_stats_record(&stats, end - start, text_length,
+                                          token_count);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_tooling_benchmark_stats_print(&stats, "decode");
+  }
+
+  iree_allocator_free(allocator, text_buffer);
+  iree_allocator_free(allocator, token_ids);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static iree_status_t iree_tooling_tokenize_benchmark(
+    const iree_tokenizer_t* tokenizer, iree_string_view_t text,
+    iree_allocator_t allocator) {
+  iree_string_view_t mode = iree_make_cstring_view(FLAG_benchmark);
+
+  if (iree_string_view_equal(mode, IREE_SV("oneshot"))) {
+    return iree_tooling_benchmark_oneshot(tokenizer, text, allocator);
+  } else if (iree_string_view_equal(mode, IREE_SV("stream"))) {
+    return iree_tooling_benchmark_stream(tokenizer, text, allocator);
+  } else if (iree_string_view_equal(mode, IREE_SV("decode"))) {
+    return iree_tooling_benchmark_decode(tokenizer, text, allocator);
+  }
+
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unknown benchmark mode '%.*s' "
+                          "(expected: oneshot, stream, decode)",
+                          (int)mode.size, mode.data);
+}
+
+//===----------------------------------------------------------------------===//
+// JSON String Processing
+//===----------------------------------------------------------------------===//
+
+// Decodes a JSON-escaped string into raw UTF-8 bytes.
+static iree_status_t iree_tooling_decode_json_string(
+    iree_string_view_t raw_input, iree_allocator_t allocator, char** out_buffer,
+    iree_string_view_t* out_text) {
+  // Strip surrounding quotes if present.
+  iree_string_view_t escaped = raw_input;
+  if (escaped.size >= 2 && escaped.data[0] == '"' &&
+      escaped.data[escaped.size - 1] == '"') {
+    escaped = iree_string_view_substr(escaped, 1, escaped.size - 2);
+  }
+
+  // First pass: compute required size.
+  iree_host_size_t decoded_length = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_json_unescape_string(escaped, 0, NULL, &decoded_length));
+
+  // Allocate and decode.
+  char* buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, decoded_length + 1, (void**)&buffer));
+  iree_status_t status = iree_json_unescape_string(escaped, decoded_length + 1,
+                                                   buffer, &decoded_length);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(allocator, buffer);
+    return status;
+  }
+  buffer[decoded_length] = '\0';
+
+  *out_buffer = buffer;
+  *out_text = iree_make_string_view(buffer, decoded_length);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -550,67 +965,82 @@ int main(int argc, char** argv) {
   iree_flags_set_usage(
       "iree-tokenize",
       "Tokenizes text using HuggingFace tokenizer.json files.\n"
-      "Outputs JSON for easy scripting and pipeline integration.\n"
+      "Outputs comma-separated token IDs (use --json for JSON format).\n"
       "\n"
       "Usage:\n"
-      "  iree-tokenize <tokenizer.json> [flags] <text>\n"
+      "  iree-tokenize --tokenizer=<file> [flags] <text>\n"
       "\n"
       "Examples:\n"
       "\n"
-      "  Encode text to token IDs (default mode):\n"
-      "    iree-tokenize tokenizer.json \"hello, world!\"\n"
-      "    {\"ids\":[101,7592,1010,2088,999,102]}\n"
-      "\n"
-      "  Raw output for iree-run-module integration:\n"
-      "    iree-tokenize tokenizer.json --raw \"hello, world!\"\n"
+      "  Encode text to token IDs (default: comma-separated):\n"
+      "    iree-tokenize --tokenizer=tokenizer.json \"hello, world!\"\n"
       "    101,7592,1010,2088,999,102\n"
+      "\n"
+      "  JSON output:\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --json \"hello, world!\"\n"
+      "    {\"ids\":[101,7592,1010,2088,999,102]}\n"
       "\n"
       "  Use with iree-run-module:\n"
       "    iree-run-module --module=model.vmfb \\\n"
-      "      --input=\"6xi32=$(iree-tokenize tokenizer.json --raw 'hello')\"\n"
+      "      --input=\"6xi32=$(iree-tokenize --tokenizer=tokenizer.json "
+      "'hello')\"\n"
       "\n"
       "  Encode without special tokens (no [CLS]/[SEP] or BOS/EOS):\n"
-      "    iree-tokenize tokenizer.json --no_special \"hello world\"\n"
-      "    {\"ids\":[7592,2088]}\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --special=false \"hello "
+      "world\"\n"
+      "    7592,2088\n"
+      "\n"
+      "  Show token-to-byte offset mappings:\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --offsets \"hello world\"\n"
+      "    7592[0:5],2088[6:11]\n"
       "\n"
       "  Decode token IDs back to text:\n"
-      "    iree-tokenize tokenizer.json --decode \"101,7592,2088,102\"\n"
-      "    {\"text\":\"[CLS]helloworld[SEP]\"}\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --decode "
+      "\"101,7592,2088,102\"\n"
+      "    [CLS]helloworld[SEP]\n"
       "\n"
-      "  Show tokenizer info (vocab size, model type, special tokens):\n"
-      "    iree-tokenize tokenizer.json --info\n"
-      "    {\"vocab_size\":30522,\"model_type\":\"WordPiece\",\"unk_id\":100,"
+      "  Show tokenizer info (always JSON):\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --info\n"
+      "    {\"vocab_size\":30522,\"model_type\":\"BPE\",\"unk_id\":100,"
       "\"cls_id\":101,\"sep_id\":102}\n"
       "\n"
       "  Batch mode - encode one line per input from stdin:\n"
-      "    echo -e \"hello\\nworld\" | iree-tokenize tokenizer.json --batch\n"
-      "    {\"ids\":[101,7592,102]}\n"
-      "    {\"ids\":[101,2088,102]}\n"
+      "    echo -e \"hello\\nworld\" | iree-tokenize "
+      "--tokenizer=tokenizer.json --batch\n"
+      "    101,7592,102\n"
+      "    101,2088,102\n"
       "\n"
       "  Stream mode - continuous stdin encoding (no line buffering):\n"
-      "    cat large_file.txt | iree-tokenize tokenizer.json --stream\n"
-      "    {\"ids\":[...]}\n"
+      "    cat large_file.txt | iree-tokenize --tokenizer=tokenizer.json "
+      "--stream\n"
+      "    101,7592,...\n"
       "\n"
       "  Truncate output to max length:\n"
-      "    iree-tokenize tokenizer.json --max_length=5 \"hello world foo\"\n"
-      "    {\"ids\":[101,7592,2088,29379,102]}\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --max_length=5 \"hello "
+      "world foo\"\n"
+      "    101,7592,2088,29379,102\n"
       "\n"
-      "  Pipeline with jq to extract just the IDs:\n"
-      "    iree-tokenize tokenizer.json \"hello\" | jq '.ids'\n"
+      "  Benchmark encode throughput:\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --benchmark=oneshot "
+      "\"hello world\"\n"
+      "\n"
+      "  JSON output with jq:\n"
+      "    iree-tokenize --tokenizer=tokenizer.json --json \"hello\" | jq "
+      "'.ids'\n"
       "    [101,7592,102]\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
-  if (argc < 2) {
+  if (FLAG_tokenizer[0] == '\0') {
     fprintf(stderr,
-            "Error: missing tokenizer.json path\n"
-            "Usage: iree-tokenize <tokenizer.json> [flags] <text>\n"
+            "Error: missing --tokenizer=<file> flag\n"
+            "Usage: iree-tokenize --tokenizer=<file> [flags] <text>\n"
             "Run with --help for more information.\n");
     IREE_TRACE_ZONE_END(z0);
     IREE_TRACE_APP_EXIT(EXIT_FAILURE);
     return EXIT_FAILURE;
   }
 
-  const char* tokenizer_path = argv[1];
+  const char* tokenizer_path = FLAG_tokenizer;
 
   // Load tokenizer.json file.
   iree_io_file_contents_t* file_contents = NULL;
@@ -652,34 +1082,58 @@ int main(int argc, char** argv) {
   if (iree_status_is_ok(status)) {
     if (FLAG_info) {
       status = iree_tooling_tokenize_info(tokenizer);
+    } else if (FLAG_benchmark[0] != '\0') {
+      // Benchmark mode requires text input.
+      if (argc < 2) {
+        fprintf(stderr, "Error: --benchmark requires input text argument\n");
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "--benchmark requires input text");
+      } else {
+        iree_string_view_t input = iree_make_cstring_view(argv[1]);
+        char* decoded_buffer = NULL;
+        if (FLAG_json_string) {
+          status = iree_tooling_decode_json_string(input, host_allocator,
+                                                   &decoded_buffer, &input);
+        }
+        if (iree_status_is_ok(status)) {
+          status =
+              iree_tooling_tokenize_benchmark(tokenizer, input, host_allocator);
+        }
+        iree_allocator_free(host_allocator, decoded_buffer);
+      }
     } else if (FLAG_stream) {
-      // Continuous streaming from stdin (encode only).
       if (FLAG_decode) {
         fprintf(stderr, "Error: --stream is not supported with --decode\n");
         status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "--stream requires encode mode");
       } else {
-        status = iree_tooling_tokenize_stdin_streaming(tokenizer);
+        status =
+            iree_tooling_tokenize_stdin_streaming(tokenizer, host_allocator);
       }
     } else if (FLAG_batch) {
       status = iree_tooling_tokenize_batch(tokenizer, host_allocator);
-    } else if (argc < 3) {
+    } else if (argc < 2) {
       fprintf(stderr,
               "Error: missing input text\n"
-              "Usage: iree-tokenize <tokenizer.json> [flags] <text>\n");
+              "Usage: iree-tokenize --tokenizer=<file> [flags] <text>\n");
       status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "missing input");
     } else {
-      iree_string_view_t input = iree_make_cstring_view(argv[2]);
-      if (FLAG_decode) {
-        status = iree_tooling_process_decode(tokenizer, input);
-      } else {
-        iree_tooling_encode_flags_t flags = IREE_TOOLING_ENCODE_FLAG_DEFAULT;
-        if (FLAG_json_string) {
-          flags |= IREE_TOOLING_ENCODE_FLAG_JSON_STRING;
-        }
-        status = iree_tooling_process_encode(tokenizer, input, flags,
-                                             host_allocator);
+      iree_string_view_t input = iree_make_cstring_view(argv[1]);
+      char* decoded_buffer = NULL;
+      if (FLAG_json_string) {
+        status = iree_tooling_decode_json_string(input, host_allocator,
+                                                 &decoded_buffer, &input);
       }
+      if (iree_status_is_ok(status)) {
+        if (FLAG_decode) {
+          status =
+              iree_tooling_tokenize_decode(tokenizer, input, host_allocator);
+        } else {
+          status =
+              iree_tooling_tokenize_encode(tokenizer, input, host_allocator);
+        }
+      }
+      iree_allocator_free(host_allocator, decoded_buffer);
     }
   }
 

@@ -187,6 +187,34 @@ TEST(UnicodeUtf8Test, EncodedLength) {
   EXPECT_EQ(iree_unicode_utf8_encoded_length(0x110000), 0);  // Invalid
 }
 
+TEST(UnicodeUtf8Test, SequenceLength) {
+  // ASCII (0x00-0x7F): 1 byte.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0x00), 1u);  // Null byte.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length('A'), 1u);
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0x7F), 1u);
+
+  // 2-byte lead (0xC0-0xDF): 2 bytes.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xC3), 2u);  // Start of é.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xDF), 2u);
+
+  // 3-byte lead (0xE0-0xEF): 3 bytes.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xE4), 3u);  // Start of 中.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xEF), 3u);
+
+  // 4-byte lead (0xF0-0xF7): 4 bytes.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xF0), 4u);  // Start of emoji.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xF4), 4u);
+
+  // Continuation bytes (0x80-0xBF): return 1 (advance past invalid).
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0x80), 1u);
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xBF), 1u);
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xA9), 1u);  // Part of é.
+
+  // Invalid lead bytes (0xF8+): return 1.
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xF8), 1u);
+  EXPECT_EQ(iree_unicode_utf8_sequence_length(0xFF), 1u);
+}
+
 TEST(UnicodeUtf8Test, IncompleteTailLengthEmpty) {
   // Empty buffer has no incomplete tail.
   EXPECT_EQ(iree_unicode_utf8_incomplete_tail_length("", 0), 0u);
@@ -352,6 +380,58 @@ TEST(UnicodeCategoryTest, CombiningMarks) {
   EXPECT_TRUE(iree_unicode_is_mark(0x0302));  // Combining Circumflex Accent
 }
 
+TEST(UnicodeCategoryTest, MarkNonspacing) {
+  // iree_unicode_is_mark_nonspacing() returns true for Mn (Mark, Nonspacing)
+  // category, and false for Mc (Spacing Combining) and Me (Enclosing).
+
+  // Combining Diacritical Marks (U+0300-U+036F) - all Mn.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0300));  // Grave accent
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0301));  // Acute accent
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0308));  // Diaeresis
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x036F));  // Last in block
+
+  // Hebrew cantillation marks (Mn).
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0591));  // Etnahta
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x05B0));  // Sheva
+
+  // Arabic marks (Mn).
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0610));  // Sallallahou
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x064B));  // Fathatan
+
+  // Khmer combining marks (Mn).
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x17D2));  // Coeng (virama)
+
+  // Combining Diacritical Marks Supplement (U+1DC0-U+1DFF) - Mn.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x1DC0));
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x1DFF));
+
+  // Combining Half Marks (U+FE20-U+FE2F) - Mn.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0xFE20));
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0xFE2F));
+
+  // Sharada Sign Virama (U+111B6) - Mn.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x111B6));
+
+  // Musical Symbol Combining Stem (U+1D165) - Mc (NOT Mn).
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(0x1D165));
+
+  // Grantha Vowel Sign AU (U+1134C) - Mc (NOT Mn) - the original bug case.
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(0x1134C));
+
+  // Devanagari vowel signs: some are Mn, some are Mc.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x0941));   // Mn: Vowel Sign U
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(0x093E));  // Mc: Vowel Sign AA
+
+  // Bengali: some Mn, some Mc.
+  EXPECT_TRUE(iree_unicode_is_mark_nonspacing(0x09C1));   // Mn: Vowel Sign U
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(0x09BE));  // Mc: Vowel Sign AA
+
+  // Non-marks should return false.
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing('A'));
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(0x4E2D));  // CJK
+  EXPECT_FALSE(iree_unicode_is_mark_nonspacing(' '));
+}
+
 TEST(UnicodeCategoryTest, C1ControlCharacters) {
   // C1 controls (0x80-0x9F) should be detected as control characters.
   EXPECT_TRUE(iree_unicode_is_control(0x80));
@@ -360,30 +440,70 @@ TEST(UnicodeCategoryTest, C1ControlCharacters) {
   EXPECT_FALSE(iree_unicode_is_control(0xA0));  // NBSP is not a control
 }
 
-TEST(UnicodeCategoryTest, CJKCharacters) {
-  // CJK Unified Ideographs (U+4E00-U+9FFF).
-  EXPECT_TRUE(iree_unicode_is_cjk(0x4E00));  // First CJK Unified Ideograph
-  EXPECT_TRUE(iree_unicode_is_cjk(0x4E2D));  // 中 (middle)
-  EXPECT_TRUE(iree_unicode_is_cjk(0x6587));  // 文 (text)
-  EXPECT_TRUE(iree_unicode_is_cjk(0x9FFF));  // Last CJK Unified Ideograph
+TEST(UnicodeCategoryTest, InvisibleFormatCharacters) {
+  // Zero-width characters (U+200B-U+200F).
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x200B));  // ZWSP
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x200C));  // ZWNJ
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x200D));  // ZWJ
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x200E));  // LRM
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x200F));  // RLM
+
+  // Directional formatting (U+202A-U+202E).
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x202A));  // LRE
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x202B));  // RLE
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x202C));  // PDF
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x202D));  // LRO
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x202E));  // RLO
+
+  // Word joiner and invisible operators (U+2060-U+2064).
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x2060));  // Word Joiner
+  EXPECT_TRUE(
+      iree_unicode_is_invisible_format(0x2061));  // Function Application
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x2062));  // Invisible Times
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x2063));  // Invisible Separator
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0x2064));  // Invisible Plus
+
+  // Byte Order Mark (U+FEFF).
+  EXPECT_TRUE(iree_unicode_is_invisible_format(0xFEFF));  // BOM
+
+  // Characters that should NOT be invisible format.
+  EXPECT_FALSE(iree_unicode_is_invisible_format(' '));  // Regular space
+  EXPECT_FALSE(iree_unicode_is_invisible_format('A'));  // ASCII letter
+  EXPECT_FALSE(
+      iree_unicode_is_invisible_format(0x00A0));  // NBSP (visible space)
+  EXPECT_FALSE(iree_unicode_is_invisible_format(0x3000));  // Ideographic Space
+  EXPECT_FALSE(
+      iree_unicode_is_invisible_format(0x00));  // NUL (control, not format)
+  EXPECT_FALSE(iree_unicode_is_invisible_format(0x1F));  // Control character
+  EXPECT_FALSE(iree_unicode_is_invisible_format(0x7F));  // DEL (control)
+  EXPECT_FALSE(
+      iree_unicode_is_invisible_format(0x0301));  // Combining Acute (mark)
+}
+
+TEST(UnicodeCategoryTest, HanCharacters) {
+  // Han characters: CJK Unified Ideographs (U+4E00-U+9FFF).
+  EXPECT_TRUE(iree_unicode_is_han(0x4E00));  // First CJK Unified Ideograph
+  EXPECT_TRUE(iree_unicode_is_han(0x4E2D));  // 中 (middle)
+  EXPECT_TRUE(iree_unicode_is_han(0x6587));  // 文 (text)
+  EXPECT_TRUE(iree_unicode_is_han(0x9FFF));  // Last CJK Unified Ideograph
 
   // CJK Extension A (U+3400-U+4DBF).
-  EXPECT_TRUE(iree_unicode_is_cjk(0x3400));
-  EXPECT_TRUE(iree_unicode_is_cjk(0x4DBF));
+  EXPECT_TRUE(iree_unicode_is_han(0x3400));
+  EXPECT_TRUE(iree_unicode_is_han(0x4DBF));
 
   // CJK Extension B (U+20000-U+2A6DF).
-  EXPECT_TRUE(iree_unicode_is_cjk(0x20000));
-  EXPECT_TRUE(iree_unicode_is_cjk(0x2A6DF));
+  EXPECT_TRUE(iree_unicode_is_han(0x20000));
+  EXPECT_TRUE(iree_unicode_is_han(0x2A6DF));
 
   // CJK Compatibility Ideographs (U+F900-U+FAFF).
-  EXPECT_TRUE(iree_unicode_is_cjk(0xF900));
-  EXPECT_TRUE(iree_unicode_is_cjk(0xFAFF));
+  EXPECT_TRUE(iree_unicode_is_han(0xF900));
+  EXPECT_TRUE(iree_unicode_is_han(0xFAFF));
 
   // Non-CJK characters.
-  EXPECT_FALSE(iree_unicode_is_cjk('A'));     // ASCII
-  EXPECT_FALSE(iree_unicode_is_cjk(0x3041));  // Hiragana あ
-  EXPECT_FALSE(iree_unicode_is_cjk(0x30A1));  // Katakana ア
-  EXPECT_FALSE(iree_unicode_is_cjk(0xAC00));  // Hangul 가
+  EXPECT_FALSE(iree_unicode_is_han('A'));     // ASCII
+  EXPECT_FALSE(iree_unicode_is_han(0x3041));  // Hiragana あ
+  EXPECT_FALSE(iree_unicode_is_han(0x30A1));  // Katakana ア
+  EXPECT_FALSE(iree_unicode_is_han(0xAC00));  // Hangul 가
 }
 
 TEST(UnicodeCategoryTest, NonAsciiPunctuation) {
@@ -466,15 +586,133 @@ TEST(UnicodeCategoryTest, UnassignedCodepoints) {
   EXPECT_TRUE(iree_unicode_is_other(0x10FFFF));  // Max codepoint (unassigned)
 }
 
+TEST(UnicodeCategoryTest, Latin1SupplementCategories) {
+  // Verify the Latin-1 Supplement fast path table (U+0080-U+00FF) produces
+  // correct categories for every codepoint in the range.
+
+  // U+0080-009F: C1 Controls (Cc) → OTHER.
+  for (uint32_t cp = 0x80; cp <= 0x9F; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_OTHER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00A0: No-Break Space (Zs) → SEPARATOR.
+  EXPECT_EQ(iree_unicode_category(0x00A0), IREE_UNICODE_CATEGORY_SEPARATOR);
+
+  // U+00A1: ¡ Inverted Exclamation Mark (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00A1), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00A2-00A6: Currency/Other symbols (Sc/So) → SYMBOL.
+  for (uint32_t cp = 0xA2; cp <= 0xA6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_SYMBOL)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00A7: § Section Sign (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00A7), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00A8-00A9: Modifier/Other symbols (Sk/So) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00A8), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00A9), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00AA: ª Feminine Ordinal (Lo) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00AA), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00AB: « Left-Pointing Double Angle (Pi) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00AB), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00AC: ¬ Not Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00AC), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00AD: Soft Hyphen (Cf) → OTHER.
+  EXPECT_EQ(iree_unicode_category(0x00AD), IREE_UNICODE_CATEGORY_OTHER);
+
+  // U+00AE-00AF: ® ¯ (So/Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00AE), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00AF), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B0-00B1: ° ± (So/Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B0), IREE_UNICODE_CATEGORY_SYMBOL);
+  EXPECT_EQ(iree_unicode_category(0x00B1), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B2-00B3: ² ³ (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00B2), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00B3), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00B4: ´ Acute Accent (Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B4), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B5: µ Micro Sign (Ll) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00B5), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00B6: ¶ Pilcrow Sign (So) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B6), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B7: · Middle Dot (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00B7), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00B8: ¸ Cedilla (Sk) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00B8), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00B9: ¹ Superscript One (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00B9), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00BA: º Masculine Ordinal (Lo) → LETTER.
+  EXPECT_EQ(iree_unicode_category(0x00BA), IREE_UNICODE_CATEGORY_LETTER);
+
+  // U+00BB: » Right-Pointing Double Angle (Pf) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00BB), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00BC-00BE: ¼ ½ ¾ (No) → NUMBER.
+  EXPECT_EQ(iree_unicode_category(0x00BC), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00BD), IREE_UNICODE_CATEGORY_NUMBER);
+  EXPECT_EQ(iree_unicode_category(0x00BE), IREE_UNICODE_CATEGORY_NUMBER);
+
+  // U+00BF: ¿ Inverted Question Mark (Po) → PUNCTUATION.
+  EXPECT_EQ(iree_unicode_category(0x00BF), IREE_UNICODE_CATEGORY_PUNCTUATION);
+
+  // U+00C0-00D6: Latin uppercase letters (Lu) → LETTER.
+  for (uint32_t cp = 0xC0; cp <= 0xD6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00D7: × Multiplication Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00D7), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00D8-00F6: Latin letters (Lu/Ll) → LETTER.
+  for (uint32_t cp = 0xD8; cp <= 0xF6; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+
+  // U+00F7: ÷ Division Sign (Sm) → SYMBOL.
+  EXPECT_EQ(iree_unicode_category(0x00F7), IREE_UNICODE_CATEGORY_SYMBOL);
+
+  // U+00F8-00FF: Latin lowercase letters (Ll) → LETTER.
+  for (uint32_t cp = 0xF8; cp <= 0xFF; ++cp) {
+    EXPECT_EQ(iree_unicode_category(cp), IREE_UNICODE_CATEGORY_LETTER)
+        << "U+" << std::hex << cp;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Case Folding Tests
 //===----------------------------------------------------------------------===//
 
+// Helper to test 1:1 lowercase mappings.
+static uint32_t to_lower_single(uint32_t codepoint) {
+  uint32_t out[2];
+  iree_host_size_t count = iree_unicode_to_lower(codepoint, out);
+  EXPECT_EQ(count, 1u);
+  return out[0];
+}
+
 TEST(UnicodeCaseTest, AsciiLowercase) {
-  EXPECT_EQ(iree_unicode_to_lower('A'), 'a');
-  EXPECT_EQ(iree_unicode_to_lower('Z'), 'z');
-  EXPECT_EQ(iree_unicode_to_lower('a'), 'a');  // Already lowercase
-  EXPECT_EQ(iree_unicode_to_lower('0'), '0');  // Not a letter
+  EXPECT_EQ(to_lower_single('A'), 'a');
+  EXPECT_EQ(to_lower_single('Z'), 'z');
+  EXPECT_EQ(to_lower_single('a'), 'a');  // Already lowercase
+  EXPECT_EQ(to_lower_single('0'), '0');  // Not a letter
 }
 
 TEST(UnicodeCaseTest, AsciiUppercase) {
@@ -485,9 +723,9 @@ TEST(UnicodeCaseTest, AsciiUppercase) {
 }
 
 TEST(UnicodeCaseTest, Latin1Lowercase) {
-  EXPECT_EQ(iree_unicode_to_lower(0x00C0), 0x00E0u);  // À → à
-  EXPECT_EQ(iree_unicode_to_lower(0x00C9), 0x00E9u);  // É → é
-  EXPECT_EQ(iree_unicode_to_lower(0x00D6), 0x00F6u);  // Ö → ö
+  EXPECT_EQ(to_lower_single(0x00C0), 0x00E0u);  // À → à
+  EXPECT_EQ(to_lower_single(0x00C9), 0x00E9u);  // É → é
+  EXPECT_EQ(to_lower_single(0x00D6), 0x00F6u);  // Ö → ö
 }
 
 TEST(UnicodeCaseTest, Latin1Uppercase) {
@@ -497,25 +735,41 @@ TEST(UnicodeCaseTest, Latin1Uppercase) {
 }
 
 TEST(UnicodeCaseTest, Greek) {
-  EXPECT_EQ(iree_unicode_to_lower(0x0391), 0x03B1u);  // Α → α
-  EXPECT_EQ(iree_unicode_to_lower(0x03A9), 0x03C9u);  // Ω → ω
+  EXPECT_EQ(to_lower_single(0x0391), 0x03B1u);        // Α → α
+  EXPECT_EQ(to_lower_single(0x03A9), 0x03C9u);        // Ω → ω
   EXPECT_EQ(iree_unicode_to_upper(0x03B1), 0x0391u);  // α → Α
   EXPECT_EQ(iree_unicode_to_upper(0x03C9), 0x03A9u);  // ω → Ω
 }
 
 TEST(UnicodeCaseTest, Cyrillic) {
-  EXPECT_EQ(iree_unicode_to_lower(0x0410), 0x0430u);  // А → а
-  EXPECT_EQ(iree_unicode_to_lower(0x042F), 0x044Fu);  // Я → я
+  EXPECT_EQ(to_lower_single(0x0410), 0x0430u);        // А → а
+  EXPECT_EQ(to_lower_single(0x042F), 0x044Fu);        // Я → я
   EXPECT_EQ(iree_unicode_to_upper(0x0430), 0x0410u);  // а → А
   EXPECT_EQ(iree_unicode_to_upper(0x044F), 0x042Fu);  // я → Я
 }
 
 TEST(UnicodeCaseTest, NoMapping) {
   // Characters without case mappings should return unchanged.
-  EXPECT_EQ(iree_unicode_to_lower(0x4E2D), 0x4E2Du);  // 中 (CJK)
+  EXPECT_EQ(to_lower_single(0x4E2D), 0x4E2Du);  // 中 (CJK)
   EXPECT_EQ(iree_unicode_to_upper(0x4E2D), 0x4E2Du);
-  EXPECT_EQ(iree_unicode_to_lower(0x3042), 0x3042u);  // あ (Hiragana)
+  EXPECT_EQ(to_lower_single(0x3042), 0x3042u);  // あ (Hiragana)
   EXPECT_EQ(iree_unicode_to_upper(0x3042), 0x3042u);
+}
+
+TEST(UnicodeCaseTest, TurkishI) {
+  uint32_t out[2];
+
+  // U+0130 (İ, Latin Capital Letter I With Dot Above) expands to 2 codepoints.
+  // This is the ONLY unconditional 1:N lowercase mapping in Unicode.
+  iree_host_size_t count = iree_unicode_to_lower(0x0130, out);
+  EXPECT_EQ(count, 2u);
+  EXPECT_EQ(out[0], 0x0069u);  // LATIN SMALL LETTER I
+  EXPECT_EQ(out[1], 0x0307u);  // COMBINING DOT ABOVE
+
+  // Regular Turkish dotless I (U+0131, ı) is already lowercase - unchanged.
+  count = iree_unicode_to_lower(0x0131, out);
+  EXPECT_EQ(count, 1u);
+  EXPECT_EQ(out[0], 0x0131u);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1061,6 +1315,666 @@ TEST(UnicodeComposeTest, InvalidUtf8BehaviorUndefined) {
   // Either succeeds (with replacement char) or fails (capacity issues).
   // We don't assert on the result, just that it doesn't crash.
   iree_status_ignore(status);
+}
+
+//===----------------------------------------------------------------------===//
+// NFD Decomposition Tests
+//===----------------------------------------------------------------------===//
+
+TEST(UnicodeDecomposeTest, AsciiUnchanged) {
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose('A', out), 1);
+  EXPECT_EQ(out[0], 'A');
+  EXPECT_EQ(iree_unicode_decompose('z', out), 1);
+  EXPECT_EQ(out[0], 'z');
+  EXPECT_EQ(iree_unicode_decompose('5', out), 1);
+  EXPECT_EQ(out[0], '5');
+}
+
+TEST(UnicodeDecomposeTest, LatinPrecomposed) {
+  uint32_t out[4];
+  // é (U+00E9) -> e (U+0065) + combining acute accent (U+0301)
+  EXPECT_EQ(iree_unicode_decompose(0x00E9, out), 2);
+  EXPECT_EQ(out[0], 'e');
+  EXPECT_EQ(out[1], 0x0301);  // Combining acute accent
+  // ñ (U+00F1) -> n (U+006E) + combining tilde (U+0303)
+  EXPECT_EQ(iree_unicode_decompose(0x00F1, out), 2);
+  EXPECT_EQ(out[0], 'n');
+  EXPECT_EQ(out[1], 0x0303);  // Combining tilde
+}
+
+TEST(UnicodeDecomposeTest, HangulSyllableLVT) {
+  // 뮨 (U+BBA8) decomposes to ᄆ (U+1106) + ᅲ (U+1172) + ᆫ (U+11AB)
+  // This is an LVT syllable (Leading + Vowel + Trailing).
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose(0xBBA8, out), 3);
+  EXPECT_EQ(out[0], 0x1106);  // ᄆ (Choseong Mieum)
+  EXPECT_EQ(out[1], 0x1172);  // ᅲ (Jungseong Yu)
+  EXPECT_EQ(out[2], 0x11AB);  // ᆫ (Jongseong Nieun)
+}
+
+TEST(UnicodeDecomposeTest, HangulSyllableLV) {
+  // 가 (U+AC00) decomposes to ᄀ (U+1100) + ᅡ (U+1161)
+  // This is an LV syllable (Leading + Vowel, no Trailing).
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose(0xAC00, out), 2);
+  EXPECT_EQ(out[0], 0x1100);  // ᄀ (Choseong Kiyeok)
+  EXPECT_EQ(out[1], 0x1161);  // ᅡ (Jungseong A)
+}
+
+TEST(UnicodeDecomposeTest, HangulSyllableLastLVT) {
+  // 힣 (U+D7A3) - last valid Hangul syllable.
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose(0xD7A3, out), 3);
+  EXPECT_EQ(out[0], 0x1112);  // ᄒ (Choseong Hieuh)
+  EXPECT_EQ(out[1], 0x1175);  // ᅵ (Jungseong I)
+  EXPECT_EQ(out[2], 0x11C2);  // ᇂ (Jongseong Hieuh)
+}
+
+TEST(UnicodeDecomposeTest, HangulJamoUnchanged) {
+  // Jamo characters (already decomposed) should pass through unchanged.
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose(0x1100, out), 1);  // ᄀ
+  EXPECT_EQ(out[0], 0x1100);
+  EXPECT_EQ(iree_unicode_decompose(0x1161, out), 1);  // ᅡ
+  EXPECT_EQ(out[0], 0x1161);
+}
+
+TEST(UnicodeDecomposeTest, NonDecomposable) {
+  uint32_t out[4];
+  // CJK character - no decomposition
+  EXPECT_EQ(iree_unicode_decompose(0x4E2D, out), 1);  // 中
+  EXPECT_EQ(out[0], 0x4E2D);
+  // Emoji - no decomposition
+  EXPECT_EQ(iree_unicode_decompose(0x1F600, out), 1);  // 😀
+  EXPECT_EQ(out[0], 0x1F600);
+}
+
+//===----------------------------------------------------------------------===//
+// Vietnamese Character Recursive Decomposition Tests
+//===----------------------------------------------------------------------===//
+
+// Vietnamese characters require recursive decomposition because they have
+// multiple levels of combining marks. For example:
+// - ử (U+1EED) = u + horn + hook above
+//   First level:  U+1EED → U+1B0 (ư - u with horn)
+//   Second level: U+1B0 → U+0075 (u)
+// - ệ (U+1EC7) = e + circumflex + dot below
+//   First level:  U+1EC7 → U+1EB9 (ẹ - e with dot below)
+//   Second level: U+1EB9 → U+0065 (e)
+
+TEST(UnicodeNfdTest, VietnameseRecursiveDecomposition) {
+  // ử (U+1EED) should decompose recursively to 'u' (U+0075)
+  // Path: U+1EED → U+1B0 (ư) → U+0075 (u)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1EED), 0x0075u);  // ử → u
+
+  // ệ (U+1EC7) should decompose recursively to 'e' (U+0065)
+  // Path: U+1EC7 → U+1EB9 (ẹ) → U+0065 (e)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1EC7), 0x0065u);  // ệ → e
+
+  // ư (U+1B0) should decompose to 'u' (U+0075)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1B0), 0x0075u);  // ư → u
+
+  // ẹ (U+1EB9) should decompose to 'e' (U+0065)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1EB9), 0x0065u);  // ẹ → e
+
+  // ơ (U+01A1) should decompose to 'o' (U+006F)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1A1), 0x006Fu);  // ơ → o
+
+  // Ơ (U+01A0) should decompose to 'O' (U+004F)
+  EXPECT_EQ(iree_unicode_nfd_base(0x1A0), 0x004Fu);  // Ơ → O
+}
+
+TEST(UnicodeDecomposeTest, VietnameseRecursiveDecomposition) {
+  uint32_t out[4];
+
+  // ử (U+1EED) = ư + hook above, ư = u + horn
+  // Full NFD: u (U+0075) + horn (U+031B) + hook above (U+0309)
+  EXPECT_EQ(iree_unicode_decompose(0x1EED, out), 3);
+  EXPECT_EQ(out[0], 0x0075u);  // u
+  EXPECT_EQ(out[1], 0x031Bu);  // horn
+  EXPECT_EQ(out[2], 0x0309u);  // hook above
+
+  // ệ (U+1EC7) decomposes to ẹ (U+1EB9) + circumflex (U+0302)
+  // ẹ (U+1EB9) decomposes to e (U+0065) + dot below (U+0323)
+  // Full NFD: e (U+0065) + dot below (U+0323) + circumflex (U+0302)
+  // Note: The order follows the decomposition chain, not canonical order.
+  EXPECT_EQ(iree_unicode_decompose(0x1EC7, out), 3);
+  EXPECT_EQ(out[0], 0x0065u);  // e
+  EXPECT_EQ(out[1], 0x0323u);  // dot below (from ẹ decomposition)
+  EXPECT_EQ(out[2], 0x0302u);  // circumflex (from ệ decomposition)
+
+  // ư (U+01B0) = u + horn
+  // Full NFD: u (U+0075) + horn (U+031B)
+  EXPECT_EQ(iree_unicode_decompose(0x1B0, out), 2);
+  EXPECT_EQ(out[0], 0x0075u);  // u
+  EXPECT_EQ(out[1], 0x031Bu);  // horn
+
+  // ẹ (U+1EB9) = e + dot below
+  // Full NFD: e (U+0065) + dot below (U+0323)
+  EXPECT_EQ(iree_unicode_decompose(0x1EB9, out), 2);
+  EXPECT_EQ(out[0], 0x0065u);  // e
+  EXPECT_EQ(out[1], 0x0323u);  // dot below
+}
+
+TEST(UnicodeDecomposeTest, BufferSafetyCheck) {
+  uint32_t out[4];
+
+  // All decompositions should fit in a 4-element buffer.
+  // Most return 1-3 codepoints; Hangul can return up to 3.
+
+  // Vietnamese (recursive decomposition) - can return up to 3
+  EXPECT_LE(iree_unicode_decompose(0x1EED, out), 4);
+  EXPECT_LE(iree_unicode_decompose(0x1EC7, out), 4);
+
+  // Latin Extended Additional - returns 1-2
+  EXPECT_LE(iree_unicode_decompose(0x1E00, out), 4);  // Ḁ
+  EXPECT_LE(iree_unicode_decompose(0x1EF9, out), 4);  // ỹ
+
+  // Hangul (algorithmic) - returns 2 or 3
+  EXPECT_LE(iree_unicode_decompose(0xAC00, out), 4);  // 가 (LV)
+  EXPECT_LE(iree_unicode_decompose(0xBBA8, out), 4);  // 뮨 (LVT)
+  EXPECT_LE(iree_unicode_decompose(0xD7A3, out), 4);  // 힣 (LVT)
+
+  // Greek Extended - returns 1-2
+  EXPECT_LE(iree_unicode_decompose(0x1F00, out), 4);  // ἀ
+  EXPECT_LE(iree_unicode_decompose(0x1FFF, out), 4);
+
+  // Non-decomposable characters - returns 1
+  EXPECT_LE(iree_unicode_decompose(0x4E2D, out), 4);   // 中
+  EXPECT_LE(iree_unicode_decompose(0x1F600, out), 4);  // 😀
+}
+
+//===----------------------------------------------------------------------===//
+// NFC Canonical Decomposition Tests
+//===----------------------------------------------------------------------===//
+
+// Tests for iree_unicode_decompose_nfc_canonical() which handles all
+// decompositions required for NFC normalization, including NFC_QC=No
+// characters with multi-codepoint canonical decompositions.
+
+TEST(UnicodeDecomposeNfcCanonicalTest, AsciiUnchanged) {
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical('A', out), 1u);
+  EXPECT_EQ(out[0], (uint32_t)'A');
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical('z', out), 1u);
+  EXPECT_EQ(out[0], (uint32_t)'z');
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, PrecomposedUnchanged) {
+  // Precomposed characters (NFC_QC=Yes) should NOT be decomposed.
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x00E9, out), 1u);  // é
+  EXPECT_EQ(out[0], 0x00E9u);
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x00FC, out), 1u);  // ü
+  EXPECT_EQ(out[0], 0x00FCu);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, SingletonNfcQcNo) {
+  // Singleton NFC_QC=No characters (decompose to a single codepoint).
+  uint32_t out[4];
+
+  // U+0340 COMBINING GRAVE TONE MARK → U+0300
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0340, out), 1u);
+  EXPECT_EQ(out[0], 0x0300u);
+
+  // U+0341 COMBINING ACUTE TONE MARK → U+0301
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0341, out), 1u);
+  EXPECT_EQ(out[0], 0x0301u);
+
+  // U+0343 COMBINING GREEK KORONIS → U+0313
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0343, out), 1u);
+  EXPECT_EQ(out[0], 0x0313u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, MultiCodepointNfcQcNo) {
+  // U+0344 COMBINING GREEK DIALYTIKA TONOS → U+0308 + U+0301
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0344, out), 2u);
+  EXPECT_EQ(out[0], 0x0308u);
+  EXPECT_EQ(out[1], 0x0301u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, DevanagariNukta) {
+  // U+0958 → U+0915 + U+093C (ka + nukta)
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0958, out), 2u);
+  EXPECT_EQ(out[0], 0x0915u);
+  EXPECT_EQ(out[1], 0x093Cu);
+
+  // U+095F → U+092F + U+093C (ya + nukta)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x095F, out), 2u);
+  EXPECT_EQ(out[0], 0x092Fu);
+  EXPECT_EQ(out[1], 0x093Cu);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, TibetanSubjoined) {
+  // U+0F43 → U+0F42 + U+0FB7 (ga + subjoined ha)
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0F43, out), 2u);
+  EXPECT_EQ(out[0], 0x0F42u);
+  EXPECT_EQ(out[1], 0x0FB7u);
+
+  // U+0F73 → U+0F71 + U+0F72 (Tibetan vowel sign II)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0F73, out), 2u);
+  EXPECT_EQ(out[0], 0x0F71u);
+  EXPECT_EQ(out[1], 0x0F72u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, HebrewDagesh) {
+  // U+FB1D → U+05D9 + U+05B4 (yod + hiriq)
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0xFB1D, out), 2u);
+  EXPECT_EQ(out[0], 0x05D9u);
+  EXPECT_EQ(out[1], 0x05B4u);
+
+  // U+FB2A → U+05E9 + U+05C1 (shin + shin dot)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0xFB2A, out), 2u);
+  EXPECT_EQ(out[0], 0x05E9u);
+  EXPECT_EQ(out[1], 0x05C1u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, MusicalSymbolsRecursive) {
+  // U+1D15E → U+1D157 + U+1D165 (2 codepoints, no recursion)
+  uint32_t out[4];
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x1D15E, out), 2u);
+  EXPECT_EQ(out[0], 0x1D157u);
+  EXPECT_EQ(out[1], 0x1D165u);
+
+  // U+1D160 → U+1D158 + U+1D165 + U+1D16E (3 codepoints, recursive expansion)
+  // (U+1D160 → U+1D15F + U+1D16E, then U+1D15F → U+1D158 + U+1D165)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x1D160, out), 3u);
+  EXPECT_EQ(out[0], 0x1D158u);
+  EXPECT_EQ(out[1], 0x1D165u);
+  EXPECT_EQ(out[2], 0x1D16Eu);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, HangulSyllable) {
+  // Hangul is handled algorithmically (same as decompose_singleton).
+  uint32_t out[4];
+
+  // U+AC00 → U+1100 + U+1161 (LV syllable)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0xAC00, out), 2u);
+  EXPECT_EQ(out[0], 0x1100u);
+  EXPECT_EQ(out[1], 0x1161u);
+
+  // U+AC01 → U+1100 + U+1161 + U+11A8 (LVT syllable)
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0xAC01, out), 3u);
+  EXPECT_EQ(out[0], 0x1100u);
+  EXPECT_EQ(out[1], 0x1161u);
+  EXPECT_EQ(out[2], 0x11A8u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, CjkCompatibility) {
+  // CJK compatibility ideographs (handled via NFD singleton table).
+  uint32_t out[4];
+
+  // U+F900 → U+8C48
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0xF900, out), 1u);
+  EXPECT_EQ(out[0], 0x8C48u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, NonDecomposableUnchanged) {
+  uint32_t out[4];
+
+  // Standard CJK ideograph — not a compatibility character.
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x4E2D, out), 1u);
+  EXPECT_EQ(out[0], 0x4E2Du);  // 中
+
+  // Emoji.
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x1F600, out), 1u);
+  EXPECT_EQ(out[0], 0x1F600u);
+
+  // Combining mark (NFC_QC=Maybe, not No).
+  EXPECT_EQ(iree_unicode_decompose_nfc_canonical(0x0301, out), 1u);
+  EXPECT_EQ(out[0], 0x0301u);
+}
+
+TEST(UnicodeDecomposeNfcCanonicalTest, BufferSafetyCheck) {
+  // Verify all returned counts fit within the 4-element buffer.
+  uint32_t out[4];
+
+  // All entries in the NFC decomposition table should return <= 3 codepoints.
+  // Test the entries with 3-codepoint expansions explicitly.
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0x1D160, out), 4u);
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0x1D161, out), 4u);
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0x1D1BD, out), 4u);
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0x1D1BF, out), 4u);
+
+  // Hangul max is 3.
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0xAC01, out), 4u);
+  EXPECT_LE(iree_unicode_decompose_nfc_canonical(0xD7A3, out), 4u);
+}
+
+//===----------------------------------------------------------------------===//
+// Full NFC Normalization Tests
+//===----------------------------------------------------------------------===//
+
+// Tests for iree_unicode_nfc() which performs full NFC normalization
+// (NFD decomposition followed by canonical composition).
+// Unlike iree_unicode_compose(), this handles characters that need
+// decomposition first, such as CJK Compatibility Ideographs.
+
+TEST(UnicodeNfcTest, AsciiUnchanged) {
+  char buffer[64];
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_unicode_nfc(iree_make_cstring_view("Hello World"),
+                                  sizeof(buffer), buffer, &length));
+  EXPECT_EQ(length, 11u);
+  EXPECT_EQ(std::string(buffer, length), "Hello World");
+}
+
+TEST(UnicodeNfcTest, EmptyString) {
+  char buffer[16];
+  iree_host_size_t length;
+  IREE_ASSERT_OK(iree_unicode_nfc(iree_make_cstring_view(""), sizeof(buffer),
+                                  buffer, &length));
+  EXPECT_EQ(length, 0u);
+}
+
+TEST(UnicodeNfcTest, CJKCompatibilityIdeograph) {
+  // U+2FA15 (CJK Compatibility Ideograph 麻) should normalize to U+9EBB.
+  char buffer[16];
+  iree_host_size_t length;
+
+  // U+2FA15 in UTF-8: F0 AF A8 95
+  const char input[] = "\xF0\xAF\xA8\x95";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+
+  // U+9EBB in UTF-8: E9 BA BB (3 bytes)
+  ASSERT_EQ(length, 3u);
+  EXPECT_EQ((uint8_t)buffer[0], 0xE9);
+  EXPECT_EQ((uint8_t)buffer[1], 0xBA);
+  EXPECT_EQ((uint8_t)buffer[2], 0xBB);
+}
+
+TEST(UnicodeNfcTest, MultipleCJKCompatibilityIdeographs) {
+  // Test several codepoints from the U+2F800-U+2FA1D range.
+  struct TestCase {
+    const char* utf8_input;
+    iree_host_size_t input_length;
+    uint32_t expected_codepoint;
+  };
+
+  // U+2F800 -> U+4E3D (丽), U+2FA14 -> U+2A291, U+2FA15 -> U+9EBB (麻)
+  TestCase cases[] = {
+      {"\xF0\xAF\xA0\x80", 4, 0x4E3D},  // U+2F800 -> U+4E3D
+      {"\xF0\xAF\xA8\x95", 4, 0x9EBB},  // U+2FA15 -> U+9EBB
+      {"\xF0\xAF\xA8\x96", 4, 0x4D56},  // U+2FA16 -> U+4D56
+      {"\xF0\xAF\xA8\x97", 4, 0x9EF9},  // U+2FA17 -> U+9EF9
+      {"\xF0\xAF\xA8\x98", 4, 0x9EFE},  // U+2FA18 -> U+9EFE
+      {"\xF0\xAF\xA8\x9B", 4, 0x9F16},  // U+2FA1B -> U+9F16
+      {"\xF0\xAF\xA8\x9C", 4, 0x9F3B},  // U+2FA1C -> U+9F3B (鼻)
+  };
+
+  for (const auto& tc : cases) {
+    char buffer[16];
+    iree_host_size_t length;
+    IREE_ASSERT_OK(
+        iree_unicode_nfc(iree_make_string_view(tc.utf8_input, tc.input_length),
+                         sizeof(buffer), buffer, &length));
+
+    // Decode output and verify.
+    iree_host_size_t pos = 0;
+    uint32_t output_cp =
+        iree_unicode_utf8_decode(iree_make_string_view(buffer, length), &pos);
+    EXPECT_EQ(output_cp, tc.expected_codepoint)
+        << "Input bytes: " << std::hex << (int)(uint8_t)tc.utf8_input[0] << " "
+        << (int)(uint8_t)tc.utf8_input[1] << " "
+        << (int)(uint8_t)tc.utf8_input[2] << " "
+        << (int)(uint8_t)tc.utf8_input[3];
+  }
+}
+
+TEST(UnicodeNfcTest, StandardCJKUnchanged) {
+  // Standard CJK characters should pass through unchanged.
+  char buffer[16];
+  iree_host_size_t length;
+
+  // U+9EBB (麻) in UTF-8: E9 BA BB
+  const char input[] = "\xE9\xBA\xBB";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+
+  ASSERT_EQ(length, 3u);
+  EXPECT_EQ(memcmp(buffer, input, length), 0);
+}
+
+TEST(UnicodeNfcTest, MixedCJKAndAscii) {
+  // Mix of standard CJK, compatibility ideographs, and ASCII.
+  char buffer[64];
+  iree_host_size_t length;
+
+  // "a" + U+2FA15 + "b" -> "a" + U+9EBB + "b"
+  const char input[] =
+      "a\xF0\xAF\xA8\x95"
+      "b";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+
+  // Output: "a" (1) + U+9EBB (3) + "b" (1) = 5 bytes
+  EXPECT_EQ(length, 5u);
+  EXPECT_EQ(buffer[0], 'a');
+  EXPECT_EQ((uint8_t)buffer[1], 0xE9);  // U+9EBB
+  EXPECT_EQ((uint8_t)buffer[2], 0xBA);
+  EXPECT_EQ((uint8_t)buffer[3], 0xBB);
+  EXPECT_EQ(buffer[4], 'b');
+}
+
+TEST(UnicodeNfcTest, HangulSyllableDecompositionAndRecomposition) {
+  // Hangul syllables should be decomposed to Jamo and then recomposed.
+  // 뮨 (U+BBA8) should remain as 뮨 (already NFC).
+  char buffer[16];
+  iree_host_size_t length;
+
+  // U+BBA8 in UTF-8: EB AE A8
+  const char input[] = "\xEB\xAE\xA8";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+
+  // Should be unchanged (or recomposed to the same character).
+  ASSERT_EQ(length, 3u);
+  EXPECT_EQ(memcmp(buffer, input, length), 0);
+}
+
+TEST(UnicodeNfcTest, DecomposedToComposed) {
+  // Decomposed e + combining acute (U+0065 + U+0301) -> é (U+00E9)
+  char buffer[16];
+  iree_host_size_t length;
+
+  // e (0x65) + combining acute (CC 81)
+  const char input[] = "e\xCC\x81";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+
+  // Should compose to é (U+00E9): C3 A9
+  ASSERT_EQ(length, 2u);
+  EXPECT_EQ((uint8_t)buffer[0], 0xC3);
+  EXPECT_EQ((uint8_t)buffer[1], 0xA9);
+}
+
+TEST(UnicodeNfcTest, BufferTooSmall) {
+  char buffer[2];  // Too small for the output.
+  iree_host_size_t length;
+
+  // U+2FA15 needs 3 bytes when normalized to U+9EBB.
+  const char input[] = "\xF0\xAF\xA8\x95";
+  iree_status_t status =
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length);
+
+  EXPECT_THAT(Status(std::move(status)),
+              StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(UnicodeNfcTest, NfcQcNoSingletonGraveTone) {
+  // U+0340 (Combining Grave Tone Mark) → U+0300 via NFC decomposition.
+  // e + U+0340 should normalize to è (U+00E8 = C3 A8).
+  // U+0340 = CD 80.
+  char buffer[16];
+  iree_host_size_t length;
+  const char input[] = "e\xCD\x80";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+  EXPECT_EQ(length, 2u);
+  EXPECT_EQ((uint8_t)buffer[0], 0xC3u);  // è = C3 A8
+  EXPECT_EQ((uint8_t)buffer[1], 0xA8u);
+}
+
+TEST(UnicodeNfcTest, NfcQcNoMultiCodepointDialytikaTonos) {
+  // U+0344 (Combining Greek Dialytika Tonos) → U+0308 + U+0301.
+  // a + U+0344 = a + U+0308 + U+0301.
+  // compose_pair('a', U+0308) = ä (U+00E4).
+  // U+0301 has same CCC=230 as U+0308, so it's blocked from composing with ä.
+  // Result: ä + U+0301 = C3 A4 CC 81.
+  // U+0344 = CD 84.
+  char buffer[16];
+  iree_host_size_t length;
+  const char input[] = "a\xCD\x84";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+  EXPECT_EQ(length, 4u);
+  EXPECT_EQ((uint8_t)buffer[0], 0xC3u);  // ä = C3 A4
+  EXPECT_EQ((uint8_t)buffer[1], 0xA4u);
+  EXPECT_EQ((uint8_t)buffer[2], 0xCCu);  // U+0301 = CC 81
+  EXPECT_EQ((uint8_t)buffer[3], 0x81u);
+}
+
+TEST(UnicodeNfcTest, NfcQcNoDevanagariNukta) {
+  // U+0958 → U+0915 + U+093C (ka + nukta).
+  // These should NOT recompose back (U+0958 is a composition exclusion).
+  // U+0958 = E0 A5 98, U+0915 = E0 A4 95, U+093C = E0 A4 BC.
+  char buffer[16];
+  iree_host_size_t length;
+  const char input[] = "\xE0\xA5\x98";
+  IREE_ASSERT_OK(
+      iree_unicode_nfc(iree_make_string_view(input, sizeof(input) - 1),
+                       sizeof(buffer), buffer, &length));
+  EXPECT_EQ(length, 6u);
+  EXPECT_EQ((uint8_t)buffer[0], 0xE0u);  // U+0915 = E0 A4 95
+  EXPECT_EQ((uint8_t)buffer[1], 0xA4u);
+  EXPECT_EQ((uint8_t)buffer[2], 0x95u);
+  EXPECT_EQ((uint8_t)buffer[3], 0xE0u);  // U+093C = E0 A4 BC
+  EXPECT_EQ((uint8_t)buffer[4], 0xA4u);
+  EXPECT_EQ((uint8_t)buffer[5], 0xBCu);
+}
+
+//===----------------------------------------------------------------------===//
+// UTF-8 Sequence Validation Tests
+//===----------------------------------------------------------------------===//
+
+TEST(UnicodeUtf8Test, IsValidSequenceAscii) {
+  // Valid ASCII (single byte).
+  uint8_t bytes[] = {'A'};
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 1));
+
+  bytes[0] = 0x00;  // Null byte is valid ASCII.
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 1));
+
+  bytes[0] = 0x7F;  // DEL is valid ASCII.
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 1));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceTwoByte) {
+  // Valid 2-byte: é (U+00E9) = C3 A9
+  uint8_t bytes[] = {0xC3, 0xA9};
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 2));
+
+  // Valid 2-byte: U+0080 (first 2-byte codepoint) = C2 80
+  bytes[0] = 0xC2;
+  bytes[1] = 0x80;
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 2));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceThreeByte) {
+  // Valid 3-byte: 中 (U+4E2D) = E4 B8 AD
+  uint8_t bytes[] = {0xE4, 0xB8, 0xAD};
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 3));
+
+  // Valid 3-byte: U+FFFD (replacement char) = EF BF BD
+  bytes[0] = 0xEF;
+  bytes[1] = 0xBF;
+  bytes[2] = 0xBD;
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 3));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceFourByte) {
+  // Valid 4-byte: 😀 (U+1F600) = F0 9F 98 80
+  uint8_t bytes[] = {0xF0, 0x9F, 0x98, 0x80};
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 4));
+
+  // Valid 4-byte: U+10FFFF (max codepoint) = F4 8F BF BF
+  bytes[0] = 0xF4;
+  bytes[1] = 0x8F;
+  bytes[2] = 0xBF;
+  bytes[3] = 0xBF;
+  EXPECT_TRUE(iree_unicode_utf8_is_valid_sequence(bytes, 4));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceInvalidContinuation) {
+  // Invalid: continuation byte in 2-byte sequence.
+  uint8_t bytes[] = {0xC3, 0x00};  // 0x00 is not 10xxxxxx
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 2));
+
+  bytes[1] = 0xC0;  // 0xC0 is a lead byte, not continuation
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 2));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceOverlong) {
+  // Overlong 2-byte: encoding of ASCII 'A' (should be 1 byte).
+  // U+0041 as 2 bytes would be C1 81, but C1 is not a valid lead byte.
+  // Actually the overlong check is: (bytes[0] & 0x1E) == 0 for 2-byte.
+  uint8_t bytes[] = {0xC0, 0x80};  // Overlong NUL
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 2));
+
+  // Overlong 3-byte: U+007F as 3 bytes.
+  uint8_t bytes3[] = {0xE0, 0x81, 0xBF};  // Would encode U+007F
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes3, 3));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceSurrogate) {
+  // Invalid: UTF-16 surrogate half U+D800 = ED A0 80
+  uint8_t bytes[] = {0xED, 0xA0, 0x80};
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 3));
+
+  // Invalid: UTF-16 surrogate half U+DFFF = ED BF BF
+  bytes[0] = 0xED;
+  bytes[1] = 0xBF;
+  bytes[2] = 0xBF;
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 3));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceOutOfRange) {
+  // Invalid: codepoint > U+10FFFF = F4 90 80 80 (U+110000)
+  uint8_t bytes[] = {0xF4, 0x90, 0x80, 0x80};
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 4));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceZeroLength) {
+  uint8_t bytes[] = {0x00};
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 0));
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceInvalidLength) {
+  uint8_t bytes[] = {0x00};
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 5));  // Max is 4
+}
+
+TEST(UnicodeUtf8Test, IsValidSequenceHighBitAscii) {
+  // High bit set in "ASCII" position is invalid.
+  uint8_t bytes[] = {0x80};  // Continuation byte alone
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 1));
+
+  bytes[0] = 0xFF;  // Invalid lead byte
+  EXPECT_FALSE(iree_unicode_utf8_is_valid_sequence(bytes, 1));
 }
 
 }  // namespace

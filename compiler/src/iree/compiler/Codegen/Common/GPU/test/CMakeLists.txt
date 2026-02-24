@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "gpu_nested_layout_contract_amdgpu.mlir"
     "gpu_nested_layout_contract_nvgpu.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_inner_tiled.mlir"
     "gpu_nested_layout_vector_distribution_mask.mlir"
     "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
     "gpu_nested_layout_vector_distribution_step.mlir"

@@ -22,8 +22,7 @@ with open(input_file, "rb") as f:
 
 def create_simple_io_module():
     class SimpleIO:
-        def __init__(self, iface):
-            ...
+        def __init__(self, iface): ...
 
         def print_impl(self):
             print("+++ HELLO FROM SIMPLE_IO")

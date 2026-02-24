@@ -10,6 +10,7 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
+include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.td"
 include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
@@ -24,6 +25,7 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
+    DeclareOpInterfaceMethods<HoistableRegionOpInterface>,
     Pure,
     SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">
     ]> {

@@ -17,21 +17,18 @@
 // Maximum nesting depth for groups to prevent stack overflow.
 // Deeply nested patterns like ((((a)))) repeated many times would exhaust
 // the call stack during recursive descent parsing.
-#define IREE_TOKENIZER_REGEX_MAX_NESTING_DEPTH 100
+#define IREE_TOKENIZER_UTIL_REGEX_MAX_NESTING_DEPTH 100
 
 typedef struct iree_tokenizer_regex_parser_t {
   iree_tokenizer_regex_lexer_t lexer;
   iree_arena_allocator_t* arena;
-  iree_tokenizer_regex_parse_error_t
-      error;              // User-facing: position in pattern.
-  iree_status_t status;   // Non-OK on any error (owns allocation).
-  bool case_insensitive;  // Currently inside (?i:...).
-  uint32_t depth;         // Current nesting depth.
+  // User-facing: position in pattern.
+  iree_tokenizer_regex_parse_error_t error;
+  // Non-OK on any error (owns allocation).
+  iree_status_t status;
+  bool case_insensitive;  // Inside (?i:...).
+  uint32_t depth;         // Nesting depth.
 } iree_tokenizer_regex_parser_t;
-
-//===----------------------------------------------------------------------===//
-// Forward Declarations
-//===----------------------------------------------------------------------===//
 
 static iree_tokenizer_regex_ast_node_t*
 iree_tokenizer_regex_parser_parse_alternation(
@@ -133,7 +130,29 @@ static bool iree_tokenizer_regex_parser_add_child(
 
   if (count >= capacity) {
     // Grow capacity.
-    iree_host_size_t new_capacity = capacity == 0 ? 4 : capacity * 2;
+    iree_host_size_t new_capacity;
+    if (capacity == 0) {
+      new_capacity = 4;
+    } else if (capacity > IREE_HOST_SIZE_MAX / 2) {
+      iree_tokenizer_regex_parser_set_status(
+          parser, iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                   "AST child capacity overflow: %" PRIhsz
+                                   " children cannot be doubled",
+                                   capacity));
+      return false;
+    } else {
+      new_capacity = capacity * 2;
+    }
+    // Guard against allocation size overflow.
+    if (new_capacity >
+        IREE_HOST_SIZE_MAX / sizeof(iree_tokenizer_regex_ast_node_t*)) {
+      iree_tokenizer_regex_parser_set_status(
+          parser, iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                   "AST child allocation overflow: %" PRIhsz
+                                   " * sizeof(node*)",
+                                   new_capacity));
+      return false;
+    }
     iree_tokenizer_regex_ast_node_t** new_children = NULL;
     iree_status_t status = iree_arena_allocate(
         parser->arena, new_capacity * sizeof(iree_tokenizer_regex_ast_node_t*),
@@ -167,44 +186,45 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       iree_tokenizer_regex_parser_peek(parser);
 
   switch (tok->type) {
-    case IREE_TOKENIZER_REGEX_TOKEN_LITERAL: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_LITERAL: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_LITERAL, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_LITERAL, tok->position);
       if (!node) return NULL;
       node->data.literal = tok->value.literal;
       iree_tokenizer_regex_parser_advance(parser);
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_DOT: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOT: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_DOT, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_DOT, tok->position);
       iree_tokenizer_regex_parser_advance(parser);
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_CARET: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_CARET: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_ANCHOR_START, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_START,
+              tok->position);
       iree_tokenizer_regex_parser_advance(parser);
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_DOLLAR: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOLLAR: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_ANCHOR_END, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_END, tok->position);
       iree_tokenizer_regex_parser_advance(parser);
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_CHAR_CLASS: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_CHAR_CLASS: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_CHAR_CLASS, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_CHAR_CLASS, tok->position);
       if (!node) return NULL;
       memcpy(node->data.char_class.bitmap, tok->value.char_class.bitmap, 32);
       node->data.char_class.pseudo_mask = tok->value.char_class.pseudo_mask;
@@ -216,20 +236,21 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_SHORTHAND, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_SHORTHAND, tok->position);
       if (!node) return NULL;
       node->data.shorthand = (uint8_t)tok->value.shorthand;
       iree_tokenizer_regex_parser_advance(parser);
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_UNICODE_PROP: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_UNICODE_PROP: {
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_UNICODE_PROP, tok->position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_UNICODE_PROP,
+              tok->position);
       if (!node) return NULL;
       node->data.unicode_pseudo_byte = tok->value.unicode_pseudo_byte;
       iree_tokenizer_regex_parser_advance(parser);
@@ -237,11 +258,11 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
     }
 
     // Groups.
-    case IREE_TOKENIZER_REGEX_TOKEN_LPAREN:
-    case IREE_TOKENIZER_REGEX_TOKEN_GROUP_NC: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_LPAREN:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NC: {
       iree_host_size_t position = tok->position;
       // Check depth limit before recursing.
-      if (parser->depth >= IREE_TOKENIZER_REGEX_MAX_NESTING_DEPTH) {
+      if (parser->depth >= IREE_TOKENIZER_UTIL_REGEX_MAX_NESTING_DEPTH) {
         iree_tokenizer_regex_parser_set_error(
             parser, position,
             "maximum nesting depth exceeded (100 levels); simplify pattern");
@@ -254,7 +275,7 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       --parser->depth;
       if (!inner) return NULL;
       if (!iree_tokenizer_regex_parser_match(
-              parser, IREE_TOKENIZER_REGEX_TOKEN_RPAREN)) {
+              parser, IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN)) {
         iree_tokenizer_regex_parser_set_error(parser, position,
                                               "unbalanced parentheses");
         return NULL;
@@ -263,16 +284,16 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       // The group wrapper is only needed if we want to track case-insensitive.
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_GROUP, position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_GROUP, position);
       if (!node) return NULL;
       node->data.group_child = inner;
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_GROUP_CASE_I: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_CASE_I: {
       iree_host_size_t position = tok->position;
       // Check depth limit before recursing.
-      if (parser->depth >= IREE_TOKENIZER_REGEX_MAX_NESTING_DEPTH) {
+      if (parser->depth >= IREE_TOKENIZER_UTIL_REGEX_MAX_NESTING_DEPTH) {
         iree_tokenizer_regex_parser_set_error(
             parser, position,
             "maximum nesting depth exceeded (100 levels); simplify pattern");
@@ -288,21 +309,21 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       --parser->depth;
       if (!inner) return NULL;
       if (!iree_tokenizer_regex_parser_match(
-              parser, IREE_TOKENIZER_REGEX_TOKEN_RPAREN)) {
+              parser, IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN)) {
         iree_tokenizer_regex_parser_set_error(parser, position,
                                               "unbalanced parentheses");
         return NULL;
       }
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_GROUP, position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_GROUP, position);
       if (!node) return NULL;
       node->data.group_child = inner;
       node->case_insensitive = true;  // Mark the group itself.
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_GROUP_NEG_LA: {
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_GROUP_NEG_LA: {
       iree_host_size_t position = tok->position;
       iree_tokenizer_regex_parser_advance(parser);
       // Negative lookahead: must be a simple atom (single
@@ -312,11 +333,11 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
       iree_tokenizer_regex_ast_node_t* la_child = NULL;
 
       switch (la_tok->type) {
-        case IREE_TOKENIZER_REGEX_TOKEN_LITERAL:
-        case IREE_TOKENIZER_REGEX_TOKEN_CHAR_CLASS:
-        case IREE_TOKENIZER_REGEX_TOKEN_SHORTHAND:
-        case IREE_TOKENIZER_REGEX_TOKEN_UNICODE_PROP:
-        case IREE_TOKENIZER_REGEX_TOKEN_DOT:
+        case IREE_TOKENIZER_UTIL_REGEX_TOKEN_LITERAL:
+        case IREE_TOKENIZER_UTIL_REGEX_TOKEN_CHAR_CLASS:
+        case IREE_TOKENIZER_UTIL_REGEX_TOKEN_SHORTHAND:
+        case IREE_TOKENIZER_UTIL_REGEX_TOKEN_UNICODE_PROP:
+        case IREE_TOKENIZER_UTIL_REGEX_TOKEN_DOT:
           la_child = iree_tokenizer_regex_parser_parse_atom(parser);
           break;
         default:
@@ -328,7 +349,7 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
 
       if (!la_child) return NULL;
       if (!iree_tokenizer_regex_parser_match(
-              parser, IREE_TOKENIZER_REGEX_TOKEN_RPAREN)) {
+              parser, IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN)) {
         iree_tokenizer_regex_parser_set_error(
             parser, position, "unbalanced parentheses in lookahead");
         return NULL;
@@ -336,13 +357,13 @@ static iree_tokenizer_regex_ast_node_t* iree_tokenizer_regex_parser_parse_atom(
 
       iree_tokenizer_regex_ast_node_t* node =
           iree_tokenizer_regex_parser_node_allocate(
-              parser, IREE_TOKENIZER_REGEX_AST_NEG_LOOKAHEAD, position);
+              parser, IREE_TOKENIZER_UTIL_REGEX_AST_NEG_LOOKAHEAD, position);
       if (!node) return NULL;
       node->data.lookahead_child = la_child;
       return node;
     }
 
-    case IREE_TOKENIZER_REGEX_TOKEN_ERROR:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_ERROR:
       iree_tokenizer_regex_parser_set_error(parser, tok->position,
                                             tok->value.error_message);
       return NULL;
@@ -372,25 +393,25 @@ iree_tokenizer_regex_parser_parse_quantified(
   bool has_quantifier = false;
 
   switch (tok->type) {
-    case IREE_TOKENIZER_REGEX_TOKEN_STAR:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_STAR:
       min = 0;
       max = UINT16_MAX;
       has_quantifier = true;
       iree_tokenizer_regex_parser_advance(parser);
       break;
-    case IREE_TOKENIZER_REGEX_TOKEN_PLUS:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_PLUS:
       min = 1;
       max = UINT16_MAX;
       has_quantifier = true;
       iree_tokenizer_regex_parser_advance(parser);
       break;
-    case IREE_TOKENIZER_REGEX_TOKEN_QUESTION:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUESTION:
       min = 0;
       max = 1;
       has_quantifier = true;
       iree_tokenizer_regex_parser_advance(parser);
       break;
-    case IREE_TOKENIZER_REGEX_TOKEN_QUANTIFIER:
+    case IREE_TOKENIZER_UTIL_REGEX_TOKEN_QUANTIFIER:
       min = tok->value.quantifier.min;
       max = tok->value.quantifier.max;
       has_quantifier = true;
@@ -407,15 +428,16 @@ iree_tokenizer_regex_parser_parse_quantified(
   // Check for nested quantifiers: (expr+)+ or similar.
   // These cause exponential DFA state explosion and are never needed for
   // tokenizer patterns. Reject with a clear error.
-  if (atom->type == IREE_TOKENIZER_REGEX_AST_GROUP) {
+  if (atom->type == IREE_TOKENIZER_UTIL_REGEX_AST_GROUP) {
     iree_tokenizer_regex_ast_node_t* group_child = atom->data.group_child;
     // Unwrap through single-element CONCAT if present.
-    if (group_child && group_child->type == IREE_TOKENIZER_REGEX_AST_CONCAT &&
+    if (group_child &&
+        group_child->type == IREE_TOKENIZER_UTIL_REGEX_AST_CONCAT &&
         group_child->data.compound.child_count == 1) {
       group_child = group_child->data.compound.children[0];
     }
     if (group_child &&
-        group_child->type == IREE_TOKENIZER_REGEX_AST_QUANTIFIER) {
+        group_child->type == IREE_TOKENIZER_UTIL_REGEX_AST_QUANTIFIER) {
       iree_tokenizer_regex_parser_set_error(
           parser, atom->source_position,
           "nested quantifiers like (a+)+ cause exponential state explosion; "
@@ -426,7 +448,8 @@ iree_tokenizer_regex_parser_parse_quantified(
 
   iree_tokenizer_regex_ast_node_t* node =
       iree_tokenizer_regex_parser_node_allocate(
-          parser, IREE_TOKENIZER_REGEX_AST_QUANTIFIER, atom->source_position);
+          parser, IREE_TOKENIZER_UTIL_REGEX_AST_QUANTIFIER,
+          atom->source_position);
   if (!node) return NULL;
   node->data.quantifier.child = atom;
   node->data.quantifier.min = min;
@@ -449,7 +472,7 @@ iree_tokenizer_regex_parser_parse_concat(
   if (!first) {
     // Empty sequence is valid (e.g., in alternation branch).
     return iree_tokenizer_regex_parser_node_allocate(
-        parser, IREE_TOKENIZER_REGEX_AST_EMPTY,
+        parser, IREE_TOKENIZER_UTIL_REGEX_AST_EMPTY,
         iree_tokenizer_regex_lexer_position(&parser->lexer));
   }
 
@@ -460,9 +483,9 @@ iree_tokenizer_regex_parser_parse_concat(
   while (true) {
     const iree_tokenizer_regex_token_t* tok =
         iree_tokenizer_regex_parser_peek(parser);
-    if (tok->type == IREE_TOKENIZER_REGEX_TOKEN_EOF ||
-        tok->type == IREE_TOKENIZER_REGEX_TOKEN_PIPE ||
-        tok->type == IREE_TOKENIZER_REGEX_TOKEN_RPAREN) {
+    if (tok->type == IREE_TOKENIZER_UTIL_REGEX_TOKEN_EOF ||
+        tok->type == IREE_TOKENIZER_UTIL_REGEX_TOKEN_PIPE ||
+        tok->type == IREE_TOKENIZER_UTIL_REGEX_TOKEN_RPAREN) {
       break;
     }
 
@@ -476,7 +499,7 @@ iree_tokenizer_regex_parser_parse_concat(
     // Lazy allocation: create CONCAT only when we confirm a second item.
     if (!concat) {
       concat = iree_tokenizer_regex_parser_node_allocate(
-          parser, IREE_TOKENIZER_REGEX_AST_CONCAT, first->source_position);
+          parser, IREE_TOKENIZER_UTIL_REGEX_AST_CONCAT, first->source_position);
       if (!concat) return NULL;
       if (!iree_tokenizer_regex_parser_add_child(parser, concat, first))
         return NULL;
@@ -493,13 +516,13 @@ iree_tokenizer_regex_parser_parse_concat(
   // Exception: end anchors ($) can follow lookahead since they're not content.
   for (iree_host_size_t i = 0; i < concat->data.compound.child_count - 1; ++i) {
     iree_tokenizer_regex_ast_node_t* child = concat->data.compound.children[i];
-    if (child->type == IREE_TOKENIZER_REGEX_AST_NEG_LOOKAHEAD) {
+    if (child->type == IREE_TOKENIZER_UTIL_REGEX_AST_NEG_LOOKAHEAD) {
       // Check if all remaining children are end anchors.
       bool only_end_anchors_follow = true;
       for (iree_host_size_t j = i + 1; j < concat->data.compound.child_count;
            ++j) {
         if (concat->data.compound.children[j]->type !=
-            IREE_TOKENIZER_REGEX_AST_ANCHOR_END) {
+            IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_END) {
           only_end_anchors_follow = false;
           break;
         }
@@ -529,8 +552,8 @@ iree_tokenizer_regex_parser_parse_alternation(
       iree_tokenizer_regex_parser_parse_concat(parser);
   if (!first) return NULL;
 
-  if (!iree_tokenizer_regex_parser_check(parser,
-                                         IREE_TOKENIZER_REGEX_TOKEN_PIPE)) {
+  if (!iree_tokenizer_regex_parser_check(
+          parser, IREE_TOKENIZER_UTIL_REGEX_TOKEN_PIPE)) {
     // No alternation.
     return first;
   }
@@ -538,20 +561,21 @@ iree_tokenizer_regex_parser_parse_alternation(
   // Multiple alternatives - create ALTERNATION node.
   iree_tokenizer_regex_ast_node_t* alt =
       iree_tokenizer_regex_parser_node_allocate(
-          parser, IREE_TOKENIZER_REGEX_AST_ALTERNATION, first->source_position);
+          parser, IREE_TOKENIZER_UTIL_REGEX_AST_ALTERNATION,
+          first->source_position);
   if (!alt) return NULL;
 
   if (!iree_tokenizer_regex_parser_add_child(parser, alt, first)) return NULL;
 
-  while (iree_tokenizer_regex_parser_match(parser,
-                                           IREE_TOKENIZER_REGEX_TOKEN_PIPE)) {
+  while (iree_tokenizer_regex_parser_match(
+      parser, IREE_TOKENIZER_UTIL_REGEX_TOKEN_PIPE)) {
     iree_tokenizer_regex_ast_node_t* branch =
         iree_tokenizer_regex_parser_parse_concat(parser);
     if (!branch) {
       if (!iree_status_is_ok(parser->status)) return NULL;
       // Empty branch is valid.
       branch = iree_tokenizer_regex_parser_node_allocate(
-          parser, IREE_TOKENIZER_REGEX_AST_EMPTY,
+          parser, IREE_TOKENIZER_UTIL_REGEX_AST_EMPTY,
           iree_tokenizer_regex_lexer_position(&parser->lexer));
       if (!branch) return NULL;
     }
@@ -602,7 +626,7 @@ iree_status_t iree_tokenizer_regex_parse(
 
   // Verify we consumed all input.
   if (!iree_tokenizer_regex_parser_check(&parser,
-                                         IREE_TOKENIZER_REGEX_TOKEN_EOF)) {
+                                         IREE_TOKENIZER_UTIL_REGEX_TOKEN_EOF)) {
     const iree_tokenizer_regex_token_t* tok =
         iree_tokenizer_regex_parser_peek(&parser);
     if (out_error) {

@@ -6,6 +6,7 @@
 
 #include "iree/tokenizer/regex/internal/nfa.h"
 
+#include <stdint.h>
 #include <string.h>
 
 #include "iree/base/internal/unicode.h"
@@ -18,35 +19,64 @@
 static iree_status_t iree_tokenizer_regex_nfa_state_allocate(
     iree_tokenizer_regex_nfa_t* nfa, iree_tokenizer_regex_nfa_state_type_t type,
     iree_tokenizer_regex_nfa_state_t** out_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   *out_state = NULL;
 
   // Allocate state.
   iree_tokenizer_regex_nfa_state_t* state = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_arena_allocate(nfa->arena, sizeof(*state), (void**)&state));
-  memset(state, 0, sizeof(*state));
-  state->type = type;
-  state->id = nfa->state_count;
+  iree_status_t status =
+      iree_arena_allocate(nfa->arena, sizeof(*state), (void**)&state);
+
+  if (iree_status_is_ok(status)) {
+    memset(state, 0, sizeof(*state));
+    state->type = type;
+    state->id = nfa->state_count;
+  }
 
   // Add to state list.
-  if (nfa->state_count >= nfa->state_capacity) {
-    iree_host_size_t new_capacity =
-        nfa->state_capacity == 0 ? 64 : nfa->state_capacity * 2;
-    iree_tokenizer_regex_nfa_state_t** new_states = NULL;
-    IREE_RETURN_IF_ERROR(iree_arena_allocate(
-        nfa->arena, new_capacity * sizeof(iree_tokenizer_regex_nfa_state_t*),
-        (void**)&new_states));
-    if (nfa->states) {
-      memcpy(new_states, nfa->states,
-             nfa->state_count * sizeof(iree_tokenizer_regex_nfa_state_t*));
+  if (iree_status_is_ok(status) && nfa->state_count >= nfa->state_capacity) {
+    iree_host_size_t new_capacity;
+    if (nfa->state_capacity == 0) {
+      new_capacity = 64;
+    } else if (nfa->state_capacity > UINT32_MAX / 2) {
+      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "NFA state capacity overflow: %" PRIu32
+                                " states cannot be doubled",
+                                nfa->state_capacity);
+    } else {
+      new_capacity = nfa->state_capacity * 2;
     }
-    nfa->states = new_states;
-    nfa->state_capacity = (uint32_t)new_capacity;
+    // Guard against allocation size overflow.
+    if (iree_status_is_ok(status) &&
+        new_capacity >
+            IREE_HOST_SIZE_MAX / sizeof(iree_tokenizer_regex_nfa_state_t*)) {
+      status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "NFA state allocation overflow: %" PRIhsz
+                                " * sizeof(state*)",
+                                new_capacity);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_tokenizer_regex_nfa_state_t** new_states = NULL;
+      status = iree_arena_allocate(
+          nfa->arena, new_capacity * sizeof(iree_tokenizer_regex_nfa_state_t*),
+          (void**)&new_states);
+      if (iree_status_is_ok(status)) {
+        if (nfa->states) {
+          memcpy(new_states, nfa->states,
+                 nfa->state_count * sizeof(iree_tokenizer_regex_nfa_state_t*));
+        }
+        nfa->states = new_states;
+        nfa->state_capacity = (uint32_t)new_capacity;
+      }
+    }
   }
-  nfa->states[nfa->state_count++] = state;
 
-  *out_state = state;
-  return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    nfa->states[nfa->state_count++] = state;
+    *out_state = state;
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -57,16 +87,18 @@ static iree_status_t iree_tokenizer_regex_nfa_state_allocate(
 static void iree_tokenizer_regex_nfa_fragment_initialize(
     iree_tokenizer_regex_nfa_fragment_t* frag,
     iree_tokenizer_regex_nfa_state_t* start) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   memset(frag, 0, sizeof(*frag));
   frag->start = start;
-  frag->lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+  frag->lookahead_type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
   frag->lookahead_data = 0;
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Returns true if fragment has a lookahead requirement.
 static inline bool iree_tokenizer_regex_nfa_fragment_has_lookahead(
     const iree_tokenizer_regex_nfa_fragment_t* frag) {
-  return frag->lookahead_type != IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+  return frag->lookahead_type != IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
 }
 
 // Adds a patch pointer to the fragment's patch list.
@@ -74,8 +106,25 @@ static iree_status_t iree_tokenizer_regex_nfa_fragment_add_patch(
     iree_tokenizer_regex_nfa_t* nfa, iree_tokenizer_regex_nfa_fragment_t* frag,
     iree_tokenizer_regex_nfa_state_t** ptr) {
   if (frag->patch_count >= frag->patch_capacity) {
-    iree_host_size_t new_capacity =
-        frag->patch_capacity == 0 ? 8 : frag->patch_capacity * 2;
+    iree_host_size_t new_capacity;
+    if (frag->patch_capacity == 0) {
+      new_capacity = 8;
+    } else if (frag->patch_capacity > IREE_HOST_SIZE_MAX / 2) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "NFA patch capacity overflow: %" PRIhsz
+                              " patches cannot be doubled",
+                              frag->patch_capacity);
+    } else {
+      new_capacity = frag->patch_capacity * 2;
+    }
+    // Guard against allocation size overflow.
+    if (new_capacity >
+        IREE_HOST_SIZE_MAX / sizeof(iree_tokenizer_regex_nfa_state_t**)) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "NFA patch allocation overflow: %" PRIhsz
+                              " * sizeof(state**)",
+                              new_capacity);
+    }
     iree_tokenizer_regex_nfa_state_t*** new_list = NULL;
     IREE_RETURN_IF_ERROR(iree_arena_allocate(
         nfa->arena, new_capacity * sizeof(iree_tokenizer_regex_nfa_state_t**),
@@ -122,36 +171,37 @@ static void iree_tokenizer_regex_nfa_shorthand_to_bitmap(
   *pseudo_mask = 0;
 
   switch (shorthand) {
-    case IREE_TOKENIZER_REGEX_SHORTHAND_d:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_d:
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] |= (1u << (c & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_D:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_D:
       memset(bitmap, 0xFF, 32);
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_w:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_w:
       for (int c = 'a'; c <= 'z'; ++c) bitmap[c >> 3] |= (1u << (c & 7));
       for (int c = 'A'; c <= 'Z'; ++c) bitmap[c >> 3] |= (1u << (c & 7));
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] |= (1u << (c & 7));
       bitmap['_' >> 3] |= (1u << ('_' & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_W:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_W:
       memset(bitmap, 0xFF, 32);
       for (int c = 'a'; c <= 'z'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       for (int c = 'A'; c <= 'Z'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       for (int c = '0'; c <= '9'; ++c) bitmap[c >> 3] &= ~(1u << (c & 7));
       bitmap['_' >> 3] &= ~(1u << ('_' & 7));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_s:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_s:
       bitmap[' ' >> 3] |= (1u << (' ' & 7));
       bitmap['\t' >> 3] |= (1u << ('\t' & 7));
       bitmap['\r' >> 3] |= (1u << ('\r' & 7));
       bitmap['\n' >> 3] |= (1u << ('\n' & 7));
       bitmap['\f' >> 3] |= (1u << ('\f' & 7));
       bitmap['\v' >> 3] |= (1u << ('\v' & 7));
-      *pseudo_mask = (1u << (IREE_TOKENIZER_REGEX_PSEUDO_WHITESPACE - 0x80));
+      *pseudo_mask =
+          (1u << (IREE_TOKENIZER_UTIL_REGEX_PSEUDO_WHITESPACE - 0x80));
       break;
-    case IREE_TOKENIZER_REGEX_SHORTHAND_S:
+    case IREE_TOKENIZER_UTIL_REGEX_SHORTHAND_S:
       memset(bitmap, 0xFF, 32);
       bitmap[' ' >> 3] &= ~(1u << (' ' & 7));
       bitmap['\t' >> 3] &= ~(1u << ('\t' & 7));
@@ -160,7 +210,7 @@ static void iree_tokenizer_regex_nfa_shorthand_to_bitmap(
       bitmap['\f' >> 3] &= ~(1u << ('\f' & 7));
       bitmap['\v' >> 3] &= ~(1u << ('\v' & 7));
       *pseudo_mask =
-          0xFF & ~(1u << (IREE_TOKENIZER_REGEX_PSEUDO_WHITESPACE - 0x80));
+          0xFF & ~(1u << (IREE_TOKENIZER_UTIL_REGEX_PSEUDO_WHITESPACE - 0x80));
       break;
   }
 }
@@ -216,7 +266,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_literal(
     // Expand to character class with both cases.
     iree_tokenizer_regex_nfa_state_t* state = NULL;
     IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-        nfa, IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS, &state));
+        nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS, &state));
     memset(state->data.match_class.bitmap, 0, 32);
     iree_tokenizer_regex_nfa_expand_case_byte(byte,
                                               state->data.match_class.bitmap);
@@ -229,7 +279,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_literal(
 
   iree_tokenizer_regex_nfa_state_t* state = NULL;
   IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      nfa, IREE_TOKENIZER_REGEX_NFA_MATCH_BYTE, &state));
+      nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_BYTE, &state));
   state->data.match_byte.byte = byte;
 
   iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
@@ -246,7 +296,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_char_class(
     iree_tokenizer_regex_nfa_fragment_t* out_frag) {
   iree_tokenizer_regex_nfa_state_t* state = NULL;
   IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      nfa, IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS, &state));
+      nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS, &state));
 
   memcpy(state->data.match_class.bitmap, bitmap, 32);
   state->data.match_class.pseudo_mask = pseudo_mask;
@@ -275,7 +325,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_dot(
     iree_tokenizer_regex_nfa_fragment_t* out_frag) {
   iree_tokenizer_regex_nfa_state_t* state = NULL;
   IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      nfa, IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS, &state));
+      nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS, &state));
 
   // Match any byte except \n and \r.
   memset(state->data.match_class.bitmap, 0xFF, 32);
@@ -283,7 +333,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_dot(
   state->data.match_class.bitmap['\r' >> 3] &= ~(1u << ('\r' & 7));
   // Match all pseudo-bytes (Unicode characters including script blocks).
   state->data.match_class.pseudo_mask =
-      (1u << IREE_TOKENIZER_REGEX_PSEUDO_COUNT) - 1;
+      (1u << IREE_TOKENIZER_UTIL_REGEX_PSEUDO_COUNT) - 1;
   nfa->uses_unicode = true;
 
   iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
@@ -338,13 +388,16 @@ static iree_status_t iree_tokenizer_regex_nfa_accept_state_allocate(
     iree_tokenizer_regex_lookahead_type_t lookahead_type,
     uint8_t lookahead_data, uint8_t branch_index,
     iree_tokenizer_regex_nfa_state_t** out_state) {
-  IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      nfa, IREE_TOKENIZER_REGEX_NFA_ACCEPT, out_state));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_tokenizer_regex_nfa_state_allocate(
+              nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT, out_state));
 
   (*out_state)->data.accept.has_lookahead = has_lookahead;
   (*out_state)->data.accept.lookahead_type = lookahead_type;
   (*out_state)->data.accept.lookahead_data = lookahead_data;
   (*out_state)->data.accept.branch_index = branch_index;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -366,14 +419,14 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
 
   // Validate branch count fits in uint8_t (branch_index field).
   if (node->data.compound.child_count >
-      IREE_TOKENIZER_REGEX_MAX_ALTERNATION_BRANCHES) {
+      IREE_TOKENIZER_UTIL_REGEX_MAX_ALTERNATION_BRANCHES) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "alternation has %" PRIhsz
         " branches but maximum supported is %d; "
         "consider using a trie-based approach for large keyword lists",
         node->data.compound.child_count,
-        IREE_TOKENIZER_REGEX_MAX_ALTERNATION_BRANCHES);
+        IREE_TOKENIZER_UTIL_REGEX_MAX_ALTERNATION_BRANCHES);
   }
 
   // First, build all children to check for mixed lookahead requirements.
@@ -387,7 +440,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
   bool has_non_lookahead_branch = false;
   bool has_conflicting_lookaheads = false;
   iree_tokenizer_regex_lookahead_type_t first_lookahead_type =
-      IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+      IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
   uint8_t first_lookahead_data = 0;
 
   for (iree_host_size_t i = 0; i < child_count; ++i) {
@@ -418,7 +471,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
   // Create split state.
   iree_tokenizer_regex_nfa_state_t* split = NULL;
   IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &split));
+      nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &split));
 
   iree_tokenizer_regex_nfa_fragment_initialize(out_frag, split);
 
@@ -451,7 +504,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
             (uint8_t)i, &accept));
       } else {
         IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_accept_state_allocate(
-            nfa, false, IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE, 0, (uint8_t)i,
+            nfa, false, IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE, 0, (uint8_t)i,
             &accept));
       }
       iree_tokenizer_regex_nfa_fragment_patch(&children[i], accept);
@@ -471,7 +524,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
         } else {
           iree_tokenizer_regex_nfa_state_t* next_split = NULL;
           IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-              nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &next_split));
+              nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &next_split));
           current_split->data.epsilon.out2 = next_split;
           current_split = next_split;
           current_split->data.epsilon.out1 = children[i].start;
@@ -480,7 +533,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
     }
 
     // Result has no patches - everything is already connected to accept.
-    out_frag->lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+    out_frag->lookahead_type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
     return iree_ok_status();
   }
 
@@ -512,7 +565,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_alternation(
     } else {
       iree_tokenizer_regex_nfa_state_t* next_split = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &next_split));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &next_split));
       current_split->data.epsilon.out2 = next_split;
       current_split = next_split;
       current_split->data.epsilon.out1 = children[i].start;
@@ -543,7 +596,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_quantifier(
   if (max == 0) {
     iree_tokenizer_regex_nfa_state_t* state = NULL;
     IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-        nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &state));
+        nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &state));
     iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
     IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_fragment_add_patch(
         nfa, out_frag, &state->data.epsilon.out1));
@@ -585,7 +638,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_quantifier(
 
     iree_tokenizer_regex_nfa_state_t* loop_split = NULL;
     IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-        nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &loop_split));
+        nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &loop_split));
 
     loop_split->data.epsilon.out1 = child.start;  // Loop into child.
     iree_tokenizer_regex_nfa_fragment_patch(&child,
@@ -618,7 +671,7 @@ static iree_status_t iree_tokenizer_regex_nfa_build_quantifier(
 
       iree_tokenizer_regex_nfa_state_t* opt_split = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &opt_split));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &opt_split));
 
       opt_split->data.epsilon.out1 = child.start;  // Take child.
 
@@ -655,31 +708,31 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
   }
 
   switch (node->type) {
-    case IREE_TOKENIZER_REGEX_AST_EMPTY: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_EMPTY: {
       // Empty expression - epsilon transition.
       iree_tokenizer_regex_nfa_state_t* state = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &state));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &state));
       iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_fragment_add_patch(
           nfa, out_frag, &state->data.epsilon.out1));
       return iree_ok_status();
     }
 
-    case IREE_TOKENIZER_REGEX_AST_LITERAL:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_LITERAL:
       return iree_tokenizer_regex_nfa_build_literal(
           nfa, node->data.literal, node->case_insensitive, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_DOT:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_DOT:
       return iree_tokenizer_regex_nfa_build_dot(nfa, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_CHAR_CLASS:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_CHAR_CLASS:
       return iree_tokenizer_regex_nfa_build_char_class(
           nfa, node->data.char_class.bitmap, node->data.char_class.pseudo_mask,
           node->data.char_class.ranges, node->data.char_class.range_count,
           node->case_insensitive, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_SHORTHAND: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_SHORTHAND: {
       uint8_t bitmap[32];
       uint8_t pseudo_mask;
       iree_tokenizer_regex_nfa_shorthand_to_bitmap(
@@ -690,11 +743,11 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
           nfa, bitmap, pseudo_mask, NULL, 0, node->case_insensitive, out_frag);
     }
 
-    case IREE_TOKENIZER_REGEX_AST_UNICODE_PROP: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_UNICODE_PROP: {
       // Unicode property - matches both ASCII chars AND pseudo-byte.
       iree_tokenizer_regex_nfa_state_t* state = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_MATCH_CLASS, &state));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_MATCH_CLASS, &state));
       memset(state->data.match_class.bitmap, 0, 32);
 
       // Use the Unicode library to classify ASCII characters.
@@ -702,25 +755,25 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
       for (int c = 0; c < 128; ++c) {
         bool matches = false;
         switch (pseudo) {
-          case IREE_TOKENIZER_REGEX_PSEUDO_LETTER:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_LETTER:
             matches = iree_unicode_is_letter((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_NUMBER:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_NUMBER:
             matches = iree_unicode_is_number((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_PUNCT:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_PUNCT:
             matches = iree_unicode_is_punctuation((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_MARK:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_MARK:
             matches = iree_unicode_is_mark((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_SYMBOL:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SYMBOL:
             matches = iree_unicode_is_symbol((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_SEPARATOR:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_SEPARATOR:
             matches = iree_unicode_is_separator((uint32_t)c);
             break;
-          case IREE_TOKENIZER_REGEX_PSEUDO_OTHER:
+          case IREE_TOKENIZER_UTIL_REGEX_PSEUDO_OTHER:
             matches = iree_unicode_is_other((uint32_t)c);
             break;
         }
@@ -738,10 +791,10 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
       return iree_ok_status();
     }
 
-    case IREE_TOKENIZER_REGEX_AST_ANCHOR_START: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_START: {
       iree_tokenizer_regex_nfa_state_t* state = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_ANCHOR_START, &state));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_START, &state));
       nfa->has_anchors = true;
       iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_fragment_add_patch(
@@ -749,10 +802,10 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
       return iree_ok_status();
     }
 
-    case IREE_TOKENIZER_REGEX_AST_ANCHOR_END: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_ANCHOR_END: {
       iree_tokenizer_regex_nfa_state_t* state = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_ANCHOR_END, &state));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_ANCHOR_END, &state));
       nfa->has_anchors = true;
       iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_fragment_add_patch(
@@ -760,27 +813,27 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
       return iree_ok_status();
     }
 
-    case IREE_TOKENIZER_REGEX_AST_CONCAT:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_CONCAT:
       return iree_tokenizer_regex_nfa_build_concat(nfa, node, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_ALTERNATION:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_ALTERNATION:
       return iree_tokenizer_regex_nfa_build_alternation(nfa, node, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_QUANTIFIER:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_QUANTIFIER:
       return iree_tokenizer_regex_nfa_build_quantifier(nfa, node, out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_GROUP:
+    case IREE_TOKENIZER_UTIL_REGEX_AST_GROUP:
       return iree_tokenizer_regex_nfa_build_node(nfa, node->data.group_child,
                                                  out_frag);
 
-    case IREE_TOKENIZER_REGEX_AST_NEG_LOOKAHEAD: {
+    case IREE_TOKENIZER_UTIL_REGEX_AST_NEG_LOOKAHEAD: {
       // Negative lookahead - extracts constraint and stores on fragment.
       nfa->has_lookahead = true;
 
       // Create epsilon transition (lookahead is checked at DFA level).
       iree_tokenizer_regex_nfa_state_t* state = NULL;
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-          nfa, IREE_TOKENIZER_REGEX_NFA_EPSILON, &state));
+          nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_EPSILON, &state));
       iree_tokenizer_regex_nfa_fragment_initialize(out_frag, state);
       IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_fragment_add_patch(
           nfa, out_frag, &state->data.epsilon.out1));
@@ -789,28 +842,29 @@ static iree_status_t iree_tokenizer_regex_nfa_build_node(
       const iree_tokenizer_regex_ast_node_t* child = node->data.lookahead_child;
       if (child) {
         switch (child->type) {
-          case IREE_TOKENIZER_REGEX_AST_LITERAL:
-            out_frag->lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_CHAR;
+          case IREE_TOKENIZER_UTIL_REGEX_AST_LITERAL:
+            out_frag->lookahead_type =
+                IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_CHAR;
             out_frag->lookahead_data = child->data.literal;
             break;
-          case IREE_TOKENIZER_REGEX_AST_SHORTHAND:
+          case IREE_TOKENIZER_UTIL_REGEX_AST_SHORTHAND:
             out_frag->lookahead_type =
-                IREE_TOKENIZER_REGEX_LOOKAHEAD_NEG_SHORTHAND;
+                IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NEG_SHORTHAND;
             out_frag->lookahead_data = child->data.shorthand;
             break;
-          case IREE_TOKENIZER_REGEX_AST_CHAR_CLASS:
+          case IREE_TOKENIZER_UTIL_REGEX_AST_CHAR_CLASS:
             // Character class lookahead requires bitmap storage which isn't
             // implemented. Fail at compile time rather than load time.
             return iree_make_status(
                 IREE_STATUS_UNIMPLEMENTED,
                 "negative lookahead with character class not supported; "
                 "use shorthand (\\S, \\d, \\w) or single character instead");
-          case IREE_TOKENIZER_REGEX_AST_DOT:
+          case IREE_TOKENIZER_UTIL_REGEX_AST_DOT:
             return iree_make_status(
                 IREE_STATUS_UNIMPLEMENTED,
                 "negative lookahead with dot (.) not supported; "
                 "dot lookahead only makes sense at end-of-string");
-          case IREE_TOKENIZER_REGEX_AST_UNICODE_PROP:
+          case IREE_TOKENIZER_UTIL_REGEX_AST_UNICODE_PROP:
             return iree_make_status(
                 IREE_STATUS_UNIMPLEMENTED,
                 "negative lookahead with Unicode property not supported; "
@@ -845,7 +899,7 @@ iree_status_t iree_tokenizer_regex_nfa_build(
 
   memset(out_nfa, 0, sizeof(*out_nfa));
   out_nfa->arena = arena;
-  out_nfa->pending_lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+  out_nfa->pending_lookahead_type = IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
   out_nfa->pending_lookahead_data = 0;
 
   // Build NFA fragment from AST.
@@ -864,7 +918,7 @@ iree_status_t iree_tokenizer_regex_nfa_build(
   if (frag.patch_count == 0) {
     // Find an accept state for out_nfa->accept (used for traversal).
     for (uint32_t i = 0; i < out_nfa->state_count; ++i) {
-      if (out_nfa->states[i]->type == IREE_TOKENIZER_REGEX_NFA_ACCEPT) {
+      if (out_nfa->states[i]->type == IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT) {
         out_nfa->accept = out_nfa->states[i];
         break;
       }
@@ -877,7 +931,7 @@ iree_status_t iree_tokenizer_regex_nfa_build(
   // is false (no alternation means no "early" non-lookahead branch to prefer).
   iree_tokenizer_regex_nfa_state_t* accept = NULL;
   IREE_RETURN_IF_ERROR(iree_tokenizer_regex_nfa_state_allocate(
-      out_nfa, IREE_TOKENIZER_REGEX_NFA_ACCEPT, &accept));
+      out_nfa, IREE_TOKENIZER_UTIL_REGEX_NFA_ACCEPT, &accept));
 
   // Apply fragment's lookahead info to the accept state.
   if (iree_tokenizer_regex_nfa_fragment_has_lookahead(&frag)) {
@@ -886,7 +940,8 @@ iree_status_t iree_tokenizer_regex_nfa_build(
     accept->data.accept.lookahead_data = frag.lookahead_data;
   } else {
     accept->data.accept.has_lookahead = false;
-    accept->data.accept.lookahead_type = IREE_TOKENIZER_REGEX_LOOKAHEAD_NONE;
+    accept->data.accept.lookahead_type =
+        IREE_TOKENIZER_UTIL_REGEX_LOOKAHEAD_NONE;
     accept->data.accept.lookahead_data = 0;
   }
   // No alternation means single branch at index 0.

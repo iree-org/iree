@@ -40,8 +40,7 @@ typedef hsa_signal_t iree_hsa_signal_t;
 
 // No-op signal that will immediately succeed when waited on and be ignored when
 // signaling.
-#define iree_hsa_signal_null() \
-  (iree_hsa_signal_t) { 0 }
+#define iree_hsa_signal_null() (iree_hsa_signal_t){0}
 
 // Returns true if the given signal is null.
 #define iree_hsa_signal_is_null(signal) ((signal).handle == 0)

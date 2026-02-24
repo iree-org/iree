@@ -13,16 +13,13 @@ package(
 )
 
 iree_c_embed_data(
-    name = "tokenizer_testdata",
+    name = "streaming_testdata",
     testonly = True,
     srcs = [
-        "benchmark_bert.json",
-        "benchmark_bpe.json",
-        "bpe_sequence_pretokenizer.json",
-        "wordpiece_bert_minimal.json",
+        "bpe_bytelevel_minimal.json",
     ],
-    c_file_output = "tokenizer_testdata.c",
+    c_file_output = "streaming_testdata.c",
     flatten = True,
-    h_file_output = "tokenizer_testdata.h",
-    identifier = "iree_tokenizer_testdata",
+    h_file_output = "streaming_testdata.h",
+    identifier = "iree_tokenizer_streaming_testdata",
 )
