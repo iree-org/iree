@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRMemRefTransformOps
     MLIRSCFDialect
     MLIRSCFTransformOps
+    MLIRSideEffectInterfaces
     MLIRTensorDialect
     MLIRTensorTransformOps
     MLIRTensorTransforms

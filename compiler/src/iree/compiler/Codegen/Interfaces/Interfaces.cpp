@@ -90,11 +90,9 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   // TODO: when warranted, move to its own file.
   registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
                          transform_ext::StructuredTransformOpsExtension>();
-  registry.addExtension(
-      +[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
-        linalg::GenericOp::attachInterface<
-            LinalgGenericHoistableRegionModel>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
+  });
   registerPartitionableLoopsInterfaceModels(registry);
   registerTransformDialectCommonExtension(registry);
   registerTransformDialectIREEGPUExtension(registry);
