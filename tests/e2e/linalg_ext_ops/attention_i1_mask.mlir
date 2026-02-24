@@ -1,9 +1,9 @@
 func.func @attention1x4x4_i1_mask() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2],
-                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6],
+                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -39,10 +39,10 @@ func.func @attention1x4x4_i1_mask() {
 
 func.func @attention1x4x4_i1_mask_all_ones() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2],
-                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6],
+                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -78,10 +78,10 @@ func.func @attention1x4x4_i1_mask_all_ones() {
 
 func.func @attention1x4x4_i1_mask_tril() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2],
-                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6],
+                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],

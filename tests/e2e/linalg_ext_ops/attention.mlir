@@ -1,8 +1,8 @@
 func.func @attention1x3x4() {
   %init = tensor.empty() : tensor<1x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6]]]> : tensor<1x3x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -30,9 +30,9 @@ func.func @attention1x3x4() {
 
 func.func @causal_attention1x3x4() {
   %init = tensor.empty() : tensor<1x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6]]]> : tensor<1x3x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -64,10 +64,10 @@ func.func @causal_attention1x3x4() {
 
 func.func @attention1x4x4_i1_mask_all_ones() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2],
-                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6],
+                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
 
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
@@ -138,10 +138,10 @@ func.func @softcap_attention1x3x4() {
 
 func.func @attention1x4x4() {
   %init = tensor.empty() : tensor<1x4x4xf32>
-  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
-                                            [0.5, 0.6, 0.7, 0.8],
-                                            [0.9, 1.0, 1.1, 1.2],
-                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.05, 0.1, 0.15, 0.2],
+                                            [0.25, 0.3, 0.35, 0.4],
+                                            [0.45, 0.5, 0.55, 0.6],
+                                            [0.65, 0.7, 0.75, 0.8]]]> : tensor<1x4x4xf32>
   %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
                                           [0.5, 0.6, 0.7, 0.8],
                                           [0.9, 1.0, 1.1, 1.2],
@@ -171,15 +171,15 @@ func.func @attention1x4x4() {
 
 func.func @attention3x3x4() {
   %init = tensor.empty() : tensor<3x3x4xf32>
-  %query = util.unfoldable_constant dense<[[[-1.5256, -0.7502, -0.6540, -1.6095],
-                                            [-0.6092, -0.9798, -1.6091, -0.7121],
-                                            [ 0.4676, -0.6970, -1.1608,  0.6995]],
-                                           [[ 0.8657,  0.2444, -0.6629,  0.8073],
-                                            [-0.1759, -2.2456, -1.4465,  0.0612],
-                                            [-0.7735,  0.1991,  0.0457,  0.1530]],
-                                           [[-0.1110,  0.2927, -0.1578, -0.0288],
-                                            [ 1.1422, 0.2486,  -1.7754, -0.0255],
-                                            [ 1.6103, -0.7040, -0.1853, -0.9962]]]> : tensor<3x3x4xf32>
+  %query = util.unfoldable_constant dense<[[[-0.7628, -0.3751, -0.3270, -0.80475],
+                                            [-0.3046, -0.4899, -0.80455, -0.35605],
+                                            [ 0.2338, -0.3485, -0.5804,  0.34975]],
+                                           [[ 0.43285,  0.1222, -0.33145,  0.40365],
+                                            [-0.08795, -1.1228, -0.72325,  0.0306],
+                                            [-0.38675,  0.09955,  0.02285,  0.0765]],
+                                           [[-0.0555,  0.14635, -0.0789, -0.0144],
+                                            [ 0.5711, 0.1243,  -0.8877, -0.01275],
+                                            [ 0.80515, -0.3520, -0.09265, -0.4981]]]> : tensor<3x3x4xf32>
   %key = util.unfoldable_constant dense<[[[-0.6092, -0.9798, -1.6091, -0.7121],
                                           [-0.7773, -0.2515, -0.2223,  1.6871],
                                           [ 0.4676, -0.6970, -1.1608,  0.6995]],

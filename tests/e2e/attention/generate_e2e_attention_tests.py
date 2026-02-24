@@ -200,26 +200,22 @@ def generate_function(
         f"tensor<{value_shape[0]}x{value_shape[1]}x{value_shape[2]}x{value_type.value}>"
     )
     result_tensor_type = f"tensor<{result_shape[0]}x{result_shape[1]}x{result_shape[2]}x{value_type.value}>"
-    F32 = "f32"
-    F16 = "f16"
     op_name = "iree_linalg_ext.attention"
 
     # Compilation info is optional; prints empty string by default.
     func_definition = ""
 
     signature = f"({query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {result_tensor_type}) -> {result_tensor_type}"
-    import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %scale: {F32}) -> !hal.buffer_view"
+    import_declaration = f"func.func private @module.{func_name}(%query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view) -> !hal.buffer_view"
     func_definition = func_definition + (
-        f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}, %scale: {F32}) -> {result_tensor_type} {{\n"
+        f"func.func @{func_name}(%query: {query_tensor_type}, %key: {key_tensor_type}, %value: {value_tensor_type}) -> {result_tensor_type} {{\n"
         f"  %result0 = tensor.empty(): {result_tensor_type}\n"
-        f"  %scale_f16 = arith.truncf %scale : {F32} to {F16} \n"
         f"  %result1 = {op_name} {{\n"
         f"      indexing_maps = [affine_map<(batch, m, n, k1, k2) -> (batch, m, k1)>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, k1)>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, k2, n)>,\n"
-        f"                       affine_map<(batch, m, n, k1, k2) -> ()>,\n"
         f"                       affine_map<(batch, m, n, k1, k2) -> (batch, m, n)>]\n}}"
-        f"      ins(%query, %key, %value, %scale_f16: {query_tensor_type}, {key_tensor_type}, {value_tensor_type}, {F16})\n"
+        f"      ins(%query, %key, %value: {query_tensor_type}, {key_tensor_type}, {value_tensor_type})\n"
         f"      outs(%result0: {result_tensor_type}) {{\n"
         f"   ^bb0(%score: f32): \n"
         f"   iree_linalg_ext.yield %score : f32\n"
@@ -320,8 +316,7 @@ def generate_call(
     global pseudorandom_generator_seed
     pseudorandom_generator_seed = pseudorandom_generator_seed - 1
     op = op + (
-        f"  %scale = arith.constant {shapes_scale.scale} : f32\n"
-        f"  %result = call @module.{function.name}(%query, %key, %value, %scale) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view, f32) -> !hal.buffer_view\n"
+        f"  %result = call @module.{function.name}(%query, %key, %value) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
     )
 
     op = op + (
