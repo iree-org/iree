@@ -372,7 +372,6 @@ iree_cc_library(
     "sysfs.c"
   DEPS
     iree::base
-    iree::base::core_headers
   PUBLIC
 )
 

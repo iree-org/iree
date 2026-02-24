@@ -337,7 +337,6 @@ iree_runtime_cc_library(
     hdrs = ["sysfs.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:core_headers",
     ],
 )
 
