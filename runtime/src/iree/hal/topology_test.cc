@@ -212,6 +212,61 @@ TEST(TopologyEdge, CreateCrossDriver) {
 }
 
 //===----------------------------------------------------------------------===//
+// Aliased device detection tests
+//===----------------------------------------------------------------------===//
+
+// Tests that from_capabilities detects aliased same-driver devices and returns
+// a self-edge when driver_device_handle matches.
+TEST(TopologyEdge, AliasedDeviceDetection) {
+  iree_hal_device_capabilities_t caps = {0};
+  caps.flags = IREE_HAL_DEVICE_CAPABILITY_TIMELINE_SEMAPHORES;
+  caps.driver_device_handle = 0x12345678;
+
+  // Same driver, same handle → should return self-edge.
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_from_capabilities(
+      &caps, &caps, IREE_SV("hip"), IREE_SV("hip"));
+
+  EXPECT_EQ(iree_hal_topology_edge_wait_mode(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+  EXPECT_EQ(iree_hal_topology_edge_link_class(edge.lo),
+            IREE_HAL_TOPOLOGY_LINK_CLASS_SAME_DIE);
+}
+
+// Tests that different handles on the same driver are NOT treated as aliased.
+TEST(TopologyEdge, DifferentHandlesNotAliased) {
+  iree_hal_device_capabilities_t caps_a = {0};
+  caps_a.driver_device_handle = 0x11111111;
+
+  iree_hal_device_capabilities_t caps_b = {0};
+  caps_b.driver_device_handle = 0x22222222;
+
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_from_capabilities(
+      &caps_a, &caps_b, IREE_SV("hip"), IREE_SV("hip"));
+
+  // Different handles → should NOT be a self-edge.
+  // Same driver without P2P or UUID match gives cross-driver-like costs.
+  EXPECT_NE(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+}
+
+// Tests that zero handle (sentinel for "not set") skips aliasing detection.
+TEST(TopologyEdge, ZeroHandleNoAliasing) {
+  iree_hal_device_capabilities_t caps = {0};
+  // driver_device_handle is 0 (default from zero-init).
+
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_from_capabilities(
+      &caps, &caps, IREE_SV("hip"), IREE_SV("hip"));
+
+  // Zero handle → no aliasing detection.
+  // Same driver but no UUID or P2P → non-zero copy cost.
+  EXPECT_NE(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+}
+
+//===----------------------------------------------------------------------===//
 // Resource origin tests
 //===----------------------------------------------------------------------===//
 

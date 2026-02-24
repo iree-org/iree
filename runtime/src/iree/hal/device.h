@@ -310,8 +310,12 @@ typedef struct iree_hal_device_capabilities_t {
   uint8_t physical_device_uuid[16];
   bool has_physical_device_uuid;
 
-  // Opaque driver-specific handle (for same-driver refinement).
-  // Used ONLY by same-driver refinement, not by base builder.
+  // Opaque driver-specific handle for same-driver aliasing detection.
+  // 0 means "not set." When two same-driver devices report the same non-zero
+  // handle, they are wrapping the same underlying driver object.
+  // from_capabilities uses this to detect aliased devices and return a
+  // self-edge (zero-cost NATIVE). Also available to refine_topology_edge
+  // for driver-specific refinement.
   uintptr_t driver_device_handle;
 
   // Device group index (for same-driver multi-device groups).

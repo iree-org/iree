@@ -256,6 +256,14 @@ iree_hal_topology_edge_from_capabilities(
   // Same driver detection (enables NATIVE mode).
   bool same_driver = iree_string_view_equal(src_driver_name, dst_driver_name);
 
+  // Same-driver aliasing detection: two iree_hal_device_t instances wrapping
+  // the same underlying driver object. They share all resources and should
+  // behave as self-edges (zero-cost NATIVE everything).
+  if (same_driver && src_caps->driver_device_handle != 0 &&
+      src_caps->driver_device_handle == dst_caps->driver_device_handle) {
+    return iree_hal_topology_edge_make_self();
+  }
+
   // Physical device UUID matching (cross-driver same-GPU detection).
   bool same_physical_device = false;
   if (src_caps->has_physical_device_uuid &&
