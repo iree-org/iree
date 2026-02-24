@@ -174,8 +174,8 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
                                                 vectorSize);
       })
-      .Case([&](IREE::LinalgExt::MapStoreOp scatterOp) -> SmallVector<int64_t> {
-        ShapedType inputType = scatterOp.getInputType();
+      .Case([&](IREE::LinalgExt::MapStoreOp storeOp) -> SmallVector<int64_t> {
+        ShapedType inputType = storeOp.getInputType();
         if (!inputType.hasStaticShape()) {
           return {};
         }
