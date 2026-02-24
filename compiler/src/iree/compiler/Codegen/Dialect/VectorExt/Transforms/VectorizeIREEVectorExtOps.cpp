@@ -435,16 +435,16 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
       vectorSizes.take_front(gatherOp.getBatchRank()), rewriter.getIndexType());
 
   Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-  auto indicesVecRead = vector::TransferReadOp::create(
-      rewriter, loc, indicesVecTy.clone(indicesTy.getElementType()),
-      gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
-      std::nullopt);
   VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
   SmallVector<OpFoldResult> gatherDims =
       tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
   Value indicesMask = vector::CreateMaskOp::create(
       rewriter, loc, indicesMaskType,
       ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
+  auto indicesVecRead = vector::TransferReadOp::create(
+      rewriter, loc, indicesVecTy.clone(indicesTy.getElementType()),
+      gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
+      std::nullopt);
   rewriter.modifyOpInPlace(indicesVecRead, [&] {
     indicesVecRead.getMaskMutable().assign(indicesMask);
   });
