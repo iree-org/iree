@@ -68,6 +68,17 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "queue_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/hal/cts2/queue:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "file_tests",
     srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
     deps = [

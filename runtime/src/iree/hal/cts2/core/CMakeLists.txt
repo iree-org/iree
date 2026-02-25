@@ -12,19 +12,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    allocator_test
-  SRCS
-    "allocator_test.cc"
-  DEPS
-    iree::hal
-    iree::hal::cts2::util::test_base
-  TESTONLY
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     driver_test
   SRCS
     "driver_test.cc"
@@ -64,39 +51,10 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    semaphore_submission_test
-  SRCS
-    "semaphore_submission_test.cc"
-  DEPS
-    iree::hal
-    iree::hal::cts2::util::test_base
-  TESTONLY
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    queue_host_call_test
-  SRCS
-    "queue_host_call_test.cc"
-  DEPS
-    iree::hal
-    iree::hal::cts2::util::test_base
-  TESTONLY
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     all_tests
   DEPS
-    ::allocator_test
     ::driver_test
     ::event_test
-    ::queue_host_call_test
-    ::semaphore_submission_test
     ::semaphore_test
   TESTONLY
   PUBLIC

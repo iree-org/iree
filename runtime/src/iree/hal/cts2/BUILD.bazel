@@ -12,8 +12,9 @@
 #
 # Directory layout:
 #   util/            Registry, test base, test_main.cc
-#   core/            Allocator, driver, event, semaphore tests
-#   buffer/          Buffer mapping tests
+#   core/            Driver, event, semaphore tests
+#   buffer/          Allocator and buffer mapping tests
+#   queue/           Queue operations: host calls, semaphore submission
 #   command_buffer/  Command buffer tests (basic, copy, fill, update)
 #   file/            File I/O tests
 

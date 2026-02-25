@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Buffer mapping CTS tests.
+# Buffer and allocator CTS tests.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
@@ -12,6 +12,17 @@ package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "allocator_test",
+    testonly = True,
+    srcs = ["allocator_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
 )
 
 iree_runtime_cc_library(
@@ -30,6 +41,7 @@ iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
     deps = [
+        ":allocator_test",
         ":mapping_test",
     ],
 )

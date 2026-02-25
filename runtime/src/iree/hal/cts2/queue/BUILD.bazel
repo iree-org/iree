@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Core HAL CTS tests: driver, event, semaphore.
+# Queue operation CTS tests: host calls, semaphore submission orchestration.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 
@@ -15,9 +15,9 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "driver_test",
+    name = "queue_host_call_test",
     testonly = True,
-    srcs = ["driver_test.cc"],
+    srcs = ["queue_host_call_test.cc"],
     deps = [
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts2/util:test_base",
@@ -26,9 +26,9 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "event_test",
+    name = "semaphore_submission_test",
     testonly = True,
-    srcs = ["event_test.cc"],
+    srcs = ["semaphore_submission_test.cc"],
     deps = [
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts2/util:test_base",
@@ -36,24 +36,12 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
-iree_runtime_cc_library(
-    name = "semaphore_test",
-    testonly = True,
-    srcs = ["semaphore_test.cc"],
-    deps = [
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/cts2/util:test_base",
-    ],
-    alwayslink = True,
-)
-
-# All core tests (link with backend library and test_main.cc for test binary).
+# All queue tests.
 iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
     deps = [
-        ":driver_test",
-        ":event_test",
-        ":semaphore_test",
+        ":queue_host_call_test",
+        ":semaphore_submission_test",
     ],
 )
