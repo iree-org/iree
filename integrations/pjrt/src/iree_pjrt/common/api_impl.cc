@@ -1680,12 +1680,16 @@ iree_status_t ClientInstance::PopulateVMModules(
     iree_hal_device_t* hal_device,
     iree::vm::ref<iree_vm_module_t>& main_module) {
   // HAL module.
+  iree_hal_device_group_t* device_group = nullptr;
+  IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(
+      hal_device, host_allocator(), &device_group));
   modules.push_back({});
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      vm_instance(), iree_hal_module_device_policy_default(),
-      /*device_count=*/1, &hal_device, IREE_HAL_MODULE_FLAG_NONE,
-      iree_hal_module_debug_sink_stdio(stderr), host_allocator(),
-      &modules.back()));
+  iree_status_t status = iree_hal_module_create(
+      vm_instance(), iree_hal_module_device_policy_default(), device_group,
+      IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink_stdio(stderr),
+      host_allocator(), &modules.back());
+  iree_hal_device_group_release(device_group);
+  IREE_RETURN_IF_ERROR(status);
 
   // Main module.
   modules.push_back(main_module);

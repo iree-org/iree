@@ -39,12 +39,17 @@ iree_status_t Run() {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(create_sample_device(iree_allocator_system(), &device),
                        "create device");
+  iree_hal_device_group_t* device_group = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(
+      device, iree_allocator_system(), &device_group));
   iree_vm_module_t* hal_module = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      instance, iree_hal_module_device_policy_default(), /*device_count=*/1,
-      &device, IREE_HAL_MODULE_FLAG_SYNCHRONOUS,
-      iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
-      &hal_module));
+  iree_status_t status =
+      iree_hal_module_create(instance, iree_hal_module_device_policy_default(),
+                             device_group, IREE_HAL_MODULE_FLAG_SYNCHRONOUS,
+                             iree_hal_module_debug_sink_stdio(stderr),
+                             iree_allocator_system(), &hal_module);
+  iree_hal_device_group_release(device_group);
+  IREE_RETURN_IF_ERROR(status);
 
   // Load bytecode module from the embedded data.
   const iree_const_byte_span_t module_data = load_bytecode_module_data();

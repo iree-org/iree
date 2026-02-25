@@ -89,10 +89,12 @@ static iree_status_t TryGetDriver(const std::string& driver_name,
 class CTSTestResources {
  public:
   static iree_hal_driver_t* driver_;
+  static iree_hal_device_group_t* device_group_;
   static iree_hal_device_t* device_;
   static iree_hal_allocator_t* device_allocator_;
 };
 /*static*/ iree_hal_driver_t* CTSTestResources::driver_ = NULL;
+/*static*/ iree_hal_device_group_t* CTSTestResources::device_group_ = NULL;
 /*static*/ iree_hal_device_t* CTSTestResources::device_ = NULL;
 /*static*/ iree_hal_allocator_t* CTSTestResources::device_allocator_ = NULL;
 
@@ -129,6 +131,13 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     IREE_CHECK_OK(status);
     device_ = device;
 
+    // Create a device group so the device gets topology info assigned.
+    // The group must outlive the device (it holds a raw topology pointer).
+    iree_hal_device_group_t* device_group = NULL;
+    IREE_CHECK_OK(iree_hal_device_group_create_from_device(
+        device_, iree_allocator_system(), &device_group));
+    device_group_ = device_group;
+
     device_allocator_ = iree_hal_device_allocator(device_);
     iree_hal_allocator_retain(device_allocator_);
   }
@@ -141,6 +150,12 @@ class CTSTestBase : public BaseType, public CTSTestResources {
     if (device_) {
       iree_hal_device_release(device_);
       device_ = NULL;
+    }
+    // Release the device group after the device — the device holds a raw
+    // pointer to the group's embedded topology.
+    if (device_group_) {
+      iree_hal_device_group_release(device_group_);
+      device_group_ = NULL;
     }
     if (driver_) {
       iree_hal_driver_release(driver_);

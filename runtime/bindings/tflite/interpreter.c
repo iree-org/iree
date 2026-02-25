@@ -60,11 +60,16 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
       "failed creating the default device for driver '%.*s'",
       (int)driver_name.size, driver_name.data);
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+  iree_hal_device_group_t* device_group = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_group_create_from_device(
+      interpreter->device, interpreter->allocator, &device_group));
+  status = iree_hal_module_create(
       interpreter->instance, iree_hal_module_device_policy_default(),
-      /*device_count=*/1, &interpreter->device, IREE_HAL_MODULE_FLAG_NONE,
+      device_group, IREE_HAL_MODULE_FLAG_NONE,
       iree_hal_module_debug_sink_stdio(stderr), interpreter->allocator,
-      &interpreter->hal_module));
+      &interpreter->hal_module);
+  iree_hal_device_group_release(device_group);
+  IREE_RETURN_IF_ERROR(status);
 
   return iree_ok_status();
 }

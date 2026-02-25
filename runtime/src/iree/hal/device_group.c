@@ -35,6 +35,20 @@ struct iree_hal_device_group_t {
   iree_hal_topology_t topology;
 };
 
+IREE_API_EXPORT iree_status_t iree_hal_device_group_create_from_device(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_device_group_t** out_group) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_group);
+  *out_group = NULL;
+  iree_hal_device_group_builder_t builder;
+  iree_hal_device_group_builder_initialize(&builder);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_device_group_builder_add_device(&builder, device));
+  return iree_hal_device_group_builder_finalize(&builder, host_allocator,
+                                                out_group);
+}
+
 static void iree_hal_device_group_destroy(iree_hal_device_group_t* group) {
   IREE_ASSERT_ARGUMENT(group);
   IREE_TRACE_ZONE_BEGIN(z0);

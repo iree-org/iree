@@ -1107,25 +1107,26 @@ VmModule CreateHalModule(
         PyExc_ValueError,
         "\"device\" and \"devices\" are mutually exclusive arguments.");
   }
-  std::vector<iree_hal_device_t*> devices_vector;
-  iree_hal_device_t* device_ptr;
-  iree_hal_device_t** devices_ptr;
-  iree_host_size_t device_count;
-  iree_vm_module_t* module = NULL;
+  // Build a device group from the provided device(s).
+  iree_hal_device_group_builder_t group_builder;
+  iree_hal_device_group_builder_initialize(&group_builder);
   if (device) {
-    device_ptr = device.value()->raw_ptr();
-    devices_ptr = &device_ptr;
-    device_count = 1;
+    CheckApiStatus(iree_hal_device_group_builder_add_device(
+                       &group_builder, device.value()->raw_ptr()),
+                   "Error adding device to group builder");
   } else {
-    // Set device related arguments in the case of multiple devices.
-    devices_vector.reserve(devices->size());
     for (auto devicesIt = devices->begin(); devicesIt != devices->end();
          ++devicesIt) {
-      devices_vector.push_back(py::cast<HalDevice*>(*devicesIt)->raw_ptr());
+      CheckApiStatus(
+          iree_hal_device_group_builder_add_device(
+              &group_builder, py::cast<HalDevice*>(*devicesIt)->raw_ptr()),
+          "Error adding device to group builder");
     }
-    devices_ptr = devices_vector.data();
-    device_count = devices_vector.size();
   }
+  iree_hal_device_group_t* device_group = nullptr;
+  CheckApiStatus(iree_hal_device_group_builder_finalize(
+                     &group_builder, iree_allocator_system(), &device_group),
+                 "Error creating device group");
 
   iree_hal_module_debug_sink_t iree_hal_module_debug_sink =
       iree_hal_module_debug_sink_stdio(stderr);
@@ -1133,12 +1134,13 @@ VmModule CreateHalModule(
     iree_hal_module_debug_sink = (*debug_sink)->AsIreeHalModuleDebugSink();
   }
 
-  CheckApiStatus(
-      iree_hal_module_create(
-          instance->raw_ptr(), iree_hal_module_device_policy_default(),
-          device_count, devices_ptr, IREE_HAL_MODULE_FLAG_NONE,
-          iree_hal_module_debug_sink, iree_allocator_system(), &module),
-      "Error creating hal module");
+  iree_vm_module_t* module = NULL;
+  iree_status_t status = iree_hal_module_create(
+      instance->raw_ptr(), iree_hal_module_device_policy_default(),
+      device_group, IREE_HAL_MODULE_FLAG_NONE, iree_hal_module_debug_sink,
+      iree_allocator_system(), &module);
+  iree_hal_device_group_release(device_group);
+  CheckApiStatus(status, "Error creating hal module");
   VmModule vm_module = VmModule::StealFromRawPtr(module);
   if (debug_sink) {
     // Retain a reference. We want the callback to be valid after

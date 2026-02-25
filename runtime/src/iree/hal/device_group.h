@@ -45,6 +45,12 @@ extern "C" {
 // concurrently from any thread without synchronization.
 typedef struct iree_hal_device_group_t iree_hal_device_group_t;
 
+// Creates a single-device group.
+// Equivalent to initializing a builder, adding the device, and finalizing.
+IREE_API_EXPORT iree_status_t iree_hal_device_group_create_from_device(
+    iree_hal_device_t* device, iree_allocator_t host_allocator,
+    iree_hal_device_group_t** out_group);
+
 // Retains the given |group| for the caller.
 IREE_API_EXPORT void iree_hal_device_group_retain(
     iree_hal_device_group_t* group);

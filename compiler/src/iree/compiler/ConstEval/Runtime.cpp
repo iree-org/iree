@@ -462,15 +462,20 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   }
   iree_hal_driver_release(driver);
 
-  // Create hal module.
+  // Create device group and hal module.
+  iree_hal_device_group_t *device_group = nullptr;
   if (iree_status_is_ok(status)) {
-    std::array<iree_hal_device_t *, 1> devices = {device.get()};
-    status = iree_hal_module_create(
-        runtime.instance.get(), iree_hal_module_device_policy_default(),
-        devices.size(), devices.data(), IREE_HAL_MODULE_FLAG_NONE,
-        iree_hal_module_debug_sink_stdio(stderr), iree_allocator_system(),
-        &hal_module);
+    status = iree_hal_device_group_create_from_device(
+        device.get(), iree_allocator_system(), &device_group);
   }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_module_create(runtime.instance.get(),
+                                    iree_hal_module_device_policy_default(),
+                                    device_group, IREE_HAL_MODULE_FLAG_NONE,
+                                    iree_hal_module_debug_sink_stdio(stderr),
+                                    iree_allocator_system(), &hal_module);
+  }
+  iree_hal_device_group_release(device_group);
 
   // Bytecode module.
   if (iree_status_is_ok(status)) {

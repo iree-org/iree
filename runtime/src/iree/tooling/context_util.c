@@ -246,13 +246,31 @@ static iree_status_t iree_tooling_load_hal_async_module(
   iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
   iree_hal_allocator_retain(device_allocator);
 
-  // Create HAL module wrapping the device created above.
+  // Build a device group from all enumerated devices.
+  iree_hal_device_group_builder_t group_builder;
+  iree_hal_device_group_builder_initialize(&group_builder);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0;
+       i < device_list->count && iree_status_is_ok(status); ++i) {
+    status = iree_hal_device_group_builder_add_device(&group_builder,
+                                                      device_list->devices[i]);
+  }
+  iree_hal_device_group_t* device_group = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_device_group_builder_finalize(
+        &group_builder, host_allocator, &device_group);
+  }
+
+  // Create HAL module wrapping the device group.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
-  iree_status_t status = iree_hal_module_create(
-      instance, iree_hal_module_device_policy_from_flags(device_list),
-      device_list->count, device_list->devices, flags,
-      iree_hal_module_debug_sink_stdio(stderr), host_allocator, &module);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_module_create(
+        instance, iree_hal_module_device_policy_from_flags(device_list),
+        device_group, flags, iree_hal_module_debug_sink_stdio(stderr),
+        host_allocator, &module);
+  }
+  iree_hal_device_group_release(device_group);
 
   iree_hal_device_list_free(device_list);
 

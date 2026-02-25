@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/device_group.h"
 #include "iree/modules/hal/debugging.h"
 #include "iree/modules/hal/types.h"
 #include "iree/vm/api.h"
@@ -63,14 +64,14 @@ enum iree_hal_module_flag_bits_t {
 };
 typedef uint32_t iree_hal_module_flags_t;
 
-// Creates the HAL module initialized to use one or more |devices|.
+// Creates the HAL module initialized to use the devices in |device_group|.
 // Each context using this module will share the devices and have compatible
-// allocations.
+// allocations. The module retains the device group for its lifetime.
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
     iree_vm_instance_t* instance, iree_hal_module_device_policy_t device_policy,
-    iree_host_size_t device_count, iree_hal_device_t** devices,
-    iree_hal_module_flags_t flags, iree_hal_module_debug_sink_t debug_sink,
-    iree_allocator_t host_allocator, iree_vm_module_t** out_module);
+    iree_hal_device_group_t* device_group, iree_hal_module_flags_t flags,
+    iree_hal_module_debug_sink_t debug_sink, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module);
 
 // Returns the total number of available devices registered with the HAL module.
 IREE_API_EXPORT iree_host_size_t
