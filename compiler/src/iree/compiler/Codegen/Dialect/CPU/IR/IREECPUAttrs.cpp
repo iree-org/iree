@@ -287,6 +287,8 @@ SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
 // CPU MMA intrinsic layout (MxNxK shape and element types)
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 struct CPUOpaqueMmaLayout {
   int64_t mSize = 0;
   int64_t nSize = 0;
@@ -295,6 +297,8 @@ struct CPUOpaqueMmaLayout {
   Type bType;
   Type cType;
 };
+
+}  // namespace
 
 static std::tuple<int64_t, int64_t, int64_t>
 getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {

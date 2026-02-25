@@ -77,7 +77,14 @@ def IREECPU_DataTiledMMAAttr
   let cppNamespace = "::mlir::iree_compiler::IREE::CPU";
 
   let description = [{
-    CPU data-tiled MMA layout.
+    CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
+    iree_codegen.inner_tiled. Like the GPU case, this wraps an intrinsic-enum and
+    some intrinsics_{m,n,k} unrolling factor. Unlike the GPU case, there is no
+    thread-distribution, no concept of subgroups and no interleaving of
+    intrinsics' layout.
+
+    Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
+    here but are unused.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";

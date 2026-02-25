@@ -28,6 +28,7 @@ func.func @cpu_avx512_1x8x1_f64(
 //  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -50,6 +51,7 @@ func.func @cpu_avx512_1x16x1_f32(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -72,6 +74,7 @@ func.func @cpu_avx512_1x16x1_f16_castf32(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F16_CASTF32, intrinsics_n = 2>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -94,6 +97,7 @@ func.func @cpu_avx512fp16_1x32x1_f16(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512FP16_1x32x1_F16_F16, intrinsics_k = 2>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -116,6 +120,7 @@ func.func @cpu_avx512bf16_1x16x2_bf16(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_1x16x2_F32_BF16, intrinsics_m = 2, intrinsics_n = 2>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -138,6 +143,7 @@ func.func @cpu_avx512_1x16x2_i32_i16(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x2_I32_I16, intrinsics_n = 4>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -160,6 +166,7 @@ func.func @cpu_avx512vnni_1x16x2_i32_i16(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512VNNI_1x16x2_I32_I16, intrinsics_m = 2, intrinsics_k = 2>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
@@ -182,6 +189,7 @@ func.func @cpu_avx512_1x16x2_i32_i8(
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x2_I32_I8_CASTI16, intrinsics_k = 4>
 
 // -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,
