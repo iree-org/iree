@@ -98,8 +98,13 @@ TEST_P(MultishotTest, MultishotAccept_MultipleConnections) {
     }
   }
 
-  // Give time for all accepts to complete.
-  DrainPending(iree_make_duration_ms(500));
+  // Wait for at least one accept completion. The connect-wait loop above may
+  // have already consumed accept completions, but on a slow system the last
+  // accept(s) may still be in the poll thread pipeline.
+  while (accept_log.entries.empty()) {
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(5000));
+  }
 
   // Verify we got multiple accept completions with MORE flag set.
   EXPECT_GE(accept_log.entries.size(), 1u)
@@ -275,10 +280,17 @@ TEST_P(MultishotTest, MultishotRecv_MultipleMessages) {
     }
   }
 
-  // Give time for receive completions.
-  DrainPending(iree_make_duration_ms(500));
+  // Wait for at least one recv completion. Sends complete eagerly via writev
+  // at submit time, so PollUntil during the send loop above may be satisfied
+  // by send completions alone without any recv firing. DrainPending uses
+  // immediate (0ms) timeout and breaks on the first empty poll, which is wrong
+  // here — we need a blocking wait for the recv that may not have been
+  // processed by the poll thread yet.
+  while (recv_log.entries.empty()) {
+    PollUntil(/*min_completions=*/1,
+              /*total_budget=*/iree_make_duration_ms(5000));
+  }
 
-  // Verify we got at least one recv completion.
   // TCP may coalesce messages, so we might get fewer completions than
   // messages sent. The key verification is that multishot mode is active.
   EXPECT_GE(recv_log.entries.size(), 1u)
