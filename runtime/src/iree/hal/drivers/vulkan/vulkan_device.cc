@@ -1504,7 +1504,8 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
 static iree_status_t iree_hal_vulkan_device_query_capabilities(
     iree_hal_device_t* base_device,
     iree_hal_device_capabilities_t* out_capabilities) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+  memset(out_capabilities, 0, sizeof(*out_capabilities));
+  return iree_ok_status();
 }
 
 static const iree_hal_device_topology_info_t*
