@@ -43,7 +43,6 @@ transform.named_sequence
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
-        affine_map<(B0, B1, M, N, K1, K2) -> ()>,
         affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>
       ] : !transform.any_op -> !transform.param<i64>
 

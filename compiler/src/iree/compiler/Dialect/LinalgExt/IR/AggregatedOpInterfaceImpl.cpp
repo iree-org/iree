@@ -325,9 +325,6 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
   auto qETy = getElementTypeOrSelf(query.getType());
   bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
 
-  AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
-                                      /*symbolCount=*/0, ctx);
-
   // ---- QK Matmul ----
 
   // Get sizes for S.
@@ -354,7 +351,9 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
     // For low bit-depth types we perform post Q @ K scaling. This is to avoid
     // losing numerical precision due to the low dynamic range of fp8 types when
     // pre applying the sclaing.
-    AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
+    AffineMap localSMap = b.getMultiDimIdentityMap(sSizes.size());
+    AffineMap localScaleMap = AffineMap::get(/*dimCount=*/sSizes.size(),
+                                             /*symbolCount=*/0, ctx);
 
     // If we need to truncate to fp8 post softmax we apply a scaling to use the
     // full fp8 range. We can do this with a offset as post `exp2` this equates
@@ -366,8 +365,8 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
             .convertToDouble();
     Value offset = arith::ConstantOp::create(
         b, loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
-    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
-                                               offset);
+    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, localSMap, localScaleMap,
+                                               s, offset);
   }
 
   // S += mask
