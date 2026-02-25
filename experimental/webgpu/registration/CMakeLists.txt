@@ -11,7 +11,7 @@ iree_cc_library(
     "driver_module.h"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::experimental::webgpu
   DEFINES

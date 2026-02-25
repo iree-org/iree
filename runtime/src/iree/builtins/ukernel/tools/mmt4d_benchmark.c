@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/builtins/ukernel/api.h"
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/builtins/ukernel/mmt4d.h"

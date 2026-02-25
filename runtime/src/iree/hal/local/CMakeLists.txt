@@ -57,7 +57,7 @@ iree_cc_binary_benchmark(
     ::executable_library
     ::local
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::hal::local::loaders::registration
     iree::hal::local::plugins::registration

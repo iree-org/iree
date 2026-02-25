@@ -9,8 +9,8 @@
 #include <memory.h>
 #include <string.h>
 
-#include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/io/file_contents.h"

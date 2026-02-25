@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 
 IREE_FLAG(bool, test_bool, false, "A boolean value.");
 IREE_FLAG(int32_t, test_int32, 123, "An int32_t value.");

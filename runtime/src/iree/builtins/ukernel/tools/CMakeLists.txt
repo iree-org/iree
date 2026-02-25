@@ -95,7 +95,7 @@ iree_cc_binary_benchmark(
     ::benchmark
     ::util
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
@@ -112,7 +112,7 @@ iree_cc_test(
     ::util
     iree::base
     iree::base::internal
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
 )
@@ -127,7 +127,7 @@ iree_cc_binary_benchmark(
     ::memcpy_benchmark
     ::util
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
@@ -143,7 +143,7 @@ iree_cc_test(
     ::test
     ::util
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
 )
@@ -158,7 +158,7 @@ iree_cc_binary_benchmark(
     ::memcpy_benchmark
     ::util
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
     iree::testing::benchmark
@@ -175,7 +175,7 @@ iree_cc_test(
     ::util
     iree::base
     iree::base::internal::cpu
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
 )
@@ -189,7 +189,7 @@ iree_cc_binary_benchmark(
     ::benchmark
     ::util
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::ukernel
     iree::builtins::ukernel::internal_headers
     iree::testing::benchmark

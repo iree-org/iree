@@ -24,8 +24,8 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
 #include "iree/base/internal/unicode.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/tokenizer/format/huggingface/tokenizer_json.h"
 #include "iree/tokenizer/tokenizer.h"
 

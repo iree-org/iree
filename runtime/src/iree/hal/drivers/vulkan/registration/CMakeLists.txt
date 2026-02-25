@@ -19,7 +19,7 @@ iree_cc_library(
     "driver_module.cc"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::hal::drivers::vulkan
   DEFINES

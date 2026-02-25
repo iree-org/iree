@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/io/file_contents.h"
 #include "iree/io/file_handle.h"
 #include "iree/io/parameter_index.h"

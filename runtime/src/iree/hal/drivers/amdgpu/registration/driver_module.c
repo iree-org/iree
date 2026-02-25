@@ -7,7 +7,7 @@
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/drivers/amdgpu/api.h"
 
 IREE_FLAG_LIST(string, amdgpu_libhsa_search_path,

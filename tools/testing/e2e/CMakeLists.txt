@@ -26,8 +26,8 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::cpu
-    iree::base::internal::flags
     iree::base::internal::path
+    iree::base::tooling::flags
     iree::hal
     iree::modules::hal
     iree::tooling::context_util
@@ -48,8 +48,8 @@ iree_cc_binary(
     iree::base
     iree::base::internal
     iree::base::internal::cpu
-    iree::base::internal::flags
     iree::base::internal::path
+    iree::base::tooling::flags
     iree::hal
     iree::modules::hal
     iree::tooling::context_util
@@ -69,8 +69,8 @@ iree_cc_binary(
     iree::base
     iree::base::internal
     iree::base::internal::cpu
-    iree::base::internal::flags
     iree::base::internal::path
+    iree::base::tooling::flags
     iree::hal
     iree::modules::hal
     iree::tooling::context_util
@@ -90,8 +90,8 @@ iree_cc_binary(
     iree::base
     iree::base::internal
     iree::base::internal::cpu
-    iree::base::internal::flags
     iree::base::internal::path
+    iree::base::tooling::flags
     iree::hal
     iree::modules::hal
     iree::tooling::context_util

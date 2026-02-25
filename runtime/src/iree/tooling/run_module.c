@@ -7,7 +7,7 @@
 #include "iree/tooling/run_module.h"
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/io/stdio_stream.h"
 #include "iree/modules/hal/types.h"

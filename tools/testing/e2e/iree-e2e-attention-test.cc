@@ -12,9 +12,9 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/context_util.h"

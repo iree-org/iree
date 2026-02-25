@@ -17,8 +17,8 @@ cc_binary_benchmark(
     srcs = ["comprehensive_benchmark.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:unicode",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/tokenizer",
         "//runtime/src/iree/tokenizer/format/huggingface:tokenizer_json",
         "@com_google_benchmark//:benchmark",

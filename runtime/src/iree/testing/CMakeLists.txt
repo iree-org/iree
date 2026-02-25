@@ -42,7 +42,7 @@ iree_cc_library(
     "benchmark_main.c"
   DEPS
     ::benchmark
-    iree::base::internal::flags
+    iree::base::tooling::flags
   TESTONLY
   PUBLIC
 )
@@ -71,7 +71,7 @@ iree_cc_library(
     gmock
     gtest
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
   TESTONLY
   PUBLIC
 )

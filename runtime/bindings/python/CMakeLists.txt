@@ -68,7 +68,7 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
 target_link_libraries(iree_runtime_bindings_python_PyExtRt
   PRIVATE
   iree::base
-  iree::base::internal::flags
+  iree::base::tooling::flags
   iree::hal
   iree::hal::drivers
   iree::hal::utils::allocators

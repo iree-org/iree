@@ -17,7 +17,7 @@ iree_cc_binary_benchmark(
     "libdevice_benchmark.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::device
     iree::testing::benchmark
   TESTONLY
@@ -31,7 +31,7 @@ iree_cc_test(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::builtins::device
     iree::testing::gtest
     iree::testing::gtest_main

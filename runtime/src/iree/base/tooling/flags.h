@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BASE_INTERNAL_FLAGS_H_
-#define IREE_BASE_INTERNAL_FLAGS_H_
+#ifndef IREE_BASE_TOOLING_FLAGS_H_
+#define IREE_BASE_TOOLING_FLAGS_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -346,4 +346,4 @@ void iree_flags_dump(iree_flag_dump_mode_t mode, FILE* file);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_BASE_INTERNAL_FLAGS_H_
+#endif  // IREE_BASE_TOOLING_FLAGS_H_

@@ -45,8 +45,8 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/flags.h"
 #include "iree/base/internal/json.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/io/file_contents.h"
 #include "iree/tokenizer/format/huggingface/tokenizer_json.h"
 #include "iree/tokenizer/tokenizer.h"

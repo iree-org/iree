@@ -35,7 +35,7 @@ iree_runtime_cc_library(
     srcs = ["benchmark_main.c"],
     deps = [
         ":benchmark",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
     ],
 )
 
@@ -60,7 +60,7 @@ iree_runtime_cc_library(
     deps = [
         ":gtest",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "@com_google_googletest//:gtest",
     ],
 )

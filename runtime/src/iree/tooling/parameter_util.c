@@ -6,7 +6,7 @@
 
 #include "iree/tooling/parameter_util.h"
 
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/io/file_handle.h"
 #include "iree/io/formats/parser_registry.h"
 #include "iree/io/parameter_index.h"

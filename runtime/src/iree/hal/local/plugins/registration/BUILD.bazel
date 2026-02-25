@@ -42,7 +42,7 @@ iree_runtime_cc_library(
     hdrs = ["init.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local:executable_plugin_manager",
     ] + select({

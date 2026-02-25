@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/modules/hal/types.h"
 
 //===----------------------------------------------------------------------===//

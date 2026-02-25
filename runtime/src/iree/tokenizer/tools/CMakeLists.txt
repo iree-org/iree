@@ -18,8 +18,8 @@ iree_cc_binary_benchmark(
   DEPS
     benchmark
     iree::base
-    iree::base::internal::flags
     iree::base::internal::unicode
+    iree::base::tooling::flags
     iree::tokenizer
     iree::tokenizer::format::huggingface::tokenizer_json
   TESTONLY

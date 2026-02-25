@@ -18,7 +18,7 @@ cc_binary_benchmark(
     srcs = ["libdevice_benchmark.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/builtins/device",
         "//runtime/src/iree/testing:benchmark",
     ],
@@ -30,7 +30,7 @@ iree_runtime_cc_test(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/builtins/device",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

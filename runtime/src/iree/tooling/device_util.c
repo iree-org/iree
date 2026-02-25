@@ -6,8 +6,8 @@
 
 #include "iree/tooling/device_util.h"
 
-#include "iree/base/internal/flags.h"
 #include "iree/base/threading/call_once.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/hal/utils/mpi_channel_provider.h"

@@ -26,7 +26,7 @@ iree_runtime_cc_library(
     tags = ["driver=cuda"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/cuda",
     ],

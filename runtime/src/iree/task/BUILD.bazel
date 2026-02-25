@@ -36,7 +36,7 @@ iree_runtime_cc_library(
     deps = [
         ":task",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
     ],
 )
 

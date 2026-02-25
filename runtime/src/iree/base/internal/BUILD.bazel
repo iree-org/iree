@@ -180,38 +180,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "flags",
-    srcs = ["flags.c"],
-    hdrs = ["flags.h"],
-    deps = [
-        ":internal",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/io:file_handle",
-    ],
-)
-
-iree_runtime_cc_binary(
-    name = "flags_demo",
-    testonly = True,
-    srcs = ["flags_demo.c"],
-    deps = [
-        ":flags",
-        "//runtime/src/iree/base",
-    ],
-)
-
-iree_lit_test_suite(
-    name = "flags_test",
-    srcs = ["flags_test.txt"],
-    cfg = "//runtime:lit.cfg.py",
-    tags = ["hostonly"],
-    tools = [
-        ":flags_demo",
-        "@llvm-project//llvm:FileCheck",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "fpu_state",
     srcs = ["fpu_state.c"],
     hdrs = ["fpu_state.h"],

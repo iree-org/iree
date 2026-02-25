@@ -32,7 +32,7 @@ iree_cc_library(
   DEPS
     ::task
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
   PUBLIC
 )
 

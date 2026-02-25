@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "iree/base/internal/flags.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/task/topology.h"
 
 //===----------------------------------------------------------------------===//

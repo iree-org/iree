@@ -71,7 +71,7 @@ iree_cc_binary(
     "iree-benchmark-executable-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::io::file_handle
     iree::modules::hal::types
@@ -91,7 +91,7 @@ iree_cc_binary(
   DEPS
     benchmark
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::modules::hal::types
     iree::tooling::context_util
@@ -109,7 +109,7 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::modules::check
     iree::testing::gtest
@@ -128,7 +128,7 @@ iree_cc_binary(
     "iree-convert-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::io::file_handle
     iree::io::formats::irpa
@@ -159,7 +159,7 @@ iree_cc_binary(
     "iree-create-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::io::file_handle
     iree::io::formats::irpa
@@ -194,7 +194,7 @@ iree_cc_binary(
   DEPS
     flatcc::runtime
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
     iree::io::file_handle
@@ -212,7 +212,7 @@ iree_cc_binary(
     "iree-dump-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::io::file_handle
     iree::io::parameter_index
     iree::io::scope_map
@@ -228,7 +228,7 @@ iree_cc_binary(
     "iree-encode-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::io::file_handle
     iree::io::formats::irpa
@@ -272,7 +272,7 @@ iree_cc_binary(
     "iree-run-module-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::hal
     iree::tooling::context_util
     iree::tooling::run_module
@@ -288,7 +288,7 @@ iree_cc_binary(
     "iree-tokenize-main.c"
   DEPS
     iree::base
-    iree::base::internal::flags
+    iree::base::tooling::flags
     iree::base::internal::json
     iree::io::file_handle
     iree::tokenizer::tokenizer
@@ -447,7 +447,7 @@ if(IREE_BUILD_COMPILER)
       "iree-run-mlir-main.cc"
     DEPS
       iree::base
-      iree::base::internal::flags
+      iree::base::tooling::flags
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
       iree::hal

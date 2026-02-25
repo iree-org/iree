@@ -183,43 +183,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    flags
-  HDRS
-    "flags.h"
-  SRCS
-    "flags.c"
-  DEPS
-    ::internal
-    iree::base
-    iree::io::file_handle
-  PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    flags_demo
-  SRCS
-    "flags_demo.c"
-  DEPS
-    ::flags
-    iree::base
-  TESTONLY
-)
-
-iree_lit_test_suite(
-  NAME
-    flags_test
-  SRCS
-    "flags_test.txt"
-  TOOLS
-    ::flags_demo
-    FileCheck
-  LABELS
-    "hostonly"
-)
-
-iree_cc_library(
-  NAME
     fpu_state
   HDRS
     "fpu_state.h"

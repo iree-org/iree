@@ -30,7 +30,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-executable-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/modules/hal:types",
@@ -46,7 +46,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/tooling:context_util",
@@ -63,7 +63,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/check",
         "//runtime/src/iree/testing:gtest",
@@ -79,7 +79,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-convert-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
@@ -104,7 +104,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-create-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
@@ -131,9 +131,9 @@ iree_runtime_cc_binary(
     srcs = ["iree-dump-module-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal/flatcc:debugging",
         "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm",
@@ -146,7 +146,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-dump-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
@@ -159,7 +159,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-encode-parameters-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
@@ -218,7 +218,7 @@ cc_binary(
         "//compiler/src/iree/compiler/API:Impl",
         "//runtime/src:runtime_defines",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
@@ -232,7 +232,7 @@ iree_runtime_cc_binary(
     srcs = ["iree-run-module-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:run_module",
@@ -261,8 +261,8 @@ iree_runtime_cc_binary(
     srcs = ["iree-tokenize-main.c"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:json",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/tokenizer",
         "//runtime/src/iree/tokenizer/format/huggingface:tokenizer_json",
