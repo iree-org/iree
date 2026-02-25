@@ -88,3 +88,29 @@ func.func @bufferize_coalesced_gather_dma_in_bounds(%source: tensor<4x32xf32>,
 
 // CHECK-LABEL: func @bufferize_coalesced_gather_dma_in_bounds
 //       CHECK:   iree_gpu.coalesced_gather_dma %{{.+}} into %{{.+}} lane(%{{.+}}) in_bounds [true, false] : memref<4x32xf32{{.+}}>, memref<4x64xf32{{.+}}>, index
+
+// -----
+
+// Test bufferization with slice semantics (offsets/sizes/strides) inside forall.
+func.func @bufferize_coalesced_gather_dma_slice(%source: tensor<2x2x64xf32>) -> tensor<2x2x64xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c64 = arith.constant 64 : index
+  %empty = tensor.empty() : tensor<2x2x64xf32>
+  %result = scf.forall (%tid0, %tid1, %tid2) in (2, 2, 64) shared_outs(%init = %empty) -> tensor<2x2x64xf32> {
+    %src_slice = tensor.extract_slice %source[%tid0, %tid1, 0] [1, 1, 64] [1, 1, 1]
+      : tensor<2x2x64xf32> to tensor<1x1x64xf32>
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %src_slice into %init
+        [%tid0, %tid1, %c0] [%c1, %c1, %c64] [%c1, %c1, %c1]
+        lane(%tid2)
+        : tensor<1x1x64xf32>, tensor<2x2x64xf32>, index, index, index, index, index, index, index, index, index, index
+    }
+  } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  return %result : tensor<2x2x64xf32>
+}
+
+// CHECK-LABEL: func @bufferize_coalesced_gather_dma_slice
+//   CHECK-DAG:   %[[SRC_SUBVIEW:.+]] = memref.subview %{{.+}}[%{{.+}}, %{{.+}}, 0] [1, 1, 64] [1, 1, 1] : memref<2x2x64xf32{{.+}}> to memref<1x1x64xf32
+//   CHECK-DAG:   %[[DST_SUBVIEW:.+]] = memref.subview %{{.+}}[%{{.+}}, %{{.+}}, 0] [1, 1, 64] [1, 1, 1] : memref<2x2x64xf32> to memref<1x1x64xf32
+//       CHECK:   iree_gpu.coalesced_gather_dma %[[SRC_SUBVIEW]] into %[[DST_SUBVIEW]] lane(%{{.+}}) : memref<1x1x64xf32{{.+}}>, memref<1x1x64xf32{{.+}}>, index

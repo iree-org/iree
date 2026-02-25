@@ -16,6 +16,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
@@ -443,10 +444,27 @@ struct CoalescedGatherDMAOpBufferizationInterface
       rewriter.setInsertionPoint(gatherOp);
     }
 
+    // Handle slice semantics: create a subview of the init buffer.
+    Value destBuffer = *initBuffer;
+    if (gatherOp.hasSliceSemantics()) {
+      SmallVector<OpFoldResult> offsets = llvm::map_to_vector(
+          gatherOp.getOffsets(),
+          [](Value v) -> OpFoldResult { return getAsOpFoldResult(v); });
+      SmallVector<OpFoldResult> sizes =
+          llvm::map_to_vector(gatherOp.getSizes(), [](Value v) -> OpFoldResult {
+            return getAsOpFoldResult(v);
+          });
+      SmallVector<OpFoldResult> strides = llvm::map_to_vector(
+          gatherOp.getStrides(),
+          [](Value v) -> OpFoldResult { return getAsOpFoldResult(v); });
+      destBuffer = memref::SubViewOp::create(
+          rewriter, gatherOp.getLoc(), destBuffer, offsets, sizes, strides);
+    }
+
     // Create the bufferized DMA operation with no results (memref form).
     IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-        bufferizedIndices, *initBuffer, gatherOp.getLane(),
+        rewriter, gatherOp.getLoc(), /*resultType=*/Type{}, *sourceBuffer,
+        bufferizedIndices, destBuffer, gatherOp.getLane(),
         gatherOp.getInBoundsAttr());
 
     // Replace the tensor op. If it has a result, replace with the init buffer.

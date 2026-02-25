@@ -25,6 +25,7 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -312,42 +313,60 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
     auto coalescedGather = cast<IREE::GPU::CoalescedGatherDMAOp>(
         *terminator.getYieldingOps().begin());
 
-    // Create the new CoalescedGatherDMAOp with a result outside the in_parallel
+    // Convert the combining DMA op to sequential form:
+    // 1. Create extract_slice for the DMA init (destination slice)
+    // 2. Create DMA with result (sequential, not combining)
+    // 3. Create insert_slice to write result back
     rewriter.setInsertionPoint(terminator);
+
+    SmallVector<OpFoldResult> destOffsets;
+    SmallVector<OpFoldResult> destSizes;
+    SmallVector<OpFoldResult> destStrides;
+    Value dmaInit = coalescedGather.getInit();
+
+    if (coalescedGather.hasSliceSemantics()) {
+      // DMA with slice semantics: offsets/sizes/strides are on the DMA itself.
+      // Extract the slice from the destination to use as the DMA init.
+      destOffsets =
+          llvm::map_to_vector(coalescedGather.getOffsets(),
+                              [](Value v) -> OpFoldResult { return v; });
+      destSizes =
+          llvm::map_to_vector(coalescedGather.getSizes(),
+                              [](Value v) -> OpFoldResult { return v; });
+      destStrides =
+          llvm::map_to_vector(coalescedGather.getStrides(),
+                              [](Value v) -> OpFoldResult { return v; });
+      dmaInit = tensor::ExtractSliceOp::create(
+          rewriter, loc, coalescedGather.getInit(), destOffsets, destSizes,
+          destStrides);
+    } else {
+      // DMA without slice semantics: get offsets from init's extract_slice.
+      auto extractSlice =
+          coalescedGather.getInit().getDefiningOp<tensor::ExtractSliceOp>();
+      if (extractSlice) {
+        destOffsets = extractSlice.getMixedOffsets();
+        destSizes = extractSlice.getMixedSizes();
+        destStrides = extractSlice.getMixedStrides();
+      } else {
+        auto initType = cast<ShapedType>(dmaInit.getType());
+        int64_t rank = initType.getRank();
+        destOffsets.assign(rank, rewriter.getIndexAttr(0));
+        destSizes =
+            getAsIndexOpFoldResult(rewriter.getContext(), initType.getShape());
+        destStrides.assign(rank, rewriter.getIndexAttr(1));
+      }
+    }
+
     auto newGatherOp = IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, loc, coalescedGather.getInit().getType(),
-        coalescedGather.getSource(), coalescedGather.getIndices(),
-        coalescedGather.getInit(), coalescedGather.getLane(),
+        rewriter, loc, dmaInit.getType(), coalescedGather.getSource(),
+        coalescedGather.getIndices(), dmaInit, coalescedGather.getLane(),
         coalescedGather.getInBoundsAttr());
     Value gatherResult = newGatherOp.getResult();
-
-    // Use a tensor.insert_slice to insert the gather result back into the
-    // shared memory destination. Extract offsets from the init's extract_slice.
-    SmallVector<OpFoldResult> destIndices;
-    SmallVector<OpFoldResult> sizes;
-    SmallVector<OpFoldResult> strides;
-
-    // Get offsets, sizes, and strides from the init's extract_slice op
-    auto extractSlice =
-        coalescedGather.getInit().getDefiningOp<tensor::ExtractSliceOp>();
-    if (extractSlice) {
-      destIndices = extractSlice.getMixedOffsets();
-      sizes = extractSlice.getMixedSizes();
-      strides = extractSlice.getMixedStrides();
-    } else {
-      // Fallback: use offset 0 if init is not from an extract_slice
-      auto initType = cast<ShapedType>(coalescedGather.getInit().getType());
-      int64_t rank = initType.getRank();
-      destIndices.assign(rank, rewriter.getIndexAttr(0));
-      sizes =
-          getAsIndexOpFoldResult(rewriter.getContext(), initType.getShape());
-      strides.assign(rank, rewriter.getIndexAttr(1));
-    }
 
     // Get the destination tensor from the loop's iter_args
     Value dest = newProducer.getRegionIterArgs()[0];
     Value insertedSlice = tensor::InsertSliceOp::create(
-        rewriter, loc, gatherResult, dest, destIndices, sizes, strides);
+        rewriter, loc, gatherResult, dest, destOffsets, destSizes, destStrides);
 
     // Yield the result with the inserted slice
     scf::YieldOp::create(rewriter, loc, insertedSlice);
@@ -435,36 +454,40 @@ static void composeParallelInsertSlices(
 }
 
 /// Compose and fuse coalesced gather DMA operations with parallel insert
-/// slices. Creates a DMA op with a result, then uses parallel_insert_slice
-/// to insert the result into the forall's shared_out at the composed offsets.
+/// slices. Replaces the parallel_insert_slice with a CoalescedGatherDMAOp
+/// that has slice semantics, writing directly to the shared_out at the
+/// given offsets.
 static void composeCoalescedGatherDMA(
     RewriterBase &rewriter,
     SmallVector<std::pair<tensor::ParallelInsertSliceOp,
                           IREE::GPU::CoalescedGatherDMAOp>> &insertPairs) {
   for (auto [warpInsert, laneInsert] : insertPairs) {
     OpBuilder::InsertionGuard g(rewriter);
+    Location loc = warpInsert.getLoc();
 
-    // Create an extract_slice for the DMA's init to match the source shape.
-    // This is done outside the in_parallel region.
-    rewriter.setInsertionPoint(warpInsert->getParentOp());
-    auto destSlice = tensor::ExtractSliceOp::create(
-        rewriter, warpInsert.getLoc(), warpInsert.getDest(),
-        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
-        warpInsert.getMixedStrides());
+    // Materialize constants OUTSIDE the in_parallel region to avoid
+    // polluting the combining op region with non-combining ops.
+    auto *inParallelOp = warpInsert->getParentOp();
+    rewriter.setInsertionPoint(inParallelOp);
+    SmallVector<Value> offsets = llvm::map_to_vector(
+        warpInsert.getMixedOffsets(), [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
+    SmallVector<Value> sizes =
+        llvm::map_to_vector(warpInsert.getMixedSizes(), [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
+    SmallVector<Value> strides = llvm::map_to_vector(
+        warpInsert.getMixedStrides(), [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
 
-    // Create new CoalescedGatherDMAOp with a result (outside in_parallel).
-    auto dmaOp = IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, warpInsert.getLoc(), destSlice.getType(),
-        laneInsert.getSource(), laneInsert.getIndices(), destSlice,
-        laneInsert.getLane(), laneInsert.getInBoundsAttr());
-
-    // Replace the warp parallel_insert_slice with one that inserts the DMA
-    // result.
     rewriter.setInsertionPoint(warpInsert);
-    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
-        warpInsert, dmaOp.getResult(), warpInsert.getDest(),
-        warpInsert.getMixedOffsets(), warpInsert.getMixedSizes(),
-        warpInsert.getMixedStrides());
+    rewriter.replaceOpWithNewOp<IREE::GPU::CoalescedGatherDMAOp>(
+        warpInsert,
+        /*resultType=*/Type{}, laneInsert.getSource(), laneInsert.getIndices(),
+        warpInsert.getDest(), laneInsert.getLane(),
+        laneInsert.getInBoundsAttr(), offsets, sizes, strides);
     rewriter.eraseOp(laneInsert);
   }
 }
