@@ -87,15 +87,18 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     // This pattern will transform vector loads whose elements are used in a
     // scalar fashion into scalar loads. This will let scalar loads to be folded
     // into broadcast/arithmetic operations and reduce register pressure.
+    int benefit = 2;
+    PatternBenefit lowering(benefit);
+    PatternBenefit unrolling(benefit - 1);
     vector::populateScalarVectorTransferLoweringPatterns(
         patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
     vector::populateVectorMultiReductionReorderAndExpandPatterns(
-        patterns, vectorMultiReductionLowering);
+        patterns, vectorMultiReductionLowering, lowering);
     vector::populateVectorMultiReductionFlatteningPatterns(
-        patterns, vectorMultiReductionLowering);
+        patterns, vectorMultiReductionLowering, lowering);
     vector::populateVectorMultiReductionUnrollingPatterns(
-        patterns, vectorMultiReductionLowering);
+        patterns, vectorMultiReductionLowering, unrolling);
     populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }

@@ -607,15 +607,18 @@ struct LLVMGPUVectorLoweringPass final
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
+      int benefit = 2;
+      PatternBenefit lowering(benefit);
+      PatternBenefit unrolling(benefit - 1);
       vector::populateVectorMultiReductionReorderAndExpandPatterns(
           contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerReduction);
+          vector::VectorMultiReductionLowering::InnerReduction, lowering);
       vector::populateVectorMultiReductionFlatteningPatterns(
           contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerReduction);
+          vector::VectorMultiReductionLowering::InnerReduction, lowering);
       vector::populateVectorMultiReductionUnrollingPatterns(
           contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerReduction);
+          vector::VectorMultiReductionLowering::InnerReduction, unrolling);
       contractLoweringPatterns.add<UnrollElementwiseOps>(funcOp->getContext());
       // Unroll transfer_gather ops to rank 1 and lower contiguous ones to
       // vector.transfer_read.

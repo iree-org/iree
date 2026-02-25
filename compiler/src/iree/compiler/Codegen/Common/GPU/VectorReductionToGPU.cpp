@@ -229,12 +229,15 @@ struct VectorReductionToGPUPass final
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
     {
       RewritePatternSet patterns(ctx);
+      int benefit = 2;
+      PatternBenefit lowering(benefit);
+      PatternBenefit unrolling(benefit - 1);
       vector::populateVectorMultiReductionReorderAndExpandPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerReduction);
+          patterns, vector::VectorMultiReductionLowering::InnerReduction, lowering);
       vector::populateVectorMultiReductionFlatteningPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerReduction);
+          patterns, vector::VectorMultiReductionLowering::InnerReduction, lowering);
       vector::populateVectorMultiReductionUnrollingPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerReduction);
+          patterns, vector::VectorMultiReductionLowering::InnerReduction, unrolling);
       // Add clean up patterns after lowering of multidimreduce lowering.
       patterns.add<InsertToBroadcast>(ctx);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);

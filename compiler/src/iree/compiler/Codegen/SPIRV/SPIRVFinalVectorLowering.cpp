@@ -80,12 +80,15 @@ public:
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
+      int benefit = 2;
+      PatternBenefit lowering(benefit);
+      PatternBenefit unrolling(benefit - 1);
       vector::populateVectorMultiReductionReorderAndExpandPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+          patterns, vector::VectorMultiReductionLowering::InnerParallel, lowering);
       vector::populateVectorMultiReductionFlatteningPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+          patterns, vector::VectorMultiReductionLowering::InnerParallel, lowering);
       vector::populateVectorMultiReductionUnrollingPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerParallel);
+          patterns, vector::VectorMultiReductionLowering::InnerParallel, unrolling);
       vector::populateVectorTransposeLoweringPatterns(
           patterns, options.vectorTransposeLowering);
       vector::populateVectorGatherToConditionalLoadPatterns(patterns);
