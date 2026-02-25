@@ -43,8 +43,8 @@ protected:
                                       Type mlirType);
 
   iree::vm::ref<iree_hal_device_t> device;
-  iree::vm::ref<iree_vm_module_t> hal_module;
-  iree::vm::ref<iree_vm_module_t> main_module;
+  iree::vm::ref<iree_vm_module_t> halModule;
+  iree::vm::ref<iree_vm_module_t> mainModule;
   iree::vm::ref<iree_vm_context_t> context;
 
   friend class FunctionCall;

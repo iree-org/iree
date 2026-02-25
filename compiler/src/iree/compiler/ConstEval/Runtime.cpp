@@ -126,8 +126,8 @@ CompiledBinary::CompiledBinary() = default;
 CompiledBinary::~CompiledBinary() = default;
 
 void CompiledBinary::deinitialize() {
-  hal_module.reset();
-  main_module.reset();
+  halModule.reset();
+  mainModule.reset();
   context.reset();
   device.reset();
 }
@@ -325,7 +325,7 @@ LogicalResult FunctionCall::invoke(Location loc, StringRef name) {
   // Lookup function.
   iree_vm_function_t function;
   if (auto status = iree_vm_module_lookup_function_by_name(
-          binary.main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          binary.mainModule.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
           iree_string_view_t{name.data(),
                              static_cast<iree_host_size_t>(name.size())},
           &function)) {
@@ -463,33 +463,33 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   iree_hal_driver_release(driver);
 
   // Create device group and hal module.
-  iree_hal_device_group_t *device_group = nullptr;
+  iree_hal_device_group_t *deviceGroup = nullptr;
   if (iree_status_is_ok(status)) {
     status = iree_hal_device_group_create_from_device(
-        device.get(), iree_allocator_system(), &device_group);
+        device.get(), iree_allocator_system(), &deviceGroup);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(runtime.instance.get(),
                                     iree_hal_module_device_policy_default(),
-                                    device_group, IREE_HAL_MODULE_FLAG_NONE,
+                                    deviceGroup, IREE_HAL_MODULE_FLAG_NONE,
                                     iree_hal_module_debug_sink_stdio(stderr),
-                                    iree_allocator_system(), &hal_module);
+                                    iree_allocator_system(), &halModule);
   }
-  iree_hal_device_group_release(device_group);
+  iree_hal_device_group_release(deviceGroup);
 
   // Bytecode module.
   if (iree_status_is_ok(status)) {
     status = iree_vm_bytecode_module_create(
         runtime.instance.get(), IREE_VM_BYTECODE_MODULE_FLAG_NONE,
         iree_make_const_byte_span(data, length), iree_allocator_null(),
-        iree_allocator_system(), &main_module);
+        iree_allocator_system(), &mainModule);
   }
 
   // Create context.
   if (iree_status_is_ok(status)) {
     std::array<iree_vm_module_t *, 2> modules = {
-        hal_module.get(),
-        main_module.get(),
+        halModule.get(),
+        mainModule.get(),
     };
     status = iree_vm_context_create_with_modules(
         runtime.instance.get(), IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
