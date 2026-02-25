@@ -666,7 +666,7 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_host_size_t cpu_count, const uint32_t* cpu_ids,
     iree_task_topology_t* out_topology) {
   // Validate input.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
                             " provided for a max capacity of %zu)",
