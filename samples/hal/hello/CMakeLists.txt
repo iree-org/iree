@@ -17,6 +17,7 @@ iree_cc_binary(
     "hello.c"
   DEPS
     iree::base
+    iree::base::tooling::flags
     iree::hal
     iree::hal::drivers
 )

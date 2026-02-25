@@ -9,7 +9,7 @@
 // Demonstrates the core HAL workflow without any VM, bytecode modules, or
 // compiled executables. This is the minimal path through the HAL:
 //
-//   1. Create a driver and device from the registry.
+//   1. Create a device from the registry by URI.
 //   2. Create a device group (assigns topology info to the device).
 //   3. Allocate two buffers via the device allocator.
 //   4. Record a command buffer that fills one buffer and copies to the other.
@@ -20,19 +20,21 @@
 // operations supported by every HAL driver.
 //
 // Usage:
-//   hello [driver_name]
-//
-// Examples:
-//   hello                  # Uses local-sync (default)
-//   hello local-task       # Uses the task system driver
-//   hello vulkan           # Uses Vulkan (if available)
+//   hello --device=local-sync
+//   hello --device=local-task
+//   hello --device=vulkan
 
 #include <inttypes.h>
 #include <stdio.h>
 
 #include "iree/base/api.h"
+#include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
+
+IREE_FLAG(string, device, "local-sync",
+          "HAL device URI to use for execution.\n"
+          "Examples: local-sync, local-task, vulkan, cuda, hip");
 
 // The fill pattern and buffer size are chosen to be small enough to print
 // but large enough to exercise the command buffer path (not inlined).
@@ -145,11 +147,10 @@ static iree_status_t record_and_verify(
 // end -- every iree_hal_*_release is safe to call with NULL.
 //===----------------------------------------------------------------------===//
 
-static iree_status_t run_sample(const char* driver_name) {
+static iree_status_t run_sample(void) {
   iree_allocator_t host_allocator = iree_allocator_system();
 
   // All NULL-initialized so cleanup is unconditional.
-  iree_hal_driver_t* driver = NULL;
   iree_hal_device_t* device = NULL;
   iree_hal_device_group_t* device_group = NULL;
   iree_hal_buffer_t* source_buffer = NULL;
@@ -157,31 +158,21 @@ static iree_status_t run_sample(const char* driver_name) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   iree_hal_semaphore_t* semaphore = NULL;
 
-  //--- 1. Register drivers and create device ----------------------------------
+  //--- 1. Create device from registry -----------------------------------------
 
-  fprintf(stdout, "1. Creating device (driver=%s)...\n", driver_name);
+  fprintf(stdout, "1. Creating device (--device=%s)...\n", FLAG_device);
 
   // Register all linked-in drivers with the default registry.
   iree_status_t status = iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default());
 
-  // Create the requested driver. This looks up the driver factory by name and
-  // instantiates it.
+  // Create a device directly from the URI. This handles driver lookup,
+  // instantiation, and default device selection in one step.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_driver_registry_try_create(
-        iree_hal_driver_registry_default(), iree_make_cstring_view(driver_name),
-        host_allocator, &driver);
+    status = iree_hal_create_device(iree_hal_driver_registry_default(),
+                                    iree_make_cstring_view(FLAG_device),
+                                    host_allocator, &device);
   }
-
-  // Create the default device from the driver. For drivers with multiple
-  // devices (multi-GPU) this picks the first one.
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_driver_create_default_device(driver, host_allocator, &device);
-  }
-  // Driver is no longer needed -- the device is self-contained.
-  iree_hal_driver_release(driver);
-  driver = NULL;
 
   //--- 2. Create device group (topology) --------------------------------------
 
@@ -204,8 +195,7 @@ static iree_status_t run_sample(const char* driver_name) {
             iree_hal_device_group_device_count(device_group));
   }
 
-  //--- 3. Allocate buffers and create command buffer / semaphore
-  //---------------
+  //--- 3. Allocate buffers, command buffer, semaphore -------------------------
 
   if (iree_status_is_ok(status)) {
     fprintf(stdout, "3. Allocating buffers (%" PRIhsz " bytes each)...\n",
@@ -281,11 +271,8 @@ static iree_status_t run_sample(const char* driver_name) {
 //===----------------------------------------------------------------------===//
 
 int main(int argc, char** argv) {
-  const char* driver_name = "local-sync";
-  if (argc > 1) {
-    driver_name = argv[1];
-  }
-  iree_status_t status = run_sample(driver_name);
+  iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
+  iree_status_t status = run_sample();
   if (iree_status_is_ok(status)) {
     return 0;
   }
