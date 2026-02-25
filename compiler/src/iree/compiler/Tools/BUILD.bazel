@@ -193,6 +193,7 @@ iree_compiler_cc_library(
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API/Internal:CompilerDriver",
         "//compiler/src/iree/compiler/Pipelines",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
     ],
 )
