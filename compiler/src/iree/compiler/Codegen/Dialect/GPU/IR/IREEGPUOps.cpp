@@ -18,6 +18,9 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
+using namespace mlir;
+using namespace mlir::iree_compiler::IREE::GPU;
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.cpp.inc" // IWYU pragma: keep
@@ -219,36 +222,20 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 void CoalescedGatherDMAOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  // Get the OpOperand pointers for source and init
-  // Operand layout: source, indices (variadic), init, lane
-  unsigned numOperands = getOperation()->getNumOperands();
-  unsigned laneOperandIdx = numOperands - 1;
-  unsigned initOperandIdx = laneOperandIdx - 1;
-  unsigned sourceOperandIdx = 0;
-
   Value source = getSource();
   Value init = getInit();
 
-  // The operation reads from the source.
   if (isa<MemRefType>(source.getType())) {
-    effects.emplace_back(MemoryEffects::Read::get(),
-                         &getOperation()->getOpOperand(sourceOperandIdx),
+    effects.emplace_back(MemoryEffects::Read::get(), &getSourceMutable(),
                          SideEffects::DefaultResource::get());
   }
 
-  // For memref form, the operation writes to init (side effect)
-  // For tensor form with result, the write is captured in the result value
-  // For tensor form without result (combiner case in forall.in_parallel),
-  // we must declare a write effect to prevent DCE from eliminating the op.
   if (isa<MemRefType>(init.getType())) {
-    effects.emplace_back(MemoryEffects::Write::get(),
-                         &getOperation()->getOpOperand(initOperandIdx),
+    effects.emplace_back(MemoryEffects::Write::get(), &getInitMutable(),
                          SideEffects::DefaultResource::get());
   } else if (isa<RankedTensorType>(init.getType()) &&
              getOperation()->getNumResults() == 0) {
-    // Tensor combiner case: declare write effect to prevent DCE.
-    effects.emplace_back(MemoryEffects::Write::get(),
-                         &getOperation()->getOpOperand(initOperandIdx),
+    effects.emplace_back(MemoryEffects::Write::get(), &getInitMutable(),
                          SideEffects::DefaultResource::get());
   }
 }
@@ -334,41 +321,55 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     }
   }
 
-  // Verify the contiguous (non-indexed) dimensions match between source and
-  // dest, unless in_bounds allows OOB reads for that dimension.
-  std::optional<ArrayAttr> inBoundsAttr = getInBounds();
-  for (auto [dim, size] : llvm::enumerate(initShape)) {
-    if (dim >= sourceShape.size()) {
-      return emitOpError("expected source to have at least ")
-             << (dim + 1) << " dimensions when destination has rank "
-             << initShape.size();
-    }
+  // Validate slice semantics if present.
+  if (hasSliceSemantics()) {
+    size_t numOffsets = getOffsets().size();
+    size_t numSizes = getSizes().size();
+    size_t numStrides = getStrides().size();
 
-    // Skip indexed dimensions - they're validated above.
-    if (dim < indices.size()) {
-      continue;
+    if (numOffsets != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " offset values, got " << numOffsets;
     }
+    if (numSizes != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " size values, got " << numSizes;
+    }
+    if (numStrides != initShape.size()) {
+      return emitOpError("expected ")
+             << initShape.size() << " stride values, got " << numStrides;
+    }
+  } else {
+    // Without slice semantics, verify source and init shapes match.
+    std::optional<ArrayAttr> inBoundsAttr = getInBounds();
+    for (auto [dim, size] : llvm::enumerate(initShape)) {
+      if (dim >= sourceShape.size()) {
+        return emitOpError("expected source to have at least ")
+               << (dim + 1) << " dimensions when destination has rank "
+               << initShape.size();
+      }
 
-    // If in_bounds is present and this dimension allows OOB (in_bounds=false),
-    // skip the size matching check. The source may be smaller than init along
-    // this dimension, and reads beyond the source extent return zero.
-    if (inBoundsAttr) {
-      auto inBoundsArray = *inBoundsAttr;
-      if (dim < inBoundsArray.size()) {
-        bool dimInBounds = cast<BoolAttr>(inBoundsArray[dim]).getValue();
-        if (!dimInBounds) {
-          continue; // OOB allowed, skip size check
+      if (dim < indices.size()) {
+        continue;
+      }
+
+      if (inBoundsAttr) {
+        auto inBoundsArray = *inBoundsAttr;
+        if (dim < inBoundsArray.size()) {
+          bool dimInBounds = cast<BoolAttr>(inBoundsArray[dim]).getValue();
+          if (!dimInBounds) {
+            continue;
+          }
         }
       }
-    }
 
-    // Check the suffix (hidden) gathering dimensions are the same in `source`
-    // and `init`.
-    int64_t sourceDim = sourceShape[dim];
-    if (sourceDim != size) {
-      return emitOpError("expected unindexed dimension ")
-             << dim << " to have same length in source (" << sourceDim
-             << ") and destination (" << size << ')';
+      int64_t sourceDim = sourceShape[dim];
+      if (sourceDim != size && !ShapedType::isDynamic(sourceDim) &&
+          !ShapedType::isDynamic(size)) {
+        return emitOpError("expected unindexed dimension ")
+               << dim << " to have same length in source (" << sourceDim
+               << ") and destination (" << size << ')';
+      }
     }
   }
 
