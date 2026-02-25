@@ -2062,7 +2062,7 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=${_F8E4M3_TYPE}"
     "--acc_type=f32"
     "--shapes=custom_mnk"
-    "--mnk=2048,2048,2048"
+    "--mnk=2048,8192,2048"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS

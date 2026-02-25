@@ -592,3 +592,42 @@ module attributes {
 // CHECK-REMARKS:      [Analysis] UKernel
 // CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
 // CHECK-REMARKS-SAME:   Remark=pingpong_dt_medium_f4E2M1FN
+
+// -----
+
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx950", features = "",
+                                               wgp = <compute = fp16, storage =  b16,
+                                               subgroup =  none,
+                                               subgroup_size_choices = [64],
+                                               max_workgroup_sizes = [1024, 1024, 1024],
+                                               max_thread_count_per_workgroup = 1024,
+                                               max_workgroup_memory_bytes = 163840,
+                                               max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+   ukernels = "none"}>
+module attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  func.func @inner_tiled_f8E4M3FN_large(%arg0: tensor<1x4x2x8x4x16x8xf8E4M3FN>, %arg1: tensor<16x4x4x4x4x16x8xf8E4M3FN>) -> tensor<1x16x2x4x8x4x4x16x4xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = tensor.empty() : tensor<1x16x2x4x8x4x4x16x4xf32>
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x16x2x4x8x4x4x16x4xf32>) -> tensor<1x16x2x4x8x4x4x16x4xf32>
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
+          indexing_maps = [#map1, #map2, #map3],
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+          kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FN, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>,
+          semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
+        } : tensor<1x4x2x8x4x16x8xf8E4M3FN>, tensor<16x4x4x4x4x16x8xf8E4M3FN> into tensor<1x16x2x4x8x4x4x16x4xf32>
+    return %2 : tensor<1x16x2x4x8x4x4x16x4xf32>
+  }
+}
+// CHECK-LABEL: @inner_tiled_f8E4M3FN_large
+// CHECK:         iree_codegen.inner_tiled
+// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_dt_large_f8E4M3FN", tensor>
+
+// CHECK-REMARKS:      [Analysis] UKernel
+// CHECK-REMARKS-SAME:   Category:ApplyBuiltinPDLPatternsDriverPass
+// CHECK-REMARKS-SAME:   Remark=pingpong_dt_large_f8E4M3FN

@@ -43,6 +43,7 @@ iree_c_embed_data(
     iree_mlir_ukernels_amdgpu
   SRCS
     "iree_uk_amdgpu_dt_matmul_f16.mlir"
+    "iree_uk_amdgpu_dt_matmul_f8E4M3FN.mlir"
     "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir"
     "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir"
     "iree_uk_amdgpu_matmul_bf16.mlir"
@@ -62,6 +63,7 @@ iree_lit_test_suite(
     verify_mlir_ukernels_amdgpu
   SRCS
     "iree_uk_amdgpu_dt_matmul_f16.mlir"
+    "iree_uk_amdgpu_dt_matmul_f8E4M3FN.mlir"
     "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir"
     "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir"
     "iree_uk_amdgpu_matmul_bf16.mlir"
