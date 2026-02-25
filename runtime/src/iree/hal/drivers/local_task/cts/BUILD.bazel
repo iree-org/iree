@@ -1,0 +1,79 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# CTS2 test binaries for the local-task HAL driver.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+#===------------------------------------------------------------------------===#
+# Backend Registration
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/drivers/local_task/registration",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Tests
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "core_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/hal/cts2/core:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/hal/cts2/buffer:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "command_buffer_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/hal/cts2/command_buffer:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "file_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/hal/cts2/file:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
