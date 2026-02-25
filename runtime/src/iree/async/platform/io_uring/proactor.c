@@ -1690,6 +1690,16 @@ static iree_status_t iree_async_proactor_io_uring_create_notification(
                                                  out_notification);
 }
 
+static iree_status_t iree_async_proactor_io_uring_create_notification_shared(
+    iree_async_proactor_t* base_proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification) {
+  iree_async_proactor_io_uring_t* proactor =
+      iree_async_proactor_io_uring_cast(base_proactor);
+  return iree_async_io_uring_notification_create_shared(proactor, options,
+                                                        out_notification);
+}
+
 static void iree_async_proactor_io_uring_destroy_notification(
     iree_async_proactor_t* base_proactor,
     iree_async_notification_t* notification) {
@@ -2179,6 +2189,8 @@ const iree_async_proactor_vtable_t iree_async_proactor_io_uring_vtable = {
     .unregister_event_source =
         iree_async_proactor_io_uring_unregister_event_source,
     .create_notification = iree_async_proactor_io_uring_create_notification,
+    .create_notification_shared =
+        iree_async_proactor_io_uring_create_notification_shared,
     .destroy_notification = iree_async_proactor_io_uring_destroy_notification,
     .notification_signal = iree_async_io_uring_notification_signal,
     .notification_wait = iree_async_io_uring_notification_wait,

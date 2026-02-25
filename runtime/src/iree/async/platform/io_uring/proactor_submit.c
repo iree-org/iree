@@ -827,13 +827,19 @@ static void iree_async_proactor_io_uring_fill_notification_wait_futex(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(wait->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAIT;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&wait->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)wait->notification->epoch_ptr;
   sqe->off = wait->wait_token;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -849,8 +855,8 @@ static void iree_async_proactor_io_uring_fill_notification_wait_event(
   iree_async_notification_wait_operation_t* wait =
       (iree_async_notification_wait_operation_t*)base_operation;
 
-  wait->wait_token =
-      iree_atomic_load(&wait->notification->epoch, iree_memory_order_acquire);
+  wait->wait_token = iree_atomic_load(wait->notification->epoch_ptr,
+                                      iree_memory_order_acquire);
 
   int fd = wait->notification->platform.io_uring.primitive.value.fd;
 
@@ -883,13 +889,19 @@ static void iree_async_proactor_io_uring_fill_notification_signal_futex(
   signal->woken_count = 0;
 
   // Increment epoch before kernel FUTEX_WAKE so waiters see the new value.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
+
+  int32_t futex_flags = IREE_ASYNC_FUTEX_SIZE_U32;
+  if (!iree_any_bit_set(signal->notification->flags,
+                        IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    futex_flags |= IREE_ASYNC_FUTEX_FLAG_PRIVATE;
+  }
 
   memset(sqe, 0, sizeof(*sqe));
   sqe->opcode = IREE_IORING_OP_FUTEX_WAKE;
-  sqe->fd = IREE_ASYNC_FUTEX_SIZE_U32 | IREE_ASYNC_FUTEX_FLAG_PRIVATE;
-  sqe->addr = (uint64_t)(uintptr_t)&signal->notification->epoch;
+  sqe->fd = futex_flags;
+  sqe->addr = (uint64_t)(uintptr_t)signal->notification->epoch_ptr;
   sqe->off = (uint64_t)signal->wake_count;
   sqe->len = 0;
   sqe->futex_flags = 0;
@@ -906,7 +918,7 @@ static void iree_async_proactor_io_uring_fill_notification_signal_event(
   signal->woken_count = 0;
 
   // Increment epoch before kernel writes to eventfd.
-  iree_atomic_fetch_add(&signal->notification->epoch, 1,
+  iree_atomic_fetch_add(signal->notification->epoch_ptr, 1,
                         iree_memory_order_release);
 
   int fd = signal->notification->platform.io_uring.primitive.value.fd;

@@ -48,6 +48,8 @@ typedef struct iree_async_file_t iree_async_file_t;
 typedef struct iree_async_event_t iree_async_event_t;
 typedef struct iree_async_event_source_t iree_async_event_source_t;
 typedef struct iree_async_notification_t iree_async_notification_t;
+typedef struct iree_async_notification_shared_options_t
+    iree_async_notification_shared_options_t;
 typedef struct iree_async_relay_t iree_async_relay_t;
 typedef struct iree_async_semaphore_t iree_async_semaphore_t;
 
@@ -515,6 +517,10 @@ typedef struct iree_async_proactor_vtable_t {
 
   iree_status_t (*create_notification)(
       iree_async_proactor_t* proactor, iree_async_notification_flags_t flags,
+      iree_async_notification_t** out_notification);
+  iree_status_t (*create_notification_shared)(
+      iree_async_proactor_t* proactor,
+      const iree_async_notification_shared_options_t* options,
       iree_async_notification_t** out_notification);
   void (*destroy_notification)(iree_async_proactor_t* proactor,
                                iree_async_notification_t* notification);

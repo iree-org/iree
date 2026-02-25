@@ -755,7 +755,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
 
         // Check if epoch already advanced past the captured token.
         uint32_t current_epoch = (uint32_t)iree_atomic_load(
-            &notification->epoch, iree_memory_order_acquire);
+            notification->epoch_ptr, iree_memory_order_acquire);
         if (current_epoch != notification_wait->wait_token) {
           // Already satisfied: dispatch completion immediately.
           iree_async_proactor_iocp_dispatch_completion(
@@ -1108,7 +1108,7 @@ iree_async_proactor_iocp_process_pending_notification_waits(
     iree_async_notification_t* next_notification =
         notification->platform.iocp.next_with_waits;
     uint32_t current_epoch = (uint32_t)iree_atomic_load(
-        &notification->epoch, iree_memory_order_acquire);
+        notification->epoch_ptr, iree_memory_order_acquire);
 
     // Walk pending_waits list, dispatching satisfied or cancelled waits.
     iree_async_notification_wait_operation_t** wait_prev =
@@ -2291,6 +2291,8 @@ static iree_status_t iree_async_proactor_iocp_create_notification(
   iree_atomic_ref_count_init(&notification->ref_count);
   notification->proactor = &proactor->base;
   iree_atomic_store(&notification->epoch, 0, iree_memory_order_release);
+  notification->epoch_ptr = &notification->epoch;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_NONE;
   // IOCP uses WaitOnAddress for sync waits (functionally identical to futex).
   // No fd/primitive needed — the epoch atomic is the wait address.
   notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
@@ -2298,6 +2300,76 @@ static iree_status_t iree_async_proactor_iocp_create_notification(
   notification->platform.iocp.next_with_waits = NULL;
   notification->platform.iocp.in_wait_list = false;
   notification->platform.iocp.relay_list = NULL;
+
+  *out_notification = notification;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+// Threadpool callback for shared notifications. Fired when the remote process
+// signals the wake Event via SetEvent. Posts a sentinel completion to the IOCP
+// to wake the poll thread, which will then check pending_waits.
+static VOID CALLBACK iree_async_proactor_iocp_shared_notification_callback(
+    PVOID context, BOOLEAN timer_or_wait_fired) {
+  (void)timer_or_wait_fired;
+  iree_async_notification_t* notification = (iree_async_notification_t*)context;
+  iree_async_proactor_iocp_t* proactor =
+      iree_async_proactor_iocp_cast(notification->proactor);
+  PostQueuedCompletionStatus((HANDLE)proactor->completion_port, 0, 0, NULL);
+}
+
+static iree_status_t iree_async_proactor_iocp_create_notification_shared(
+    iree_async_proactor_t* base_proactor,
+    const iree_async_notification_shared_options_t* options,
+    iree_async_notification_t** out_notification) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(options->epoch_address);
+  IREE_ASSERT_ARGUMENT(out_notification);
+  *out_notification = NULL;
+
+  iree_async_proactor_iocp_t* proactor =
+      iree_async_proactor_iocp_cast(base_proactor);
+  iree_allocator_t allocator = proactor->base.allocator;
+
+  iree_async_notification_t* notification = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(*notification),
+                                (void**)&notification));
+  memset(notification, 0, sizeof(*notification));
+
+  iree_atomic_ref_count_init(&notification->ref_count);
+  notification->proactor = &proactor->base;
+  notification->epoch_ptr = options->epoch_address;
+  notification->flags = IREE_ASYNC_NOTIFICATION_FLAG_SHARED;
+  notification->mode = IREE_ASYNC_NOTIFICATION_MODE_FUTEX;
+  notification->platform.iocp.pending_waits = NULL;
+  notification->platform.iocp.next_with_waits = NULL;
+  notification->platform.iocp.in_wait_list = false;
+  notification->platform.iocp.relay_list = NULL;
+  notification->platform.iocp.signal_handle =
+      options->signal_primitive.value.win32_handle;
+
+  // Register the caller-provided wake Event with the Windows threadpool.
+  // When the remote process signals this Event (via SetEvent), the callback
+  // posts a completion to our IOCP, waking the poll thread to check
+  // pending_waits and relays.
+  HANDLE wait_registration = NULL;
+  HANDLE wake_event = (HANDLE)options->wake_primitive.value.win32_handle;
+  if (!RegisterWaitForSingleObject(
+          &wait_registration, wake_event,
+          iree_async_proactor_iocp_shared_notification_callback, notification,
+          INFINITE, WT_EXECUTEDEFAULT)) {
+    DWORD error = GetLastError();
+    iree_allocator_free(allocator, notification);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INTERNAL,
+        "RegisterWaitForSingleObject failed for shared notification "
+        "(error=%lu)",
+        error);
+  }
+  notification->platform.iocp.wait_registration = (uintptr_t)wait_registration;
 
   *out_notification = notification;
   IREE_TRACE_ZONE_END(z0);
@@ -2314,7 +2386,17 @@ static void iree_async_proactor_iocp_destroy_notification(
       iree_async_proactor_iocp_cast(base_proactor);
   iree_allocator_t allocator = proactor->base.allocator;
 
-  // No fds to close (unlike POSIX). Just free the allocation.
+  if (iree_any_bit_set(notification->flags,
+                       IREE_ASYNC_NOTIFICATION_FLAG_SHARED)) {
+    // Unregister the threadpool wait. INVALID_HANDLE_VALUE blocks until any
+    // in-flight callbacks complete, preventing use-after-free.
+    if (notification->platform.iocp.wait_registration != 0) {
+      UnregisterWaitEx((HANDLE)notification->platform.iocp.wait_registration,
+                       INVALID_HANDLE_VALUE);
+    }
+    // Do not close the wake/signal Events — caller owns them.
+  }
+
   iree_allocator_free(allocator, notification);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -2323,15 +2405,23 @@ static void iree_async_proactor_iocp_notification_signal(
     iree_async_proactor_t* base_proactor,
     iree_async_notification_t* notification, int32_t wake_count) {
   (void)base_proactor;
-  // Epoch already incremented by the shared iree_async_notification_signal()
-  // in notification.c before this vtable call. Wake sync waiters blocked in
-  // WaitOnAddress on the epoch value.
+  // Epoch already incremented by iree_async_notification_signal() in
+  // notification.c before this vtable call. Wake sync waiters blocked in
+  // WaitOnAddress on the epoch value. WakeByAddress uses physical page hashing
+  // on Windows, so this works cross-process for shared notifications.
   if (wake_count == 1) {
-    WakeByAddressSingle((void*)&notification->epoch);
+    WakeByAddressSingle((void*)notification->epoch_ptr);
   } else {
-    WakeByAddressAll((void*)&notification->epoch);
+    WakeByAddressAll((void*)notification->epoch_ptr);
   }
-  // Wake the poll thread so it checks async waits in the notification's
+  // For shared notifications, signal the remote process's wake Event so its
+  // IOCP poll loop checks pending_waits and relays.
+  if (iree_any_bit_set(notification->flags,
+                       IREE_ASYNC_NOTIFICATION_FLAG_SHARED) &&
+      notification->platform.iocp.signal_handle != 0) {
+    SetEvent((HANDLE)notification->platform.iocp.signal_handle);
+  }
+  // Wake our own poll thread so it checks async waits in the notification's
   // pending_waits list.
   iree_async_proactor_iocp_wake(notification->proactor);
 }
@@ -2342,10 +2432,10 @@ static bool iree_async_proactor_iocp_notification_wait(
   (void)base_proactor;
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
   int32_t wait_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   while (iree_time_now() < deadline_ns) {
     int32_t current_epoch =
-        iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+        iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
     if (current_epoch != wait_epoch) return true;
     // Calculate remaining time for WaitOnAddress timeout.
     iree_time_t now = iree_time_now();
@@ -2353,14 +2443,14 @@ static bool iree_async_proactor_iocp_notification_wait(
     int64_t remaining_ns = deadline_ns - now;
     DWORD remaining_ms = (DWORD)((remaining_ns + 999999) / 1000000);
     if (remaining_ms == 0) remaining_ms = 1;
-    BOOL waited = WaitOnAddress((volatile void*)&notification->epoch,
+    BOOL waited = WaitOnAddress((volatile void*)notification->epoch_ptr,
                                 &wait_epoch, sizeof(int32_t), remaining_ms);
     (void)waited;
     // WaitOnAddress returns FALSE on timeout, TRUE on wake. Either way,
     // re-check the epoch.
   }
   int32_t final_epoch =
-      iree_atomic_load(&notification->epoch, iree_memory_order_acquire);
+      iree_atomic_load(notification->epoch_ptr, iree_memory_order_acquire);
   return final_epoch != wait_epoch;
 }
 
@@ -2552,7 +2642,7 @@ static iree_status_t iree_async_proactor_iocp_register_relay(
   // and ensure the notification is tracked in the proactor's
   // notifications_with_waits list for poll-loop dispatch.
   iree_async_notification_t* notification = source.notification;
-  relay->wait_epoch = (uint32_t)iree_atomic_load(&notification->epoch,
+  relay->wait_epoch = (uint32_t)iree_atomic_load(notification->epoch_ptr,
                                                  iree_memory_order_acquire);
   relay->platform.iocp.notification_relay_next =
       notification->platform.iocp.relay_list;
@@ -2897,6 +2987,8 @@ const iree_async_proactor_vtable_t iree_async_proactor_iocp_vtable = {
     .register_event_source = iree_async_proactor_iocp_register_event_source,
     .unregister_event_source = iree_async_proactor_iocp_unregister_event_source,
     .create_notification = iree_async_proactor_iocp_create_notification,
+    .create_notification_shared =
+        iree_async_proactor_iocp_create_notification_shared,
     .destroy_notification = iree_async_proactor_iocp_destroy_notification,
     .notification_signal = iree_async_proactor_iocp_notification_signal,
     .notification_wait = iree_async_proactor_iocp_notification_wait,

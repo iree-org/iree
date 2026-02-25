@@ -38,11 +38,12 @@ static iree::StatusOr<iree_async_proactor_t*> CreateIOCPProactor() {
 //===----------------------------------------------------------------------===//
 
 // IOCP backend: Windows-native, completion-based async I/O.
-static bool iocp_registered_ = (CtsRegistry::RegisterBackend({
-                                    "iocp",
-                                    {"iocp", CreateIOCPProactor},
-                                    {"portable", "multishot"},
-                                }),
-                                true);
+static bool iocp_registered_ =
+    (CtsRegistry::RegisterBackend({
+         "iocp",
+         {"iocp", CreateIOCPProactor},
+         {"portable", "multishot", "shared_notification"},
+     }),
+     true);
 
 }  // namespace iree::async::cts
