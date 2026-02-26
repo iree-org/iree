@@ -316,8 +316,11 @@ about the bindings themselves.
 
 ### Dependencies
 
-You will need a recent Python installation >=3.9 (we aim to support
-[non-eol Python versions](https://endoflife.date/python)).
+You will need a recent Python installation >=3.10 (we aim to support
+[non-eol Python versions](https://endoflife.date/python)). This also aligns
+the Python lifecycle adopted by LLVM's minimum required Python version
+policy — see the
+[LLVM RFC on upgrading the minimum required Python version](https://discourse.llvm.org/t/rfc-upgrading-llvm-s-minimum-required-python-version/88605).
 
 ???+ Tip "Tip - Managing Python versions"
     Make sure your 'python' is what you expect:
