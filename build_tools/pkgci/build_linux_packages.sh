@@ -16,7 +16,7 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp39-cp39 cp310-cp310" \
+#   override_python_versions="cp310-cp310" \
 #   packages="iree-base-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh

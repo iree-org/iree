@@ -23,8 +23,7 @@ PYTHON_SPECS=(
   3.13@https://www.python.org/ftp/python/3.13.1/python-3.13.1-macos11.pkg
   3.12@https://www.python.org/ftp/python/3.12.8/python-3.12.8-macos11.pkg
   3.11@https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg
-  # 3.10@https://www.python.org/ftp/python/3.10.5/python-3.10.5-macos11.pkg
-  # 3.9@https://www.python.org/ftp/python/3.9.13/python-3.9.13-macos11.pkg
+  3.10@https://www.python.org/ftp/python/3.10.5/python-3.10.5-macos11.pkg
 )
 
 for python_spec in "${PYTHON_SPECS[@]}"; do
