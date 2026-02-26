@@ -1300,7 +1300,7 @@ func.func @no_lower_oob_without_fat_raw_buffer(
     attributes {hal.executable.target = #executable_target_rocm_hsaco_fb,
                 translation_info = #translation_64} {
   scf.forall (%arg6) in (64) {
-    // expected-error @+1 {{failed to lower to gather_to_lds; possible causes: source lacks fat_raw_buffer address space for OOB padding, destination is not contiguous, or element sizes are incompatible with dma_sizes}}
+    // expected-error @+1 {{failed to lower to gather_to_lds: source lacks fat_raw_buffer address space but has out-of-bounds dimensions (in_bounds contains false)}}
     iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [false, true] :
       memref<2x128xf32>,
       memref<4x128xf32, #gpu.address_space<workgroup>>, index
