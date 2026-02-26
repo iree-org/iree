@@ -2,10 +2,10 @@
 #   * main-dist-linux (CMake 'install')
 #   * py-compiler-pkg (`iree-base-compiler` Python package)
 #     * Linux, macOS, Windows
-#     * All supported Python versions (e.g. 3.9, 3.10, 3.11)
+#     * All supported Python versions (e.g. 3.10, 3.11)
 #   * py-runtime-pkg (`iree-base-runtime` Python package)
 #     * Linux, macOS, Windows
-#     * All supported Python versions (e.g. 3.9, 3.10, 3.11)
+#     * All supported Python versions (e.g. 3.10, 3.11)
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
 
 name: Build Release Packages
