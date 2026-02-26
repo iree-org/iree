@@ -1079,6 +1079,7 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
 
 typedef struct iree_hal_hip_dispatch_completed_data_t {
   iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
   iree_notification_t notification;
   iree_slim_mutex_t completed_mutex;
   bool completed;
@@ -1090,6 +1091,7 @@ static void iree_hal_hip_dispatch_completed_destroy(
       (iree_hal_hip_dispatch_completed_data_t*)resource;
   iree_slim_mutex_deinitialize(&data->completed_mutex);
   iree_notification_deinitialize(&data->notification);
+  iree_allocator_free(data->host_allocator, data);
 }
 
 static const iree_hal_resource_vtable_t
@@ -1104,11 +1106,11 @@ static iree_status_t iree_hal_hip_dispatch_completed_create(
 
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, sizeof(**out), (void**)out));
-
   iree_slim_mutex_initialize(&(*out)->completed_mutex);
   iree_notification_initialize(&(*out)->notification);
   iree_hal_resource_initialize(&iree_hal_hip_dispatch_completed_data_vtable_t,
                                &(*out)->resource);
+  (*out)->host_allocator = host_allocator;
   return iree_ok_status();
 }
 
