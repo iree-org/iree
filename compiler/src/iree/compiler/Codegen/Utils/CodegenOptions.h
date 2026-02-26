@@ -40,6 +40,19 @@ struct CPUCodegenOptions : CodegenOptions {
   // Enables reassociation for FP reductions.
   bool reassociateFpReductions = false;
 
+  // Use arith.minf/maxf instead of arith.minimumf/maximumf.
+  bool useFastMinMaxOps = false;
+
+  // Allow skipping intermediate roundings (e.g., in f16 matmul on f32
+  // hardware).
+  bool skipIntermediateRoundings = true;
+
+  // Enables inter-pass fusion for the DecomposeSoftmax pass.
+  bool useSoftmaxInterFusion = true;
+
+  // Instruments memory reads and writes in dispatches for address tracking.
+  bool instrumentMemoryAccesses = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<CPUCodegenOptions>;
 };

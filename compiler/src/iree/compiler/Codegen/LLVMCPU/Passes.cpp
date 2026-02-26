@@ -46,51 +46,24 @@ namespace mlir::iree_compiler {
 static llvm::cl::opt<bool> clFailOnLargeVector(
     "iree-llvmcpu-fail-on-large-vector",
     llvm::cl::desc("fail if there are operations with large vectors"),
-    llvm::cl::init(true));
+    llvm::cl::init(true), llvm::cl::Hidden);
 
 static llvm::cl::opt<bool> clCheckLinalgVectorization(
     "iree-llvmcpu-check-linalg-vectorization",
     llvm::cl::desc(
         "Runs the pass to check if all the Linalg ops are vectorized"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clUseFastMinMaxOps(
-    "iree-llvmcpu-use-fast-min-max-ops",
-    llvm::cl::desc(
-        "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clSkipIntermediateRoundings(
-    "iree-llvmcpu-skip-intermediate-roundings",
-    llvm::cl::desc(
-        "Allow skipping intermediate roundings. For example, in f16 matmul "
-        "kernels on targets with only f32 arithmetic, we have to perform each "
-        "multiply-accumulate in f32, and if this flag is false, then we have "
-        "to round those f32 accumulators to the nearest f16 every time, which "
-        "is slow."),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
-    "iree-llvmcpu-instrument-memory-accesses",
-    llvm::cl::desc("Instruments memory accesses in dispatches when dispatch "
-                   "instrumentation is enabled."),
-    llvm::cl::init(false)};
-
-static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
-    "iree-llvmcpu-use-decompose-softmax-fuse",
-    llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
-    llvm::cl::init(true));
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
     "iree-llvmcpu-enable-vector-contract-custom-kernels",
     llvm::cl::desc("Enables vector contract custom kernels for "
                    "LLVMCPUMmt4dVectorLowering pass."),
-    llvm::cl::init(false));
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 static llvm::cl::opt<bool> clTileDispatchUsingForall(
     "iree-llvmcpu-tile-dispatch-using-forall",
     llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(true));
+    llvm::cl::init(true), llvm::cl::Hidden);
 
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
 // presence of scalable vectors (even when using `+sme`), as currently there's
@@ -103,7 +76,7 @@ static llvm::cl::opt<bool> clForceArmStreaming(
         "Enables Armv9-A streaming SVE mode for any dispatch region that "
         "contains supported scalable vector operations (i.e., use SSVE rather "
         "than SVE). Requires the +sme feature flag."),
-    llvm::cl::init(false));
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 static llvm::cl::opt<bool> clPatchFuncOps(
     "iree-llvmcpu-debug-patch-func-ops",
@@ -375,8 +348,8 @@ void addMmt4dTilingExpertPassPipeline(
   // The below two passes are nop if the "mmt4d" is explicitly excluded in the
   // ukernels attribute.
   funcPassManager.addPass(createCPUPrepareUkernelsPass());
-  funcPassManager.addPass(
-      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  funcPassManager.addPass(createCPULowerToUKernelsPass(
+      pipelineOpt.cpuOpts.skipIntermediateRoundings));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   // `VectorInnerParallelTiles` level models the tiling and fusion for the
@@ -427,8 +400,8 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
   // The below two passes are nop if pack/unpack is not specified in ukernels
   // attribute. By default, they are disabled.
   funcPassManager.addPass(createCPUPrepareUkernelsPass());
-  funcPassManager.addPass(
-      createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  funcPassManager.addPass(createCPULowerToUKernelsPass(
+      pipelineOpt.cpuOpts.skipIntermediateRoundings));
 
   funcPassManager.addPass(createLLVMCPUTilePass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles, /*skipRootOp=*/false));
@@ -557,7 +530,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createMathTransformPass)
       .addPass(createHoistStaticallyBoundAllocationsPass)
       // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
-      .addPredicatedPass(clUseFastMinMaxOps, createReplaceSlowMinMaxOpsPass);
+      .addPredicatedPass(cpuOpts.useFastMinMaxOps,
+                         createReplaceSlowMinMaxOpsPass);
 
   if (enableAArch64SME) {
     modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
@@ -632,7 +606,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createEmulateNarrowTypePass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
-      .addPredicatedPass(clInstrumentMemoryAccesses,
+      .addPredicatedPass(cpuOpts.instrumentMemoryAccesses,
                          createInstrumentMemoryAccessesPass);
 
   if (enableAArch64SME) {
@@ -659,7 +633,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager,
-                                                 clUseSoftmaxInterFusion);
+                                                 cpuOpts.useSoftmaxInterFusion);
   }
   modulePassManager.addPass(createMaterializeTuningSpecsPass(
       MaterializeTuningSpecsPassOptions{cpuOpts.tuningSpecPath}));

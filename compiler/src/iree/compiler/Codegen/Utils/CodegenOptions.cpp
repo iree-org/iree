@@ -61,6 +61,36 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
                     initAtOpt(llvm::OptimizationLevel::O2, true)},
                    llvm::cl::desc("Enables reassociation for FP reductions."),
                    llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-llvmcpu-use-fast-min-max-ops", useFastMinMaxOps,
+      llvm::cl::desc(
+          "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-llvmcpu-skip-intermediate-roundings", skipIntermediateRoundings,
+      llvm::cl::desc(
+          "Allow skipping intermediate roundings. For example, in f16 matmul "
+          "kernels on targets with only f32 arithmetic, we have to perform "
+          "each multiply-accumulate in f32, and if this flag is false, then "
+          "we have to round those f32 accumulators to the nearest f16 every "
+          "time, which is slow."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-llvmcpu-use-decompose-softmax-fuse", useSoftmaxInterFusion,
+      llvm::cl::desc(
+          "Enables inter-pass fusion for the DecomposeSoftmax pass."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-llvmcpu-instrument-memory-accesses", instrumentMemoryAccesses,
+      llvm::cl::desc(
+          "Instruments memory reads and writes in dispatches for address "
+          "tracking. Use with --iree-hal-instrument-dispatches=<buffer-size> "
+          "and analyze results with iree-dump-instruments."),
+      llvm::cl::cat(category));
 }
 
 void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
