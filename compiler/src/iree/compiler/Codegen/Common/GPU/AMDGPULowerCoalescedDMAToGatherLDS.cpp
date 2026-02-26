@@ -223,6 +223,16 @@ struct LowerCoalescedGatherDMAPattern final
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
 
+    // Look through memref.cast to recover static shapes. Bufferization may
+    // insert casts that erase static type info (e.g., memref<16x64xf32> ->
+    // memref<?x?xf32>) to match the op's type signature.
+    if (auto castOp = dest.getDefiningOp<memref::CastOp>()) {
+      dest = castOp.getSource();
+    }
+    if (auto castOp = source.getDefiningOp<memref::CastOp>()) {
+      source = castOp.getSource();
+    }
+
     auto sourceType = cast<MemRefType>(source.getType());
     auto destType = cast<MemRefType>(dest.getType());
 
@@ -747,14 +757,65 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
     // Verify all CoalescedGatherDMAOps were lowered.
-    WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
-      op.emitOpError(
-          "failed to lower to gather_to_lds; possible causes: source "
-          "lacks fat_raw_buffer address space for OOB padding, destination "
-          "is not contiguous, or element sizes are incompatible with "
-          "dma_sizes");
-      return WalkResult::interrupt();
-    });
+    WalkResult result =
+        funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
+          // Diagnose the specific failure cause.
+          auto sourceType = cast<MemRefType>(op.getSource().getType());
+          auto destType = cast<MemRefType>(op.getInit().getType());
+
+          if (!destType.areTrailingDimsContiguous(1)) {
+            op.emitOpError(
+                "failed to lower to gather_to_lds: destination memref "
+                "is not contiguous");
+            return WalkResult::interrupt();
+          }
+
+          if (std::optional<ArrayAttr> inBounds = op.getInBounds()) {
+            bool hasOOB = llvm::any_of(*inBounds, [](Attribute attr) {
+              return !cast<BoolAttr>(attr).getValue();
+            });
+            if (hasOOB && !hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+              op.emitOpError(
+                  "failed to lower to gather_to_lds: source lacks "
+                  "fat_raw_buffer address space but has out-of-bounds "
+                  "dimensions (in_bounds contains false)");
+              return WalkResult::interrupt();
+            }
+          }
+
+          int64_t destRank = destType.getRank();
+          int64_t numLinearDims =
+              std::max<int64_t>(destType.getNumContiguousTrailingDims(), 1);
+          for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
+            if (ShapedType::isDynamic(destType.getShape()[i])) {
+              op.emitOpError()
+                  << "failed to lower to gather_to_lds: dynamic dimension " << i
+                  << " in destination shape";
+              return WalkResult::interrupt();
+            }
+          }
+
+          std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+          if (subgroupSize) {
+            int64_t elementBits = sourceType.getElementTypeBitWidth();
+            int64_t linearSize = 1;
+            for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
+              linearSize *= destType.getShape()[i];
+            }
+            if (failed(computeTransferSegments(linearSize, elementBits,
+                                               *subgroupSize, dmaSizes))) {
+              op.emitOpError()
+                  << "failed to lower to gather_to_lds: cannot cover "
+                  << linearSize << " elements (" << elementBits
+                  << "-bit) with available dma_sizes and subgroup size "
+                  << *subgroupSize;
+              return WalkResult::interrupt();
+            }
+          }
+
+          op.emitOpError("failed to lower to gather_to_lds");
+          return WalkResult::interrupt();
+        });
     if (result.wasInterrupted()) {
       return signalPassFailure();
     }
