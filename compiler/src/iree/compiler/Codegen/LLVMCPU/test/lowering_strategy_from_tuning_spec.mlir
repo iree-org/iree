@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(iree-codegen-llvmcpu-configuration-pipeline{pipeline-on-module=true})' \
+// RUN:   --iree-codegen-llvmcpu-configuration-pipeline \
 // RUN:   --iree-codegen-tuning-spec-path=%p/tuning_spec_matmul.mlir \
 // RUN:   --iree-codegen-test-notify-transform-strategy-application \
 // RUN:   --verify-diagnostics %s | FileCheck %s

@@ -419,7 +419,16 @@ public:
   using Base::Base;
 
   void runOnOperation() override {
-    IREE::HAL::ExecutableVariantOp variant = getOperation();
+    auto variant = dyn_cast<IREE::HAL::ExecutableVariantOp>(getOperation());
+    if (!variant) {
+      variant =
+          getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    }
+    if (!variant) {
+      LLVM_DEBUG(llvm::dbgs() << "Not within an ExecutableVariantOp, skipping "
+                                 "export specialization\n");
+      return;
+    }
 
     auto *codegenDialect =
         getContext().getLoadedDialect<IREE::Codegen::IREECodegenDialect>();

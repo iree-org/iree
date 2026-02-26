@@ -36,6 +36,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
+#define DEBUG_TYPE "iree-codegen-resolve-workgroup-count-hints"
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_RESOLVEWORKGROUPCOUNTHINTSPASS
@@ -913,7 +915,16 @@ static LogicalResult replaceFromSliceOpWithFunctionSlice(
 //===---------------------------------------------------------------------===//
 
 void ResolveWorkgroupCountHintsPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(getOperation());
+  if (!variantOp) {
+    variantOp =
+        getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  }
+  if (!variantOp) {
+    LLVM_DEBUG(llvm::dbgs() << "Not within an ExecutableVariantOp, skipping "
+                               "workgroup count hint resolution\n");
+    return;
+  }
   ModuleOp innerModuleOp = variantOp.getInnerModule();
 
   // Run the analysis. If a function that contains a `workgroup_count_hint`

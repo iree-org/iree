@@ -366,7 +366,7 @@ def DropVectorUnitDimsPass :
 }
 
 def ReconcileTranslationInfoPass
-    : Pass<"iree-codegen-reconcile-translation-info", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-reconcile-translation-info"> {
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
       "`TranslationInfo` set on each function in the dispatch and merge them"
@@ -392,7 +392,7 @@ def ReconcileTranslationInfoPass
 }
 
 def ResolveWorkgroupCountHintsPass
-    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-resolve-workgroup-count-hints"> {
   let summary = "Materialize workgroup count hints in the workgroup count region per export.";
   let description = [{
     Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
@@ -1012,7 +1012,7 @@ def ResolveSwizzleHintsPass :
 }
 
 def SpecializeExportsPass :
-    Pass<"iree-codegen-specialize-exports", "IREE::HAL::ExecutableVariantOp">{
+    Pass<"iree-codegen-specialize-exports">{
    let summary = "Specializes exported functions based on annotated ranges";
 }
 

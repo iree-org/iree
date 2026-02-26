@@ -124,24 +124,20 @@ void addMultiTilingExpertPassPipeline(
 //----------------------------------------------------------------------------//
 
 /// Populates passes needed for preprocessing before codegen lowerings, as well
-/// as high level lowering strategy selection.
-/// When `pipelineOnModule` is true, the pipeline operates directly on a
-/// `ModuleOp` (no variant-level nesting or variant-specific passes), enabling
-/// simpler test IR without double module nesting.
+/// as high level lowering strategy selection. The pass manager should operate
+/// on a `ModuleOp`. Passes that need variant context (e.g., export
+/// specialization) look up the parent `ExecutableVariantOp` and are no-ops
+/// when it is absent.
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts,
-    bool pipelineOnModule = false);
+    OpPassManager &modulePassManager, const CPUCodegenOptions &cpuOpts);
 
 /// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
-/// to LLVM dialect via the structured ops path. The  `variantPassManager`
-/// should operate on the module within the IREE::HAL::ExecutableOp.
-/// When `pipelineOnModule` is true, the pipeline operates directly on a
-/// `ModuleOp` (no variant-level nesting or variant-specific passes), enabling
-/// simpler test IR without double module nesting.
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+/// to LLVM dialect via the structured ops path. The pass manager should operate
+/// on a `ModuleOp`. Passes that need variant context look up the parent
+/// `ExecutableVariantOp` and are no-ops when it is absent.
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &codegenOptions,
                                      bool enableAArch64SME = false,
-                                     bool pipelineOnModule = false,
                                      bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//

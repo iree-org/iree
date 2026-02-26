@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-riscv-aggressive-distribution=true --iree-codegen-llvmcpu-configuration-pipeline='pipeline-on-module=true' --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false pipeline-on-module=true' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-llvmcpu-riscv-aggressive-distribution=true --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

@@ -26,6 +26,8 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-codegen-reconcile-translation-info"
+
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_RECONCILETRANSLATIONINFOPASS
@@ -708,7 +710,16 @@ getTranslationInfoAttrs(IREE::Codegen::TranslationInfoAttr translationInfo,
 }
 
 void ReconcileTranslationInfoPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(getOperation());
+  if (!variantOp) {
+    variantOp =
+        getOperation()->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  }
+  if (!variantOp) {
+    LLVM_DEBUG(llvm::dbgs() << "Not within an ExecutableVariantOp, skipping "
+                               "translation info reconciliation\n");
+    return;
+  }
   auto innerModuleOp = variantOp.getInnerModule();
   MLIRContext *context = &getContext();
 

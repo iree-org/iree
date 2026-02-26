@@ -241,15 +241,16 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager, codegenOptions_);
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager.nest<ModuleOp>(),
+                                                 codegenOptions_);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
     bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
                             hasSMEFeature(targetAttr.getConfiguration());
-    buildLLVMCPUCodegenPassPipeline(passManager, codegenOptions_,
-                                    enableAArch64SME);
+    buildLLVMCPUCodegenPassPipeline(passManager.nest<ModuleOp>(),
+                                    codegenOptions_, enableAArch64SME);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

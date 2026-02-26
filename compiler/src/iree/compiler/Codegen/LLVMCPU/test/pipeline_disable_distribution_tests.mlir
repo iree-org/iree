@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='pipeline-on-module=true' --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false pipeline-on-module=true' --iree-llvmcpu-disable-distribution --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-disable-distribution --split-input-file %s | FileCheck %s
 
 // Test that iree_linalg_ext.map_store op is not generated when distribution
 // is disabled. The op is used in the fallback solution when the pack op is not

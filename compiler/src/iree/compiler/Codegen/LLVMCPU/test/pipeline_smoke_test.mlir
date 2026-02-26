@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmcpu-configuration-pipeline, iree-codegen-llvmcpu-lowering-pipeline)))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmcpu-configuration-pipeline, iree-codegen-llvmcpu-lowering-pipeline))))' --split-input-file %s | FileCheck %s
 
 // Smoke test: verify the full LLVMCPU pipeline (configuration + lowering
 // including LLVM conversion) runs end-to-end on a simple dynamic elementwise
