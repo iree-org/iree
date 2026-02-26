@@ -84,16 +84,16 @@ struct Deprecated {
   void apply(Opt &) const {}
 };
 
-// Custom parser for llvm::cl::opt<std::optional<int64_t>>. Allows a flag to be
-// truly optional: unset on the command line means std::nullopt, while a
-// user-provided integer is stored in the optional.
-struct OptionalInt64Parser : public llvm::cl::parser<std::optional<int64_t>> {
-  OptionalInt64Parser(llvm::cl::Option &O)
+// Custom parser for llvm::cl::opt<std::optional<int64_t>> that only accepts
+// non-negative integers. Unset on the command line means std::nullopt.
+struct NonNegativeOptionalInt64Parser
+    : public llvm::cl::parser<std::optional<int64_t>> {
+  NonNegativeOptionalInt64Parser(llvm::cl::Option &O)
       : llvm::cl::parser<std::optional<int64_t>>(O) {}
   bool parse(llvm::cl::Option &O, llvm::StringRef, llvm::StringRef arg,
              std::optional<int64_t> &v) {
     long long w;
-    if (llvm::getAsSignedInteger(arg, 10, w)) {
+    if (llvm::getAsSignedInteger(arg, 10, w) || w < 0) {
       return O.error("Invalid argument '" + arg + "'");
     }
     v = w;

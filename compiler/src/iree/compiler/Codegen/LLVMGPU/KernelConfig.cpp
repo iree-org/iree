@@ -123,7 +123,7 @@ static llvm::cl::opt<bool> clDirectConvolution(
     llvm::cl::init(false));
 
 static llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
-                     OptionalInt64Parser>
+                     NonNegativeOptionalInt64Parser>
     clPrefetchNumStages(
         "iree-llvmgpu-prefetch-num-stages",
         llvm::cl::desc("Number of pipelining stages for shared memory "

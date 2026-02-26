@@ -132,7 +132,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           "Emit bytecode when generating compile-to or VM MLIR output."),
       llvm::cl::init(false));
   llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
-                mlir::iree_compiler::OptionalInt64Parser>
+                mlir::iree_compiler::NonNegativeOptionalInt64Parser>
       emitMLIRBytecodeVersion(
           "emit-mlir-bytecode-version",
           llvm::cl::desc("Use specified bytecode version when "
