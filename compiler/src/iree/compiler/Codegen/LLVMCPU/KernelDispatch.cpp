@@ -3969,9 +3969,10 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  auto tInfo = getTranslationInfo(entryPointFn);
-  auto pipeline = tInfo.getPassPipeline().getValue();
-  auto pipelineConfig = tInfo.getConfiguration();
+  IREE::Codegen::TranslationInfoAttr tInfo = getTranslationInfo(entryPointFn);
+  DispatchLoweringPassPipeline pipeline =
+      tInfo.getDispatchLoweringPassPipeline();
+  DictionaryAttr pipelineConfig = tInfo.getConfiguration();
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LDBG() << "unpack fusion does not work with peeling, falling back to "
@@ -4160,7 +4161,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  DispatchLoweringPassPipeline pipeline =
+      getTranslationInfo(entryPointFn).getDispatchLoweringPassPipeline();
   if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
     if (failed(adjustTileSizesForRootUnPackOp(entryPointFn, rootOperation))) {
       return failure();

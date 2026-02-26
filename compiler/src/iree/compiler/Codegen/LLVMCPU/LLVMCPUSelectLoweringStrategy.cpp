@@ -240,8 +240,15 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    auto translationInfo = getTranslationInfo(funcOp);
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
     if (!translationInfo) {
+      continue;
+    }
+
+    // Custom pipelines via PipelineAttrInterface skip enum-based verification.
+    if (isa<IREE::Codegen::PipelineAttrInterface>(
+            translationInfo.getPassPipeline())) {
       continue;
     }
 

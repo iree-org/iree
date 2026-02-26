@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -30,10 +30,12 @@ namespace mlir::iree_compiler {
 namespace {
 
 /// Lowers an hal.executable.variant operation to scalar/native-vector code.
-class VMVXLowerExecutableTargetPass
+class VMVXLowerExecutableTargetPass final
     : public impl::VMVXLowerExecutableTargetPassBase<
           VMVXLowerExecutableTargetPass> {
 public:
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<IREE::HAL::HALDialect,
@@ -53,7 +55,8 @@ public:
 void VMVXLowerExecutableTargetPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
-  auto translationInfo = getTranslationInfo(funcOp);
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(funcOp);
   if (!translationInfo) {
     return;
   }
@@ -67,24 +70,32 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
-  auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool enableUKernels = target && hasUkernel(target.getConfiguration());
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-  // No pipeline specified, nothing to do.
-  case IREE::Codegen::DispatchLoweringPassPipeline::None:
-    return;
-  case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-    addVMVXDefaultPassPipeline(pipeline, enableUKernels);
-    break;
-  default:
-    funcOp.emitOpError("Unsupported pipeline on VMVX target.");
-    return signalPassFailure();
+  // Check for a custom pipeline via PipelineAttrInterface.
+  Attribute pipelineAttr = translationInfo.getPassPipeline();
+  if (auto customPipeline =
+          dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
+    if (failed(customPipeline.buildPipeline(pipeline))) {
+      funcOp.emitOpError("failed to build custom pass pipeline");
+      return signalPassFailure();
+    }
+  } else {
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    bool enableUKernels = target && hasUkernel(target.getConfiguration());
+    switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    // No pipeline specified, nothing to do.
+    case IREE::Codegen::DispatchLoweringPassPipeline::None:
+      return;
+    case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
+      addVMVXDefaultPassPipeline(pipeline, enableUKernels);
+      break;
+    default:
+      funcOp.emitOpError("Unsupported pipeline on VMVX target.");
+      return signalPassFailure();
+    }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Using Pass pipeline : ";
-    pipeline.dump();
-  });
+  LDBG() << "Using pass pipeline: ";
+  LLVM_DEBUG(pipeline.dump());
   if (failed(runPipeline(pipeline, funcOp))) {
     return signalPassFailure();
   }

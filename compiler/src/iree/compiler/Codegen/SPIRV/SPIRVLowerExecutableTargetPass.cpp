@@ -13,7 +13,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -80,63 +80,70 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-  case CodeGenPipeline::SPIRVBaseLowering:
-    addSPIRVBaseLoweringPassPipeline(pipeline);
-    break;
-  case CodeGenPipeline::SPIRVBaseDistribute:
-    addSPIRVBaseDistributePassPipeline(pipeline);
-    break;
-  case CodeGenPipeline::SPIRVBaseVectorize:
-    addSPIRVBaseVectorizePassPipeline(pipeline);
-    break;
-  case CodeGenPipeline::SPIRVSubgroupReduce:
-    addSPIRVSubgroupReducePassPipeline(pipeline);
-    break;
-  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize: {
-    FailureOr<int64_t> maybeDepth =
-        getSoftwarePipelineDepth(translationInfo.getConfiguration());
-    FailureOr<int64_t> maybeStage =
-        getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
-    if (failed(maybeDepth) || failed(maybeStage)) {
-      funcOp.emitOpError("invalid cooperative matrix pipeline without "
-                         "software pipelining configuration.");
+  // Check for a custom pipeline via PipelineAttrInterface.
+  Attribute pipelineAttr = translationInfo.getPassPipeline();
+  if (auto customPipeline =
+          dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
+    if (failed(customPipeline.buildPipeline(pipeline))) {
+      funcOp.emitOpError("failed to build custom pass pipeline");
       return signalPassFailure();
     }
-    addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
-                                                   *maybeStage);
-    break;
-  }
-  case CodeGenPipeline::SPIRVMatmulPromoteVectorize: {
-    FailureOr<int64_t> maybeDepth =
-        getSoftwarePipelineDepth(translationInfo.getConfiguration());
-    FailureOr<int64_t> maybeStage =
-        getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
-    if (failed(maybeDepth) || failed(maybeStage)) {
-      funcOp.emitOpError("invalid matmul pipeline without software "
-                         "pipelining configuration.");
+  } else {
+    switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    case CodeGenPipeline::SPIRVBaseLowering:
+      addSPIRVBaseLoweringPassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVBaseDistribute:
+      addSPIRVBaseDistributePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVBaseVectorize:
+      addSPIRVBaseVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVSubgroupReduce:
+      addSPIRVSubgroupReducePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize: {
+      FailureOr<int64_t> maybeDepth =
+          getSoftwarePipelineDepth(translationInfo.getConfiguration());
+      FailureOr<int64_t> maybeStage =
+          getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+      if (failed(maybeDepth) || failed(maybeStage)) {
+        funcOp.emitOpError("invalid cooperative matrix pipeline without "
+                           "software pipelining configuration.");
+        return signalPassFailure();
+      }
+      addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
+                                                     *maybeStage);
+      break;
+    }
+    case CodeGenPipeline::SPIRVMatmulPromoteVectorize: {
+      FailureOr<int64_t> maybeDepth =
+          getSoftwarePipelineDepth(translationInfo.getConfiguration());
+      FailureOr<int64_t> maybeStage =
+          getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+      if (failed(maybeDepth) || failed(maybeStage)) {
+        funcOp.emitOpError("invalid matmul pipeline without software "
+                           "pipelining configuration.");
+        return signalPassFailure();
+      }
+      addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
+                                                 *maybeStage);
+      break;
+    }
+    case CodeGenPipeline::SPIRVWinogradVectorize:
+      addSPIRVWinogradVectorizePassPipeline(pipeline);
+      break;
+    // No pipeline specified, nothing to do.
+    case CodeGenPipeline::None:
+      return;
+    default:
+      funcOp.emitOpError("unsupported pipeline on GPU target.");
       return signalPassFailure();
     }
-    addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
-                                               *maybeStage);
-    break;
-  }
-  case CodeGenPipeline::SPIRVWinogradVectorize:
-    addSPIRVWinogradVectorizePassPipeline(pipeline);
-    break;
-  // No pipeline specified, nothing to do.
-  case CodeGenPipeline::None:
-    return;
-  default:
-    funcOp.emitOpError("unsupported pipeline on GPU target.");
-    return signalPassFailure();
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Using SPIR-V lowering pass pipeline:\n";
-    pipeline.printAsTextualPipeline(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LDBG() << "Using SPIR-V lowering pass pipeline: ";
+  LLVM_DEBUG(pipeline.dump());
 
   if (failed(runPipeline(pipeline, funcOp))) {
     return signalPassFailure();
