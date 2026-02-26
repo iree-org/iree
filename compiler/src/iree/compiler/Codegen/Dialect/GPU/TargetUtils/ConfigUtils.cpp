@@ -53,7 +53,7 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig,
-    std::optional<int64_t> prefetchNumStages) {
+    std::optional<uint64_t> prefetchNumStages) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
@@ -1017,7 +1017,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 LogicalResult setIGEMMConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, bool useDirectLoad, bool padConv,
-    std::optional<int64_t> prefetchNumStages) {
+    std::optional<uint64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
@@ -1128,7 +1128,7 @@ LogicalResult
 setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                         mlir::FunctionOpInterface entryPoint, Operation *op,
                         bool useDirectLoad,
-                        std::optional<int64_t> prefetchNumStages) {
+                        std::optional<uint64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp ||
       (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -1792,7 +1792,7 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 
 LogicalResult setDirectConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, std::optional<int64_t> prefetchNumStages) {
+    Operation *op, std::optional<uint64_t> prefetchNumStages) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
-#include "iree/compiler/Utils/OptionUtils.h"
 
 #include <cstdint>
 #include <numeric>
@@ -122,8 +121,25 @@ static llvm::cl::opt<bool> clDirectConvolution(
     llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
-                     NonNegativeOptionalInt64Parser>
+// Custom parser for llvm::cl::opt<std::optional<uint64_t>>. Allows a flag to
+// be truly optional: unset on the command line means std::nullopt, while a
+// user-provided non-negative integer is stored in the optional.
+struct OptionalUInt64Parser : public llvm::cl::parser<std::optional<uint64_t>> {
+  OptionalUInt64Parser(llvm::cl::Option &O)
+      : llvm::cl::parser<std::optional<uint64_t>>(O) {}
+  bool parse(llvm::cl::Option &O, llvm::StringRef, llvm::StringRef arg,
+             std::optional<uint64_t> &v) {
+    unsigned long long w;
+    if (llvm::getAsUnsignedInteger(arg, 10, w)) {
+      return O.error("Invalid argument '" + arg + "'");
+    }
+    v = w;
+    return false;
+  }
+};
+
+static llvm::cl::opt<std::optional<uint64_t>, /*ExternalStorage=*/false,
+                     OptionalUInt64Parser>
     clPrefetchNumStages(
         "iree-llvmgpu-prefetch-num-stages",
         llvm::cl::desc("Number of pipelining stages for shared memory "
