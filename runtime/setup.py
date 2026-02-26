@@ -573,7 +573,7 @@ setup(
         "repository": "https://github.com/iree-org/iree",
         "documentation": "https://iree.dev/reference/bindings/python/",
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     ext_modules=(
         [
             CMakeExtension("iree._runtime_libs._runtime"),
