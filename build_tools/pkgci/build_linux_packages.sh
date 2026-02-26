@@ -23,7 +23,7 @@
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp39-cp39 cp310-cp310
+#   cp310-cp310 cp311-cp311
 #
 # Valid packages:
 #   iree-base-runtime
