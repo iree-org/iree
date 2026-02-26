@@ -1210,35 +1210,6 @@ void buildLLVMGPULinkingPassPipeline(OpPassManager &modulePassManager,
   variantPassManager.addPass(createLLVMGPUAssignConstantOrdinalsPass());
 }
 
-//===----------------------------------------------------------------------===//
-// ROCDL Pass Pipelines
-//===----------------------------------------------------------------------===//
-
-void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
-                                   bool preserveDebugInfo) {
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
-    FunctionLikeNest(modulePassManager)
-        .addPass(createROCDLLowerExecutableTargetPass)
-        .addPass(createVerifyWorkgroupDistributionPass);
-  }
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-  variantPassManager.addPass(createIREECodegenLowerAffinePass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
-      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
-
-  addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
-                          /*forROCDL=*/true, preserveDebugInfo);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Using ROCDL pass pipeline:\n";
-    variantPassManager.printAsTextualPipeline(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
-}
-
 //===---------------------------------------------------------------------===//
 // Common Pass Registration
 //===---------------------------------------------------------------------===//
@@ -1310,13 +1281,6 @@ void registerCodegenROCDLPasses() {
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
   };
-
-  static PassPipelineRegistration<ROCDLPipelineOptions> LinalgROCDLPipeline(
-      "iree-codegen-linalg-to-rocdl-pipeline2",
-      "Runs pass pipeline to progressively lower Linalg to ROCDL",
-      [](OpPassManager &passManager, const ROCDLPipelineOptions &options) {
-        buildROCDLCodegenPassPipeline(passManager, options.preserveDebugInfo);
-      });
 
   static PassPipelineRegistration<> LLVMGPUBufferizePipeline(
       "iree-codegen-llvmgpu-bufferization-pipeline",
