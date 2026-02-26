@@ -360,10 +360,7 @@ LogicalResult distributeVectorOps(Operation *root,
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   llvm::MapVector<Value, VectorLayoutInterface> layouts;
-  if (failed(propagateVectorLayoutInfo(root, layouts))) {
-    LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Failed\n");
-    return failure();
-  }
+  propagateVectorLayoutInfo(root, layouts);
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeeded\n");
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 

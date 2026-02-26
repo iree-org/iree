@@ -1069,7 +1069,7 @@ def TestPartitionableLoopsInterfacePass :
   let summary = "Test the PartitionableLoopsInterface";
 }
 
-def TestVectorLayoutAnalysisPass : Pass<"iree-codegen-test-vector-layout-analysis", ""> {
+def TestVectorLayoutAnalysisPass : InterfacePass<"iree-codegen-test-vector-layout-analysis", "mlir::FunctionOpInterface"> {
   let summary = "Test the vector layout analysis.";
   let description = [{
     Run VectorLayoutAnalysis on the root operation. The analysis emits remarks

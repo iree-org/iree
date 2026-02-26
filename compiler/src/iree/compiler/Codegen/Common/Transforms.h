@@ -143,7 +143,7 @@ class VectorLayoutInterface;
 ///
 /// The analysis itself will not try to resolve the conflict, but instead
 /// will leave it as a to_layout op, which can be rewritten by the caller.
-LogicalResult propagateVectorLayoutInfo(
+void propagateVectorLayoutInfo(
     Operation *root,
     llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface> &layouts);
 
