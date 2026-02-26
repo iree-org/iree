@@ -25,7 +25,7 @@ $PYTHON_INSTALLER_URLS = @(
   "https://www.python.org/ftp/python/3.13.1/python-3.13.1-amd64.exe" #,
   "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" #,
   "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe" #,
-  "https://www.python.org/ftp/python/3.10.5/python-3.10.5-amd64.exe"
+  # "https://www.python.org/ftp/python/3.10.5/python-3.10.5-amd64.exe",
 )
 
 # Multiple Python install locations are valid, so we use the `py` helper to
