@@ -369,8 +369,10 @@ def ReconcileTranslationInfoPass
     : Pass<"iree-codegen-reconcile-translation-info"> {
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
-      "`TranslationInfo` set on each function in the dispatch and merge them"
-      "and set them at the appropriate places in the surrounding HAL ops";
+      "`TranslationInfo` set on each function in the dispatch and merge them "
+      "and set them at the appropriate places in the surrounding HAL ops. "
+      "Looks for the enclosing `ExecutableVariantOp` from the parent hierarchy "
+      "and is a no-op when one is not found.";
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
@@ -393,12 +395,15 @@ def ReconcileTranslationInfoPass
 
 def ResolveWorkgroupCountHintsPass
     : Pass<"iree-codegen-resolve-workgroup-count-hints"> {
-  let summary = "Materialize workgroup count hints in the workgroup count region per export.";
+  let summary =
+      "Materialize workgroup count hints in the workgroup count region per "
+      "export. Looks for the enclosing `ExecutableVariantOp` from the parent "
+      "hierarchy and is a no-op when one is not found.";
   let description = [{
     Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
     agreeable workgroup count per export. This pass performs a depth-first walk
-    of the target variant's call graph constructing the necessary information to
-    materialize workgroup count hints for that function.
+    of the enclosing variant's call graph constructing the necessary information
+    to materialize workgroup count hints for that function.
 
     #### Supported IR Structure
 
@@ -1013,7 +1018,10 @@ def ResolveSwizzleHintsPass :
 
 def SpecializeExportsPass :
     Pass<"iree-codegen-specialize-exports">{
-   let summary = "Specializes exported functions based on annotated ranges";
+   let summary =
+       "Specializes exported functions based on annotated ranges. "
+       "Looks for the enclosing `ExecutableVariantOp` from the parent "
+       "hierarchy and is a no-op when one is not found.";
 }
 
 def StripCompilationInfoPass :
