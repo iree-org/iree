@@ -319,7 +319,7 @@ about the bindings themselves.
 You will need Python >=3.10. IREE supports
 [non-EOL Python versions](https://endoflife.date/python), following the same
 lifecycle policy as LLVM's minimum required Python version — see the
-[LLVM minimum Python version RFC](https://discourse.llvm.org/t/rfc-upgrading-llvm-s-minimum-required-python-version/88605).
+[LLVM's Python support policy](https://discourse.llvm.org/t/rfc-adopt-regularly-scheduled-python-minimum-version-bumps/88841).
 
 ???+ Tip "Tip - Managing Python versions"
     Make sure your 'python' is what you expect:
