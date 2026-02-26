@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-llvmcpu-configuration-pipeline, func.func(iree-llvmcpu-lower-executable-target, iree-llvmcpu-check-ir-before-llvm-conversion))' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='pipeline-on-module=true' --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false pipeline-on-module=true' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly

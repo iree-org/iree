@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline='pipeline-on-module=true' --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false pipeline-on-module=true' --split-input-file %s | FileCheck %s
 // XFAIL: *
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

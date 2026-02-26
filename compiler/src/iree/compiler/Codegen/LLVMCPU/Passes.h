@@ -125,15 +125,24 @@ void addMultiTilingExpertPassPipeline(
 
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
+/// When `pipelineOnModule` is true, the pipeline operates directly on a
+/// `ModuleOp` (no variant-level nesting or variant-specific passes), enabling
+/// simpler test IR without double module nesting.
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts);
+    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts,
+    bool pipelineOnModule = false);
 
 /// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
 /// to LLVM dialect via the structured ops path. The  `variantPassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
+/// When `pipelineOnModule` is true, the pipeline operates directly on a
+/// `ModuleOp` (no variant-level nesting or variant-specific passes), enabling
+/// simpler test IR without double module nesting.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      const CPUCodegenOptions &codegenOptions,
-                                     bool enableAArch64SME = false);
+                                     bool enableAArch64SME = false,
+                                     bool pipelineOnModule = false,
+                                     bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines
