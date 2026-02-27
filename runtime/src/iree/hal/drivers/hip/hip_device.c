@@ -1558,10 +1558,10 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
     }
   }
   IREE_TRACE_ZONE_END(z3);
-
+  iree_hal_hip_dispatch_completed_data_t* external_stream_dispatch_data = NULL;
   if (device->uses_external_stream) {
-    iree_hal_hip_set_external_stream_data_completed(
-        data->base.external_stream_dispatch_data);
+    external_stream_dispatch_data = data->base.external_stream_dispatch_data;
+    iree_hal_resource_retain(external_stream_dispatch_data);
   }
 
   const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
@@ -1579,6 +1579,12 @@ static iree_status_t iree_hal_hip_device_perform_buffer_operation_now(
                               iree_status_clone(status));
     }
     iree_hal_hip_device_destroy_buffer_callback_data(data);
+  }
+
+  if (external_stream_dispatch_data) {
+    iree_hal_hip_set_external_stream_data_completed(
+        external_stream_dispatch_data);
+    iree_hal_resource_release(external_stream_dispatch_data);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -2053,6 +2059,11 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
         device, device->devices[device_ordinal].hip_dispatch_stream,
         data->base.wait_semaphore_list, device_ordinal);
   }
+  iree_hal_hip_dispatch_completed_data_t* external_stream_dispatch_data = NULL;
+  if (device->uses_external_stream) {
+    external_stream_dispatch_data = data->base.external_stream_dispatch_data;
+    iree_hal_resource_retain(external_stream_dispatch_data);
+  }
 
   const iree_hal_hip_dynamic_symbols_t* symbols = device->hip_symbols;
   iree_device_size_t amount_left = data->length;
@@ -2144,18 +2155,20 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
     }
   }
 
-  if (device->uses_external_stream) {
-    iree_hal_hip_set_external_stream_data_completed(
-        data->base.external_stream_dispatch_data);
-  }
-
   if (!iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < data->base.signal_semaphore_list.count;
          ++i) {
       iree_hal_semaphore_fail(data->base.signal_semaphore_list.semaphores[i],
                               iree_status_clone(status));
     }
+
     iree_hal_hip_device_destroy_queue_read_callback_data(data);
+  }
+
+  if (external_stream_dispatch_data) {
+    iree_hal_hip_set_external_stream_data_completed(
+        external_stream_dispatch_data);
+    iree_hal_resource_release(external_stream_dispatch_data);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -2486,10 +2499,10 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
   }
 
   IREE_TRACE_ZONE_END(z1);
-
+  iree_hal_hip_dispatch_completed_data_t* external_stream_dispatch_data = NULL;
   if (device->uses_external_stream) {
-    iree_hal_hip_set_external_stream_data_completed(
-        data->base.external_stream_dispatch_data);
+    external_stream_dispatch_data = data->base.external_stream_dispatch_data;
+    iree_hal_resource_retain(external_stream_dispatch_data);
   }
 
   // Store symbols, because the cleanup may trigger off-thread
@@ -2510,6 +2523,12 @@ static iree_status_t iree_hal_hip_device_execute_now(void* user_data,
                               iree_status_clone(status));
     }
     iree_hal_hip_device_destroy_callback_data(data);
+  }
+
+  if (external_stream_dispatch_data) {
+    iree_hal_hip_set_external_stream_data_completed(
+        external_stream_dispatch_data);
+    iree_hal_resource_release(external_stream_dispatch_data);
   }
 
   IREE_TRACE_ZONE_END(z0);
