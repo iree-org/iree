@@ -1307,3 +1307,66 @@ func.func @no_lower_oob_without_fat_raw_buffer(
   } {mapping = [#gpu.thread<linear_dim_0>]}
   return
 }
+
+// -----
+
+// Test: OOB clamping with dynamic source inner dimension.
+// Source is <4x?xf32> (dynamic innermost), dest is <4x256xf32>.
+// in_bounds = [true, false]: inner dim may be OOB.
+// The OOB check uses memref.dim (not arith.constant) to get the dynamic
+// source inner dimension size.
+// With subgroup_size=64, 128-bit DMA (4 f32/lane): 64*4=256 elements/transfer.
+// 4 outer rows × 1 transfer/row = 4 gather_to_lds ops.
+
+#executable_target_rocm_hsaco_fb_dyn = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_64_dyn = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @gather_dma_dynamic_inner_dim_oob
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<4x?xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x256xf32, #gpu.address_space<workgroup>>
+func.func @gather_dma_dynamic_inner_dim_oob(
+    %source: memref<4x?xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x256xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_dyn,
+    translation_info = #translation_64_dyn} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%arg6) in (64) {
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: linearOffset = 0
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 256)
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 256)
+    //
+    // Bounds check: memref.dim for dynamic source inner dim (not arith.constant).
+    // CHECK: %[[FALSE:.+]] = arith.constant false
+    // CHECK: %[[DIM:.+]] = memref.dim %[[SRC]], %{{.+}}
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#1, %[[DIM]] : index
+    // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
+    // Replace outermost index with 4 (source dim 0 size) to force hardware OOB.
+    // CHECK: %[[C4_OOB:.+]] = arith.constant 4 : index
+    // CHECK: %[[FIXED_IDX:.+]] = arith.select %[[OOB]], %[[C4_OOB]], %[[SRC_DELIN0]]#0 : index
+    // CHECK: amdgpu.gather_to_lds %[[SRC]][%[[FIXED_IDX]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
+    //
+    // Remaining 3 transfers.
+    // CHECK-COUNT-3: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) in_bounds [true, false] :
+      memref<4x?xf32, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x256xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}

@@ -684,7 +684,7 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    auto subgroupSize = getDMAAlignedSubgroupSize(
+    std::optional<int64_t> subgroupSize = getDMAAlignedSubgroupSize(
         funcOp, outputType.getElementType(), innermostDim);
     if (!subgroupSize) {
       return failure();
@@ -945,7 +945,10 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Check DMA alignment using the shared utility.
+    // Skip coalesced DMA if the available elements are not aligned to the
+    // minimum transfer size. The minimum transfer size is subgroupSize *
+    // minElementsPerLane, where minElementsPerLane is determined by the
+    // smallest DMA size and element type.
     int64_t innermostDim = shape[rank - 1];
     if (ShapedType::isDynamic(innermostDim)) {
       return failure();

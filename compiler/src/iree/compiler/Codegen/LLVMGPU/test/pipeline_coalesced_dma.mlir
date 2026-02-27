@@ -424,13 +424,14 @@ hal.executable public @coalesced_dma_oob_clamping {
         %dest = memref.alloc() : memref<4x256xf32, #gpu.address_space<workgroup>>
         // CHECK: scf.forall (%[[LANE_ID:.+]]) in (64)
         scf.forall (%arg6) in (64) {
-          // 4 outer rows, 1 transfer per row.
-          // Verify OOB clamping pattern for the first transfer:
+          // 4 outer rows, 1 transfer per row (256 elements / 64 lanes / 4
+          // elements per lane = 1). For each transfer, OOB clamping on dim 1:
           //   memref.dim → arith.cmpi uge → arith.select → gather_to_lds
-          // CHECK: memref.dim
-          // CHECK: arith.cmpi uge
-          // CHECK: arith.select
-          // CHECK: amdgpu.gather_to_lds
+          // CHECK: %[[DIM:.+]] = memref.dim %{{.+}}, %{{.+}}
+          // CHECK: %[[CMP:.+]] = arith.cmpi uge, %{{.+}}, %[[DIM]]
+          // CHECK: %[[OOB:.+]] = arith.ori %{{.+}}, %[[CMP]]
+          // CHECK: %[[SEL:.+]] = arith.select %[[OOB]], %{{.+}}, %{{.+}}
+          // CHECK: amdgpu.gather_to_lds %{{.+}}[%[[SEL]], %{{.+}}]
           // Remaining 3 transfers also produce gather_to_lds ops.
           // CHECK-COUNT-3: amdgpu.gather_to_lds
           // CHECK-NOT: iree_gpu.coalesced_gather_dma
