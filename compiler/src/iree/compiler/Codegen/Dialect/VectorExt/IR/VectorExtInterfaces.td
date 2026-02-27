@@ -65,6 +65,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*methodName=*/"getRank",
       /*args=*/(ins)
     >,
+    InterfaceMethod<
+      /*description=*/"Given a target layout, check if we need shared memory for the conversion.",
+      /*retTy=*/"bool",
+      /*methodName=*/"needsSharedMemoryForConversion",
+      /*args=*/(ins "VectorLayoutInterface":$targetLayout)
+    >,
     StaticInterfaceMethod<
       /*description=*/"Given operand layouts and indexing maps, create a recombined layout for result indexing map",
       /*retTy=*/"VectorLayoutInterface",

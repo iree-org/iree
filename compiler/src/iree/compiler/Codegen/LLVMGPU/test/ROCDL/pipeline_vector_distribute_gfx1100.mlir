@@ -130,3 +130,70 @@ hal.executable private @matvec_dispatch_0 {
 //          CHECK:   scf.forall ({{.*}}) = (0, 0) to (32000, 2) step (16, 1)
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 4) : (f32) -> f32
+
+// -----
+
+#decomposition_config = {
+  pv_attrs = {attention_pv_matmul,
+              lowering_config = #iree_gpu.lowering_config<{
+                  mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
+                  promote_operands = [1],
+                  subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 3, 4]]}>},
+  qk_attrs = {attention_qk_matmul,
+             lowering_config = #iree_gpu.lowering_config<{
+                  mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
+                  promote_operands = [0, 1],
+                  subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]}>}}
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 32, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
+module {
+  hal.executable public @attention {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      hal.executable.export public @attention ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+        hal.return %x, %y, %z : index, index, index
+      }
+      builtin.module {
+        func.func @attention() attributes {translation_info = #translation} {
+          %cst = arith.constant 1.250000e-01 : f16
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+          %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+          %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+          %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+          %8 = iree_codegen.load_from_buffer %0 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
+          %9 = iree_codegen.load_from_buffer %2 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
+          %10 = iree_codegen.load_from_buffer %4 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
+          %11 = tensor.empty() : tensor<20x4096x64xf16>
+          %12 = iree_linalg_ext.attention {decomposition_config = #decomposition_config, indexing_maps = [#map, #map1, #map2, #map3, #map4], lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 64, 0, 0, 64]}>} ins(%8, %9, %10, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%11 : tensor<20x4096x64xf16>) {
+          ^bb0(%arg0: f32):
+            iree_linalg_ext.yield %arg0 : f32
+          } -> tensor<20x4096x64xf16>
+          iree_codegen.store_to_buffer %12, %6 : tensor<20x4096x64xf16> into memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+          return
+        }
+      }
+    }
+  }
+}
+
+%alloc = memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+          %subview = memref.subview %alloc[0, 0, 0] [1, 64, 64] [1, 1, 1] : memref<1x64x68xf16, #gpu.address_space<workgroup>> to memref<1x64x64xf16, strided<[4352, 68, 1]>, #gpu.address_space<workgroup>>
+          %alloc_10 = memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+          %subview_11 = memref.subview %alloc_10[0, 0, 0] [1, 64, 64] [1, 1, 1] : memref<1x64x68xf16, #gpu.address_space<workgroup>> to memref<1x64x64xf16, strided<[4352, 68, 1]>, #gpu.address_space<workgroup>>
+          %alloc_12 = memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+          %subview_13 = memref.subview %alloc_12[0, 0, 0] [1, 64, 64] [1, 1, 1] : memref<1x64x68xf16, #gpu.address_space<workgroup>> to memref<1x64x64xf16, strided<[4352, 68, 1]>, #gpu.address_space<workgroup>>
+          %alloc_14 = memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+
+// There should be only 4 allocs for shared memory. For Q, K, V and one for
+// intermediate P conversion.
+// CHECK-LABEL: func.func @attention
+// CHECK-COUNT-4: memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+// CHECK-NOT: memref.alloc()
