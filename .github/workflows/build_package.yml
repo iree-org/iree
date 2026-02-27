@@ -232,7 +232,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       - name: Main distribution (Linux for Arm64)
         if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-aarch64'"
@@ -241,7 +241,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_AARCH64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       ##########################################################################
       # py-runtime-pkg
@@ -341,7 +341,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
+            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
