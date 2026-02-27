@@ -292,6 +292,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
+  funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizeCopies = vectorizeCopies;
@@ -823,6 +824,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // loop invariant anchors.
   funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
+  // TODO: Move this pass before layout configuration. We want to do that,
+  // but it requires some additional work to figure out the layout conflicting
+  // for attention matmuls.
+  funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -854,6 +859,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapStorePass());
+  funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
+  funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 

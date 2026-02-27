@@ -65,7 +65,7 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     }
   }
 
-  if (auto mmaKind = dyn_cast<IREE::GPU::MMAAttr>(kind)) {
+  if (auto mmaKind = dyn_cast<IREE::GPU::MmaInterfaceAttr>(kind)) {
     FailureOr<linalg::ContractionDimensions> contractionDims =
         linalg::inferContractionDims(linalgOp);
     if (succeeded(contractionDims)) {

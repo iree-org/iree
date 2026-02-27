@@ -61,38 +61,36 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable @matmul_256x256x256_f16_f16 {
+hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
-  hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
+  hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
-    func.func @matmul_256x256x256_f16_f16() attributes {translation_info = #translation} {
-      %cst = arith.constant 0.000000e+00 : f16
+    func.func @matmul_256x256x256_f16_f32() attributes {translation_info = #translation} {
+      %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>>
       %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>>
-      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf16>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf32>>
       %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
       %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
-      %5 = tensor.empty() : tensor<256x256xf16>
-      %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<256x256xf16>) -> tensor<256x256xf16>
-      %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%6 : tensor<256x256xf16>) -> tensor<256x256xf16>
-      iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf16>>
+      %5 = tensor.empty() : tensor<256x256xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %7 = linalg.matmul {lowering_config = #config} ins(%3, %4 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%6 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf32>>
       return
     }
   }
 }
 }
 
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x4x1xf16>)
-//          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x4x1xf16> to vector<2x2x1x1x4x1xf32>
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<2x2x1x1x4x1xf32> to vector<2x2x1x1x4x1xf16>
-//          CHECK:     scf.yield %[[TRUNC]] : vector<2x2x1x1x4x1xf16>
-//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -113,20 +111,20 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     builtin.module {
       func.func @expanded_matmul_transpose_b() attributes {translation_info = #translation} {
         %c0 = arith.constant 0 : index
-        %cst = arith.constant 0.000000e+00 : f16
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
           : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x64x2048xf16>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
           : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x64x2048xf16>>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0)
-          : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf16>>
+          : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf32>>
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 64, 2048], strides = [1, 1, 1]
           : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x64x2048xf16>> -> tensor<2x64x2048xf16>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [10, 64, 2048], strides = [1, 1, 1]
           : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x64x2048xf16>> -> tensor<10x64x2048xf16>
 
-        %5 = tensor.empty() : tensor<2x10x64x64xf16>
-        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x10x64x64xf16>) -> tensor<2x10x64x64xf16>
+        %5 = tensor.empty() : tensor<2x10x64x64xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x10x64x64xf32>) -> tensor<2x10x64x64xf32>
         %7 = linalg.generic {
           indexing_maps = [
             affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
@@ -135,15 +133,16 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
           ],
           iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"],
           lowering_config = #config
-        } ins(%3, %4 : tensor<2x64x2048xf16>, tensor<10x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf16>) {
-        ^bb0(%lhs: f16, %rhs: f16, %out: f16):
+        } ins(%3, %4 : tensor<2x64x2048xf16>, tensor<10x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf32>) {
+        ^bb0(%lhs: f16, %rhs: f16, %out: f32):
           %mul = arith.mulf %lhs, %rhs : f16
-          %add = arith.addf %mul, %out : f16
-          linalg.yield %add : f16
-        } -> tensor<2x10x64x64xf16>
+          %ext = arith.extf %mul : f16 to f32
+          %add = arith.addf %ext, %out : f32
+          linalg.yield %add : f32
+        } -> tensor<2x10x64x64xf32>
 
         iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 10, 64, 64], strides = [1, 1, 1, 1]
-          : tensor<2x10x64x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf16>>
+          : tensor<2x10x64x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf32>>
         return
       }
     }
@@ -153,13 +152,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 //          CHECK: func @expanded_matmul_transpose_b
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 128 = 1920.
-//          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>)
-//          CHECK:     arith.extf %[[ARG]] : vector<1x1x4x1x1x1x1x1x1x1x4x1xf16> to vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>
+//          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args({{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<1x1x4x1x1x1x1x1x1x1x4x1xf32> to vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>
-//          CHECK:     scf.yield %[[TRUNC]] : vector<1x1x4x1x1x1x1x1x1x1x4x1xf16>
+//          CHECK:     scf.yield %{{.+}} : vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>
 // CHECK-COUNT-32:   amdgpu.mfma
-//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf32>, memref<2x10x64x64xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -177,22 +174,23 @@ hal.executable @matmul_multiple_k {
     }
     builtin.module {
       func.func @matmul_multiple_k() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64>} {
-        %cst = arith.constant 0.000000e+00 : f16
+        %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x64x2048xf16>>
         %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x128x64x2048xf16>>
-        %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf16>>
+        %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf32>>
         %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 128, 64, 2048], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x128x64x2048xf16>> -> tensor<2x128x64x2048xf16>
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [10, 128, 64, 2048], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x128x64x2048xf16>> -> tensor<10x128x64x2048xf16>
-        %5 = tensor.empty() : tensor<2x10x64x64xf16>
-        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x10x64x64xf16>) -> tensor<2x10x64x64xf16>
-        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d4, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<2x128x64x2048xf16>, tensor<10x128x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 1, 128], workgroup = [1, 1, 64, 64, 0, 0], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_basis = [[1, 1, 1, 4, 1, 1], [0, 1, 2, 3, 4, 5]]}>} {
-        ^bb0(%in: f16, %in_0: f16, %out: f16):
+        %5 = tensor.empty() : tensor<2x10x64x64xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x10x64x64xf32>) -> tensor<2x10x64x64xf32>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d2, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d4, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<2x128x64x2048xf16>, tensor<10x128x64x2048xf16>) outs(%6 : tensor<2x10x64x64xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 0, 1, 128], workgroup = [1, 1, 64, 64, 0, 0], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_basis = [[1, 1, 1, 4, 1, 1], [0, 1, 2, 3, 4, 5]]}>} {
+        ^bb0(%in: f16, %in_0: f16, %out: f32):
           %8 = arith.mulf %in, %in_0 : f16
-          %9 = arith.addf %8, %out : f16
-          linalg.yield %9 : f16
-        } -> tensor<2x10x64x64xf16>
-        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 10, 64, 64], strides = [1, 1, 1, 1] : tensor<2x10x64x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf16>>
+          %9 = arith.extf %8 : f16 to f32
+          %10 = arith.addf %9, %out : f32
+          linalg.yield %10 : f32
+        } -> tensor<2x10x64x64xf32>
+        iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 10, 64, 64], strides = [1, 1, 1, 1] : tensor<2x10x64x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x10x64x64xf32>>
         return
       }
     }
@@ -207,7 +205,7 @@ hal.executable @matmul_multiple_k {
 // CHECK:            affine.delinearize_index %[[IV]] into (128, 16)
 // CHECK-COUNT-32:   amdgpu.mfma
 // CHECK:            scf.yield
-// CHECK-COUNT-4:  vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf16>, memref<2x10x64x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-COUNT-4:  vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf32>, memref<2x10x64x64xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -460,7 +458,7 @@ hal.executable public @main_dispatch_expanded_matmul {
     }
     builtin.module {
       func.func @generic_2x1024x20x64x1280_f16() attributes {translation_info = #translation} {
-        %cst = arith.constant 0.000000e+00 : f16
+        %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
         %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
@@ -468,23 +466,24 @@ hal.executable public @main_dispatch_expanded_matmul {
         %3 = arith.index_castui %1 : i32 to index
         %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1024x1280xf16>>
         %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x64x1280xf16>>
-        %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%3) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x1024x20x64xf16>>
+        %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%3) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x1024x20x64xf32>>
         %7 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0], sizes = [2, 1024, 1280], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1024x1280xf16>> -> tensor<2x1024x1280xf16>
         %8 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0, 0], sizes = [20, 64, 1280], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x64x1280xf16>> -> tensor<20x64x1280xf16>
-        %9 = tensor.empty() : tensor<2x1024x20x64xf16>
-        %10 = linalg.fill ins(%cst : f16) outs(%9 : tensor<2x1024x20x64xf16>) -> tensor<2x1024x20x64xf16>
+        %9 = tensor.empty() : tensor<2x1024x20x64xf32>
+        %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<2x1024x20x64xf32>) -> tensor<2x1024x20x64xf32>
         %11 = linalg.generic {
           indexing_maps = [#map, #map1, #map2],
           iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"],
           lowering_config = #config
         } ins(%7, %8 : tensor<2x1024x1280xf16>, tensor<20x64x1280xf16>)
-          outs(%10 : tensor<2x1024x20x64xf16>) {
-        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          outs(%10 : tensor<2x1024x20x64xf32>) {
+        ^bb0(%in: f16, %in_0: f16, %out: f32):
           %12 = arith.mulf %in, %in_0 : f16
-          %13 = arith.addf %out, %12 : f16
-          linalg.yield %13 : f16
-        } -> tensor<2x1024x20x64xf16>
-        iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0, 0, 0], sizes = [2, 1024, 20, 64], strides = [1, 1, 1, 1] : tensor<2x1024x20x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x1024x20x64xf16>>
+          %13 = arith.extf %12 : f16 to f32
+          %14 = arith.addf %out, %13 : f32
+          linalg.yield %14 : f32
+        } -> tensor<2x1024x20x64xf32>
+        iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0, 0, 0], sizes = [2, 1024, 20, 64], strides = [1, 1, 1, 1] : tensor<2x1024x20x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x1024x20x64xf32>>
         return
       }
     }
@@ -495,13 +494,13 @@ hal.executable public @main_dispatch_expanded_matmul {
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 1280 - 128 = 1152.
-//          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<1x2x1x2x1x1x1x1x1x4x1x1xf16>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<1x2x1x2x1x1x1x1x1x4x1x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<1x2x1x2x1x1x1x1x1x4x1x1xf16>
+//          CHECK:     scf.yield %{{.+}} : vector<1x2x1x2x1x1x1x1x1x4x1x1xf32>
 // CHECK-COUNT-32:   amdgpu.mfma
-//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x4x1x1xf16>, memref<2x1024x20x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x4x1x1xf32>, memref<2x1024x20x64xf32, #amdgpu.address_space<fat_raw_buffer>>
 
 // -----
 
@@ -528,7 +527,7 @@ hal.executable public @contract_schedule_considering_read_layout {
     }
     builtin.module {
       func.func @contract_schedule_considering_read_layout() attributes {translation_info = #translation} {
-        %cst = arith.constant 0.000000e+00 : f16
+        %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
         %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
         %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
@@ -537,13 +536,13 @@ hal.executable public @contract_schedule_considering_read_layout {
         %5 = arith.index_castui %2 : i32 to index
         %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x160x1536xf16>>
         %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1536x1536xf16>>
-        %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x160x1536xf16>>
+        %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x160x1536xf32>>
         %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0, 0], sizes = [2, 160, 1536], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x160x1536xf16>> -> tensor<2x160x1536xf16>
         %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [2, 1536, 1536], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x1536x1536xf16>> -> tensor<2x1536x1536xf16>
-        %11 = tensor.empty() : tensor<2x160x1536xf16>
-        %12 = linalg.fill ins(%cst : f16) outs(%11 : tensor<2x160x1536xf16>) -> tensor<2x160x1536xf16>
-        %13 = linalg.batch_matmul {lowering_config = #config} ins(%9, %10 : tensor<2x160x1536xf16>, tensor<2x1536x1536xf16>) outs(%12 : tensor<2x160x1536xf16>) -> tensor<2x160x1536xf16>
-        iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0, 0], sizes = [2, 160, 1536], strides = [1, 1, 1] : tensor<2x160x1536xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x160x1536xf16>>
+        %11 = tensor.empty() : tensor<2x160x1536xf32>
+        %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<2x160x1536xf32>) -> tensor<2x160x1536xf32>
+        %13 = linalg.batch_matmul {lowering_config = #config} ins(%9, %10 : tensor<2x160x1536xf16>, tensor<2x1536x1536xf16>) outs(%12 : tensor<2x160x1536xf32>) -> tensor<2x160x1536xf32>
+        iree_tensor_ext.dispatch.tensor.store %13, %8, offsets = [0, 0, 0], sizes = [2, 160, 1536], strides = [1, 1, 1] : tensor<2x160x1536xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x160x1536xf32>>
         return
       }
     }
@@ -556,7 +555,7 @@ hal.executable public @contract_schedule_considering_read_layout {
 // CHECK-DAG:     memref.subview %[[RHS_SHARED]][0, 0, 0] [1, 128, 128] [1, 1, 1]
 // CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x132xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 128] [1, 1, 1]
-// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args({{.*}}) -> (vector<1x1x2x1x1x1x1x4x1xf16>)
+// CHECK:   scf.for {{.*}} = %c0 to %c1408 step %c128 iter_args({{.*}}) -> (vector<1x1x2x1x1x1x1x4x1xf32>)
 // CHECK-COUNT-16:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK:     scf.yield
 // CHECK-COUNT-16:   amdgpu.mfma
@@ -604,8 +603,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // Validate that VMFMA is decomposed into coalesced read and 2 MFMAs:
 
-// CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x1x8xf16> to vector<8xf16>
-// CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x8x1xf16> to vector<8xf16>
+// CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
+// CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
 // CHECK:       %[[C_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x1x4x1x4x1xf32> to vector<16xf32>
 // CHECK:       %[[A_SLICE_0:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[B_SLICE_0:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
@@ -726,11 +725,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK:       %[[SLICE_RHS_1:.+]] = vector.transfer_read %[[ALLOC_RHS]]
 // CHECK:       %[[VECTOR_RHS_1:.+]] = vector.insert_strided_slice %[[SLICE_RHS_1]], %[[VECTOR_RHS_0]] {{.*}} : vector<4x1xf8E4M3FNUZ> into vector<4x1x2x1x4x1xf8E4M3FNUZ>
 
-// CHECK:       %[[EXTRACT_LHS:.+]] = vector.extract %[[VECTOR_LHS_1]][{{.*}}, {{.*}}] : vector<1x2x1x4xf8E4M3FNUZ> from vector<1x4x1x2x1x4xf8E4M3FNUZ>
-// CHECK:       %[[EXTRACT_RHS:.+]] = vector.extract %[[VECTOR_RHS_1]][{{.*}}, {{.*}}] : vector<2x1x4x1xf8E4M3FNUZ> from vector<4x1x2x1x4x1xf8E4M3FNUZ>
+// CHECK:       %[[LHS_CAST_0:.+]] = vector.shape_cast %[[VECTOR_LHS_1]] : vector<1x4x1x2x1x4xf8E4M3FNUZ> to vector<1x4x1x8xf8E4M3FNUZ>
+// CHECK:       %[[RHS_CAST_0:.+]] = vector.shape_cast %[[VECTOR_RHS_1]] : vector<4x1x2x1x4x1xf8E4M3FNUZ> to vector<4x1x1x8xf8E4M3FNUZ>
+// CHECK:       %[[EXTRACT_LHS:.+]] = vector.extract %[[LHS_CAST_0]][{{.*}}, {{.*}}] : vector<1x8xf8E4M3FNUZ> from vector<1x4x1x8xf8E4M3FNUZ>
+// CHECK:       %[[EXTRACT_RHS:.+]] = vector.extract %[[RHS_CAST_0]][{{.*}}, {{.*}}] : vector<1x8xf8E4M3FNUZ> from vector<4x1x1x8xf8E4M3FNUZ>
 
-// CHECK:       %[[LHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_LHS]] : vector<1x2x1x4xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
-// CHECK:       %[[RHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_RHS]] : vector<2x1x4x1xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+// CHECK:       %[[LHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_LHS]] : vector<1x8xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+// CHECK:       %[[RHS_CAST:.+]] = vector.shape_cast %[[EXTRACT_RHS]] : vector<1x8xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 // CHECK:       amdgpu.mfma 16x16x32 %[[LHS_CAST]] * %[[RHS_CAST]] + %{{.*}} blgp = none
 // CHECK-SAME:     : vector<8xf8E4M3FNUZ>, vector<8xf8E4M3FNUZ>, vector<4xf32>
 
