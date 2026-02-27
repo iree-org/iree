@@ -485,10 +485,6 @@ struct LowerCoalescedGatherDMAFallbackPattern final
     : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
   using Base::Base;
 
-  LowerCoalescedGatherDMAFallbackPattern(MLIRContext *context)
-      : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp>(context,
-                                                          /*benefit=*/1) {}
-
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override;
 
@@ -595,10 +591,8 @@ void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
          << " numFullIter=" << numFullIterations << " remainder=" << remainder;
 
   // Build delinearization basis for linear portion.
-  SmallVector<int64_t> linearBasis;
-  for (int64_t i = numOuterDims; i < destRank; ++i) {
-    linearBasis.push_back(destShape[i]);
-  }
+  SmallVector<int64_t> linearBasis =
+      llvm::to_vector(destShape.drop_front(numOuterDims));
   SmallVector<OpFoldResult> basis =
       getAsIndexOpFoldResult(builder.getContext(), linearBasis);
 
@@ -676,7 +670,7 @@ void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
     // memref dim. Set in_bounds based on original DMA's in_bounds for
     // the innermost dimension.
     SmallVector<bool> readInBounds = {true};
-    if (inBoundsAttr && inBoundsAttr->size() > 0) {
+    if (inBoundsAttr && !inBoundsAttr->empty()) {
       bool innermostInBounds =
           cast<BoolAttr>((*inBoundsAttr)[inBoundsAttr->size() - 1]).getValue();
       readInBounds[0] = innermostInBounds;
@@ -692,11 +686,11 @@ void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
   for (const SmallVector<int64_t> &outerOffsets :
        StaticTileOffsetRange(destShape, tileSizes)) {
 
-    SmallVector<Value> outerDimOffsets;
-    for (int64_t i = 0; i < numOuterDims; ++i) {
-      outerDimOffsets.push_back(
-          arith::ConstantIndexOp::create(builder, loc, outerOffsets[i]));
-    }
+    SmallVector<Value> outerDimOffsets = llvm::map_to_vector(
+        llvm::ArrayRef(outerOffsets).take_front(numOuterDims),
+        [&](int64_t offset) -> Value {
+          return arith::ConstantIndexOp::create(builder, loc, offset);
+        });
 
     for (int64_t iter = 0; iter < numIterations; ++iter) {
       Value linearBase =
@@ -752,9 +746,7 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
-    // Verify all CoalescedGatherDMAOps were lowered. Currently, we require all
-    // ops to be successfully lowered. In the future, a fallback lowering path
-    // (e.g., using global_load) could handle ops that don't match the pattern.
+    // Verify all CoalescedGatherDMAOps were lowered.
     WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
       op.emitOpError(
           "failed to lower to gather_to_lds; possible causes: source "
