@@ -1239,6 +1239,24 @@ int HalModuleDebugSinkTpClear(PyObject* self) {
 }
 
 //------------------------------------------------------------------------------
+// HalMappedMemory buffer protocol
+//------------------------------------------------------------------------------
+
+int HalMappedMemory::HandleBufferProtocol(Py_buffer* view, int flags) {
+  view->buf = mapped_memory_.contents.data;
+  view->len = mapped_memory_.contents.data_length;
+  view->readonly = 1;  // Mapped with IREE_HAL_MEMORY_ACCESS_READ
+  view->itemsize = 1;
+  view->format = (char*)"B";
+  view->ndim = 1;
+  view->shape = nullptr;
+  view->strides = nullptr;
+  view->suboffsets = nullptr;
+  view->internal = nullptr;
+  return 0;
+}
+
+//------------------------------------------------------------------------------
 // Bindings
 //------------------------------------------------------------------------------
 
@@ -1344,9 +1362,7 @@ void SetupHalBindings(nanobind::module_ m) {
   hal_element_type
       .def_static("map_to_dtype",
                   [](iree_hal_element_type_t element_type) {
-                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
-                        element_type);
-                    return numpy::DescrNewFromType(typenum);
+                    return numpy::DescrNewFromType(element_type);
                   })
       .def_static("is_byte_aligned",
                   [](iree_hal_element_type_t element_type) {
@@ -1856,7 +1872,9 @@ void SetupHalBindings(nanobind::module_ m) {
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
           kHalWait);
 
-  py::class_<HalMappedMemory>(m, "MappedMemory")
+  py::class_<HalMappedMemory>(
+      m, "MappedMemory",
+      buffer_protocol_slots<HalMappedMemory>())
       .def(
           "asarray",
           [](HalMappedMemory* self, py::handle shape, py::object dtype_descr) {
@@ -1867,8 +1885,7 @@ void SetupHalBindings(nanobind::module_ m) {
             for (size_t i = 0; i < rank; ++i) {
               dims[i] = py::cast<intptr_t>(shape[i]);
             }
-            int typenum = numpy::TypenumFromDescr(dtype_descr);
-            return numpy::SimpleNewFromData(rank, dims, typenum,
+            return numpy::SimpleNewFromData(rank, dims, dtype_descr,
                                             self->mapped_memory().contents.data,
                                             py_mapped_memory);
           },

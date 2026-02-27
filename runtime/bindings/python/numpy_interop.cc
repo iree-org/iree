@@ -8,93 +8,110 @@
 
 #include "./binding.h"
 
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#include "numpy/arrayobject.h"
-
 namespace iree::python::numpy {
 
-namespace {
-
-int internal_import_array() {
-  import_array1(-1);
-  return 0;
-}
-
-}  // namespace
-
-void InitializeNumPyInterop() {
-  if (internal_import_array() < 0) {
-    throw py::import_error("numpy.core.multiarray failed to import");
-  }
-}
-
-int ConvertHalElementTypeToNumPyTypeNum(iree_hal_element_type_t t) {
+static const char* ConvertHalElementTypeToDtypeName(iree_hal_element_type_t t) {
   switch (t) {
     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      return NPY_BOOL;
+      return "bool";
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      return NPY_INT8;
+      return "int8";
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      return NPY_UINT8;
+      return "uint8";
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      return NPY_INT16;
+      return "int16";
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      return NPY_UINT16;
+      return "uint16";
     case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      return NPY_INT32;
+      return "int32";
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      return NPY_UINT32;
+      return "uint32";
     case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      return NPY_INT64;
+      return "int64";
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      return NPY_UINT64;
+      return "uint64";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      return NPY_FLOAT16;
+      return "float16";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return NPY_FLOAT32;
+      return "float32";
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      return NPY_FLOAT64;
+      return "float64";
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      return NPY_COMPLEX64;
+      return "complex64";
     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      return NPY_COMPLEX128;
+      return "complex128";
     default:
       throw py::value_error("Unsupported VM Buffer -> numpy dtype mapping");
   }
 }
 
-py::object DescrNewFromType(int typenum) {
-  PyArray_Descr* dtype = PyArray_DescrNewFromType(typenum);
-  if (!dtype) {
-    throw py::python_error();
-  }
-  return py::steal((PyObject*)dtype);
+py::object DescrNewFromType(iree_hal_element_type_t t) {
+  const char* name = ConvertHalElementTypeToDtypeName(t);
+  // import_() is a sys.modules dict lookup, not a full import. Could cache
+  // the module reference if this becomes a hot path.
+  return py::module_::import_("numpy").attr("dtype")(name);
 }
 
-int TypenumFromDescr(py::handle dtype) {
-  if (!PyArray_DescrCheck(dtype.ptr())) {
-    throw py::cast_error();
-  }
-  PyArray_Descr* descr = (PyArray_Descr*)dtype.ptr();
-  return descr->type_num;
-}
 
-py::object SimpleNewFromData(int nd, intptr_t const* dims, int typenum,
-                             void* data, py::handle base_object) {
-  PyObject* array_c = PyArray_SimpleNewFromData(nd, dims, typenum, data);
-  if (!array_c) throw py::python_error();
-  py::object array = py::steal(array_c);
-  if (base_object) {
-    if (PyArray_SetBaseObject(reinterpret_cast<PyArrayObject*>(array.ptr()),
-                              base_object.ptr())) {
-      throw py::python_error();
+py::object SimpleNewFromData(int nd, intptr_t const* dims,
+                             py::handle dtype_descr, void* data,
+                             py::handle base_object) {
+  int itemsize = py::cast<int>(dtype_descr.attr("itemsize"));
+  Py_ssize_t total_elems = 1;
+  for (int i = 0; i < nd; ++i) {
+    total_elems *= dims[i];
+  }
+  Py_ssize_t byte_len = total_elems * itemsize;
+
+  // Create a writable memoryview that keeps base_object alive.
+  // PyBuffer_FillInfo sets buf.obj = base_object (with Py_INCREF), and
+  // PyMemoryView_FromBuffer copies the buffer info. When the memoryview is
+  // released, PyBuffer_Release DECREFs base_object. This maintains the
+  // lifetime chain: array.base -> memoryview -> base_object, matching the
+  // original PyArray_SetBaseObject semantics. The writable flag matches
+  // the original PyArray_SimpleNewFromData behavior.
+  py::object buf;
+  if (base_object.ptr()) {
+    Py_buffer pybuf;
+    if (PyBuffer_FillInfo(&pybuf, base_object.ptr(), static_cast<char*>(data),
+                          byte_len,
+                          /*readonly=*/0, PyBUF_WRITABLE) == 0) {
+      buf = py::steal(PyMemoryView_FromBuffer(&pybuf));
     }
-    base_object.inc_ref();
+    if (!buf.ptr()) PyErr_Clear();
   }
+  if (!buf.ptr()) {
+    // Fallback: base_object is null or PyBuffer_FillInfo failed.
+    buf = py::steal(PyMemoryView_FromMemory(static_cast<char*>(data), byte_len,
+                                            PyBUF_WRITE));
+    if (!buf.ptr()) throw py::python_error();
+  }
+
+  // import_() is a sys.modules dict lookup, not a full import. Could cache
+  // the module reference if this becomes a hot path.
+  py::object array = py::module_::import_("numpy").attr("frombuffer")(
+      buf, py::arg("dtype") = dtype_descr);
+
+  // Reshape if needed (frombuffer always returns 1-D).
+  if (nd != 1) {
+    PyObject* shape_raw = PyTuple_New(nd);
+    if (!shape_raw) throw py::python_error();
+    for (int i = 0; i < nd; ++i) {
+      PyObject* item = PyLong_FromSsize_t(dims[i]);
+      if (!item) {
+        Py_DECREF(shape_raw);
+        throw py::python_error();
+      }
+      PyTuple_SetItem(shape_raw, i, item);
+    }
+    py::object shape_tuple = py::steal(shape_raw);
+    array = array.attr("reshape")(shape_tuple);
+  }
+
   return array;
 }
 

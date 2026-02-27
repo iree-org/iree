@@ -21,6 +21,23 @@ namespace python {
 
 namespace {
 
+// nanobind::python_error::what() is noexcept but under the limited API
+// (Py_LIMITED_API / abi3) it uses a code path that can internally throw,
+// causing std::terminate. This helper safely extracts the error message.
+// Note: only safe to call when the Python error indicator has been cleared
+// (i.e., after nanobind's catch has stored the exception). Not safe in
+// C callbacks where the exception may still be active.
+static std::string get_exception_message(const std::exception& e) {
+  if (auto* pe = dynamic_cast<const py::python_error*>(&e)) {
+    try {
+      return py::cast<std::string>(py::str(pe->value()));
+    } catch (...) {
+      return "(Python exception)";
+    }
+  }
+  return e.what();
+}
+
 class InvokeContext {
  public:
   InvokeContext(HalDevice& device) : device_(device) {}
@@ -128,7 +145,7 @@ class InvokeStatics {
       std::string msg("could not map dtype ");
       msg.append(py::cast<std::string>(py::repr(dtype)));
       msg.append(" to element type: ");
-      msg.append(e.what());
+      msg.append(get_exception_message(e));
       throw std::invalid_argument(std::move(msg));
     }
   }
@@ -191,7 +208,7 @@ class InvokeStatics {
               std::string msg("could not convert value to numpy array: dtype=");
               msg.append(py::cast<std::string>(py::repr(target_dtype)));
               msg.append(", error='");
-              msg.append(e.what());
+              msg.append(get_exception_message(e));
               msg.append("', value=");
               msg.append(py::cast<std::string>(py::repr(py_value)));
               throw std::invalid_argument(std::move(msg));
@@ -246,7 +263,7 @@ class InvokeStatics {
               msg.append(" from: ");
               msg.append(py::cast<std::string>(py::repr(py_value)));
               msg.append(": ");
-              msg.append(e.what());
+              msg.append(get_exception_message(e));
               throw std::invalid_argument(std::move(msg));
             }
             sub_packers[i](c, item_list.raw_ptr(), item_py_value);
@@ -291,7 +308,7 @@ class InvokeStatics {
               msg.append(" from: ");
               msg.append(py::cast<std::string>(py::repr(py_value)));
               msg.append(": ");
-              msg.append(e.what());
+              msg.append(get_exception_message(e));
               throw std::invalid_argument(std::move(msg));
             }
             sub_packers[i].second(c, item_list.raw_ptr(), item_py_value);
@@ -392,7 +409,7 @@ class InvokeStatics {
       } catch (std::exception& e) {
         std::string msg("could not convert value to numpy array: ");
         msg.append("error='");
-        msg.append(e.what());
+        msg.append(get_exception_message(e));
         msg.append("', value=");
         msg.append(py::cast<std::string>(py::repr(py_value)));
         throw std::invalid_argument(std::move(msg));

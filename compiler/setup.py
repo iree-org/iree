@@ -41,6 +41,13 @@ from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
 from setuptools.command.egg_info import egg_info
 
+# Detect whether we should build an abi3 (Stable ABI) wheel.
+# This applies to CPython 3.12+ when not in free-threaded mode.
+_is_abi3_build = (
+    sys.version_info >= (3, 12)
+    and not sysconfig.get_config_var("Py_GIL_DISABLED")
+)
+
 
 def check_pip_version():
     from packaging import version
@@ -269,6 +276,8 @@ def prepare_installation():
             get_env_cmake_option("IREE_TARGET_BACKEND_CUDA", "OFF"),
             get_env_cmake_option("IREE_ENABLE_LLD", "OFF"),
         ]
+        if _is_abi3_build:
+            cmake_args.append("-DIREE_ENABLE_PYTHON_STABLE_ABI=ON")
         cmake_args.extend(get_cmake_version_info_args())
 
         # These usually flow through the environment, but we add them explicitly
@@ -382,6 +391,24 @@ class CleanEggInfo(egg_info):
         egg_info.run(self)
 
 
+# Override bdist_wheel to produce abi3 wheel tags when applicable.
+_bdist_wheel_cmdclass = {}
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class bdist_wheel(_bdist_wheel):
+        def get_tag(self):
+            python, abi, plat = _bdist_wheel.get_tag(self)
+            if _is_abi3_build:
+                python, abi = "cp312", "abi3"
+            return python, abi, plat
+
+    _bdist_wheel_cmdclass = {"bdist_wheel": bdist_wheel}
+except ImportError:
+    # wheel package not available (e.g., during sdist). Not an error.
+    pass
+
+
 def generate_version_py():
     return f"""# Auto-generated version info.
 PACKAGE_SUFFIX = "{PACKAGE_SUFFIX}"
@@ -485,12 +512,15 @@ setup(
         CMakeExtension("iree.compiler._mlir_libs._mlirGPUPasses"),
         CMakeExtension("iree.compiler._mlir_libs._site_initialize_0"),
     ],
-    cmdclass={
-        "build": CustomBuild,
-        "built_ext": NoopBuildExtension,
-        "build_py": CMakeBuildPy,
-        "egg_info": CleanEggInfo,
-    },
+    cmdclass=dict(
+        {
+            "build": CustomBuild,
+            "built_ext": NoopBuildExtension,
+            "build_py": CMakeBuildPy,
+            "egg_info": CleanEggInfo,
+        },
+        **_bdist_wheel_cmdclass,
+    ),
     zip_safe=False,
     package_dir={
         # Note: Must be relative path, so we line this up with the absolute

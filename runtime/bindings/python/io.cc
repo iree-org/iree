@@ -217,8 +217,8 @@ int FileHandle::HandleBufferProtocol(Py_buffer* view, int flags) {
 void SetupIoBindings(py::module_& m) {
   m.def("create_io_parameters_module", &CreateIoParametersModule);
 
-  auto file_handle = py::class_<FileHandle>(m, "FileHandle");
-  BindBufferProtocol<FileHandle>(file_handle);
+  auto file_handle = py::class_<FileHandle>(
+      m, "FileHandle", buffer_protocol_slots<FileHandle>());
   file_handle
       .def_static(
           "wrap_memory",

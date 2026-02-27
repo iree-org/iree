@@ -12,21 +12,14 @@
 
 namespace iree::python::numpy {
 
-// Must be called in init of extension module.
-void InitializeNumPyInterop();
+// Creates a numpy.dtype object for an IREE element type.
+py::object DescrNewFromType(iree_hal_element_type_t t);
 
-// Converts an IREE element type to a NumPy NPY_TYPES value.
-int ConvertHalElementTypeToNumPyTypeNum(iree_hal_element_type_t t);
-
-// Wraps a call to PyArray_DescrNewFromType(int).
-py::object DescrNewFromType(int typenum);
-
-// Extracts a typenum from a dtype (descriptor) object.
-int TypenumFromDescr(py::handle dtype);
-
-// Delegates to PyArray_SimpleNewFromData and sets the base_object.
-py::object SimpleNewFromData(int nd, intptr_t const* dims, int typenum,
-                             void* data, py::handle base_object);
+// Creates a numpy array from data using numpy.frombuffer and reshapes it.
+// base_object is kept alive by the returned array via its memoryview base.
+py::object SimpleNewFromData(int nd, intptr_t const* dims,
+                             py::handle dtype_descr, void* data,
+                             py::handle base_object);
 
 }  // namespace iree::python::numpy
 

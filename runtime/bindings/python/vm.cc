@@ -823,11 +823,11 @@ void SetupVmBindings(nanobind::module_ m) {
       .value("EXPORT_OPTIONAL", IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL)
       .export_values();
 
-  auto vm_buffer = py::class_<VmBuffer>(m, "VmBuffer");
+  auto vm_buffer = py::class_<VmBuffer>(
+      m, "VmBuffer", buffer_protocol_slots<VmBuffer>());
   VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type,
                          iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
                          iree_vm_buffer_isa);
-  BindBufferProtocol<VmBuffer>(vm_buffer);
   vm_buffer
       .def(
           "__init__",

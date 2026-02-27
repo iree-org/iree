@@ -65,7 +65,9 @@ this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4" }')}"
-python_versions="${override_python_versions:-cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313 cp313-cp313t}"
+# Python versions to build. cp312 is the abi3 build (produces a wheel
+# compatible with 3.12+). Per-version builds are used for <3.12 and 3.13t.
+python_versions="${override_python_versions:-cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313t}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
@@ -173,8 +175,14 @@ function build_iree_compiler() {
 function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
+  # For abi3 builds (cp312 non-free-threaded), the wheel tag is cp312-abi3
+  # instead of cp312-cp312.
+  local wheel_tag="${python_version}"
+  if [[ "${python_version}" == "cp312-cp312" ]]; then
+    wheel_tag="cp312-abi3"
+  fi
   # Force wildcard expansion here
-  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_$(uname -m).whl")"
+  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${wheel_tag}-linux_$(uname -m).whl")"
   ls "${generic_wheel}"
   echo ":::: Auditwheel ${generic_wheel}"
   auditwheel repair -w "${output_dir}" "${generic_wheel}"
@@ -186,6 +194,10 @@ function clean_wheels() {
   local python_version="$2"
   echo ":::: Clean wheels ${wheel_basename} ${python_version}"
   rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
+  # Also clean abi3 wheels for cp312.
+  if [[ "${python_version}" == "cp312-cp312" ]]; then
+    rm -f -v "${output_dir}/${wheel_basename}-"*"-cp312-abi3-"*".whl"
+  fi
 }
 
 function prepare_python() {
