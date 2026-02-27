@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
@@ -104,6 +105,25 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
       patterns.add<SetIGEMMConfiguration>(context, configFn.value());
     }
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return failure();
+    }
+  }
+
+  // Materialize implicit broadcasts in element-wise consumer ops. Consumer
+  // generics with non-identity indexing maps (e.g., per-row bias with map
+  // (d0,d1,d2,d3) -> (d1)) cannot be folded through by the reshape
+  // propagation patterns below. Materialize the broadcasts explicitly to
+  // turn consumers into pure element-wise ops with identity maps.
+  //
+  // Note: this intentionally matches all element-wise generics, not just
+  // conv consumers. Reshape propagation needs all consumers to have
+  // identity maps for collapse_shape to fold through.
+  {
+    RewritePatternSet materializeBroadcastPatterns(context);
+    linalg::populateDecomposeProjectedPermutationPatterns(
+        materializeBroadcastPatterns);
+    if (failed(applyPatternsGreedily(
+            funcOp, std::move(materializeBroadcastPatterns)))) {
       return failure();
     }
   }
