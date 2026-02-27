@@ -276,6 +276,9 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  if (enableMasking) {
+    funcPassManager.addPass(createMaterializeVectorTileSizesPass());
+  }
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizeCopies = vectorizeCopies;

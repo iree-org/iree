@@ -822,6 +822,16 @@ def MaterializeEncodingIntoNopPass :
   let summary = "Drop the encodings from tensor types with encodings.";
 }
 
+def MaterializeVectorTileSizesPass :
+    InterfacePass<"iree-codegen-materialize-vector-tile-sizes",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Propagate vector tile sizes and materialize as attribute";
+  let description = [{
+    Propagate vector tile sizes from to_layout anchors and materialize them as
+    discardable attributes on compute ops.
+  }];
+}
+
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
   let summary =
       "Load tuning spec transform dialect libraries and encode them in the module";
