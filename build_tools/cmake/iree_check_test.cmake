@@ -7,6 +7,7 @@
 function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _SRC_LABELS)
   string(TOLOWER "${CMAKE_BUILD_TYPE}" _LOWERCASE_BUILD_TYPE)
   if(((IREE_ARCH MATCHES "^riscv_") AND ("noriscv" IN_LIST _SRC_LABELS)) OR
+     ((IREE_ARCH STREQUAL "arm_64") AND ("noaarch64" IN_LIST _SRC_LABELS)) OR
      (EMSCRIPTEN AND ("nowasm" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_TSAN AND ("notsan" IN_LIST _SRC_LABELS)) OR
