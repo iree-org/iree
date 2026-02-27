@@ -281,9 +281,9 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
-  auto layoutedLhs = ToLayoutOp::create(rewriter, loc, lhs, aLayout, intrinsic);
-  auto layoutedRhs = ToLayoutOp::create(rewriter, loc, rhs, bLayout, intrinsic);
-  auto layoutedAcc = ToLayoutOp::create(rewriter, loc, acc, cLayout, intrinsic);
+  auto layoutedLhs = ToLayoutOp::create(rewriter, loc, lhs, aLayout);
+  auto layoutedRhs = ToLayoutOp::create(rewriter, loc, rhs, bLayout);
+  auto layoutedAcc = ToLayoutOp::create(rewriter, loc, acc, cLayout);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -306,8 +306,8 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = ToLayoutOp::create(rewriter, loc, contract->getResult(0),
-                                     cLayout, intrinsic);
+  auto toLayout =
+      ToLayoutOp::create(rewriter, loc, contract->getResult(0), cLayout);
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 

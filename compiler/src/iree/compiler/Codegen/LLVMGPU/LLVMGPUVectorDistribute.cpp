@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -36,7 +35,6 @@ ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
                                                 workgroupSize);
-  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
 }
 
 RewritePatternSet &ContractionVectorLayoutOptions::getPatterns() {
@@ -114,7 +112,6 @@ struct LLVMGPUVectorDistributePass final
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<affine::AffineDialect>();
-    registry.insert<amdgpu::AMDGPUDialect>();
     registry.insert<gpu::GPUDialect>();
     registry.insert<scf::SCFDialect>();
   }
