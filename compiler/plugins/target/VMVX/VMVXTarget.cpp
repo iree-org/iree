@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -270,6 +271,35 @@ struct VMVXSession final
       return std::make_shared<VMVXInlineTargetBackend>(options);
     });
   }
+
+  // Override Registration to also bind VMVXCodegenOptions to the session.
+  struct Registration : PluginSession::Registration {
+    using PluginSession::Registration::Registration;
+    std::unique_ptr<AbstractPluginSession>
+    createUninitializedSession(OptionsBinder &localOptionsBinder) final {
+      auto instance = std::make_unique<VMVXSession>();
+      // Bootstrap target options from global CLI if available.
+      if (globalCLIOptions) {
+        instance->options = *(*globalCLIOptions);
+      }
+      instance->options.bindOptions(localOptionsBinder);
+
+      // Bootstrap codegen options from global CLI if available.
+      if (globalCLICodegenOptions) {
+        instance->codegenOptions = *(*globalCLICodegenOptions);
+      }
+      instance->codegenOptions.bindOptions(localOptionsBinder);
+
+      return instance;
+    }
+    void initializeCLI() final {
+      PluginSession::Registration::initializeCLI();
+      globalCLICodegenOptions = &VMVXCodegenOptions::FromFlags::get();
+    }
+    std::optional<VMVXCodegenOptions *> globalCLICodegenOptions;
+  };
+
+  VMVXCodegenOptions codegenOptions;
 };
 
 } // namespace

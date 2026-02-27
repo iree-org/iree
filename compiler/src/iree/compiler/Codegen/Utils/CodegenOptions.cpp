@@ -8,6 +8,7 @@
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::VMVXCodegenOptions);
 
 namespace mlir::iree_compiler {
 
@@ -100,6 +101,28 @@ void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>(
       "iree-llvmgpu-enable-prefetch", enablePrefetch,
       llvm::cl::desc("Enable prefetch in the vector distribute pipeline."),
+      llvm::cl::cat(category));
+}
+
+void VMVXCodegenOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category("IREE VMVX Codegen Options");
+  CodegenOptions::bindOptions(binder);
+
+  binder.opt<bool>(
+      "iree-vmvx-skip-intermediate-roundings", skipIntermediateRoundings,
+      llvm::cl::desc(
+          "Allow skipping intermediate roundings. For example, in f16 matmul "
+          "kernels on targets with only f32 arithmetic, we have to perform "
+          "each multiply-accumulate in f32, and if this flag is false, then "
+          "we have to round those f32 accumulators to the nearest f16 every "
+          "time, which is slow."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-vmvx-enable-ukernels-decompose-linalg-generic",
+      enableUKernelsDecomposeLinalgGeneric,
+      llvm::cl::desc("Enables decomposition of linalg.generic ops when "
+                     "ukernels are enabled (experimental)"),
       llvm::cl::cat(category));
 }
 

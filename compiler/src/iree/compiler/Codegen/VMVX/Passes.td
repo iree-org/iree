@@ -33,6 +33,11 @@ def VMVXLowerExecutableTargetPass :
     InterfacePass<"iree-vmvx-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+  let options = [
+    Option<"vmvxOptions", "vmvx-options", "VMVXCodegenOptions",
+      /*default=*/"VMVXCodegenOptions::FromFlags::get()",
+      "Session-scoped VMVX codegen options.">,
+  ];
 }
 
 def VMVXLowerLinalgMicrokernelsPass :

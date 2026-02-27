@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -34,6 +35,7 @@ class VMVXLowerExecutableTargetPass
     : public impl::VMVXLowerExecutableTargetPassBase<
           VMVXLowerExecutableTargetPass> {
 public:
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<IREE::HAL::HALDialect,
@@ -74,7 +76,8 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
   case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-    addVMVXDefaultPassPipeline(pipeline, enableUKernels);
+    addVMVXDefaultPassPipeline(pipeline, enableUKernels,
+                               vmvxOptions.getValue());
     break;
   default:
     funcOp.emitOpError("Unsupported pipeline on VMVX target.");
