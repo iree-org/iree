@@ -280,3 +280,110 @@ func.func @no_simplify_not_divisible(%1 : memref<1x?xbf16, #amdgpu.address_space
 //       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
 //  CHECK-SAME: %[[MASK]]
 //       CHECK: return %[[READ]] : vector<1x8xbf16>
+
+// -----
+
+func.func @no_simplify_create_mask_permuted_map(%1 : memref<?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %index1 : index) -> vector<8x1xbf16> {
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %cst = arith.constant 1.000000e+00 : bf16
+  %mask = vector.create_mask %index1, %c8 : vector<1x8xi1>
+  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask
+    {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>}
+    : memref<?x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x1xbf16>
+  return %read : vector<8x1xbf16>
+}
+
+// CHECK-LABEL: @no_simplify_create_mask_permuted_map
+//       CHECK: %[[MASK:.+]] = vector.create_mask
+//       CHECK: vector.transfer_read {{.*}} %[[MASK]]
+
+// -----
+
+func.func @simplify_broadcast_mask(%1 : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %cond : i1) -> vector<8xbf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %1[%c0], %cst, %mask {in_bounds = [true]} : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
+}
+
+// CHECK-LABEL: @simplify_broadcast_mask
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8xbf16>
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
+//  CHECK-NOT:  vector<8xi1>
+//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[READ]], %[[CST]] : vector<8xbf16>
+//       CHECK: return %[[SEL]] : vector<8xbf16>
+
+// -----
+
+func.func @simplify_broadcast_mask_multi_read(%1 : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %2 : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %cond : i1) -> (vector<8xbf16>, vector<8xbf16>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read1 = vector.transfer_read %1[%c0], %cst, %mask {in_bounds = [true]} : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  %read2 = vector.transfer_read %2[%c0], %cst, %mask {in_bounds = [true]} : memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read1, %read2 : vector<8xbf16>, vector<8xbf16>
+}
+
+// CHECK-LABEL: @simplify_broadcast_mask_multi_read
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[ARG1:.+]]: memref<8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8xbf16>
+//       CHECK: %[[READ1:.+]] = vector.transfer_read %[[ARG0]]
+//       CHECK: %[[SEL1:.+]] = arith.select %[[COND]], %[[READ1]], %[[CST]] : vector<8xbf16>
+//       CHECK: %[[READ2:.+]] = vector.transfer_read %[[ARG1]]
+//       CHECK: %[[SEL2:.+]] = arith.select %[[COND]], %[[READ2]], %[[CST]] : vector<8xbf16>
+//       CHECK: return %[[SEL1]], %[[SEL2]] : vector<8xbf16>, vector<8xbf16>
+
+// -----
+
+func.func @no_simplify_broadcast_mask_no_fat_raw_buffer(%1 : memref<8xbf16>, %cond : i1) -> vector<8xbf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %1[%c0], %cst, %mask {in_bounds = [true]} : memref<8xbf16>, vector<8xbf16>
+  return %read : vector<8xbf16>
+}
+
+// CHECK-LABEL: @no_simplify_broadcast_mask_no_fat_raw_buffer
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<8xbf16>, %[[COND:.+]]: i1)
+//       CHECK: %[[MASK:.+]] = vector.broadcast %[[COND]] : i1 to vector<8xi1>
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]{{.+}}, %[[MASK]]
+//       CHECK: return %[[READ]] : vector<8xbf16>
+
+// -----
+
+// Broadcast masks on fat raw buffers are optimized even without in_bounds,
+// because fat raw buffers handle OOB reads gracefully (return 0).
+func.func @simplify_broadcast_mask_no_inbounds(%1 : memref<6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %cond : i1) -> vector<8xbf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<8xi1>
+  %read = vector.transfer_read %1[%c0], %cst, %mask {in_bounds = [false]} : memref<6xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8xbf16>
+  return %read : vector<8xbf16>
+}
+
+// CHECK-LABEL: @simplify_broadcast_mask_no_inbounds
+//  CHECK-SAME:   (%[[ARG0:.+]]: memref<6xbf16, #amdgpu.address_space<fat_raw_buffer>>, %[[COND:.+]]: i1)
+//   CHECK-DAG: %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<8xbf16>
+//       CHECK: %[[READ:.+]] = vector.transfer_read %[[ARG0]]
+//  CHECK-NOT:  vector<8xi1>
+//       CHECK: %[[SEL:.+]] = arith.select %[[COND]], %[[READ]], %[[CST]] : vector<8xbf16>
+//       CHECK: return %[[SEL]] : vector<8xbf16>
+
+// -----
+
+func.func @no_simplify_broadcast_mask_permuted_map(%1 : memref<4x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, %cond : i1) -> vector<8x4xbf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : bf16
+  %mask = vector.broadcast %cond : i1 to vector<4x8xi1>
+  %read = vector.transfer_read %1[%c0, %c0], %cst, %mask
+    {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>}
+    : memref<4x8xbf16, #amdgpu.address_space<fat_raw_buffer>>, vector<8x4xbf16>
+  return %read : vector<8x4xbf16>
+}
+
+// CHECK-LABEL: @no_simplify_broadcast_mask_permuted_map
+//       CHECK: %[[MASK:.+]] = vector.broadcast %{{.+}} : i1 to vector<4x8xi1>
+//       CHECK: vector.transfer_read {{.*}} %[[MASK]]
