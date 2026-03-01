@@ -97,7 +97,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   }
 
   // 3. Calculate new tiling levels.
-  // Note that this will basically erase the _H_ dims from the orignal lowering
+  // Note that this will basically erase the _H_ dims from the original lowering
   // config.
   auto dims = linalg::inferConvolutionDims(convOp);
   SmallVector<unsigned> hDimsToErase = {dims->outputImage[0],

@@ -38,7 +38,7 @@ builtin.module {
 
 
 // -----
-// Test that maximum and minum are converted to max and min on rocm
+// Test that maximum and minimum are converted to max and min on rocm
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,

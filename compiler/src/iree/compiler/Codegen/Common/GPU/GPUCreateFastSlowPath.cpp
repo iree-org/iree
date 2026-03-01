@@ -134,7 +134,7 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
   };
   scf::IfOp::create(rewriter, padOp.getLoc(), ifCond, thenBuilder, elseBuilder);
 
-  // All of these ops have been cloned to both regions. Erease them now.
+  // All of these ops have been cloned to both regions. Erase them now.
   for (Operation *op : llvm::reverse(cloneOps)) {
     rewriter.eraseOp(op);
   }

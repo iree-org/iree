@@ -106,8 +106,8 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
   auto funcOp = getOperation();
 
   // Collect all storage buffer subspan ops with 1-D static shapes. We only need
-  // to handle such cases here--high-D static shapes are expected to be flattend
-  // into 1-D by a previous pass.
+  // to handle such cases here--high-D static shapes are expected to be
+  // flattened into 1-D by a previous pass.
   SmallVector<IREE::HAL::InterfaceBindingSubspanOp> subspanOps;
   funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
     if (is1DStaticShapedStorageBuffer(subspanOp)) {

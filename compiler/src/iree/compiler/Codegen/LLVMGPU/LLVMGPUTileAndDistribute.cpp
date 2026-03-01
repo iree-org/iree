@@ -66,7 +66,7 @@ static LogicalResult tileReductionLoops(mlir::FunctionOpInterface funcOp) {
 
 static LogicalResult tileToSerialLoops(mlir::FunctionOpInterface funcOp) {
   {
-    // Tile again at the workgroup level since redution dimension were
+    // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     if (failed(tileReductionLoops(funcOp))) {

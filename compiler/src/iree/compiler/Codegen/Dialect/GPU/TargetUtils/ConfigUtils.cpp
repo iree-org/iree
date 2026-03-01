@@ -36,7 +36,7 @@
 #define DEBUG_TYPE "iree-gpu-config-utils"
 
 static llvm::cl::opt<bool> clGPUTestCpromotion(
-    "iree-codegen-test-c-promtion",
+    "iree-codegen-test-c-promotion",
     llvm::cl::desc("C promote in specific case of elemetwise operations that "
                    "codegen cant yet support without it if also doing padding"),
     llvm::cl::init(true));
@@ -1450,7 +1450,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   const unsigned scaleToByte =
       std::max(8 / distInfo.minBitwidth, static_cast<unsigned>(1));
 
-  // Distribute workload to the given `numThreads` by allowing a potental loss.
+  // Distribute workload to the given `numThreads` by allowing a potential loss.
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) -> int64_t {
@@ -1628,7 +1628,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   // Heuristic value chosen to limit maximum vector sizes when tiling below.
   const unsigned maxVectorSize = 32;
 
-  // Try to tile all reductions by some small factor, preferrably 4, when
+  // Try to tile all reductions by some small factor, preferably 4, when
   // possible. This gives us a chance to perform vector4 load if an input has
   // its innnermost dimension being reduction. It also avoids generating too
   // many instructions when unrolling vector later. We limit the expected

@@ -75,7 +75,7 @@ private:
   std::optional<PackUnPackControlFn> controlFn;
 };
 
-/// A warpper pattern that calls linalg::lowerUnPack on linalg::UnPackOp. It
+/// A wrapper pattern that calls linalg::lowerUnPack on linalg::UnPackOp. It
 /// lowers a linalg.unpack op to tensor.empty + linalg.transpose +
 /// tensor.collapse_shape + tensor.extract_slice ops.
 struct LowerUnPackPattern : public OpRewritePattern<linalg::UnPackOp> {

@@ -92,7 +92,7 @@ def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
   let description = [{
     Indicates that tensor.extract_slice -> vector.transfer_read and
     vector.transfer_write -> tensor.insert_slice op chains should be folded into
-    vector tranfer read and write ops
+    vector transfer read and write ops
   }];
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -595,7 +595,7 @@ def ShareForallOperandsOp : Op<
     However this can still be unsafe wrt parallelism so use carefully!
 
     Sharing consists in rewriting all uses of the operands passed as
-    `shared_outs` that are also captured wihtin the `scf.forall` region
+    `shared_outs` that are also captured within the `scf.forall` region
     into the matching `shared_outs` bbarg.
 
     Only those operands whose indices are specified in `share_operands` are

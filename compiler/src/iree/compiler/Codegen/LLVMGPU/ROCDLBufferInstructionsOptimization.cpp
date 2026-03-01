@@ -87,7 +87,7 @@ static bool isInnermostMaskIndexDivisible(Value maskIndex, int64_t maskSize,
 // %read = vector.transfer_read %memref : memref<1x?xbf16, amdgpu.raw_fat_buffer> // no mask!
 // %masked_read = arith.select %cmp, %read, %padding : vector<1x8xbf16>
 // clang-format on
-// Note we currently dont support cases where muliple masks are ANDed or ORed
+// Note we currently dont support cases where multiple masks are ANDed or ORed
 // together to form the final mask to a read but such support can be added where
 // we track a set of valid masks and add that an AND or OR of valid masks is
 // valid.

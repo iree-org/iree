@@ -459,7 +459,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
       loweringConfigs.push_back({linalgOp, *loweringConfig});
     }
   }
-  // Only set lowering configs once we've sucessfully determined them for all
+  // Only set lowering configs once we've successfully determined them for all
   // operations, to avoid leaving the IR in an inconsistent state on failure.
   for (auto &[linalgOp, loweringConfig] : loweringConfigs) {
     setLoweringConfig(linalgOp, loweringConfig);

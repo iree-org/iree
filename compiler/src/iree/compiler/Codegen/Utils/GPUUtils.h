@@ -153,7 +153,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType);
 
 /// Return true if the given memref has one of the global address spaces - no
-/// adress space, explicit integer 0, #gpu.address_space<global>, or
+/// address space, explicit integer 0, #gpu.address_space<global>, or
 /// #amdgpu.address_space<fat_raw_buffer>
 bool hasGlobalMemoryAddressSpace(MemRefType memrefType);
 

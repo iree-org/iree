@@ -181,7 +181,7 @@ func.func @test_multiple_reduction() {
 
 // The same IR as 'test_multiple_reduction' but with an unsupported operation,
 // preventing this from going down vector distribute. Previously lowering configs
-// would be attached to the suppported operations even though the full dispatch
+// would be attached to the supported operations even though the full dispatch
 // is unsupported.
 func.func @test_negative_multiple_reduction() {
   %cst = arith.constant 0.000000e+00 : f32

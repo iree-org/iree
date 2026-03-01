@@ -55,7 +55,7 @@ func.func @do_not_decompose_batch_mmt4d(%arg0: tensor<1x10x32x8x1xf32>, %arg1: t
 
 // -----
 
-func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> attributes {
+func.func @batch_mmt4d_with_extended_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %c0_i32 = arith.constant 0 : i32
@@ -83,7 +83,7 @@ func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1:
 }
 
 // CHECK:      #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK:      func.func @batch_mmt4d_with_extened_inputs
+// CHECK:      func.func @batch_mmt4d_with_extended_inputs
 // CHECK-SAME:   %[[LHS:.+]]: tensor<1x10x32x8x1xi8>,
 // CHECK-SAME:   %[[RHS:.+]]: tensor<1x80x32x4x1xi8>,
 // CHECK-SAME:   %[[OUT:.+]]: tensor<1x10x80x8x4xi32>

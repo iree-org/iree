@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 //====---------------------------------------------------------------------===//
-// Pass to lower workgroup memory copy to distibuted
+// Pass to lower workgroup memory copy to distributed
 // transfer_read/transfer_write ops.
 //====---------------------------------------------------------------------===//
 

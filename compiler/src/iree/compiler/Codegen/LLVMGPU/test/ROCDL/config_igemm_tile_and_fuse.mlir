@@ -338,7 +338,7 @@ func.func @nhwc_conv_mfma_biasadd(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x12
 //           CHECK: promote_operands = [0, 1, 2]
 
 // -----
-// Check that we dont c promote if there is no additonal operand
+// Check that we dont c promote if there is no additional operand
 func.func @nhwc_conv_mfma_truncf(%3: tensor<2x35x35x128xf32>, %4: tensor<3x3x128x64xf32>, %5 : tensor<2x33x33x64xf32>) -> tensor<2x33x33x64xf16> {
   %cst = arith.constant 0.000000e+00 : f32
   %empty = tensor.empty() : tensor<2x33x33x64xf32>

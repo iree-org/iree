@@ -730,7 +730,7 @@ void transform_dialect::IREEApplyLoopIndependentCodeMotionOp::getEffects(
 
 // Important note: this transform is load-bearing and is the glue between
 // different dialects that want to operate on tensors.
-// Originaly, it used to just call `addIREEComprehensiveBufferizePasses` but
+// Originally, it used to just call `addIREEComprehensiveBufferizePasses` but
 // this introduces a lot of complexity in the registration process due to the
 // use of nested pass pipelines, to a point that it is a major endeavor to
 // connect a new dialect.
@@ -814,7 +814,7 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
   // Insert barriers for copies from and to shared memory. We use
-  // workgroup-scope barriers here because we do not currenly produce code that
+  // workgroup-scope barriers here because we do not currently produce code that
   // destructively overwrites global memory or uses it as a communication
   // mechanism, thus eliminating the need for us to force glomal reads/writes to
   // conclude at the barrier. This produces performance improvements on backends

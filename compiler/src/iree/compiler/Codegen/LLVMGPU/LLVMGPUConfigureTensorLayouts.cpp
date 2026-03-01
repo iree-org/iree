@@ -203,7 +203,7 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
 
   // MMA intrinsics can be weird and usually don't have a single subgroup
   // iteration space, so we need to find their value subgroup iteration space
-  // indvidually.
+  // individually.
   auto getFragmentLayout = [&](int operandIndex, int64_t outerDim,
                                int64_t innerDim,
                                AffineMap map) -> VectorLayoutInterface {
@@ -353,7 +353,7 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 /// is only defined on standard "@" function, it may be a different
 /// transformation for other indexing maps.
 ///
-/// For linalg operands, since the indexing maps are part of the op defination,
+/// For linalg operands, since the indexing maps are part of the op definition,
 /// we can achieve the same transformation by simply swapping the operands.
 static void swapOperandsToTransposeIntrinsic(RewriterBase &rewriter,
                                              linalg::GenericOp contractOp) {

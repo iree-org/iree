@@ -37,7 +37,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     `vector<subgroup1 x subgroup2 x batch1 x batch2 x ... x element1 x element2>`
 
     Now, when the vector<subgroup x batch x outer x thread x element> is
-    indexed, the indices of 'subgroup' and `thread` are not directly refferring
+    indexed, the indices of 'subgroup' and `thread` are not directly referring
     to the subgroup_id and thread_id in the GPU context. lets define them
     as virtual_subgroup_id and virtual_thread_id and they hold the following
     definition:
@@ -83,7 +83,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     The total number of subgroups used (computed by multiplying each dim in
     subgroup_tile) should be a multiple of number of subgroups in the
-    harware. If the total number of subgroups used exceeds the number of
+    hardware. If the total number of subgroups used exceeds the number of
     subgroups of the hardware, then the subgroup used (say x) is
     x mod num_subgroups:
 
@@ -99,7 +99,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     #### Threads per Subgroup:
 
     This level of tiling is also known as "thread distribution" within a subgroup.
-    The logic is quite similiar to subgroup distribution using the tile sizes
+    The logic is quite similar to subgroup distribution using the tile sizes
     and the 'thread_strides'.
 
     #### Element distribution on a thread

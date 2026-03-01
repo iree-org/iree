@@ -141,7 +141,7 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
 
     // GPU subgroup MMA ops do not care about the memref element type. But we
     // still need to make sure we can load/store with good strides.
-    // The `leadingDimension` attributes specifies the stride (numer of
+    // The `leadingDimension` attributes specifies the stride (number of
     // *elements*) over the memref for the leading dimension.
     auto memrefType = cast<MemRefType>(memrefVal.getType());
     std::optional<unsigned> elementBits =
