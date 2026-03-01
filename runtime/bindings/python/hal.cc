@@ -1872,9 +1872,8 @@ void SetupHalBindings(nanobind::module_ m) {
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
           kHalWait);
 
-  py::class_<HalMappedMemory>(
-      m, "MappedMemory",
-      buffer_protocol_slots<HalMappedMemory>())
+  py::class_<HalMappedMemory>(m, "MappedMemory",
+                              buffer_protocol_slots<HalMappedMemory>())
       .def(
           "asarray",
           [](HalMappedMemory* self, py::handle shape, py::object dtype_descr) {

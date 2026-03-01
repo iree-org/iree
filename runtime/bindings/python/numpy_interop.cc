@@ -56,7 +56,6 @@ py::object DescrNewFromType(iree_hal_element_type_t t) {
   return py::module_::import_("numpy").attr("dtype")(name);
 }
 
-
 py::object SimpleNewFromData(int nd, intptr_t const* dims,
                              py::handle dtype_descr, void* data,
                              py::handle base_object) {
