@@ -331,7 +331,7 @@ jobs:
       ##########################################################################
       # TF Compiler Tools
       # These wheels are not Python version specific and include only Python
-      # code (no C/C++), so just build for one examplar python version on Linux.
+      # code (no C/C++), so just build for one exemplar python version on Linux.
       ##########################################################################
 
       - name: Build TF Compiler Tools wheels
