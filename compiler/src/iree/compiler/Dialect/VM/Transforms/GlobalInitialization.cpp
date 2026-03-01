@@ -115,7 +115,7 @@ static void fixupGlobalMutability(Operation *moduleOp,
   });
 }
 
-// Finds all global variables and moves their inital values/initializer calls
+// Finds all global variables and moves their initial values/initializer calls
 // into a single function. Relies on the inliner to later make the uber function
 // better.
 //

@@ -24,7 +24,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 /// S = reduce QKT dim=2 keep_dims=True
 /// att = S @ V
 ///
-/// By this defination, K1 and K2 can be seen as reduction dimensions and
+/// By this definition, K1 and K2 can be seen as reduction dimensions and
 /// B, M, N can be seen as parallel dimensions.
 ///
 /// Generally, K1 and N are really small (64/128), K2 and M are really large

@@ -35,7 +35,7 @@ static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
 }
 
 static std::tuple<SmallVector<Value>, SmallVector<Value>>
-lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
+lookupDevicesAndQueueAffinitiesFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   SmallVector<Value> devices;
   SmallVector<Value> queueAffinities;
@@ -67,7 +67,7 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          Value bufferUsage,
                                                          OpBuilder &builder) {
   auto [devices, queueAffinities] =
-      lookupDevicesAndQueueAffintiesFor(op, builder);
+      lookupDevicesAndQueueAffinitiesFor(op, builder);
   // Returns the device and queue affinity for the first device, if only one
   // exists.
   if (devices.size() == 1) {

@@ -38,7 +38,7 @@ namespace mlir::iree_compiler::Preprocessing {
 
 } // namespace mlir::iree_compiler::Preprocessing
 
-/// Get strides for row-major oredering of a tensor with the given `shape`.
+/// Get strides for row-major ordering of a tensor with the given `shape`.
 static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   if (shape.empty()) {
     return {};

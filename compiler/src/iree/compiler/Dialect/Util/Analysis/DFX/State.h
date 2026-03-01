@@ -181,7 +181,7 @@ struct BooleanState : public IntegerStateBase<bool, 1, 0> {
   // Returns true if the state is known to hold.
   bool isKnown() const { return getKnown(); }
 
-  // Sets the known and asssumed value to |value|.
+  // Sets the known and assumed value to |value|.
   void setKnown(bool value) {
     known |= value;
     assumed |= value;
@@ -414,13 +414,14 @@ struct PotentialValuesState : AbstractState {
   // Returns this set. We should check whether this set is valid or not by
   // isValidState() before calling this function.
   const SetTy &getAssumedSet() const {
-    assert(isValidState() && "This set shoud not be used when it is invalid!");
+    assert(isValidState() && "This set should not be used when it is invalid!");
     return set;
   }
 
   // Returns whether this state contains an undef value or not.
   bool isUndefContained() const {
-    assert(isValidState() && "This flag shoud not be used when it is invalid!");
+    assert(isValidState() &&
+           "This flag should not be used when it is invalid!");
     return undefIsContained;
   }
 

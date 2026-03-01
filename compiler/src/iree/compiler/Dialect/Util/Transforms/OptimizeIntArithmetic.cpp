@@ -42,7 +42,7 @@ namespace {
 // platforms, demoting to an index is only conservatively correct if all
 // operands and all results are within the unsigned 32bit bounds.
 // While there is a good chance that such arithmetic that exceeds these
-// bounds is simply wrong/overflow-ridden, we opt to do no harm and preseve
+// bounds is simply wrong/overflow-ridden, we opt to do no harm and preserve
 // the exact results. This optimization is targeted at "small" sequences
 // anyway and this catches everything known to exist. If needed, this rule
 // could be dropped if it is ever appropriate to unconditionally assume
@@ -466,7 +466,7 @@ class OptimizeIntArithmeticPass
     expandAffineOps(op);
 
     DataFlowSolver solver;
-    // Needed to make the dead code analyis not be too conservative.
+    // Needed to make the dead code analysis not be too conservative.
     solver.load<SparseConstantPropagation>();
     solver.load<DeadCodeAnalysis>();
     solver.load<IntegerRangeAnalysis>();

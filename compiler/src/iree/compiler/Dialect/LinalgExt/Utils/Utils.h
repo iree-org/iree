@@ -133,7 +133,7 @@ static void permute(SmallVectorImpl<T> &vector) {
   }
 }
 
-/// Return dim expresssions that can be used as replacements in map that
+/// Return dim expressions that can be used as replacements in map that
 /// contains `numSymbols` symbols. The new dim expressions have positions
 /// `numDims, numDims + 1, numDims + 2, ...., numDims + numSymbols - 1`.
 SmallVector<AffineExpr> getDimExprsForSymbols(MLIRContext *context,

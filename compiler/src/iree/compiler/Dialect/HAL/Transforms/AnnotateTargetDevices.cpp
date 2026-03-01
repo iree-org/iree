@@ -24,7 +24,7 @@ namespace {
 // --iree-hal-annotate-target-devices
 //===----------------------------------------------------------------------===//
 
-// Sorts |attrs| in lexigraphical order.
+// Sorts |attrs| in lexicographical order.
 // We have to do this as the PVS elements we source from are unsorted.
 static void sortAttributes(SmallVectorImpl<Attribute> &attrs) {
   if (attrs.size() <= 1) {

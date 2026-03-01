@@ -1356,8 +1356,8 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
   if (installSignalHandlers) {
     // A few other things from InitLLVM to setup default command-line signal
     // handlers. See InitLLVM::InitLLVM for the initialization sequence and
-    // commentary, should it ever be necessary to revist this (it hasn't changed
-    // in many years).
+    // commentary, should it ever be necessary to revisit this (it hasn't
+    // changed in many years).
     llvm::sys::SetOneShotPipeSignalFunction(
         llvm::sys::DefaultOneShotPipeSignalHandler);
     static llvm::PrettyStackTraceProgram stackPrinter(argc, argv);

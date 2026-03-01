@@ -92,7 +92,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
       builder.getArrayAttr({builder.getStringAttr("static")}));
   newFuncOp.setPrivate();
 
-  // This call shold be equivalent to rewriter.inlineRegionBefore()
+  // This call should be equivalent to rewriter.inlineRegionBefore()
   newFuncOp.getFunctionBody().getBlocks().splice(
       newFuncOp.end(), funcOp.getFunctionBody().getBlocks());
 
@@ -1508,7 +1508,7 @@ private:
     // printed as the arguments to the function call.
     SmallVector<Attribute> args_;
 
-    // If the operation has attributes, we need to explicitely build the args
+    // If the operation has attributes, we need to explicitly build the args
     // attribute of the emitc opaque_call op. This consists of index attributes
     // for the operands, followed by the source op attributes themselves.
     if (op->getAttrs().size() > 0) {

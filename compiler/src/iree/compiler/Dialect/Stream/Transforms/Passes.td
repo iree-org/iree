@@ -27,7 +27,7 @@ def ConvertToStreamPass :
     used on the program ABI boundary for interoperating with external buffers
     and fences. These ops, such as `hal.tensor.import` and `hal.tensor.barrier`,
     will be converted to their `stream` dialect form and preserve the implicit
-    synchronization guaranteeds required for proper analysis.
+    synchronization guarantees required for proper analysis.
 
     Dispatched executables are allowed to be in one of the supported input
     dialects (like `flow.executable`), already be lowered into

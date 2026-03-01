@@ -223,8 +223,8 @@ def Util_PreprocessingPipelineAttr : Util_AttrDef<"PreprocessingPassPipeline"> {
   let summary = "[{Preprocessing pass-pipeline to run on the function.}]";
   let description = [{
     Textual description of the preprocessing pass-pipeline to run on the
-    function-like object that the attribute is specified on. Note that the
-    string pipeline is implicitly nested to `builtin.module(func-lik(..))`
+    function-likee object that the attribute is specified on. Note that the
+    string pipeline is implicitly nested to `builtin.module(func-like(..))`
     operation. For example to run the transpose convolution pipeline, the
     attribute is specified as
 

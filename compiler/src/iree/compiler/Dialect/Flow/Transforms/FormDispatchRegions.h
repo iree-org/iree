@@ -40,7 +40,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 FailureOr<IREE::Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
                                                           Operation *rootOp);
 
-/// Simplfy the given tensor::DimOps as much as possible.
+/// Simplify the given tensor::DimOps as much as possible.
 /// * Static dimensions are replaced by constant.
 /// * Dynamic dim ops are pushed as much as possible to the top of the function,
 ///   i.e., if the dim of a value is known to be equal to the dim of a value on

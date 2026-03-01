@@ -48,7 +48,7 @@ struct MakeReductionInnermostPattern final
         }
       }
     }
-    // If all the parallel loops are outter loops skip the pattern.
+    // If all the parallel loops are outer loops skip the pattern.
     if (!needInterchange) {
       return failure();
     }

@@ -26,7 +26,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 /// The CastOpInterface op should extend the bitwidth of the source.
 /// The bitwidth of the source element type should be greater than 1. If it is
 /// casting from i1 types, a std::nullopt is returned. It is dangerous to mix
-/// boalean concept and i1 subtypes concept at graph optimizatoin level. We
+/// boalean concept and i1 subtypes concept at graph optimization level. We
 /// ignore this type of casting ops intentionally.
 /// TODO(hanchung): Remove the restriction about i1 after we can handle i1
 /// sub-type emulation and deprecate TypePropagation pass.
