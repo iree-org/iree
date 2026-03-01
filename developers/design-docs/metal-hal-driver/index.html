@@ -6577,7 +6577,7 @@
 
 
 <h1 id="metal-hal-driver">Metal HAL driver<a class="headerlink" href="#metal-hal-driver" title="Permanent link">link</a></h1>
-<p>This document lists technical details regarding the Metal implemenation of
+<p>This document lists technical details regarding the Metal implementation of
 IREE's Hardware Abstraction Layer, called a Metal HAL driver.</p>
 <p>IREE provides a <a href="https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
 interface to different compute accelerators. IREE HAL's design draws inspiration
@@ -6670,7 +6670,7 @@ creation.</p>
 <p><a href="https://github.com/iree-org/iree/tree/main/experimental/metal/metal_device.h"><code>iree_hal_metal_device_t</code></a> implements <a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a>
 to provide the interface to Metal GPU device by wrapping a <code>id&lt;MTLDevice&gt;</code>. Upon
 construction, <code>iree_hal_metal_device_t</code> creates and retains one queue for both
-dispatch and transfer during its lifetime. In the future we expect to spport
+dispatch and transfer during its lifetime. In the future we expect to support
 multiple queues for better concurrency.</p>
 <h4 id="command-buffer-submission">Command buffer submission<a class="headerlink" href="#command-buffer-submission" title="Permanent link">link</a></h4>
 <p>In IREE HAL, command buffers are directly created from the <code>iree_hal_device_t</code>.
@@ -6692,7 +6692,7 @@ in three steps:</p>
 <code>iree_hal_device_queue_alloc</code> is not fully supported yet; it just
 translates to blocking wait and allocation.</p>
 <h4 id="collectives">Collectives<a class="headerlink" href="#collectives" title="Permanent link">link</a></h4>
-<p>Collectives suppport is not yet implemented.</p>
+<p>Collectives support is not yet implemented.</p>
 <h4 id="profiling">Profiling<a class="headerlink" href="#profiling" title="Permanent link">link</a></h4>
 <p>The Metal HAL driver supports profiling via <code>MTLCaptureManager</code>. We can either
 capture to a trace file or XCode.</p>
@@ -6737,7 +6737,7 @@ Metal world, the counterpart would be <a href="https://developer.apple.com/docum
 of the <code>iree_hal_semaphore_t</code> APIs are simple to implement in
 <a href="https://github.com/iree-org/iree/tree/main/experimental/metal/shared_event.h"><code>MetalSharedEvent</code></a>, with <code>iree_hal_semaphore_wait()</code> as an
 exception. A listener is registered on the <code>MTLSharedEvent</code> with
-<code>notifyListener:atValue:block:</code> to singal a semaphore to wake the current
+<code>notifyListener:atValue:block:</code> to signal a semaphore to wake the current
 thread, which is put into sleep by waiting on the semaphore.</p>
 <h3 id="allocator">Allocator<a class="headerlink" href="#allocator" title="Permanent link">link</a></h3>
 <p>At the moment the Metal HAL driver just has a very simple
@@ -6757,8 +6757,8 @@ An entry point in a <code>MTLLibrary</code> is a <a href="https://developer.appl
 constructed from <code>MTLFunction</code>s.</p>
 <h3 id="executable-cache">Executable cache<a class="headerlink" href="#executable-cache" title="Permanent link">link</a></h3>
 <p>IREE <a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable_cache.h"><code>iree_hal_executable_cache_t</code></a> is modeling a cache of
-preprared GPU executables for a particular device. At the moment the Metal
-HAL driver does not peforming any caching on GPU programs; it simply reads the
+prepared GPU executables for a particular device. At the moment the Metal
+HAL driver does not performing any caching on GPU programs; it simply reads the
 program from the FlatBuffer and hands it over to Metal driver.</p>
 <h2 id="compute-pipeline">Compute Pipeline<a class="headerlink" href="#compute-pipeline" title="Permanent link">link</a></h2>
 <h3 id="shaderkernel-compilation">Shader/kernel compilation<a class="headerlink" href="#shaderkernel-compilation" title="Permanent link">link</a></h3>
@@ -6802,7 +6802,7 @@ different places: the former is given when invoking
 dispatched SPIR-V code. This split does not match the Metal model, where we
 specify both in the API with <code>dispatchThreads:threadsPerThreadgroup:</code>.</p>
 <p>As said in <a href="#shaderkernel-compilation">shader/kernel compilation</a>, MSL kernels
-are cross compiled from SPIR-V code and then embeded in the module FlatBuffer.
+are cross compiled from SPIR-V code and then embedded in the module FlatBuffer.
 The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
 information extracted from the SPIR-V code. We encode an additional 3-D vector
 for each entry point and use it as the threadgroup size when later dispatching

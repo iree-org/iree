@@ -11433,7 +11433,7 @@ memory) then <code>did_import</code> will indicate that the returned buffer is n
 the given lifetime and affinity. This operation encapsulates the logic
 for deriving buffer properties based on stream resource semantics.</p>
 <p>This operation can be resolved later in compilation either by canonicalization
-for single device affinties or using the topology attribute for multiple devices.</p>
+for single device affinities or using the topology attribute for multiple devices.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>%memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
     for(#hal.device.affinity&lt;@device_a&gt;)
@@ -12326,7 +12326,7 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
               `:` type($result)
 </code></pre></div>
 <p>Maps an MLIR type to a runtime <code>iree_hal_element_type_t</code> value for all types
-that are convertable.</p>
+that are convertible.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -12359,7 +12359,7 @@ that are convertable.</p>
               `:` type($result)
 </code></pre></div>
 <p>Maps an MLIR encoding to a runtime <code>iree_hal_encoding_type_t</code> value for all
-encodings that are convertable.</p>
+encodings that are convertible.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -14669,7 +14669,7 @@ a virtual address (GetMappedFileNameA/posix_mem_offset) but the APIs are
 sketchy and likely slow. Instead we should probably have a way to query for
 a file handle derived from the calling module by stack-walking and asking
 the VM module for its handle. Until we can figure this out this method will
-be marked epxerimental.</p>
+be marked experimental.</p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>OpAsmOpInterface</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>

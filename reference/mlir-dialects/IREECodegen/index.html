@@ -7944,7 +7944,7 @@ criterion depends on the <code>opaque</code> boolean attribute:
   unit-dimensions.</p>
 <p>Note that different <code>kind</code> attributes may adopt different conventions as to
 the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
-and it may be necessary to use <code>opaque = true</code> to accomodate them. Others
+and it may be necessary to use <code>opaque = true</code> to accommodate them. Others
 may use higher-rank vectors with shapes reflecting semantics, allowing to
 use <code>opaque = false</code>, which is preferable when possible at all thanks to the
 stricter semantics. However, that is not only a function of the <code>kind</code>
@@ -7992,7 +7992,7 @@ without needing to essentially clone this op.</p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indxing affine maps</td></tr>
+<tr><td><code>indexing_maps</code></td><td>::mlir::ArrayAttr</td><td>indexing affine maps</td></tr>
 <tr><td><code>iterator_types</code></td><td>::mlir::ArrayAttr</td><td>Iterator type should be an enum.</td></tr>
 <tr><td><code>kind</code></td><td>IREE::Codegen::InnerTileDescAttrInterface</td><td>buffer-like constant attribute values</td></tr>
 <tr><td><code>semantics</code></td><td>IREE::Codegen::InnerTiledSemanticsAttrInterface</td><td>Attribute implementing InnerTiledSemanticsAttrInterface</td></tr>
