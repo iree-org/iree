@@ -6251,7 +6251,7 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
               attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the buffer view or tensor operands with float elements satisfy
-the Numpy-style fuzzy-comparision condition with parameters <code>atol</code>,
+the Numpy-style fuzzy-comparison condition with parameters <code>atol</code>,
 <code>rtol</code>, defined exactly as in NumPy isclose():
 <a href="https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449">https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449</a></p>
 <p>The condition being verified on each lhs and rhs value is:
@@ -6261,7 +6261,7 @@ to return true. Indeed, in that case, lhs-rhs is NaN.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <p>The <code>atol</code>, <code>rtol</code> parameters may be omitted, in which case some default
 value is used. The default <code>atol</code> is nonzero, while the default <code>rtol</code> is
-zero, which makes these comparision behave closer to exact comparisons as
+zero, which makes these comparison behave closer to exact comparisons as
 the values being compared get large.</p>
 <p>This default behavior is supported for legacy compatibility and to support
 some use cases that legitimately don't care, but the majority of use cases
@@ -6307,7 +6307,7 @@ should care and so should provide explicit <code>atol</code>, <code>rtol</code> 
 </code></pre></div>
 <p>This op is just a convenience wrapper around the expect_almost_eq op.</p>
 <p>Verifies that the buffer view or tensor operands with float elements satisfy
-the Numpy-style fuzzy-comparision condition with pararameters <code>atol</code>,
+the Numpy-style fuzzy-comparison condition with pararameters <code>atol</code>,
 <code>rtol</code>. More details in the description of <code>expect_almost_eq</code>.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq_const(%const0, dense&lt;[0.999999, 2.0]&gt; : tensor&lt;5xf32&gt;, atol 1.0e-2, rtol 1.0e-3) : tensor&lt;5xf32&gt;
