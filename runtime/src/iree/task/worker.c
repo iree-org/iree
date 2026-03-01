@@ -301,7 +301,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
   while (true) {
     // If we fail to find any work to do we'll wait at the end of this loop.
     // In order not to not miss any work that is enqueued after we've already
-    // checked a particular source we use an interruptable wait token that
+    // checked a particular source we use an interruptible wait token that
     // will prevent the wait from happening if anyone touches the data
     // structures we use.
     iree_wait_token_t wait_token =

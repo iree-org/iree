@@ -683,7 +683,7 @@ TEST(StringViewTest, MatchPattern) {
 
   // Exact matches.
   EXPECT_TRUE(match("abc", "abc"));
-  EXPECT_FALSE(match("abc", "abd"));
+  EXPECT_FALSE(match("abc", "and"));
   EXPECT_FALSE(match("abc", "ab"));
   EXPECT_FALSE(match("ab", "abc"));
 

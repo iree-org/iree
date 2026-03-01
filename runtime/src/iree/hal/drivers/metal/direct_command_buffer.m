@@ -646,7 +646,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_fill_buffer(
       z0, iree_arena_allocate(&command_buffer->arena, sizeof(*segment) + pattern_length,
                               (void**)&storage_base));
 
-  // Copy the patttern to the end of the segment for later access.
+  // Copy the pattern to the end of the segment for later access.
   uint8_t* pattern_ptr = storage_base + sizeof(*segment);
   memcpy(pattern_ptr, (const uint8_t*)pattern, pattern_length);
 

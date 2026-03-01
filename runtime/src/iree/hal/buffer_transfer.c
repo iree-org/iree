@@ -267,7 +267,7 @@ static iree_status_t iree_hal_device_submit_transfer_range_and_wait(
   iree_hal_buffer_t* target_buffer = target.device_buffer;
   if (iree_status_is_ok(status) && !target_buffer) {
     // Allocate uninitialized staging memory for the transfer target.
-    // We only allocate enough for the portion we are transfering.
+    // We only allocate enough for the portion we are transferring.
     // TODO(benvanik): use import if supported to avoid the allocation/copy.
     const iree_hal_buffer_params_t target_params = {
         .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |

@@ -827,7 +827,7 @@ typedef struct TfLiteContext {
   // }
   //
   // NOTE: The context owns the memory referenced by partition_params_array. It
-  // will be cleared with another call to PreviewDelegateParitioning, or after
+  // will be cleared with another call to PreviewDelegatePartitioning, or after
   // TfLiteDelegateParams::Prepare returns.
   //
   // WARNING: This is an experimental interface that is subject to change.

@@ -357,7 +357,7 @@ static iree_status_t iree_vm_bytecode_internal_enter(
   caller_storage->return_registers = dst_reg_list;
 
   // NOTE: after this call the caller registers may be invalid and need to be
-  // requeried.
+  // required.
   iree_vm_function_t function;
   function.module = module;
   function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;

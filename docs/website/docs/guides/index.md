@@ -18,7 +18,7 @@ Guides for specific frameworks:
 
 !!! info ""
 
-    Start here: [Deplyment configurations overview](./deployment-configurations/index.md)
+    Start here: [Deployment configurations overview](./deployment-configurations/index.md)
 
 Guides for specific configurations:
 

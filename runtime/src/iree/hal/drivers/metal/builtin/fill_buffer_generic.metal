@@ -16,7 +16,7 @@ struct FillSpec {
 // Fills target |buffer| with the given |spec|ification.
 //
 // The target |buffer| is assumed to have 16-byte aligned offset/length.
-// Each thread fills one 4-compoment 32-bit element vector.
+// Each thread fills one 4-component 32-bit element vector.
 kernel void fill_buffer_16byte(device uint4* buffer [[buffer(0)]],
                                constant FillSpec& spec [[buffer(1)]],
                                uint id [[thread_position_in_grid]]) {
@@ -54,7 +54,7 @@ kernel void fill_buffer_1byte(device uint32_t* buffer [[buffer(0)]],
   // 3. Right bytes: containing (0 to 3) bytes since the last 4-byte aligned
   // address
   //
-  // Threads are distributed from the perspecitve of handling middle 32-bit
+  // Threads are distributed from the perspective of handling middle 32-bit
   // scalars. We use the first thread to *additionally* handle left and right
   // bytes.
   uint8_t left_byte_count = spec.buffer_offset % 4;
@@ -69,7 +69,7 @@ kernel void fill_buffer_1byte(device uint32_t* buffer [[buffer(0)]],
   uint32_t left_mask = ~((uint64_t(1) << (8 * (4 - left_byte_count))) - 1);
   uint32_t right_mask = (uint64_t(1) << (8 * right_byte_count)) - 1;
 
-  // Indexing start points in |buffer| for the threee parts.
+  // Indexing start points in |buffer| for the three parts.
   uint64_t left_start = spec.buffer_offset / 4;
   uint64_t middle_start = (spec.buffer_offset + 3) / 4;
   uint64_t right_start = (spec.buffer_offset + spec.buffer_length) / 4;

@@ -202,7 +202,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
   //       operations. In a real command buffer we would be this stream command
   //       buffer is strictly used to perform inline execution/replay of
   //       deferred command buffers that are retaining the resources already.
-  // NOTE: reseting the arena invalidates the collective batch.
+  // NOTE: resetting the arena invalidates the collective batch.
   iree_arena_reset(&command_buffer->arena);
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);

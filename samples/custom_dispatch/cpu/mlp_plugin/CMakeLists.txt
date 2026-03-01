@@ -12,7 +12,7 @@ endif()
 
 ## Current support is only for x86.
 if(NOT IREE_ARCH STREQUAL "x86_64")
-  message(STATUS "IREE mlp_pluging sample ignored -- only builds for x86_64 (today)")
+  message(STATUS "IREE mlp_plugin sample ignored -- only builds for x86_64 (today)")
   return()
 endif()
 

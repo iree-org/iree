@@ -12,7 +12,7 @@ from mpi4py import MPI
 import test_utils
 
 """
-Run 1 rank in a destributed context.
+Run 1 rank in a distributed context.
 To start 4 ranks you would use
 ```
 mpirun -n 4 python run_rank.py ...
@@ -21,7 +21,7 @@ mpirun -n 4 python run_rank.py ...
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run 1 rank in a destributed context.")
+    parser = argparse.ArgumentParser(description="Run 1 rank in a distributed context.")
     parser.add_argument("--driver", type=str, default="local-task", help="Device URI.")
     parser.add_argument(
         "--module_filepath", type=str, required=True, help="Path to IREE module."

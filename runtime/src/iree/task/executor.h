@@ -233,7 +233,7 @@ extern "C" {
 //
 // If more than 64 unique L1/L2 caches (or realistically more than probably ~32)
 // are available *and* all of them are attached to the same memory controllers
-// (no NUMA involved) then the solution is straightfoward: use multiple IREE
+// (no NUMA involved) then the solution is straightforward: use multiple IREE
 // task executors. Either within a process or in separate processes the
 // granularity is coarse enough to not be a burden and changes the problem from
 // needing 100% perfect work scaling of a single task to needing a naive

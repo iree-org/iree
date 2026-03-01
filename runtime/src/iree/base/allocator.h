@@ -26,7 +26,7 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 #if IREE_STATISTICS_ENABLE
-// Evalutes the expression code only if statistics are enabled.
+// Evaluates the expression code only if statistics are enabled.
 //
 // Example:
 //  struct {

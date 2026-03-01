@@ -108,7 +108,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
 
     def to_host(self) -> np.ndarray:
         """Return the array as host accessible NumPy ndarray.
-        This may map the memory or create a copy depending on wether the array is
+        This may map the memory or create a copy depending on whether the array is
         mappable to the host."""
         return self._transfer_to_host(False)
 

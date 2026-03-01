@@ -81,7 +81,7 @@ overridden.
 
 - `iree-opt-outer-dim-concat` (enabled at `O1`)
 
-    Transpose concat operations to ocurr along the outermost dimension. The
+    Transpose concat operations to occur along the outermost dimension. The
     resulting concat will now be contiguous and the inserted transposes can
     possibly be fused with surrounding ops.
 

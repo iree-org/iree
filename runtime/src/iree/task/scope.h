@@ -112,7 +112,7 @@ iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
 // describing the failure and subsequent calls will return the status code.
 bool iree_task_scope_has_failed(iree_task_scope_t* scope);
 
-// Returns the permanent scope failure status to the caller (transfering
+// Returns the permanent scope failure status to the caller (transferring
 // ownership). The scope will remain in a failed state with the status code.
 iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope);
 

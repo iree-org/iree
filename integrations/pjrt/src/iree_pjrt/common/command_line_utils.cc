@@ -10,7 +10,7 @@ namespace iree {
 namespace pjrt {
 
 // TODO: currently this function doesn't handle escape sequences,
-// it just ensure that single/double quotes are interpreted corrently.
+// it just ensure that single/double quotes are interpreted correctly.
 std::optional<std::vector<std::string>> ParseOptionsFromCommandLine(
     std::string_view options_str) {
   std::vector<std::string> options;

@@ -9,7 +9,7 @@ func.func @f32_to_i4_1d() {
     linalg.yield %3 : i4
   } -> tensor<8xi4>
 
-  // TODO(#14996): Remove the signed extention and directly check with i4 types.
+  // TODO(#14996): Remove the signed extension and directly check with i4 types.
   %blocker = util.optimization_barrier %res : tensor<8xi4>
   %init1 = tensor.empty() : tensor<8xi8>
   %exti8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
@@ -34,7 +34,7 @@ func.func @f32_to_i2_1d() {
     linalg.yield %3 : i2
   } -> tensor<8xi2>
 
-  // TODO(#14996): Remove the signed extention and directly check with i2 types.
+  // TODO(#14996): Remove the signed extension and directly check with i2 types.
   %blocker = util.optimization_barrier %res : tensor<8xi2>
   %init1 = tensor.empty() : tensor<8xi8>
   %exti8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}

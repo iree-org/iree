@@ -42,7 +42,7 @@ sampling profiler that IREE uses for performance analysis.
     needs:
 
     * Debug information from `-DCMAKE_BUILD_TYPE=RelWithDebInfo` or `Debug`
-    * Privilege elevation from `sudo` on Unix or adminstrator on Windows
+    * Privilege elevation from `sudo` on Unix or administrator on Windows
 
 ### :material-connection: Remote or embedded telemetry
 
@@ -397,7 +397,7 @@ sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
 
     Tracy keeps a number of file descriptors open that, depending on the
     machine and its settings, may exceed the limit allowed by the system
-    resulting in IREE failing to open more files. In particular, it is commom
+    resulting in IREE failing to open more files. In particular, it is common
     to have a relatively low limit when running with `sudo`.
 
 ---

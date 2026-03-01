@@ -65,7 +65,7 @@ The above procedure is for facing a large problem with no clue, for example,
 when bringing up a new model end-to-end via IREE.
 
 Though most of the time, we can leverage existing facilities to avoid going down
-the full top-down hiearchical debugging procedure.
+the full top-down hierarchical debugging procedure.
 For example, for regression happening on an existing model, CI or `git bitsect`
 might tell us directly the culprit commit.
 
@@ -193,7 +193,7 @@ investigate by comparing with different paths and inputs:
 ## Pinpointing runtime issues
 
 On the other side, if we suspect that it's a runtime issue, here are some
-useful approachs and tips:
+useful approaches and tips:
 
 !!! tip "[correctness/performance]"
 
@@ -247,12 +247,12 @@ useful approachs and tips:
       `--metal_command_buffer_retain_resources=true`, or
       `--metal_resource_hazard_tracking=true` to `iree-run-module` to see
       if any of the above "fixes" the issue.
-      It can help to isolate the pontential problem.
+      It can help to isolate the potential problem.
     * [:simple-vulkan:] Use `--vulkan_robust_buffer_access=true` to `iree-run-module`
       especially when seeing undeterministic/corrupted contents in buffers and
       suspecting there are buffer allocation/indexing issues.
 
-## Binary substiution for ROCm
+## Binary substitution for ROCm
 
 [:simple-amd:] The AMD ROCm target supports binary substitution on HSA code objects
 (`.hsaco` files).
@@ -300,7 +300,7 @@ iree-compile dispatch.mlir \
   --iree-hal-substitute-executable-object=[dispatch_name]=altered.hsaco
 ```
 
-If successful, `iree-complie` will print a message stating
+If successful, `iree-compile` will print a message stating
 
 ``` shell
 NOTE: hal.executable `[executable name]` substituted with object file at`altered.hsaco`

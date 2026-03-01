@@ -322,7 +322,7 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set, bool require_all,
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   } else if (result >= WAIT_OBJECT_0 &&
              result < WAIT_OBJECT_0 + set->handle_count) {
-    // One (or more) handles were signaled sucessfully.
+    // One (or more) handles were signaled successfully.
     if (out_wake_handle) {
       DWORD wake_index = result - WAIT_OBJECT_0;
       iree_wait_primitive_value_t wake_value;
@@ -338,7 +338,7 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set, bool require_all,
     return iree_ok_status();
   } else if (result >= WAIT_ABANDONED_0 &&
              result < WAIT_ABANDONED_0 + set->handle_count) {
-    // One (or more) mutex handles were abandonded during the wait.
+    // One (or more) mutex handles were abandoned during the wait.
     // This happens when a thread holding the mutex dies without releasing it.
     // This is less common in-process and more for the cross-process situations
     // where we have duped/opened a remote handle and the remote process dies.
@@ -352,7 +352,7 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set, bool require_all,
     DWORD wake_index = result - WAIT_ABANDONED_0;
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
-        "mutex native handle %lu abanonded; shared state is "
+        "mutex native handle %lu abandoned; shared state is "
         "(likely) inconsistent",
         wake_index);
   } else if (result == WAIT_FAILED) {
@@ -408,7 +408,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
     // Handle was signaled successfully.
     status = iree_ok_status();
   } else if (result == WAIT_ABANDONED_0) {
-    // The mutex handle was abandonded during the wait.
+    // The mutex handle was abandoned during the wait.
     // This happens when a thread holding the mutex dies without releasing it.
     // This is less common in-process and more for the cross-process situations
     // where we have duped/opened a remote handle and the remote process dies.
@@ -420,7 +420,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
     // that mutex abandonment is exceptional. If you see this you are probably
     // going to want to look for thread exit messages or zombie processes.
     status = iree_make_status(IREE_STATUS_DATA_LOSS,
-                              "mutex native handle abanonded; shared state is "
+                              "mutex native handle abandoned; shared state is "
                               "(likely) inconsistent");
   } else if (result == WAIT_FAILED) {
     status = iree_make_status(iree_status_code_from_win32_error(GetLastError()),

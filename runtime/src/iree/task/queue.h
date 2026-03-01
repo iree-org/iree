@@ -61,7 +61,7 @@ extern "C" {
 // of tasks in any given flush is low(ish) and by walking in reverse order to
 // then process forward the cache should be hot as the worker starts making its
 // way back through the tasks. As we walk forward we'll be using the task fields
-// for execution and retiring of tasks (notifing dependencies/etc) and the
+// for execution and retiring of tasks (notifying dependencies/etc) and the
 // intrusive next pointer sitting next to those should be in-cache when we need
 // to access it. This, combined with slab allocation of tasks in command buffers
 // to begin with gives us the (probabilistically) same characteristics of a flat
@@ -94,7 +94,7 @@ extern "C" {
 // Unlike that implementation, though, our task list is unbounded because we use
 // a linked list. To keep our options open, though, I've left the API of this
 // implementation compatible with classic atomic work-stealing queues. I'm
-// hopeful this will not need to be revisted for awhile, though!
+// hopeful this will not need to be revisited for awhile, though!
 //
 // Future improvement idea: have the owner of the queue maintain a theft point
 // skip list that makes it possible for thieves to quickly come in and slice

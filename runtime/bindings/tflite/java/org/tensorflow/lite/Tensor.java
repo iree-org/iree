@@ -16,7 +16,7 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 
 /**
- * A typed multi-dimensional array used in the IREE Java comptability shim.
+ * A typed multi-dimensional array used in the IREE Java compatibility shim.
  *
  * <p>The native handle of a tensor is managed by {@link Interpreter}, and does not needed to be
  * closed by the client. However, once the {@link Interpreter} has been closed, the tensor will be

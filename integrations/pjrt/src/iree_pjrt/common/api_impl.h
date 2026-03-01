@@ -346,7 +346,7 @@ class EventInstance {
 // data until loaded onto a device context. We call this a ResidentExecutable
 // to avoid name collisions.
 //
-// Correspondance:
+// Correspondence:
 //   PJRT_Executable -> ExecutableImage
 //   PJRT_LoadedExecutable -> LoadedExecutableInstance
 //   <None> -> ResidentExecutable

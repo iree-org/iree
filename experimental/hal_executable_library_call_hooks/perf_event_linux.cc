@@ -432,7 +432,7 @@ static const std::vector<PerfEventType>& listAllPerfEventTypes() {
       {"ls_inef_sw_pref.data_pipe_sw_pf_dc_hit", PERF_TYPE_RAW, 0x152, "AMD",
        "Software prefetches that did not fetch data outside of the processor "
        "core as the PREFETCH instruction saw a data cache hit."},
-      {"ls_inef_sw_pref.mab_mch_cnt", PERF_TYPE_RAW, 0x252, "AMD",
+      {"ls_inef_sw_pref.mab_much_cnt", PERF_TYPE_RAW, 0x252, "AMD",
        "Software prefetches that did not fetch data outside of the processor "
        "core as the PREFETCH instruction saw a match on an already allocated "
        "Miss Address Buffer (MAB)."},
