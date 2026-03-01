@@ -466,7 +466,7 @@ module @partially_analyzed_op {
 
 // -----
 
-// Check that hoisting happens in a determinsitic order. If this is ordered
+// Check that hoisting happens in a deterministic order. If this is ordered
 // incorrectly it will result in >1 util.initializer.
 
 // CHECK-LABEL: @hoist_multiple_globals_ordered

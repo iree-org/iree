@@ -535,7 +535,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
             for (py::handle item : mmaIntrinsicObjs) {
               if (!py::isinstance(item, mmaIntrinsicClass) &&
                   !py::isinstance(item, virtualMmaIntrinsicClass)) {
-                throw py::type_error("All items must be MMA atributes");
+                throw py::type_error("All items must be MMA attributes");
               }
               mmaIntrinsicVals.push_back(
                   py::cast<mma_intrinsic_enum_t>(item.attr("value")));

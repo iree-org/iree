@@ -154,7 +154,7 @@ public:
     }
   }
 
-  // Bind a flag with a single `opt_initialier` that specifies defaults at a
+  // Bind a flag with a single `opt_initializer` that specifies defaults at a
   // given optimization level.
   template <typename T, typename V, typename... Mods>
   void opt(llvm::StringRef name, V &value,

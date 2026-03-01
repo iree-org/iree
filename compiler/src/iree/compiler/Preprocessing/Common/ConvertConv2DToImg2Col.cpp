@@ -49,7 +49,7 @@ namespace {
 // Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
 // and linalg.matmul.
 //
-// A convolution operaton can be written as a matrix-matrix multiplication by
+// A convolution operation can be written as a matrix-matrix multiplication by
 // unfolding the cross correlation between input and filter and explicitly copy
 // overlapped sliding window inputs.
 //
@@ -78,7 +78,7 @@ namespace {
 // and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix
 // multiplication (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in
 // the N input. For the case where N > 1 its a batched matrxi-matrix
-// multplication.
+// multiplication.
 class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 public:

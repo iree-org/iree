@@ -48,4 +48,4 @@ util.func public @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
 //  CHECK-SAME:         ins(%[[CONV]], %[[ARG3]]
 //       CHECK:     %[[PADDED:.+]] = tensor.pad %[[GENERIC]]
 //       CHECK:     flow.return %[[PADDED]]
-//       CHEKC:   util.return %[[RETURN]]
+//       CHECK:   util.return %[[RETURN]]

@@ -257,7 +257,7 @@ struct ZIPFileRef {
   uint32_t crc32;
 };
 
-// Computes the minimum length of the ZIP header we write preceeding the file.
+// Computes the minimum length of the ZIP header we write preceding the file.
 // This can have any alignment. The result value is only a minimum as up to 64KB
 // of padding can be added following it.
 static uint64_t computeMinHeaderLength(StringRef fileName) {

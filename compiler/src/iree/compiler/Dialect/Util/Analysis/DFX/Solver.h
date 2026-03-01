@@ -296,7 +296,7 @@ protected:
     SEEDING,
     // Fixed point iteration is running.
     UPDATE,
-    // Iteration has completed; does not indicate whether it coverged.
+    // Iteration has completed; does not indicate whether it converged.
     DONE,
   } phase = Phase::SEEDING;
 

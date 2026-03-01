@@ -41,7 +41,7 @@ def TopkSplitReductionPass:
   let summary = "Topk split reduction pass.";
   let description = [{
     Produces a "map-reduce" style of parallelizing a Topk Op. The op is split
-    into two, on containing reducitons in parallel and the other contianing the
+    into two, on containing reducitons in parallel and the other containing the
     combination of the parallel reductions into a final result.
   }];
   let options = [

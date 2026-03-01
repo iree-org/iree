@@ -36,7 +36,7 @@ static Value createTranspose(OpBuilder &builder, Value source,
 }
 
 // Transposes the concatenation dimension to happen along the outer most
-// non-unit dim of the inputs. The idea is that outer dim concatentations
+// non-unit dim of the inputs. The idea is that outer dim concatenations
 // can lower to `flow.tensor.update` and ideally disappear, in the worst case
 // becoming a sequence of copies. The hope then is that the transposes on the
 // inputs and output is then fusable with surrounding operations.

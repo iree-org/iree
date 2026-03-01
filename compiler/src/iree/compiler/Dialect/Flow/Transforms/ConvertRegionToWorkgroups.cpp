@@ -210,7 +210,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
 
   // Move regionOp body into the workgroupsOp.
   rewriter.inlineRegionBefore(region, newBody, newBody.end());
-  // Merge the enrty block of `newBody` with the original entry block from the
+  // Merge the entry block of `newBody` with the original entry block from the
   // region.
   Block *origEntry = &(*(std::next(newBody.begin())));
   rewriter.mergeBlocks(origEntry, newBodyEntry);

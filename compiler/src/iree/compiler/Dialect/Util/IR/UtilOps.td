@@ -465,7 +465,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     Typically multiple permutations record a specific subset of assumptions
     broken down per call-site in some way that is meaningful to the receiver.
     Implementations can use this information to specialize on each
-    permutation if it is meaninful to do so (i.e. vs unioning across them).
+    permutation if it is meaningful to do so (i.e. vs unioning across them).
     In such cases, there will typically be one such op at the top of a
     function or scope which passes all covered operands through it.
   }];

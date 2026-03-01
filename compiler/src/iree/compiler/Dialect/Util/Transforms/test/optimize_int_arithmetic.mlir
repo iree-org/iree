@@ -417,7 +417,7 @@ util.func @elide_trunc_of_index_castui(%arg0 : index) -> i32 {
   %1 = arith.index_castui %arg0 : index to i64
   %2 = arith.trunci %1 : i64 to i32
   // CHECK: %[[RESULT:.*]] = arith.index_castui %arg0 : index to i32
-  // CHECH: util.return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   util.return %2 : i32
 }
 
@@ -427,7 +427,7 @@ util.func @elide_trunc_of_index_cast(%arg0 : index) -> i32 {
   %1 = arith.index_cast %arg0 : index to i64
   %2 = arith.trunci %1 : i64 to i32
   // CHECK: %[[RESULT:.*]] = arith.index_castui %arg0 : index to i32
-  // CHECH: util.return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   util.return %2 : i32
 }
 

@@ -101,7 +101,7 @@ class CompilerInvocation:
         raw_flags: list[str] = []
 
         # Set any defaults derived from the input_file metadata. These are set
-        # first because they can be overriden by explicit flag settings.
+        # first because they can be overridden by explicit flag settings.
         meta = CompileSourceMeta.get(self.input_file)
         raw_flags.append(f"--iree-input-type={meta.input_type}")
 

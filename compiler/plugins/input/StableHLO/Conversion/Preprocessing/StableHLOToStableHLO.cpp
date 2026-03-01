@@ -269,7 +269,7 @@ bool isConsecutive(ArrayRef<int64_t> array) {
 /// {batch_dims, parallel_dims, contraction_dims}.
 ///   {batch_dims, contraction_dims, parallel_dims}
 /// After that, batch_dims, contraction_dims, parallel_dims are
-/// in consecutive order and not spliting the domain. This pattern inserts
+/// in consecutive order and not splitting the domain. This pattern inserts
 /// reshapes to collapse consecutive reduction and parallel dims to always
 /// generate a rank-3 dot_general op.
 struct TransposeReshapeGenericDotGeneral final

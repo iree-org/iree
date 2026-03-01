@@ -440,7 +440,7 @@ func.func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 // CHECK-SAME:          iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
 //
-//                    The computation is bascially the same, and they are
+//                    The computation is basically the same, and they are
 //                    checked above. Here only checks the different part.
 // CHECK:             %{{.+}} = linalg.index 1 : index
 

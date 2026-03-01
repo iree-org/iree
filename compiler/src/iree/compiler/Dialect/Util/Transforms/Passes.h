@@ -36,7 +36,7 @@ struct ExprHoistingOptions {
   using RegisterDialectsFn = std::function<void(DialectRegistry &)>;
 
   // Hook to register extra dependent dialects needed for types implementing
-  // the `HoistableTypeInterace`.
+  // the `HoistableTypeInterface`.
   std::optional<RegisterDialectsFn> registerDependentDialectsFn = std::nullopt;
 
   // Threshold for controlling the maximum allowed increase in the stored size
