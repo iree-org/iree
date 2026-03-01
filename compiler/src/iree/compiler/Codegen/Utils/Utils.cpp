@@ -881,7 +881,7 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
   auto stepApplyOp = forOp.getStep().getDefiningOp<affine::AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
-    // Try to see if this is a specical case where we have:
+    // Try to see if this is a special case where we have:
     //   scf.for %iv = %id to %ub step %count
     std::optional<unsigned> idDim;
     if (auto ifx = dyn_cast_if_present<ProcessorIDInterface>(
@@ -1177,7 +1177,7 @@ getSourceSubspanMemref(TypedValue<MemRefType> buffer) {
   return std::nullopt;
 }
 
-/// Get strides for row-major oredering of a tensor with the given `shape`.
+/// Get strides for row-major ordering of a tensor with the given `shape`.
 static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   if (shape.empty()) {
     return {};

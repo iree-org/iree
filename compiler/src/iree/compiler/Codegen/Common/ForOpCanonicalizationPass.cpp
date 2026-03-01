@@ -144,7 +144,7 @@ struct CanonicalizeForOpInductionVarShape final
       //   %to_clone = vector.extract %arg1[%arg0] : f32 from vector<4xf32>
       //   ...
       // }
-      // %new_clone = vector.extact %cst[%c1] : f32 from vector<4xf32>
+      // %new_clone = vector.extract %cst[%c1] : f32 from vector<4xf32>
       // ```
       IRMapping mapping;
       mapping.map(iterArg, initArgs[index]);

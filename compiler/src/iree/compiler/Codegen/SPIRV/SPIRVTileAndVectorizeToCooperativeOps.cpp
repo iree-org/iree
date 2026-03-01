@@ -362,7 +362,7 @@ public:
       return WalkResult::advance();
     });
     if (!rootOp) {
-      funcOp.emitError("expected lowering confg on a (batch) matmul op");
+      funcOp.emitError("expected lowering config on a (batch) matmul op");
       return signalPassFailure();
     }
 

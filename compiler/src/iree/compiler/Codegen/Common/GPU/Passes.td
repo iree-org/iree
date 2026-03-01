@@ -245,7 +245,7 @@ def GPUPipeliningPass :
   let options = [
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
             /*default=*/"true",
-           "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
+           "Try to use un-peeling epilogue when false, peeled epilogue o.w.">,
     Option<"depth", "pipeline-depth", "int64_t",
             /*default=*/"2",
            "Number of stages ">,

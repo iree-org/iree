@@ -489,7 +489,7 @@ static void reduceDistributionWorkgroups(
     int64_t newSize = std::min(currSize * 2, workload[index]);
     int64_t vectorSize = vectorSizeHints ? vectorSizeHints.value()[index] : 0;
 
-    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // Check if it's the ideal size with vector size hint. And skip if the new
     // size will break the ideal size.
     if (vectorSize > 1 &&
         (currSize % vectorSize == 0 && workload[index] % currSize == 0) &&
@@ -519,7 +519,7 @@ static void reduceDistributionWorkgroups(
     int64_t nwg = llvm::divideCeil(workload[i], distributedTileSizes[i]);
     int64_t newSize = llvm::divideCeil(workload[i], nwg);
 
-    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // Check if it's the ideal size with vector size hint. And skip if the new
     // size will break the ideal size.
     int64_t vectorSize = vectorSizeHints ? vectorSizeHints.value()[i] : 0;
     if (vectorSize > 1 &&
@@ -810,7 +810,7 @@ static void limitVectorTileSizes(SmallVectorImpl<int64_t> &vecTileSizes,
 }
 
 // Clamps in-place `vecTileSizes`, ensuring that the resulting vector tile sizes
-// for each opearand of `op` satisfy two requirements:
+// for each operand of `op` satisfy two requirements:
 // 1. No resulting operand tile size exceeds `eachOperandMaxTileBits`.
 // 2. The sum of all resulting operand tile size does not exceed
 // `allOperandsMaxTileBits`.
@@ -1494,7 +1494,7 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
   if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
-    // and a sequence of vrgather ops to implemement the broadcast explicitly.
+    // and a sequence of vrgather ops to implement the broadcast explicitly.
     // We should tile and/or unroll that dimension without vectorization, which
     // is not possible right now.
     sizes.append({8, 32, 1});
@@ -1609,7 +1609,7 @@ getMatmulRISCVVectorSizes(mlir::FunctionOpInterface entryPointFn,
     return;
   }
 
-  // nativeVectorSize is cacluated with VLEN and LMUL=2.
+  // nativeVectorSize is calculated with VLEN and LMUL=2.
   int64_t nativeVectorSize = getNativeVectorSizeInBytes(entryPointFn);
   int64_t elementSize;
   if (elementType->isF16()) {
@@ -4158,7 +4158,7 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
     return failure();
   }
 
-  // The transform dialect codegen has differnet logics and codegen flow.
+  // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
   auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
   if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {

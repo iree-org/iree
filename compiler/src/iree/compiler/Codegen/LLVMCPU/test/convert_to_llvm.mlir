@@ -77,7 +77,7 @@ func.func @interleave_and_bitcast_lowering() {
 // CHECK-LABEL: llvm.func @interleave_and_bitcast_lowering(
 // vector.interleave should be gone entirely
 //   CHECK-NOT:   vector.interleave
-// 2D vector.bitcast tha followed should be replaced with 1D vector.bitcast
+// 2D vector.bitcast than followed should be replaced with 1D vector.bitcast
 //       CHECK:   llvm.bitcast {{.*}} : vector<4xi8> to vector<8xi4>
 //   CHECK-NOT:   vector.bitcast %{{.*}} : vector<4x4xi8> to vector<4x8xi4>
 

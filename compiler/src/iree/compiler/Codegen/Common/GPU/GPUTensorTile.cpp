@@ -163,7 +163,7 @@ private:
       }
     }
 
-    // Fuse the candidate immeidate operands into the tiled loop.
+    // Fuse the candidate immediate operands into the tiled loop.
     OpBuilder::InsertionGuard guard(rewriter);
     while (!candidates.empty()) {
       tensor::ExtractSliceOp sliceOp = candidates.back();
@@ -213,7 +213,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer,
                                          bool coalesceLoops) {
   {
-    // Tile again at the workgroup level since redution dimension were
+    // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());

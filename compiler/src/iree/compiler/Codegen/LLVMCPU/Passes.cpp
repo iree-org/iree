@@ -643,7 +643,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       .addPass(createCPUPropagateDataLayoutPass)
       .addPass(createRematerializeParallelOpsPass)
       // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added
-      // way to late and should insted be be done during lowering to LLVM.
+      // way to late and should instead be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)
       .addPass(createConvertAccGEMMToGEMMPass)
       // TODO: Remove the following pass the plumb support for

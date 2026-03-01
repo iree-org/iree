@@ -77,8 +77,8 @@ inferWorkgroupTileMultiplesFromPackUnPack(
     int64_t innerTileIdx = i + innerTiles.size();
     // Compute the LCM with the initial multiples for both the inner tile and
     // the corresponding outer tile. The multiples for the packedMultiples will
-    // then be these LCMs, and the multiple for the unPackedMultipes will be the
-    // product of these LCMs.
+    // then be these LCMs, and the multiple for the unPackedMultiples will be
+    // the product of these LCMs.
     int64_t lcmInnerTileMultiple = tile;
     int64_t lcmOuterTileMultiple = 1;
     if (initialPackedMultiples) {
@@ -218,7 +218,7 @@ expandMultiples(ArrayRef<int64_t> collapsedMultiples,
   return expandedMultiples;
 }
 
-/// Find a set of required workgroup tile size mulitples for the given OpResult
+/// Find a set of required workgroup tile size multiples for the given OpResult
 /// by walking the producer chain of the OpResult's owner, and finding ops that
 /// require specific tile size multiples. For now, the only ops that need
 /// special workgroup tile size multiples are pack and unpack ops. The returned
@@ -291,7 +291,7 @@ static SmallVector<int64_t> inferResultWorkgroupTileMultiples(OpResult result) {
       });
 }
 
-/// Find a set of required workgroup tile size mulitples for the given OpOperand
+/// Find a set of required workgroup tile size multiples for the given OpOperand
 /// by walking the use chain of the OpOperand's owner, and finding ops that
 /// require specific tile size multiples. For now, the only ops that need
 /// special workgroup tile size multiples are pack and unpack ops. The returned

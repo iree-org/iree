@@ -934,7 +934,7 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
       // CPU features are typically prefixed with a +, e.g. +avx,+avx2,+fma.
       featureString.consume_front("+");
       // Silently skip unknown CPU features, more flexible for now. Note that
-      // some featurs occurring here are not standard CPU features but internal
+      // some features occurring here are not standard CPU features but internal
       // things such as the "+reserve-x18" that we add on arm64.
       if (featureToBitPattern.count(featureString)) {
         specifiedCpuDataField0 |= featureToBitPattern.lookup(featureString);

@@ -64,7 +64,7 @@ TEST(TileSwizzle, Serialization) {
   EXPECT_TRUE(dictAttr.contains("permutation"));
 
   // Verify if the sizes match. The check of values is done by the comparison
-  // between deserialzation result and the original struct.
+  // between deserialization result and the original struct.
   auto expandShapeArrayAttr =
       dyn_cast<ArrayAttr>(dictAttr.getNamed("expandShape")->getValue());
   EXPECT_EQ(expandShapeArrayAttr.size(), swizzle.expandShape.size());

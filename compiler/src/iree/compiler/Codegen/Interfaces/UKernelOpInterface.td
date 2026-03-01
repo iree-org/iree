@@ -24,7 +24,7 @@ def UKernelOpInterface : OpInterface<"UKernelOpInterface"> {
       /*methodName=*/"lowerToFunctionCall",
       /*args=*/(ins "RewriterBase &":$rewriter),
       /*methodBody=*/"",
-      /*defautImplementation=*/"return failure();"
+      /*defaultImplementation=*/"return failure();"
     >,
   ];
 }

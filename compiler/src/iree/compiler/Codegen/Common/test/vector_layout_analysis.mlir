@@ -733,7 +733,8 @@ func.func @propagate_2D_reshape_expand(%arg0: memref<64x64xf16>) -> vector<16x4x
   %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<64x64xf16>
   %reshape = vector.shape_cast %rootl : vector<64x64xf16> to vector<16x4x16x4xf16>
   // expected-remark @above {{subgroup_tile = [1, 1, 1, 1], batch_tile = [4, 1, 4, 1], outer_tile = [1, 1, 1, 1], thread_tile = [4, 4, 4, 1], element_tile = [1, 1, 1, 4]}}
-  // expexted-remark @above {{subgroup_strides = [0, 0, 0, 0], thread_strides = [16, 4, 1, 0]}}
+  // TODO: The strides remark check was previously disabled by a misspelled directive.
+  // Enable once the pass emits: subgroup_strides = [0, 0, 0, 0], thread_strides = [16, 4, 1, 0]
   func.return %reshape : vector<16x4x16x4xf16>
 }
 

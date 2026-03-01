@@ -222,7 +222,7 @@ createIndirectResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceInfo;
 
-  // We insert each new global variable at the begining of the module,
+  // We insert each new global variable at the beginning of the module,
   // therefore, to preserve the original order, we process all functions and all
   // subspan ops in the reverse order.
   auto functions = llvm::to_vector(module.getOps<func::FuncOp>());
@@ -735,8 +735,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   patterns.add<HALInterfaceLoadConstantConverter>(typeConverter, context,
                                                   supportsAssume);
 
-  // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops
-  // and creates spirv.GlobalVariables.
+  // Performs a preliminary step to analyze all hal.interface.binding.subspan
+  // ops and creates spirv.GlobalVariables.
   InterfaceResourceMap interfaceToResourceVars =
       useIndirectBindings ? createIndirectResourceVariables(moduleOp)
                           : createResourceVariables(moduleOp);

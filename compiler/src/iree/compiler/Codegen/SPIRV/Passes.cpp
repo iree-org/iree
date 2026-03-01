@@ -148,7 +148,7 @@ static void
 addSPIRVBufferizePasses(OpPassManager &funcPassManager,
                         BufferizationOptions::AllocationFn allocationFn) {
   // Resolve dim ops first so that we don't have compute Linalg ops lingering on
-  // becuase of dim op usage. This avoids bufferizing those compute ops just for
+  // because of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   addBufferizePasses(funcPassManager, allocationFn);

@@ -125,7 +125,7 @@ func.func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x
 
 // -----
 
-func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1x1xf32> {
+func.func @ksplitmatmul_4D_alone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1x1xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -135,7 +135,7 @@ func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1
   return %0 : vector<1x1x1x1xf32>
 }
 
-// CHECK-LABEL: func.func @ksplitmatmul_4D_allone
+// CHECK-LABEL: func.func @ksplitmatmul_4D_alone
 //   CHECK-DAG: %[[ID:.+]] = arith.constant 0 : index
 //   CHECK-DAG: arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview

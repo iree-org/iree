@@ -418,7 +418,7 @@ def PipelineSharedMemoryCopiesOp : Op<
     This applies software pipelining to a given scf.for loop. The pipelining
     strategy will look for a copy to shared memory and pipeline it to overlap
     it with the rest of the loop.
-    It is user responsability to ensure that there are no dependency between
+    It is user responsibility to ensure that there are no dependency between
     `depth` iterations of the loop by using multi-buffering.
 
     `depth` will indicate how many stages the software pipeline should have.

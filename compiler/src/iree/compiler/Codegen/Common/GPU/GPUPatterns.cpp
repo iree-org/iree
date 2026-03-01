@@ -17,7 +17,7 @@
 namespace mlir::iree_compiler {
 
 namespace {
-/// Applies tranformation to drop unit dims in destination vector.transfer_read
+/// Applies transformation to drop unit dims in destination vector.transfer_read
 /// destination so that the resulting vector is 2D.
 //
 /// Example:

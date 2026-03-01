@@ -82,7 +82,7 @@ hal.executable public @main {
   }
 }
 // The purpose of this test is to make sure that we dont merge basic blocks
-// If some pass accidentaly does this then we would have arguments to
+// If some pass accidentally does this then we would have arguments to
 // ^bb4 and also have 4 preds instead of 2 due to back edges.
 // CHECK-LABEL: func @no_merge_basic_blocks(
 //       CHECK:   ^bb4:

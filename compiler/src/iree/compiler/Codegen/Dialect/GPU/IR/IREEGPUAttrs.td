@@ -548,7 +548,7 @@ def IREEGPU_VirtualMMAAttr :
     in a chained-matmul operation.
 
     If set to true (similar to MMAAttr), |col_major| indicates the computation
-    is perfomed as below:
+    is performed as below:
 
     ```
       C^T += B^T x A^T
