@@ -42,9 +42,8 @@ from setuptools.command.build_py import build_py as _build_py
 
 # Detect whether we should build an abi3 (Stable ABI) wheel.
 # This applies to CPython 3.12+ when not in free-threaded mode.
-_is_abi3_build = (
-    sys.version_info >= (3, 12)
-    and not sysconfig.get_config_var("Py_GIL_DISABLED")
+_is_abi3_build = sys.version_info >= (3, 12) and not sysconfig.get_config_var(
+    "Py_GIL_DISABLED"
 )
 
 
