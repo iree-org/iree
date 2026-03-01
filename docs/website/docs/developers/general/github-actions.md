@@ -9,7 +9,7 @@ icon: octicons/check-circle-16
 We use [GitHub Actions](https://docs.github.com/en/actions) for continuous
 automation (CI) and continuous delivery (CD) workflows:
 
-* Code formating and linting.
+* Code formatting and linting.
 * Building from source and running tests.
 * Building packages for testing and releases.
 * Testing packages across a variety of platforms.

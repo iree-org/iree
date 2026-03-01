@@ -137,7 +137,7 @@ EXEC @add
 ## Performance
 
 Now that we have enabled functionality we need to look at the performance. Once
-again we can leverage existing MLIR transformations to speed up the developement
+again we can leverage existing MLIR transformations to speed up the development
 work.
 
 ### Tiling and distribution

@@ -57,7 +57,7 @@ and system behavior with the compiled VM program.
 
 Executable sources can be dumped, edited, and then loaded back into a program
 using `--iree-hal-dump-executable-sources-to` and
-`--iree-hal-substitute-executable-source`. This can be used for performace
+`--iree-hal-substitute-executable-source`. This can be used for performance
 tuning or for debugging (e.g. by replacing a complicated dispatch with a
 simpler one).
 

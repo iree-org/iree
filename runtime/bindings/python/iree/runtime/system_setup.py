@@ -65,7 +65,7 @@ def get_first_device(
     """Gets the first valid (cached) device for a prioritized list of names.
 
     If no driver_names are given, and an environment variable of
-    IREE_DEFAULT_DEVICE is available, then it is treated as a comma delimitted
+    IREE_DEFAULT_DEVICE is available, then it is treated as a comma delimited
     list of driver names to try.
 
     This is meant to be used for default/automagic startup and is not suitable

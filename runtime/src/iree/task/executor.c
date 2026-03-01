@@ -121,7 +121,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   // enough to ensure each worker gets a sufficiently random seed for itself to
   // then generate entropy with. As a hack we use out_executor's address, as
   // that should live on the caller stack and with ASLR that's likely pretty
-  // random itself. I'm sure somewhere a mathemetician just cringed :)
+  // random itself. I'm sure somewhere a mathematician just cringed :)
   iree_prng_splitmix64_state_t seed_prng;
   iree_prng_splitmix64_initialize(/*seed=*/(uint64_t)(out_executor),
                                   &seed_prng);

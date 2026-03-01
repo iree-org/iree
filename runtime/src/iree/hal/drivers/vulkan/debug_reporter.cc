@@ -102,7 +102,7 @@ iree_status_t iree_hal_vulkan_debug_reporter_allocate(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Allocate our struct first as we need to pass the pointer to the userdata
-  // of the messager instance when we create it.
+  // of the messenger instance when we create it.
   iree_hal_vulkan_debug_reporter_t* reporter = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*reporter),

@@ -1999,7 +1999,8 @@ void SetupHalBindings(nanobind::module_ m) {
               if (resolved_length !=
                   iree_hal_buffer_byte_length(target_buffer.raw_ptr())) {
                 throw std::invalid_argument(
-                    "If length is not provided, source and target bufer length "
+                    "If length is not provided, source and target buffer "
+                    "length "
                     "must match and it does not. Provide explicit length=");
               }
             }

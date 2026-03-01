@@ -17,7 +17,7 @@ icon: octicons/package-16
 
 ## Mapping releases back to git commits
 
-The source IREE commit SHA is embeded into pip releases in a few places.
+The source IREE commit SHA is embedded into pip releases in a few places.
 Starting in a python venv, you can find the IREE commit from both the shell:
 
 ```shell

@@ -34,7 +34,7 @@ def iree_check_test(
       src: source mlir file containing the module.
       target_backend: target backend to compile for.
       driver: driver to run the module with. This can be omitted to test only
-          compilation, but consider omiting the driver as a hacky abuse of the
+          compilation, but consider omitting the driver as a hacky abuse of the
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
@@ -101,7 +101,7 @@ def iree_check_single_backend_test_suite(
       srcs: source mlir files containing the module.
       target_backend: target backend to compile for.
       driver: driver to run the module with. This can be omitted to test only
-          compilation, but consider omiting the driver as a hacky abuse of the
+          compilation, but consider omitting the driver as a hacky abuse of the
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.

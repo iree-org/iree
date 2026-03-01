@@ -206,7 +206,7 @@ static inline bool iree_uk_all_bits_set(const iree_uk_uint64_t val,
 }
 
 //===----------------------------------------------------------------------===//
-// Architecture detection (copied from target_platorm.h)
+// Architecture detection (copied from target_platform.h)
 //===----------------------------------------------------------------------===//
 
 #if defined(__arm64) || defined(__aarch64__) || defined(_M_ARM64) || \
@@ -744,12 +744,12 @@ static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
       if (biased_f32_mantissa > f32_mantissa_mask) {
         // Note: software implementations that try to be fast tend to get this
         // conditional increment of exp and zeroing of mantissa for free by
-        // simplying incrementing the whole uint32 encoding of the float value,
-        // so that the mantissa overflows into the exponent bits.
-        // This results in magical-looking code like in the following links.
-        // We'd rather not care too much about performance of this function;
-        // we should only care about fp16 performance on fp16 hardware, and
-        // then, we should use hardware instructions.
+        // simplifying incrementing the whole uint32 encoding of the float
+        // value, so that the mantissa overflows into the exponent bits. This
+        // results in magical-looking code like in the following links. We'd
+        // rather not care too much about performance of this function; we
+        // should only care about fp16 performance on fp16 hardware, and then,
+        // we should use hardware instructions.
         // https://github.com/pytorch/pytorch/blob/e1502c0cdbfd17548c612f25d5a65b1e4b86224d/c10/util/BFloat16.h#L76
         // https://gitlab.com/libeigen/eigen/-/blob/21cd3fe20990a5ac1d683806f605110962aac3f1/Eigen/src/Core/arch/Default/BFloat16.h#L565
         biased_f32_mantissa = 0;

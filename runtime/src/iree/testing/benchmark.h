@@ -152,7 +152,7 @@ bool iree_benchmark_keep_running(iree_benchmark_state_t* state,
 void iree_benchmark_skip(iree_benchmark_state_t* state, const char* message);
 
 // Suspends the benchmark timer until iree_benchmark_resume_timing is called.
-// This can be used to guard per-step code that is required to initialze the
+// This can be used to guard per-step code that is required to initialize the
 // work but not something that needs to be accounted for in the benchmark
 // timing. Introduces non-trivial overhead: only use this ~once per step when
 // then going on to perform large amounts of batch work in the step.

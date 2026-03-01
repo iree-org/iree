@@ -176,7 +176,7 @@ the current build type is Debug and the compiler supports it.
 
 * type: BOOL
 
-Enable [undefiend behavior sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
+Enable [undefined behavior sanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html)
 if the current build type is Debug and the compiler supports it.
 
 ### `IREE_ENABLE_RUNTIME_COVERAGE`

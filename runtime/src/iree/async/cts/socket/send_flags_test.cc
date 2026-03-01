@@ -150,7 +150,7 @@ TEST_P(SendFlagsTest, ZeroCopySendLargeBuffer) {
 //===----------------------------------------------------------------------===//
 
 // Send two messages with MORE flag on first, verify both arrive.
-TEST_P(SendFlagsTest, MorFlagCoalesces) {
+TEST_P(SendFlagsTest, MoreFlagCoalesces) {
   // Create connected socket pair.
   iree_async_socket_t* client = nullptr;
   iree_async_socket_t* server = nullptr;
@@ -215,7 +215,7 @@ TEST_P(SendFlagsTest, MorFlagCoalesces) {
 // Zero-copy send combined with MORE flag.
 // Tests that socket option ZC works with per-send MORE flag and data arrives
 // correctly.
-TEST_P(SendFlagsTest, ZeroCopyWithMoreFlag) {
+TEST_P(SendFlagsTest, ZeroCopyWithMoreeFlag) {
   // Create connected socket pair with ZERO_COPY enabled on client.
   iree_async_socket_t* client = nullptr;
   iree_async_socket_t* server = nullptr;
@@ -239,7 +239,7 @@ TEST_P(SendFlagsTest, ZeroCopyWithMoreFlag) {
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &send_op1.base));
 
   // Send second message without MORE (uncorks). ZC is from socket option.
-  const char* send_data2 = "AndMore";
+  const char* send_data2 = "AndMoree";
   iree_async_span_t send_span2 =
       iree_async_span_from_ptr((void*)send_data2, strlen(send_data2));
 
@@ -270,7 +270,7 @@ TEST_P(SendFlagsTest, ZeroCopyWithMoreFlag) {
       RecvAll(server, reinterpret_cast<uint8_t*>(recv_buffer), total_expected);
 
   EXPECT_EQ(total_received, total_expected);
-  EXPECT_EQ(memcmp(recv_buffer, "ZeroCopyAndMore", total_expected), 0);
+  EXPECT_EQ(memcmp(recv_buffer, "ZeroCopyAndMoree", total_expected), 0);
 
   iree_async_socket_release(server);
   iree_async_socket_release(client);

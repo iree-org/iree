@@ -19,7 +19,7 @@ import java.util.Map;
  * creation and inference for IREE compatible TFLite models.
  *
  * <p>This shim aims to mimic the functionality of Tensorflow Lite's
- * Interpeter.java class, however, there are a few notable features IREE doesn't
+ * Interpreter.java class, however, there are a few notable features IREE doesn't
  * support:
  *
  * <ul>
@@ -325,9 +325,9 @@ public final class Interpreter implements AutoCloseable {
   }
 
   /**
-   * Gets the Tensor associated with the provdied input index.
+   * Gets the Tensor associated with the provided input index.
    *
-   * @throws IllegalArgumentException if {@code inputIndex} is negtive or is not smaller than the
+   * @throws IllegalArgumentException if {@code inputIndex} is negative or is not smaller than the
    *     number of model inputs.
    */
   public Tensor getInputTensor(int index) {
@@ -356,7 +356,7 @@ public final class Interpreter implements AutoCloseable {
   }
 
   /**
-   * Gets the Tensor associated with the provdied output index.
+   * Gets the Tensor associated with the provided output index.
    *
    * <p>Note: Output tensor details (e.g., shape) may not be fully populated until after inference
    * is executed. If you need updated details *before* running inference (e.g., after resizing an

@@ -84,7 +84,7 @@ TEST_F(AllocatorTest, AllocateBuffer) {
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
                                                     kAllocationSize, &buffer));
 
-  // At a mimimum, the requested memory type should be respected.
+  // At a minimum, the requested memory type should be respected.
   // Additional bits may be optionally set depending on the allocator.
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_memory_type(buffer), params.type));

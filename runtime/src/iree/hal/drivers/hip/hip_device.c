@@ -990,7 +990,7 @@ static iree_status_t iree_hal_hip_device_create_event(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     iree_hal_event_flags_t flags, iree_hal_event_t** out_event) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "event not yet implmeneted");
+                          "event not yet implemented");
 }
 
 static iree_status_t iree_hal_hip_device_import_file(
@@ -1154,7 +1154,7 @@ typedef struct iree_hal_hip_semaphore_callback_data_t {
   iree_hal_semaphore_list_t signal_semaphore_list;
   iree_slim_mutex_t status_mutex;
   iree_status_t status;
-  // This is null unless we are running with an extenal stream,
+  // This is null unless we are running with an external stream,
   // at which point this is valid.
   iree_hal_hip_dispatch_completed_data_t* external_stream_dispatch_data;
 } iree_hal_hip_semaphore_callback_data_t;

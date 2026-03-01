@@ -146,7 +146,7 @@ typedef struct iree_hal_vulkan_device_properties_t {
   // Note that i32 or i1 is assumed to always exist and does not appear in
   // this bitfield.
   uint32_t compute_int : 8;
-  // Storage bitwidth requirement bitfiled:
+  // Storage bitwidth requirement bitfield:
   // * 0b01: 8-bit
   // * 0b10: 16-bit
   uint32_t storage : 8;

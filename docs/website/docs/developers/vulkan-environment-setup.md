@@ -30,13 +30,13 @@ There are four components involved in this architecture:
 ![High Level View of Loader][VulkanArchPicture]
 
 The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
-and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
+and the ICDs, which implements these Vulkan APIs. Vulkan layers argument the
 Vulkan system to provide optional features like validation and debugging. The
 Vulkan loader composes a chain of requested layers, which processes the Vulkan
 application's API calls one by one, and finally redirects the API calls made by
 the Vulkan application to one or more ICDs.
 
-It's highly recommned to read the
+It's highly recommend to read the
 [Architecture of the Vulkan Loader Interfaces Overview][VulkanArchOverview] to
 get a general understanding of what these components are and how they interact
 with one another.

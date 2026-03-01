@@ -60,7 +60,7 @@ typedef enum {
 // will also be cleaned up at this time. If the semaphore is failed,
 // the callbacks will be called with the status code of the failure.
 // If the semaphore is destroyed while callbacks are active,
-// they will be called with the CANCELLED erorr.
+// they will be called with the CANCELLED error.
 // The |cpu_event| is a value for the CPU to wait on when
 // we may not have to wait infinitely. For example with a multi
 // wait or a non-infinite timeout.

@@ -208,7 +208,7 @@ If no target is specified, then a safe but more limited default will be used.
     the allowed variances on extensions, properties, limits, etc. So the target
     triple is just an approximation for usage. This is more of a mechanism to
     help us develop IREE itself. In the long term we want to perform
-    multi-targetting to generate code for multiple architectures if no explicit
+    multi-targeting to generate code for multiple architectures if no explicit
     target is given.
 
 ### :octicons-terminal-16: Run a compiled program

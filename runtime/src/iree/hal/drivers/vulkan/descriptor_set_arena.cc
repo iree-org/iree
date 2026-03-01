@@ -49,7 +49,7 @@ static void PopulateDescriptorSetWriteInfos(
       // allocations; here we just need to provide the proper "view" to Vulkan
       // drivers over the allocated memory.
       //
-      // Note this is needed because we can see unusal buffers like
+      // Note this is needed because we can see unusual buffers like
       // tensor<3xi8>. Depending on GPU capabilities, this might not always be
       // directly supported by the hardware. Under such circumstances, we need
       // to emulate i8 support with i32. Shader CodeGen takes care of that: the

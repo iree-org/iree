@@ -8,7 +8,7 @@
 # Build and test, using CMake/CTest, with ThreadSanitizer instrumentation.
 #
 # See https://clang.llvm.org/docs/ThreadSanitizer.html. Some tests are run many
-# times to flush out non-determinstic failures.
+# times to flush out non-deterministic failures.
 #
 # The desired build directory can be passed as the first argument. Otherwise, it
 # uses the environment variable IREE_TSAN_BUILD_DIR, defaulting to "build-tsan".

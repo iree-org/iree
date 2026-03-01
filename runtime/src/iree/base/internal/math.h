@@ -100,14 +100,14 @@ static inline int iree_math_count_leading_zeros_u32(const uint32_t n) {
 static inline int iree_math_count_leading_zeros_u64(uint64_t n) {
 #if defined(IREE_COMPILER_MSVC_COMPAT) && \
     (defined(IREE_ARCH_ARM_64) || defined(IREE_ARCH_X86_64))
-  // MSVC does not have __buitin_clzll. Use _BitScanReverse64.
+  // MSVC does not have __builtin_clzll. Use _BitScanReverse64.
   unsigned long result = 0;  // NOLINT(runtime/int)
   if (_BitScanReverse64(&result, n)) {
     return (int)(63 - result);
   }
   return 64;
 #elif defined(IREE_COMPILER_MSVC_COMPAT)
-  // MSVC does not have __buitin_clzll. Compose two calls to _BitScanReverse
+  // MSVC does not have __builtin_clzll. Compose two calls to _BitScanReverse
   unsigned long result = 0;  // NOLINT(runtime/int)
   if ((n >> 32) && _BitScanReverse(&result, n >> 32)) {
     return (int)(31 - result);
@@ -435,12 +435,12 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       if (biased_f32_mantissa > f32_mantissa_mask) {
         // Note: software implementations that try to be fast tend to get this
         // conditional increment of exp and zeroing of mantissa for free by
-        // simplying incrementing the whole uint32 encoding of the float value,
-        // so that the mantissa overflows into the exponent bits.
-        // This results in magical-looking code like in the following links.
-        // We'd rather not care too much about performance of this function;
-        // we should only care about fp16 performance on fp16 hardware, and
-        // then, we should use hardware instructions.
+        // simplifying incrementing the whole uint32 encoding of the float
+        // value, so that the mantissa overflows into the exponent bits. This
+        // results in magical-looking code like in the following links. We'd
+        // rather not care too much about performance of this function; we
+        // should only care about fp16 performance on fp16 hardware, and then,
+        // we should use hardware instructions.
         // https://github.com/pytorch/pytorch/blob/e1502c0cdbfd17548c612f25d5a65b1e4b86224d/c10/util/BFloat16.h#L76
         // https://gitlab.com/libeigen/eigen/-/blob/21cd3fe20990a5ac1d683806f605110962aac3f1/Eigen/src/Core/arch/Default/BFloat16.h#L565
         biased_f32_mantissa = 0;

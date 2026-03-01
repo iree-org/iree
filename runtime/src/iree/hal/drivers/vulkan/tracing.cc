@@ -123,7 +123,7 @@ static void iree_hal_vulkan_tracing_submit_command_buffer(
   context->maintenance_command_pool->Free(command_buffer);
 }
 
-// Synchronously resets a range of querys in a query pool.
+// Synchronously resets a range of queries in a query pool.
 // This may submit commands to the queue.
 static void iree_hal_vulkan_tracing_reset_query_pool(
     iree_hal_vulkan_tracing_context_t* context, uint32_t query_index,
@@ -249,7 +249,7 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
   // implementation and platform specific reasons. It is the application’s
   // responsibility to assess whether the returned maximum deviation makes the
   // timestamp values suitable for any particular purpose and can choose to
-  // re-issue the timestamp calibration call pursuing a lower devation value.
+  // re-issue the timestamp calibration call pursuing a lower deviation value.
   // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkGetCalibratedTimestampsEXT.html
   //
   // We perform a small number of queries here and find the minimum deviation

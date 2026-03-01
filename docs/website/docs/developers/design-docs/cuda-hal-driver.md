@@ -8,7 +8,7 @@ tags:
 
 # CUDA HAL driver
 
-This document lists technical details regarding the CUDA implemenation of
+This document lists technical details regarding the CUDA implementation of
 IREE's Hardware Abstraction Layer, called a CUDA HAL driver.
 
 IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
@@ -46,7 +46,7 @@ and device enumeration and creation.
 `iree_hal_cuda_device_t` implements [`iree_hal_device_t`][hal-device] to provide
 the interface to CUDA GPU device by wrapping a [`CUdevice`][cu-device].
 For each device, right now we create two `CUstream`s--one for issuing commands
-for memory allocation and kernel lauches as instructed by the program; the other
+for memory allocation and kernel launches as instructed by the program; the other
 for issue host callback functions after dispatched command buffers completes.
 See [synchronization](#synchronization) section regarding the details.
 
@@ -137,7 +137,7 @@ In CUDA, there is no direct equivalent primitives providing all the capabilities
 needed by the HAL semaphore abstraction:
 
 * [Stream memory operations][cu-mem-ops] provides `cuStreamWriteValue64()` and
-  `cuStreamWaitValue64()`, which can implment HAL semaphore 64-bit integer value
+  `cuStreamWaitValue64()`, which can implement HAL semaphore 64-bit integer value
   signal and wait. Though these operations require device pointers and cannot
   accepts pointers to managed memory buffers, meaning no support for the host.
   Additionally, per the spec, "synchronization ordering established through
@@ -148,7 +148,7 @@ needed by the HAL semaphore abstraction:
 * For [external resource interoperability][cu-external-resource], we have APIs
   like `cuSignalExternalSemaphoresAsync()` and `cuWaitExternalSemaphoresAsync()`,
   which can directly map to Vulkan timeline semaphores. Though these APIs are
-  meant to handle exernal resources--there is no way to create
+  meant to handle external resources--there is no way to create
   `CUexternalSemaphore` objects directly other than `cuImportExternalSemaphore()`.
 
 Therefore, to implement the support, we need to leverage multiple native CPU or
@@ -215,7 +215,7 @@ Though, per the [documentation][cu-launch-host-func] of `cuLaunchHostFunc()`,
 "the host function must not make any CUDA API calls." So we cannot do that
 directly inside `cuLaunchHostFunc()`; we need to notify another separate
 thread to call CUDA APIs to push more work to the GPU. So the deferred/pending
-action queue should have an associcated thread.
+action queue should have an associated thread.
 
 For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that

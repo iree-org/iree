@@ -91,7 +91,7 @@ static void iree_task_topology_set_affinity_from_processor(
   out_affinity->id_assigned = 1;
   out_affinity->id = processor->linux_id;
 #else
-  // WASM? Unusued today.
+  // WASM? Unused today.
   out_affinity->id_assigned = 0;
 #endif  // cpuinfo-like platform field
 

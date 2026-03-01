@@ -415,7 +415,7 @@ skip-ci: free form reason
 ??? info - "Using `skip-ci`"
 
     `skip-ci` skips all jobs. It is mutually exclusive with the other `ci-*`
-    options and is synonomous with `ci-skip: all`.
+    options and is synonymous with `ci-skip: all`.
 
     ``` text
     skip-ci: free form reason

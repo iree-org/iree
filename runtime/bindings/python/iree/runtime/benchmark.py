@@ -135,7 +135,7 @@ def benchmark_module(
     if "INVALID_ARGUMENT;" in err:
         raise ValueError("Invalid inputs specified for benchmarking")
 
-    # In the event benchmarking runs but encounteres an internal error,
+    # In the event benchmarking runs but encounters an internal error,
     # return the internal error instead of benchmark results.
     if "INTERNAL; CUDA driver error" in out:
         raise BenchmarkToolError(out)

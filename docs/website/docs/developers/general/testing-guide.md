@@ -399,7 +399,7 @@ The CMake functions follow a similar pattern. The calls to them are generated in
 our `CMakeLists.txt` file by
 [bazel_to_cmake](https://github.com/iree-org/iree/tree/main/build_tools/bazel_to_cmake/bazel_to_cmake.py).
 
-There are other test targets that generate tests based on template configuraton
+There are other test targets that generate tests based on template configuration
 and platform detection, such as `iree_static_linker_test`. Those targets are
 not supported by Bazel rules at this point.
 

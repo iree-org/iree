@@ -23,8 +23,9 @@ typedef enum iree_vm_bytecode_disassembly_format_e {
 } iree_vm_bytecode_disassembly_format_t;
 
 // Disassembles the bytecode operation at |pc| using the provided module state.
-// Appends the disasembled op to |string_builder| in a format based on |format|.
-// If |regs| are available then values can be added using the format mode.
+// Appends the disassembled op to |string_builder| in a format based on
+// |format|. If |regs| are available then values can be added using the format
+// mode.
 //
 // Example: `%i0 <= ShrI32U %i2, %i3`
 //
