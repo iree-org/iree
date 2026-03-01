@@ -256,7 +256,7 @@ struct InsertDebugTargetAtSymbolPass
       });
 
       // Break on the selected operation (dispatch). Currently this breaks on
-      // the first occurance of a dispatch that matches the symbol by assuming
+      // the first occurrence of a dispatch that matches the symbol by assuming
       // no control flow within the function. This will fail if the target
       // dispatch is not found within the entry block of the function.
       if (breakTarget) {

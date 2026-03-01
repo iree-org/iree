@@ -1073,7 +1073,7 @@ def TestVectorLayoutAnalysisPass : Pass<"iree-codegen-test-vector-layout-analysi
   let summary = "Test the vector layout analysis.";
   let description = [{
     Run VectorLayoutAnalysis on the root operation. The analysis emits remarks
-    for the layout for each SSA value infered on it's owning operation.
+    for the layout for each SSA value inferred on it's owning operation.
   }];
 }
 
@@ -1153,7 +1153,7 @@ def TransformDialectInterpreterPass :
 
 def TypePropagationPass :
     InterfacePass<"iree-codegen-type-propagation", "mlir::FunctionOpInterface"> {
-  let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
+  let summary = "Propagate the type of tensor to avoid load/stores of illegal bit widths";
 }
 
 def UnrollAnnotatedLoopsPass :

@@ -19,7 +19,7 @@
 // parallel paths.
 static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
     "iree-codegen-mmt4d-use-intrinsics",
-    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
+    llvm::cl::desc("Whether to use intrinsics when lowering vector contracts "
                    "generated from mmt4d matmuls (as opposed to inline asm). "
                    "Not for production use."),
     llvm::cl::init(false));
@@ -71,7 +71,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     LLVM_DEBUG({
       llvm::dbgs()
           << "\n--- After folding consumer add ops into contraction op "
-             "iteself ---\n";
+             "itself ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });

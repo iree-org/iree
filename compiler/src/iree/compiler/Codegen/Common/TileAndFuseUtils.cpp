@@ -405,10 +405,10 @@ LogicalResult applyTileAndFuseToEachRoot(
     RewritePatternSet cleanupPatterns(context);
 
     if (allowZeroSlices) {
-      // Add pattern to fuse pad operations without zero slice gaurd, if we
+      // Add pattern to fuse pad operations without zero slice guard, if we
       // know we have no zero slices.
       auto zeroSliceGuard = [](tensor::ExtractSliceOp) -> std::optional<bool> {
-        // Do not use zero slice gaurd.
+        // Do not use zero slice guard.
         return false;
       };
       cleanupPatterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(

@@ -19,4 +19,4 @@ IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x4_x8_arm_64_transpose)
 IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x8_x8_arm_64_transpose)
 IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x8_x32_arm_64_direct)
 
-#endif  // foIREE_BUILTINS_UKERNEL_ARCH_ARM_64_PACK_ARM_64_INTERNAL_H_
+#endif  // IREE_BUILTINS_UKERNEL_ARCH_ARM_64_PACK_ARM_64_INTERNAL_H_

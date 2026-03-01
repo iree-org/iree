@@ -131,7 +131,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     # Model is too big for in-memory inference: do file-based shape inference
     # to a temp file.
     # Make a temp dir for all the temp files we'll be generating as a side
-    # effect of infering shapes. For now, the only file is a new .onnx holding
+    # effect of inferring shapes. For now, the only file is a new .onnx holding
     # the revised model with shapes.
     with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
         temp_dir_path = Path(temp_dir_name)
@@ -165,7 +165,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         "--data-prop",
         default=True,
         action=argparse.BooleanOptionalAction,
-        help="Toggle data propogation for onnx shape inference",
+        help="Toggle data propagation for onnx shape inference",
     )
     parser.add_argument(
         "--data-dir",

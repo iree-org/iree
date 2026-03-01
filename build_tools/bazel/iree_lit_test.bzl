@@ -26,7 +26,7 @@ def iree_lit_test(
       env: string_dict. Environment variables available to the test at runtime.
         FILECHECK_OPTS=--enable-var-scope is added if FILECHECK_OPTS is not
         already set.
-      **kwargs: additional keyword args to forward to the underyling lit_test.
+      **kwargs: additional keyword args to forward to the underlying lit_test.
     """
 
     tools = tools or []
@@ -70,7 +70,7 @@ def iree_lit_test_suite(
       env: string_dict. Environment variables available to the test at runtime.
         FILECHECK_OPTS=--enable-var-scope is added if FILECHECK_OPTS is not
         already set.
-      **kwargs: additional keyword args to forward to the underyling
+      **kwargs: additional keyword args to forward to the underlying
         lit_test_suite.
     """
     tools = tools or []

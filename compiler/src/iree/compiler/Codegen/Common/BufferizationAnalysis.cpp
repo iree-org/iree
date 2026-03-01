@@ -7,7 +7,7 @@
 //===- BufferizationAnalysis.cpp - Pre bufferization analysis -------------===//
 //
 // Analysis to group together tensors within a dispatch region into an
-// equivalance class such that all members of a set can be mapped to the same
+// equivalence class such that all members of a set can be mapped to the same
 // memory region.
 //
 //===----------------------------------------------------------------------===//

@@ -101,16 +101,16 @@ class VectorLayoutInterface;
 ///
 ///    %root = vector.transfer_read
 ///     |
-///     --> infered to layout L
+///     --> inferred to layout L
 ///    %root2 = vector.transfer_read
 ///     |
-///     --> infered to layout L
+///     --> inferred to layout L
 ///    %c = arith.mulf %root, %b
 ///     |
-///     --> infered to layout L
+///     --> inferred to layout L
 ///    %e = arith.divf %b, %root2
 ///     |
-///     --> infered to layout L
+///     --> inferred to layout L
 ///
 /// If at any point, a value has a layout, but the user of that value requires
 /// a different layout, the analysis inserts a resolution operation. This
@@ -138,7 +138,7 @@ class VectorLayoutInterface;
 ///  --> anchored to layout L'
 /// %resolved = iree_vector_ext.to_layout %1
 ///  |
-///  --> infered to layout L
+///  --> inferred to layout L
 /// arith.addf %0, %resolved
 ///
 /// The analysis itself will not try to resolve the conflict, but instead

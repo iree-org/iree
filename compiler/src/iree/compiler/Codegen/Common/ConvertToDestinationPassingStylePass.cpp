@@ -132,7 +132,7 @@ static Value getTiedResultForOperand(OpOperand &operand,
 /// walked to get to a value already mapped to a buffer or a
 /// `iree_tensor_ext.dispatch.tensor.store` or `iree_codegen.store_to_buffer`
 /// operation. For each use, gets the tied result and follow its uses. The
-/// traversed uses and thir tied results are returned in `traversedUses`.
+/// traversed uses and this tied results are returned in `traversedUses`.
 static Operation *
 walkUseToGetDispatchStoreOp(Value value, const BufferizationPlan &plan,
                             SmallVectorImpl<OpOperand *> &traversedUses,
@@ -442,7 +442,7 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
     numIterations++;
     BufferizationPlan plan;
     if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
-      return funcOp.emitOpError("failed to create tensor equivalance classes");
+      return funcOp.emitOpError("failed to create tensor equivalence classes");
     }
 
     auto resultMovedIntoStoreSet =

@@ -414,7 +414,7 @@ VER_0 {
     mlirDictionaryAttrGetName;
     mlirDictionaryAttrGetNumElements;
     mlirDictionaryAttrGetTypeID;
-    mlirDisctinctAttrCreate;
+    mlirDistinctAttrCreate;
     mlirElementsAttrGetNumElements;
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;

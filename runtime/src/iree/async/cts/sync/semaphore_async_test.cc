@@ -474,7 +474,7 @@ TEST_P(SemaphoreAsyncTest, WaitSemaphoreFailed) {
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait_op.base));
 
   // Fail the semaphore from another thread.
-  std::thread failer([semaphore]() {
+  std::thread failure([semaphore]() {
     iree_wait_until(iree_time_now() + iree_make_duration_ms(20));
     iree_async_semaphore_fail(
         semaphore, iree_make_status(IREE_STATUS_ABORTED, "device lost"));
@@ -483,7 +483,7 @@ TEST_P(SemaphoreAsyncTest, WaitSemaphoreFailed) {
   PollUntil(/*min_completions=*/1,
             /*total_budget=*/iree_make_duration_ms(5000));
 
-  failer.join();
+  failure.join();
 
   EXPECT_EQ(tracker.call_count, 1);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_ABORTED, tracker.ConsumeStatus());

@@ -1157,7 +1157,7 @@ def Util_ReferenceType : Util_TypeInterface<"ReferenceTypeInterface"> {
 
   let description = [{
     Interface used to mark types as passed by-reference. These types may have
-    aliases/ties or be convertable into forms that do. This is in contrast to
+    aliases/ties or be convertible into forms that do. This is in contrast to
     the default of immutable by-value types.
   }];
 }

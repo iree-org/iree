@@ -150,7 +150,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //          CHECK: func @expanded_matmul_transpose_b
-// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 128 = 1920.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args({{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
@@ -492,7 +492,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 
 
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
-// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 1280 - 128 = 1152.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<1x2x1x2x1x1x1x1x1x4x1x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
@@ -877,7 +877,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @attention_20x4096x64x4096x64()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc
@@ -944,7 +944,7 @@ hal.executable private @attention_multiple_m_transpose {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @attention_multiple_m_transpose()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc
@@ -1011,7 +1011,7 @@ hal.executable private @attention_mfma_32x32x8 {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @attention_mfma_32x32x8()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc
@@ -1089,7 +1089,7 @@ hal.executable private @online_attention_split_k2 {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @online_attention_split_k2()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc

@@ -111,7 +111,7 @@ class ExpansionInfo {
 public:
   // Computes the mapping from original dimensions of the op to the dimensions
   // of the expanded op given the `indexingMap` of the fused operand/result of
-  // the op, the `reassocationMaps` of the reshape op and the shape of
+  // the op, the `reassociationMaps` of the reshape op and the shape of
   // the expanded op.
   LogicalResult compute(SmallVector<ReshapeOperandInfo> infos,
                         SmallVector<int64_t> loopRanges,
@@ -718,7 +718,7 @@ struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
     Value reducedIndices = gatherOp.getIndices();
     Value reducedOutput = gatherOp.getOutput();
     if (gatherOp.getBatchRank() > 1) {
-      // The only reaason we have to do these rank reductions seperate is
+      // The only reaason we have to do these rank reductions separate is
       // because gather/scatter have special behavior for eliding the coordinate
       // dimension.
       // TODO: Do the rank reduction in one go after this behavior is changed.
@@ -932,7 +932,7 @@ getOperandReassociation(AffineMap indexingMap,
     unsigned dim =
         cast<AffineDimExpr>(indexingMap.getResult(counter)).getPosition();
     // This is the start of a collapsed dimensions of the iteration that
-    // is gauranteed to be preserved in the indexing map. The number of folded
+    // is guaranteed to be preserved in the indexing map. The number of folded
     // dims is obtained from the collapsed op to original op mapping.
     unsigned numFoldedDims =
         collapsedOpToOrigOpMapping[origOpToCollapsedOpMapping[dim].first]

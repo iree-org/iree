@@ -33,7 +33,7 @@ struct DecomposeHorizontallyFusedGemmsPass final
 // horizontally fused contractions.
 //===---------------------------------------------------------------------===//
 
-static LogicalResult captureUsedOperationsAndBlockArguements(
+static LogicalResult captureUsedOperationsAndBlockArguments(
     linalg::LinalgOp linalgOp, SetVector<int64_t> &usedInputs,
     SetVector<Operation *> &usedOperations, int64_t resultNumber) {
   BackwardSliceOptions options;
@@ -75,7 +75,7 @@ static LogicalResult captureUsedOperationsAndBlockArguements(
 }
 
 // Since the `promotedOperands` changes that needs to be modified
-// and transfered over to the decomposed ops.
+// and transferred over to the decomposed ops.
 static IREE::GPU::LoweringConfigAttr
 getModifiedLoweringConfigForDecomposedGemmOp(
     RewriterBase &rewriter, IREE::GPU::LoweringConfigAttr origAttr,
@@ -117,7 +117,7 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
     // Get all operations required to produce this result.
     SetVector<Operation *> usedOperations;
     SetVector<int64_t> usedInputs;
-    if (failed(captureUsedOperationsAndBlockArguements(
+    if (failed(captureUsedOperationsAndBlockArguments(
             linalgOp, usedInputs, usedOperations, resultNumber))) {
       return failure();
     }

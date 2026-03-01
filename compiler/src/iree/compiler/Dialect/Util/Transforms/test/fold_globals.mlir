@@ -242,8 +242,8 @@ util.func @foo() -> (index, index) attributes {
 
 // CHECK: util.global private @dontFoldInitialized = 6 : index
 util.global private @dontFoldInitialized = 6 : index
-// CHECK-NOT: util.global private @foldUnintialized
-util.global private @foldUnintialized : index
+// CHECK-NOT: util.global private @foldUninitialized
+util.global private @foldUninitialized : index
 // CHECK: util.initializer
 util.initializer {
   // CHECK-NEXT: %[[STORE_VAL:.+]] = arith.constant 7
@@ -251,14 +251,14 @@ util.initializer {
   // CHECK-NEXT: util.global.store %[[STORE_VAL]], @dontFoldInitialized
   util.global.store %c7, @dontFoldInitialized : index
   %c8 = arith.constant 8 : index
-  util.global.store %c8, @foldUnintialized : index
+  util.global.store %c8, @foldUninitialized : index
   // CHECK-NEXT: util.return
   util.return
 }
 // CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index) {
   // CHECK-NEXT: %[[FOLDED:.+]] = arith.constant 8 : index
-  %1 = util.global.load @foldUnintialized : index
+  %1 = util.global.load @foldUninitialized : index
   // CHECK-NEXT: %[[UNFOLDED:.+]] = util.global.load immutable @dontFoldInitialized
   %0 = util.global.load @dontFoldInitialized : index
   // CHECK-NEXT: return %[[UNFOLDED]], %[[FOLDED]]

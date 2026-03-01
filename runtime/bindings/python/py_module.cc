@@ -19,7 +19,7 @@ namespace iree::python {
 //
 // This class has a complicated life-cycle and can be in one of several
 // states:
-//   UNINITIALZED: Prior to calling Create(). Mutable.
+//   UNINITIALIZED: Prior to calling Create(). Mutable.
 //   INITIALIZED: After calling Create() and prior to the returned reference
 //     being released. Immutable.
 //   DESTROYED: After the reference from Create() is released. Nothing
@@ -262,7 +262,7 @@ class PyModuleInterface {
     d.attr_count = 0;
     d.attrs = nullptr;
     std::string& alloced_name = py_function->name;
-    CheckApiStatus(py_function->ParseCconv(), "Unparseable calling convention");
+    CheckApiStatus(py_function->ParseCconv(), "Unparsable calling convention");
 
     // Transfer the PyFunction to its vector now that we are done touching it.
     export_functions_.push_back(std::move(py_function));

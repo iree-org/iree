@@ -2706,7 +2706,7 @@ def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
     OpBuilder<(ins
       "ExecutableExportOp":$exportOp, "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$operands,
-      "ValueRange":$operandSizes, "ValueRange":$operandOffests,
+      "ValueRange":$operandSizes, "ValueRange":$operandOffsets,
       "ValueRange":$operandEnds, "ValueRange":$operandLengths,
       "ValueRange":$resultSizes,
       CArg<"ArrayRef<int64_t>", "{}">:$tiedOperands,

@@ -90,7 +90,7 @@ def SPIRVMapMemRefStorageClassPass :
 def SPIRVMaterializeExecutableConditionsPass :
     Pass<"iree-spirv-materialize-executable-conditions",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Materialize SPIR-V target requirements of hal.exectuable.variant "
+  let summary = "Materialize SPIR-V target requirements of hal.executable.variant "
                 "ops into hal.executable.condition regions";
 }
 
@@ -135,7 +135,7 @@ def SPIRVVectorizeLoadStorePass :
     InterfacePass<"iree-spirv-vectorize-load-store", "mlir::FunctionOpInterface"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let description = [{
-    Converts memref of scalar to memref of vector of efficent size. This will
+    Converts memref of scalar to memref of vector of efficient size. This will
     allow to convert memory accesses to vector load/store in SPIR-V without
     having pointer bitcast.
   }];

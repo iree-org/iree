@@ -365,7 +365,7 @@ LogicalResult propagateVectorLayoutInfo(
     LDBG() << "Initializing layout from to_layout op: " << toLayout << "\n";
     info.setLayoutIfUnset(toLayout.getResult(), toLayout.getLayout());
   });
-  // Propgate all layout information until fixpoint. Give priority to
+  // Propagate all layout information until fixpoint. Give priority to
   // forward propagation and only do backward propagation when there is no
   // forward propagation work left.
   while (!info.forward.empty() || !info.backward.empty()) {

@@ -423,7 +423,7 @@ extern void mlirDictionaryAttrGetElementByName();
 extern void mlirDictionaryAttrGetName();
 extern void mlirDictionaryAttrGetNumElements();
 extern void mlirDictionaryAttrGetTypeID();
-extern void mlirDisctinctAttrCreate();
+extern void mlirDistinctAttrCreate();
 extern void mlirElementsAttrGetNumElements();
 extern void mlirElementsAttrGetValue();
 extern void mlirElementsAttrIsValidIndex();
@@ -1541,7 +1541,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirDictionaryAttrGetName;
   x += (uintptr_t)&mlirDictionaryAttrGetNumElements;
   x += (uintptr_t)&mlirDictionaryAttrGetTypeID;
-  x += (uintptr_t)&mlirDisctinctAttrCreate;
+  x += (uintptr_t)&mlirDistinctAttrCreate;
   x += (uintptr_t)&mlirElementsAttrGetNumElements;
   x += (uintptr_t)&mlirElementsAttrGetValue;
   x += (uintptr_t)&mlirElementsAttrIsValidIndex;

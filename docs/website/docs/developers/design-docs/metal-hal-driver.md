@@ -8,7 +8,7 @@ tags:
 
 # Metal HAL driver
 
-This document lists technical details regarding the Metal implemenation of
+This document lists technical details regarding the Metal implementation of
 IREE's Hardware Abstraction Layer, called a Metal HAL driver.
 
 IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
@@ -87,7 +87,7 @@ creation.
 [`iree_hal_metal_device_t`][metal-device] implements [`iree_hal_device_t`][hal-device]
 to provide the interface to Metal GPU device by wrapping a `id<MTLDevice>`. Upon
 construction, `iree_hal_metal_device_t` creates and retains one queue for both
-dispatch and transfer during its lifetime. In the future we expect to spport
+dispatch and transfer during its lifetime. In the future we expect to support
 multiple queues for better concurrency.
 
 #### Command buffer submission
@@ -115,7 +115,7 @@ translates to blocking wait and allocation.
 
 #### Collectives
 
-Collectives suppport is not yet implemented.
+Collectives support is not yet implemented.
 
 #### Profiling
 
@@ -173,7 +173,7 @@ Metal world, the counterpart would be [`MTLSharedEvent`][mtl-shared-event]. Most
 of the `iree_hal_semaphore_t` APIs are simple to implement in
 [`MetalSharedEvent`][metal-shared-event], with `iree_hal_semaphore_wait()` as an
 exception. A listener is registered on the `MTLSharedEvent` with
-`notifyListener:atValue:block:` to singal a semaphore to wake the current
+`notifyListener:atValue:block:` to signal a semaphore to wake the current
 thread, which is put into sleep by waiting on the semaphore.
 
 ### Allocator
@@ -201,8 +201,8 @@ constructed from `MTLFunction`s.
 ### Executable cache
 
 IREE [`iree_hal_executable_cache_t`][hal-executable-cache] is modeling a cache of
-preprared GPU executables for a particular device. At the moment the Metal
-HAL driver does not peforming any caching on GPU programs; it simply reads the
+prepared GPU executables for a particular device. At the moment the Metal
+HAL driver does not performing any caching on GPU programs; it simply reads the
 program from the FlatBuffer and hands it over to Metal driver.
 
 ## Compute Pipeline
@@ -257,7 +257,7 @@ dispatched SPIR-V code. This split does not match the Metal model, where we
 specify both in the API with `dispatchThreads:threadsPerThreadgroup:`.
 
 As said in [shader/kernel compilation](#shaderkernel-compilation), MSL kernels
-are cross compiled from SPIR-V code and then embeded in the module FlatBuffer.
+are cross compiled from SPIR-V code and then embedded in the module FlatBuffer.
 The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
 information extracted from the SPIR-V code. We encode an additional 3-D vector
 for each entry point and use it as the threadgroup size when later dispatching

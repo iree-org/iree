@@ -910,7 +910,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> FftOp::getLoopIteratorTypes() {
-  // There are `rank-1` outer loops. The fft itselfs has one loop for each
+  // There are `rank-1` outer loops. The fft itself has one loop for each
   // stage, which handles the merge step -- taking two half size tensors and
   // merge them into one tensor.
   SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
@@ -996,7 +996,7 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
                                            ArrayRef<Value> operands) {
   auto rank = getOperandRank();
   SmallVector<AffineMap> maps;
-  // The size of coefficent buffer is epxected to match `2^(stage-1)`, which
+  // The size of coefficient buffer is expected to match `2^(stage-1)`, which
   // equals to the last dim of operands.
   maps.append(
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
@@ -1377,7 +1377,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   indices[kDim] = scfFor.getInductionVar();
   auto loopCarryValues = scfFor.getRegionIterArgs();
 
-  // Retrieve region as black box comparision function f(x,y). Plug into op.
+  // Retrieve region as black box comparison function f(x,y). Plug into op.
   auto &srcBlock = getRegion().front();
   IRMapping bvmF; // f(x,y)
   IRMapping bvmR; // f(y,x)
@@ -3544,7 +3544,7 @@ LogicalResult OnlineAttentionOp::getPartialResultTilePosition(
     resultSizes.push_back(sizes[dim]);
 
     if (llvm::find(opInfo.getK2Dims(), dim) != opInfo.getK2Dims().end()) {
-      // Reduction dims are reduced, and are always outputed in the same
+      // Reduction dims are reduced, and are always outputted in the same
       // place. So use offset 0 for them.
       resultOffsets.push_back(b.getIndexAttr(0));
     } else {

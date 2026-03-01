@@ -90,7 +90,7 @@ static llvm::cl::list<std::string> clSubstituteExecutableConfiguration{
     llvm::cl::desc(
         "A `executable_name=object_file.xxx` pair specifying a hal.executable "
         "symbol name that will be substituted with the configured executable "
-        "file at the given path. Configured execuable paths are relative to "
+        "file at the given path. Configured executable paths are relative to "
         "those specified on `--iree-hal-executable-object-search-path=`. If a "
         "`.mlir` or `.mlirbc` file is specified the entire executable will be "
         "replaced with an equivalently named hal.executable in the referenced "

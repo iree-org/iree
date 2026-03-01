@@ -821,8 +821,8 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
     // Keep track of every operation where any of the alloc in the group is
     // live.
     // Liveness is represent as a set of Operations where the alloc is alive.
-    // To make it merge liveranges and check if a given Operation interfers
-    // with the liverange we store it as a DesneSet.
+    // To make it merge liveranges and check if a given Operation interferes
+    // with the liverange we store it as a DenseSet.
     llvm::DenseSet<Operation *> liveness;
   };
   Liveness liveness(funcOp);
@@ -852,7 +852,7 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
           liveness.resolveLiveness(alloc->getResult(0));
       newGroup.liveness.insert(liveInfo.begin(), liveInfo.end());
     } else {
-      // Merge the alloc into the first alias group it interfers with.
+      // Merge the alloc into the first alias group it interferes with.
       AllocGroup &mergeGroup = groups[aliasGroups[0]];
       mergeGroup.allocs.push_back(alloc);
       Liveness::OperationListT liveInfo =

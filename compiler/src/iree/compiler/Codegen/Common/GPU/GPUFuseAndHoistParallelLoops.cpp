@@ -412,7 +412,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     tensor::populateFoldTensorEmptyPatterns(patterns);
     scf::ForallOp::getCanonicalizationPatterns(patterns, context);
     auto zeroSliceGuard = [](tensor::ExtractSliceOp) -> std::optional<bool> {
-      // Do not use zero slice gaurd.
+      // Do not use zero slice guard.
       return false;
     };
     patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(context,

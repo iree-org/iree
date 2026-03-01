@@ -160,7 +160,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 
 //    CHECK-LABEL: func @expanded_matmul_transpose_b
-// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args({{.*}}) -> (vector<1x1x4x1x1x1x1x1x1x1x4x1xf32>)
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
@@ -504,7 +504,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @attention_20x4096x64x4096x64()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc
@@ -578,7 +578,7 @@ hal.executable private @attention_mfma_32x32x16 {
 // CHECK: scf.yield
 
 // Check that we only use alloc for Q, K, and V. No shared memory for S is
-// needed because the intrinsic layout mathes.
+// needed because the intrinsic layout matches.
 // MEMORY-LABEL: func.func @attention_mfma_32x32x16()
 // MEMORY-COUNT-3: memref.alloc
 // MEMORY-NOT: memref.alloc

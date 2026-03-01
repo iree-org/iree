@@ -145,10 +145,10 @@ Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
 
 static std::string getNewGlobalName(StringRef originalName,
                                     IREE::Stream::AffinityAttr affinityAttr) {
-  std::string resul = originalName.str();
-  llvm::raw_string_ostream sstream(resul);
+  std::string result = originalName.str();
+  llvm::raw_string_ostream sstream(result);
   sstream << "_" << affinityAttr;
-  return resul;
+  return result;
 }
 
 IREE::Util::GlobalOpInterface
@@ -244,17 +244,17 @@ Value ValuePerAffinityHelper::getOrCreateAffinityOpForAffinity(
       clone(builder, affinityOp, affinityOp->getResultTypes(), newOperands);
   newAffinityOp->setDiscardableAttrs(
       affinityOp->getDiscardableAttrDictionary());
-  // Cache all the results, so it won't create new operations when querying for
-  // other results that have the same affinity.
+  // Cache all the resultts, so it won't create new operations when querying for
+  // other resultts that have the same affinity.
   for (auto [oldResult, newResult] :
        llvm::zip_equal(affinityOp->getResults(), newAffinityOp->getResults())) {
-    ValueAffinityPair resultKey = {oldResult, affinityAttr};
-    cachedValuePerAffinity[resultKey] = newResult;
+    ValueAffinityPair resulttKey = {oldResult, affinityAttr};
+    cachedValuePerAffinity[resulttKey] = newResult;
   }
   return cachedValuePerAffinity[key];
 }
 
-// Tracks which operands of an operation are avaialble for affinity analysis.
+// Tracks which operands of an operation are available for affinity analysis.
 // Some operands may come from globals that do not have specified affinity. It
 // can be used to prioritize the operand affinities for the operation.
 class OpOperandAffinityState {
@@ -343,7 +343,7 @@ struct ReplicateGlobalsPerAffinityPass
 };
 } // namespace
 
-// Dumps the operand affinities and result usage affinities of the given op.
+// Dumps the operand affinities and resultt usage affinities of the given op.
 static void
 dumpOpAffinityStatus(IREE::Stream::AffinityOpInterface affinityOp,
                      ArrayRef<IREE::Stream::AffinityAttr> affinityAttrs,
@@ -369,18 +369,18 @@ dumpOpAffinityStatus(IREE::Stream::AffinityOpInterface affinityOp,
     auto attr = affinityAnalysis.lookupResourceAffinity(value);
     LDBG() << "\toperand #" << idx << " affinity: " << attr;
   }
-  for (auto result : affinityOp->getResults()) {
+  for (auto resultt : affinityOp->getResults()) {
     SmallVector<IREE::Stream::AffinityAttr> usageAffinities;
-    if (affinityAnalysis.tryLookupResourceUsageAffinity(result,
+    if (affinityAnalysis.tryLookupResourceUsageAffinity(resultt,
                                                         usageAffinities)) {
       LDBG_OS([&](raw_ostream &os) {
-        os << "\tresult type: " << result.getType() << " affinities: [";
+        os << "\tresultt type: " << resultt.getType() << " affinities: [";
         llvm::interleaveComma(usageAffinities, os);
         os << "]";
       });
     } else {
       LDBG_OS([&](raw_ostream &os) {
-        os << "\tresult type: " << result.getType() << " affinities: failed";
+        os << "\tresultt type: " << resultt.getType() << " affinities: failed";
       });
     }
   }
@@ -470,12 +470,12 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
         })
         .Case<IREE::Stream::AffinityOpInterface, IREE::Flow::TensorReshapeOp>(
             [&](auto affinityOp) {
-              for (OpResult result : affinityOp->getResults()) {
+              for (OpResult resultt : affinityOp->getResults()) {
                 if (!isa<IREE::Stream::AffinityTypeInterface>(
-                        result.getType())) {
+                        resultt.getType())) {
                   continue;
                 }
-                explorer.walkTransitiveUses(result, [&](OpOperand &operand) {
+                explorer.walkTransitiveUses(resultt, [&](OpOperand &operand) {
                   LDBG() << "\tuse: " << *operand.getOwner();
                   Operation *consumerOp = operand.getOwner();
                   opOperandAffinityStateMap.setUnavailableOperand(
@@ -493,7 +493,7 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
   }
 
   // We have to update the operands in topological order, because they may
-  // depend on each other. It can lead to ambigious affinity if an op queries
+  // depend on each other. It can lead to ambiguous affinity if an op queries
   // the affinity from unresolved operations. In this context, it can return
   // multiple affinities and fail to replicate the global for its uses.
   SetVector<Operation *> sortedAffinityOps(opToGlobalUseMap.keys().begin(),

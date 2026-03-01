@@ -2405,7 +2405,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       });
 }
 
-// Propogate the configuration to the other ops.
+// Propagate the configuration to the other ops.
 // TODO(ravishankarm, thomasraoux): This is a very specific use (and
 // fragile). In general, this should not be needed. Things are already tiled
 // and distributed. The rest of the compilation must be structured to either

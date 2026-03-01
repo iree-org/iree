@@ -34,7 +34,7 @@ iree_status_t iree_hal_metal_allocator_create(
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 #if defined(IREE_PLATFORM_MACOS)
-// Returns the underyling MetalCommandQueue associated with the given
+// Returns the underlying MetalCommandQueue associated with the given
 // |allocator|.
 id<MTLCommandQueue> iree_hal_metal_allocator_command_queue(
     const iree_hal_allocator_t* allocator);

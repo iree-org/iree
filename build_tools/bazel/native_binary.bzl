@@ -17,7 +17,7 @@ to that rule:
 These rules let you wrap a pre-built binary or script in a conventional binary
 and test rule respectively. They fulfill the same goal as sh_binary and sh_test
 do, but they run the wrapped binary directly, instead of through Bash, so they
-don't depend on Bash and work with --shell_exectuable="".
+don't depend on Bash and work with --shell_executable="".
 """
 
 def _shared_impl(ctx):
