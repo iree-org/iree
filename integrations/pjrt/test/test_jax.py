@@ -71,8 +71,8 @@ def exec_test(testcase):
     start = time.perf_counter()
     result = subprocess.run(command, capture_output=True)
     end = time.perf_counter()
-    ellapsed = end - start
-    timedout = (float(timeout) > 0) and (ellapsed > float(timeout))
+    elapsed = end - start
+    timedout = (float(timeout) > 0) and (elapsed > float(timeout))
 
     if result.returncode == 0:
         sys.stdout.write(".")

@@ -29,7 +29,7 @@ endfunction()
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with. This can be omitted to test only
-#       compilation, but consider omiting the driver as a hacky abuse of the
+#       compilation, but consider omitting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.
@@ -228,7 +228,7 @@ endfunction()
 #   SRCS: source mlir files containing the module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with. This can be omitted to test only
-#       compilation, but consider omiting the driver as a hacky abuse of the
+#       compilation, but consider omitting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.

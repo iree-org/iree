@@ -648,7 +648,7 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
     rewriter.setInsertionPointAfter(dispatchRegionOp);
   } else {
     return rewriter.notifyMatchFailure(
-        op, "op has both operands and users insided of its dispatch");
+        op, "op has both operands and users inside of its dispatch");
   }
   Operation *hoistedOp = rewriter.clone(*op);
 
@@ -804,10 +804,10 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
-// White list of operations we could ever want to clone. All clonable operations
-// must be part of this white list before any other consideration. Any operation
-// that returns `true` here is never cloned.
-static bool isUnclonableOp(Operation *op) {
+// White list of operations we could ever want to clone. All cloneable
+// operations must be part of this white list before any other consideration.
+// Any operation that returns `true` here is never cloned.
+static bool isUncloneableOp(Operation *op) {
   if (!op) {
     return true;
   }
@@ -850,15 +850,15 @@ static bool isScatterIndicesGenerator(Operation *op) {
 
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op,
-                              ClonableIntoDispatchOptions options) {
-  if (isUnclonableOp(op)) {
+bool isCloneableIntoDispatchOp(Operation *op,
+                               CloneableIntoDispatchOptions options) {
+  if (isUncloneableOp(op)) {
     return false;
   }
 
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
+  // trivially cloneable too, but they cause problems
+  // with bufferization. Make them cloneable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
           complex::CreateOp, IREE::Encoding::UnsetEncodingOp>(op)) {
@@ -956,7 +956,7 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
 }
 
 SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
-                                         ClonableIntoDispatchOptions options) {
+                                         CloneableIntoDispatchOptions options) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;
@@ -981,7 +981,7 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
 
     Operation *definingOp = outsideValue.getDefiningOp();
     if (!definingOp ||
-        !IREE::Flow::isClonableIntoDispatchOp(definingOp, options) ||
+        !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -999,7 +999,7 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
 /// Clone producers into the dispatch region.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      IREE::Flow::DispatchRegionOp regionOp,
-                                     ClonableIntoDispatchOptions options) {
+                                     CloneableIntoDispatchOptions options) {
   SmallVector<Operation *> cloneableOps;
   do {
     cloneableOps = getCloneableOps(regionOp, options);

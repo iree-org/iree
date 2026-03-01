@@ -20,17 +20,17 @@ util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_t
       archs = ["gfx942"],
       types = [f16, f16, f32],
       iteration_sizes_constraints = [
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 0,
           size_min = 512,
           size_div = 64
         >,
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 1,
           size_min = 32832,
           size_div = 64
         >,
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 2,
           size_min = 512,
           size_div = 64

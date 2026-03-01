@@ -519,7 +519,7 @@ module @jit_fn attributes {mhlo.num_partitions = 2 : i32, mhlo.num_replicas = 4 
   // CHECK-LABEL: @cross_replica_and_partition
   func.func @cross_replica_and_partition(%input : tensor<2304xf32>) -> tensor<2304xf32> {
     // Cross replica_and_partition should form groups (0,2,1,3),(4,6,5,7), where each number represents a cell below.
-    // Note that the rank is assigned in a partiton first, e.g., rank 0 and 1 are assigned to cell 0 and 2, respectively.
+    // Note that the rank is assigned in a partition first, e.g., rank 0 and 1 are assigned to cell 0 and 2, respectively.
     // +---+---+
     // | 0   1 |
     // | 2   3 |

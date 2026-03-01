@@ -77,7 +77,7 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
   };
 
   auto compare = dyn_cast<mlir::stablehlo::CompareOp>(cond.front());
-  // If the rhs of the comapare is defined outside the block, it's a constant
+  // If the rhs of the compare is defined outside the block, it's a constant
   // within the loop.
   if (!compare ||
       compare.getComparisonDirection() !=

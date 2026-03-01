@@ -32,7 +32,7 @@ struct CloneProducersIntoDispatchRegionsPass final
     mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
-    IREE::Flow::ClonableIntoDispatchOptions options;
+    IREE::Flow::CloneableIntoDispatchOptions options;
     options.aggressive = aggressive;
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
       if (failed(cloneProducersToRegion(rewriter, regionOp, options))) {
@@ -56,7 +56,7 @@ struct CloneProducersIntoDispatchRegionsPass final
       }
     });
 
-    // Rerun the cloning again to move still clonable operations into
+    // Rerun the cloning again to move still cloneable operations into
     // dispatches.
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
       if (failed(cloneProducersToRegion(rewriter, regionOp, options))) {

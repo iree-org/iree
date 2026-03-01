@@ -46,7 +46,7 @@ namespace {
 //     (presently for all buffer arguments but in the future could only be
 //     those which are not tied to fine grained fences).
 //   * Adding a postamble with a synchronization barrier on any produced
-//     or mutated tensors and appropriate exports/in-place tieing to buffers.
+//     or mutated tensors and appropriate exports/in-place tying to buffers.
 //   * Generation of a synchronous wrapper function with the original name
 //     (the async function is named with an `$async` suffix) which internally
 //     sets up/waits on fences while delegating to the async function.

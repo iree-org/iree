@@ -206,9 +206,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     assert(convDims.outputChannel.size() == 1);
     ocIndex = convDims.outputChannel.front();
   } else if (!convDims.depth.empty()) {
-    // For depthwise convolution ops with multipler 1, we have the same
+    // For depthwise convolution ops with multiplier 1, we have the same
     // input/filter/output channel size, which is being categorized as the
-    // multipler.
+    // multiplier.
     assert(convDims.depth.size() == 1);
     ocIndex = convDims.depth.front();
   } else {
@@ -273,7 +273,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
       return failure();
     }
 
-    // Deduce the configruation for the OW and OH dimension. Try to make them
+    // Deduce the configuration for the OW and OH dimension. Try to make them
     // even if possible given we typically have images with the same height
     // and width.
     const bool tileToSquare = tileConvSquare(
@@ -1437,20 +1437,20 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
 
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-  int64_t remaingGroupSize = groupSize;
+  int64_t remainingGroupSize = groupSize;
   for (int i = reductionDims.size() - 1; i >= 0; --i) {
     int64_t dim = reductionDims[i];
     int64_t bound = bounds[dim];
     if (i == reductionDims.size() - 1) {
       bound /= vectorSize;
     }
-    APInt size = GreatestCommonDivisor(APInt(64, uint64_t(remaingGroupSize)),
+    APInt size = GreatestCommonDivisor(APInt(64, uint64_t(remainingGroupSize)),
                                        APInt(64, uint64_t(bound)));
     reductionTileSizes[dim] = size.getSExtValue();
     if (i == reductionDims.size() - 1) {
       reductionTileSizes[dim] *= vectorSize;
     }
-    remaingGroupSize /= size.getSExtValue();
+    remainingGroupSize /= size.getSExtValue();
   }
 
   TileSizesListType tileSizes;
@@ -1562,7 +1562,7 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
   // Make sure we use a tile size that results in some integral number of bytes.
   const unsigned scaleToByte = minBitwidth < 8 ? 8 / minBitwidth : 1;
 
-  // Distribute workload to the given `numThreads` by allowing a potental loss.
+  // Distribute workload to the given `numThreads` by allowing a potential loss.
   auto distributeToThreads = [&](int64_t numThreads,
                                  std::optional<int64_t> lossFactor =
                                      std::nullopt) {
@@ -1590,7 +1590,7 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
         continue;
       }
 
-      // Try to find some power of two that can devide the current shape dim
+      // Try to find some power of two that can divide the current shape dim
       // size. This vector keeps the candidate tile sizes.
       SmallVector<int64_t, 8> candidates;
 
@@ -1687,7 +1687,7 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
   tileSizes.push_back(threadTileSizes);
 
   if (vectorizable) {
-    // Try to tile all reductions by some small factor, preferrably 4, when
+    // Try to tile all reductions by some small factor, preferably 4, when
     // possible. This gives us a chance to perform vector4 load if an input has
     // its innnermost dimension being reduction. It also avoids generating too
     // many instructions when unrolling vector later.
@@ -1756,8 +1756,8 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
         auto type = cast<ShapedType>(op->getResult(0).getType());
         const int bitwidth = type.getElementTypeBitWidth();
         if (bitwidth <= 32) {
-          const int multipler = 32 / bitwidth;
-          const int bestTilingFactor = 32 * multipler;
+          const int multiplier = 32 / bitwidth;
+          const int bestTilingFactor = 32 * multiplier;
           const int subgroupSize = 32;
           auto result = detail::setConvOpConfig(cast<linalg::LinalgOp>(*op),
                                                 subgroupSize, bestTilingFactor);

@@ -107,7 +107,7 @@ public:
     }
     spvCrossOptions.msl_version =
         SPIRVToMSLCompiler::Options::make_msl_version(3, 0);
-    // Eanble using Metal argument buffers. It is more akin to Vulkan descriptor
+    // Enable using Metal argument buffers. It is more akin to Vulkan descriptor
     // sets, which is how IREE HAL models resource bindings and mappings.
     spvCrossOptions.argument_buffers = true;
     return spvCrossOptions;

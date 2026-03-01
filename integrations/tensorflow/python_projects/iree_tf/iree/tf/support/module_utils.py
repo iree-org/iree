@@ -640,7 +640,7 @@ class TfCompiledModule(CompiledModule):
         return _TfFunctionWrapper(f)
 
 
-def _get_non_inhereted_function_names(cls):
+def _get_non_inherited_function_names(cls):
     """Gets all methods that cls has that its parents don't have."""
     names = set(dir(cls))
     for parent in cls.__bases__:
@@ -654,7 +654,7 @@ def _get_concrete_functions(
     """Get concrete functions from non-inherited methods or exported_names."""
     if not len(exported_names):
         # Get all method names on 'module_class' that aren't on 'tf.Module'.
-        exported_names = _get_non_inhereted_function_names(module_class)
+        exported_names = _get_non_inherited_function_names(module_class)
     instance = module_class()
     functions = []
     for name in exported_names:
@@ -691,7 +691,7 @@ def tf_module_to_tflite_module_bytes(
             tflite_modules.append(converter.convert())
         except Exception as e:
             logging.error("Failed to convert '%s' to tflite.", method_name)
-            logging.error("TFLite excpetion: %s", e)
+            logging.error("TFLite exception: %s", e)
             failed_methods.append(method_name)
 
     if failed_methods:

@@ -12,7 +12,7 @@ util.func @simple_test() -> tensor<10x20xf32> {
 
 // -----
 
-// Generic test excercising some basic use case.
+// Generic test exercising some basic use case.
 util.func public @conv_2d(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
     %arg2: !hal.fence, %arg3: !hal.fence) -> !hal.buffer_view {
   %cst = arith.constant 0.000000e+00 : f32

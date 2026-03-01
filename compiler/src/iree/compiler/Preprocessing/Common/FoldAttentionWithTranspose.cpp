@@ -109,10 +109,11 @@ struct FoldAttentionAndTranspose
     // Check reassociation indexing map.
     SmallVector<ReassociationIndices> reassociation =
         expandShapeOp.getReassociationIndices();
-    SmallVector<ReassociationIndices> expectedReassocation = {{0, 1}, {2}, {3}};
-    if (reassociation != expectedReassocation) {
+    SmallVector<ReassociationIndices> expectedReassociation = {
+        {0, 1}, {2}, {3}};
+    if (reassociation != expectedReassociation) {
       return rewriter.notifyMatchFailure(expandShapeOp,
-                                         "unhandled reassocation");
+                                         "unhandled reassociation");
     }
 
     // Check the permutation maps for the transpose.

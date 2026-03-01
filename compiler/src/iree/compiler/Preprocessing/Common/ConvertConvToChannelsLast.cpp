@@ -484,7 +484,7 @@ private:
 // Generalization patterns
 //=====================================================================
 
-// Returns a reassocation map of the given |rank| such that all dimensions
+// Returns a reassociation map of the given |rank| such that all dimensions
 // in the set |innerDims| map to two dimensions. For example,
 //
 // rank = 4, innerDims = {1, 3}
@@ -573,17 +573,17 @@ public:
                            .getResult()[0];
 
     // Expand the unit dimensions for the result of the pack.
-    SmallVector<ReassociationIndices> reassocationIndices;
+    SmallVector<ReassociationIndices> reassociationIndices;
     int64_t nTiled = 0;
     for (int64_t srcIdx = 0; srcIdx < srcRank; srcIdx++) {
-      reassocationIndices.push_back({srcIdx + nTiled});
+      reassociationIndices.push_back({srcIdx + nTiled});
       while (innerDims.contains(srcIdx + nTiled)) {
-        reassocationIndices.back().push_back(srcIdx + ++nTiled);
+        reassociationIndices.back().push_back(srcIdx + ++nTiled);
       }
     }
 
     rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
-        packOp, destType, transposed, reassocationIndices);
+        packOp, destType, transposed, reassociationIndices);
     return success();
   }
 };

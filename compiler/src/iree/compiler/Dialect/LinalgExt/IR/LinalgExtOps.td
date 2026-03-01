@@ -443,7 +443,7 @@ def IREELinalgExt_MapStoreOp : IREELinalgExt_Op<"map_store",
     // identity.
     bool isIdentity();
 
-    // Creates a MapStoreOp with an identity mapping in the transforamtion
+    // Creates a MapStoreOp with an identity mapping in the transformation
     // body. Expects the types of `input` and `output` to be the same.
     static MapStoreOp createIdentityMapStore(OpBuilder &builder,
                                                  Location loc, Value input,
@@ -634,19 +634,19 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
    A Top-K operation for N-D tensors. Reduces the target dimension from the input
    size N down to K elements based on the supplied binary region.
 
-   Accepts an N-D tensor input consisting of values and an optioanl N-D tensor
+   Accepts an N-D tensor input consisting of values and an optional N-D tensor
    for indices of those values (i32 type). If input indices aren't provided, the
    index mapping is inferred based on the k dim.  Both input values/indices
-   tensors and output values/indicies tensors must have the same shape. Top-K is
+   tensors and output values/indices tensors must have the same shape. Top-K is
    computed along the target dimension (from dimension()). Returns two output
-   tensors of values and the indicies of Top-K results. The output dimensions
+   tensors of values and the indices of Top-K results. The output dimensions
    must match the input save for the dimension that is reduced to K results.
 
-   Region accepts lhs=[next N input] and rhs=[exiting K output] and yeilds an
+   Region accepts lhs=[next N input] and rhs=[exiting K output] and yields an
    i1. If true, the two values are swapped:
      - For Top-K compoarision: >
-     - For Min-K comparision: <
-   Note: when the two values are equal, the first occurence is always selected.
+     - For Min-K comparison: <
+   Note: when the two values are equal, the first occurrence is always selected.
   }];
 
   let arguments = (ins AnyShaped:$values,
@@ -1141,7 +1141,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
     0 < e{negative} <= 1.
 
     These properties allow us to compute an online normalization of this
-    function, in which we don't have to compute the `max(x)` as a seperate
+    function, in which we don't have to compute the `max(x)` as a separate
     reduction, but as a running max.
 
     Generally, these properties are hard to infer from a linalg.generic, because
@@ -1327,7 +1327,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
                 outs(%out_tile : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
     ```
     Then, when the tiled op is decomposed, it becomes a loop over the iteration
-    space of the im2col op, whith an extract_slice from the `%in_tile` followed
+    space of the im2col op, with an extract_slice from the `%in_tile` followed
     by an insert_slice to the `%out_tile`. The indices for the extract slice are
     computed using the `m_offset` and `k_offset` as:
     (b, m, k) -> (b, M / 32 + K / (640*3), M % 32 + K % (640*3) / 640, K % 640)
@@ -1454,7 +1454,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     //
     // This method does not find vectorizable dims if output dims are partially
     // collapsed. For example, it computes K dim mapping for standard conv_2d if
-    // the K dim is fully collapsed or fully expanded (inlcuding all input
+    // the K dim is fully collapsed or fully expanded (including all input
     // channel and filter loop dims), but otherwise omits mappings for the K
     // dims.
     SmallVector<SmallVector<int64_t>> getInputToOutputDimVectorizationMap();

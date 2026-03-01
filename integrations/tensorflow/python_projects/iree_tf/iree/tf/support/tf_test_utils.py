@@ -543,7 +543,7 @@ def tf_function_unit_test(
                 signature = function.input_signature
 
             if input_generator is not None:
-                # Use the user-specificed input_generator.
+                # Use the user-specified input_generator.
                 get_trace_args = lambda: tf_utils.generate_inputs(
                     signature, input_generator
                 )

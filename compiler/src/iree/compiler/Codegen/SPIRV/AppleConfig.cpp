@@ -52,8 +52,8 @@ LogicalResult setAppleCodeGenConfig(IREE::GPU::TargetAttr target,
     if (bitwidth > 32) {
       return failure();
     }
-    const int multipler = 32 / bitwidth;
-    const int bestTilingFactor = 16 * multipler;
+    const int multiplier = 32 / bitwidth;
+    const int bestTilingFactor = 16 * multiplier;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
                            bestTilingFactor);
   }

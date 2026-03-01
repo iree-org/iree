@@ -56,14 +56,14 @@ LogicalResult setAdrenoCodeGenConfig(IREE::GPU::TargetAttr target,
     if (bitwidth > 32) {
       return failure();
     }
-    const int multipler = 32 / bitwidth;
+    const int multiplier = 32 / bitwidth;
 
     auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
     if (failed(convDimsOrFailure)) {
       return failure();
     }
     const int bestTilingFactor =
-        (convDimsOrFailure->depth.empty() ? 32 : 16) * multipler;
+        (convDimsOrFailure->depth.empty() ? 32 : 16) * multiplier;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
                            bestTilingFactor);
   }

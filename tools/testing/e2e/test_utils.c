@@ -40,7 +40,7 @@ float iree_test_utils_acceptable_fb_delta(void) {
 IREE_FLAG(
     int32_t, max_elements_to_check, 10000,
     "Maximum number of tensor elements to check for the given test. For larger "
-    "buffers, only every n-th element will be checked for some n chosed to "
+    "buffers, only every n-th element will be checked for some n chosen to "
     "stay just under that threshold and to avoid being a divisor of the inner "
     "dimension size to avoid special patterns. As the check uses a slow "
     "reference implementation, this is a trade-off between test latency and "
@@ -374,7 +374,7 @@ void iree_test_utils_get_min_max_for_element_type(
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
       // uint8 is special-cased as random bytes.  It's not used in practice for
-      // any other purpose. Random bytes are usefull to fill MX buffers where
+      // any other purpose. Random bytes are useful to fill MX buffers where
       // the element type is sub-byte and all representable values are small.
       *min = 0;
       *max = 255;
