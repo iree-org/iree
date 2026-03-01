@@ -30,11 +30,11 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
       archs = ["gfx942"],
       types = [f8E4M3FNUZ, f8E4M3FNUZ, f32],
       iteration_sizes_constraints = [
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 0,
           size_min = 64
         >,
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 1,
           size_min = 2048,
           size_max = 8192
@@ -306,7 +306,7 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
       archs = ["gfx942"],
       types = [f8E4M3FNUZ, f8E4M3FNUZ, f32],
       iteration_sizes_constraints = [
-        #rocm.ukernel_interation_size_constraint<
+        #rocm.ukernel_iteration_size_constraint<
           index = 0,
           size_min = 32
         >

@@ -440,10 +440,10 @@ endfunction()
 # This appends to two properties:
 #   INTERFACE_IREE_TRANSITIVE_OBJECTS: Transitive list of all objects from
 #     this library and all "iree::" prefixed dependent libraries. This will
-#     allow you to create mondo objects for any transtive libraries that are
+#     allow you to create mondo objects for any transitive libraries that are
 #     part of IREE, but it will not contain outside.
 #   INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS: Transitive list of any dependency
-#     targets that are not under teh "iree::" namespace but are encountered
+#     targets that are not under the "iree::" namespace but are encountered
 #     in the dependency dag.
 function(_iree_cc_library_add_object_deps name)
   foreach(_DEP_TARGET ${ARGN})

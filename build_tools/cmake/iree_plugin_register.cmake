@@ -47,7 +47,7 @@ endfunction()
 # Since external HAL driver building is typically fully optional, they should
 # be in a CMake directory tree that is not included by default in the project.
 # Use the SOURCE_DIR and BINARY_DIR params to configure. If the BINARY_DIR
-# is relative, it will be relative to runtime/plugins/hal/drivers. If ommitted,
+# is relative, it will be relative to runtime/plugins/hal/drivers. If omitted,
 # it will be runtime/plugins/hal/drivers/${NAME}
 #
 # Args:
@@ -84,7 +84,7 @@ function(iree_register_external_hal_driver)
 
   set_property(GLOBAL APPEND PROPERTY IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE "${_RULE_NAME}")
   if(_RULE_OPTIONAL)
-    set_proeprty(GLOBAL_PROPERTY "IREE_EXTERNAL_${_NAME_SPEC}_HAL_DRIVER_OPTIONAL" TRUE)
+    set_property(GLOBAL_PROPERTY "IREE_EXTERNAL_${_NAME_SPEC}_HAL_DRIVER_OPTIONAL" TRUE)
   endif()
   set_property(GLOBAL PROPERTY "IREE_EXTERNAL_${_NAME_SPEC}_HAL_DRIVER_SOURCE_DIR"
     "${_RULE_SOURCE_DIR}")

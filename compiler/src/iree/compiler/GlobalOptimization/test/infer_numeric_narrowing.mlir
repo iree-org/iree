@@ -5,8 +5,8 @@
 
 // CHECK-LABEL: @probe_linalg_op
 // Checks as a by-product:
-//   - Infering ui0 for [0, 0] range
-//   - Infering unsigned for >= 0 range
+//   - Inferring ui0 for [0, 0] range
+//   - Inferring unsigned for >= 0 range
 util.func public @probe_linalg_op(%arg0 : tensor<5x3xf32>) -> tensor<5x1xf32> {
   // CHECK-DAG: %[[RHS:.*]] = arith.constant dense
   // CHECK-DAG: %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32

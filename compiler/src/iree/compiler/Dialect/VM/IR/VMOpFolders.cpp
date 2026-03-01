@@ -385,7 +385,7 @@ OpFoldResult ConstF64ZeroOp::fold(FoldAdaptor operands) {
 }
 
 OpFoldResult ConstRefZeroOp::fold(FoldAdaptor operands) {
-  // TODO(benvanik): relace unit attr with a proper null ref attr.
+  // TODO(benvanik): replace unit attr with a proper null ref attr.
   return UnitAttr::get(getContext());
 }
 
@@ -3010,7 +3010,7 @@ OpFoldResult CmpNZRefOp::fold(FoldAdaptor operands) {
 
 /// Given a successor, try to collapse it to a new destination if it only
 /// contains a passthrough unconditional branch. If the successor is
-/// collapsable, `successor` and `successorOperands` are updated to reference
+/// collapsible, `successor` and `successorOperands` are updated to reference
 /// the new destination and values. `argStorage` is an optional storage to use
 /// if operands to the collapsed successor need to be remapped.
 static LogicalResult collapseBranch(Block *&successor,

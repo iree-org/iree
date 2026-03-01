@@ -732,7 +732,7 @@ materializeFunc(RewriterBase &rewriter, IRMapping &map, ValueRange workloadVals,
 /// Materializes the IR for the provided CallSlice using the given mapping at
 /// the current insertion point. This amounts to cloning all of the IR cached
 /// in `operandSlice.slice` for each required and optional operand.
-/// If one of the optional operands is not resolvable in terms of clonable ops
+/// If one of the optional operands is not resolvable in terms of cloneable ops
 /// (e.g. hal.interface.* ops or memory effecting ops that can't live on the
 /// host), then the conditional op(s) that depend on that optional operands
 /// aren't generated.

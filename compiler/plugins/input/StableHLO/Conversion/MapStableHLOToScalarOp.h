@@ -252,11 +252,11 @@ struct IsComplexType {
 
 template <template <typename T> class MapTy, typename OpTy,
           typename PredTy = llvm::is_detected<MapTy, OpTy>>
-struct MapableIf {
+struct MappableIf {
   using type = void;
 };
 template <template <typename T> class MapTy, typename OpTy>
-struct MapableIf<MapTy, OpTy, std::true_type> {
+struct MappableIf<MapTy, OpTy, std::true_type> {
   using type = MapTy<OpTy>;
 };
 
@@ -266,10 +266,10 @@ template <typename StableHloOpTy>
 inline Value mapStableHloOpToStdScalarOp(
     Location loc, ArrayRef<Type> resultTypes, ArrayRef<Type> argTypes,
     typename StableHloOpTy::Adaptor adaptor, OpBuilder *b) {
-  using ScalarIOpOrVoid = typename MapableIf<ScalarIOp, StableHloOpTy>::type;
-  using ScalarUOpOrVoid = typename MapableIf<ScalarUOp, StableHloOpTy>::type;
-  using ScalarFOpOrVoid = typename MapableIf<ScalarFOp, StableHloOpTy>::type;
-  using ScalarCOpOrVoid = typename MapableIf<ScalarCOp, StableHloOpTy>::type;
+  using ScalarIOpOrVoid = typename MappableIf<ScalarIOp, StableHloOpTy>::type;
+  using ScalarUOpOrVoid = typename MappableIf<ScalarUOp, StableHloOpTy>::type;
+  using ScalarFOpOrVoid = typename MappableIf<ScalarFOp, StableHloOpTy>::type;
+  using ScalarCOpOrVoid = typename MappableIf<ScalarCOp, StableHloOpTy>::type;
   return MapStableHloOpToScalarOpImpl<IsSignedIntegerType, ScalarIOpOrVoid,
                                       IsUnsignedIntegerType, ScalarUOpOrVoid,
                                       IsFloatType, ScalarFOpOrVoid,
@@ -1096,7 +1096,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::PowOp>(
   Value step = arith::ConstantIndexOp::create(lb, 1);
   Value lowerBound = arith::ConstantIndexOp::create(lb, 0);
   // Everything else would overflow for any exponent > 1, as 2^64
-  // is the larget possible exponent for a 64-bit integer, and
+  // is the largest possible exponent for a 64-bit integer, and
   // that's 1 << 6.
   Value upperBound = arith::ConstantIndexOp::create(lb, 6);
   auto originalBase = adaptor.getLhs();
@@ -1138,7 +1138,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::PowOp>(
   // The accum is correct when the rhs is non-negative. When rhs is
   // negative, we return 0 for integer, with the exception of lhs values of 1
   // and -1 which have integer results for negative exponents. Specifically, the
-  // calulation is the following:
+  // calculation is the following:
   //
   // - Return accum if the rhs is not negative.
   // - Return 1 or -1 depending on the parity of rhs when the lhs is -1.

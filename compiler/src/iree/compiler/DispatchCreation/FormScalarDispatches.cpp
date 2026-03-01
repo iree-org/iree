@@ -88,8 +88,8 @@ static bool isScalarOperation(int workload, Operation *op) {
 
   // 3. Do not move operations that are cloned into the dispatch region.
   // TODO: This might prevent moving all scalar operations into dispatch
-  // resulting in artifical splits. Revisit after more examples.
-  return !IREE::Flow::isClonableIntoDispatchOp(op);
+  // resulting in artificial splits. Revisit after more examples.
+  return !IREE::Flow::isCloneableIntoDispatchOp(op);
 }
 
 /// Given a `rootOp` return a DAG of the program that represents
@@ -169,7 +169,7 @@ void FormScalarDispatchesPass::runOnOperation() {
   SmallVector<DispatchRegionDescriptor> dispatches;
   llvm::DenseMap<Operation *, Operation *> opToRootMap;
 
-  // Walk the function in postorder, reverse orded ignore all operations
+  // Walk the function in postorder, reverse ordered ignore all operations
   // not immediately nested within the `funcOp`.
   funcOp.walk<WalkOrder::PostOrder, ReverseIterator>([&](Operation *op) {
     if (op->getParentOp() != funcOp || opToRootMap.count(op)) {
@@ -280,7 +280,7 @@ void FormScalarDispatchesPass::runOnOperation() {
     }
 
     // Set the workgroup count to {1, 1, 1} since this is to be executed
-    // sequentially (at leats for now)
+    // sequentially (at least for now)
     Region &countRegion = dispatchRegionOp->getWorkgroupCount();
     Block *countBody = rewriter.createBlock(&countRegion, countRegion.begin());
     OpBuilder::InsertionGuard g(rewriter);

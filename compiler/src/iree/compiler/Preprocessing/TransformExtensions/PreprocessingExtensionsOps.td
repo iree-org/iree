@@ -27,7 +27,7 @@ def MatchCastCompatibleDagFromRootOp : Op<Transform_Dialect, "iree.match.cast_co
   }];
   let description = [{
     Checks whether the given root op matches an operation dag specified in the
-    body of this op. Enforces cast compatibilty between types rather than a
+    body of this op. Enforces cast compatibility between types rather than a
     strict equality, similar to `iree.match.cast_compatible_type`.
 
     Note: This operation is experimental and subject to change. General subgraph

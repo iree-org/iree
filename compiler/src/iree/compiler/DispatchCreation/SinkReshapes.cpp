@@ -63,7 +63,8 @@ static bool shouldBubbleCollapseShapeOp(tensor::CollapseShapeOp collapseOp,
   if (!producer) {
     return false;
   }
-  return IREE::Flow::isClonableIntoDispatchOp(opOperand->get().getDefiningOp());
+  return IREE::Flow::isCloneableIntoDispatchOp(
+      opOperand->get().getDefiningOp());
 }
 
 /// Control function to check if a `tensor.expand_shape` (which is producer of

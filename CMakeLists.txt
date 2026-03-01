@@ -812,7 +812,7 @@ add_custom_target(iree-sample-deps
 )
 
 # Testing rules that require generation will add dependencies to this target.
-# This allows them to be EXCLUDE_FROM_ALL but still invokable.
+# This allows them to be EXCLUDE_FROM_ALL but still invocable.
 add_custom_target(iree-test-deps
   COMMENT
     "Building IREE test deps"
@@ -1289,7 +1289,7 @@ endif(IREE_ENABLE_RUNTIME_COVERAGE)
 # environment variable "DESTDIST" on a per invocation basis (i.e. to place under
 # a versioned path, etc).
 #
-# The `iree-install-dist` target includes everthing that is typically included in
+# The `iree-install-dist` target includes everything that is typically included in
 # a distribution tarball.
 #-------------------------------------------------------------------------------
 

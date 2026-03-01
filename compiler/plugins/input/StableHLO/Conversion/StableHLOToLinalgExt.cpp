@@ -633,7 +633,7 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
 
     Type valueElementType = inputValuesType.getElementType();
     Type indicesElementType = outputIndicesType.getElementType();
-    // Only handle integer types for indicies. Index type is not supported.
+    // Only handle integer types for indices. Index type is not supported.
     if (!isa<IntegerType>(indicesElementType)) {
       return rewriter.notifyMatchFailure(
           op, "Output indices must be of integer type.");

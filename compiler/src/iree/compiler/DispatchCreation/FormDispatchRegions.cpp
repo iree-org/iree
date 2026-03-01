@@ -477,9 +477,9 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   // If consumer is a dequant operation, dont fuse it. These get cloned
   // into their consumers.
-  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
-  clonableOptions.aggressive = options.aggressiveFusion;
-  if (IREE::Flow::isClonableIntoDispatchOp(consumer, clonableOptions)) {
+  IREE::Flow::CloneableIntoDispatchOptions cloneableOptions;
+  cloneableOptions.aggressive = options.aggressiveFusion;
+  if (IREE::Flow::isCloneableIntoDispatchOp(consumer, cloneableOptions)) {
     return false;
   }
 
@@ -790,8 +790,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
                        FusionTracker &tracker, bool fuseWithTruncate) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
-  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
-  clonableOptions.aggressive = options.aggressiveFusion;
+  IREE::Flow::CloneableIntoDispatchOptions cloneableOptions;
+  cloneableOptions.aggressive = options.aggressiveFusion;
   while (!worklist.empty()) {
     Operation *candidate = worklist.pop_back_val();
     for (OpOperand &operand : candidate->getOpOperands()) {
@@ -799,7 +799,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
       if (!producer) {
         continue;
       }
-      if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
+      if (IREE::Flow::isCloneableIntoDispatchOp(producer, cloneableOptions) ||
           tracker.isFusedOp(producer) || tracker.isRootOp(producer)) {
         continue;
       }
@@ -834,8 +834,8 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        FusionTracker &tracker, unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
-  IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
-  clonableOptions.aggressive = options.aggressiveFusion;
+  IREE::Flow::CloneableIntoDispatchOptions cloneableOptions;
+  cloneableOptions.aggressive = options.aggressiveFusion;
   for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
@@ -887,14 +887,14 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // into their own dispatch since it is better to clone these ops and avoid
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, linalg::PackOp>(op) ||
-          IREE::Flow::isClonableIntoDispatchOp(&op, clonableOptions)) {
+          IREE::Flow::isCloneableIntoDispatchOp(&op, cloneableOptions)) {
         continue;
       }
 
       // For now check if this is a rope computation that is to be fused with
       // attention.
       // TODO: Ideally this is just regular gather fusion which will be covered
-      // by the `isClonableIntoDispatchOp` call above, but for now this is done
+      // by the `isCloneableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
           llvm::all_of(op.getUsers(),

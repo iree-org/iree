@@ -34,7 +34,7 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
   %c2 = arith.constant 2 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?xf32>
   %dest = tensor.empty(%d0) : tensor<?xf32>
-  // Create a dispatch that operands on `2` threads. Set the `worload` of
+  // Create a dispatch that operands on `2` threads. Set the `workload` of
   // `flow.dispatch.region` to capture the values needed to specify the number
   // of threads to use in the `count` region.
   %0 = flow.dispatch.region[%c2] -> (tensor<?xf32>{%d0}) {

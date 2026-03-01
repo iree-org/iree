@@ -57,7 +57,7 @@ util.func public @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_si
     // CHECK-DAG: %[[BUFFER1_STORAGE:.+]] = hal_inline.buffer.storage<%[[BUFFER1]]
 
     // Workload calculation gets inlined and folds during conversion; this is
-    // the original worload ceildiv 4 on x/y:
+    // the original workload ceildiv 4 on x/y:
     // CHECK-DAG: %[[COUNT_X:.+]] = arith.constant 250
     // CHECK-DAG: %[[COUNT_Y:.+]] = arith.constant 251
     // CHECK-DAG: %[[COUNT_Z:.+]] = arith.constant 1

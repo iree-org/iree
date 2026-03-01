@@ -47,7 +47,7 @@
 #
 # - Need to add an include directory?
 #   Don't do that here. Always prefer to fully-specify the path from the IREE
-#   workspace root when it's known that the compilation will be occuring using
+#   workspace root when it's known that the compilation will be occurring using
 #   the files within the IREE checkout; for example, instead of adding a global
 #   include path to third_party/foo/ and #include <foo.h>'ing, just
 #   #include "third_party/foo/foo.h". This reduces build configuration, makes it

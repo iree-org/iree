@@ -279,7 +279,7 @@ public:
       return std::nullopt;
     }
 
-    // PDB file gets generated wtih the same path + .pdb.
+    // PDB file gets generated with the same path + .pdb.
     artifacts.debugFile =
         Artifact::createVariant(artifacts.libraryFile.path, "pdb");
 

@@ -28,7 +28,7 @@ private:
                                  ArrayRef<Chunk> maybeInterestingChunks,
                                  DenseSet<Chunk> &uninterestingChunks);
 
-  bool increaseGranuality(SmallVector<Chunk> &chunks);
+  bool increaseGranularity(SmallVector<Chunk> &chunks);
 
   Oracle &oracle;
   WorkItem &root;

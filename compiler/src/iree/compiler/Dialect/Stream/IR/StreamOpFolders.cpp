@@ -56,7 +56,7 @@ static APInt computeRequiredPatternBits(APInt pattern) {
   uint64_t bitWidth = llvm::PowerOf2Ceil(pattern.getBitWidth());
   if (bitWidth != pattern.getBitWidth()) {
     // Extending as we operate - that's not good: users should have taken care
-    // of this earier.
+    // of this earlier.
     return pattern;
   }
 
@@ -349,7 +349,7 @@ struct ElideUnusedOp : public OpRewritePattern<Op> {
 // ->
 //  %1 = stream.async.splat %c123_i32
 template <typename Op>
-struct PropagateClonableOps : public OpRewritePattern<Op> {
+struct PropagateCloneableOps : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(Op cloneOp,
                                 PatternRewriter &rewriter) const override {
@@ -1293,7 +1293,7 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(benvanik): clone + slice => slice.
   // TODO(benvanik): if both operand and result are used once then elide.
   //                 (if not tied block/fn arguments)
-  results.insert<PropagateClonableOps<TensorCloneOp>>(context);
+  results.insert<PropagateCloneableOps<TensorCloneOp>>(context);
   results.insert<ElideUnneededTensorClones>(context);
 }
 
@@ -1570,7 +1570,7 @@ OpFoldResult AsyncCloneOp::fold(FoldAdaptor operands) {
 void AsyncCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
-  results.insert<PropagateClonableOps<AsyncCloneOp>>(context);
+  results.insert<PropagateCloneableOps<AsyncCloneOp>>(context);
   results.insert<ElideUnusedOp<AsyncCloneOp>>(context);
 }
 

@@ -375,10 +375,10 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
         makeStridedLinearLayoutMap(strides, 0, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
-    SmallVector<OpFoldResult> opFoldIndicies = getAsOpFoldResult(indices);
+    SmallVector<OpFoldResult> opFoldIndices = getAsOpFoldResult(indices);
     if (linearLayoutMap.getNumSymbols() == 0) {
       return affine::makeComposedAffineApply(builder, loc, linearLayoutMap,
-                                             opFoldIndicies);
+                                             opFoldIndices);
     }
   }
 

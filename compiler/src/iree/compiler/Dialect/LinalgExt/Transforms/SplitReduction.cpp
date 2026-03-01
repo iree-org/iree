@@ -73,7 +73,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                                  int64_t splitReductionRatio,
                                  int64_t splitReductionDepth) {
   // Determine if we should split the reduction. Requires aligned static shapes
-  // and no input indicies.
+  // and no input indices.
   auto valuesOriginalType = topkOp.getInputType();
   if (valuesOriginalType.isDynamicDim(kDimOrig)) {
     return rewriter.notifyMatchFailure(topkOp,

@@ -137,7 +137,7 @@ public:
         "-o " + artifacts.libraryFile.path,
     };
 
-    // Hide build info that makes files unreproducable.
+    // Hide build info that makes files unreproducible.
     flags.push_back("--build-id=none");
 
     // Avoids including any libc/startup files that initialize the CRT as

@@ -184,8 +184,8 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
     }
     visited.insert(op);
 
-    // Do not clone ops that are not clonable.
-    if (!IREE::Flow::isClonableIntoDispatchOp(op)) {
+    // Do not clone ops that are not cloneable.
+    if (!IREE::Flow::isCloneableIntoDispatchOp(op)) {
       continue;
     }
 

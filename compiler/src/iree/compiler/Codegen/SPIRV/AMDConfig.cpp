@@ -82,9 +82,9 @@ LogicalResult setAMDCodeGenConfig(IREE::GPU::TargetAttr target,
     if (bitwidth > 32) {
       return failure();
     }
-    const int multipler = 32 / bitwidth;
+    const int multiplier = 32 / bitwidth;
     bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
-    const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multipler;
+    const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multiplier;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
                            bestTilingFactor);
   }

@@ -96,7 +96,7 @@ function(iree_bytecode_module)
     endif()
     # Note: --iree-llvmcpu-system-linker-path is left unspecified.
 
-    # Check LLVM static library setting. If the static libary output path is set,
+    # Check LLVM static library setting. If the static library output path is set,
     # retrieve the object path and the corresponding header file path.
     if(_RULE_STATIC_LIB_PATH)
       list(APPEND _ARGS "--iree-llvmcpu-link-embedded=false")
