@@ -598,7 +598,7 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
       if (failed(getTypeConverter()->convertType(result.getType(),
                                                  convertedTypes))) {
         return rewriter.notifyMatchFailure(callOp.getLoc(),
-                                           "unconvertable result type");
+                                           "unconvertible result type");
       }
       llvm::append_range(resultTypes, convertedTypes);
     }

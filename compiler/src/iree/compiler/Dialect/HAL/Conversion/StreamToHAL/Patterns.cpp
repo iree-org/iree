@@ -104,7 +104,7 @@ struct ResourceAllocOpPattern
         static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
 
     // Lookup the appropriate allocator/queue for allocation based on the buffer
-    // propreties.
+    // properties.
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
         allocOp, resolveOp.getMemoryTypes(), resolveOp.getBufferUsage(),
         rewriter);
@@ -125,13 +125,13 @@ struct ResourceAllocaOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
 
-    // Derive buffer propreties from the resource type.
+    // Derive buffer properties from the resource type.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     // Lookup the appropriate device/queue for allocation based on the buffer
-    // propreties.
+    // properties.
     auto resolveOp = IREE::HAL::AllocatorResolveMemoryPropertiesOp::create(
         rewriter, loc, rewriter.getI32Type(), rewriter.getI32Type(),
         allocaOp.getAffinity().value_or(nullptr),
@@ -174,7 +174,7 @@ struct ResourceDeallocaOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
 
-    // Derive buffer propreties from the resource type. This must match the
+    // Derive buffer properties from the resource type. This must match the
     // original allocation. If we're uncertain if it does we have to switch to
     // prefer-origin mode.
     auto resourceType =
@@ -310,7 +310,7 @@ struct ResourceTryMapOpPattern
     Value memoryTypeOp = IREE::HAL::MemoryTypeOp::create(
         rewriter, tryMapOp.getLoc(), memoryTypes);
     // Lookup the appropriate allocator/queue for allocation based on the buffer
-    // propreties.
+    // properties.
     auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
         tryMapOp, memoryTypeOp, bufferUsageOp, rewriter);
 
@@ -1134,7 +1134,7 @@ struct CmdCallOpPattern
       if (failed(getTypeConverter()->convertType(result.getType(),
                                                  convertedTypes))) {
         return rewriter.notifyMatchFailure(callOp.getLoc(),
-                                           "unconvertable result type");
+                                           "unconvertible result type");
       }
       llvm::append_range(resultTypes, convertedTypes);
     }

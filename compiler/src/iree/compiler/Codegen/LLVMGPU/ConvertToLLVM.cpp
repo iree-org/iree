@@ -53,7 +53,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
       LLVM::Linkage::External, "__dynamic_shared_memory__", Attribute(),
       /*alignment=*/16, /*addr_space=*/3);
   uint32_t numberOfBytes = 0;
-  // Replace the addressOfOps with correctly offseted pointers to dynamic
+  // Replace the addressOfOps with correctly offsetted pointers to dynamic
   // shared memory.
   llvm::SmallDenseMap<LLVM::GlobalOp, uint32_t> globalMemoryOffsetMap;
   for (auto addressOfOp : addressOfOps) {
@@ -162,21 +162,21 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
       return failure();
     }
 
-    uint64_t alignement;
-    if (std::optional<uint64_t> alignementInfo = allocOp.getAlignment()) {
-      alignement = alignementInfo.value();
+    uint64_t alignment;
+    if (std::optional<uint64_t> alignmentInfo = allocOp.getAlignment()) {
+      alignment = alignmentInfo.value();
     } else {
       // If no alignment specified align at least to the size of an element.
       Type elType = allocOp.getType().getElementType();
       if (auto shapeType = dyn_cast<ShapedType>(elType)) {
-        alignement =
+        alignment =
             shapeType.getNumElements() * shapeType.getElementTypeBitWidth() / 8;
       } else if (elType.isIndex()) {
         auto mod = allocOp->getParentOfType<ModuleOp>();
         LowerToLLVMOptions options(mod.getContext(), DataLayout(mod));
-        alignement = options.getIndexBitwidth() / 8;
+        alignment = options.getIndexBitwidth() / 8;
       } else {
-        alignement = elType.getIntOrFloatBitWidth() / 8;
+        alignment = elType.getIntOrFloatBitWidth() / 8;
       }
     }
     // In CUDA workgroup memory is represented by a global variable.
@@ -192,7 +192,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         /*type=*/allocType,
         /*initial_value=*/ElementsAttr(),
         /*constant=*/false,
-        /*alignment=*/rewriter.getI64IntegerAttr(alignement));
+        /*alignment=*/rewriter.getI64IntegerAttr(alignment));
     symbolTable.insert(global);
 
     rewriter.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
@@ -625,7 +625,7 @@ struct ConvertIREEUtilAssumeIntOp final
         conds = LLVM::AndOp::create(rewriter, loc, *conds, cond);
       }
     };
-    // Materialize the assumptions that aren't atteched directly to arguments
+    // Materialize the assumptions that aren't attached directly to arguments
     // in order to account for the fact that i64 inputs get passed in as a pair
     // of i32 constants.
     for (auto [idx, mlirVal, llvmVal] :

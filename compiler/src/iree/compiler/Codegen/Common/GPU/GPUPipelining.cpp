@@ -38,13 +38,13 @@ constexpr StringLiteral kPipeliningExtraBarrier =
 /// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
 /// epilogue needs to handle the last iterations within the mainloop which
 /// requires predicating operations, for e.g., OOB global memory access. This
-/// helper function predicates operations (where predication is avialable),
+/// helper function predicates operations (where predication is available),
 /// checks if unpredicated operations are side-effect free and acceptable to
 /// execute speculatively.
 static Operation *replaceOpWithPredicatedOp(RewriterBase &rewriter,
                                             Operation *op, Value pred) {
   // Predication is only supported for AsyncCopyOp. Thus, for operations which
-  // are *not* AsyncCopyOp additional checks are requrired in order to be issued
+  // are *not* AsyncCopyOp additional checks are required in order to be issued
   // speculatively.
   if (!isa<nvgpu::DeviceAsyncCopyOp>(op)) {
     // Return/execute the op if it is a side effect free.
@@ -82,7 +82,7 @@ static Operation *replaceOpWithPredicatedOp(RewriterBase &rewriter,
   auto loc = asyncCopyOp->getLoc();
 
   // Create srcElement Value based on the pred.
-  // The next few lins generate the below code:
+  // The next few lines generate the below code:
   // srcElement = (pred) ?  prevSrcElements : 0;
   Value dstElements = arith::ConstantOp::create(
       rewriter, loc, asyncCopyOp.getDstElementsAttr());
@@ -268,22 +268,22 @@ struct WarpMmaOp {
 };
 
 /// Structure to hold the matmul's mainloop information:
-/// Seperates the mma operations into kgroups and collects the Shared Memory
+/// Separates the mma operations into kgroups and collects the Shared Memory
 /// loads for each kgroup. This information is used to pipeline the mainloop and
 /// to generate an optimal schedule; interleaving Global Memory loads, Shared
 /// Memory loads, and math operations.
 struct MainLoopInfo {
-  // Mainloop asyncronous copy operations:
+  // Mainloop asynchronous copy operations:
   // `cp.async` GlobalMemory -> SharedMemory
   llvm::SetVector<Operation *> copyGlobalToSharedOps;
   llvm::SetVector<Operation *> asyncCreateGroupOp;
   llvm::SetVector<Operation *> barrierOps;
   llvm::SetVector<Operation *> asyncWaitOps;
 
-  // Mainloop asyncronous copy operations dependencies
+  // Mainloop asynchronous copy operations dependencies
   llvm::SetVector<Operation *> copyGlobalToSharedOpDeps;
 
-  // Warp-level syncronous operations:
+  // Warp-level synchronous operations:
   // `ldmatrix, ld.shared` SharedMemory -> Registers
   // `mma.sync` Registers -> Tensor Cores.
   llvm::SmallVector<WarpMmaOp> warpOperations;
@@ -295,7 +295,7 @@ struct MainLoopInfo {
   // populate the warp-level warpOperations
   llvm::SetVector<Operation *> seenMmaOps;
 
-  // Boolen to store if the mainloop can be pipelined (coarse-grained
+  // Boolean to store if the mainloop can be pipelined (coarse-grained
   // scheduling) and the instructions can be interleaved (fine-grained
   // scheduling).
   bool isSchedulable = false;
@@ -344,7 +344,7 @@ struct MainLoopInfo {
   // (start) to numKgroups (ends scf.yield).
   // Assumption: The mma operations are in a chain of monotonicaly increasing
   // kgroup order.
-  void vistMmaSyncOp(Operation *op, int kgroup) {
+  void visitMmaSyncOp(Operation *op, int kgroup) {
     // if the operation in an `scf.yield`, we reached the end of MmaSyncOp chain
     // return.
     if (seenMmaOps.contains(op) || isa<scf::YieldOp>(op)) {
@@ -368,7 +368,7 @@ struct MainLoopInfo {
 
     warpOperations[kgroup].mmaOperations.insert(op);
 
-    vistMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroup);
+    visitMmaSyncOp((op->getUses().begin())->getOwner(), ++kgroup);
   }
 
   MainLoopInfo(scf::ForOp forOp) : isSchedulable(true) { analyze(forOp); }
@@ -404,7 +404,7 @@ struct MainLoopInfo {
       if (isa<nvgpu::MmaSyncOp>(op)) {
         // MmaSyncOp visitor traverses the chain of mma operations and separates
         // them into kgroups.
-        vistMmaSyncOp(&op, 0 /*kgroup=0*/);
+        visitMmaSyncOp(&op, 0 /*kgroup=0*/);
       }
     }
 
@@ -454,8 +454,8 @@ struct MainLoopInfo {
     }
 
     // Collect the dependent operations for `cp.async` in the mainloop order for
-    // coarse-grained software pipeling. The deps are collected in stage order,
-    // i.e., `cp.async`'s deps in stage 0 are collected first.
+    // coarse-grained software pipelining. The deps are collected in stage
+    // order, i.e., `cp.async`'s deps in stage 0 are collected first.
     for (Operation &op : forOp.getBody()->getOperations()) {
       if (isa<nvgpu::DeviceAsyncCopyOp>(&op)) {
         backwardSliceOfDependentOps(copyGlobalToSharedOpDeps, &op,
@@ -464,7 +464,7 @@ struct MainLoopInfo {
     }
 
     // Collect the dependent operations for `mma.sync`, lhs, and rhs defining
-    // operations. The operation and their dependencies are seperated by kgroups
+    // operations. The operation and their dependencies are separated by kgroups
     // for fine-grained instruction scheduling.
     for (int kgroup = 0; kgroup < getNumberOfKgroups(); ++kgroup) {
       for (Operation &op : forOp.getBody()->getOperations()) {
@@ -547,7 +547,7 @@ static void getNvidiaAmpereTensorCorePipeline(
     return;
   }
 
-  // Un-pipelined mainloop should have only one occurance of
+  // Un-pipelined mainloop should have only one occurrence of
   // cp.async.commit_group and cp.async.wait_group. Additionally, two barrier
   // ops are inserted around each staged copy. The barrier op before the copy is
   // un-necessary and will be removed. If the conditions are not met, return an
@@ -624,7 +624,7 @@ static void getNvidiaAmpereTensorCorePipeline(
   }
 
   // Prints the mainloop schedule generated for NVIDIA Ampere through native
-  // Tensor Core operations (asyncronous copy, load matrix, and mma.sync).
+  // Tensor Core operations (asynchronous copy, load matrix, and mma.sync).
   debugMainloopSchedule(mainloop, numStages, ops);
 }
 
@@ -663,8 +663,8 @@ applyPipelining(scf::ForOp forOp, int64_t depth, bool epiloguePeeling,
   options.getScheduleFn = getSchedule;
   options.annotateFn = setAnnotation;
 
-  // Use un-peeled epilogue (i.e. epiloguePeeling=flase) only when predication
-  // is avialable a.k.a. AsyncCopyOp.
+  // Use un-peeled epilogue (i.e. epiloguePeeling=false) only when predication
+  // is available a.k.a. AsyncCopyOp.
   if (!epiloguePeeling) {
     options.peelEpilogue = false;
     options.predicateFn = [](RewriterBase &rewriter, Operation *op,

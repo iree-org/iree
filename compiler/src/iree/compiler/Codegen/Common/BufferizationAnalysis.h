@@ -7,7 +7,7 @@
 //===- BufferizationAnalysis.h - Pre bufferization analysis ---------------===//
 //
 // Analysis to group together tensors within a dispatch region into an
-// equivalance class such that all members of a set can be mapped to the same
+// equivalence class such that all members of a set can be mapped to the same
 // memory region.
 //
 //===----------------------------------------------------------------------===//
@@ -51,7 +51,7 @@ public:
   /// done and does nothing if union is invalid.
   void unionSets(Value v1, Value v2);
 
-  /// Sets the equivalance class that contains `v` as the set that contains the
+  /// Sets the equivalence class that contains `v` as the set that contains the
   /// result tensor of the dispatch region (i.e. a tensor that is the `value`
   /// operand of a iree_tensor_ext.dispatch.tensor.store` op). All operations in
   /// this equivalence class can use the result buffer of the dispatch region to

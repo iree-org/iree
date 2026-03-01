@@ -126,7 +126,7 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
                       SmallVector<Operation *> partial,
                       DenseMap<Value, std::pair<Value, AffineMap>> &tmap) {
   // Each value used in the partial body is either outside the operation (use as
-  // is), or is defined inside the block (including block arguements). For
+  // is), or is defined inside the block (including block arguments). For
   // values defined inside the block, the value will have a tensor and an
   // AffineMap to access the tensor in tmap;
 

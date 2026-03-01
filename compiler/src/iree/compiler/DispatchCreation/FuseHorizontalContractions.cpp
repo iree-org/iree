@@ -171,12 +171,12 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
 
   FailureOr<linalg::ContractionDimensions> aContractionDims =
       linalg::inferContractionDims(aIndexingMaps);
-  FailureOr<linalg::ContractionDimensions> bContactionDims =
+  FailureOr<linalg::ContractionDimensions> bContractionDims =
       linalg::inferContractionDims(bIndexingMaps);
-  if (failed(aContractionDims) || failed(bContactionDims)) {
+  if (failed(aContractionDims) || failed(bContractionDims)) {
     return false;
   }
-  if (aContractionDims.value() != bContactionDims.value()) {
+  if (aContractionDims.value() != bContractionDims.value()) {
     return false;
   }
 

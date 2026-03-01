@@ -253,22 +253,22 @@ static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
 /// Firstly, this will transpose the vector in a way sliced out
 /// dims become outermost. Then it performs a vector.extract
 /// remove the dims that are not present in the results of the map.
-/// Note that the implementation is similiar to vector.extract_stride_slice
+/// Note that the implementation is similar to vector.extract_stride_slice
 /// but with projecting out the indexed/sliced dimensions from the result.
 static VectorValue projectVector(RewriterBase &rewriter, Location loc,
                                  VectorValue val, AffineMap projectionMap) {
-  SmallVector<int64_t> remaningDims;
+  SmallVector<int64_t> remainingDims;
   auto allDims =
       llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
   llvm::SmallDenseSet<int64_t> slicedDims(allDims.begin(), allDims.end());
   for (int64_t resultIdx : llvm::seq<int64_t>(projectionMap.getNumResults())) {
     int64_t iterSpacePos = projectionMap.getDimPosition(resultIdx);
-    remaningDims.push_back(iterSpacePos);
+    remainingDims.push_back(iterSpacePos);
     slicedDims.erase(iterSpacePos);
   }
 
   auto transposePerm = llvm::to_vector_of<int64_t>(slicedDims);
-  transposePerm.append(remaningDims);
+  transposePerm.append(remainingDims);
   auto transposed =
       vector::TransposeOp::create(rewriter, loc, val, transposePerm);
 
@@ -1033,7 +1033,7 @@ struct DistributeMultiReduction final
     // TODO: As per current upstream lowering implementations, there is no point
     // in doing this because it does a select much later in a finer granularity
     // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions accross the distribution, we can choose not to mask
+    // to cater reductions across the distribution, we can choose not to mask
     // the op post-distribution.
 
     VectorValue locallyReduced;
@@ -1497,7 +1497,7 @@ struct DistributeContract final
     // TODO: As per current upstream lowering implementations, there is no point
     // in doing this because it does a select much later in a finer granularity
     // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions accross the distribution, we can choose not to mask
+    // to cater reductions across the distribution, we can choose not to mask
     // the op post-distribution.
 
     VectorValue localContractValue;

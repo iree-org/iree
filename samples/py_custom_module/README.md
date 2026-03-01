@@ -4,7 +4,7 @@ This sample illustrates how to define a custom module in the Python API,
 with a pure Python implementation, and compiling an overall program that
 can use it.
 
-This builds on the capabilities ot the `custom_module` sample, which
+This builds on the capabilities of the `custom_module` sample, which
 demonstrates C-based extension modules -- applying the same basics to
 Python. Some features are not yet implemented on the Python side, and
 the API is lower level than we should ultimately have. However, as

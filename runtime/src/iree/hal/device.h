@@ -438,7 +438,7 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 // The |category| and |key| will be provided to the device driver to interpret
 // in a device-specific way and if recognized the value will be converted to an
 // int64_t and returned in |out_value|. Fails if the value represented by the
-// key is not convertable.
+// key is not convertible.
 //
 // This is roughly equivalent to the `sysconf` linux syscall
 // (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact

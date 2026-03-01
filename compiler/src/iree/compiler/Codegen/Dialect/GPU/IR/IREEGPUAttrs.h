@@ -46,7 +46,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 // only has the M and K semantical dimensions. A scaled-matmul Lhs has the M, K,
 // Kb semantical dimensions.
 //
-// Let us call "semantical rank" the number of semantical dimensions occuring
+// Let us call "semantical rank" the number of semantical dimensions occurring
 // in the operand that we are concerned with. That is often 2, but can be 3
 // for some scaled-matmul operands and for all batch-matmul operands. This could
 // also be 1 for vector operands of matrix-vector operations.

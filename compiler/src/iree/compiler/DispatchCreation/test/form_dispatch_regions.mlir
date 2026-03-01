@@ -887,7 +887,7 @@ util.func @custom_op_no_producer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<
 
 // -----
 
-// Do not form seperate dispatches for mask generators for attention. These
+// Do not form separate dispatches for mask generators for attention. These
 // will clone into the dispatch.
 
 util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: tensor<?x?xf16>) -> tensor<?x?xf16> {

@@ -154,7 +154,7 @@ static std::pair<Value, Value> getFlattenMemrefAndOffset(OpBuilder &rewriter,
       getValueFromOpFoldResult(rewriter, loc, index));
 }
 
-static bool needFlattenning(Value val) {
+static bool needFlattening(Value val) {
   auto type = cast<MemRefType>(val.getType());
   return type.getRank() > 1;
 }
@@ -247,7 +247,7 @@ struct MemRefRewritePatternBase : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     Value memref = getTargetMemref<T>(op);
-    if (!needFlattenning(memref) || !checkLayout(memref)) {
+    if (!needFlattening(memref) || !checkLayout(memref)) {
       return rewriter.notifyMatchFailure(op,
                                          "nothing to do or unsupported layout");
     }
@@ -304,7 +304,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
   LogicalResult matchAndRewrite(memref::SubViewOp op,
                                 PatternRewriter &rewriter) const override {
     Value memref = op.getSource();
-    if (!needFlattenning(memref)) {
+    if (!needFlattening(memref)) {
       return rewriter.notifyMatchFailure(op, "nothing to do");
     }
 

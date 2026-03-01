@@ -285,7 +285,7 @@ module {
 // -----
 
 // This test only checks when a tensor.pad gets fused when tiling. We disable
-// tensor.pad fusion by default, because it generates a gaurd to prevent
+// tensor.pad fusion by default, because it generates a guard to prevent
 // empty slices, which is hard to vectorize.
 //
 // However, if we already know no zero slices will be generated, we can fuse

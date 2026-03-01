@@ -1190,7 +1190,7 @@ bool DeviceOptimalAttr::isExecutableWith(
 
   // Since any affinity in the set may be selected at runtime all must be
   // compatible with the target. If the other attr is itself an optimal set then
-  // all must be compatable with all.
+  // all must be compatible with all.
   if (auto otherOptimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(other)) {
     for (auto affinityAttr : getAffinities()) {
       for (auto otherAffinityAttr : otherOptimalAttr.getAffinities()) {
