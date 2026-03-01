@@ -1,0 +1,80 @@
+[files]
+extend-exclude = [
+    "third_party/",
+    "runtime/src/iree/tokenizer/**/*_test.*",
+    "runtime/src/iree/tokenizer/**/*_fuzz.*",
+    "runtime/src/iree/tokenizer/testdata/",
+]
+
+[default.extend-words]
+# AMD Heterogeneous System Architecture.
+hsa = "hsa"
+# ARM Scalable Matrix Extension.
+sme = "sme"
+# MLIR OpFoldResult abbreviation.
+ofr = "ofr"
+# GPU instruction conversion suffix (dp4xi8toi32).
+toi = "toi"
+# Memory copy operation abbreviation (createMemCpy).
+cpy = "cpy"
+# Greater Than Integer comparison ops (CmpGTI32SOp).
+gti = "gti"
+# Ordered Less Than float predicate (arith.cmpf olt).
+olt = "olt"
+# Serialization abbreviation (serOptions).
+ser = "ser"
+# N-dimensional abbreviation.
+nd = "nd"
+# Processor number variable / math notation.
+pn = "pn"
+# Semaphores abbreviation.
+sems = "sems"
+# Python packaging tool name.
+delocate = "delocate"
+# Valid English word (plural of canonicalization).
+canonicalizations = "canonicalizations"
+# Valid English word.
+inferrable = "inferrable"
+# ELF relocation section type (SHT_RELA).
+rela = "rela"
+# Unicode café test data.
+caf = "caf"
+# CUDA opt-in attribute (MAX_SHARED_MEMORY_PER_BLOCK_OPTIN).
+optin = "optin"
+# One who is invoked.
+invokee = "invokee"
+# Windows Structured Exception Handling.
+seh = "seh"
+# Unique Device Identifier.
+udid = "udid"
+# Intermediate abbreviation.
+interm = "interm"
+# Parameters abbreviation.
+parms = "parms"
+# From CHECKs word splitting.
+chec = "chec"
+# FileCheck variable name in tests.
+tpos = "tpos"
+# From SIZExi8 word splitting in comments.
+siz = "siz"
+# Hex byte value 0xBA in generated tables.
+ba = "ba"
+# From ANDed/ORed/XORed word splitting.
+ded = "ded"
+# BPE subword tokens in tokenizer implementation.
+hel = "hel"
+ois = "ois"
+# MSVC assembler output flag (/Fo) and notebook cell IDs.
+fo = "fo"
+# Valid prefix (mis-compiled, mis-detected) and notebook cell IDs.
+mis = "mis"
+ot = "ot"
+# Notebook cell IDs.
+mye = "mye"
+# Workgroup coordinate variables (iz, iy).
+iz = "iz"
+iy = "iy"
+# Upstream MLIR API name (warpSyncronizationFn).
+syncronization = "syncronization"
+# Upstream MLIR error message typo (faild to tile operation).
+faild = "faild"
