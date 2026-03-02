@@ -239,14 +239,19 @@ class HalDeviceLoopBridge {
                                       value_owned = std::move(value_owned),
                                       message = std::move(message)]() {
       PyErr_SetString(PyExc_RuntimeError, message.c_str());
+#if PY_VERSION_HEX >= 0x030C0000
+      PyObject* exc = PyErr_GetRaisedException();
+      future_owned.attr("set_exception")(py::steal(exc));
+#else
       PyObject* exc_type;
       PyObject* exc_value;
       PyObject* exc_tb;
       PyErr_Fetch(&exc_type, &exc_value, &exc_tb);
-      future_owned.attr("set_exception")(exc_value);
+      future_owned.attr("set_exception")(py::handle(exc_value));
       Py_XDECREF(exc_type);
       Py_XDECREF(exc_tb);
       Py_XDECREF(exc_value);
+#endif
     }));
   }
 

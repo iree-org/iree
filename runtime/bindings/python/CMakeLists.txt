@@ -42,8 +42,13 @@ iree_select_compiler_opts(_RTTI_AND_EXCEPTION_COPTS
     "/GR"
 )
 
+set(_STABLE_ABI_FLAG "")
+if(IREE_ENABLE_PYTHON_STABLE_ABI)
+  set(_STABLE_ABI_FLAG STABLE_ABI)
+endif()
+
 nanobind_add_module(iree_runtime_bindings_python_PyExtRt
-  NB_STATIC LTO FREE_THREADED
+  NB_STATIC LTO FREE_THREADED ${_STABLE_ABI_FLAG}
   "binding.h"
   "initialize_module.cc"
   "invoke.h"
@@ -87,8 +92,6 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::tooling::modules
   iree::vm
   iree::vm::bytecode::module
-
-  Python::NumPy
 )
 
 target_compile_options(iree_runtime_bindings_python_PyExtRt

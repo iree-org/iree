@@ -286,6 +286,9 @@ class HalMappedMemory {
 
   iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
+  // Buffer protocol for PyMemoryView_FromObject (used by SimpleNewFromData).
+  int HandleBufferProtocol(Py_buffer* view, int flags);
+
  private:
   iree_hal_buffer_mapping_t mapped_memory_ = {{0}};
   iree_hal_buffer_t* buffer_ = nullptr;

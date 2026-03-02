@@ -9,7 +9,9 @@
 
 # Configure settings with script parameters.
 param(
-    [array]$python_versions=@("3.11"),
+    # Python versions to build. 3.12 produces an abi3 wheel (compatible with 3.12+).
+    # Per-version builds are used for <3.12 and free-threaded builds.
+    [array]$python_versions=@("3.11", "3.12"),
     [array]$packages=@("iree-base-runtime", "iree-base-compiler"),
     [System.String]$output_dir
 )

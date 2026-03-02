@@ -726,6 +726,13 @@ include(iree_setup_toolchain)
 # Otherwise, for features that just require the interpreter, find that alone.
 #-------------------------------------------------------------------------------
 
+# Build Python bindings with Python Stable ABI (abi3) for Python 3.12+.
+# When enabled, a single extension module can be used across Python 3.12+.
+# nanobind handles the interaction with FREE_THREADED: if the interpreter
+# is free-threaded, STABLE_ABI is ignored and the free-threaded ABI is used.
+# Declared here (before first use) and also cascaded to MLIR below.
+option(IREE_ENABLE_PYTHON_STABLE_ABI "Build Python bindings with Stable ABI (abi3) for Python 3.12+" OFF)
+
 if(IREE_BUILD_PYTHON_BINDINGS)
   # After CMake 3.18, we are able to limit the scope of the search to just
   # Development.Module. Searching for Development will fail in situations where
@@ -739,13 +746,19 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # See: https://reviews.llvm.org/D118148
   # If building Python packages, we have a hard requirement on 3.10+.
   find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
-  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  # Development.SABIModule is needed for Stable ABI (abi3) builds. CMake 3.26+
+  # provides it; on older CMake it is silently ignored if not found.
+  set(_PYTHON_SABI_COMPONENT "")
+  if(IREE_ENABLE_PYTHON_STABLE_ABI)
+    set(_PYTHON_SABI_COMPONENT Development.SABIModule)
+  endif()
+  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module NumPy ${_PYTHON_SABI_COMPONENT} REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  find_package(Python 3.10 COMPONENTS Interpreter Development.Module NumPy ${_PYTHON_SABI_COMPONENT} REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
@@ -869,6 +882,11 @@ endif()
 #-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
 #-------------------------------------------------------------------------------
+
+# Cascade IREE_ENABLE_PYTHON_STABLE_ABI to MLIR.
+if(IREE_ENABLE_PYTHON_STABLE_ABI)
+  set(MLIR_ENABLE_PYTHON_STABLE_ABI ON CACHE BOOL "" FORCE)
+endif()
 
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.

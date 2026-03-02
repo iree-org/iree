@@ -14,7 +14,6 @@
 #include "./invoke.h"
 #include "./io.h"
 #include "./loop.h"
-#include "./numpy_interop.h"
 #include "./py_module.h"
 #include "./status_utils.h"
 #include "./vm.h"
@@ -33,7 +32,6 @@ namespace iree {
 namespace python {
 
 NB_MODULE(_runtime, m) {
-  numpy::InitializeNumPyInterop();
   IREE_TRACE_APP_ENTER();
 
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
