@@ -1937,6 +1937,15 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     auto distrUpperBound =
         arith::AddIOp::create(rewriter, loc, linearizedLastValidIdx, one);
 
+    // For threads past the boundary thread (tid > u3), all iterations in
+    // batches before the boundary batch are still valid. The count of such
+    // elements is linearize(u1, u2, 0).
+    auto distrUpperBoundPostThreads = affine::AffineLinearizeIndexOp::create(
+        rewriter, loc,
+        ValueRange{packedLastValidIdx[batchIdx], packedLastValidIdx[outerIdx],
+                   zero},
+        distrShape);
+
     // The following code constructs a selection tree
     // that in effect follows the code:
     // * upperbound --> delinearize --> u0, u1, u2, u3, u4
@@ -1949,7 +1958,7 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     //   if tid < u3:
     //     [u1][u2][max]
     //   if tid > u3:
-    //     all invalid.
+    //     [u1][u2][0]
     //   if tid == u3:
     //     [u1][u2][u4]
 
@@ -1970,9 +1979,10 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
         rewriter, loc, arith::CmpIPredicate::slt,
         subgroupIndices[unDistributedDim], packedLastValidIdx[subgroupIdx]);
 
-    // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
+    // selectTid0 = tid < u3 ? [u1][u2][max] : [u1][u2][0]
     auto selectTid0 = arith::SelectOp::create(rewriter, loc, cmpBoundTidSlt,
-                                              distrUpperBoundPreThreads, zero);
+                                              distrUpperBoundPreThreads,
+                                              distrUpperBoundPostThreads);
     // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
     auto selectTid1 = arith::SelectOp::create(rewriter, loc, cmpBoundTidEq,
                                               distrUpperBound, selectTid0);

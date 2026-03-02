@@ -42,13 +42,14 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[ETILE_VALID_BOUND:.+]] = arith.addi %[[ETILE_VALID]], %c1 : index
 // CHECK: %[[DISTR_LASTIDX:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %[[PACKED_LASTIDX]]#3] by (16, 2) : index
 // CHECK: %[[DISTR_BOUND:.+]] = arith.addi %[[DISTR_LASTIDX]], %c1 : index
+// CHECK: %[[POST_THREADS_BOUND:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %c0] by (16, 2) : index
 
 // CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
 // CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
 // CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
 // CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
 
-// CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %[[ETILE_VALID_BOUND]], %c0 : index
+// CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %[[ETILE_VALID_BOUND]], %[[POST_THREADS_BOUND]] : index
 // CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %[[DISTR_BOUND]], %[[SELTREE0]] : index
 // CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c32, %c0 : index
 // CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
@@ -416,3 +417,101 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[MASK3:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
 // CHECK: %[[CMASK3:.+]] = vector.shape_cast %[[MASK3]] : vector<1x8xi1> to vector<8xi1>
 // CHECK: vector.transfer_read {{.+}} %[[CMASK3]]
+
+// -----
+
+// This test covers the case constant_mask [2, 508] on a 2x512
+// vector with element_tile=1 and batch_tile=8 on the masked dimension.
+// Last valid index 507 delinearizes to (u1=7, u3=59). Threads 60-63 (tid > 59)
+// must get postThreadsBound=7 (not 0), because they still have 7 valid batch
+// iterations before the boundary batch.
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 8],
+  outer_tile = [1, 1],
+  thread_tile = [1, 64],
+  element_tile = [1, 1],
+
+  subgroup_strides = [0, 0],
+  thread_strides = [0, 1]
+>
+
+func.func @masked_read_write_unit_element_tile(%arg0 : memref<2x512xf16>, %arg1 : memref<2x512xf16>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %mask = vector.constant_mask [2, 508] : vector<2x512xi1>
+  %read = vector.transfer_read %arg0[%c0, %c0], %cst, %mask {in_bounds = [true, true]} : memref<2x512xf16>, vector<2x512xf16>
+  %layout = iree_vector_ext.to_layout %read to layout(#layout) : vector<2x512xf16>
+  vector.transfer_write %layout, %arg1[%c0, %c0], %mask {in_bounds = [true, true]} : vector<2x512xf16>, memref<2x512xf16>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @masked_read_write_unit_element_tile
+// CHECK-DAG: %[[C7:.+]] = arith.constant 7 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG: %[[C59:.+]] = arith.constant 59 : index
+// CHECK: %[[VTID:.+]]:2 = affine.delinearize_index %thread_id_x into (64) : index, index
+
+// CHECK: %[[EQ_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[C59]] : index
+// CHECK: %[[LT_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[C59]] : index
+// CHECK: %[[SELTID0:.+]] = arith.select %[[LT_TID]], %[[C8]], %[[C7]] : index
+// CHECK: %[[BOUND:.+]] = arith.select %[[EQ_TID]], %[[C8]], %[[SELTID0]] : index
+
+// -----
+
+// This test exercises the three-way thread split when element_tile > 1. With
+// constant_mask [58] on a 64-element vector (batch=4, thread=4, element=4),
+// last valid index 57 delinearizes to (u1=3, u3=2, u4=1). All three cases
+// produce distinct bounds:
+//   tid < 2:  16 (4 full batches)
+//   tid == 2: 14 (3 full batches + partial element tile of 2)
+//   tid > 2:  12 (3 full batches, boundary batch has 0 valid elements)
+
+#layout_1d = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [4],
+  outer_tile = [1],
+  thread_tile = [4],
+  element_tile = [4],
+
+  subgroup_strides = [0],
+  thread_strides = [1]
+>
+
+func.func @masked_read_write_partial_element_tile(%arg0 : memref<64xf16>, %arg1 : memref<64xf16>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f16
+  %mask = vector.constant_mask [58] : vector<64xi1>
+  %read = vector.transfer_read %arg0[%c0], %cst, %mask {in_bounds = [true]} : memref<64xf16>, vector<64xf16>
+  %layout = iree_vector_ext.to_layout %read to layout(#layout_1d) : vector<64xf16>
+  vector.transfer_write %layout, %arg1[%c0], %mask {in_bounds = [true]} : vector<64xf16>, memref<64xf16>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @masked_read_write_partial_element_tile
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C12:.+]] = arith.constant 12 : index
+// CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK: %[[VTID:.+]]:2 = affine.delinearize_index %thread_id_x into (4) : index, index
+// CHECK: %[[EQ_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[C2]] : index
+// CHECK: %[[LT_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[C2]] : index
+// CHECK: %[[SELTID0:.+]] = arith.select %[[LT_TID]], %[[C16]], %[[C12]] : index
+// CHECK: %[[BOUND:.+]] = arith.select %[[EQ_TID]], %[[C14]], %[[SELTID0]] : index
