@@ -6,7 +6,7 @@
 
 [files]
 extend-exclude = [
-    "third_party/",
+    "**/third_party/",
     "**/runtime/src/iree/tokenizer/**/*_test.*",
     "**/runtime/src/iree/tokenizer/**/*_fuzz.*",
     "**/runtime/src/iree/tokenizer/testdata/",
