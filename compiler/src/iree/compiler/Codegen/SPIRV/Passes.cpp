@@ -222,6 +222,9 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createCSEPass)
       .addPass([&]() { return createOptimizeVectorTransferPass(); });
 
+  // Commit the func-level adaptor before adding module-level passes.
+  funcPassManager.commitPass();
+
   // Turn multi-dimension memref into one-dimension. This is needed for
   // SPIR-V because we don't use upstream memref descriptors.
   modulePassManager.addPass(createFlattenMemRefSubspanPass());

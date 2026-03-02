@@ -1060,7 +1060,16 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
                         : createEmulateNarrowTypePass();
       })
       .addPass(createIREECodegenAffineExpandIndexOpsPass)
-      .addPass(createIREECodegenLowerAffinePass);
+      .addPass(createIREECodegenLowerAffinePass)
+      // Software emulation for small float types (fp4/fp8).
+      .addPredicatedPass(forROCDL, [] {
+        return createConvertUnsupportedFloatArithPass(
+            ConvertUnsupportedFloatArithPassOptions{
+                clLLVMGPUEnableSmallFloatEmulation});
+      });
+
+  // Commit the func-level adaptor before adding module-level passes.
+  funcPassManager.commitPass();
 
   if (!preserveDebugInfo) {
     modulePassManager.addPass(createStripDebugInfoPass());
@@ -1071,20 +1080,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   if (forROCDL) {
-    // convert to ROCDL.
-    // Software emulation for small float types (fp4/fp8) is controlled by
-    // --iree-llvmgpu-enable-small-float-emulation. When disabled (default),
-    // ConvertToROCDL will error on unsupported types.
-    funcPassManager.addPass([] {
-      return createConvertUnsupportedFloatArithPass(
-          ConvertUnsupportedFloatArithPassOptions{
-              clLLVMGPUEnableSmallFloatEmulation});
-    });
+    // Convert to ROCDL.
     modulePassManager.addPass(createConvertToROCDLPass());
     modulePassManager.addNestedPass<LLVM::LLVMFuncOp>(
         createROCDLAnnotateKernelForTranslationPass());
   } else {
-    // convert to NVVM.
+    // Convert to NVVM.
     modulePassManager.addPass(createConvertToNVVMPass());
   }
 }

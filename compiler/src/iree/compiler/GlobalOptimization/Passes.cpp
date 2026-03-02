@@ -106,13 +106,10 @@ void buildGlobalOptimizationPassPipeline(
         importParametersOptions));
   }
 
-  if (clWarnOnUninitializedValues) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(createWarnOnUninitializedValuesPass);
-  }
-
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
+      .addPredicatedPass(clWarnOnUninitializedValues,
+                         createWarnOnUninitializedValuesPass)
       .addPredicatedPass(transformOptions.stripAssertions,
                          IREE::Util::createStripDebugOpsPass)
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
@@ -154,9 +151,7 @@ void buildGlobalOptimizationPassPipeline(
         GeneralizeLinalgNamedOpsPassOptions opt;
         opt.enableGeneralizeMatmul = transformOptions.generalizeMatmul;
         return createGeneralizeLinalgNamedOpsPass(opt);
-      });
-
-  FunctionLikeNest(mainPassManager)
+      })
       .addPredicatedPass(!clEnableEdgeReshapePropagation,
                          DispatchCreation::createInsertTensorBarriersPass);
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
@@ -214,10 +209,9 @@ void buildGlobalOptimizationPassPipeline(
   }
   // Generalize transposes and any other remaining named linalg ops that can
   // now be represented as generics.
-  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
-
   // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
   FunctionLikeNest(mainPassManager)
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       .addPass(createGlobalLoopInvariantCodeMotionPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
