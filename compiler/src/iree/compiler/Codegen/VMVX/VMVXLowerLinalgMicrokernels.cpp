@@ -569,7 +569,7 @@ struct LinalgBinaryGenericConversion
     OpOperand *result = op.getDpsInitOperand(0);
 
     // Returns an emitter for a generic binary compatible operation where
-    // |binaryOp| has a 1:1 correspondance with |opcode|.
+    // |binaryOp| has a 1:1 correspondence with |opcode|.
     auto configureGenericBinary =
         [&](Operation *binaryOp,
             StringRef opcode) -> std::optional<BinaryEmitter> {
@@ -751,7 +751,7 @@ struct LinalgUnaryGenericConversion
     OpOperand *result = op.getDpsInitOperand(0);
 
     // Returns an emitter for a generic binary compatible operation where
-    // |binaryOp| has a 1:1 correspondance with |opcode|.
+    // |binaryOp| has a 1:1 correspondence with |opcode|.
     auto configureGenericUnary =
         [&](Operation *unaryOp,
             StringRef opcode) -> std::optional<UnaryEmitter> {

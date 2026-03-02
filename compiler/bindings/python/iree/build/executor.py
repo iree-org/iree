@@ -449,7 +449,7 @@ class BuildContext(BuildDependency):
     ) -> BuildFile:
         """Allocates a file in the build tree with local path |path|.
 
-        If |path| is absoluate (starts with '/'), then it is used as-is. Otherwise,
+        If |path| is absolute (starts with '/'), then it is used as-is. Otherwise,
         it is joined with the path of this context.
         """
         if not path.startswith("/"):

@@ -324,7 +324,7 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
     } else {
       // Unsatisfied.
       if (wait_mode == IREE_HAL_WAIT_MODE_ALL) {
-        // All semaphores need ot be reached in wait-all mode.
+        // All semaphores need to be reached in wait-all mode.
         return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
       }
     }

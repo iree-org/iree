@@ -17,7 +17,7 @@ icon: octicons/package-16
 
 ## Mapping releases back to git commits
 
-The source IREE commit SHA is embeded into pip releases in a few places.
+The source IREE commit SHA is embedded into pip releases in a few places.
 Starting in a python venv, you can find the IREE commit from both the shell:
 
 ```shell
@@ -41,7 +41,7 @@ The Linux releases are done in a manylinux2014 docker container defined in the
 [`manylinux_x86_64.Dockerfile`](https://github.com/iree-org/base-docker-images/blob/main/dockerfiles/manylinux_x86_64.Dockerfile)
 file within the
 [iree-org/base-docker-images repository](https://github.com/iree-org/base-docker-images/).
-At the time of this writing, it has Python versions 3.9 - 3.13 under
+At the time of this writing, it has Python versions 3.10 - 3.13 under
 `/opt/python`. Note that this docker image approximates a 2014 era RHEL distro,
 patched with backported (newer) dev packages. It builds with clang by default.
 `yum` can be used to get some packages.

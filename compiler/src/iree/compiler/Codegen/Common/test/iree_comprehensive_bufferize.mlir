@@ -1417,7 +1417,7 @@ func.func @bufferize_cst_output_tensor() {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<()[s0] -> (s0 * 32)>
-func.func @cast_follwed_by_store() {
+func.func @cast_followed_by_store() {
   %cst = arith.constant 0.000000e+00 : f32
   %c4 = arith.constant 4 : index
   %c64 = arith.constant 64 : index
@@ -1450,7 +1450,7 @@ func.func @cast_follwed_by_store() {
   }
   return
 }
-// CHECK-LABEL: func.func @cast_follwed_by_store()
+// CHECK-LABEL: func.func @cast_followed_by_store()
 //   CHECK-DAG: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<4x32x1024xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) : memref<4x1024x64xf32, #hal.descriptor_type<storage_buffer>>

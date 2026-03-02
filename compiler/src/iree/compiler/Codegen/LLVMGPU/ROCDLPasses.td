@@ -50,12 +50,6 @@ def ROCDLConfigureBufferInstructionsPass :
   let dependentDialects = ["::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"];
 }
 
-def ROCDLLowerExecutableTargetPass : InterfacePass<
-    "iree-rocdl-lower-executable-target", "mlir::FunctionOpInterface"> {
-  let summary = "Lower an IREE hal.executable.variant op using a suitable "
-                "pass pipeline";
-}
-
 def ROCDLLoadToTransposeLoadPass :
     InterfacePass<"iree-rocdl-load-to-transpose-load", "mlir::FunctionOpInterface"> {
   let summary = "Lower vector.transfer_read to amdgpu.transpose_load when profitable";

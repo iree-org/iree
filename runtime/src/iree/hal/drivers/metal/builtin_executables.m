@@ -20,7 +20,7 @@ typedef struct iree_hal_metal_builtin_pipeline_info_t {
   uint32_t file_index;
 } iree_hal_metal_builtin_pipeline_info_t;
 
-// The list of builtin executable entry points and their source file index in builtin exectuable
+// The list of builtin executable entry points and their source file index in builtin executable
 // embedded data.
 //
 // NOTE: must be consistent with the same struct in MSL source code.

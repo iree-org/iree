@@ -57,7 +57,7 @@ number of stages:
 4. Legalize the graph's operations so only IREE-compatible operations remain
 5. Write the imported MLIR to a file
 
-This fully imported form can then be compiled indepedently of the source
+This fully imported form can then be compiled independently of the source
 language and framework.
 
 ## :octicons-gear-16: Compilation

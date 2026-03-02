@@ -278,7 +278,7 @@ public:
 
 /// Fold tensor.extract_slice into vector.transfer_write if
 ///   1. The vector.transfer_write op has only one use.
-///   2. All the offests of the tensor.extract_slice op are zeros.
+///   2. All the offsets of the tensor.extract_slice op are zeros.
 ///   3. The vector.transfer_write op does not have masks.
 ///   4. The vector.transfer_write op writes to a tensor.empty op.
 ///

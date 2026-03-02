@@ -54,7 +54,7 @@ def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
     sketchy and likely slow. Instead we should probably have a way to query for
     a file handle derived from the calling module by stack-walking and asking
     the VM module for its handle. Until we can figure this out this method will
-    be marked epxerimental.
+    be marked experimental.
   }];
 
   let arguments = (ins
@@ -751,7 +751,7 @@ def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memor
     for deriving buffer properties based on stream resource semantics.
 
     This operation can be resolved later in compilation either by canonicalization
-    for single device affinties or using the topology attribute for multiple devices.
+    for single device affinities or using the topology attribute for multiple devices.
 
     Example:
     ```mlir
@@ -1100,7 +1100,7 @@ def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
   let summary = [{An iree_hal_element_type_t for the given MLIR type.}];
   let description = [{
     Maps an MLIR type to a runtime `iree_hal_element_type_t` value for all types
-    that are convertable.
+    that are convertible.
   }];
 
   let arguments = (ins
@@ -1131,7 +1131,7 @@ def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
   let summary = [{An iree_hal_encoding_type_t for the given MLIR encoding.}];
   let description = [{
     Maps an MLIR encoding to a runtime `iree_hal_encoding_type_t` value for all
-    encodings that are convertable.
+    encodings that are convertible.
   }];
 
   let arguments = (ins
@@ -2823,7 +2823,7 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
 
     /// For now assume that the workload is at max 3D.
     /// Arguments to the region are workload along x, y and z.
-    // TODO: Propogate this and avoid magic constants.
+    // TODO: Propagate this and avoid magic constants.
     static int64_t getNumWorkgroupDims() { return 3; }
 
     Block* getWorkgroupCountBody() {

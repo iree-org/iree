@@ -134,7 +134,7 @@ def generate(
                 )
                 # Different testcases may differ only by runtime parameters but
                 # share the same code. For example, dynamic-shapes testcases
-                # share the same code involing tensor<?x?xf32> even though the runtime
+                # share the same code involving tensor<?x?xf32> even though the runtime
                 # value in the trace are different. That's why we append conditionally
                 # to calls, but unconditionally to function_definitions.
                 if function.name not in functions:

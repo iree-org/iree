@@ -7,6 +7,7 @@
 function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _SRC_LABELS)
   string(TOLOWER "${CMAKE_BUILD_TYPE}" _LOWERCASE_BUILD_TYPE)
   if(((IREE_ARCH MATCHES "^riscv_") AND ("noriscv" IN_LIST _SRC_LABELS)) OR
+     ((IREE_ARCH STREQUAL "arm_64") AND ("noaarch64" IN_LIST _SRC_LABELS)) OR
      (EMSCRIPTEN AND ("nowasm" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_TSAN AND ("notsan" IN_LIST _SRC_LABELS)) OR
@@ -28,7 +29,7 @@ endfunction()
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with. This can be omitted to test only
-#       compilation, but consider omiting the driver as a hacky abuse of the
+#       compilation, but consider omitting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.
@@ -227,7 +228,7 @@ endfunction()
 #   SRCS: source mlir files containing the module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with. This can be omitted to test only
-#       compilation, but consider omiting the driver as a hacky abuse of the
+#       compilation, but consider omitting the driver as a hacky abuse of the
 #       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.

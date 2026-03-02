@@ -176,7 +176,7 @@ util.func public @mismatchedRaggedShapeAttr(%source : tensor<?x?x?xf32>,
 // -----
 
 // Error when `column_lengths` is static shaped when `num_ragged_rows` is dynamic.
-util.func public @staticColumnLenghtsWithDynamicNumRaggedRows(%source : tensor<?x?x?xf32>,
+util.func public @staticColumnLengthsWithDynamicNumRaggedRows(%source : tensor<?x?x?xf32>,
     %columnLengths : tensor<4xindex>, %numRaggedRows : index,
     %d0 : index, %d1 : index, %d2 : index) -> tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_shape<1>> {
   // expected-error @+1 {{invalid to have static dimensions for `column_lengths` when `num_ragged_rows` is dynamic}}

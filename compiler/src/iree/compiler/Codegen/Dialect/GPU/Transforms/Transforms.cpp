@@ -116,7 +116,7 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   }
 
   // Create a `bufferization.alloc_tensor` op with memory space
-  // `#gpu.address_space<workgroup>`.
+  // `#gpu.addresses_space<workgroup>`.
   Location loc = empty->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(empty);
@@ -1760,12 +1760,12 @@ struct UnrollInnerTiledPattern
       // Helper to compute the new shape of each operand and extract the slice.
       auto extractOperand = [&](unsigned index, Value operand,
                                 AffineMap permutationMap,
-                                ArrayRef<int64_t> operandOffets) {
+                                ArrayRef<int64_t> operandOffsets) {
         SmallVector<int64_t> operandShape = applyPermutationMap(
             permutationMap, ArrayRef<int64_t>(*targetShape));
-        SmallVector<int64_t> operandStrides(operandOffets.size(), 1);
+        SmallVector<int64_t> operandStrides(operandOffsets.size(), 1);
         slicesOperands[index] = vector::ExtractStridedSliceOp::create(
-            rewriter, loc, operand, operandOffets, operandShape,
+            rewriter, loc, operand, operandOffsets, operandShape,
             operandStrides);
       };
       // Extract the new input operands.
@@ -1776,16 +1776,16 @@ struct UnrollInnerTiledPattern
                        inOffsets);
       }
 
-      SmallVector<int64_t> accOffets =
+      SmallVector<int64_t> accOffsets =
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
       // If a version of the accumulator has already been computed, use it
       // otherwise extract the first version from the original operand.
-      auto *accIt = accCache.find(accOffets);
+      auto *accIt = accCache.find(accOffsets);
       if (accIt != accCache.end()) {
         slicesOperands[accIndex] = accIt->second;
       } else {
         extractOperand(accIndex, tiledOp.getOutputs().front(),
-                       accPermutationMap, accOffets);
+                       accPermutationMap, accOffsets);
       }
 
       SmallVector<int64_t> dstShape = applyPermutationMap(
@@ -1797,11 +1797,11 @@ struct UnrollInnerTiledPattern
       IREE::Codegen::InnerTiledOp newOp =
           mlir::clone(rewriter, tiledOp, targetType, slicesOperands);
 
-      SmallVector<int64_t> dstOffets =
+      SmallVector<int64_t> dstOffsets =
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
       // Save the accumulated value until all the loops are unrolled since
       // reduction loop keep updating the accumulator.
-      accCache[dstOffets] = newOp.getResults().front();
+      accCache[dstOffsets] = newOp.getResults().front();
     }
     // Assemble back the accumulator into a single vector.
     Value result = arith::ConstantOp::create(rewriter, loc, dstVecType,
@@ -2075,7 +2075,7 @@ struct LowerValueBarrierPattern
     }
     // TODO(kdrewnia): We give this barrier workgroup fence semantics to mach
     // the behavior it had from before we could be more precise about barrier
-    // addres spaces. Investigate if this could be a sync-only (`memfence []`)
+    // address spaces. Investigate if this could be a sync-only (`memfence []`)
     // barrier
     gpu::BarrierOp::create(rewriter, barrier.getLoc(),
                            gpu::AddressSpace::Workgroup);

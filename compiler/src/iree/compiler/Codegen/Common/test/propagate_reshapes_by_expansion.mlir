@@ -661,3 +661,61 @@ func.func @propagate_expand_through_inner_tiled_dynamic(
 // CHECK-SAME:        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
 // CHECK-SAME:        : tensor<?x3x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<?x3x2x16x16xf32>
 // CHECK:         return %[[INNER_TILED]]
+
+// -----
+
+func.func @expand_dest_for(%init: tensor<4x16xf32>) -> tensor<4x16xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %result = scf.for %iv = %c0 to %c4 step %c1 iter_args(%arg = %init) -> tensor<4x16xf32> {
+    %expanded = tensor.expand_shape %arg [[0], [1, 2]]
+                output_shape [4, 4, 4] : tensor<4x16xf32> into tensor<4x4x4xf32>
+    %barrier = util.optimization_barrier %expanded : tensor<4x4x4xf32>
+    %collapsed = tensor.collapse_shape %barrier [[0], [1, 2]]
+                  : tensor<4x4x4xf32> into tensor<4x16xf32>
+    scf.yield %collapsed : tensor<4x16xf32>
+  }
+  return %result : tensor<4x16xf32>
+}
+
+// CHECK-LABEL: func @expand_dest_for(
+// CHECK-SAME:      %[[INIT:[A-Za-z0-9]+]]: tensor<4x16xf32>
+// CHECK:         %[[EXPANDED_INIT:.+]] = tensor.expand_shape %[[INIT]] {{\[}}[0], [1, 2]{{\]}}
+// CHECK-SAME:        output_shape [4, 4, 4] : tensor<4x16xf32> into tensor<4x4x4xf32>
+// CHECK:         %[[FOR_RESULT:.+]] = scf.for {{.*}} iter_args(%[[ARG:.+]] = %[[EXPANDED_INIT]]) -> (tensor<4x4x4xf32>) {
+// CHECK:           %[[BARRIER:.+]] = util.optimization_barrier %[[ARG]] : tensor<4x4x4xf32>
+// CHECK:           scf.yield %[[BARRIER]] : tensor<4x4x4xf32>
+// CHECK:         }
+// CHECK:         %[[COLLAPSED_RESULT:.+]] = tensor.collapse_shape %[[FOR_RESULT]] {{\[}}[0], [1, 2]{{\]}}
+// CHECK-SAME:        : tensor<4x4x4xf32> into tensor<4x16xf32>
+// CHECK:         return %[[COLLAPSED_RESULT]]
+
+// -----
+
+func.func @no_expand_dest_for_other_users(%init: tensor<4x16xf32>) -> tensor<4x16xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %result = scf.for %iv = %c0 to %c4 step %c1 iter_args(%arg = %init) -> tensor<4x16xf32> {
+    %expanded = tensor.expand_shape %arg [[0], [1, 2]]
+                output_shape [4, 4, 4] : tensor<4x16xf32> into tensor<4x4x4xf32>
+    %other_use = util.optimization_barrier %arg : tensor<4x16xf32>
+    %barrier = util.optimization_barrier %expanded : tensor<4x4x4xf32>
+    %collapsed = tensor.collapse_shape %barrier [[0], [1, 2]]
+                 : tensor<4x4x4xf32> into tensor<4x16xf32>
+    scf.yield %collapsed : tensor<4x16xf32>
+  }
+  return %result : tensor<4x16xf32>
+}
+
+// CHECK-LABEL: func @no_expand_dest_for_other_users(
+// CHECK-SAME:      %[[INIT:[A-Za-z0-9]+]]: tensor<4x16xf32>
+// CHECK:         %[[FOR_RESULT:.+]] = scf.for {{.*}} iter_args(%[[ARG:.+]] = %[[INIT]]) -> (tensor<4x16xf32>) {
+// CHECK:           %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG]]
+// CHECK:           %[[OTHER:.+]] = util.optimization_barrier %[[ARG]] : tensor<4x16xf32>
+// CHECK:           %[[BARRIER:.+]] = util.optimization_barrier %[[EXPANDED]]
+// CHECK:           %[[COLLAPSED:.+]] = tensor.collapse_shape %[[BARRIER]]
+// CHECK:           scf.yield %[[COLLAPSED]] : tensor<4x16xf32>
+// CHECK:         }
+// CHECK:         return %[[FOR_RESULT]]

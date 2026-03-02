@@ -30,7 +30,7 @@ namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
-// We aribtrarily say that unbounded dimensions in a torch program cannot
+// We arbitrarily say that unbounded dimensions in a torch program cannot
 // exceed 53bits, making the maximum safe dimension 9007199254740991. The
 // astute reader will note that this is also the maximum safe value in
 // JavaScript, which also "happens" to be the largest mantissa value in a
@@ -62,7 +62,7 @@ static constexpr uint64_t MAX_DIM_VALUE = (static_cast<uint64_t>(1) << 53) - 1;
 // symbols are not actionable by us, and we therefore drop them. It is possible
 // for the frontend or user to fix this situation, and we therefore assume
 // that anyone who cares will have done so. These cases are emitted as warnings
-// in this pass because they signal potential missed optimization opportunties
+// in this pass because they signal potential missed optimization opportunities
 // that we would like to know about.
 //
 // The approach we use from here will roughly map a torch.bind_symbolic_shape

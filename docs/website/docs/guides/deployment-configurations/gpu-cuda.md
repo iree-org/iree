@@ -117,7 +117,7 @@ Here is a table of commonly used architectures:
 | NVIDIA RTX40 series | `sm_89`             | `ada`
 
 In addition to the canonical `sm_<arch_number>` scheme, `iree-cuda-target`
-also supports two additonal schemes to make a better developer experience:
+also supports two additional schemes to make a better developer experience:
 
 * Architecture code names like `volta` or `ampere`
 * GPU product names like `a100` or `rtx3090`

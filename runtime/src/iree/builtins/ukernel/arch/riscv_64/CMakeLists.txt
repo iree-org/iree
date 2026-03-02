@@ -135,7 +135,7 @@ set(IREE_UK_TRY_RISCV_64_ZVFHMIN ON)
 
 # Compiler emits '__extendhfsf2' call for the
 # C code below. So, the following test checks whether
-# compiler can link '__extendhfsf2' succesfully.
+# compiler can link '__extendhfsf2' successfully.
 # This is needed because riscv toolchain used by
 # 'Test RISC-V 64 CI job' fails to link '__extendhfsf2'
 # builtin. See: https://github.com/iree-org/iree/issues/22303.

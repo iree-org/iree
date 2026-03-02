@@ -82,7 +82,7 @@ util.func public @rebaseBindings(%operand: index) {
 // Tests that bindings that are duplicated at all dispatch sites are folded.
 // This will happen even if the offsets differ as we are rebasing them to 0 and
 // moving the offsetting into the dispatched function. To ensure that we are
-// offseting things correctly we have pre-offset subspans in the dispatch region
+// offsetting things correctly we have pre-offset subspans in the dispatch region
 // that must have the host binding offsets added to them.
 //
 // NOTE: the offset operands are inserted at the start of the operand list and

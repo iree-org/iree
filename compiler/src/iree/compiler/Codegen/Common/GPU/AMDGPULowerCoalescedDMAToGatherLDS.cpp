@@ -162,7 +162,7 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 ///   - dstDimOffset: position without lane offset (uniform across subgroup)
 ///   - indices[dim]: index memref mapping dest positions to source positions
 static std::pair<SmallVector<Value>, SmallVector<Value>>
-generateGatherIndices(PatternRewriter &rewriter, Location loc,
+generateGatherIndices(OpBuilder &rewriter, Location loc,
                       ValueRange srcDimOffsets, ValueRange dstDimOffsets,
                       OperandRange indices) {
   SmallVector<Value> srcIndices;
@@ -197,7 +197,8 @@ struct LowerCoalescedGatherDMAPattern final
 
   LowerCoalescedGatherDMAPattern(MLIRContext *context,
                                  ArrayRef<int64_t> targetDmaSizes)
-      : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp>(context),
+      : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp>(context,
+                                                          /*benefit=*/2),
         targetDmaSizes(targetDmaSizes) {}
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
@@ -476,6 +477,247 @@ private:
   ArrayRef<int64_t> targetDmaSizes;
 };
 
+/// Fallback pattern that lowers CoalescedGatherDMAOp to
+/// vector.transfer_read/vector.transfer_write when the fast path
+/// (gather_to_lds) fails due to DMA size alignment issues.
+/// Each lane transfers one element per iteration across the subgroup.
+struct LowerCoalescedGatherDMAFallbackPattern final
+    : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
+                                PatternRewriter &rewriter) const override;
+
+private:
+  void emitFallbackTransfers(OpBuilder &builder, Location loc, Value source,
+                             Value dest, ArrayRef<int64_t> destShape,
+                             int64_t numLinearDims, Type elementType,
+                             OperandRange indices, int64_t subgroupSize,
+                             Value laneId,
+                             std::optional<ArrayAttr> inBoundsAttr) const;
+};
+
+LogicalResult LowerCoalescedGatherDMAFallbackPattern::matchAndRewrite(
+    IREE::GPU::CoalescedGatherDMAOp dmaOp, PatternRewriter &rewriter) const {
+  LDBG() << "Fallback: Processing CoalescedGatherDMAOp: " << dmaOp;
+
+  auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
+  if (!forallOp) {
+    return rewriter.notifyMatchFailure(
+        dmaOp, "coalesced_gather_dma not inside scf.forall");
+  }
+
+  if (failed(verifyThreadMapping(forallOp))) {
+    return rewriter.notifyMatchFailure(
+        dmaOp, "forall does not have proper thread mapping");
+  }
+
+  if (failed(verifyMemoryLayoutContiguous(dmaOp, rewriter))) {
+    return failure();
+  }
+
+  Value source = dmaOp.getSource();
+  Value dest = dmaOp.getInit();
+  auto sourceType = cast<MemRefType>(source.getType());
+  auto destType = cast<MemRefType>(dest.getType());
+  Type elementType = sourceType.getElementType();
+  ArrayRef<int64_t> destShape = destType.getShape();
+
+  std::optional<int64_t> subgroupSize =
+      getSubgroupSize(dmaOp->getParentOfType<FunctionOpInterface>());
+  if (!subgroupSize.has_value()) {
+    return rewriter.notifyMatchFailure(dmaOp,
+                                       "unable to determine subgroup size");
+  }
+
+  // Compute linearized dimensions (same as fast path).
+  int64_t destRank = destShape.size();
+  int64_t numLinearDims = destType.getNumContiguousTrailingDims();
+  numLinearDims = std::max<int64_t>(numLinearDims, 1);
+
+  for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
+    if (ShapedType::isDynamic(destShape[i])) {
+      return rewriter.notifyMatchFailure(
+          dmaOp, "dynamic dimension in linearized portion");
+    }
+  }
+
+  // OOB padding requires fat_raw_buffer.
+  if (std::optional<ArrayAttr> inBounds = dmaOp.getInBounds()) {
+    if (!hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+      for (Attribute attr : *inBounds) {
+        if (!cast<BoolAttr>(attr).getValue()) {
+          return rewriter.notifyMatchFailure(
+              dmaOp, "in_bounds with OOB dimensions requires "
+                     "fat_raw_buffer address space on source");
+        }
+      }
+    }
+  }
+
+  rewriter.setInsertionPoint(dmaOp);
+  TypedValue<IndexType> laneId = dmaOp.getLane();
+  Location loc = dmaOp.getLoc();
+
+  emitFallbackTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
+                        elementType, dmaOp.getIndices(), *subgroupSize, laneId,
+                        dmaOp.getInBounds());
+
+  rewriter.eraseOp(dmaOp);
+  return success();
+}
+
+void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
+    OpBuilder &builder, Location loc, Value source, Value dest,
+    ArrayRef<int64_t> destShape, int64_t numLinearDims, Type elementType,
+    OperandRange indices, int64_t subgroupSize, Value laneId,
+    std::optional<ArrayAttr> inBoundsAttr) const {
+  int64_t destRank = destShape.size();
+  int64_t numOuterDims = destRank - numLinearDims;
+
+  // Compute linearized size.
+  int64_t linearSize = 1;
+  for (int64_t i = numOuterDims; i < destRank; ++i) {
+    linearSize *= destShape[i];
+  }
+
+  // Element distribution across lanes.
+  int64_t numFullIterations = linearSize / subgroupSize;
+  int64_t remainder = linearSize % subgroupSize;
+  int64_t numIterations = numFullIterations + (remainder > 0 ? 1 : 0);
+
+  LDBG() << "Fallback: linearSize=" << linearSize
+         << " subgroupSize=" << subgroupSize
+         << " numFullIter=" << numFullIterations << " remainder=" << remainder;
+
+  // Build delinearization basis for linear portion.
+  SmallVector<int64_t> linearBasis =
+      llvm::to_vector(destShape.drop_front(numOuterDims));
+  SmallVector<OpFoldResult> basis =
+      getAsIndexOpFoldResult(builder.getContext(), linearBasis);
+
+  // Build tile sizes for outer dimension iteration.
+  SmallVector<int64_t> tileSizes(destRank, 1);
+  for (int64_t i = numOuterDims; i < destRank; ++i) {
+    tileSizes[i] = destShape[i];
+  }
+
+  // Padding value and vector type for transfers.
+  Value padVal =
+      arith::ConstantOp::create(builder, loc, builder.getZeroAttr(elementType));
+  VectorType vecType = VectorType::get({1}, elementType);
+
+  // Lambda to emit a single element transfer at the given linear offset.
+  auto emitSingleTransfer = [&](OpBuilder &b, Location loc,
+                                SmallVector<Value> &outerDimOffsets,
+                                Value linearOffset) {
+    // Delinearize linear offset to multi-dim indices.
+    // Both source and destination use the same delinearized position,
+    // but generateGatherIndices handles the gather indirection for source.
+    auto delinearize = affine::AffineDelinearizeIndexOp::create(
+        b, loc, linearOffset, basis, /*hasOuterBound=*/true);
+
+    SmallVector<Value> srcDimOffsets(outerDimOffsets);
+    llvm::append_range(srcDimOffsets, delinearize.getResults());
+    SmallVector<Value> dstDimOffsets(outerDimOffsets);
+    llvm::append_range(dstDimOffsets, delinearize.getResults());
+
+    auto [srcIndices, dstIndices] =
+        generateGatherIndices(b, loc, srcDimOffsets, dstDimOffsets, indices);
+
+    // OOB handling: replicate the fast path's outermost-index-replacement
+    // trick for non-outermost dimensions.
+    auto sourceType = cast<MemRefType>(source.getType());
+    if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+      ArrayRef<int64_t> sourceShape = sourceType.getShape();
+      Value anyNonOutermostOOB =
+          arith::ConstantOp::create(b, loc, b.getBoolAttr(false));
+
+      for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
+        if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
+          break;
+        }
+        bool dimInBounds = cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
+        if (dimInBounds) {
+          continue;
+        }
+
+        Value dimSize;
+        if (ShapedType::isDynamic(sourceShape[dim])) {
+          dimSize = memref::DimOp::create(b, loc, source, dim);
+        } else {
+          dimSize = arith::ConstantIndexOp::create(b, loc, sourceShape[dim]);
+        }
+
+        Value isOOB = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::uge,
+                                            srcIndices[dim], dimSize);
+        anyNonOutermostOOB =
+            arith::OrIOp::create(b, loc, anyNonOutermostOOB, isOOB);
+      }
+
+      Value oobOuterIdx;
+      if (ShapedType::isDynamic(sourceShape[0])) {
+        oobOuterIdx = memref::DimOp::create(b, loc, source, 0);
+      } else {
+        oobOuterIdx = arith::ConstantIndexOp::create(b, loc, sourceShape[0]);
+      }
+      srcIndices[0] = arith::SelectOp::create(b, loc, anyNonOutermostOOB,
+                                              oobOuterIdx, srcIndices[0]);
+    }
+
+    // Determine in_bounds for vector.transfer_read.
+    // For vector<1xelemType>, there is 1 vector dim mapped to innermost
+    // memref dim. Set in_bounds based on original DMA's in_bounds for
+    // the innermost dimension.
+    SmallVector<bool> readInBounds = {true};
+    if (inBoundsAttr && !inBoundsAttr->empty()) {
+      bool innermostInBounds =
+          cast<BoolAttr>((*inBoundsAttr)[inBoundsAttr->size() - 1]).getValue();
+      readInBounds[0] = innermostInBounds;
+    }
+
+    Value vec = vector::TransferReadOp::create(
+        b, loc, vecType, source, srcIndices, padVal, readInBounds);
+    vector::TransferWriteOp::create(b, loc, vec, dest, dstIndices,
+                                    SmallVector<bool>{true});
+  };
+
+  // Emit transfers for each outer position and each iteration.
+  for (const SmallVector<int64_t> &outerOffsets :
+       StaticTileOffsetRange(destShape, tileSizes)) {
+
+    SmallVector<Value> outerDimOffsets = llvm::map_to_vector(
+        llvm::ArrayRef(outerOffsets).take_front(numOuterDims),
+        [&](int64_t offset) -> Value {
+          return arith::ConstantIndexOp::create(builder, loc, offset);
+        });
+
+    for (int64_t iter = 0; iter < numIterations; ++iter) {
+      Value linearBase =
+          arith::ConstantIndexOp::create(builder, loc, iter * subgroupSize);
+      Value linearOffset =
+          arith::AddIOp::create(builder, loc, linearBase, laneId);
+
+      if (iter >= numFullIterations) {
+        // Remainder: guard with scf.if(linearOffset < linearSize).
+        Value linearSizeVal =
+            arith::ConstantIndexOp::create(builder, loc, linearSize);
+        Value inRange =
+            arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ult,
+                                  linearOffset, linearSizeVal);
+        scf::IfOp::create(builder, loc, inRange,
+                          [&](OpBuilder &thenBuilder, Location thenLoc) {
+                            emitSingleTransfer(thenBuilder, thenLoc,
+                                               outerDimOffsets, linearOffset);
+                            scf::YieldOp::create(thenBuilder, thenLoc);
+                          });
+      } else {
+        emitSingleTransfer(builder, loc, outerDimOffsets, linearOffset);
+      }
+    }
+  }
+}
+
 namespace {
 struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     : impl::AMDGPULowerCoalescedDMAToGatherLDSPassBase<
@@ -500,12 +742,11 @@ struct AMDGPULowerCoalescedDMAToGatherLDSPass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<LowerCoalescedGatherDMAPattern>(context, dmaSizes);
+    patterns.add<LowerCoalescedGatherDMAFallbackPattern>(context);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
 
-    // Verify all CoalescedGatherDMAOps were lowered. Currently, we require all
-    // ops to be successfully lowered. In the future, a fallback lowering path
-    // (e.g., using global_load) could handle ops that don't match the pattern.
+    // Verify all CoalescedGatherDMAOps were lowered.
     WalkResult result = funcOp.walk([&](IREE::GPU::CoalescedGatherDMAOp op) {
       op.emitOpError(
           "failed to lower to gather_to_lds; possible causes: source "

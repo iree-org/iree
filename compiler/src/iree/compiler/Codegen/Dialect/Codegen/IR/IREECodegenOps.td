@@ -365,7 +365,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
 
     Note that different `kind` attributes may adopt different conventions as to
     the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
-    and it may be necessary to use `opaque = true` to accomodate them. Others
+    and it may be necessary to use `opaque = true` to accommodate them. Others
     may use higher-rank vectors with shapes reflecting semantics, allowing to
     use `opaque = false`, which is preferable when possible at all thanks to the
     stricter semantics. However, that is not only a function of the `kind`
@@ -418,7 +418,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
 
   let arguments = (ins Variadic<AnyRankedTensorOrVector>:$inputs,
       Variadic<AnyRankedTensorOrVector>:$outputs,
-      TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
+      TypedArrayAttrBase<AffineMapAttr, "indexing affine maps">:$indexing_maps,
       IteratorTypeArrayAttr:$iterator_types,
       IREECodegen_AnyInnerTileDescAttr:$kind,
       IREECodegen_AnyInnerTiledSemanticscAttr:$semantics,

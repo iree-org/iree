@@ -210,7 +210,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // dependency. The op will be duplicated in each consumer partition, so
       // there's no shared state causing circular dependencies.
     } else {
-      // For non-clonable ops, nestedRegionHazards must be respected to prevent
+      // For non-cloneable ops, nestedRegionHazards must be respected to prevent
       // circular dependencies from nested region captures. Unlike normal
       // hazards which propagate through use-def chains, nestedRegionHazards may
       // not be fully captured in opInfo.hazards when the containing operation
@@ -544,7 +544,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
     LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
                             << firstCandidateOrdinal << " (continue)\n");
-    // If we are a clonable op (like splat) clone us into every partition.
+    // If we are a cloneable op (like splat) clone us into every partition.
     // We also clone if there are nested region hazards, indicating consumers
     // in nested regions that will need their own copy.
     // Otherwise we just pick the first we find (probably a bad heuristic).
@@ -581,7 +581,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       }
       // Else: all uses are in nested regions, leave for re-materialization.
     } else {
-      // Not a clonable op, insert into first candidate partition.
+      // Not a cloneable op, insert into first candidate partition.
       builder->insert(&op, opInfo);
     }
   }

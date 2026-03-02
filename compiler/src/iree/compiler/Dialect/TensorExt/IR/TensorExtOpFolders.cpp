@@ -339,7 +339,7 @@ void DispatchTensorLoadOp::getCanonicalizationPatterns(
 
 // Inlining producers of an input to the dispatch region results in the
 // `flow.dispatch.input.load` having a `tensor` type as input. This fails
-// verification. Fold such uses of the offsets, size and strides are emtpy.
+// verification. Fold such uses of the offsets, size and strides are empty.
 // i.e, flow.dispatch.input.load %v -> %v
 OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
   if (getSource().getType() && isa<RankedTensorType>(getSource().getType()) &&

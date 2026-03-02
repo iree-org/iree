@@ -253,22 +253,22 @@ static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
 /// Firstly, this will transpose the vector in a way sliced out
 /// dims become outermost. Then it performs a vector.extract
 /// remove the dims that are not present in the results of the map.
-/// Note that the implementation is similiar to vector.extract_stride_slice
+/// Note that the implementation is similar to vector.extract_stride_slice
 /// but with projecting out the indexed/sliced dimensions from the result.
 static VectorValue projectVector(RewriterBase &rewriter, Location loc,
                                  VectorValue val, AffineMap projectionMap) {
-  SmallVector<int64_t> remaningDims;
+  SmallVector<int64_t> remainingDims;
   auto allDims =
       llvm::to_vector(llvm::seq<int64_t>(projectionMap.getNumDims()));
   llvm::SmallDenseSet<int64_t> slicedDims(allDims.begin(), allDims.end());
   for (int64_t resultIdx : llvm::seq<int64_t>(projectionMap.getNumResults())) {
     int64_t iterSpacePos = projectionMap.getDimPosition(resultIdx);
-    remaningDims.push_back(iterSpacePos);
+    remainingDims.push_back(iterSpacePos);
     slicedDims.erase(iterSpacePos);
   }
 
   auto transposePerm = llvm::to_vector_of<int64_t>(slicedDims);
-  transposePerm.append(remaningDims);
+  transposePerm.append(remainingDims);
   auto transposed =
       vector::TransposeOp::create(rewriter, loc, val, transposePerm);
 
@@ -679,6 +679,8 @@ struct DistributeTransferGather final
       mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
     }
 
+    // Guard on memrefs for distribution. In isolation this pattern is agnostic
+    // to tensors or memrefs.
     if (!isa<MemRefType>(gatherOp.getBase().getType())) {
       return rewriter.notifyMatchFailure(gatherOp,
                                          "distribution expects memrefs");
@@ -690,9 +692,13 @@ struct DistributeTransferGather final
 
     Type elementType = gatherOp.getBase().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
+    // The shape of the vector we read is pre-permutation. The permutation is
+    // a transpose on the resulting read vector.
     auto innerVectorType =
         VectorType::get(vectorLayout.getElementTile(), elementType);
 
+    // Initialize the full distributed vector for unrolling the batch/outer
+    // vector dimensions.
     Value zero =
         arith::ConstantOp::create(rewriter, gatherOp.getLoc(), vectorType,
                                   rewriter.getZeroAttr(vectorType));
@@ -708,6 +714,11 @@ struct DistributeTransferGather final
 
     ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
+
+    // getPermutationMap inverts the source map, mapping gathered (symbol) and
+    // broadcast (constant) dims to constant 0. This is correct here because
+    // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
+    // leaving the original base offset unchanged for gathered dimensions.
     AffineMap permMap = gatherOp.getPermutationMap();
 
     SmallVector<SmallVector<int64_t>> allMaskOffsets;
@@ -734,6 +745,9 @@ struct DistributeTransferGather final
           gatherOp.getPadding(), slicedMask);
 
       if (acc.getType().getRank() == 0) {
+        // TODO: This should really be a folding pattern in
+        // insert_strided_slice, but instead insert_strided_slice just doesn't
+        // support 0-d vectors...
         acc = slicedGather;
       } else {
         acc = vector::InsertStridedSliceOp::create(
@@ -1150,7 +1164,7 @@ struct DistributeMultiReduction final
     // TODO: As per current upstream lowering implementations, there is no point
     // in doing this because it does a select much later in a finer granularity
     // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions accross the distribution, we can choose not to mask
+    // to cater reductions across the distribution, we can choose not to mask
     // the op post-distribution.
 
     VectorValue locallyReduced;
@@ -1614,7 +1628,7 @@ struct DistributeContract final
     // TODO: As per current upstream lowering implementations, there is no point
     // in doing this because it does a select much later in a finer granularity
     // rather than supporting predication. Moreover, since we are doing a select
-    // to cater reductions accross the distribution, we can choose not to mask
+    // to cater reductions across the distribution, we can choose not to mask
     // the op post-distribution.
 
     VectorValue localContractValue;

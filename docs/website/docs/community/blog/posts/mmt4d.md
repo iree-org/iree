@@ -116,7 +116,7 @@ The two main problems with this approach are:
     sufficed, as this could have been done as a pre-processing step on
     O(N<sup>2</sup>) data.
 
-- **Inefficent memory traversal:** For efficiency reasons, we always need
+- **Inefficient memory traversal:** For efficiency reasons, we always need
     `tile_m_v>1` and `tile_n_v>1`. That is because the higher these values, the
     fewer memory-load instructions are needed overall; and this is also dictated
     by the SIMD instructions that we want to use. But that means that the kernel
@@ -275,7 +275,7 @@ about it.
 ## Conclusion
 
 We introduced a 4d tiled representation for 2d matrix-matrix multiplication with
-a decomposable algebric transformations that requires only reshape and transpose
+a decomposable algebraic transformations that requires only reshape and transpose
 of input operands, we discussed and empirically showed how that solves major
 drawbacks in row-major linear matmul by providing a flexible way to match
 different ISA layout along with better cache locality achieving near peak

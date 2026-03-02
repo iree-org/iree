@@ -323,6 +323,114 @@ struct ExpandDestinationForallOp final
   }
 };
 
+/// This pattern hoists expand_shape & collapse_shape ops out of scf.for loops.
+struct ExpandDestinationForOp final : OpRewritePattern<scf::YieldOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = yieldOp.getLoc();
+    auto forOp = dyn_cast<scf::ForOp>(yieldOp->getParentOp());
+    if (!forOp) {
+      return failure();
+    }
+    tensor::CollapseShapeOp collapseOp;
+    tensor::ExpandShapeOp expandOp;
+    int64_t tiedResultIdx = 0;
+
+    for (auto [idx, operand] : llvm::enumerate(yieldOp.getOperands())) {
+      collapseOp = operand.getDefiningOp<tensor::CollapseShapeOp>();
+      if (!collapseOp) {
+        continue;
+      }
+      if (collapseOp.getSrcType().getRank() ==
+          collapseOp.getResultType().getRank()) {
+        continue;
+      }
+
+      // Get the corresponding expandOp.
+      auto iterArg = forOp.getRegionIterArgs()[idx];
+      for (auto user : iterArg.getUsers()) {
+        expandOp = dyn_cast<tensor::ExpandShapeOp>(user);
+        if (expandOp &&
+            (expandOp.getReassociationIndices() ==
+             collapseOp.getReassociationIndices()) &&
+            (expandOp.getResultType() == collapseOp.getSrcType())) {
+          break;
+        } else {
+          expandOp = nullptr;
+        }
+      }
+
+      if (expandOp && collapseOp) {
+        bool hasOtherUsers = false;
+        for (auto user : iterArg.getUsers()) {
+          if (user != expandOp) {
+            hasOtherUsers = true;
+            expandOp = nullptr;
+            collapseOp = nullptr;
+            break;
+          }
+        }
+        if (!hasOtherUsers) {
+          tiedResultIdx = idx;
+          break;
+        }
+      }
+    }
+    if (!expandOp || !collapseOp) {
+      return failure();
+    }
+
+    // Create the expand -> new scf.for -> collapse chain.
+    rewriter.setInsertionPoint(forOp);
+
+    Value initArg = forOp.getInitArgs()[tiedResultIdx];
+    auto expandedDest = tensor::ExpandShapeOp::create(
+        rewriter, loc, expandOp.getResultType(), initArg,
+        expandOp.getReassociationIndices());
+
+    auto expandedInitArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
+    expandedInitArgs[tiedResultIdx] = expandedDest.getResult();
+
+    scf::ForOp newForOp = scf::ForOp::create(
+        rewriter, loc, forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), expandedInitArgs);
+
+    auto collapsedOutput = tensor::CollapseShapeOp::create(
+        rewriter, loc, collapseOp.getResultType(),
+        newForOp.getResults()[tiedResultIdx],
+        collapseOp.getReassociationIndices());
+
+    // Users of the result of collapseOp must use the input to the collapseOp.
+    collapseOp->getResult(0).replaceAllUsesWith(collapseOp.getOperand());
+
+    // Users of the result of expandOp must use the iter_arg of the new forOp.
+    for (auto user : forOp.getRegionIterArgs()[tiedResultIdx].getUsers()) {
+      if (user->getNumResults() > 0) {
+        user->getResult(0).replaceAllUsesWith(
+            newForOp.getRegionIterArgs()[tiedResultIdx]);
+      }
+    }
+
+    // Merge the old scf.for block with the new scf.for block.
+    SmallVector<Value> ivs = {newForOp.getInductionVar()};
+    SmallVector<Value> argReplacements(ivs);
+    argReplacements.append(newForOp.getRegionIterArgs().begin(),
+                           newForOp.getRegionIterArgs().end());
+    rewriter.mergeBlocks(forOp.getBody(), newForOp.getBody(), argReplacements);
+
+    // Replace the uses of the old scf.for with the new scf.for.
+    for (int idx = 0; idx < forOp->getNumResults(); ++idx) {
+      if (idx == tiedResultIdx) {
+        forOp->getResult(idx).replaceAllUsesWith(collapsedOutput->getResult(0));
+      } else {
+        forOp->getResult(idx).replaceAllUsesWith(newForOp->getResult(idx));
+      }
+    }
+    return success();
+  }
+};
+
 /// This pattern exchanges bitcast(extract_slice) to extract_slice(bitcast) in
 /// an attempt to move the bitcast closer to the loads. There is a related
 /// pattern that does the reverse when folding the bitcast is not possible and
@@ -444,8 +552,8 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
   populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns
-      .add<ExpandDestinationForallOp, SwapInnerBitcastWithExtractSlice>(
-          context);
+      .add<ExpandDestinationForallOp, ExpandDestinationForOp,
+           SwapInnerBitcastWithExtractSlice>(context);
 
   if (failed(applyPatternsGreedily(getOperation(),
                                    std::move(bubbleExpandShapePatterns)))) {

@@ -81,6 +81,7 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
+    "noaarch64"
     "noriscv"
 )
 

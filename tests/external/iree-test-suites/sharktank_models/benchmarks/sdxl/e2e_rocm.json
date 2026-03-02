@@ -12,7 +12,7 @@
     "compile_flags": [
         "--iree-rocm-waves-per-eu=2",
         "--iree-opt-outer-dim-concat=true",
-        "--iree-llvmgpu-enable-prefetch",
+        "--iree-llvmgpu-prefetch-num-stages=2",
         "--iree-hal-target-backends=rocm"
     ],
     "mlir_file_name": "sdxl_pipeline_bench_f16.mlir",

@@ -319,7 +319,7 @@ specializeDispatches(IREE::Stream::ExecutableOp executableOp,
   });
 
   // Inline that constant table into the dispatch function and look up the
-  // contants to use based on a parameterized input. All unneeded operands
+  // constants to use based on a parameterized input. All unneeded operands
   // are removed.
   insertConstantTableLookup(funcOp, constantTable);
 

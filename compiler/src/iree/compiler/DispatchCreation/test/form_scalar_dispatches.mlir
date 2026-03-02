@@ -161,7 +161,7 @@ util.func public @interleaving(
 // -----
 
 #map = affine_map<() -> ()>
-util.func public @clonable_op_in_chain(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>) {
+util.func public @cloneable_op_in_chain(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>) {
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%arg2 : tensor<i32>) {
   ^bb0(%out: i32):
     %2 = arith.select %arg1, %arg7, %arg0 : i32
@@ -176,14 +176,14 @@ util.func public @clonable_op_in_chain(%arg0: i32, %arg1: i1, %arg2: tensor<i32>
   util.return %0, %1 : tensor<i32>, tensor<i32>
 }
 
-// CHECK-LABEL: util.func public @clonable_op_in_chain(
+// CHECK-LABEL: util.func public @cloneable_op_in_chain(
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 
 // -----
 
 #map = affine_map<() -> ()>
-util.func public @clonable_op_used_after(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>, i32) {
+util.func public @cloneable_op_used_after(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>, i32) {
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%arg2 : tensor<i32>) {
   ^bb0(%out: i32):
     %2 = arith.select %arg1, %arg7, %arg0 : i32
@@ -198,14 +198,14 @@ util.func public @clonable_op_used_after(%arg0: i32, %arg1: i1, %arg2: tensor<i3
   util.return %0, %1, %extracted : tensor<i32>, tensor<i32>, i32
 }
 
-// CHECK-LABEL: util.func public @clonable_op_used_after
+// CHECK-LABEL: util.func public @cloneable_op_used_after
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 
 // -----
 
 #map = affine_map<() -> ()>
-util.func public @clonable_op_only_used_after(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>, i32) {
+util.func public @cloneable_op_only_used_after(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>, i32) {
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%arg2 : tensor<i32>) {
   ^bb0(%out: i32):
     %2 = arith.select %arg1, %arg7, %arg0 : i32
@@ -221,6 +221,6 @@ util.func public @clonable_op_only_used_after(%arg0: i32, %arg1: i1, %arg2: tens
   util.return %0, %1, %extracted : tensor<i32>, tensor<i32>, i32
 }
 
-// CHECK-LABEL: util.func public @clonable_op_only_used_after
+// CHECK-LABEL: util.func public @cloneable_op_only_used_after
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region

@@ -413,7 +413,7 @@ EXPORTS
   mlirDictionaryAttrGetName
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
-  mlirDisctinctAttrCreate
+  mlirDistinctAttrCreate
   mlirElementsAttrGetNumElements
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex

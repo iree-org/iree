@@ -572,7 +572,7 @@ transform.named_sequence @match_matmul_like_Bx20x64x64x2048_transposev_i8xi8xi32
         //, @match_broadcast_rhs_mmt_Bx64x640x2480 -> @apply_op_config
 
 
-        // Contration.
+        // Contraction.
         , @match_matmul_like_Bx20x1024x64x1280_i8xi8xi32 -> @apply_op_config
         , @match_matmul_like_Bx10x4096x64x640_i8xi8xi32 -> @apply_op_config
         , @match_matmul_like_Bx20x64x64x2048_i8xi8xi32 -> @apply_op_config

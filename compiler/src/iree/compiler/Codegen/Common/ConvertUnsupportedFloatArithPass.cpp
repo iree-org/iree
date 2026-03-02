@@ -7,7 +7,7 @@
 //===--------------- ConvertUnsupportedFloatArithPass.cpp ----------------===//
 //
 //   Emulate arith and vector floating point operations that use float types
-//   which are unspported on a target by inserting extf/truncf pairs around all
+//   which are unsupported on a target by inserting extf/truncf pairs around all
 //   such operations in order to produce arithmetic that can be performed while
 //   preserving the original rounding behavior.
 //

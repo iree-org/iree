@@ -83,12 +83,13 @@ def GPUConvertToCoalescedDMAPass :
 
 def AMDGPULowerCoalescedDMAToGatherLDSPass :
     InterfacePass<"iree-codegen-amdgpu-lower-coalesced-dma-to-gather-lds", "mlir::FunctionOpInterface"> {
-  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds.";
+  let summary = "Lower coalesced DMA operations to amdgpu.gather_to_lds with vector fallback.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::scf::SCFDialect",
     "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::vector::VectorDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -244,7 +245,7 @@ def GPUPipeliningPass :
   let options = [
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
             /*default=*/"true",
-           "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
+           "Try to use un-peeling epilogue when false, peeled epilogue o.w.">,
     Option<"depth", "pipeline-depth", "int64_t",
             /*default=*/"2",
            "Number of stages ">,

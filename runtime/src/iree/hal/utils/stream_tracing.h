@@ -136,7 +136,7 @@ void iree_hal_stream_tracing_context_free(
 iree_status_t iree_hal_stream_tracing_context_collect(
     iree_hal_stream_tracing_context_t* context);
 
-// Notifies that the given list of events has been dispached on to the gpu.
+// Notifies that the given list of events has been dispatched on to the gpu.
 void iree_hal_stream_tracing_notify_submitted(
     iree_hal_stream_tracing_context_t* context,
     iree_hal_stream_tracing_context_event_list_t* event_list);
@@ -247,7 +247,7 @@ void iree_hal_graph_tracing_zone_end_impl(
     context, event_list, out_node, graph, verbosity, dependency_nodes,        \
     dependency_nodes_count, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
-#define IREE_HAL_STREAM_TRACE_ZONE_END(context, evnet_list, verbosity)
+#define IREE_HAL_STREAM_TRACE_ZONE_END(context, event_list, verbosity)
 #define IREE_HAL_GRAPH_TRACE_ZONE_END(context, event_list, out_node, graph, \
                                       verbosity, dependency_nodes,          \
                                       dependency_nodes_count)

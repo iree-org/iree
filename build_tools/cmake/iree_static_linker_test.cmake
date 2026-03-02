@@ -168,7 +168,7 @@ function(iree_static_linker_test)
     string(REPLACE "x" ";" _INPUT_ENTRY_LIST "${_INPUT_ENTRY}")
     list(POP_BACK _INPUT_ENTRY_LIST _INPUT_FORMAT)
 
-    # Process shape to compute the size (number of elements) and dimention.
+    # Process shape to compute the size (number of elements) and dimension.
     # The results are stored into lists to support multiple inputs
     if(NOT _INPUT_ENTRY_LIST)  # single entry input
       set(_INPUT_ENTRY_LIST "1")

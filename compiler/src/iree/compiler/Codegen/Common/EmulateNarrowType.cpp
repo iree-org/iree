@@ -161,7 +161,7 @@ LogicalResult emulateNarrowType(
 
   RewritePatternSet patterns(ctx);
 
-  // Try to flatten memrefs as a prerequiste for narrow type emulation,
+  // Try to flatten memrefs as a prerequisite for narrow type emulation,
   // so we can have simplified checks in the emulation patterns.
   memref::populateFlattenMemrefsPatterns(patterns);
 

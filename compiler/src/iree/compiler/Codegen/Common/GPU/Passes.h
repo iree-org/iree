@@ -33,7 +33,7 @@ enum class PipeliningSchedulingStrategy : int64_t {
   // be vector registers carried between stages.
   loadStoreStage0 = 1,
   // Schedule optimized when using nvidia tensorcore with async copies. It will
-  // set all the copies in stage 0 then it will prefecth part of loads in `depth
+  // set all the copies in stage 0 then it will prefetch part of loads in `depth
   // - 2` stage and keep the rest of the load and compute into `depth - 1`.
   nvidiaTensorCore = 2,
 };

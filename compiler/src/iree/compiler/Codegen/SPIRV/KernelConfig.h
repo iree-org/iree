@@ -88,7 +88,7 @@ LogicalResult setCooperativeMatrixConfig(
 /// `translation_info` attribute to the entry point containing `rootOp` and a
 /// `lowering_config` attribute to `rootOp`.
 ///
-/// Returns success when a configuration is successfullly attached as attribute.
+/// Returns success when a configuration is successfully attached as attribute.
 /// Returns failure otherwise.
 
 LogicalResult setAdrenoCodeGenConfig(IREE::GPU::TargetAttr target,

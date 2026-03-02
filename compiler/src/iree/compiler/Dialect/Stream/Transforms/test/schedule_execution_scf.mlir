@@ -1107,8 +1107,8 @@ util.func public @splatWithMultipleBarriers() -> (!stream.resource<external>, !s
 // Tests clone with optimization_barrier + use in deeply nested regions.
 // Ensures barrier causes partitioning even with deep nesting (scf.for > scf.if).
 
-// CHECK-LABEL: @clonableBarrierDeeplyNested
-util.func public @clonableBarrierDeeplyNested(%arg0: !stream.resource<external>, %cond: i1, %ub: index) -> !stream.resource<external> {
+// CHECK-LABEL: @cloneableBarrierDeeplyNested
+util.func public @cloneableBarrierDeeplyNested(%arg0: !stream.resource<external>, %cond: i1, %ub: index) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index

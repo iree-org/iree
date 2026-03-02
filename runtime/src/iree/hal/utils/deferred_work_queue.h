@@ -24,7 +24,7 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t
 // This interface is used to allow the deferred work queue to interact with
 // a specific driver.
 // Calls to this vtable may be made from the deferred work queue on
-// multile threads simultaneously and so these functions must be thread
+// multiple threads simultaneously and so these functions must be thread
 // safe.
 // Calls to this interface will either come from a thread that has had
 // bind_to_thread called on it or as a side-effect from one of the public
@@ -39,7 +39,7 @@ typedef void* iree_hal_deferred_work_queue_host_device_event_t;
 typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
   void(IREE_API_PTR* destroy)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface);
-  // Binds the device work queue to a thread. May be simulatneously
+  // Binds the device work queue to a thread. May be simultaneously
   // bound to multiple threads.
   iree_status_t(IREE_API_PTR* bind_to_thread)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface);
@@ -76,7 +76,7 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
       struct iree_hal_semaphore_t*, uint64_t,
       iree_hal_deferred_work_queue_native_event_t* out_event);
 
-  // Get the device to wait on the event associated wit hthe host event.
+  // Get the device to wait on the event associated wit the host event.
   iree_status_t(IREE_API_PTR* device_wait_on_host_event)(
       iree_hal_deferred_work_queue_device_interface_t* device_interface,
       iree_hal_deferred_work_queue_host_device_event_t event);

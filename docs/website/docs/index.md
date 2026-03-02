@@ -5,7 +5,7 @@ hide:
 
 # IREE
 
-IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment[^1]) is
+IREE (**I**ntermediate **R**epresentation **E**xecution **E**environment[^1]) is
 an [MLIR](https://mlir.llvm.org/)-based end-to-end compiler and runtime that
 lowers Machine Learning (ML) models to a unified IR that scales up to meet the
 needs of the datacenter and down to satisfy the constraints and special
@@ -147,7 +147,7 @@ IREE supports importing models from a growing list of
 
 IREE provides a flexible set of tools for various
 [deployment scenarios](./guides/deployment-configurations/index.md). Fully
-featured environments can use IREE for dynamic model deployments taking
+featured eenvironments can use IREE for dynamic model deployments taking
 advantage of multi-threaded hardware, while embedded systems can bypass IREE's
 runtime entirely or interface with custom accelerators.
 

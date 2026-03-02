@@ -46,7 +46,7 @@ FailureOr<WorkItem> Delta::checkChunk(Chunk maybeUninterestingChunk,
   return clonedProgram;
 };
 
-bool Delta::increaseGranuality(SmallVector<Chunk> &chunks) {
+bool Delta::increaseGranularity(SmallVector<Chunk> &chunks) {
   LLVM_DEBUG(llvm::dbgs() << "Increasing granularity\n");
   SmallVector<Chunk> newChunks;
   bool anyNewSplit = false;
@@ -116,8 +116,9 @@ void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
     erase_if(maybeInteresting,
              [&](Chunk chunk) { return uninterestingChunks.count(chunk) > 0; });
 
-  } while (!maybeInteresting.empty() && (atleastOneNewUninteresting ||
-                                         increaseGranuality(maybeInteresting)));
+  } while (
+      !maybeInteresting.empty() &&
+      (atleastOneNewUninteresting || increaseGranularity(maybeInteresting)));
 
   ModuleOp newModule = reducedProgram.getModule();
   if (newModule && newModule != root.getModule()) {

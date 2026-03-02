@@ -205,7 +205,7 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
 // Meanwhile, when we split the LHS s16 values into high and low 8bit components
 // the high 8bits are signed s8 and the low 8bit are unsigned u8. So, for each
 // of the combinations of operands that we have to feed _mm512_dpbusd_epi32, we
-// manage to find an operand order that accomodates the instruction's
+// manage to find an operand order that accommodates the instruction's
 // requirements on signednesses.
 void iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,

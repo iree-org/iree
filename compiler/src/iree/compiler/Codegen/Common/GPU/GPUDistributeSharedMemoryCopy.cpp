@@ -31,7 +31,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 //====---------------------------------------------------------------------===//
-// Pass to lower workgroup memory copy to distibuted
+// Pass to lower workgroup memory copy to distributed
 // transfer_read/transfer_write ops.
 //====---------------------------------------------------------------------===//
 
@@ -129,7 +129,7 @@ static int getBaseVectorSize(linalg::GenericOp genericOp) {
   return vectorSize;
 }
 
-/// Compute a tile size so that the numer of iteraton is equal to the flat
+/// Compute a tile size so that the number of iteration is equal to the flat
 /// workgroup size.
 static std::optional<SmallVector<int64_t>>
 getTileToDistributableSize(linalg::GenericOp copyOp,
@@ -414,7 +414,7 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   debugPrint(funcOp, "After initial IR cleanup");
 
   if (isAligned) {
-    // Ignore all the exisiting loop
+    // Ignore all the existing loop
     llvm::SmallDenseSet<scf::ForOp> loopsToIgnore;
     funcOp.walk([&](scf::ForOp loop) { loopsToIgnore.insert(loop); });
 

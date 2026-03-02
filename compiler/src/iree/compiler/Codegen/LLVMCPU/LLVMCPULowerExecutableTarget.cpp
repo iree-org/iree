@@ -171,7 +171,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   OpPassManager passManager(func::FuncOp::getOperationName());
   switch (pipeline) {
-  // No pipleline specified, nothing to do.
+  // No pipeline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault: {

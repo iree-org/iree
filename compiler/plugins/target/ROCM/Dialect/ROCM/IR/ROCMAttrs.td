@@ -96,12 +96,12 @@ def ROCM_UKernelInfoAttr : AttrDef<ROCM_Dialect, "UKernelInfo", []> {
 }
 
 //===---------------------------------------------------------------------===//
-// rocm.ukernel_interation_size_constraint
+// rocm.ukernel_iteration_size_constraint
 //===---------------------------------------------------------------------===//
 
 def ROCM_UKernelIterationSizeConstraint
     : AttrDef<ROCM_Dialect, "UKernelIterationSizeConstraint", []> {
-  let mnemonic = "ukernel_interation_size_constraint";
+  let mnemonic = "ukernel_iteration_size_constraint";
   let summary = [{
     An attribute that provides a matching constraint on an iteration size.
   }];

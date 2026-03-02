@@ -36,7 +36,7 @@ SmallVector<Range> getLoopRanges(Operation *op, Location loc,
 LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
                                      SmallVectorImpl<Value> &dynamicDims);
 
-/// Attemps to create optimized expressions for computing every dynamic
+/// Attempts to create optimized expressions for computing every dynamic
 /// dimension of 'value'. If successful, 'dynamicDims' contains a value for each
 /// dynamic dimension of 'value'. Returns failure otherwise.
 LogicalResult
@@ -133,11 +133,11 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 ///
 /// Note: This function returns `false` for ops that should be tiled and fused
 /// into a dispatch region.
-struct ClonableIntoDispatchOptions {
+struct CloneableIntoDispatchOptions {
   bool aggressive = false;
 };
-bool isClonableIntoDispatchOp(Operation *op,
-                              ClonableIntoDispatchOptions options = {});
+bool isCloneableIntoDispatchOp(Operation *op,
+                               CloneableIntoDispatchOptions options = {});
 
 /// Hoists an operation out of a dispatch region, as long as it does not have
 /// producers inside of the dispatch region, or all of its uses are part of
@@ -154,13 +154,13 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *>
 getCloneableOps(Flow::DispatchRegionOp regionOp,
-                ClonableIntoDispatchOptions options = {});
+                CloneableIntoDispatchOptions options = {});
 
 /// Clone into the region producers of those value used in the region but
 /// defined above, to prepare the dispatch region isolated from above.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp,
-                                     ClonableIntoDispatchOptions options = {});
+                                     CloneableIntoDispatchOptions options = {});
 
 } // namespace mlir::iree_compiler::IREE::Flow
 

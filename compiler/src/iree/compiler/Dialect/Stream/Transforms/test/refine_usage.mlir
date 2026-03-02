@@ -119,7 +119,7 @@ util.func public @conflictResolution(%cond: i1, %arg0: !stream.resource<transien
 // Tests invalid transfer conflict resolution.
 // Constants cannot be mutated even though it is tied. This survives after
 // copy-on-write materialization because of the transfer and we need to preserve
-// it such that the copy is performed as epxected.
+// it such that the copy is performed as expected.
 
 // CHECK-LABEL: @transferResolution
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)

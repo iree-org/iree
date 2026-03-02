@@ -112,7 +112,7 @@ def LLVMGPUSelectLoweringStrategyPass :
   let options = [
     Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
       /*default=*/"GPUCodegenOptions::FromFlags::get()",
-      "Session-scoped GPU codegen options controlling prefetch, etc.">,
+      "Session-scoped GPU codegen options (tuning spec, etc.).">,
   ];
 }
 

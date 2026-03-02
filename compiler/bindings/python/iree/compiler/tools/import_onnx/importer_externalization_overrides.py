@@ -135,7 +135,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
                 dims, data_type = self.get_type_info_from_type(t.type)
             else:
                 raise TypeError(
-                    f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(t)} from {name}"
+                    f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, received {type(t)} from {name}"
                 )
 
             vtensor_type = RankedTensorType.get(
@@ -265,7 +265,7 @@ class IREENodeImporter(onnx_importer.NodeImporter):
             dims, data_type = self.get_type_info_from_type(initializer.type)
         else:
             raise TypeError(
-                f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, recieved {type(initializer)} from {initializer_name}"
+                f"Expected an onnx.TensorProto or an onnx.ValueInfoProto, received {type(initializer)} from {initializer_name}"
             )
 
         actual_symbol_name, tensor_type = self.create_tensor_global(initializer)

@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-hal-elide-redundant-commands))' %s | FileCheck %s
 
-// Tests that redundant barriers are elided but barriers gaurding ops are not.
+// Tests that redundant barriers are elided but barriers guarding ops are not.
 
 // CHECK-LABEL: @elideRedundantBarriers
 // CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[BUFFER:.+]]: !hal.buffer)

@@ -1,4 +1,4 @@
-// Test various forms of matmuls with narrow N, in particual matvec/batch_matvec
+// Test various forms of matmuls with narrow N, in particular matvec/batch_matvec
 // (implicitly N=1) and matmuls with N=1 and N=2.
 //
 // The reason why this needs extensive e2e testing is the transposition of

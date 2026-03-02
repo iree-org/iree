@@ -375,7 +375,7 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
   if (lowPrecision) {
     // For low bit-depth types we perform post Q @ K scaling. This is to avoid
     // losing numerical precision due to the low dynamic range of fp8 types when
-    // pre applying the sclaing.
+    // pre applying the scaling.
     AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
     AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
                                         /*symbolCount=*/0, ctx);
@@ -565,7 +565,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
       sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
 
-  // TODO: This decomposition should be in a seperate op called
+  // TODO: This decomposition should be in a separate op called
   // "online softmax".
   // ---- Online Softmax ----
 

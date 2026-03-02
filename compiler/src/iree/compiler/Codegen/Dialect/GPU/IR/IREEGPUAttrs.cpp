@@ -2183,7 +2183,7 @@ static AffineExpr getSubExpr(OpBuilder &b) {
   return s0 - s1;
 }
 
-/// Computes the total number of different Tile loads accross all XCDs per
+/// Computes the total number of different Tile loads across all XCDs per
 /// iteration for the pingpong matmul kernel. For each iteration, we distribute
 /// tile loads to invidiual CUs along the X axis of the RHS.
 static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,

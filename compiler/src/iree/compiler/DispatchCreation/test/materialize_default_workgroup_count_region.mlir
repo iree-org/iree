@@ -107,7 +107,7 @@ util.func @error_no_mapping(%arg0 : index, %arg1 : index, %arg2 : index) {
 
 // -----
 
-// Check that mutliple scf.forall loops within dispatch is not supported.
+// Check that multiple scf.forall loops within dispatch is not supported.
 util.func @error_multiple_scf_forall(%arg0 : index, %arg1 : index, %arg2 : index) {
   // expected-error @below {{unhandled multiple scf.forall ops in a dispatch}}
   %0:2 = flow.dispatch.workgroups[%arg0, %arg1](%arg0, %arg1, %arg2)

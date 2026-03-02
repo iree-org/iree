@@ -1870,7 +1870,7 @@ def FLOW_CollectiveAllToAllOp : FLOW_Op<"collective.all_to_all", [
   ]>,
 ]> {
   let summary = [{Performs all-to-all operation.}];
-  let description = [{This operation mutually exchanges data acrosss all of the ranks in the channel.}];
+  let description = [{This operation mutually exchanges data across all of the ranks in the channel.}];
 
   let arguments = (ins
     FLOW_CollectiveElementTypeAttr:$element_type,
@@ -1947,7 +1947,7 @@ def FLOW_CollectiveSendRecvOp : FLOW_Op<"collective.send_recv", [
   ]>,
 ]> {
   let summary = [{Performs a grouped send and receive operation.}];
-  let description = [{The operation sends data to the rank specificied by send
+  let description = [{The operation sends data to the rank specified by send
     and receives data from the rank specified by recv. If send is -1, this rank
     will not send any data. If recv is -1, this rank will not receive any data
     and the output will be all zeros.}];

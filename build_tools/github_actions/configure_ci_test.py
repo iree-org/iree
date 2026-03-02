@@ -249,7 +249,7 @@ class ConfigureCITest(unittest.TestCase):
         self.assertCountEqual(jobs, expected_jobs)
 
     def test_get_enabled_jobs_windows_docs(self):
-        # docs/ directory is excluded from CI, superceding "windows" inclusion
+        # docs/ directory is excluded from CI, superseding "windows" inclusion
         trailers = {}
         all_jobs = {"job1"}
         is_pr = True

@@ -562,7 +562,6 @@ setup(
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -573,7 +572,7 @@ setup(
         "repository": "https://github.com/iree-org/iree",
         "documentation": "https://iree.dev/reference/bindings/python/",
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     ext_modules=(
         [
             CMakeExtension("iree._runtime_libs._runtime"),

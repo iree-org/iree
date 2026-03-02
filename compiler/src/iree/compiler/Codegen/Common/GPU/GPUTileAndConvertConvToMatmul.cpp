@@ -99,7 +99,7 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
 void GPUTileAndConvertConvToMatmulPass::runOnOperation() {
   MLIRContext *context = &getContext();
   mlir::FunctionOpInterface funcOp = getOperation();
-  // Collect candiates that need to be tiled to convert to matmul.
+  // Collect candidates that need to be tiled to convert to matmul.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> convCandidates;
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
@@ -139,7 +139,7 @@ void GPUTileAndConvertConvToMatmulPass::runOnOperation() {
                                         targetTileMap))) {
     funcOp.emitError() << "tiling of level  convolution failed\n";
   }
-  // Collect candiates again since the old candidates are not valid
+  // Collect candidates again since the old candidates are not valid
   // after convolution tiling.
   convCandidates = {};
   funcOp->walk([&](linalg::LinalgOp linalgOp) {

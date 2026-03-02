@@ -124,7 +124,7 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
   }
 
   auto bodyBuilder = [&](OpBuilder &builder, Location loc, ValueRange args) {
-    // Create an IR mapping from old block arguements to new ones.
+    // Create an IR mapping from old block arguments to new ones.
     IRMapping mapper;
     ArrayRef<BlockArgument> oldArgs = linalgOp.getBody()->getArguments();
     // Map i^th old argument to (i + 1)^th new argument.
@@ -240,7 +240,7 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
   OpOperand *inputOperand = linalgOp.getDpsInputOperand(0);
   OpOperand *outputOperand = linalgOp.getDpsInitOperand(0);
 
-  // Check if linalg.yield yields a block arguement.
+  // Check if linalg.yield yields a block argument.
   auto yieldOp = dyn_cast<linalg::YieldOp>(linalgOp.getBody()->getTerminator());
   if (!yieldOp) {
     return failure();
@@ -253,7 +253,7 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
   if (blockArg.getOwner() != linalgOp.getBody()) {
     return failure();
   }
-  // Check that the block arguement corresponds to the input.
+  // Check that the block argument corresponds to the input.
   if (blockArg.getArgNumber() != 0) {
     return failure();
   }

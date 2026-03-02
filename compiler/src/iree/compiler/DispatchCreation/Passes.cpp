@@ -234,7 +234,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
             options);
       })
 
-      // Clone all producers into the dispatch region to perpare for being
+      // Clone all producers into the dispatch region to prepare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands

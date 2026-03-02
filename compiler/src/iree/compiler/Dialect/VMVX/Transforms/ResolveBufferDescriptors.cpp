@@ -446,7 +446,7 @@ struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
 };
 
 //===---------------------------------------------------------------------===//
-// Pass To resovle descriptors.
+// Pass To resolve descriptors.
 //===---------------------------------------------------------------------===//
 
 class ResolveBufferDescriptorsPass final

@@ -3,7 +3,7 @@
     "compiler_flags": [
         "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",
-        "--iree-llvmgpu-enable-prefetch",
+        "--iree-llvmgpu-prefetch-num-stages=2",
         "--iree-execution-model=async-external",
         "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
         "--iree-scheduling-dump-statistics-format=json",

@@ -143,7 +143,7 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
 }
 
 /// Helper function to verify both `scatter` and `gather`. Since both ops share
-/// the same sementics, we can use the same function to verify them. Note: this
+/// the same semantics, we can use the same function to verify them. Note: this
 /// is written from the perspective of `scatter` op. For gather, `updateType`
 /// maps to the type of the output and `originalType` maps to the type of the
 /// `source`.
@@ -1017,7 +1017,7 @@ namespace {
 
 /// This pattern removes unused results from SortOp. The SortOp uses the
 /// Destination Passing Style interface so it's results are tied to it's
-/// operands as well as it's comparitor block arguments. So, to remove unused
+/// operands as well as it's comparator block arguments. So, to remove unused
 /// results we must also remove the associated operands and block arguments.
 ///
 /// For example:
@@ -1038,7 +1038,7 @@ namespace {
 /// } -> tensor<?x10xf32>
 ///
 /// Note: that we will not remove unused results if their associated block
-/// arguments are used within the comparitor because that's needed for op
+/// arguments are used within the comparator because that's needed for op
 /// functionality.
 struct RemoveUnusedSortOpResults
     : public OpRewritePattern<IREE::LinalgExt::SortOp> {
@@ -1236,14 +1236,14 @@ LogicalResult TopkOp::verify() {
       return op->emitOpError("expected input/output to have the same rank");
     }
   }
-  // Input indicies and values must have the same shape.
+  // Input indices and values must have the same shape.
   if (Value inputIndices = getIndices()) {
     auto inputIndicesType = cast<ShapedType>(inputIndices.getType());
     if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
       return op->emitOpError("input indices/values shape must match");
     }
   }
-  // Output indicies and values must have the same shape.
+  // Output indices and values must have the same shape.
   if (failed(verifyCompatibleShape(outputValuesType, outputIndicesType))) {
     return op->emitOpError("output indices/values shape must match");
   }

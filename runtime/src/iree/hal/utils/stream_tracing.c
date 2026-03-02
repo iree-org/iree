@@ -24,9 +24,9 @@
 // command_buffer        command_buffer          command_buffer
 //
 // The submission list is owned by the tracing context and elements are
-// inserted and removed as commmand_buffers are submitted and when they
+// inserted and removed as command_buffers are submitted and when they
 // complete. This is a list of the head elements for each command buffer.
-// The commnad buffer list is owned by the command buffer. It is the list of
+// The command buffer list is owned by the command buffer. It is the list of
 // events used to trace command buffer dispatches.
 //
 // When the event is in the freelist, next_submission should be null, and

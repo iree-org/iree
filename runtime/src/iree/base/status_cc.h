@@ -306,7 +306,7 @@ using IsStatusOrConversionAmbiguous =
                              std::is_convertible<const StatusOr<U>&&, T>>;
 
 template <typename T, typename U>
-using IsStatusOrConversionAssigmentAmbiguous =
+using IsStatusOrConversionAssignmentAmbiguous =
     status_impl::disjunction<IsStatusOrConversionAmbiguous<T, U>,
                              std::is_assignable<T&, StatusOr<U>&>,
                              std::is_assignable<T&, const StatusOr<U>&>,
@@ -645,7 +645,7 @@ class StatusOr
                     std::is_constructible<T, const U&>,
                     std::is_assignable<T, const U&>,
                     status_impl::negation<
-                        status_impl::IsStatusOrConversionAssigmentAmbiguous<
+                        status_impl::IsStatusOrConversionAssignmentAmbiguous<
                             T, U>>>::value,
                 int> = 0>
   StatusOr& operator=(const StatusOr<U>& other) {
@@ -658,7 +658,7 @@ class StatusOr
                     status_impl::negation<std::is_same<T, U>>,
                     std::is_constructible<T, U&&>, std::is_assignable<T, U&&>,
                     status_impl::negation<
-                        status_impl::IsStatusOrConversionAssigmentAmbiguous<
+                        status_impl::IsStatusOrConversionAssignmentAmbiguous<
                             T, U>>>::value,
                 int> = 0>
   StatusOr& operator=(StatusOr<U>&& other) {

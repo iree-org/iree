@@ -422,7 +422,7 @@ def compare_traces(ref_trace: Trace, tar_trace: Trace) -> Tuple[bool, Sequence[s
 
         if not calls_match:
             logging.error(
-                "Comparision between '%s' and '%s' failed on method '%s'",
+                "Comparison between '%s' and '%s' failed on method '%s'",
                 ref_trace.backend_id,
                 tar_trace.backend_id,
                 ref_call.method,

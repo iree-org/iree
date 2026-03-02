@@ -143,7 +143,7 @@ static bool hasRecognizedEncoding(ModuleOp moduleOp, SymbolTable &symbolTable,
 }
 
 /// Returns all the stream tensor ops that implement AffinityOpInterface, where
-/// a stream affinity indicates the kind of enviroment the ops are expected run
+/// a stream affinity indicates the kind of environment the ops are expected run
 /// in.
 static SmallVector<IREE::Stream::AffinityOpInterface>
 collectStreamTensorOps(ModuleOp moduleOp, SymbolTable &symbolTable,

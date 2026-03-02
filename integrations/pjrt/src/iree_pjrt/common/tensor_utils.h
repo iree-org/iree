@@ -9,7 +9,7 @@
 namespace iree {
 namespace pjrt {
 
-// Compute the braodcasting equivalents for an output shape and striding
+// Compute the broadcasting equivalents for an output shape and striding
 // behavior. This cannot guarantee a unique solution but will minimize
 // moving dimensions when possible.
 void computeBroadcastArgs(int64_t ndims, int64_t element_size,

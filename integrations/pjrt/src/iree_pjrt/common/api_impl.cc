@@ -554,7 +554,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
     auto* copy_data = static_cast<CopyToHostData*>(user_data);
 
     if (!error) {
-      // If there is an allocated buffer we need to copy to the destinaton.
+      // If there is an allocated buffer we need to copy to the destination.
       if (copy_data->alloc) {
         std::memcpy(copy_data->dst, copy_data->aligned, copy_data->size);
       }

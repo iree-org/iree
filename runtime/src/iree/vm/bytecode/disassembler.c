@@ -1659,7 +1659,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
         IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " = "));
       }
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, "vm.call.varadic @"));
+          iree_string_builder_append_cstring(b, "vm.call.variadic @"));
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));

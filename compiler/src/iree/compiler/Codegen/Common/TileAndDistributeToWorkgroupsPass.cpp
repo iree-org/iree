@@ -56,7 +56,7 @@ namespace mlir::iree_compiler {
 ///   the static values that the workload of the dispatch corresponds to.
 // TODO: Remove the use of static loop ranges. This is used to set the number of
 // workgroups to a static value. Ideally this should not be done and the static
-// and dyamic cases are handled the same way. When the tile+distribute moves
+// and dynamic cases are handled the same way. When the tile+distribute moves
 // away from using `scf.for` to using a construct that better captures
 // distribution (like `scf.forall`) this information can be dropped.
 static LogicalResult

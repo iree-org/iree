@@ -443,7 +443,7 @@ TEST_P(SemaphoreLinkedTest, LinkedWaitFailureCancelsChain) {
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
 
   // Fail the semaphore.
-  std::thread failer([semaphore]() {
+  std::thread failure([semaphore]() {
     iree_wait_until(iree_time_now() + iree_make_duration_ms(50));
     iree_async_semaphore_fail(
         semaphore, iree_make_status(IREE_STATUS_ABORTED, "device lost"));
@@ -453,7 +453,7 @@ TEST_P(SemaphoreLinkedTest, LinkedWaitFailureCancelsChain) {
   PollUntil(/*min_completions=*/2,
             /*total_budget=*/iree_make_duration_ms(5000));
 
-  failer.join();
+  failure.join();
 
   // WAIT should complete with ABORTED.
   EXPECT_EQ(wait_tracker.call_count, 1);
@@ -1272,7 +1272,7 @@ TEST_P(SemaphoreLinkedTest, LinkedFailureCancelsMixedChain) {
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
 
   // Fail the wait semaphore to break the chain.
-  std::thread failer([wait_semaphore]() {
+  std::thread failure([wait_semaphore]() {
     iree_wait_until(iree_time_now() + iree_make_duration_ms(50));
     iree_async_semaphore_fail(
         wait_semaphore, iree_make_status(IREE_STATUS_ABORTED, "device lost"));
@@ -1282,7 +1282,7 @@ TEST_P(SemaphoreLinkedTest, LinkedFailureCancelsMixedChain) {
   PollUntil(/*min_completions=*/3,
             /*total_budget=*/iree_make_duration_ms(5000));
 
-  failer.join();
+  failure.join();
 
   // WAIT should complete with ABORTED.
   EXPECT_EQ(wait_tracker.call_count, 1);

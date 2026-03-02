@@ -87,7 +87,7 @@ struct LLVMCPUPipelineOptions {
   bool lowerToAVX2 = false;
 };
 
-/// Populates the passes to lower linalg ops on buffers. Currenly this
+/// Populates the passes to lower linalg ops on buffers. Currently this
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(

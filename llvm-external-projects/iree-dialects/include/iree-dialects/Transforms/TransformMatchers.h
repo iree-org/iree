@@ -980,7 +980,7 @@ public:
   }
 
 private:
-  /// The flat list of all payload opreations. `payloadGroupLengths` can be used
+  /// The flat list of all payload operations. `payloadGroupLengths` can be used
   /// to compute the sublist that corresponds to one nested list.
   // TODO: if somebody implements such a flattened vector generically, use it.
   SmallVector<Operation *> payloadOperations;

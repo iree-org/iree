@@ -737,15 +737,15 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  # If building Python packages, we have a hard requirement on 3.9+.
-  find_package(Python3 3.9 COMPONENTS Interpreter Development NumPy)
-  find_package(Python3 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.10+.
+  find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.9 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
+  find_package(Python 3.10 COMPONENTS Interpreter Development.Module NumPy REQUIRED)
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
@@ -812,7 +812,7 @@ add_custom_target(iree-sample-deps
 )
 
 # Testing rules that require generation will add dependencies to this target.
-# This allows them to be EXCLUDE_FROM_ALL but still invokable.
+# This allows them to be EXCLUDE_FROM_ALL but still invocable.
 add_custom_target(iree-test-deps
   COMMENT
     "Building IREE test deps"
@@ -1289,7 +1289,7 @@ endif(IREE_ENABLE_RUNTIME_COVERAGE)
 # environment variable "DESTDIST" on a per invocation basis (i.e. to place under
 # a versioned path, etc).
 #
-# The `iree-install-dist` target includes everthing that is typically included in
+# The `iree-install-dist` target includes everything that is typically included in
 # a distribution tarball.
 #-------------------------------------------------------------------------------
 

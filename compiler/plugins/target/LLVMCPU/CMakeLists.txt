@@ -197,7 +197,7 @@ endfunction()
 
 # This is just the CPU backends that we hard-link to. Single-target backends
 # like CUDA and ROCM bring their dependencies explicitly.
-# TODO: More archaeology and tieing this to explicit top-level configuration
+# TODO: More archaeology and tying this to explicit top-level configuration
 # of backends.
 _add_optional_llvm_target_deps(AArch64)
 _add_optional_llvm_target_deps(ARM)

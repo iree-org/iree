@@ -283,7 +283,7 @@ struct MaterializeTensorExtDispatchTensorStoreOp
 };
 
 //===---------------------------------------------------------------------===//
-// Patterns for layout transfers. They decompse load/store ops into
+// Patterns for layout transfers. They decompose load/store ops into
 // set_encoding/unset_encoding + load/store, if the converted types mismatch.
 //===---------------------------------------------------------------------===//
 

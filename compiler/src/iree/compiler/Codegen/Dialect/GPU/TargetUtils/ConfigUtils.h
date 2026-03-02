@@ -18,14 +18,14 @@ namespace mlir::iree_compiler::IREE::GPU {
 /// specified target.
 LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
+    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig,
+    std::optional<uint64_t> prefetchNumStages);
 
 /// Helper for setting up a convolution config using direct convolution based on
 /// the specified target.
-LogicalResult
-setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *op);
+LogicalResult setDirectConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, std::optional<uint64_t> prefetchNumStages);
 
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
@@ -33,15 +33,17 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 /// kind. Add support for a fallback direct lowering path.
 LogicalResult setIGEMMConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, bool useDirectLoad = false, bool padConv = false);
+    Operation *op, bool useDirectLoad, bool padConv,
+    std::optional<uint64_t> prefetchNumStages);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
-LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
-                                      mlir::FunctionOpInterface entryPoint,
-                                      Operation *op,
-                                      bool useDirectLoad = false);
+LogicalResult
+setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
+                        mlir::FunctionOpInterface entryPoint, Operation *op,
+                        bool useDirectLoad,
+                        std::optional<uint64_t> prefetchNumStages);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.

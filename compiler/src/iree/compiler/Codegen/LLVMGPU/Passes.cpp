@@ -292,6 +292,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
+  funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizeCopies = vectorizeCopies;
@@ -823,6 +824,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // loop invariant anchors.
   funcPassManager.addPass(createDecomposeHorizontallyFusedGemmsPass());
   funcPassManager.addPass(createLLVMGPUConfigureTensorLayoutsPass());
+  // TODO: Move this pass before layout configuration. We want to do that,
+  // but it requires some additional work to figure out the layout conflicting
+  // for attention matmuls.
+  funcPassManager.addPass(createGPUPackToIntrinsicsPass());
   funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -854,6 +859,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapStorePass());
+  funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
+  funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -1210,35 +1217,6 @@ void buildLLVMGPULinkingPassPipeline(OpPassManager &modulePassManager,
   variantPassManager.addPass(createLLVMGPUAssignConstantOrdinalsPass());
 }
 
-//===----------------------------------------------------------------------===//
-// ROCDL Pass Pipelines
-//===----------------------------------------------------------------------===//
-
-void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
-                                   bool preserveDebugInfo) {
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
-    FunctionLikeNest(modulePassManager)
-        .addPass(createROCDLLowerExecutableTargetPass)
-        .addPass(createVerifyWorkgroupDistributionPass);
-  }
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-  variantPassManager.addPass(createIREECodegenLowerAffinePass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
-      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
-
-  addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
-                          /*forROCDL=*/true, preserveDebugInfo);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Using ROCDL pass pipeline:\n";
-    variantPassManager.printAsTextualPipeline(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
-}
-
 //===---------------------------------------------------------------------===//
 // Common Pass Registration
 //===---------------------------------------------------------------------===//
@@ -1310,13 +1288,6 @@ void registerCodegenROCDLPasses() {
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
   };
-
-  static PassPipelineRegistration<ROCDLPipelineOptions> LinalgROCDLPipeline(
-      "iree-codegen-linalg-to-rocdl-pipeline2",
-      "Runs pass pipeline to progressively lower Linalg to ROCDL",
-      [](OpPassManager &passManager, const ROCDLPipelineOptions &options) {
-        buildROCDLCodegenPassPipeline(passManager, options.preserveDebugInfo);
-      });
 
   static PassPipelineRegistration<> LLVMGPUBufferizePipeline(
       "iree-codegen-llvmgpu-bufferization-pipeline",

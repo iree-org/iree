@@ -319,7 +319,7 @@ class HalCommandBuffer
 using HalModuleBufferViewTraceCallback =
     std::function<void(const std::string&, const std::vector<HalBufferView>&)>;
 
-// HAL debug sinks need ot live as long as the HAL module. This means the
+// HAL debug sinks need to live as long as the HAL module. This means the
 // underlying native object, not just the HAL module Python object.
 // This is necessary since here we hold a reference to a callback to a Python
 // function. This function needs to live after the destruction of the HAL module

@@ -30,7 +30,7 @@ graph LR;
     accDescr {
      A generic tuning workflow consists of compiling a model, benchmarking the
      performance with current choice of parameters, than changing the
-     parameters before begining the next iteration of this loop.
+     parameters before beginning the next iteration of this loop.
     }
     A[Compile]-->B;
     B[Benchmark]-->C;

@@ -168,6 +168,10 @@ iree_cc_library(
   LINKOPTS
     # Linux uses a linker script to version symbols.
     $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld>
+    # Hide all symbols from static archives (.a) linked into the shared library.
+    # Without this, LLVM/MLIR internal symbols leak through the `global: *`
+    # version script since LLVM is not compiled with -fvisibility=hidden.
+    $<$<PLATFORM_ID:Linux>:LINKER:--exclude-libs,ALL>
   DEPS
     iree::compiler::bindings::c::headers
 )

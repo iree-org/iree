@@ -219,7 +219,7 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
         // First constant seen for this operand.
         operandValues[idx] = intValue;
       } else {
-        // Ensure uniform constant value with previous occurrances.
+        // Ensure uniform constant value with previous occurrences.
         if (operandValues[idx].value() != intValue) {
           uniformOperandMap.reset(idx);
           continue;

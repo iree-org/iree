@@ -735,7 +735,7 @@ util.func public @multi_device_set_encoding(%arg0: !stream.resource<external>, %
 
 // -----
 
-// This test is simliar to the set_encoding test, but with unset_encoding ops.
+// This test is similar to the set_encoding test, but with unset_encoding ops.
 
 #executable_target_a = #hal.executable.target<"target_a", "abc", {iree.encoding.resolver = #iree_encoding.specialization_resolver<123>}>
 #executable_target_b = #hal.executable.target<"target_b", "xyz", {iree.encoding.resolver = #iree_encoding.specialization_resolver<456>}>

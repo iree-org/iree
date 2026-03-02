@@ -155,7 +155,7 @@ TEST_F(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
   iree_hal_semaphore_release(signal_semaphore_2);
 }
 
-// Tests we can wait on both host and device semaphore to singal.
+// Tests we can wait on both host and device semaphore to signal.
 TEST_F(SemaphoreSubmissionTest, WaitAllHostAndDeviceSemaphores) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
@@ -220,7 +220,7 @@ TEST_F(SemaphoreSubmissionTest, WaitAllHostAndDeviceSemaphores) {
   iree_hal_semaphore_release(device_signal_semaphore);
 }
 
-// Tests that we can wait on any host and device semaphore to singal,
+// Tests that we can wait on any host and device semaphore to signal,
 // and device signals.
 TEST_F(SemaphoreSubmissionTest,
        WaitAnyHostAndDeviceSemaphoresAndDeviceSignals) {
@@ -292,7 +292,7 @@ TEST_F(SemaphoreSubmissionTest,
   iree_hal_semaphore_release(device_signal_semaphore);
 }
 
-// Tests we can wait on any host and device semaphore to singal,
+// Tests we can wait on any host and device semaphore to signal,
 // and host signals.
 TEST_F(SemaphoreSubmissionTest, WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();

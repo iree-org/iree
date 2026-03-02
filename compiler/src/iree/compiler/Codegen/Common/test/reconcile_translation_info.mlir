@@ -58,7 +58,7 @@ hal.executable private @single_translation_info {
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable private @err_mistmatched_workgroup_size {
+hal.executable private @err_mismatched_workgroup_size {
   hal.executable.variant public @err_mismatched_workgroup_size target(#hal.executable.target<"", "", {}>) {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)
@@ -83,7 +83,7 @@ hal.executable private @err_mistmatched_workgroup_size {
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>
-hal.executable private @err_mistmatched_workgroup_size2 {
+hal.executable private @err_mismatched_workgroup_size2 {
   hal.executable.variant public @err_mismatched_workgroup_size2 target(#hal.executable.target<"", "", {}>) {
     // expected-error @+1 {{failed to reconcile workgroup sizes}}
     hal.executable.export public @entry_point layout(#pipeline_layout)

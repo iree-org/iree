@@ -26,7 +26,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-// We aribtrarily say that unbounded dimensions in a torch program cannot
+// We arbitrarily say that unbounded dimensions in a torch program cannot
 // exceed 53bits, making the maximum safe dimension 9007199254740991. The
 // astute reader will note that this is also the maximum safe value in
 // JavaScript, which also "happens" to be the largest mantissa value in a

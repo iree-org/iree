@@ -223,7 +223,7 @@ util.func public @hoist_encoding_const_exprs() -> tensor<640x320xf32> {
 
 #encoding = #iree_encoding.testing<>
 util.func private @get_tensor(tensor<640x320xf32, #encoding>) -> tensor<640x320xf32>
-util.func public @hoist_convertable_slice_op(%input: tensor<1024x320xf32>) -> tensor<640x320xf32> {
+util.func public @hoist_convertible_slice_op(%input: tensor<1024x320xf32>) -> tensor<640x320xf32> {
   %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
     %1 = tensor.extract_slice %input[7, 0] [640, 320] [1, 1] : tensor<1024x320xf32> to tensor<640x320xf32>
     %2 = iree_encoding.set_encoding %1 : tensor<640x320xf32> -> tensor<640x320xf32, #encoding>
@@ -232,7 +232,7 @@ util.func public @hoist_convertable_slice_op(%input: tensor<1024x320xf32>) -> te
   }
   util.return %0 : tensor<640x320xf32>
 }
-// CHECK-LABEL: util.func public @hoist_convertable_slice_op(
+// CHECK-LABEL: util.func public @hoist_convertible_slice_op(
 // CHECK:         %[[SRC:.+]] = tensor.extract_slice
 // CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
 // CHECK:         flow.dispatch.region

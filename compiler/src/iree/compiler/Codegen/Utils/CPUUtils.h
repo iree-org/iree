@@ -32,8 +32,8 @@ StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx);
 std::string getEnableLoopPeelingStr();
 
 /// Returns true if the UnitAttr of the `label` is enabled for the input
-/// function. This is is infered from the config dictionary. attribute that's
-/// part of to the translation info corresponding to this funciton.
+/// function. This is is inferred from the config dictionary. attribute that's
+/// part of to the translation info corresponding to this function.
 bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 
 /// Returns if scalable vectorization is enabled or not.

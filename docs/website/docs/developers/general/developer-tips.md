@@ -516,7 +516,7 @@ This is similar to the `--mlir-print-ir-after=` flag, but at clearly defined
 pipeline phases.
 
 Compilation can be continued from any intermediate phase. This allows for
-interative workflows - compile to a phase, make edits to the `.mlir` file,
+interactive workflows - compile to a phase, make edits to the `.mlir` file,
 then resume compilation and continue through the pipeline:
 
 ```console

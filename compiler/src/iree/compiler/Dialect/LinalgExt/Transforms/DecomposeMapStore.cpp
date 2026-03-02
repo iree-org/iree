@@ -31,7 +31,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 /// added to the corresponding yielded index. For this pattern to apply, the
 /// map_store op must be vectorized and bufferized, and the subview must be
 /// non-rank reducing with unit strides. The subview's result also should not
-/// be collapsible, because the decomposition will work for collapsable memrefs,
+/// be collapsible, because the decomposition will work for collapsible memrefs,
 /// and there is no need to fold the subview.
 struct FoldSubViewIntoMapStore final : OpRewritePattern<MapStoreOp> {
   using Base::Base;

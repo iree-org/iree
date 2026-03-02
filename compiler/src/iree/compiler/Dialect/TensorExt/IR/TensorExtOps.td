@@ -579,7 +579,7 @@ def IREETensorExt_CastToRaggedShapeOp :
     - `column_lengths` is [0, 4, 10, 13, 18]
     - result has an encoding attribute of `#iree_tensor_ext.ragged_shape<n>`.
 
-    Contraints are
+    Constraints are
     1. `ragged_dim` < rank(`source`)
     2. rank(`columnLengths`) == 1.
     3. dim(`columnLengths`, 0) == `num_rows` + 1.

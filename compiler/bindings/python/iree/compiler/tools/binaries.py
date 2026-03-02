@@ -58,7 +58,7 @@ _TOOL_MODULE_PACKAGES = {
 }
 
 # Environment variable holding directories to be searched for named tools.
-# Delimitted by os.pathsep.
+# Delimited by os.pathsep.
 _TOOL_PATH_ENVVAR = "IREE_TOOL_PATH"
 
 # We do complicated logging so retain our own Logger instance.

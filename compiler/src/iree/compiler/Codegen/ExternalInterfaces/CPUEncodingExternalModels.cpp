@@ -366,7 +366,7 @@ Operation *lowerContractionOpWithEncoding(
 }
 
 //===----------------------------------------------------------------------===//
-// Interface methods implementaion for iree_cpu.cpu_encoding_resolver.
+// Interface methods implementation for iree_cpu.cpu_encoding_resolver.
 //===----------------------------------------------------------------------===//
 
 // Enumerate tile sizes to choose from on riscv32.
@@ -720,7 +720,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
-    // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
+    // Choose a final matmul TileMxNxK from the above-enumerated tile shapes,
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK =
         chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
@@ -837,7 +837,7 @@ struct CPUEncodingResolverVerifier
 };
 
 //===----------------------------------------------------------------------===//
-// Interface methods implementaion for iree_cpu.vmvx_encoding_resolver.
+// Interface methods implementation for iree_cpu.vmvx_encoding_resolver.
 //===----------------------------------------------------------------------===//
 
 // Enumerate tile sizes to choose from when no specific architecture is
@@ -903,7 +903,7 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
       return info;
     }
     auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
-    // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
+    // Choose a final matmul TileMxNxK from the above-enumerated tile shapes,
     // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK =
         chooseMatmulTile(enumeratedTileMxNxK, narrowDim);

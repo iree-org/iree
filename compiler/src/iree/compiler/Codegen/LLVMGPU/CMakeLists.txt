@@ -94,7 +94,6 @@ iree_cc_library(
     "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
     "ROCDLLoadToTransposeLoad.cpp"
-    "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
     "Verifiers.cpp"
   DEPS

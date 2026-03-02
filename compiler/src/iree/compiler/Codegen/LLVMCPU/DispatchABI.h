@@ -351,7 +351,7 @@ public:
   /// Given a calling convention `cConv`, and callee with return of
   /// `resultTypes` and operands with type `argTypes`, along with extra fields
   /// to append to argument list specified in `extraFields`; modify the `callOp`
-  /// to implement the specified ABI. The calleee signature is expected to have
+  /// to implement the specified ABI. The callee signature is expected to have
   /// been/to be modified separately, i.e. it isnt done within this method.
   FailureOr<SmallVector<Value>>
   materializeABI(Operation *callOp, StringRef symbolName,

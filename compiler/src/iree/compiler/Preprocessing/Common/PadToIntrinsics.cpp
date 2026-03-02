@@ -81,7 +81,7 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
     return expandSource;
   }
 
-  // Form reassocation indices and expanded shape.
+  // Form reassociation indices and expanded shape.
   SmallVector<ReassociationIndices> reassoc;
   SmallVector<int64_t> expandedShape;
   int64_t reassocOffset = 0;
@@ -104,7 +104,7 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
 
 // expandMapsAndIterators expands the maps and iterators of an linalgOp at
 // dimensions specified by `dimsToExpand`. The general idea is we want to view
-// the dimensions specified in `dimsToExpand` as being splitted-up to two
+// the dimensions specified in `dimsToExpand` as being split-up to two
 // dimensions. Which means the src dim and the new child/sub dim will be
 // contiguous.
 

@@ -131,7 +131,7 @@ def CHECK_ExpectAlmostEqOp :
   let summary = [{Checks that the operands are almost equal.}];
   let description = [{
     Verifies that the buffer view or tensor operands with float elements satisfy
-    the Numpy-style fuzzy-comparision condition with parameters `atol`,
+    the Numpy-style fuzzy-comparison condition with parameters `atol`,
     `rtol`, defined exactly as in NumPy isclose():
     https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449
 
@@ -144,7 +144,7 @@ def CHECK_ExpectAlmostEqOp :
 
     The `atol`, `rtol` parameters may be omitted, in which case some default
     value is used. The default `atol` is nonzero, while the default `rtol` is
-    zero, which makes these comparision behave closer to exact comparisons as
+    zero, which makes these comparison behave closer to exact comparisons as
     the values being compared get large.
 
     This default behavior is supported for legacy compatibility and to support
@@ -179,7 +179,7 @@ def CHECK_ExpectAlmostEqConstOp :
     This op is just a convenience wrapper around the expect_almost_eq op.
 
     Verifies that the buffer view or tensor operands with float elements satisfy
-    the Numpy-style fuzzy-comparision condition with pararameters `atol`,
+    the Numpy-style fuzzy-comparison condition with pararameters `atol`,
     `rtol`. More details in the description of `expect_almost_eq`.
 
     Issues a non-fatal failure if the verification fails.

@@ -28,7 +28,7 @@ namespace IREE::HAL {
 // SPIR-V features.
 //
 // Note that this is a very specific ordering per the needs of this pass--we
-// guarantee that input ExectuableTargetAttr only differ w.r.t. their used
+// guarantee that input ExecutableTargetAttr only differ w.r.t. their used
 // SPIR-V features, and we want a deterministic order when mutating the IR.
 static bool operator<(const ExecutableTargetAttr &a,
                       const ExecutableTargetAttr &b) {
@@ -149,7 +149,7 @@ struct SPIRVLinkExecutablesPass final
           llvm::dbgs() << "  " << attr << "\n";
         }
         llvm::dbgs() << "executable bucket #" << bucketIndex
-                     << " exectuables:\n";
+                     << " executables:\n";
         for (IREE::HAL::ExecutableOp executable : bucket) {
           llvm::dbgs() << "  " << executable.getSymName() << "\n";
         }

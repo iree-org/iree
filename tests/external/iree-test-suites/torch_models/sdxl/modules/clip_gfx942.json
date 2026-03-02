@@ -5,7 +5,7 @@
         "--iree-rocm-target=gfx942",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
-        "--iree-llvmgpu-enable-prefetch",
+        "--iree-llvmgpu-prefetch-num-stages=2",
         "--iree-execution-model=async-external",
         "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics{pad-target-type=conv})"
     ]

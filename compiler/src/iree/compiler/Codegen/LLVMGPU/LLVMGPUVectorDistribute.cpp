@@ -56,14 +56,14 @@ ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
 
 namespace {
 
-struct RemoveUnitDimStrechingBroadcast final
+struct RemoveUnitDimStretchingBroadcast final
     : OpRewritePattern<vector::BroadcastOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
                                 PatternRewriter &rewriter) const override {
-    SetVector<int64_t> strechedDims = broadcastOp.computeBroadcastedUnitDims();
-    if (strechedDims.empty()) {
+    SetVector<int64_t> stretchedDims = broadcastOp.computeBroadcastedUnitDims();
+    if (stretchedDims.empty()) {
       return failure();
     }
     VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
@@ -75,21 +75,21 @@ struct RemoveUnitDimStrechingBroadcast final
         broadcastedUnitDims.push_back(i);
       }
     }
-    if (strechedDims.size() > broadcastedUnitDims.size()) {
+    if (stretchedDims.size() > broadcastedUnitDims.size()) {
       return rewriter.notifyMatchFailure(
           broadcastOp,
-          "number of streched dims is greater than broadcasted unit dims");
+          "number of stretched dims is greater than broadcasted unit dims");
     }
     // Build a permutation that swaps the broadcasted unit dims with a leading
     // unit dim.
     // Note that the way this permutation is built, makes it involutory, i.e.,
     // P = P^{-1}.
     auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
-    // We use zip instead of zip_equal because strechedDims.size() <=
+    // We use zip instead of zip_equal because stretchedDims.size() <=
     // broadcastedUnitDims.size().
-    for (auto [strechedDim, broadcastedUnitDim] :
-         llvm::zip(strechedDims.getArrayRef(), broadcastedUnitDims)) {
-      std::swap(perm[strechedDim], perm[broadcastedUnitDim]);
+    for (auto [stretchedDim, broadcastedUnitDim] :
+         llvm::zip(stretchedDims.getArrayRef(), broadcastedUnitDims)) {
+      std::swap(perm[stretchedDim], perm[broadcastedUnitDim]);
     }
     VectorType permutedBroadcastTy = VectorType::get(
         applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
@@ -105,7 +105,7 @@ struct RemoveUnitDimStrechingBroadcast final
 static LogicalResult
 preVectorDistributionNormalizations(mlir::FunctionOpInterface funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
-  patterns.add<RemoveUnitDimStrechingBroadcast>(funcOp.getContext());
+  patterns.add<RemoveUnitDimStretchingBroadcast>(funcOp.getContext());
   return applyPatternsGreedily(funcOp, std::move(patterns));
 }
 

@@ -9,7 +9,7 @@
 # Creates a PR based on the specified BASE_BRANCH (default "google") to fix
 # CMake files based on Bazel BUILD files.
 #
-# - Requries the gh CLI (https://github.com/cli/cli) to create a PR.
+# - Requires the gh CLI (https://github.com/cli/cli) to create a PR.
 # - Will force push to the configured PR_BRANCH (default "bazel-to-cmake-fix")
 #   on the configured FORK_REMOTE (default "origin")
 # - Requires that local BASE_BRANCH branch is a pristine (potentially stale)

@@ -94,7 +94,7 @@ iree_status_t iree_task_pool_acquire(iree_task_pool_t* pool,
 
 // Acquires a set of tasks from the task pool. The returned tasks will have
 // undefined contents besides their intrusive next pointers and must be
-// intialized by the caller.
+// initialized by the caller.
 //
 // WARNING: this may cause growth during races if multiple threads are trying to
 // acquire at the same time. Our usage patterns here are such that this is never

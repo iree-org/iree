@@ -419,7 +419,7 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp) {
   }
 
   // Pack all the allocations into one i8 alloc.
-  // We may need to add extra barriers to make sure we are done writting or
+  // We may need to add extra barriers to make sure we are done writing or
   // reading from the previous alias group before starting a new one.
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     for (Operation *alloc : aliasGroups[i]) {

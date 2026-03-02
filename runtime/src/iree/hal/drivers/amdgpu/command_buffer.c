@@ -575,7 +575,7 @@ static iree_status_t iree_hal_amdgpu_command_encoder_append_cmd(
 
   // --- WARNING ------------------------------------------------------------ //
   // The split above may have reset encoder state and any state loaded from it
-  // must be requeried for subsequent usage.
+  // must be required for subsequent usage.
   // --- WARNING ------------------------------------------------------------ //
 
   // We update a scratch header and copy it to each device at the end.

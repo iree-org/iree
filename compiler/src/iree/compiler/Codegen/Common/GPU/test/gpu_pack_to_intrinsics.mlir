@@ -139,6 +139,28 @@ module {
 
 // -----
 
+#config3 = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>}>
+module {
+  func.func @vmfma_matmul_16x16x32(%a: tensor<64x64xf16>, %b: tensor<64x64xf16>, %c: tensor<64x64xf32>) -> tensor<64x64xf32> {
+    %mm = linalg.matmul {lowering_config = #config3} ins(%a, %b : tensor<64x64xf16>, tensor<64x64xf16>) outs(%c : tensor<64x64xf32>) -> tensor<64x64xf32>
+    return %mm : tensor<64x64xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @vmfma_matmul_16x16x32
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<64x64xf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x64xf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: tensor<64x64xf32>
+//   CHECK-DAG:   %[[A_PACK:.+]] = linalg.pack %[[A]] inner_dims_pos = [0, 1] inner_tiles = [16, 32]
+//   CHECK-DAG:   %[[B_PACK:.+]] = linalg.pack %[[B]] inner_dims_pos = [1, 0] inner_tiles = [16, 32]
+//   CHECK-DAG:   %[[C_PACK:.+]] = linalg.pack %[[C]] inner_dims_pos = [0, 1] inner_tiles = [16, 16]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[A_PACK]], %[[B_PACK]]) outs(%[[C_PACK]])
+//  CHECK-SAME:     kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>}>
+//  CHECK-SAME:     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

@@ -191,7 +191,7 @@ class RefObject {
 // The ref wrapper calls the iree_vm_ref_* functions and uses the
 // iree_vm_ref_type_descriptor_t registered for the type T to manipulate the
 // reference counter and, when needed, destroy the object using
-// iree_vm_ref_destroy_t. Any iree_vm_ref_t can be used interchangably with
+// iree_vm_ref_destroy_t. Any iree_vm_ref_t can be used interchangeably with
 // ref<T> when RAII is needed.
 //
 // Example:

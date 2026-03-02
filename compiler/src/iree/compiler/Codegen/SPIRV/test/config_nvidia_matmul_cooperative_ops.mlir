@@ -79,7 +79,7 @@ func.func @generic_batch_matmul_32x8x512x64(%3: tensor<128x32x64xf16>, %4: tenso
 
 // -----
 
-// K dim size not divisble by 32.
+// K dim size not divisible by 32.
 
 func.func @batch_matmul_16x1024x1024x80(%3: tensor<16x1024x80xf16>, %4: tensor<16x80x1024xf16>) -> tensor<16x1024x1024xf16> {
   %cst = arith.constant 0.000000e+00 : f16
