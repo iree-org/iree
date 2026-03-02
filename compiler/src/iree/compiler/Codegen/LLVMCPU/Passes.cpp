@@ -60,11 +60,6 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
-static llvm::cl::opt<bool> clTileDispatchUsingForall(
-    "iree-llvmcpu-tile-dispatch-using-forall",
-    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(true), llvm::cl::Hidden);
-
 // By default, IREE does not enable the Armv9-A streaming SVE mode in the
 // presence of scalable vectors (even when using `+sme`), as currently there's
 // no cost model of when it could be beneficial. This flag will effectively make
@@ -85,24 +80,16 @@ static llvm::cl::opt<bool> clPatchFuncOps(
         "used with `--iree-codegen-debug-patched-func-ops-file-name`."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
-// TODO: Enable `TileDispatchUsingForall` for every pipeline.
 static void
 addTileAndDistributePasses(OpPassManager &funcPassManager,
                            const LLVMCPUPipelineOptions &pipelineOpt) {
   if (pipelineOpt.cpuOpts.disableDistribution) {
     return;
   }
-  if (clTileDispatchUsingForall) {
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
-    funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
-    funcPassManager.addPass(createCombineResultLayoutTransformationPass());
-  } else {
-    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
-    funcPassManager.addPass(createCSEPass());
-    funcPassManager.addPass(createConvertToDestinationPassingStylePass());
-    funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
-  }
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
+  funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
