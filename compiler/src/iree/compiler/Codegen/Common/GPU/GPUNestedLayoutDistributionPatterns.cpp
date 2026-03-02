@@ -584,6 +584,53 @@ struct DistributeTransferWrite final
   std::optional<int64_t> numThreadsInWorkgroup = std::nullopt;
 };
 
+/// Pre-compute all mask offsets and index vec offset iterators.
+static void precomputeOffsetIterators(
+    VectorValue mask, NestedLayoutAttr maskLayout,
+    ArrayRef<NestedLayoutAttr> indexVecLayouts,
+    SmallVectorImpl<SmallVector<int64_t>> &allMaskOffsets,
+    std::vector<StaticTileOffsetRange::IteratorTy> &allIndexVecOffsets) {
+  if (mask) {
+    SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+    SmallVector<int64_t> maskTileShape = getElementVectorTileShape(maskLayout);
+    allMaskOffsets =
+        llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+  }
+  for (NestedLayoutAttr layout : indexVecLayouts) {
+    SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
+    SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
+    allIndexVecOffsets.push_back(
+        StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
+  }
+}
+
+/// Slice index vecs and mask for a single iteration of the distribution loop.
+static void sliceIndexVecsAndMask(
+    PatternRewriter &rewriter, Location loc, int64_t idx,
+    ArrayRef<VectorValue> disIndexVecs,
+    ArrayRef<NestedLayoutAttr> indexVecLayouts,
+    std::vector<StaticTileOffsetRange::IteratorTy> &allIndexVecOffsets,
+    VectorValue mask, NestedLayoutAttr maskLayout,
+    const SmallVector<SmallVector<int64_t>> &allMaskOffsets,
+    SmallVectorImpl<Value> &slicedIndexVecs, VectorValue &slicedMask) {
+  for (auto [indexVecIdx, disIndexVec, layout] :
+       llvm::enumerate(disIndexVecs, indexVecLayouts)) {
+    SmallVector<int64_t> offsets =
+        llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
+    ++allIndexVecOffsets[indexVecIdx];
+    VectorValue slicedIndexVec =
+        getSlicedPermutedValue(rewriter, loc, offsets, layout, disIndexVec);
+    slicedIndexVecs.push_back(slicedIndexVec);
+  }
+
+  slicedMask = nullptr;
+  if (mask) {
+    SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+    slicedMask =
+        getSlicedPermutedValue(rewriter, loc, maskOffsets, maskLayout, mask);
+  }
+}
+
 /// Pattern to distribute `vector.transfer_gather` ops with nested layouts.
 struct DistributeTransferGather final
     : OpDistributionPattern<IREE::VectorExt::TransferGatherOp> {
@@ -632,8 +679,6 @@ struct DistributeTransferGather final
       mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
     }
 
-    // Guard on memrefs for distribution. In isolation this pattern is agnostic
-    // to tensors or memrefs.
     if (!isa<MemRefType>(gatherOp.getBase().getType())) {
       return rewriter.notifyMatchFailure(gatherOp,
                                          "distribution expects memrefs");
@@ -645,13 +690,9 @@ struct DistributeTransferGather final
 
     Type elementType = gatherOp.getBase().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
-    // The shape of the vector we read is pre-permutation. The permutation is
-    // a transpose on the resulting read vector.
     auto innerVectorType =
         VectorType::get(vectorLayout.getElementTile(), elementType);
 
-    // Initialize the full distributed vector for unrolling the batch/outer
-    // vector dimensions.
     Value zero =
         arith::ConstantOp::create(rewriter, gatherOp.getLoc(), vectorType,
                                   rewriter.getZeroAttr(vectorType));
@@ -667,28 +708,12 @@ struct DistributeTransferGather final
 
     ValueRange indices = gatherOp.getOffsets();
     SmallVector<int64_t> strides(rank, 1);
-
-    // getPermutationMap inverts the source map, mapping gathered (symbol) and
-    // broadcast (constant) dims to constant 0. This is correct here because
-    // getTransferIndicesFromNestedLayout treats constant-0 dims as broadcast,
-    // leaving the original base offset unchanged for gathered dimensions.
     AffineMap permMap = gatherOp.getPermutationMap();
 
     SmallVector<SmallVector<int64_t>> allMaskOffsets;
     std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
-    if (mask) {
-      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-      SmallVector<int64_t> maskTileShape =
-          getElementVectorTileShape(maskLayout);
-      allMaskOffsets =
-          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
-    }
-    for (NestedLayoutAttr layout : indexVecLayouts) {
-      SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
-      SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
-      allIndexVecOffsets.push_back(
-          StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
-    }
+    precomputeOffsetIterators(mask, maskLayout, indexVecLayouts, allMaskOffsets,
+                              allIndexVecOffsets);
 
     for (auto [idx, offsets] :
          llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
@@ -696,27 +721,12 @@ struct DistributeTransferGather final
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
 
-      // Extract offset from index_vecs.
       SmallVector<Value> slicedIndexVecs;
-      for (auto [indexVecIdx, disIndexVec, layout] :
-           llvm::enumerate(disIndexVecs, indexVecLayouts)) {
-        SmallVector<int64_t> offsets =
-            llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
-        ++allIndexVecOffsets[indexVecIdx];
-        VectorValue slicedIndexVec = getSlicedPermutedValue(
-            rewriter, gatherOp.getLoc(), offsets, layout, disIndexVec);
-        slicedIndexVecs.push_back(slicedIndexVec);
-      }
-
-      VectorValue slicedMask = nullptr;
-      if (mask) {
-        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
-        SmallVector<int64_t> maskTileShape =
-            getElementVectorTileShape(maskLayout);
-        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedValue(rewriter, gatherOp.getLoc(),
-                                            maskOffsets, maskLayout, mask);
-      }
+      VectorValue slicedMask;
+      sliceIndexVecsAndMask(rewriter, gatherOp.getLoc(), idx, disIndexVecs,
+                            indexVecLayouts, allIndexVecOffsets, mask,
+                            maskLayout, allMaskOffsets, slicedIndexVecs,
+                            slicedMask);
 
       VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
           rewriter, gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
@@ -724,9 +734,6 @@ struct DistributeTransferGather final
           gatherOp.getPadding(), slicedMask);
 
       if (acc.getType().getRank() == 0) {
-        // TODO: This should really be a folding pattern in
-        // insert_strided_slice, but instead insert_strided_slice just doesn't
-        // support 0-d vectors...
         acc = slicedGather;
       } else {
         acc = vector::InsertStridedSliceOp::create(
@@ -735,6 +742,116 @@ struct DistributeTransferGather final
     }
 
     replaceOpWithDistributedValues(rewriter, gatherOp, acc);
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+/// Pattern to distribute `iree_vector_ext.transfer_scatter` ops with nested
+/// layouts.
+struct DistributeTransferScatter final
+    : OpDistributionPattern<IREE::VectorExt::TransferScatterOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferScatter(MLIRContext *context, Value threadId,
+                            int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(IREE::VectorExt::TransferScatterOp scatterOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[scatterOp.getVector()]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(scatterOp,
+                                         "non-nested transfer_scatter layout");
+    }
+
+    SmallVector<NestedLayoutAttr> indexVecLayouts;
+    SmallVector<VectorValue> disIndexVecs;
+    for (Value indexVec : scatterOp.getIndexVecs()) {
+      auto vec = cast<VectorValue>(indexVec);
+      NestedLayoutAttr layout = dyn_cast<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(scatterOp,
+                                           "non-nested index vec layout");
+      }
+      indexVecLayouts.push_back(layout);
+      vec = getDistributed(rewriter, vec, layout);
+      vec = getDeinterleavedUnpackedForm(rewriter, vec, layout);
+      disIndexVecs.push_back(vec);
+    }
+
+    VectorValue mask = scatterOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(scatterOp,
+                                           "non-nested mask vector layout");
+      }
+      mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+    }
+
+    if (!isa<MemRefType>(scatterOp.getBase().getType())) {
+      return rewriter.notifyMatchFailure(scatterOp,
+                                         "distribution expects memrefs");
+    }
+
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    int64_t rank = vectorLayout.getRank();
+
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          scatterOp, "warp or thread tiles have overlapping strides");
+    }
+
+    Value distributedVector =
+        getDistributed(rewriter, scatterOp.getVector(), vectorLayout);
+
+    ValueRange indices = scatterOp.getOffsets();
+    SmallVector<int64_t> strides(rank, 1);
+    AffineMap permMap = scatterOp.getPermutationMap();
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
+    precomputeOffsetIterators(mask, maskLayout, indexVecLayouts, allMaskOffsets,
+                              allIndexVecOffsets);
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
+      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
+
+      SmallVector<Value> slicedIndexVecs;
+      VectorValue slicedMask;
+      sliceIndexVecsAndMask(rewriter, scatterOp.getLoc(), idx, disIndexVecs,
+                            indexVecLayouts, allIndexVecOffsets, mask,
+                            maskLayout, allMaskOffsets, slicedIndexVecs,
+                            slicedMask);
+
+      ArrayRef<int64_t> offsetArray(offsets);
+      VectorValue slicedVector =
+          extractSliceAsVector(rewriter, scatterOp.getLoc(), distributedVector,
+                               offsetArray.take_front(rank * 2));
+
+      IREE::VectorExt::TransferScatterOp::create(
+          rewriter, scatterOp.getLoc(), /*resultTypes=*/TypeRange{},
+          scatterOp.getBase(), slicedVector, slicedIndices, slicedIndexVecs,
+          scatterOp.getIndexingMapsAttr(), slicedMask);
+    }
+
+    rewriter.eraseOp(scatterOp);
     return success();
   }
 
@@ -2225,8 +2342,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
     RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
     ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferGather,
-               DistributeMapStore>(patterns.getContext(), threadId,
-                                   subgroupSize);
+               DistributeTransferScatter, DistributeMapStore>(
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(

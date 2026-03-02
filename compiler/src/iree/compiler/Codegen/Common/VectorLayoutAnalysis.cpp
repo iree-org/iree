@@ -47,6 +47,15 @@ struct LayoutInfo {
     backward.push(val);
   }
   void setLayoutOrClone(OpOperand *val, VectorLayoutInterface layout);
+
+  /// Propagate layout to index vecs and optional mask of a
+  /// TransferGatherOp/TransferScatterOp.
+  void propagateLayoutToIndexVecsAndMask(
+      VectorLayoutInterface layout, MutableOperandRange indexVecOperands,
+      int64_t numIndexVecs,
+      std::optional<std::reference_wrapper<OpOperand>> maskOperand,
+      ArrayRef<AffineMap> indexingMaps);
+
   VectorLayoutInterface getLayout(Value val) const {
     return layouts.lookup(val);
   }
@@ -187,6 +196,21 @@ void LayoutInfo::propagateLayoutForward(Value val) {
       continue;
     }
 
+    if (auto scatter = dyn_cast<TransferScatterOp>(user)) {
+      if (&use != &scatter.getVectorMutable()) {
+        continue;
+      }
+      SmallVector<AffineMap> maps = scatter.getIndexingMapsArray();
+      std::optional<std::reference_wrapper<OpOperand>> maskOp;
+      if (scatter.getMask()) {
+        maskOp = scatter.getMaskMutable()[0];
+      }
+      propagateLayoutToIndexVecsAndMask(layout, scatter.getIndexVecsMutable(),
+                                        scatter.getIndexVecs().size(), maskOp,
+                                        maps);
+      continue;
+    }
+
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(user)) {
       setLayoutIfUnset(
           shapeCast.getResult(),
@@ -284,23 +308,13 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
 
   if (auto gather = dyn_cast<TransferGatherOp>(defOp)) {
     SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
-    int64_t numIndexVecs = gather.getIndexVecs().size();
-    // Index vec maps are maps[1..numIndexVecs]. They only use dim exprs,
-    // so strip symbols before applying to layout.
-    for (auto [i, operand] : llvm::enumerate(gather.getIndexVecsMutable())) {
-      AffineMap indexVecMap = maps[1 + i];
-      AffineMap projected =
-          AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
-                         indexVecMap.getContext());
-      setLayoutOrClone(&operand, layout.apply(projected));
-    }
+    std::optional<std::reference_wrapper<OpOperand>> maskOp;
     if (gather.getMask()) {
-      OpOperand &mask = gather.getMaskMutable()[0];
-      AffineMap maskMap = maps[1 + numIndexVecs];
-      AffineMap projected = AffineMap::get(
-          maskMap.getNumDims(), 0, maskMap.getResults(), maskMap.getContext());
-      setLayoutOrClone(&mask, layout.apply(projected));
+      maskOp = gather.getMaskMutable()[0];
     }
+    propagateLayoutToIndexVecsAndMask(layout, gather.getIndexVecsMutable(),
+                                      gather.getIndexVecs().size(), maskOp,
+                                      maps);
     return;
   }
 
@@ -309,6 +323,27 @@ void LayoutInfo::propagateLayoutBackward(Value val) {
         &shapeCast.getSourceMutable(),
         layout.reshape(shapeCast.getSourceVectorType().getShape()));
     return;
+  }
+}
+
+void LayoutInfo::propagateLayoutToIndexVecsAndMask(
+    VectorLayoutInterface layout, MutableOperandRange indexVecOperands,
+    int64_t numIndexVecs,
+    std::optional<std::reference_wrapper<OpOperand>> maskOperand,
+    ArrayRef<AffineMap> indexingMaps) {
+  for (auto [i, operand] : llvm::enumerate(indexVecOperands)) {
+    AffineMap indexVecMap = indexingMaps[1 + i];
+    AffineMap projected =
+        AffineMap::get(indexVecMap.getNumDims(), 0, indexVecMap.getResults(),
+                       indexVecMap.getContext());
+    setLayoutOrClone(&operand, layout.apply(projected));
+  }
+  if (maskOperand) {
+    OpOperand &mask = maskOperand->get();
+    AffineMap maskMap = indexingMaps[1 + numIndexVecs];
+    AffineMap projected = AffineMap::get(
+        maskMap.getNumDims(), 0, maskMap.getResults(), maskMap.getContext());
+    setLayoutOrClone(&mask, layout.apply(projected));
   }
 }
 

@@ -70,7 +70,8 @@ vectorizeLinalgExtArgCompare(RewriterBase &rewriter,
                              IREE::LinalgExt::ArgCompareOp argCompareOp,
                              ArrayRef<int64_t> vectorSizes = {});
 
-void populateVectorTransferGatherLoweringPatterns(RewritePatternSet &patterns);
+void populateVectorTransferGatherScatterLoweringPatterns(
+    RewritePatternSet &patterns);
 
 }; // namespace mlir::iree_compiler::IREE::VectorExt
 
