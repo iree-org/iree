@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -392,6 +393,19 @@ LogicalResult materializeSliceFromOrdinals(
         map.map(result, constVal);
       }
       continue;
+    }
+    // Same WAR as above, but for the lowered ukernel form. When ukernels are
+    // enabled, CPULowerToUKernelsPass lowers QueryTileSizesOp to
+    // iree_codegen.ukernel.generic before this point.
+    if (auto ukernelOp = dyn_cast<IREE::Codegen::UKernelGenericOp>(op)) {
+      if (ukernelOp.getUKernelFnName().contains("query_tile_sizes")) {
+        Value constVal =
+            arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
+        for (auto result : op->getResults()) {
+          map.map(result, constVal);
+        }
+        continue;
+      }
     }
 
     // TODO(#21317, #21590): Currently, we cannot evaluate `vector.vscale` ops
