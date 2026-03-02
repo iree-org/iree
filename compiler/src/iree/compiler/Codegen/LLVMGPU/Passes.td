@@ -53,12 +53,6 @@ def LLVMGPUCastAddressSpaceFunctionPass :
   let summary = "Cast address space to generic in CallOp and FuncOp";
 }
 
-def LLVMGPUCastTypeToFitMMAPass : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
-                                                "mlir::FunctionOpInterface"> {
-  let summary = "Perform type extension/truncation over vector.contract types "
-                "to target GPU MMA intrinsics";
-}
-
 def LLVMGPUConfigureTensorLayoutsPass :
     InterfacePass<"iree-llvmgpu-configure-tensor-layouts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to set layouts on tensors for later vector distribution";

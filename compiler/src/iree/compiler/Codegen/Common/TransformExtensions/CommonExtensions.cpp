@@ -1110,7 +1110,6 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
                                                 workgroupSize);
-  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }

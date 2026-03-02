@@ -61,7 +61,7 @@ struct DropToLayoutUnitDims final
     Value rankReducedValue = rankReducingExtract.value();
     auto newToLayoutOp = IREE::VectorExt::ToLayoutOp::create(
         rewriter, loc, rankReducedValue.getType(), rankReducedValue, newLayout,
-        toLayoutOp.getSharedMemoryConversion(), toLayoutOp.getMmaKindAttr());
+        toLayoutOp.getSharedMemoryConversion());
 
     // Expand to preserve output shape using insert_slice.
     Value dest = tensor::EmptyOp::create(

@@ -42,10 +42,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let arguments = (ins
     AnyShaped:$input,
     VectorLayoutInterface:$layout,
-    DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion,
-    // TODO: Solve cmake IREEGPU and VectorExt cyclic dependency to
-    // change mma_Kind type to be of MMAInterfaceAttr.
-    OptionalAttr<AnyAttr>:$mma_kind
+    DefaultValuedAttr<UnitAttr, "false">:$shared_memory_conversion
   );
   let results = (outs
     AnyShaped:$output
@@ -53,19 +50,12 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   let builders = [
     OpBuilder<(ins "Value":$input,
                    "VectorLayoutInterface":$layout,
-                   "Attribute":$mma_kind_attr,
                    CArg<"bool", "false">:$shared_memory_conversion), [{
       UnitAttr defaultSharedMemoryConversion;
       if (shared_memory_conversion) {
         defaultSharedMemoryConversion = UnitAttr::get(input.getContext());
       }
-      build($_builder, $_state, input.getType(), input, layout, defaultSharedMemoryConversion, mma_kind_attr);
-    }]>,
-  OpBuilder<(ins "Value":$input,
-                "VectorLayoutInterface":$layout), [{
-      UnitAttr defaultSharedMemoryConversion;
-      Attribute emptyIntrinsic;
-      build($_builder, $_state, input.getType(), input, layout, defaultSharedMemoryConversion, emptyIntrinsic);
+      build($_builder, $_state, input.getType(), input, layout, defaultSharedMemoryConversion);
     }]>,
   ];
   let extraClassDeclaration = [{

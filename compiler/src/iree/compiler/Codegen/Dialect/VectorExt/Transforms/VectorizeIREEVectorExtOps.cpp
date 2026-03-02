@@ -98,7 +98,7 @@ struct VectorizeToLayoutOpPattern final
     // Create the toLayout operation but with vector types instead.
     auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
         rewriter, loc, readOp, toLayoutOp.getLayout(),
-        toLayoutOp.getMmaKindAttr(), toLayoutOp.getSharedMemoryConversion());
+        toLayoutOp.getSharedMemoryConversion());
     // Create the write back to a tensor.
     vector::TransferWriteOp writeOp =
         createWriteOp(rewriter, toLayoutOp, newLayoutOp, readOp.getMask());
