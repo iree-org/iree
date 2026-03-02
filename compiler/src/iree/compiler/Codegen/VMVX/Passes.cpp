@@ -36,8 +36,7 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
 
 static llvm::cl::opt<bool> clTileDispatchUsingForall(
     "iree-vmvx-tile-dispatch-using-forall",
-    llvm::cl::desc(
-        "Enable tile and distribute to workgroups using scf.forall"),
+    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
     llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
