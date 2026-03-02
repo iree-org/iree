@@ -1,3 +1,6 @@
+# Configuration file for the typos-rs spell checker used by pre-commit.
+# See https://crates.io/crates/typos for tool usage details.
+
 [files]
 extend-exclude = [
     "third_party/",
