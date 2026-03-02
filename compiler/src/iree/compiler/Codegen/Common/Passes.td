@@ -639,7 +639,9 @@ def GenericVectorizationPass :
       "Enable folding casting ops into vector.contract.">,
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
-           "Max vector size allowed to avoid creating large vectors.">
+           "Max vector size allowed to avoid creating large vectors.">,
+    Option<"vectorizeMapStore", "vectorize-map-store", "bool", /*default=*/"false",
+      "Enable vectorization of iree_linalg_ext.map_store operations via VectorizableOpInterface.">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithDialect"

@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
@@ -383,16 +385,85 @@ struct ToLayoutOpVectorizationModel
     return SmallVector<Value>{writeOp.getResult()};
   }
 };
+
+struct MapStoreOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          MapStoreOpVectorizationModel, IREE::LinalgExt::MapStoreOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto mapStoreOp = cast<IREE::LinalgExt::MapStoreOp>(op);
+    if (mapStoreOp.isVectorized()) {
+      return false;
+    }
+    ShapedType inputType = mapStoreOp.getInputType();
+    if (!inputType.hasStaticShape()) {
+      return false;
+    }
+    const int64_t innerSize = inputType.getShape()[inputType.getRank() - 1];
+    const int64_t bitWidth = inputType.getElementTypeBitWidth();
+    if ((innerSize * bitWidth % 8) != 0) {
+      return false;
+    }
+    // In case of a sub-byte bitwidth, we check that there is a contiguous copy
+    // on the inner dimension that is a multiple of a byte. Note that the mask
+    // shouldn't depend on the inner index for this.
+    if (bitWidth < 8) {
+      // First check that the mask is not the forward slice of the inner index.
+      Value innermostInputIdx =
+          mapStoreOp.getInputIndex(mapStoreOp.getInputRank() - 1);
+      SetVector<Operation *> slice;
+      getForwardSlice(innermostInputIdx, &slice);
+      Operation *maskOp = mapStoreOp.getMask().getDefiningOp();
+      if (maskOp && slice.contains(maskOp)) {
+        return false;
+      }
+      // Next check that the inner index of the yield is a unit function of
+      // the inner input index.
+      Value innermostOutputIdx =
+          mapStoreOp.getOutputIndex(mapStoreOp.getOutputRank() - 1);
+      if (!isUnitFunctionOf(innermostOutputIdx, innermostInputIdx)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto mapStoreOp = cast<IREE::LinalgExt::MapStoreOp>(op);
+    Location loc = mapStoreOp.getLoc();
+    rewriter.setInsertionPoint(mapStoreOp);
+    ShapedType inputType = mapStoreOp.getInputType();
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> zeros(inputType.getRank(), zero);
+    auto inputVectorType =
+        VectorType::get(inputType.getShape(), inputType.getElementType());
+    Value inputVector = vector::TransferReadOp::create(
+        rewriter, loc, inputVectorType, mapStoreOp.getInput(),
+        /*indices=*/zeros,
+        /*padding=*/std::nullopt);
+    auto vectorizedMapStoreOp =
+        clone(rewriter, mapStoreOp, mapStoreOp.getResultTypes(),
+              {inputVector, mapStoreOp.getOutput()});
+    return SmallVector<Value>(vectorizedMapStoreOp->getResults());
+  }
+};
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::GatherOp::attachInterface<GatherOpVectorizationModel>(
-            *ctx);
-        IREE::LinalgExt::ArgCompareOp::attachInterface<
-            ArgCompareOpVectorizationModel>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::GatherOp::attachInterface<GatherOpVectorizationModel>(
+        *ctx);
+    IREE::LinalgExt::ArgCompareOp::attachInterface<
+        ArgCompareOpVectorizationModel>(*ctx);
+    IREE::LinalgExt::MapStoreOp::attachInterface<MapStoreOpVectorizationModel>(
+        *ctx);
+  });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {
     IREE::VectorExt::ToLayoutOp::attachInterface<ToLayoutOpVectorizationModel>(

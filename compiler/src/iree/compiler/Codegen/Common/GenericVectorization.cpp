@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -177,6 +178,9 @@ void GenericVectorizationPass::runOnOperation() {
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
     } else if (isa<VectorizableOpInterface>(op)) {
+      if (!vectorizeMapStore && isa<IREE::LinalgExt::MapStoreOp>(op)) {
+        return;
+      }
       candidates.push_back(op);
     }
   });
