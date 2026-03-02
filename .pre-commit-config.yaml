@@ -60,7 +60,7 @@ repos:
     hooks:
       - id: typos
         name: Check for typos
-        args: ["--config", "build_tools/linters/typos.toml"]
+        args: ["--config", "build_tools/linters/typos.toml", "--force-exclude"]
 
   - repo: https://github.com/jlebar/pre-commit-hooks.git
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
