@@ -6340,12 +6340,12 @@ There are four components involved in this architecture:</p>
 </ul>
 <p><img alt="High Level View of Loader" src="https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/main/docs/images/high_level_loader.png" /></p>
 <p>The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
-and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
+and the ICDs, which implements these Vulkan APIs. Vulkan layers argument the
 Vulkan system to provide optional features like validation and debugging. The
 Vulkan loader composes a chain of requested layers, which processes the Vulkan
 application's API calls one by one, and finally redirects the API calls made by
 the Vulkan application to one or more ICDs.</p>
-<p>It's highly recommned to read the
+<p>It's highly recommend to read the
 <a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#overview">Architecture of the Vulkan Loader Interfaces Overview</a> to
 get a general understanding of what these components are and how they interact
 with one another.</p>

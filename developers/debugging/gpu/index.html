@@ -4479,10 +4479,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#binary-substiution-for-rocm" class="md-nav__link">
+  <a href="#binary-substitution-for-rocm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Binary substiution for ROCm
+        Binary substitution for ROCm
       
     </span>
   </a>
@@ -6145,10 +6145,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#binary-substiution-for-rocm" class="md-nav__link">
+  <a href="#binary-substitution-for-rocm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Binary substiution for ROCm
+        Binary substitution for ROCm
       
     </span>
   </a>
@@ -6295,7 +6295,7 @@ exact culprit is to</p>
 <p>The above procedure is for facing a large problem with no clue, for example,
 when bringing up a new model end-to-end via IREE.</p>
 <p>Though most of the time, we can leverage existing facilities to avoid going down
-the full top-down hiearchical debugging procedure.
+the full top-down hierarchical debugging procedure.
 For example, for regression happening on an existing model, CI or <code>git bitsect</code>
 might tell us directly the culprit commit.</p>
 <h3 id="using-tools">.. using tools<a class="headerlink" href="#using-tools" title="Permanent link">link</a></h3>
@@ -6413,7 +6413,7 @@ and <code>__oclc_ABI_version</code> are set and agree.</p>
 </div>
 <h2 id="pinpointing-runtime-issues">Pinpointing runtime issues<a class="headerlink" href="#pinpointing-runtime-issues" title="Permanent link">link</a></h2>
 <p>On the other side, if we suspect that it's a runtime issue, here are some
-useful approachs and tips:</p>
+useful approaches and tips:</p>
 <div class="admonition tip">
 <p class="admonition-title">[correctness/performance]</p>
 <p><a href="../../performance/profiling-with-tracy/">Tracy profiling</a> is a great way to
@@ -6469,13 +6469,13 @@ bottlenecks.</p>
   <code>--metal_command_buffer_retain_resources=true</code>, or
   <code>--metal_resource_hazard_tracking=true</code> to <code>iree-run-module</code> to see
   if any of the above "fixes" the issue.
-  It can help to isolate the pontential problem.</li>
+  It can help to isolate the potential problem.</li>
 <li>[<span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13.411 15.12h-.875v-2.798c.28.156.649.442.875.719zm-7.383 0H4.936l-1.423-4.4h.992l.979 3.093h.013l.992-3.093h.999zm4.394 0h-.833v-.444h-.017q-.167.278-.432.401c-.265.123-.358.123-.541.123q-.352 0-.576-.093a.85.85 0 0 1-.354-.261 1 1 0 0 1-.181-.412 2.6 2.6 0 0 1-.052-.539v-1.961h.876v1.799q0 .394.123.589.124.194.438.194.356 0 .518-.214.16-.213.159-.699v-1.669h.876zm3.134-1.918-.002-.123 1.104-1.147h1.035l-1.201 1.171 1.337 2.017h-1.061zm2.433-.289q.02-.307.155-.511.136-.203.345-.326a1.5 1.5 0 0 1 .473-.174q.26-.052.526-.052.241 0 .487.034.247.035.451.132a.9.9 0 0 1 .332.274q.13.174.13.466v1.659q0 .216.024.412.025.197.086.295h-.889a1 1 0 0 1-.041-.151 1 1 0 0 1-.021-.157 1.16 1.16 0 0 1-.494.302 2 2 0 0 1-.581.086q-.227-.001-.424-.056a1 1 0 0 1-.346-.173.8.8 0 0 1-.23-.295 1 1 0 0 1-.085-.425.95.95 0 0 1 .095-.447.8.8 0 0 1 .246-.28q.152-.104.345-.158a4.4 4.4 0 0 1 .779-.133q.19-.019.339-.056a.6.6 0 0 0 .235-.108q.087-.072.08-.207a.44.44 0 0 0-.048-.225.3.3 0 0 0-.123-.129.5.5 0 0 0-.179-.063 2 2 0 0 0-.218-.015.67.67 0 0 0-.407.11q-.149.111-.173.369zm2.021.647a.4.4 0 0 1-.138.078 1 1 0 0 1-.179.045q-.096.019-.201.031t-.209.03a2 2 0 0 0-.194.049.6.6 0 0 0-.166.084.4.4 0 0 0-.114.132.4.4 0 0 0-.044.203q0 .117.044.196a.35.35 0 0 0 .116.127q.075.046.173.065t.202.019q.26 0 .402-.086a.6.6 0 0 0 .291-.451q.016-.123.015-.196zm1.443-1.628h.833v.444h.017q.165-.277.431-.403c.266-.126.358-.127.542-.127q.352 0 .576.094a.9.9 0 0 1 .353.266q.13.168.182.412t.051.539v1.961h-.875v-1.799q0-.395-.123-.589-.124-.195-.438-.194-.358 0-.518.213-.161.215-.16.699v1.67h-.875zm-8.451-.55q.452.223.876.483v3.253h-.876zm-8.93.159c-.261.768.203 1.635 1.156 2.408-2.122-.911-3.496-2.244-3.184-3.38.434-1.573 3.932-2.177 7.481-1.491 3.136.606 5.416 2.375 5.884 3.617-1.035-.936-2.621-1.883-4.562-2.37-3.235-.816-6.268-.27-6.775 1.216m11.341.613a4.9 4.9 0 0 0-.875-1.001v-.436h.875zM24 14.652a.47.47 0 0 1-.479.472.473.473 0 0 1-.481-.472c0-.259.214-.466.481-.466.27 0 .479.207.479.466m-.839 0c0 .207.153.373.364.373a.357.357 0 0 0 .356-.369c0-.207-.151-.375-.358-.375a.36.36 0 0 0-.362.371m.287.246h-.108v-.466a1 1 0 0 1 .179-.015c.088 0 .127.015.162.034.026.02.045.056.045.104 0 .052-.039.09-.097.108v.006c.045.017.071.052.086.114.015.072.024.1.035.117h-.117c-.015-.017-.023-.061-.036-.114-.009-.052-.037-.074-.097-.074h-.052zm.002-.266h.052c.06 0 .108-.019.108-.069 0-.043-.031-.071-.1-.071a.2.2 0 0 0-.06.007z"/></svg></span>] Use <code>--vulkan_robust_buffer_access=true</code> to <code>iree-run-module</code>
   especially when seeing undeterministic/corrupted contents in buffers and
   suspecting there are buffer allocation/indexing issues.</li>
 </ul>
 </div>
-<h2 id="binary-substiution-for-rocm">Binary substiution for ROCm<a class="headerlink" href="#binary-substiution-for-rocm" title="Permanent link">link</a></h2>
+<h2 id="binary-substitution-for-rocm">Binary substitution for ROCm<a class="headerlink" href="#binary-substitution-for-rocm" title="Permanent link">link</a></h2>
 <p>[<span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg></span>] The AMD ROCm target supports binary substitution on HSA code objects
 (<code>.hsaco</code> files).</p>
 <p>These files are, under the hood, ELF shared libraries containing kernel code.</p>
@@ -6514,7 +6514,7 @@ iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span c
 <span class="w">  </span>-o<span class="w"> </span>altered.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-substitute-executable-object<span class="o">=[</span>dispatch_name<span class="o">]=</span>altered.hsaco
 </code></pre></div>
-<p>If successful, <code>iree-complie</code> will print a message stating</p>
+<p>If successful, <code>iree-compile</code> will print a message stating</p>
 <div class="highlight"><pre><span></span><code>NOTE:<span class="w"> </span>hal.executable<span class="w"> </span><span class="sb">`</span><span class="o">[</span>executable<span class="w"> </span>name<span class="o">]</span><span class="sb">`</span><span class="w"> </span>substituted<span class="w"> </span>with<span class="w"> </span>object<span class="w"> </span>file<span class="w"> </span>at<span class="sb">`</span>altered.hsaco<span class="sb">`</span>
 </code></pre></div>
 <p>During each of these steps, you can change the flags or manually edit the <code>.ll</code>

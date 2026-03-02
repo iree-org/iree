@@ -6445,7 +6445,7 @@
 
 
 <h1 id="cuda-hal-driver">CUDA HAL driver<a class="headerlink" href="#cuda-hal-driver" title="Permanent link">link</a></h1>
-<p>This document lists technical details regarding the CUDA implemenation of
+<p>This document lists technical details regarding the CUDA implementation of
 IREE's Hardware Abstraction Layer, called a CUDA HAL driver.</p>
 <p>IREE provides a <a href="https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
 interface to different compute accelerators. IREE HAL's design draws inspiration
@@ -6473,7 +6473,7 @@ and device enumeration and creation.</p>
 <p><code>iree_hal_cuda_device_t</code> implements <a href="https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a> to provide
 the interface to CUDA GPU device by wrapping a <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html"><code>CUdevice</code></a>.
 For each device, right now we create two <code>CUstream</code>s--one for issuing commands
-for memory allocation and kernel lauches as instructed by the program; the other
+for memory allocation and kernel launches as instructed by the program; the other
 for issue host callback functions after dispatched command buffers completes.
 See <a href="#synchronization">synchronization</a> section regarding the details.</p>
 <h4 id="async-allocation">Async allocation<a class="headerlink" href="#async-allocation" title="Permanent link">link</a></h4>
@@ -6541,7 +6541,7 @@ The semantics closely mirrors
 needed by the HAL semaphore abstraction:</p>
 <ul>
 <li><a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEMOP.html">Stream memory operations</a> provides <code>cuStreamWriteValue64()</code> and
-  <code>cuStreamWaitValue64()</code>, which can implment HAL semaphore 64-bit integer value
+  <code>cuStreamWaitValue64()</code>, which can implement HAL semaphore 64-bit integer value
   signal and wait. Though these operations require device pointers and cannot
   accepts pointers to managed memory buffers, meaning no support for the host.
   Additionally, per the spec, "synchronization ordering established through
@@ -6552,7 +6552,7 @@ needed by the HAL semaphore abstraction:</p>
 <li>For <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html">external resource interoperability</a>, we have APIs
   like <code>cuSignalExternalSemaphoresAsync()</code> and <code>cuWaitExternalSemaphoresAsync()</code>,
   which can directly map to Vulkan timeline semaphores. Though these APIs are
-  meant to handle exernal resources--there is no way to create
+  meant to handle external resources--there is no way to create
   <code>CUexternalSemaphore</code> objects directly other than <code>cuImportExternalSemaphore()</code>.</li>
 </ul>
 <p>Therefore, to implement the support, we need to leverage multiple native CPU or
@@ -6608,7 +6608,7 @@ Though, per the <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUD
 "the host function must not make any CUDA API calls." So we cannot do that
 directly inside <code>cuLaunchHostFunc()</code>; we need to notify another separate
 thread to call CUDA APIs to push more work to the GPU. So the deferred/pending
-action queue should have an associcated thread.</p>
+action queue should have an associated thread.</p>
 <p>For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that
 the CPU is involved for GPU internal synchronization. We want to use <code>CUevent</code>

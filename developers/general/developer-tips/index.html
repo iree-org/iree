@@ -6735,7 +6735,7 @@ or check the help output with a command such as:</p>
 <p>This is similar to the <code>--mlir-print-ir-after=</code> flag, but at clearly defined
 pipeline phases.</p>
 <p>Compilation can be continued from any intermediate phase. This allows for
-interative workflows - compile to a phase, make edits to the <code>.mlir</code> file,
+interactive workflows - compile to a phase, make edits to the <code>.mlir</code> file,
 then resume compilation and continue through the pipeline:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span>--compile-to<span class="o">=</span>abi<span class="w"> </span>-o<span class="w"> </span>simple_abs_abi.mlir
 

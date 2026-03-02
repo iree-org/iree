@@ -8795,7 +8795,7 @@ not be easily recovered. Assumptions are made per op/result pair.</p>
 Typically multiple permutations record a specific subset of assumptions
 broken down per call-site in some way that is meaningful to the receiver.
 Implementations can use this information to specialize on each
-permutation if it is meaninful to do so (i.e. vs unioning across them).
+permutation if it is meaningful to do so (i.e. vs unioning across them).
 In such cases, there will typically be one such op at the top of a
 function or scope which passes all covered operands through it.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
@@ -10335,8 +10335,8 @@ or outside knowledge. All components of the attribute are optional.</p>
 &gt;
 </code></pre></div>
 <p>Textual description of the preprocessing pass-pipeline to run on the
-function-like object that the attribute is specified on. Note that the
-string pipeline is implicitly nested to <code>builtin.module(func-lik(..))</code>
+function-likee object that the attribute is specified on. Note that the
+string pipeline is implicitly nested to <code>builtin.module(func-like(..))</code>
 operation. For example to run the transpose convolution pipeline, the
 attribute is specified as</p>
 <p><code>preprocess_pipeline = #util.preprocess_pipeline&lt;

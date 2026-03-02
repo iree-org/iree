@@ -7065,7 +7065,7 @@ limited support is available for a subset of the <code>hal</code> dialect ops th
 used on the program ABI boundary for interoperating with external buffers
 and fences. These ops, such as <code>hal.tensor.import</code> and <code>hal.tensor.barrier</code>,
 will be converted to their <code>stream</code> dialect form and preserve the implicit
-synchronization guaranteeds required for proper analysis.</p>
+synchronization guarantees required for proper analysis.</p>
 <p>Dispatched executables are allowed to be in one of the supported input
 dialects (like <code>flow.executable</code>), already be lowered into
 <code>stream.executable</code> ops, or be the final <code>hal.executable</code> ops. The amount of
