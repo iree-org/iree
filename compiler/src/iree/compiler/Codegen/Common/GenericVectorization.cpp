@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -170,8 +171,9 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
       candidates.push_back(op);
-    } else if (isa<IREE::LinalgExt::GatherOp, IREE::LinalgExt::ArgCompareOp>(
-                   op)) {
+    } else if (isa<IREE::LinalgExt::ArgCompareOp>(op)) {
+      candidates.push_back(op);
+    } else if (isa<VectorizableOpInterface>(op)) {
       candidates.push_back(op);
     }
   });
@@ -206,7 +208,19 @@ void GenericVectorizationPass::runOnOperation() {
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
 
-    // Try to vectorize to transfer_gather, if possible.
+    // Dispatch through VectorizableOpInterface.
+    if (auto iface = dyn_cast<VectorizableOpInterface>(op)) {
+      if (iface.isVectorizable(vectorSizes, scalableVecDims)) {
+        FailureOr<SmallVector<Value>> result =
+            iface.vectorize(rewriter, vectorSizes, scalableVecDims);
+        if (succeeded(result)) {
+          rewriter.replaceOp(op, *result);
+        }
+      }
+      continue;
+    }
+
+    // TypeSwitch for ops not yet migrated to VectorizableOpInterface.
     llvm::TypeSwitch<Operation *>(op)
         .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
@@ -221,10 +235,6 @@ void GenericVectorizationPass::runOnOperation() {
           if (succeeded(result)) {
             rewriter.replaceOp(op, result->replacements);
           }
-        })
-        .Case([&](IREE::LinalgExt::GatherOp gatherOp) {
-          (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
-              rewriter, gatherOp, vectorSizes);
         })
         .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
           (void)IREE::VectorExt::vectorizeLinalgExtArgCompare(
