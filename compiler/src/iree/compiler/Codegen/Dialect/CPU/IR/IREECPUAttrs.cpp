@@ -298,7 +298,7 @@ struct CPUOpaqueMmaLayout {
   Type cType;
 };
 
-}  // namespace
+} // namespace
 
 static std::tuple<int64_t, int64_t, int64_t>
 getMNKShapeFromIntrinsic(MMAIntrinsic intrinsic) {
