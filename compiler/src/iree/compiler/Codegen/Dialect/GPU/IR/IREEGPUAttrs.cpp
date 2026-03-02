@@ -911,6 +911,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     SmallVectorImpl<OpFoldResult> &canonicalStrides) {
   SmallVector<int64_t> rankReducedShape;
 
+  // rankReducedShape: {8, 32}
   for (auto [outer, thread, element] :
        llvm::zip_equal(subgroupLayout.outer, subgroupLayout.thread,
                        subgroupLayout.element)) {
@@ -939,6 +940,26 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   }
   auto splitLaneId = affine::AffineDelinearizeIndexOp::create(
       builder, loc, laneId, vtidBasis, /*hasOuterBound=*/false);
+  // (lldb) p splitLaneId.dump()
+  // %2:4 = affine.delinearize_index %arg3 into (4, 8, 2) : index, index, index,
+  // index
+
+  // basisFromSizesStrides gives us:
+  //   - vtidBasis: factors for affine.delinearize_index
+  //   - dimToVtid: which delinearize result corresponds to each semantic dim
+  //
+  // Example (VSMFMA LHS):
+  //   thread={8,4}, tstrides={2,16}
+  //   vtidBasis={4,8,2}, dimToVtid={2,1} (m = 2, k = 1)
+  // so `delinearize laneId by [4,8,2]` produces
+  //   [overflow, k_vtid, m_vtid, jump]
+  // where jump = laneId % 2 (even/odd lane parity).
+  // %2:4 = affine.delinearize_index %arg3 into (4, 8, 2) : index, index, index,
+  // index
+  // -> r0 = floor(x / (4*8*2))
+  // -> r1 = floor(x / (8*2)) mod 4 = floor(x/16) mod 4
+  // -> r2 = floor(x / 2) mod 8
+  // -> r3 = x mod 2 -> unused atm
 
   // Wrap delinearize results with index_hint ops for transpose load.
   // The delinearize results are already in the correct order
@@ -967,6 +988,12 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     }
     vtids.push_back(vtid);
   }
+  //  (lldb) p vtids[0].dump()
+  //  %5 = iree_codegen.index_hint %2#2(#iree_gpu.lane_constant<2>) : index
+  //      -> m_vtid = (laneId / 2) % 8)
+  //  (lldb) p vtids[1].dump()
+  //  %7 = affine.linearize_index disjoint [%4, %c0] by (4, 8) : index
+  //      -> k_offset = ((laneId / 16) % 4) * 8
 
   int64_t idx = 0;
   for (auto [element, outer] :

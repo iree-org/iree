@@ -23,6 +23,13 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
         auto [dim, stride, size] = tuple;
         return std::make_tuple(stride, size, dim);
       });
+  // Sort semantic dimensions by thread-stride so we can build the basis from
+  // fastest-varying to slowest-varying thread dimensions.
+  //
+  // Example (VSMFMA LHS):
+  //   sizes   = {8, 4}    // {M, K} thread counts
+  //   strides = {2, 16}   // lane-id strides for {M, K}
+  //   terms after sort: {(2, 8, dim=0), (16, 4, dim=1)}
   llvm::sort(terms);
 
   int64_t previousSizes = 1;
@@ -37,8 +44,12 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
       return failure();
     }
 
-    // Handle casis like threads = {4, 8}, strides = {1, 16}, which need an
-    // extra basis element.
+    // If stride jumps ahead of the currently covered range, insert a synthetic
+    // "jump" basis entry. This entry captures unused lane-id bits that are not
+    // directly mapped to a semantic dimension.
+    //
+    // Example (VSMFMA LHS): stride 2 with previousSizes 1 inserts jumpSize=2.
+    // That corresponds to the even/odd lane bit (lane % 2).
     if (stride != previousSizes) {
       int64_t jumpSize = stride / previousSizes;
       basisEntryToDim.push_back(std::nullopt);
@@ -50,6 +61,9 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
     basis.push_back(size);
     previousSizes *= size;
   }
+  // Example (VSMFMA LHS):
+  //   basis           = {2, 8, 4}
+  //   basisEntryToDim = {nullopt, 0, 1}
 
   // Post-process. The basis is backwards and the permutation
   // we've constructed is the inverse of what we need.
@@ -58,6 +72,8 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
   dimToResult.assign(numDims, ~0);
   for (auto [reverseBasisPos, dimPos] : llvm::enumerate(basisEntryToDim)) {
     if (!dimPos) {
+      // Synthetic jump entries intentionally have no semantic-dimension owner,
+      // so they do not appear in dimToResult.
       continue;
     }
     // There's an extra overflow term at the front of the delineraize results,
@@ -65,6 +81,12 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
     // to be in.
     dimToResult[*dimPos] = basisLength - reverseBasisPos;
   }
+  // Example (VSMFMA LHS):
+  //   basis      = {4, 8, 2}
+  //   dimToResult= {2, 1}
+  // `affine.delinearize_index laneId by [4,8,2]` returns
+  //   [overflow, k_vtid, m_vtid, jump]
+  // and dimToResult maps only semantic dims M/K to {m_vtid, k_vtid}.
   return success();
 }
 

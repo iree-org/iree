@@ -1345,3 +1345,87 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:       %[[R_CAST:.+]] = vector.shape_cast %[[COL]] : vector<2xi32> to vector<1x1x1x1x2x1xi32>
 // CHECK:       %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[R_CAST]] : vector<1x1x1x1x2x1xi32> -> vector<8x16xi32>
 // CHECK:       return %[[R_SIMD]]
+
+// -----
+
+// Sparse-trick VSMFMA_F32_16x16x32_F16 with transfer reads.
+// This hits computeThreadIds/basisFromSizesStrides in VectorDistribute.
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [8, 4],
+  element_tile     = [1, 8],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [2, 16]
+>
+
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [8, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [1, 1],
+  outer_tile        = [1, 1],
+  thread_tile       = [4, 16],
+  element_tile     = [2, 1],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [16, 1]
+>
+
+func.func @distribute_vsmfma_f16_transfer_contract(%a: memref<8x32xf16>, %b: memref<32x16xf16>, %c: memref<8x16xf32>) -> vector<8x16xf32> {
+  %c0 = arith.constant 0 : index
+  %f16_0 = arith.constant 0.0 : f16
+  %f32_0 = arith.constant 0.0 : f32
+
+  %ra = vector.transfer_read %a[%c0, %c0], %f16_0 {in_bounds = [true, true]} : memref<8x32xf16>, vector<8x32xf16>
+  %rb = vector.transfer_read %b[%c0, %c0], %f16_0 {in_bounds = [true, true]} : memref<32x16xf16>, vector<32x16xf16>
+  %rc = vector.transfer_read %c[%c0, %c0], %f32_0 {in_bounds = [true, true]} : memref<8x16xf32>, vector<8x16xf32>
+
+  %A = iree_vector_ext.to_layout %ra to layout(#layout_a) : vector<8x32xf16>
+  %B = iree_vector_ext.to_layout %rb to layout(#layout_b) : vector<32x16xf16>
+  %C = iree_vector_ext.to_layout %rc to layout(#layout_c) : vector<8x16xf32>
+
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.gpu.mma = #iree_gpu.virtual_mma_layout<VSMFMA_F32_16x16x32_F16>
+  } %A, %B, %C : vector<8x32xf16>, vector<32x16xf16> into vector<8x16xf32>
+
+  return %output : vector<8x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @distribute_vsmfma_f16_transfer_contract
+// CHECK:       %[[TID:.+]] = gpu.thread_id  x
+// CHECK-DAG:   %{{.+}}:4 = affine.delinearize_index %[[TID]] into (4, 8, 2)
+// CHECK-DAG:   %{{.+}}:3 = affine.delinearize_index %[[TID]] into (4, 16)
+// CHECK-DAG:   vector.transfer_read %{{.+}} : memref<8x32xf16>, vector<1x8xf16>
+// CHECK-DAG:   vector.transfer_read %{{.+}} : memref<32x16xf16>, vector<8x1xf16>
+// CHECK-DAG:   vector.transfer_read %{{.+}} : memref<8x16xf32>, vector<2x1xf32>
+// CHECK:       amdgpu.sparse_mfma 16x16x32
+// CHECK-SAME:    : vector<4xf16>, vector<8xf16>, vector<4xf32>
+// CHECK:       return %{{.+}} : vector<8x16xf32>
