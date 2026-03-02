@@ -1,5 +1,8 @@
-# Configuration file for the typos-rs spell checker used by pre-commit.
-# See https://crates.io/crates/typos for tool usage details.
+# Configuration file for the typos spell checker used by pre-commit.
+# https://github.com/crate-ci/typos
+#
+# To run manually from the repo root:
+#   typos --config build_tools/linters/typos.toml
 
 [files]
 extend-exclude = [
