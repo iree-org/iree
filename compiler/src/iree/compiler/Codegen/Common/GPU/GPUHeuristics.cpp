@@ -579,11 +579,41 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
     return lhsMNAligned > rhsMNAligned;
   }
 
+  auto intrinsicCompute = [&](const GPUIntrinsicType &intrinsic) {
+    return ShapedType::getNumElements(intrinsic.mSizes) *
+           ShapedType::getNumElements(intrinsic.nSizes) *
+           ShapedType::getNumElements(intrinsic.kSizes);
+  };
   auto intrinsicArea = [&](const GPUIntrinsicType &intrinsic) {
     return (ShapedType::getNumElements(intrinsic.mSizes) +
             ShapedType::getNumElements(intrinsic.nSizes)) *
            ShapedType::getNumElements(intrinsic.kSizes);
   };
+
+  // For compute-bound GEMMs, maximize compute throughput first, then
+  // minimize operand VGPR pressure among equal-compute intrinsics.
+  // E.g., 32x32x16 (compute=16384, area=1024) beats 32x32x8
+  // (compute=8192, area=512) because throughput matters more. Among
+  // 16x16x32 and 32x32x16 (both area=1024), prefer smaller K (16 vs 32)
+  // for less operand staging pressure.
+  if (problem.gemmSize == GemmSize::LargeGemm) {
+    int64_t lhsCompute = intrinsicCompute(lhs);
+    int64_t rhsCompute = intrinsicCompute(rhs);
+    if (lhsCompute != rhsCompute) {
+      return lhsCompute > rhsCompute;
+    }
+
+    int64_t lhsArea = intrinsicArea(lhs);
+    int64_t rhsArea = intrinsicArea(rhs);
+    if (lhsArea != rhsArea) {
+      return lhsArea < rhsArea;
+    }
+
+    return ShapedType::getNumElements(lhs.kSizes) <
+           ShapedType::getNumElements(rhs.kSizes);
+  }
+
+  // For memory-bound GEMMs, prefer larger area to amortize memory latency.
   int64_t lhsArea = intrinsicArea(lhs);
   int64_t rhsArea = intrinsicArea(rhs);
   if (lhsArea != rhsArea) {

@@ -299,3 +299,20 @@ func.func @scaled_matmul_accumulate(
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=157184
+
+// -----
+
+// Large f16 matmul — compute-bound, so picks 32x32x16 (higher compute per
+// instruction, lower VGPR pressure than 16x16x32).
+func.func @matmul_f16_compute_bound(
+    %arg0: tensor<4096x4096xf16>,
+    %arg1: tensor<4096x4096xf16>,
+    %arg2: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  // CHECK-LABEL: func.func @matmul_f16_compute_bound
+  // CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+  // CHECK:   lowering_config = #iree_gpu.lowering_config
+  // CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<4096x4096xf16>, tensor<4096x4096xf16>)
+                      outs(%arg2 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %0 : tensor<4096x4096xf32>
+}
