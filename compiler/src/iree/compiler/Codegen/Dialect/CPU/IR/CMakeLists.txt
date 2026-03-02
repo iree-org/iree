@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRParser
     MLIRSupport
     MLIRTensorDialect
