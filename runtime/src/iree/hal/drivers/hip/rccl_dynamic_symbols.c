@@ -101,7 +101,7 @@ iree_status_t iree_hal_hip_nccl_dynamic_symbols_initialize(
   memset(out_syms, 0, sizeof(*out_syms));
   iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(iree_hal_hip_nccl_dylib_names),
-      iree_hal_hip_nccl_dylib_names, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+      iree_hal_hip_nccl_dylib_names, IREE_DYNAMIC_LIBRARY_FLAG_NODELETE,
       host_allocator, &out_syms->dylib);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
