@@ -310,6 +310,80 @@ struct ArgCompareOpVectorizationModel
   }
 };
 
+struct ToLayoutOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<
+          ToLayoutOpVectorizationModel, IREE::VectorExt::ToLayoutOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto toLayoutOp = cast<IREE::VectorExt::ToLayoutOp>(op);
+    return toLayoutOp.hasTensorSemantics();
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto toLayoutOp = cast<IREE::VectorExt::ToLayoutOp>(op);
+    if (!toLayoutOp.hasTensorSemantics()) {
+      return failure();
+    }
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(toLayoutOp);
+    Location loc = toLayoutOp.getLoc();
+    ShapedType inputTy = toLayoutOp.getType();
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto identityMap = rewriter.getMultiDimIdentityMap(inputTy.getRank());
+    SmallVector<int64_t> readShape =
+        toLayoutOp.getLayout().getUndistributedShape();
+    Value mask = nullptr;
+    if (!toLayoutOp.getType().hasStaticShape()) {
+      SmallVector<OpFoldResult> mixedSourceDims =
+          tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
+      auto maskType = VectorType::get(readShape, rewriter.getI1Type());
+      mask = vector::CreateMaskOp::create(rewriter, loc, maskType,
+                                          mixedSourceDims);
+    }
+    VectorType vectorType =
+        VectorType::get(readShape, inputTy.getElementType());
+    auto inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(vectorType.getRank(), true));
+    auto padValue =
+        ub::PoisonOp::create(rewriter, loc, inputTy.getElementType());
+    auto readOp = vector::TransferReadOp::create(
+        rewriter, loc,
+        /*type=*/vectorType,
+        /*source=*/toLayoutOp.getInput(),
+        /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
+        /*permutation_map=*/identityMap,
+        /*padding=*/padValue,
+        /*mask=*/mask,
+        /*in_bounds=*/inBounds);
+    // Create the toLayout operation but with vector types instead.
+    auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
+        rewriter, loc, readOp, toLayoutOp.getLayout(),
+        toLayoutOp.getSharedMemoryConversion());
+    // Create the write back to a tensor.
+    ShapedType tensorTy = toLayoutOp.getType();
+    auto resType =
+        RankedTensorType::get(tensorTy.getShape(), tensorTy.getElementType());
+    int64_t rank = tensorTy.getShape().size();
+    auto writeInBounds =
+        rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
+    auto writeIdentityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
+    auto writeOp = vector::TransferWriteOp::create(
+        rewriter, loc,
+        /*result=*/resType,
+        /*vector=*/newLayoutOp,
+        /*source=*/toLayoutOp.getInput(),
+        /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
+        /*permutation_map=*/writeIdentityMap,
+        /*mask=*/mask,
+        /*inBounds=*/writeInBounds);
+    return SmallVector<Value>{writeOp.getResult()};
+  }
+};
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -320,6 +394,11 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         IREE::LinalgExt::ArgCompareOp::attachInterface<
             ArgCompareOpVectorizationModel>(*ctx);
       });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::VectorExt::IREEVectorExtDialect *dialect) {
+    IREE::VectorExt::ToLayoutOp::attachInterface<ToLayoutOpVectorizationModel>(
+        *ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler
