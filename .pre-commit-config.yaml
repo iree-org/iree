@@ -55,6 +55,13 @@ repos:
       - id: forbid-tabs
         exclude: ".gitmodules|Makefile"
 
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.44.0
+    hooks:
+      - id: typos
+        name: Check for typos
+        args: ["--config", "build_tools/linters/typos.toml", "--force-exclude"]
+
   - repo: https://github.com/jlebar/pre-commit-hooks.git
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
     hooks:
