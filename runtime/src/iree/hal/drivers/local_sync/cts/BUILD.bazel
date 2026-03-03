@@ -101,6 +101,7 @@ iree_runtime_cc_test(
         ":backends",
         "//runtime/src/iree/hal/cts2/core:all_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -112,6 +113,7 @@ iree_runtime_cc_test(
         ":backends",
         "//runtime/src/iree/hal/cts2/buffer:all_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -123,6 +125,7 @@ iree_runtime_cc_test(
         ":backends",
         "//runtime/src/iree/hal/cts2/command_buffer:all_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -134,6 +137,7 @@ iree_runtime_cc_test(
         ":backends",
         "//runtime/src/iree/hal/cts2/queue:all_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -145,6 +149,7 @@ iree_runtime_cc_test(
         ":backends",
         "//runtime/src/iree/hal/cts2/file:all_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -162,6 +167,7 @@ iree_runtime_cc_test(
         ":vmvx_testdata",
         "//runtime/src/iree/hal/cts2/core:all_executable_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )
@@ -175,6 +181,7 @@ iree_runtime_cc_test(
         ":vmvx_testdata",
         "//runtime/src/iree/hal/cts2/command_buffer:all_dispatch_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts2/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ],
 )

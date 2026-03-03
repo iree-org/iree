@@ -27,6 +27,7 @@
 //   )
 
 #include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts2/util/test_base.h"
 #include "iree/testing/gtest.h"
 
 int main(int argc, char** argv) {
@@ -36,5 +37,13 @@ int main(int argc, char** argv) {
   iree::hal::cts::CtsRegistry::InstantiateAll();
 
   ::testing::InitGoogleTest(&argc, argv);
+
+  // Register cleanup for cached backend resources (driver, device,
+  // device_group, allocator). These are shared across all tests for a given
+  // backend to avoid device churn, which causes reliability issues on GPU cloud
+  // runners.
+  ::testing::AddGlobalTestEnvironment(
+      new iree::hal::cts::CtsBackendCacheEnvironment);
+
   return RUN_ALL_TESTS();
 }

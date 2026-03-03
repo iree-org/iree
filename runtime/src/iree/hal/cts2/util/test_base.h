@@ -11,15 +11,16 @@
 // which use CTS_REGISTER_TEST_SUITE() for self-registration.
 //
 // Key design:
-//   - Fresh driver/device per test via SetUp/TearDown (no state leakage)
+//   - Shared driver/device per backend via cache (no GPU device churn)
+//   - Per-test resource isolation (semaphores, buffers, command buffers)
 //   - Capability-gated GTEST_SKIP instead of external EXCLUDED_TESTS lists
 //   - Link-time composition: test suites + backends linked together
-//   - Per-test device creation avoids shared static state across backends
 
 #ifndef IREE_HAL_CTS2_UTIL_TEST_BASE_H_
 #define IREE_HAL_CTS2_UTIL_TEST_BASE_H_
 
 #include <cstdlib>
+#include <map>
 #include <string>
 #include <string_view>
 
@@ -30,6 +31,47 @@
 #include "iree/testing/status_matchers.h"
 
 namespace iree::hal::cts {
+
+//===----------------------------------------------------------------------===//
+// Backend resource cache
+//===----------------------------------------------------------------------===//
+
+// Cached backend resources shared across all tests for a given backend.
+// GPU backends cannot create/destroy devices per test — cloud GPU runners
+// have reliability issues when devices are churned. CPU backends also benefit
+// from avoiding redundant device creation overhead.
+//
+// Resources are created on first access and held until program exit, when
+// the CtsBackendCacheEnvironment releases them in the correct order.
+struct CachedBackendResources {
+  iree_hal_driver_t* driver = nullptr;
+  iree_hal_device_group_t* device_group = nullptr;
+  iree_hal_device_t* device = nullptr;
+  iree_hal_allocator_t* allocator = nullptr;
+  bool unavailable = false;  // Factory returned UNAVAILABLE.
+};
+
+inline std::map<std::string, CachedBackendResources>& GetBackendCache() {
+  static std::map<std::string, CachedBackendResources> cache;
+  return cache;
+}
+
+// GTest environment that releases all cached backend resources at program exit.
+// Must be registered via ::testing::AddGlobalTestEnvironment() in test_main.cc.
+class CtsBackendCacheEnvironment : public ::testing::Environment {
+ public:
+  void TearDown() override {
+    for (auto& [name, resources] : GetBackendCache()) {
+      iree_hal_allocator_release(resources.allocator);
+      iree_hal_device_release(resources.device);
+      // Release device group after device — device holds a raw pointer to the
+      // group's embedded topology.
+      iree_hal_device_group_release(resources.device_group);
+      iree_hal_driver_release(resources.driver);
+    }
+    GetBackendCache().clear();
+  }
+};
 
 // Base class for all HAL CTS tests. Parameterized on BackendInfo.
 // Creates a fresh driver + device in SetUp(), releases in TearDown().
@@ -71,24 +113,43 @@ class CtsTestBase : public BaseType {
       }
     }
 
-    iree_hal_driver_t* driver = nullptr;
-    iree_hal_device_t* device = nullptr;
-    iree_status_t status = backend.factory(&driver, &device);
-    if (iree_status_is_unavailable(status)) {
-      iree_status_ignore(status);
+    // Get or create cached backend resources. GPU backends cannot
+    // create/destroy devices per test (cloud runners have reliability issues
+    // with device churn). CPU backends also benefit from avoiding redundant
+    // creation overhead.
+    auto& cached = GetBackendCache()[backend.name];
+    if (!cached.device && !cached.unavailable) {
+      iree_hal_driver_t* driver = nullptr;
+      iree_hal_device_t* device = nullptr;
+      iree_status_t status = backend.factory(&driver, &device);
+      if (iree_status_is_unavailable(status)) {
+        iree_status_ignore(status);
+        cached.unavailable = true;
+      } else {
+        IREE_ASSERT_OK(status);
+        cached.driver = driver;
+        cached.device = device;
+        IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
+            device, iree_allocator_system(), &cached.device_group));
+        cached.allocator = iree_hal_device_allocator(device);
+        iree_hal_allocator_retain(cached.allocator);
+      }
+    }
+    if (cached.unavailable) {
       GTEST_SKIP() << "Backend '" << backend.name
                    << "' unavailable on this system";
       return;
     }
-    IREE_ASSERT_OK(status);
-    driver_ = driver;
-    device_ = device;
 
-    // Create a device group so the device gets topology info assigned.
-    IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
-        device_, iree_allocator_system(), &device_group_));
-
-    device_allocator_ = iree_hal_device_allocator(device_);
+    // Retain cached resources for this test's use. The cache holds its own
+    // refs; per-test refs are released in TearDown.
+    driver_ = cached.driver;
+    iree_hal_driver_retain(driver_);
+    device_group_ = cached.device_group;
+    iree_hal_device_group_retain(device_group_);
+    device_ = cached.device;
+    iree_hal_device_retain(device_);
+    device_allocator_ = cached.allocator;
     iree_hal_allocator_retain(device_allocator_);
   }
 
@@ -102,24 +163,16 @@ class CtsTestBase : public BaseType {
     }
     xfail_active_ = false;
 
-    if (device_allocator_) {
-      iree_hal_allocator_release(device_allocator_);
-      device_allocator_ = nullptr;
-    }
-    if (device_) {
-      iree_hal_device_release(device_);
-      device_ = nullptr;
-    }
-    // Release the device group after the device — the device holds a raw
-    // pointer to the group's embedded topology.
-    if (device_group_) {
-      iree_hal_device_group_release(device_group_);
-      device_group_ = nullptr;
-    }
-    if (driver_) {
-      iree_hal_driver_release(driver_);
-      driver_ = nullptr;
-    }
+    // Release per-test refs. The cache still holds its own refs — these
+    // releases just decrement the refcount, they don't destroy anything.
+    iree_hal_allocator_release(device_allocator_);
+    device_allocator_ = nullptr;
+    iree_hal_device_release(device_);
+    device_ = nullptr;
+    iree_hal_device_group_release(device_group_);
+    device_group_ = nullptr;
+    iree_hal_driver_release(driver_);
+    driver_ = nullptr;
   }
 
   // Returns the recording mode for the current test parameterization.
