@@ -140,6 +140,32 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
+static bool isImplicitGather(linalg::GenericOp genericOp) {
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+    return false;
+  }
+
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+
+  auto inputMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
+  auto outputMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+
+  if (inputMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  if (!outputMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  Block *body = genericOp.getBlock();
+  return std::distance(body->begin(), body->end()) == 1;
+}
+
 class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
@@ -205,11 +231,16 @@ void GenericVectorizationPass::runOnOperation() {
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
-
+    vectorizeToTransferGather = true;
     // Try to vectorize to transfer_gather, if possible.
     llvm::TypeSwitch<Operation *>(op)
         .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
+            if (isImplicitGather(genericOp)) {
+              (void)IREE::VectorExt::directVectorizeToGather(
+                  rewriter, genericOp, vectorSizes);
+              return;
+            }
             (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
                 rewriter, genericOp, vectorSizes, scalableVecDims,
                 /*vectorizeNDExtract=*/true);

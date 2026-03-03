@@ -398,6 +398,92 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
+LogicalResult directVectorizeToGather(RewriterBase &rewriter,
+                                      linalg::GenericOp op,
+                                      ArrayRef<int64_t> vectorSizes) {
+  Location loc = op.getLoc();
+  MLIRContext *ctx = rewriter.getContext();
+  rewriter.setInsertionPoint(op);
+
+  auto *inOperand = op.getDpsInputOperand(0);
+  auto *outOperand = op.getDpsInitOperand(0);
+  auto inType = llvm::cast<RankedTensorType>(inOperand->get().getType());
+  auto outType = llvm::cast<RankedTensorType>(outOperand->get().getType());
+  Type elemType = outType.getElementType();
+
+  int64_t inRank = inType.getRank();
+  int64_t outRank = outType.getRank();
+  int64_t numLoops = op.getNumLoops();
+
+  if (vectorSizes.empty()) {
+    return failure();
+  }
+  int64_t vectorSize = vectorSizes.back();
+
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(rewriter, loc, outOperand->get());
+  SmallVector<Value> maskDims;
+  for (OpFoldResult ofr : mixedSizes) {
+    maskDims.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
+  }
+  auto vectorType = VectorType::get(vectorSizes, elemType);
+  auto maskType = VectorType::get(vectorSizes, rewriter.getI1Type());
+  Value mask = vector::CreateMaskOp::create(rewriter, loc, maskType, maskDims);
+
+  AffineMap inputMap = op.getMatchingIndexingMap(inOperand);
+  int64_t stride = 1;
+  inputMap.getResult(inputMap.getNumResults() - 1).walk([&](AffineExpr sub) {
+    if (auto mul = llvm::dyn_cast<AffineBinaryOpExpr>(sub)) {
+      if (mul.getKind() == AffineExprKind::Mul) {
+        if (auto rhs = llvm::dyn_cast<AffineConstantExpr>(mul.getRHS())) {
+          stride = rhs.getValue();
+        }
+      }
+    }
+  });
+
+  Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  Value strideVal = arith::ConstantIndexOp::create(rewriter, loc, stride);
+
+  auto indexVecType = VectorType::get({vectorSize}, rewriter.getIndexType());
+  Value step = vector::StepOp::create(rewriter, loc, indexVecType);
+  Value cstStride =
+      vector::BroadcastOp::create(rewriter, loc, indexVecType, strideVal);
+  Value indices = arith::MulIOp::create(rewriter, loc, step, cstStride);
+
+  SmallVector<AffineExpr> sourceExprs;
+  for (int i = 0; i < inRank - 1; ++i) {
+    sourceExprs.push_back(rewriter.getAffineDimExpr(i));
+  }
+  sourceExprs.push_back(rewriter.getAffineSymbolExpr(0));
+
+  AffineMap sourceMap = AffineMap::get(numLoops, 1, sourceExprs, ctx);
+  AffineMap indexMap = AffineMap::get(
+      numLoops, 1, {rewriter.getAffineDimExpr(numLoops - 1)}, ctx);
+  AffineMap maskMap = AffineMap::getMultiDimIdentityMap(numLoops, ctx);
+  maskMap =
+      AffineMap::get(numLoops, /*symbolCount=*/1, maskMap.getResults(), ctx);
+
+  Value f0 =
+      arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
+
+  SmallVector<Value> baseOffsets(inRank, c0);
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, vectorType, inOperand->get(), baseOffsets,
+      ValueRange{indices},
+      rewriter.getAffineMapArrayAttr({sourceMap, indexMap, maskMap}), f0, mask);
+
+  SmallVector<Value> writeOffsets(outRank, c0);
+  auto transferWriteOp = vector::TransferWriteOp::create(
+      rewriter, loc, transferGatherOp.getResult(), outOperand->get(),
+      writeOffsets);
+  rewriter.modifyOpInPlace(
+      transferWriteOp, [&] { transferWriteOp.getMaskMutable().assign(mask); });
+
+  rewriter.replaceOp(op, transferWriteOp.getResult());
+  return success();
+}
+
 LogicalResult
 vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
                                          IREE::LinalgExt::GatherOp gatherOp,
