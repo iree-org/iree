@@ -17,44 +17,28 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 
 namespace {
 
-/// Remove dim 0 from an AffineMap by:
-/// 1. Replacing AffineDimExpr(0) with AffineConstantExpr(0)
-/// 2. Renumbering AffineDimExpr(k) where k > 0 to AffineDimExpr(k-1)
-/// 3. Reducing numDims by 1
-static AffineMap removeDim0FromMap(AffineMap map) {
-  MLIRContext *ctx = map.getContext();
-  SmallVector<AffineExpr> newResults;
-  for (AffineExpr expr : map.getResults()) {
-    if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-      unsigned pos = dimExpr.getPosition();
-      if (pos == 0) {
-        newResults.push_back(getAffineConstantExpr(0, ctx));
-      } else {
-        newResults.push_back(getAffineDimExpr(pos - 1, ctx));
-      }
-    } else {
-      newResults.push_back(expr);
-    }
-  }
-  return AffineMap::get(map.getNumDims() - 1, map.getNumSymbols(), newResults,
-                        ctx);
-}
-
-/// Remove dim 0 references from an index vec map. Returns the new map with
-/// results that referenced dim 0 dropped, and the axis positions in the index
-/// vec that need to be sliced.
-static AffineMap removeDim0FromIndexVecMap(AffineMap map,
-                                           SmallVectorImpl<int64_t> &axes) {
+/// Remove dim 0 from an AffineMap, renumbering higher dims by -1.
+///
+/// If `droppedAxes` is null, dim-0 references are replaced with constant 0
+/// (broadcast). If non-null, dim-0 references are dropped from the results
+/// and their positions are recorded in `droppedAxes` (for index vec slicing).
+static AffineMap
+removeDim0FromMap(AffineMap map,
+                  SmallVectorImpl<int64_t> *droppedAxes = nullptr) {
   MLIRContext *ctx = map.getContext();
   SmallVector<AffineExpr> newResults;
   for (auto [resultIdx, expr] : llvm::enumerate(map.getResults())) {
     if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
       unsigned pos = dimExpr.getPosition();
       if (pos == 0) {
-        axes.push_back(resultIdx);
-        continue; // Drop this result.
+        if (droppedAxes) {
+          droppedAxes->push_back(resultIdx);
+          continue;
+        }
+        newResults.push_back(getAffineConstantExpr(0, ctx));
+      } else {
+        newResults.push_back(getAffineDimExpr(pos - 1, ctx));
       }
-      newResults.push_back(getAffineDimExpr(pos - 1, ctx));
     } else {
       newResults.push_back(expr);
     }
@@ -98,53 +82,38 @@ static Value extractVecSlice(OpBuilder &b, Location loc, Value vec,
 // Shared unroll helpers
 //===----------------------------------------------------------------------===//
 
-/// Compute the dim-0-removed indexing maps, index vec axes, mask axes, and
-/// base dims that use dim 0.
-struct UnrollDim0Info {
-  AffineMap newBaseMap;
-  SmallVector<AffineMap> newIndexVecMaps;
-  SmallVector<SmallVector<int64_t>> indexVecAxes;
-  AffineMap newMaskMap;
-  SmallVector<int64_t> maskAxes;
-  SmallVector<int64_t> baseDimsUsingDim0;
-  SmallVector<AffineMap> newAllMaps;
-};
-
-static UnrollDim0Info computeUnrollDim0Info(ArrayRef<AffineMap> indexingMaps,
-                                            int64_t numIndexVecs, bool hasMask,
-                                            AffineMap baseMap) {
-  UnrollDim0Info info;
-  info.newBaseMap = removeDim0FromMap(baseMap);
+/// Compute dim-0-removed indexing maps for unrolling. Populates the new base
+/// map, per-index-vec maps and axes, mask map and axes, base dims using dim 0,
+/// and the combined new indexing maps array.
+static void
+computeUnrollDim0Maps(ArrayRef<AffineMap> indexingMaps, int64_t numIndexVecs,
+                      bool hasMask, AffineMap baseMap,
+                      SmallVectorImpl<AffineMap> &newAllMaps,
+                      SmallVectorImpl<SmallVector<int64_t>> &indexVecAxes,
+                      SmallVectorImpl<int64_t> &maskAxes,
+                      SmallVectorImpl<int64_t> &baseDimsUsingDim0) {
+  AffineMap newBaseMap = removeDim0FromMap(baseMap);
+  newAllMaps.push_back(newBaseMap);
 
   for (int64_t i = 0; i < numIndexVecs; ++i) {
     SmallVector<int64_t> axes;
-    AffineMap newMap = removeDim0FromIndexVecMap(indexingMaps[1 + i], axes);
-    info.newIndexVecMaps.push_back(newMap);
-    info.indexVecAxes.push_back(std::move(axes));
+    AffineMap newMap = removeDim0FromMap(indexingMaps[1 + i], &axes);
+    newAllMaps.push_back(newMap);
+    indexVecAxes.push_back(std::move(axes));
   }
 
   if (hasMask) {
-    info.newMaskMap =
-        removeDim0FromIndexVecMap(indexingMaps.back(), info.maskAxes);
+    AffineMap newMaskMap = removeDim0FromMap(indexingMaps.back(), &maskAxes);
+    newAllMaps.push_back(newMaskMap);
   }
 
   for (auto [j, expr] : llvm::enumerate(baseMap.getResults())) {
     if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
       if (dimExpr.getPosition() == 0) {
-        info.baseDimsUsingDim0.push_back(j);
+        baseDimsUsingDim0.push_back(j);
       }
     }
   }
-
-  info.newAllMaps.push_back(info.newBaseMap);
-  for (AffineMap &m : info.newIndexVecMaps) {
-    info.newAllMaps.push_back(m);
-  }
-  if (hasMask) {
-    info.newAllMaps.push_back(info.newMaskMap);
-  }
-
-  return info;
 }
 
 /// Extract sliced index vecs and mask for iteration `i` of dim-0 unrolling.
@@ -193,76 +162,18 @@ computeNewOffsets(OpBuilder &rewriter, Location loc, ValueRange offsets,
 }
 
 //===----------------------------------------------------------------------===//
-// UnrollTransferGatherDim
+// UnrollTransferDim
 //===----------------------------------------------------------------------===//
 
-/// Unrolls dim 0 of a transfer_gather, reducing vector rank by 1 each
-/// application. Stops at rank 1.
-struct UnrollTransferGatherDim : public OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+/// Unrolls dim 0 of a transfer_gather or transfer_scatter, reducing vector
+/// rank by 1 each application. Stops at rank 1.
+template <typename OpTy>
+struct UnrollTransferDim : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TransferGatherOp op,
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
-    VectorType resultType = op.getVector().getType();
-    int64_t rank = resultType.getRank();
-    if (rank <= 1) {
-      return rewriter.notifyMatchFailure(op, "already rank <= 1");
-    }
-
-    Location loc = op.getLoc();
-    int64_t dim0Size = resultType.getShape()[0];
-    SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
-    OperandRange indexVecs = op.getIndexVecs();
-    int64_t numIndexVecs = indexVecs.size();
-    Value mask = op.getMask();
-
-    auto info = computeUnrollDim0Info(indexingMaps, numIndexVecs, !!mask,
-                                      indexingMaps[0]);
-
-    SmallVector<int64_t> newShape(resultType.getShape().drop_front());
-    auto newResultType = VectorType::get(newShape, resultType.getElementType());
-
-    Value acc = ub::PoisonOp::create(rewriter, loc, resultType);
-
-    for (int64_t i = 0; i < dim0Size; ++i) {
-      SmallVector<Value> newOffsets = computeNewOffsets(
-          rewriter, loc, op.getOffsets(), i, info.baseDimsUsingDim0);
-
-      SmallVector<Value> newIndexVecs;
-      Value newMask;
-      extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
-                                info.indexVecAxes, mask, info.maskAxes,
-                                newIndexVecs, newMask);
-
-      auto subGather = TransferGatherOp::create(
-          rewriter, loc, newResultType, op.getBase(), newOffsets, newIndexVecs,
-          rewriter.getAffineMapArrayAttr(info.newAllMaps), op.getPadding(),
-          newMask);
-
-      SmallVector<int64_t> offsets(rank, 0);
-      offsets[0] = i;
-      SmallVector<int64_t> strides(newShape.size(), 1);
-      acc = vector::InsertStridedSliceOp::create(
-          rewriter, loc, subGather.getResult(), acc, offsets, strides);
-    }
-
-    rewriter.replaceOp(op, acc);
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// UnrollTransferScatterDim
-//===----------------------------------------------------------------------===//
-
-/// Unrolls dim 0 of a transfer_scatter, reducing vector rank by 1 each
-/// application. Stops at rank 1.
-struct UnrollTransferScatterDim : public OpRewritePattern<TransferScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TransferScatterOp op,
-                                PatternRewriter &rewriter) const override {
-    VectorType vectorType = op.getVectorType();
+    VectorType vectorType = op.getVector().getType();
     int64_t rank = vectorType.getRank();
     if (rank <= 1) {
       return rewriter.notifyMatchFailure(op, "already rank <= 1");
@@ -275,43 +186,72 @@ struct UnrollTransferScatterDim : public OpRewritePattern<TransferScatterOp> {
     int64_t numIndexVecs = indexVecs.size();
     Value mask = op.getMask();
 
-    auto info = computeUnrollDim0Info(indexingMaps, numIndexVecs, !!mask,
-                                      indexingMaps[0]);
+    SmallVector<AffineMap> newAllMaps;
+    SmallVector<SmallVector<int64_t>> indexVecAxes;
+    SmallVector<int64_t> maskAxes, baseDimsUsingDim0;
+    computeUnrollDim0Maps(indexingMaps, numIndexVecs, !!mask, indexingMaps[0],
+                          newAllMaps, indexVecAxes, maskAxes,
+                          baseDimsUsingDim0);
 
-    Value dest = op.getBase();
+    SmallVector<int64_t> newShape(vectorType.getShape().drop_front());
+    auto newVectorType = VectorType::get(newShape, vectorType.getElementType());
+
+    // Gather accumulates sub-results; scatter chains destination updates.
+    Value acc;
+    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
+      acc = ub::PoisonOp::create(rewriter, loc, vectorType);
+    } else {
+      acc = op.getBase();
+    }
 
     for (int64_t i = 0; i < dim0Size; ++i) {
       SmallVector<Value> newOffsets = computeNewOffsets(
-          rewriter, loc, op.getOffsets(), i, info.baseDimsUsingDim0);
+          rewriter, loc, op.getOffsets(), i, baseDimsUsingDim0);
 
       SmallVector<Value> newIndexVecs;
       Value newMask;
       extractSlicesForIteration(rewriter, loc, i, indexVecs, numIndexVecs,
-                                info.indexVecAxes, mask, info.maskAxes,
-                                newIndexVecs, newMask);
+                                indexVecAxes, mask, maskAxes, newIndexVecs,
+                                newMask);
 
-      // Extract the vector slice to write.
-      Value vecSlice = vector::ExtractOp::create(rewriter, loc, op.getVector(),
-                                                 SmallVector<int64_t>{i});
+      if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
+        auto subGather = TransferGatherOp::create(
+            rewriter, loc, newVectorType, op.getBase(), newOffsets,
+            newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps),
+            op.getPadding(), newMask);
 
-      if (op.hasTensorSemantics()) {
-        auto subScatter = TransferScatterOp::create(
-            rewriter, loc, dest.getType(), dest, vecSlice, newOffsets,
-            newIndexVecs, rewriter.getAffineMapArrayAttr(info.newAllMaps),
-            newMask);
-        dest = subScatter.getResult();
+        SmallVector<int64_t> offsets(rank, 0);
+        offsets[0] = i;
+        SmallVector<int64_t> strides(newShape.size(), 1);
+        acc = vector::InsertStridedSliceOp::create(
+            rewriter, loc, subGather.getResult(), acc, offsets, strides);
       } else {
-        TransferScatterOp::create(
-            rewriter, loc, /*resultTypes=*/TypeRange{}, dest, vecSlice,
-            newOffsets, newIndexVecs,
-            rewriter.getAffineMapArrayAttr(info.newAllMaps), newMask);
+        Value vecSlice = vector::ExtractOp::create(
+            rewriter, loc, op.getVector(), SmallVector<int64_t>{i});
+
+        if (op.hasTensorSemantics()) {
+          auto subScatter = TransferScatterOp::create(
+              rewriter, loc, acc.getType(), acc, vecSlice, newOffsets,
+              newIndexVecs, rewriter.getAffineMapArrayAttr(newAllMaps),
+              newMask);
+          acc = subScatter.getResult();
+        } else {
+          TransferScatterOp::create(rewriter, loc, /*resultTypes=*/TypeRange{},
+                                    acc, vecSlice, newOffsets, newIndexVecs,
+                                    rewriter.getAffineMapArrayAttr(newAllMaps),
+                                    newMask);
+        }
       }
     }
 
-    if (op.hasTensorSemantics()) {
-      rewriter.replaceOp(op, dest);
+    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
+      rewriter.replaceOp(op, acc);
     } else {
-      rewriter.eraseOp(op);
+      if (op.hasTensorSemantics()) {
+        rewriter.replaceOp(op, acc);
+      } else {
+        rewriter.eraseOp(op);
+      }
     }
     return success();
   }
@@ -323,8 +263,8 @@ namespace mlir::iree_compiler::IREE::VectorExt {
 
 void populateVectorTransferGatherScatterLoweringPatterns(
     RewritePatternSet &patterns) {
-  patterns.add<UnrollTransferGatherDim, UnrollTransferScatterDim>(
-      patterns.getContext());
+  patterns.add<UnrollTransferDim<TransferGatherOp>,
+               UnrollTransferDim<TransferScatterOp>>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
