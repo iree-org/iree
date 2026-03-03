@@ -18,6 +18,7 @@ iree_lit_test_suite(
         # keep sorted
         [
             "invalid.mlir",
+            "iree_cpu_inner_tiled_ops.mlir",
             "roundtrip.mlir",
         ],
         include = ["*.mlir"],
