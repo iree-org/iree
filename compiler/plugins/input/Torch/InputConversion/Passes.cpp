@@ -57,6 +57,9 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());
+  if (options.enableShapeRefinement) {
+    torch::Torch::createTorchShapeRefinementPipeline(pm, /*options=*/{});
+  }
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTMTensorToLinalgExtPass());

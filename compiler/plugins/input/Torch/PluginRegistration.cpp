@@ -30,6 +30,7 @@ struct TorchOptions {
   bool strictSymbolicShapes = true;
   bool decompose = true;
   bool externalizeTransients = false;
+  bool enableShapeRefinement = false;
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("Torch Input");
     binder.opt<bool>(
@@ -46,6 +47,9 @@ struct TorchOptions {
                        "program inputs when converting torch functions to IREE "
                        "input. This buffer will be used for storing transient "
                        "memory and must be provided by the user at runtime."));
+    binder.opt<bool>("iree-torch-enable-shape-refinement",
+                     enableShapeRefinement, llvm::cl::cat(category),
+                     llvm::cl::desc("Enable shape refinement"));
   }
 };
 
@@ -96,6 +100,7 @@ struct TorchSession
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       torchOptions.decompose = options.decompose;
       torchOptions.externalizeTransients = options.externalizeTransients;
+      torchOptions.enableShapeRefinement = options.enableShapeRefinement;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       return true;
     }
