@@ -130,10 +130,11 @@ typedef struct iree_async_iocp_carrier_t {
   // without inspecting the operation type.
   uintptr_t io_handle;
 
-  // Intrusive list linkage for proactor's active carrier tracking.
+  // Intrusive doubly-linked list for proactor's active carrier tracking.
   // Used for event wait carriers (linked into proactor->active_carriers).
   // Socket I/O carriers are not tracked in the active list.
   struct iree_async_iocp_carrier_t* next;
+  struct iree_async_iocp_carrier_t* prev;
 
   // Per-type auxiliary data. The active member is determined by |type|.
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -265,7 +266,7 @@ typedef struct iree_async_proactor_iocp_t {
   // loop scans the active_carriers list for cancelled entries.
   iree_atomic_int32_t pending_event_wait_cancellation_count;
 
-  // Active event wait carriers (poll thread only). Singly-linked list of
+  // Active event wait carriers (poll thread only). Doubly-linked list of
   // carriers with outstanding RegisterWaitForSingleObject registrations.
   // Walked during proactor destroy to unregister outstanding waits.
   iree_async_iocp_carrier_t* active_carriers;

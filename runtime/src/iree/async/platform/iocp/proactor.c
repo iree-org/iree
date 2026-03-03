@@ -742,7 +742,11 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
         }
 
         // Link into active carrier list for cleanup during destroy.
+        carrier->prev = NULL;
         carrier->next = proactor->active_carriers;
+        if (proactor->active_carriers) {
+          proactor->active_carriers->prev = carrier;
+        }
         proactor->active_carriers = carrier;
         break;
       }
@@ -856,8 +860,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
 
   iree_host_size_t direct_completions = 0;
 
-  iree_async_iocp_carrier_t** prev_ptr = &proactor->active_carriers;
-  iree_async_iocp_carrier_t* carrier = *prev_ptr;
+  iree_async_iocp_carrier_t* carrier = proactor->active_carriers;
   while (carrier && cancellation_count > 0) {
     iree_async_iocp_carrier_t* next = carrier->next;
 
@@ -865,7 +868,6 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
         !iree_any_bit_set(
             iree_async_operation_load_internal_flags(carrier->operation),
             IREE_ASYNC_IOCP_INTERNAL_FLAG_CANCELLED)) {
-      prev_ptr = &carrier->next;
       carrier = next;
       continue;
     }
@@ -876,8 +878,15 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
         UnregisterWaitEx(carrier->data.event_wait.wait_handle, NULL);
     if (unregistered) {
       // Successfully unregistered before the callback fired.
-      // Unlink from active list, free carrier, dispatch CANCELLED.
-      *prev_ptr = next;
+      // Unlink from active list (O(1) via prev/next).
+      if (carrier->prev) {
+        carrier->prev->next = carrier->next;
+      } else {
+        proactor->active_carriers = carrier->next;
+      }
+      if (carrier->next) {
+        carrier->next->prev = carrier->prev;
+      }
       iree_async_operation_t* operation = carrier->operation;
       operation->next = NULL;
       iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
@@ -897,7 +906,6 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
       iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
                             iree_memory_order_release);
       --cancellation_count;
-      prev_ptr = &carrier->next;
     }
     carrier = next;
   }
@@ -1328,13 +1336,14 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
       switch (carrier->type) {
         case IREE_ASYNC_IOCP_CARRIER_EVENT_WAIT: {
-          // Unlink carrier from active list.
-          iree_async_iocp_carrier_t** prev_ptr = &proactor->active_carriers;
-          while (*prev_ptr && *prev_ptr != carrier) {
-            prev_ptr = &(*prev_ptr)->next;
+          // Unlink carrier from active list (O(1) via prev/next).
+          if (carrier->prev) {
+            carrier->prev->next = carrier->next;
+          } else {
+            proactor->active_carriers = carrier->next;
           }
-          if (*prev_ptr == carrier) {
-            *prev_ptr = carrier->next;
+          if (carrier->next) {
+            carrier->next->prev = carrier->prev;
           }
           operation->next = NULL;
           iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
