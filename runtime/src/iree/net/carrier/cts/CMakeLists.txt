@@ -153,8 +153,23 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    latency_benchmark_lib
+  SRCS
+    "latency_benchmark.cc"
+  DEPS
+    benchmark
+    iree::net::carrier::cts::util::benchmark_base
+    iree::net::carrier::cts::util::registry
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_benchmarks
   DEPS
+    ::latency_benchmark_lib
     ::roundtrip_benchmark_lib
     ::throughput_benchmark_lib
   TESTONLY

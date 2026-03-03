@@ -37,4 +37,17 @@ iree_cc_test(
     iree::testing::gtest
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    shm_benchmarks
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/net/carrier/cts/util/benchmark_main.cc"
+  DEPS
+    ::backends
+    benchmark
+    iree::net::carrier::cts::all_benchmarks
+    iree::net::carrier::cts::util::registry
+  TESTONLY
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

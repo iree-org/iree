@@ -7,6 +7,7 @@
 # SHM carrier CTS backend registration.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -42,5 +43,21 @@ iree_runtime_cc_test(
         "//runtime/src/iree/net/carrier/cts:all_tests",
         "//runtime/src/iree/net/carrier/cts/util:registry",
         "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Benchmark binaries
+#===------------------------------------------------------------------------===#
+
+# CTS benchmarks with SHM backend.
+cc_binary_benchmark(
+    name = "shm_benchmarks",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:benchmark_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_benchmarks",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "@com_google_benchmark//:benchmark",
     ],
 )
