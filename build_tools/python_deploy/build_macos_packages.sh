@@ -75,11 +75,11 @@ function run() {
 
 function build_iree_runtime() {
   export IREE_RUNTIME_BUILD_TRACY=ON
-  python3 -m pip wheel -v -w $output_dir $repo_root/runtime/
+  python3 -m pip wheel --no-deps -v -w $output_dir $repo_root/runtime/
 }
 
 function build_iree_compiler() {
-  python3 -m pip wheel -v -w $output_dir $repo_root/compiler/
+  python3 -m pip wheel --no-deps -v -w $output_dir $repo_root/compiler/
 }
 
 function clean_wheels() {
