@@ -474,8 +474,8 @@ class CustomBuild(_build):
 
 
 class CMakeExtension(Extension):
-    def __init__(self, name, sourcedir=""):
-        Extension.__init__(self, name, sources=[])
+    def __init__(self, name, sourcedir="", **kwargs):
+        Extension.__init__(self, name, sources=[], **kwargs)
         self.sourcedir = os.path.abspath(sourcedir)
 
 
@@ -601,10 +601,10 @@ setup(
     python_requires=">=3.10",
     ext_modules=(
         [
-            CMakeExtension("iree._runtime_libs._runtime"),
+            CMakeExtension("iree._runtime_libs._runtime", py_limited_api=_is_abi3_build),
         ]
         + (
-            [CMakeExtension("iree._runtime_libs_tracy._runtime")]
+            [CMakeExtension("iree._runtime_libs_tracy._runtime", py_limited_api=_is_abi3_build)]
             if ENABLE_TRACY
             else []
         )
