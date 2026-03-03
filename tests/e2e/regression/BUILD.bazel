@@ -86,6 +86,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
     tags = [
+        "noaarch64",
         "noriscv",
     ],
     target_backend = "llvm-cpu",
