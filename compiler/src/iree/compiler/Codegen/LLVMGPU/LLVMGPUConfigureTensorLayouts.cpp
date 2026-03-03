@@ -70,9 +70,10 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
 /// Returns the actual divisor (without zeros or out of bounds) used to compute
 /// bounds /= divisor.
 FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
-                                           ArrayRef<int64_t> tile) {
+                                           ArrayRef<int64_t> tile,
+                                           bool ceilDiv = false) {
   assert(bounds.size() >= tile.size() &&
-         "cannot divide bounds with a larger tile size");
+         "cannot divide bounds with a different rank");
 
   SmallVector<int64_t> divisor(bounds.size(), 1);
   for (auto [div, size] : llvm::zip(divisor, tile)) {
@@ -83,7 +84,7 @@ FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
   }
 
   for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
-    bound /= div;
+    bound = ceilDiv ? llvm::divideCeil(bound, div) : bound / div;
   }
 
   return divisor;
@@ -573,8 +574,12 @@ static LogicalResult setGPULoweringConfigLayout(
   // Use thread tile sizes as the vector width for each thread.
   SmallVector<int64_t> threadTileSizes = config.getStaticTilingLevelSizes(
       llvm::to_underlying(IREE::GPU::TilingLevel::Thread), candidate);
+  // Use ceil division here to make sure that we cover the entire tensor with
+  // the layout. If the tensor size isn't divisible by the chosen tile sizes, we
+  // want to have the vector larger than the tensor and mask out the excess
+  // elements.
   FailureOr<SmallVector<int64_t>> elementTile =
-      divideTile(bounds, threadTileSizes);
+      divideTile(bounds, threadTileSizes, /*ceilDiv=*/true);
   if (failed(elementTile)) {
     candidate->emitError() << "Could not divide bounds over given thread tile";
   }
