@@ -2373,10 +2373,43 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datatiledmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataTiledMMAAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#innertiledsemanticsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InnerTiledSemanticsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#loweringconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       
         LoweringConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmaintrinsicattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MMAIntrinsicAttr
       
     </span>
   </a>
@@ -2391,6 +2424,51 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mmaintrinsic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MMAIntrinsic
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MMAIntrinsic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -6051,10 +6129,43 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datatiledmmaattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataTiledMMAAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#innertiledsemanticsattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InnerTiledSemanticsAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#loweringconfigattr" class="md-nav__link">
     <span class="md-ellipsis">
       
         LoweringConfigAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mmaintrinsicattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MMAIntrinsicAttr
       
     </span>
   </a>
@@ -6069,6 +6180,51 @@
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enums" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Enums">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mmaintrinsic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MMAIntrinsic
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MMAIntrinsic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cases:
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -6115,8 +6271,18 @@ LLVM are handled separately.</p>
 <li><a href="#iree_cpu-dialect">'iree_cpu' Dialect</a><ul>
 <li><a href="#attributes">Attributes</a><ul>
 <li><a href="#cpuencodingresolverattr">CPUEncodingResolverAttr</a></li>
+<li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
+<li><a href="#innertiledsemanticsattr">InnerTiledSemanticsAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
+<li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
 <li><a href="#vmvxencodingresolverattr">VMVXEncodingResolverAttr</a></li>
+</ul>
+</li>
+<li><a href="#enums">Enums</a><ul>
+<li><a href="#mmaintrinsic">MMAIntrinsic</a><ul>
+<li><a href="#cases">Cases:</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -6152,6 +6318,62 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_cpu.data_tiled_mma_layout&lt;
+  ::mlir::iree_compiler::IREE::CPU::MMAIntrinsic,   # intrinsic
+  int64_t,   # intrinsics_m
+  int64_t,   # intrinsics_n
+  int64_t   # intrinsics_k
+&gt;
+</code></pre></div>
+<p>CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
+iree_codegen.inner_tiled. Like the GPU case, this wraps an intrinsic-enum and
+some intrinsics_{m,n,k} unrolling factor. Unlike the GPU case, there is no
+thread-distribution, no concept of subgroups and no interleaving of
+intrinsics' layout.</p>
+<p>Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
+here but are unused.</p>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">intrinsic</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::CPU::MMAIntrinsic</code></td>
+<td>an enum of type MMAIntrinsic</td>
+</tr>
+<tr>
+<td style="text-align: center;">intrinsics_m</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Intrinsic count along the M dimension.</td>
+</tr>
+<tr>
+<td style="text-align: center;">intrinsics_n</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Intrinsic count along the N dimension.</td>
+</tr>
+<tr>
+<td style="text-align: center;">intrinsics_k</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Intrinsic count along the K dimension.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="innertiledsemanticsattr">InnerTiledSemanticsAttr<a class="headerlink" href="#innertiledsemanticsattr" title="Permanent link">link</a></h3>
+<p>Syntax: <code>#iree_cpu.mma_semantics</code></p>
+<p>Attribute describing aspects of inner-tiled MMA semantics that are
+orthogonal to the data_tiled_mma_layout kind. On CPU, tiles are always
+undistributed (no thread distribution) and always expanded (opaque = false),
+so there is currently no parameter here, making this temporarily a unit
+attribute, but this could evolve in the future to look more like
+IREEGPU_InnerTiledSemanticsAttr.</p>
 <h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation for cpu compilation.</em></p>
 <p>CPU specific implementation of a lowering config. This carries just a
@@ -6174,7 +6396,7 @@ value on a dimension. They are expected to be disjoint. It is not enforced
 in the verifier, because we want to keep the flexibility when something is
 wrong in a lowering config. E.g., some transformations still work even if
 they are not disjoint.</p>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6191,6 +6413,30 @@ they are not disjoint.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="mmaintrinsicattr">MMAIntrinsicAttr<a class="headerlink" href="#mmaintrinsicattr" title="Permanent link">link</a></h3>
+<p><em>Descriptor for different MMA intrinsics</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_cpu.mma_intrinsic&lt;
+  ::mlir::iree_compiler::IREE::CPU::MMAIntrinsic   # value
+&gt;
+</code></pre></div>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::CPU::MMAIntrinsic</code></td>
+<td>an enum of type MMAIntrinsic</td>
+</tr>
+</tbody>
+</table>
 <h3 id="vmvxencodingresolverattr">VMVXEncodingResolverAttr<a class="headerlink" href="#vmvxencodingresolverattr" title="Permanent link">link</a></h3>
 <p><em>The encoding layout attribute for VMVX backend.</em></p>
 <p>Syntax:</p>
@@ -6202,7 +6448,7 @@ they are not disjoint.</p>
 serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
 Codegen::PackedLayoutMaterializerAttr, etc. They are implemented through external model
 mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6216,6 +6462,71 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <td style="text-align: center;">configuration</td>
 <td style="text-align: center;"><code>DictionaryAttr</code></td>
 <td>Executable target configuration. It is expected to be used in a pass scope, but not the final IR output.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
+<h3 id="mmaintrinsic">MMAIntrinsic<a class="headerlink" href="#mmaintrinsic" title="Permanent link">link</a></h3>
+<p><em>Descriptor for different MMA intrinsics</em></p>
+<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Symbol</th>
+<th style="text-align: center;">Value</th>
+<th>String</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">None</td>
+<td style="text-align: center;"><code>0</code></td>
+<td>None</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512_1x8x1_F64_F64</td>
+<td style="text-align: center;"><code>4864</code></td>
+<td>MMA_X86_AVX512_1x8x1_F64_F64</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512_1x16x1_F32_F32</td>
+<td style="text-align: center;"><code>4880</code></td>
+<td>MMA_X86_AVX512_1x16x1_F32_F32</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512_1x16x1_F32_F16_CASTF32</td>
+<td style="text-align: center;"><code>4896</code></td>
+<td>MMA_X86_AVX512_1x16x1_F32_F16_CASTF32</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512FP16_1x32x1_F16_F16</td>
+<td style="text-align: center;"><code>4897</code></td>
+<td>MMA_X86_AVX512FP16_1x32x1_F16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512BF16_1x16x2_F32_BF16</td>
+<td style="text-align: center;"><code>4912</code></td>
+<td>MMA_X86_AVX512BF16_1x16x2_F32_BF16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512_1x16x2_I32_I16</td>
+<td style="text-align: center;"><code>5024</code></td>
+<td>MMA_X86_AVX512_1x16x2_I32_I16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512VNNI_1x16x2_I32_I16</td>
+<td style="text-align: center;"><code>5025</code></td>
+<td>MMA_X86_AVX512VNNI_1x16x2_I32_I16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512_1x16x2_I32_I8_CASTI16</td>
+<td style="text-align: center;"><code>5056</code></td>
+<td>MMA_X86_AVX512_1x16x2_I32_I8_CASTI16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16</td>
+<td style="text-align: center;"><code>5057</code></td>
+<td>MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16</td>
 </tr>
 </tbody>
 </table>
