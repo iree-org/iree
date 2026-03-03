@@ -46,13 +46,13 @@ static constexpr int kMaxCandidatesPerValue = 4;
 //   conversions.
 //
 // The forward analysis is the main driver of the analysis. The reason for this
-// is that generally on GPUs you will always have something that will
-// assign a layout to the loads. If you don't, then your program is
-// ill-formed for vector distribute anyway. Then either the rest of the
-// program gets it's layout from the load layout, or it gets it's layout
-// from whatever backpropagated the layout to the load. We don't want to
-// handle other kinds of programs, because they are ill-formed and should
-// have had better layout setting on them.
+// is that for a program to be well-formed for vector distribution, there must
+// be some way for the final store/return to get a layout. Otherwise, there
+// is not enough information in the program to determine how distribution should
+// be done. The forward analysis ensures that the final return/store gets a
+// layout in a well-formed program. The rest of the program can get their
+// layouts from backward propagation, everything in the program must eventually
+// reach the store/return.
 //===----------------------------------------------------------------------===//
 
 namespace {
