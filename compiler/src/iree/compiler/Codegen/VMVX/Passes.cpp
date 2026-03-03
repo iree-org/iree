@@ -34,23 +34,11 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
                    "ukernels are enabled (experimental)"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clTileDispatchUsingForall(
-    "iree-vmvx-tile-dispatch-using-forall",
-    llvm::cl::desc("Enable tile and distribute to workgroups using scf.forall"),
-    llvm::cl::init(true));
-
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
-  if (clTileDispatchUsingForall) {
-    funcPassManager.addPass(
-        createTileAndDistributeToWorkgroupsUsingForallOpPass());
-    funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
-    funcPassManager.addPass(createCombineResultLayoutTransformationPass());
-  } else {
-    funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
-    funcPassManager.addPass(createCSEPass());
-    funcPassManager.addPass(createConvertToDestinationPassingStylePass());
-    funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
-  }
+  funcPassManager.addPass(
+      createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
+  funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
