@@ -237,9 +237,6 @@ void LayoutAnalysis::propagateOneForward(Value val,
         continue;
       }
       if (contract.getLhs() == val || contract.getRhs() == val) {
-        if (contract->hasAttr("iree.gpu.mma")) {
-          continue;
-        }
         if (auto maskOp = dyn_cast<vector::MaskOp>(contract->getParentOp())) {
           AffineMap map = contract.getMatchingIndexingMap(&use);
           if (map.isPermutation()) {
@@ -315,7 +312,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_write: vector operand layout -> derive mask layout.
   if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(write.getVector());
-    if (!layout || !write.getMask()) {
+    if (!write.getMask()) {
       return;
     }
     AffineMap maskMap =
@@ -327,7 +324,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_read: result layout -> derive mask layout.
   if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(read.getResult());
-    if (!layout || !read.getMask()) {
+    if (!read.getMask()) {
       return;
     }
     AffineMap maskMap =
@@ -339,9 +336,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // elementwise: result layout -> all operands get same layout.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
     VectorLayoutInterface layout = getResolvedLayout(op->getResult(0));
-    if (!layout) {
-      return;
-    }
     for (OpOperand &operand : op->getOpOperands()) {
       setLayoutOrClone(&operand, layout);
     }
@@ -351,9 +345,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // to_layout: result layout -> input gets same layout.
   if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(toLayout.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(&toLayout.getInputMutable(), layout);
     return;
   }
@@ -361,9 +352,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // multi_dim_reduction: result layout -> acc gets same layout.
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(multiReduce.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(&multiReduce.getAccMutable(), layout);
     return;
   }
@@ -371,9 +359,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transpose: result layout -> input gets inverse-permuted layout.
   if (auto transpose = dyn_cast<vector::TransposeOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(transpose.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(
         &transpose.getVectorMutable(),
         layout.permute(invertPermutationVector(transpose.getPermutation())));
@@ -383,7 +368,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // broadcast: result layout -> source gets projected layout.
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(broadcast.getResult());
-    if (!layout || !isa<VectorType>(broadcast.getSourceType())) {
+    if (!isa<VectorType>(broadcast.getSourceType())) {
       return;
     }
     assert(broadcast.computeBroadcastedUnitDims().empty() &&
@@ -402,9 +387,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // contract: result layout -> acc gets same layout.
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(contract.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(&contract.getAccMutable(), layout);
     return;
   }
@@ -412,9 +394,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // gather: result layout -> indices, mask, passthru get same layout.
   if (auto gather = dyn_cast<vector::GatherOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(gather.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(&gather.getIndicesMutable(), layout);
     setLayoutOrClone(&gather.getMaskMutable(), layout);
     setLayoutOrClone(&gather.getPassThruMutable(), layout);
@@ -424,9 +403,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_gather: result layout -> index vecs + mask get projected layouts.
   if (auto gather = dyn_cast<TransferGatherOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(gather.getResult());
-    if (!layout) {
-      return;
-    }
     SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
     int64_t numIndexVecs = gather.getIndexVecs().size();
     for (auto [i, operand] : llvm::enumerate(gather.getIndexVecsMutable())) {
@@ -449,9 +425,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // shape_cast: result layout -> source gets reshaped layout.
   if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(shapeCast.getResult());
-    if (!layout) {
-      return;
-    }
     setLayoutOrClone(
         &shapeCast.getSourceMutable(),
         layout.reshape(shapeCast.getSourceVectorType().getShape()));
@@ -463,9 +436,6 @@ void LayoutAnalysis::fixupOp(Operation *op) {
     auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     for (auto [i, result] : llvm::enumerate(forOp.getResults())) {
       VectorLayoutInterface layout = getResolvedLayout(result);
-      if (!layout) {
-        continue;
-      }
       setLayoutOrClone(&yieldOp->getOpOperand(i), layout);
       setLayoutOrClone(&forOp.getInitArgsMutable()[i], layout);
     }

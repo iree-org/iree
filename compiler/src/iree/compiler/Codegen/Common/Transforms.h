@@ -81,68 +81,37 @@ namespace IREE::VectorExt {
 class VectorLayoutInterface;
 } // namespace IREE::VectorExt
 
-/// Analyzes the root op and its nested ops to propagate vector layouts
-/// originating from to_vector operations. Example:
+/// Propagates vector layouts through `root` and its nested operations.
+/// Populates `layouts` with the resolved layout for every vector-typed value.
 ///
-///    %root = vector.transfer_read
-///      |
-///      --> anchored to layout L (using a to_layout op)
-///    %root2 = vector.transfer_read
-///    %c = arith.mulf %root, %b
-///          |
-///          --> %root, %b and %c must have the same layout
-///    %e = arith.divf %b, %root2
-///          |
-///          --> %root2, %b and %e must have the same layout
+/// Layout anchors are `iree_vector_ext.to_layout` ops in the IR. These must
+/// be present before calling this function — they seed the analysis. On GPUs,
+/// anchors are typically placed on loads. IR without anchors is considered
+/// ill-formed for vector distribution.
 ///
-/// Here, the user provided an anchor point for %root, fixing its layout to L.
-/// The layout then uses its inference rules to find the layout of other
-/// values:
+/// Starting from anchors, layouts are inferred for the rest of the IR using
+/// op-specific rules (elementwise, transpose, contract, scf.for, etc.).
 ///
-///    %root = vector.transfer_read
-///     |
-///     --> inferred to layout L
-///    %root2 = vector.transfer_read
-///     |
-///     --> inferred to layout L
-///    %c = arith.mulf %root, %b
-///     |
-///     --> inferred to layout L
-///    %e = arith.divf %b, %root2
-///     |
-///     --> inferred to layout L
+/// Example — single anchor:
 ///
-/// If at any point, a value has a layout, but the user of that value requires
-/// a different layout, the analysis inserts a resolution operation. This
-/// resolution operation is `iree_vector_ext.to_layout`.
-/// For Example:
+///    %read = vector.transfer_read ...
+///    %anchored = iree_vector_ext.to_layout %read to layout(L)
+///    %c = arith.mulf %anchored, %b   --> inferred to layout L
+///    %e = arith.divf %b, %anchored   --> inferred to layout L
 ///
-/// %0 = vector.transfer_read
-///  |
-///  --> anchored to layout L
-/// %1 = vector.transfer_read
-///  |
-///  --> anchored to layout L'
-///  arith.addf %0, %1
-///     |
-///     --> %0 and %1 must have the same layout
+/// When a value receives conflicting layouts from different anchors, the
+/// analysis resolves the conflict by inserting a `to_layout` conversion.
+/// Cheap ops (constants, create_mask, step) are cloned per use site instead.
+/// The caller is responsible for lowering the inserted `to_layout` ops.
 ///
-/// To resolve the conflict, the analysis chooses one of the layouts, say
-/// L, and inserts a resolution operation to convert the other layout to L.
+/// Example — conflict resolution:
 ///
-/// %0 = vector.transfer_read
-///  |
-///  --> anchored to layout L
-/// %1 = vector.transfer_read
-///  |
-///  --> anchored to layout L'
-/// %resolved = iree_vector_ext.to_layout %1
-///  |
-///  --> inferred to layout L
-/// arith.addf %0, %resolved
-///
-/// The analysis itself will not try to resolve the conflict, but instead
-/// will leave it as a to_layout op, which can be rewritten by the caller.
+///    %a = ... to_layout ... to layout(L)
+///    %b = ... to_layout ... to layout(L')
+///    // %a and %b have different layouts but feed into the same op.
+///    // The analysis inserts a conversion on %b:
+///    %resolved = iree_vector_ext.to_layout %b to layout(L)
+///    arith.addf %a, %resolved   --> layout L
 void propagateVectorLayoutInfo(
     Operation *root,
     llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface> &layouts);
