@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/MIPS/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -517,6 +518,10 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   // memory space through the stack.
   FunctionLikeNest(modulePassManager)
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+
+  // mips.matmul is eliminated during One-Shot Bufferize (func.call emitted
+  // directly by MIPSBufferizableOpInterface). This pass is now a no-op.
+  modulePassManager.addPass(IREE::MIPS::createLowerMIPSToFuncCallPass());
 
   // Lower `ukernel.*` ops to function calls
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());

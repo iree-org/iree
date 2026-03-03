@@ -43,6 +43,12 @@ struct TorchToIREELoweringPipelineOptions
           "program inputs. This buffer will be used for storing transient "
           "memory and must be provided by the user."),
       llvm::cl::init(false)};
+  Option<bool> useMIPSMatmul{
+      *this, "use-mips-matmul",
+      llvm::cl::desc("If enabled, lowers torch.aten.mm through the MIPS "
+                     "custom dialect (mips.matmul) instead of the standard "
+                     "torch->linalg path."),
+      llvm::cl::init(false)};
 };
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.

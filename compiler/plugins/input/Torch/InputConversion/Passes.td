@@ -29,6 +29,16 @@ def ConvertTorchUnstructuredToLinalgExtPass :
   let summary = "Convert unstructured Torch ops to LinalgExt ops";
 }
 
+def ConvertTorchToMIPSPass :
+    InterfacePass<"torch-iree-to-mips-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Convert torch.aten.mm to mips.matmul";
+  let description = [{
+    Intercepts torch.aten.mm before the standard torch->linalg conversion and
+    replaces it with mips.matmul. The mips.matmul op is later lowered to a
+    func.call @my_matmul_kernel by LowerMIPSToFuncCallPass after bufferization.
+  }];
+}
+
 def SetStrictSymbolicShapesPass :
     InterfacePass<"torch-iree-set-strict-symbolic-shapes", "mlir::FunctionOpInterface"> {
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";

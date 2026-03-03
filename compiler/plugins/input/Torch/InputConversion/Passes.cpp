@@ -63,6 +63,11 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTorchUnstructuredToLinalgExtPass());
+  // MIPS: When enabled, intercept aten.mm before the standard torch->linalg
+  // pass and route it through mips.matmul -> func.call @my_matmul_kernel.
+  if (options.useMIPSMatmul) {
+    pm.addNestedPass<func::FuncOp>(TorchInput::createConvertTorchToMIPSPass());
+  }
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
