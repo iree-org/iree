@@ -50,6 +50,9 @@ void createTorchToIREEPipeline(
       torch::Torch::createReduceOpVariantsPass(llvm::StringRef()));
   pm.addNestedPass<func::FuncOp>(
       mlir::torch::TorchConversion::createConvertCustomQuantOpPass());
+  if (options.enableShapeRefinement) {
+    torch::Torch::createTorchShapeRefinementPipeline(pm, /*options=*/{});
+  }
   if (options.decompose) {
     pm.addNestedPass<func::FuncOp>(
         torch::Torch::createDecomposeComplexOpsPass(BackendLegalOps::get()));
@@ -57,9 +60,6 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());
-  if (options.enableShapeRefinement) {
-    torch::Torch::createTorchShapeRefinementPipeline(pm, /*options=*/{});
-  }
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTMTensorToLinalgExtPass());
