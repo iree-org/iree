@@ -312,7 +312,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_write: vector operand layout -> derive mask layout.
   if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(write.getVector());
-    if (!write.getMask()) {
+    if (!layout || !write.getMask()) {
       return;
     }
     AffineMap maskMap =
@@ -324,7 +324,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_read: result layout -> derive mask layout.
   if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(read.getResult());
-    if (!read.getMask()) {
+    if (!layout || !read.getMask()) {
       return;
     }
     AffineMap maskMap =
@@ -359,6 +359,9 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transpose: result layout -> input gets inverse-permuted layout.
   if (auto transpose = dyn_cast<vector::TransposeOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(transpose.getResult());
+    if (!layout) {
+      return;
+    }
     setLayoutOrClone(
         &transpose.getVectorMutable(),
         layout.permute(invertPermutationVector(transpose.getPermutation())));
@@ -368,7 +371,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // broadcast: result layout -> source gets projected layout.
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(broadcast.getResult());
-    if (!isa<VectorType>(broadcast.getSourceType())) {
+    if (!layout || !isa<VectorType>(broadcast.getSourceType())) {
       return;
     }
     assert(broadcast.computeBroadcastedUnitDims().empty() &&
@@ -403,6 +406,9 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // transfer_gather: result layout -> index vecs + mask get projected layouts.
   if (auto gather = dyn_cast<TransferGatherOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(gather.getResult());
+    if (!layout) {
+      return;
+    }
     SmallVector<AffineMap> maps = gather.getIndexingMapsArray();
     int64_t numIndexVecs = gather.getIndexVecs().size();
     for (auto [i, operand] : llvm::enumerate(gather.getIndexVecsMutable())) {
@@ -425,6 +431,9 @@ void LayoutAnalysis::fixupOp(Operation *op) {
   // shape_cast: result layout -> source gets reshaped layout.
   if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(op)) {
     VectorLayoutInterface layout = getResolvedLayout(shapeCast.getResult());
+    if (!layout) {
+      return;
+    }
     setLayoutOrClone(
         &shapeCast.getSourceMutable(),
         layout.reshape(shapeCast.getSourceVectorType().getShape()));
