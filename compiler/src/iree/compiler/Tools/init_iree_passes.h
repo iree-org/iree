@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/MIPS/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/TensorExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -62,6 +63,7 @@ inline void registerAllIreePasses() {
   IREE::HAL::Loader::registerHALLoaderPasses();
   IREE::IO::Parameters::registerParametersPasses();
   IREE::LinalgExt::registerPasses();
+  IREE::MIPS::registerMIPSPasses();
   IREE::Stream::registerStreamPasses();
   IREE::TensorExt::registerPasses();
   IREE::Util::registerUtilPasses();

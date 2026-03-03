@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/MIPS/IR/MIPSOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
@@ -369,6 +370,9 @@ static bool isRootLikeOp(Operation *op) {
     return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, tensor::ConcatOp,
                 linalg::PackOp>(op);
   }
+  // MIPS: mips.matmul is a dispatch root (lowered to a custom C kernel call).
+  if (isa<IREE::MIPS::MatmulOp>(op))
+    return true;
   return isa<linalg::UnPackOp>(op);
 }
 
