@@ -236,14 +236,14 @@ func.func @transfer_scatter(%indices: vector<128xindex>,
   [%indices1 : vector<64xindex>] {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
                      affine_map<(d0, d1)[s0] -> (d1)>]
-  } : vector<128x64xf16>, tensor<4096x64xf16>
+  } : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   // outer dimension scatter
   %out1 = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
   [%indices : vector<128xindex>] {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<128x64xf16>, tensor<4096x64xf16>
+  } : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   // full scatter
   %out2 = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
@@ -251,7 +251,7 @@ func.func @transfer_scatter(%indices: vector<128xindex>,
     indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0)>,
                      affine_map<(d0, d1)[s0, s1] -> (d1)>]
-  } : vector<128x64xf16>, tensor<4096x64xf16>
+  } : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out, %out1, %out2 : tensor<4096x64xf16>, tensor<4096x64xf16>, tensor<4096x64xf16>
 }
@@ -267,9 +267,9 @@ func.func @transfer_scatter(%indices: vector<128xindex>,
 // CHECK-LABEL: func.func @transfer_scatter
 // CHECK-SAME:    %[[INDICES0:.+]]: vector<128xindex>, %[[INDICES1:.+]]: vector<64xindex>, %[[VECTOR:.+]]: vector<128x64xf16>, %[[DEST:.+]]: tensor<4096x64xf16>
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES1]] : vector<64xindex>] {indexing_maps = [#[[$SMAP_D0S0]], #[[$IVMAP_D1_1S]]]} : vector<128x64xf16>, tensor<4096x64xf16>
-// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES0]] : vector<128xindex>] {indexing_maps = [#[[$SMAP_S0D1]], #[[$IVMAP_D0_1S]]]} : vector<128x64xf16>, tensor<4096x64xf16>
-// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES0]], %[[INDICES1]] : vector<128xindex>, vector<64xindex>] {indexing_maps = [#[[$SMAP_S0S1]], #[[$IVMAP_D0_2S]], #[[$IVMAP_D1_2S]]]} : vector<128x64xf16>, tensor<4096x64xf16>
+// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES1]] : vector<64xindex>] {indexing_maps = [#[[$SMAP_D0S0]], #[[$IVMAP_D1_1S]]]} : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES0]] : vector<128xindex>] {indexing_maps = [#[[$SMAP_S0D1]], #[[$IVMAP_D0_1S]]]} : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[INDICES0]], %[[INDICES1]] : vector<128xindex>, vector<64xindex>] {indexing_maps = [#[[$SMAP_S0S1]], #[[$IVMAP_D0_2S]], #[[$IVMAP_D1_2S]]]} : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
 // -----
 
@@ -280,7 +280,7 @@ func.func @transfer_scatter_no_index_vecs(%vector: vector<128x64xf16>,
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0] {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>]
-  } : vector<128x64xf16>, tensor<4096x64xf16>
+  } : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -289,7 +289,7 @@ func.func @transfer_scatter_no_index_vecs(%vector: vector<128x64xf16>,
 // CHECK-LABEL: func.func @transfer_scatter_no_index_vecs
 // CHECK-SAME:    %[[VECTOR:.+]]: vector<128x64xf16>, %[[DEST:.+]]: tensor<4096x64xf16>
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] {indexing_maps = [#[[$SMAP_D0D1]]]} : vector<128x64xf16>, tensor<4096x64xf16>
+// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] {indexing_maps = [#[[$SMAP_D0D1]]]} : vector<128x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
 // -----
 
@@ -303,7 +303,7 @@ func.func @transfer_scatter_scalar_index(%idx: index,
   [%idx : index] {
     indexing_maps = [affine_map<(d0)[s0] -> (s0, d0)>,
                      affine_map<(d0)[s0] -> ()>]
-  } : vector<64xf16>, tensor<4096x64xf16>
+  } : vector<64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -313,7 +313,7 @@ func.func @transfer_scatter_scalar_index(%idx: index,
 // CHECK-LABEL: func.func @transfer_scatter_scalar_index
 // CHECK-SAME:    %[[IDX:.+]]: index, %[[VECTOR:.+]]: vector<64xf16>, %[[DEST:.+]]: tensor<4096x64xf16>
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[IDX]] : index] {indexing_maps = [#[[$SMAP_S0D0]], #[[$IVMAP_SCALAR]]]} : vector<64xf16>, tensor<4096x64xf16>
+// CHECK:       iree_vector_ext.transfer_scatter %[[VECTOR]] into %[[DEST]][%[[C0]], %[[C0]]] [%[[IDX]] : index] {indexing_maps = [#[[$SMAP_S0D0]], #[[$IVMAP_SCALAR]]]} : vector<64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
 // -----
 

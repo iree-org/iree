@@ -340,7 +340,8 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     }
   }];
 
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "$vector `into` $base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? (`,` $mask^)? attr-dict `:` type($vector) `,` type($base) (`,` type($mask)^)? (`->` type($result)^)?";
+
   let hasCanonicalizer = 1;
   let hasFolder = 1;
   let hasVerifier = 1;

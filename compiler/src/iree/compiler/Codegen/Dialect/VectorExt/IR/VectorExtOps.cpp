@@ -191,59 +191,48 @@ using IndexingMapFolder = function_ref<IndexingMapFoldResult(
     int64_t index, Value val, AffineMap valMap, AffineMap &baseMap)>;
 
 /// Shared index vec fold infrastructure for TransferGatherOp and
-/// TransferScatterOp. OpAdaptor provides access to op-specific operands.
+/// TransferScatterOp. Provides access to op-specific operands.
 template <typename OpTy>
-struct TransferOpAdaptor;
+struct TransferOpAdaptor {
+  static OperandRange getIndexVecs(OpTy op) { return op.getIndexVecs(); }
+  static Value getMask(OpTy op) { return op.getMask(); }
 
-template <>
-struct TransferOpAdaptor<TransferGatherOp> {
-  static OperandRange getIndexVecs(TransferGatherOp op) {
-    return op.getIndexVecs();
-  }
-  static Value getMask(TransferGatherOp op) { return op.getMask(); }
-  static void rebuildOperands(TransferGatherOp op,
-                              SmallVectorImpl<Value> &operands,
+  static void rebuildOperands(OpTy op, SmallVectorImpl<Value> &operands,
                               SmallVectorImpl<Value> &newIndexVecs,
                               Value mask) {
-    operands.push_back(op.getBase());
-    llvm::append_range(operands, op.getOffsets());
-    llvm::append_range(operands, newIndexVecs);
-    operands.push_back(op.getPadding());
-    if (mask) {
-      operands.push_back(mask);
+    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
+      operands.push_back(op.getBase());
+      llvm::append_range(operands, op.getOffsets());
+      llvm::append_range(operands, newIndexVecs);
+      operands.push_back(op.getPadding());
+      if (mask) {
+        operands.push_back(mask);
+      }
+      op.getProperties().setOperandSegmentSizes(
+          {1, static_cast<int32_t>(op.getOffsets().size()),
+           static_cast<int32_t>(newIndexVecs.size()), 1,
+           static_cast<int32_t>(mask ? 1 : 0)});
+    } else {
+      operands.push_back(op.getBase());
+      operands.push_back(op.getVector());
+      llvm::append_range(operands, op.getOffsets());
+      llvm::append_range(operands, newIndexVecs);
+      if (mask) {
+        operands.push_back(mask);
+      }
+      op.getProperties().setOperandSegmentSizes(
+          {1, 1, static_cast<int32_t>(op.getOffsets().size()),
+           static_cast<int32_t>(newIndexVecs.size()),
+           static_cast<int32_t>(mask ? 1 : 0)});
     }
-    op.getProperties().setOperandSegmentSizes(
-        {1, static_cast<int32_t>(op.getOffsets().size()),
-         static_cast<int32_t>(newIndexVecs.size()), 1,
-         static_cast<int32_t>(mask ? 1 : 0)});
   }
-  static Value getResult(TransferGatherOp op) { return op.getResult(); }
-};
 
-template <>
-struct TransferOpAdaptor<TransferScatterOp> {
-  static OperandRange getIndexVecs(TransferScatterOp op) {
-    return op.getIndexVecs();
-  }
-  static Value getMask(TransferScatterOp op) { return op.getMask(); }
-  static void rebuildOperands(TransferScatterOp op,
-                              SmallVectorImpl<Value> &operands,
-                              SmallVectorImpl<Value> &newIndexVecs,
-                              Value mask) {
-    operands.push_back(op.getBase());
-    operands.push_back(op.getVector());
-    llvm::append_range(operands, op.getOffsets());
-    llvm::append_range(operands, newIndexVecs);
-    if (mask) {
-      operands.push_back(mask);
+  static Value getResult(OpTy op) {
+    if constexpr (std::is_same_v<OpTy, TransferGatherOp>) {
+      return op.getResult();
+    } else {
+      return op.getResult() ? op.getResult() : Value();
     }
-    op.getProperties().setOperandSegmentSizes(
-        {1, 1, static_cast<int32_t>(op.getOffsets().size()),
-         static_cast<int32_t>(newIndexVecs.size()),
-         static_cast<int32_t>(mask ? 1 : 0)});
-  }
-  static Value getResult(TransferScatterOp op) {
-    return op.getResult() ? op.getResult() : Value();
   }
 };
 
@@ -738,121 +727,6 @@ void TransferScatterOp::getEffects(
     effects.emplace_back(MemoryEffects::Write::get(), &getBaseMutable(),
                          SideEffects::DefaultResource::get());
   }
-}
-
-// The declarative assemblyFormat cannot handle the optional result
-// (tensor → has result, memref → no result), so we use custom print/parse.
-//
-// Format:
-//   $vector `into` $base `[` $offsets `]`
-//       (`[` $index_vecs `:` type($index_vecs) `]`)?
-//       (`,` $mask)?  attr-dict
-//       `:` type($vector) `,` type($base) (`,` type($mask))?
-void TransferScatterOp::print(OpAsmPrinter &p) {
-  p << " " << getVector() << " into " << getBase() << "[" << getOffsets()
-    << "]";
-  if (!getIndexVecs().empty()) {
-    p << " [";
-    llvm::interleaveComma(getIndexVecs(), p);
-    p << " : ";
-    llvm::interleaveComma(
-        llvm::map_range(getIndexVecs(), [](Value v) { return v.getType(); }),
-        p);
-    p << "]";
-  }
-  if (getMask()) {
-    p << ", " << getMask();
-  }
-  p.printOptionalAttrDict((*this)->getAttrs(),
-                          {getOperandSegmentSizesAttrName()});
-  p << " : " << getVector().getType() << ", " << getBase().getType();
-  if (getMask()) {
-    p << ", " << getMask().getType();
-  }
-}
-
-ParseResult TransferScatterOp::parse(OpAsmParser &parser,
-                                     OperationState &result) {
-  auto &builder = parser.getBuilder();
-  OpAsmParser::UnresolvedOperand vectorInfo, baseInfo;
-  SmallVector<OpAsmParser::UnresolvedOperand> offsetInfo;
-  SmallVector<OpAsmParser::UnresolvedOperand> indexVecInfo;
-  SmallVector<Type> indexVecTypes;
-  OpAsmParser::UnresolvedOperand maskInfo;
-  bool hasMask = false;
-
-  // Parse: $vector `into` $base `[` $offsets `]`
-  if (parser.parseOperand(vectorInfo) || parser.parseKeyword("into") ||
-      parser.parseOperand(baseInfo) ||
-      parser.parseOperandList(offsetInfo, OpAsmParser::Delimiter::Square)) {
-    return failure();
-  }
-
-  // Parse optional: `[` $index_vecs `:` type($index_vecs) `]`
-  if (succeeded(parser.parseOptionalLSquare())) {
-    if (parser.parseOperandList(indexVecInfo) || parser.parseColon() ||
-        parser.parseTypeList(indexVecTypes) || parser.parseRSquare()) {
-      return failure();
-    }
-  }
-
-  // Parse optional: `,` $mask
-  if (succeeded(parser.parseOptionalComma())) {
-    hasMask = true;
-    if (parser.parseOperand(maskInfo)) {
-      return failure();
-    }
-  }
-
-  // Parse attr-dict
-  if (parser.parseOptionalAttrDict(result.attributes)) {
-    return failure();
-  }
-
-  // Parse `:` type($vector) `,` type($base)
-  Type vectorType, baseType;
-  if (parser.parseColon() || parser.parseType(vectorType) ||
-      parser.parseComma() || parser.parseType(baseType)) {
-    return failure();
-  }
-
-  // Parse optional `,` type($mask)
-  Type maskType;
-  if (hasMask) {
-    if (parser.parseComma() || parser.parseType(maskType)) {
-      return failure();
-    }
-  }
-
-  // Resolve operands.
-  auto indexType = builder.getIndexType();
-  if (parser.resolveOperand(baseInfo, baseType, result.operands) ||
-      parser.resolveOperand(vectorInfo, vectorType, result.operands) ||
-      parser.resolveOperands(offsetInfo, indexType, result.operands) ||
-      parser.resolveOperands(indexVecInfo, indexVecTypes, parser.getNameLoc(),
-                             result.operands)) {
-    return failure();
-  }
-  if (hasMask) {
-    if (parser.resolveOperand(maskInfo, maskType, result.operands)) {
-      return failure();
-    }
-  }
-
-  // Set operand segment sizes: {base, vector, offsets, index_vecs, mask}
-  result.addAttribute(
-      TransferScatterOp::getOperandSegmentSizesAttrName(result.name),
-      builder.getDenseI32ArrayAttr({1, 1,
-                                    static_cast<int32_t>(offsetInfo.size()),
-                                    static_cast<int32_t>(indexVecInfo.size()),
-                                    static_cast<int32_t>(hasMask)}));
-
-  // Add result type only for tensor semantics.
-  if (isa<RankedTensorType>(baseType)) {
-    result.addTypes(baseType);
-  }
-
-  return success();
 }
 
 LogicalResult TransferScatterOp::verify() {

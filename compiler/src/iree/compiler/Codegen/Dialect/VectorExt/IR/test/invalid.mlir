@@ -96,7 +96,7 @@ func.func @scatter_wrong_num_indexing_maps(%indices: vector<128xindex>,
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0]
   [%indices : vector<128xindex>] {
     indexing_maps = [affine_map<(d0)[s0] -> (s0)>]
-  } : vector<128xf16>, tensor<128xf16>
+  } : vector<128xf16>, tensor<128xf16> -> tensor<128xf16>
 
   return %out : tensor<128xf16>
 }
@@ -115,7 +115,7 @@ func.func @scatter_index_vec_shape_mismatch(%indices: vector<128x64xindex>,
   [%indices : vector<128x64xindex>] {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
                      affine_map<(d0, d1)[s0] -> (d1, d0)>]
-  } : vector<128x64xf16>, tensor<128x64xf16>
+  } : vector<128x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
 
   return %out : tensor<128x64xf16>
 }
