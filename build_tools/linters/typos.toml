@@ -80,5 +80,3 @@ mye = "mye"
 # Workgroup coordinate variables (iz, iy).
 iz = "iz"
 iy = "iy"
-# Upstream MLIR error message typo (faild to tile operation).
-faild = "faild"

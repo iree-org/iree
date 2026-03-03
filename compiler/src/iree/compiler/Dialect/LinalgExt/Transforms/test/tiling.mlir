@@ -4015,7 +4015,7 @@ module attributes { transform.with_named_sequence } {
 // -----
 
 func.func @no_tile_concat_dynamic(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?x?xi32>) -> tensor<?x?xi32> {
- // expected-error @below {{faild to tile operation}}
+ // expected-error @below {{failed to tile operation}}
  // expected-error @below {{failed to generate tiling loops}}
   %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x?xi32>, tensor<?x?xi32>) -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
@@ -4031,7 +4031,7 @@ module attributes { transform.with_named_sequence } {
 // -----
 
 func.func @no_tile_concat_concated_dim(%arg0 : tensor<?x64xi32>, %arg1 : tensor<?x64xi32>) -> tensor<?x128xi32> {
- // expected-error @below {{faild to tile operation}}
+ // expected-error @below {{failed to tile operation}}
  // expected-error @below {{failed to generate tiling loops}}
   %0 = tensor.concat dim(1) %arg0, %arg1 : (tensor<?x64xi32>, tensor<?x64xi32>) -> tensor<?x128xi32>
   return %0 : tensor<?x128xi32>
