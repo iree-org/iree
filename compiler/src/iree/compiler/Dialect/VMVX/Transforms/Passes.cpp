@@ -57,14 +57,23 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
 
 static void
 buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  {
-    FunctionLikeNest(modulePassManager)
-        .addPass(createVMVXLowerExecutableTargetPass);
-  }
+  FunctionLikeNest(variantPassManager.nest<ModuleOp>())
+      .addPass(createVMVXLowerExecutableTargetPass);
+
+  // Resolve workgroup distribution before lowering ukernels to calls.
+  // CPULowerToUKernelsPass (inside VMVXLowerExecutableTargetPass) lowers
+  // iree_codegen.query_tile_sizes to iree_codegen.ukernel.generic which is
+  // memory-effect-free at the tensor level (no memref operands). The WAR hack
+  // in materializeSliceFromOrdinals replaces it with a constant in the count
+  // region. After LowerUKernelOpsToCallsPass it becomes a func.call which is
+  // memory-effecting and would be rejected by the backward slice.
+  variantPassManager.addPass(createReconcileTranslationInfoPass());
+  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
+
+  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   // ---------------------------------------------------------------------------
@@ -134,8 +143,6 @@ void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
   buildVectorVMVXTransformPassPipeline(variantPassManager);
 
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
   // ---------------------------------------------------------------------------
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------
