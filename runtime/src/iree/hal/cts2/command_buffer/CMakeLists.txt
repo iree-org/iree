@@ -90,6 +90,45 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    dispatch_constants_bindings_test
+  SRCS
+    "dispatch_constants_bindings_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch_multi_workgroup_test
+  SRCS
+    "dispatch_multi_workgroup_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch_multi_entrypoint_test
+  SRCS
+    "dispatch_multi_entrypoint_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::basic_test
@@ -104,7 +143,10 @@ iree_cc_library(
   NAME
     all_dispatch_tests
   DEPS
+    ::dispatch_constants_bindings_test
     ::dispatch_constants_test
+    ::dispatch_multi_entrypoint_test
+    ::dispatch_multi_workgroup_test
     ::dispatch_test
   TESTONLY
   PUBLIC

@@ -134,6 +134,23 @@ class CtsTestBase : public BaseType {
     *out_buffer = buffer;
   }
 
+  void CreateDeviceBufferWithData(const void* source_data,
+                                  iree_device_size_t buffer_size,
+                                  iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_params_t params = {0};
+    params.type =
+        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER;
+    iree_hal_buffer_t* buffer = nullptr;
+    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                                      buffer_size, &buffer));
+    IREE_ASSERT_OK(iree_hal_device_transfer_h2d(
+        device_, source_data, buffer, /*target_offset=*/0, buffer_size,
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    *out_buffer = buffer;
+  }
+
   template <typename PatternType>
   void CreateFilledDeviceBuffer(iree_device_size_t buffer_size,
                                 PatternType pattern,

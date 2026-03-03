@@ -38,7 +38,10 @@ iree_runtime_cc_library(
 CTS_TESTDATA = "//runtime/src/iree/hal/cts2/testdata"
 
 CTS_TESTDATA_SRCS = [
+    "%s:command_buffer_dispatch_constants_bindings_test.mlir" % CTS_TESTDATA,
     "%s:command_buffer_dispatch_constants_test.mlir" % CTS_TESTDATA,
+    "%s:command_buffer_dispatch_multi_entrypoint_test.mlir" % CTS_TESTDATA,
+    "%s:command_buffer_dispatch_multi_workgroup_test.mlir" % CTS_TESTDATA,
     "%s:command_buffer_dispatch_test.mlir" % CTS_TESTDATA,
     "%s:executable_cache_test.mlir" % CTS_TESTDATA,
     "%s:executable_test.mlir" % CTS_TESTDATA,

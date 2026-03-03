@@ -80,6 +80,39 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+iree_runtime_cc_library(
+    name = "dispatch_constants_bindings_test",
+    testonly = True,
+    srcs = ["dispatch_constants_bindings_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "dispatch_multi_workgroup_test",
+    testonly = True,
+    srcs = ["dispatch_multi_workgroup_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "dispatch_multi_entrypoint_test",
+    testonly = True,
+    srcs = ["dispatch_multi_entrypoint_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
 # All command buffer tests (non-executable).
 iree_runtime_cc_library(
     name = "all_tests",
@@ -97,7 +130,10 @@ iree_runtime_cc_library(
     name = "all_dispatch_tests",
     testonly = True,
     deps = [
+        ":dispatch_constants_bindings_test",
         ":dispatch_constants_test",
+        ":dispatch_multi_entrypoint_test",
+        ":dispatch_multi_workgroup_test",
         ":dispatch_test",
     ],
 )
