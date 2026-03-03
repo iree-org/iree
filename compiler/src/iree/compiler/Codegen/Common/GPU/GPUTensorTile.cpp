@@ -224,8 +224,9 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
   }
 
   {
-    RewritePatternSet wgTilingCanonicalizationPatterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(funcOp.getContext());
+    RewritePatternSet wgTilingCanonicalizationPatterns(funcOp.getContext());
+    linalg::populateLinalgTilingCanonicalizationPatterns(
+        wgTilingCanonicalizationPatterns);
     populateAffineMinSCFCanonicalizationPattern(
         wgTilingCanonicalizationPatterns);
     scf::populateSCFForLoopCanonicalizationPatterns(

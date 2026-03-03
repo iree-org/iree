@@ -75,8 +75,9 @@ static LogicalResult tileToSerialLoops(mlir::FunctionOpInterface funcOp) {
   }
 
   {
-    RewritePatternSet wgTilingCanonicalizationPatterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(funcOp.getContext());
+    RewritePatternSet wgTilingCanonicalizationPatterns(funcOp.getContext());
+    linalg::populateLinalgTilingCanonicalizationPatterns(
+        wgTilingCanonicalizationPatterns);
     populateAffineMinSCFCanonicalizationPattern(
         wgTilingCanonicalizationPatterns);
     scf::populateSCFForLoopCanonicalizationPatterns(
@@ -264,8 +265,9 @@ public:
     }
 
     {
-      RewritePatternSet promotionCanonicalization =
-          linalg::getLinalgTilingCanonicalizationPatterns(context);
+      RewritePatternSet promotionCanonicalization(context);
+      linalg::populateLinalgTilingCanonicalizationPatterns(
+          promotionCanonicalization);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(promotionCanonicalization)))) {
         return signalPassFailure();
@@ -291,8 +293,9 @@ public:
     }
     {
       // Apply canonicalization patterns.
-      RewritePatternSet threadTilingCanonicalizationPatterns =
-          linalg::getLinalgTilingCanonicalizationPatterns(context);
+      RewritePatternSet threadTilingCanonicalizationPatterns(context);
+      linalg::populateLinalgTilingCanonicalizationPatterns(
+          threadTilingCanonicalizationPatterns);
       populateAffineMinSCFCanonicalizationPattern(
           threadTilingCanonicalizationPatterns);
       if (failed(applyPatternsGreedily(

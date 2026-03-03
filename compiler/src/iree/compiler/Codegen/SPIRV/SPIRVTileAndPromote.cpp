@@ -163,8 +163,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     }
   }
   {
-    RewritePatternSet patterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    RewritePatternSet patterns(context);
+    linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
@@ -253,8 +253,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       return signalPassFailure();
     }
 
-    RewritePatternSet patterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    RewritePatternSet patterns(context);
+    linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
     populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

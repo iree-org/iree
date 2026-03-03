@@ -293,8 +293,8 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
     }
   }
 
-  RewritePatternSet patterns =
-      linalg::getLinalgTilingCanonicalizationPatterns(context);
+  RewritePatternSet patterns(context);
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   scf::ForallOp::getCanonicalizationPatterns(patterns, context);
   tensor::populateFoldTensorEmptyPatterns(patterns);
