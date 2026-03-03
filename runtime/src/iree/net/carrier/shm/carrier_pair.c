@@ -1,0 +1,374 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/net/carrier/shm/carrier_pair.h"
+
+#include "iree/async/event_pair.h"
+#include "iree/async/notification.h"
+#include "iree/base/internal/shm.h"
+#include "iree/base/internal/spsc_queue.h"
+#include "iree/net/carrier/shm/carrier.h"
+
+//===----------------------------------------------------------------------===//
+// Pair context
+//===----------------------------------------------------------------------===//
+
+// Shared resources for an in-process carrier pair. Both carriers reference
+// this via their release_context, keeping the SHM region and event pairs
+// alive until both carriers are destroyed.
+//
+// Notification epoch_ptr addresses reference the SHM region — if either
+// mapping were unmapped while the other carrier still holds a notification
+// referencing it, the epoch_ptr would dangle.
+//
+// Event pairs must outlive notifications because notifications may have
+// RegisterWaitForSingleObject active on the event handles (Windows).
+typedef struct iree_net_shm_pair_context_t {
+  iree_atomic_ref_count_t ref_count;
+  iree_shm_mapping_t creator_mapping;
+  iree_shm_mapping_t opener_mapping;
+  iree_async_event_pair_t client_event_pair;
+  iree_async_event_pair_t server_event_pair;
+  iree_allocator_t allocator;
+} iree_net_shm_pair_context_t;
+
+static void iree_net_shm_pair_context_release(void* context) {
+  iree_net_shm_pair_context_t* pair_context =
+      (iree_net_shm_pair_context_t*)context;
+  if (iree_atomic_ref_count_dec(&pair_context->ref_count) == 1) {
+    iree_async_event_pair_close(&pair_context->client_event_pair);
+    iree_async_event_pair_close(&pair_context->server_event_pair);
+    iree_shm_close(&pair_context->creator_mapping);
+    iree_shm_close(&pair_context->opener_mapping);
+    iree_allocator_t allocator = pair_context->allocator;
+    iree_allocator_free(allocator, pair_context);
+  }
+}
+
+static void iree_net_shm_pair_context_retain(
+    iree_net_shm_pair_context_t* context) {
+  iree_atomic_ref_count_inc(&context->ref_count);
+}
+
+//===----------------------------------------------------------------------===//
+// Pair resource creation helpers
+//===----------------------------------------------------------------------===//
+
+// SPSC ring handles for both mappings of the SHM region. Value types (no
+// ownership semantics) — the underlying ring storage is in the SHM region.
+typedef struct iree_net_shm_pair_rings_t {
+  iree_spsc_queue_t ring_a;         // Server TX (creator mapping).
+  iree_spsc_queue_t ring_b;         // Client TX (creator mapping).
+  iree_spsc_queue_t ring_a_opener;  // Client RX (opener mapping).
+  iree_spsc_queue_t ring_b_opener;  // Server RX (opener mapping).
+} iree_net_shm_pair_rings_t;
+
+// All mode bits that the current implementation supports.
+#define IREE_NET_SHM_CARRIER_SUPPORTED_MODES IREE_NET_SHM_CARRIER_MODE_DEFAULT
+
+// Creates the SHM region, writes the immutable header, initializes SPSC rings
+// on both mappings, and returns a pair context holding the SHM mappings. On
+// failure, all partial resources are cleaned up.
+static iree_status_t iree_net_shm_pair_create_context(
+    iree_net_shm_carrier_options_t options, iree_allocator_t host_allocator,
+    iree_net_shm_pair_context_t** out_pair_context,
+    iree_net_shm_pair_rings_t* out_rings) {
+  *out_pair_context = NULL;
+  memset(out_rings, 0, sizeof(*out_rings));
+
+  // Validate options.
+  if (options.mode & ~IREE_NET_SHM_CARRIER_SUPPORTED_MODES) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED, "unsupported SHM carrier mode bits: 0x%08x",
+        (unsigned)(options.mode & ~IREE_NET_SHM_CARRIER_SUPPORTED_MODES));
+  }
+  uint32_t ring_capacity = options.ring_capacity;
+  if (ring_capacity == 0) {
+    ring_capacity = IREE_NET_SHM_CARRIER_DEFAULT_RING_CAPACITY;
+  }
+  if (ring_capacity < IREE_SPSC_QUEUE_MIN_CAPACITY ||
+      (ring_capacity & (ring_capacity - 1)) != 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "ring_capacity must be a power of two >= %" PRIu32,
+                            IREE_SPSC_QUEUE_MIN_CAPACITY);
+  }
+
+  // Compute total SHM region size with overflow checking. On 32-bit platforms
+  // a large ring_capacity could overflow the size arithmetic.
+  iree_host_size_t ring_size = iree_spsc_queue_required_size(ring_capacity);
+  iree_host_size_t double_ring_size = 0;
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(2, ring_size, &double_ring_size))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "ring size overflow for capacity %" PRIu32,
+                            ring_capacity);
+  }
+  iree_host_size_t total_region_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_add(
+          IREE_NET_SHM_OFFSET_RINGS, double_ring_size, &total_region_size))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "SHM region size overflow for capacity %" PRIu32,
+                            ring_capacity);
+  }
+
+  // Create the SHM region.
+  iree_shm_mapping_t creator_mapping;
+  memset(&creator_mapping, 0, sizeof(creator_mapping));
+  creator_mapping.handle = IREE_SHM_HANDLE_INVALID;
+  iree_status_t status = iree_shm_create(iree_shm_options_default(),
+                                         total_region_size, &creator_mapping);
+
+  // Write the immutable header and initialize creator-side SPSC rings.
+  if (iree_status_is_ok(status)) {
+    memset(creator_mapping.base, 0, creator_mapping.size);
+    iree_net_shm_region_header_t* header =
+        (iree_net_shm_region_header_t*)((uint8_t*)creator_mapping.base +
+                                        IREE_NET_SHM_OFFSET_HEADER);
+    header->magic = IREE_NET_SHM_CARRIER_MAGIC;
+    header->version = IREE_NET_SHM_CARRIER_VERSION;
+    header->ring_capacity = ring_capacity;
+  }
+  if (iree_status_is_ok(status)) {
+    void* ring_a_base =
+        (uint8_t*)creator_mapping.base + IREE_NET_SHM_OFFSET_RINGS;
+    status = iree_spsc_queue_initialize(ring_a_base, ring_size, ring_capacity,
+                                        &out_rings->ring_a);
+  }
+  if (iree_status_is_ok(status)) {
+    void* ring_b_base =
+        (uint8_t*)creator_mapping.base + IREE_NET_SHM_OFFSET_RINGS + ring_size;
+    status = iree_spsc_queue_initialize(ring_b_base, ring_size, ring_capacity,
+                                        &out_rings->ring_b);
+  }
+
+  // Open a second mapping (simulates cross-process handle exchange).
+  iree_shm_mapping_t opener_mapping;
+  memset(&opener_mapping, 0, sizeof(opener_mapping));
+  opener_mapping.handle = IREE_SHM_HANDLE_INVALID;
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_shm_open_handle(creator_mapping.handle, iree_shm_options_default(),
+                             creator_mapping.size, &opener_mapping);
+  }
+  if (iree_status_is_ok(status)) {
+    void* ring_a_base =
+        (uint8_t*)opener_mapping.base + IREE_NET_SHM_OFFSET_RINGS;
+    status =
+        iree_spsc_queue_open(ring_a_base, ring_size, &out_rings->ring_a_opener);
+  }
+  if (iree_status_is_ok(status)) {
+    void* ring_b_base =
+        (uint8_t*)opener_mapping.base + IREE_NET_SHM_OFFSET_RINGS + ring_size;
+    status =
+        iree_spsc_queue_open(ring_b_base, ring_size, &out_rings->ring_b_opener);
+  }
+
+  // Bundle both mappings into a pair context.
+  if (iree_status_is_ok(status)) {
+    iree_net_shm_pair_context_t* pair_context = NULL;
+    status = iree_allocator_malloc(host_allocator, sizeof(*pair_context),
+                                   (void**)&pair_context);
+    if (iree_status_is_ok(status)) {
+      iree_atomic_ref_count_init(&pair_context->ref_count);
+      pair_context->creator_mapping = creator_mapping;
+      pair_context->opener_mapping = opener_mapping;
+      pair_context->client_event_pair = iree_async_event_pair_empty();
+      pair_context->server_event_pair = iree_async_event_pair_empty();
+      pair_context->allocator = host_allocator;
+      *out_pair_context = pair_context;
+      return iree_ok_status();
+    }
+  }
+
+  // Cleanup on failure: close SHM mappings directly (no pair_context yet).
+  iree_shm_close(&opener_mapping);
+  iree_shm_close(&creator_mapping);
+  return status;
+}
+
+// Creates event pairs in the pair context and shared notifications for both
+// carriers. On failure, releases any partially-created notifications; event
+// pairs in pair_context are cleaned up when pair_context is released.
+static iree_status_t iree_net_shm_pair_create_notifications(
+    iree_async_proactor_t* client_proactor,
+    iree_async_proactor_t* server_proactor,
+    iree_net_shm_pair_context_t* pair_context,
+    iree_async_notification_t** out_client_notification,
+    iree_async_notification_t** out_server_notification) {
+  *out_client_notification = NULL;
+  *out_server_notification = NULL;
+
+  // Create event pairs (one per carrier direction).
+  iree_status_t status =
+      iree_async_event_pair_create(&pair_context->client_event_pair);
+  if (iree_status_is_ok(status)) {
+    status = iree_async_event_pair_create(&pair_context->server_event_pair);
+  }
+
+  // Resolve epoch addresses from the SHM region.
+  //   epoch_a: incremented when the client should wake.
+  //   epoch_b: incremented when the server should wake.
+  uint8_t* region_base = (uint8_t*)pair_context->creator_mapping.base;
+  iree_atomic_int32_t* epoch_a =
+      (iree_atomic_int32_t*)(region_base + IREE_NET_SHM_OFFSET_EPOCH_A);
+  iree_atomic_int32_t* epoch_b =
+      (iree_atomic_int32_t*)(region_base + IREE_NET_SHM_OFFSET_EPOCH_B);
+
+  // Create shared notifications. Each notification has its epoch in SHM and
+  // wake/signal primitives from the event pair.
+  if (iree_status_is_ok(status)) {
+    iree_async_notification_shared_options_t notification_options;
+    memset(&notification_options, 0, sizeof(notification_options));
+    notification_options.epoch_address = epoch_a;
+    notification_options.wake_primitive =
+        pair_context->client_event_pair.primitive;
+    notification_options.signal_primitive =
+        pair_context->client_event_pair.signal_primitive;
+    status = iree_async_notification_create_shared(
+        client_proactor, &notification_options, out_client_notification);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_async_notification_shared_options_t notification_options;
+    memset(&notification_options, 0, sizeof(notification_options));
+    notification_options.epoch_address = epoch_b;
+    notification_options.wake_primitive =
+        pair_context->server_event_pair.primitive;
+    notification_options.signal_primitive =
+        pair_context->server_event_pair.signal_primitive;
+    status = iree_async_notification_create_shared(
+        server_proactor, &notification_options, out_server_notification);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_async_notification_release(*out_client_notification);
+    iree_async_notification_release(*out_server_notification);
+    *out_client_notification = NULL;
+    *out_server_notification = NULL;
+  }
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_net_shm_carrier_create_pair
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
+    iree_async_proactor_t* client_proactor,
+    iree_async_proactor_t* server_proactor,
+    iree_net_shm_carrier_options_t options,
+    iree_net_carrier_callback_t callback, iree_allocator_t host_allocator,
+    iree_net_carrier_t** out_client, iree_net_carrier_t** out_server) {
+  IREE_ASSERT_ARGUMENT(client_proactor);
+  IREE_ASSERT_ARGUMENT(server_proactor);
+  IREE_ASSERT_ARGUMENT(out_client);
+  IREE_ASSERT_ARGUMENT(out_server);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  *out_client = NULL;
+  *out_server = NULL;
+
+  // Phase 1: Create shared memory region with SPSC rings.
+  iree_net_shm_pair_context_t* pair_context = NULL;
+  iree_net_shm_pair_rings_t rings;
+  iree_status_t status = iree_net_shm_pair_create_context(
+      options, host_allocator, &pair_context, &rings);
+
+  // Phase 2: Create event pairs and shared notifications.
+  iree_async_notification_t* client_notification = NULL;
+  iree_async_notification_t* server_notification = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_pair_create_notifications(
+        client_proactor, server_proactor, pair_context, &client_notification,
+        &server_notification);
+  }
+
+  // Phase 3: Create carriers.
+  // Resolve armed flag pointers from both SHM mappings. Each carrier reads its
+  // own armed flag from the opener mapping and the peer's flag from the creator
+  // mapping (simulating separate process address spaces).
+  if (iree_status_is_ok(status)) {
+    uint8_t* creator_base = (uint8_t*)pair_context->creator_mapping.base;
+    uint8_t* opener_base = (uint8_t*)pair_context->opener_mapping.base;
+    iree_atomic_int32_t* consumer_a_armed =
+        (iree_atomic_int32_t*)(creator_base +
+                               IREE_NET_SHM_OFFSET_CONSUMER_A_ARMED);
+    iree_atomic_int32_t* consumer_b_armed =
+        (iree_atomic_int32_t*)(creator_base +
+                               IREE_NET_SHM_OFFSET_CONSUMER_B_ARMED);
+    iree_atomic_int32_t* consumer_a_armed_opener =
+        (iree_atomic_int32_t*)(opener_base +
+                               IREE_NET_SHM_OFFSET_CONSUMER_A_ARMED);
+    iree_atomic_int32_t* consumer_b_armed_opener =
+        (iree_atomic_int32_t*)(opener_base +
+                               IREE_NET_SHM_OFFSET_CONSUMER_B_ARMED);
+
+    // Create client: TX=Ring B (creator), RX=Ring A (opener).
+    // Client's armed flag = consumer_a (from opener); checks consumer_b (from
+    // creator).
+    iree_net_shm_carrier_create_params_t client_params;
+    memset(&client_params, 0, sizeof(client_params));
+    client_params.proactor = client_proactor;
+    client_params.is_client = true;
+    client_params.tx_queue = rings.ring_b;
+    client_params.rx_queue = rings.ring_a_opener;
+    client_params.notification = client_notification;
+    client_params.peer_notification = server_notification;
+    client_params.our_armed = consumer_a_armed_opener;
+    client_params.peer_armed = consumer_b_armed;
+    client_params.release_context = pair_context;
+    client_params.release_context_fn = iree_net_shm_pair_context_release;
+    status = iree_net_shm_carrier_create(&client_params, callback,
+                                         host_allocator, out_client);
+
+    if (iree_status_is_ok(status)) {
+      // Retain pair_context for the server carrier (client already took one
+      // ref).
+      iree_net_shm_pair_context_retain(pair_context);
+
+      // Create server: TX=Ring A (creator), RX=Ring B (opener).
+      // Server's armed flag = consumer_b (from opener); checks consumer_a
+      // (from creator).
+      iree_net_shm_carrier_create_params_t server_params;
+      memset(&server_params, 0, sizeof(server_params));
+      server_params.proactor = server_proactor;
+      server_params.is_client = false;
+      server_params.tx_queue = rings.ring_a;
+      server_params.rx_queue = rings.ring_b_opener;
+      server_params.notification = server_notification;
+      server_params.peer_notification = client_notification;
+      server_params.our_armed = consumer_b_armed_opener;
+      server_params.peer_armed = consumer_a_armed;
+      server_params.release_context = pair_context;
+      server_params.release_context_fn = iree_net_shm_pair_context_release;
+      status = iree_net_shm_carrier_create(&server_params, callback,
+                                           host_allocator, out_server);
+
+      if (!iree_status_is_ok(status)) {
+        // Release the retain we did for server — client still owns its ref.
+        iree_net_shm_pair_context_release(pair_context);
+      }
+    }
+  }
+
+  // Release creation references. Each carrier has retained its own copies of
+  // the notifications. If creation failed, these may be NULL (no-op release).
+  iree_async_notification_release(client_notification);
+  iree_async_notification_release(server_notification);
+
+  if (!iree_status_is_ok(status)) {
+    if (*out_client) {
+      // Client carrier owns a pair_context ref and both notification refs.
+      // Destroying it releases all of them.
+      iree_net_carrier_release(*out_client);
+      *out_client = NULL;
+    } else if (pair_context) {
+      // No carrier was created to take ownership of pair_context.
+      iree_net_shm_pair_context_release(pair_context);
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}

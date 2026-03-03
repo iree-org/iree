@@ -1,0 +1,46 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# SHM carrier CTS backend registration.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+# Backend registration library. Link this into CTS test binaries to include
+# the SHM backend. Uses alwayslink to ensure static registration runs.
+iree_runtime_cc_library(
+    name = "backends",
+    testonly = True,
+    srcs = ["backends.cc"],
+    deps = [
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/net/carrier/shm:factory",
+        "//runtime/src/iree/net/carrier/shm:shm_pair",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Test binaries
+#===------------------------------------------------------------------------===#
+
+# CTS tests with SHM backend.
+iree_runtime_cc_test(
+    name = "shm_tests",
+    srcs = ["//runtime/src/iree/net/carrier/cts/util:test_main.cc"],
+    deps = [
+        ":backends",
+        "//runtime/src/iree/net/carrier/cts:all_tests",
+        "//runtime/src/iree/net/carrier/cts/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
