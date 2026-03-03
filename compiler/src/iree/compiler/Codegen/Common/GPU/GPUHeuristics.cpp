@@ -533,8 +533,9 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   // Redirect remaining tiles to the starved (dominant) dimension.
   auto redirectRemainingTiles = [&](bool condition, int64_t totalTiles,
                                     int64_t &tileSizeDistributed) {
-    if (!condition || remainingTiles <= 1)
+    if (!condition || remainingTiles <= 1) {
       return;
+    }
     int64_t newTile = std::min(remainingTiles, totalTiles);
     if (newTile > tileSizeDistributed) {
       remainingTiles /= (newTile / tileSizeDistributed);
@@ -553,7 +554,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   LDBG() << "Collapsed tile sizes: M: " << mTileSizeDistributed
          << ", N: " << nTileSizeDistributed;
 
-  // Distribute collapsed counts to per-dimension M and N (inner → outer).
+  // Distribute collapsed counts to per-dimension M and N (inner -> outer).
   // Use min-based distribution for the dominant dimension in imbalanced
   // problems, since GCD fails for non-power-of-2 tile counts.
   auto distributeToDims = [](MutableArrayRef<int64_t> tileCounts,
@@ -561,8 +562,8 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                              MutableArrayRef<int64_t> tileSizes,
                              int64_t &subgroupBudget, int64_t &tileBudget,
                              bool useMin) {
-    auto distribute = useMin ? distributeTilesUsingMin
-                             : distributeTilesUsingGCD;
+    int64_t distribute =
+        useMin ? distributeTilesUsingMin : distributeTilesUsingGCD;
     for (size_t e = tileCounts.size(), i = e - 1; i < e; --i) {
       subgroupCounts[i] = distribute(tileCounts[i], subgroupBudget);
       tileSizes[i] = distribute(tileCounts[i], tileBudget);
