@@ -23,19 +23,19 @@
 //   - excluded_tags: Backend must have NONE of these tags.
 //
 // Example test suite registration:
-//   CTS_REGISTER_TEST_SUITE(AllocatorTest);  // All backends.
-//   CTS_REGISTER_TEST_SUITE_WITH_TAGS(DispatchTest, {"executables"}, {});
+//   CTS_REGISTER_TEST_SUITE(AllocatorTest);  // All backends, once each.
 //   CTS_REGISTER_COMMAND_BUFFER_TEST_SUITE(CopyBufferTest);  //
-//   Direct+indirect.
+//   Direct+indirect. CTS_REGISTER_EXECUTABLE_TEST_SUITE(ExecutableTest);  //
+//   Per (device, format).
+//   CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(DispatchTest);  // All
+//   axes.
 //
 // Example backend registration:
 //   CtsRegistry::RegisterBackend({
-//       "local_task_vmvx",
-//       {.name = "local_task_vmvx",
-//        .factory = CreateLocalTaskVmvxDevice,
-//        .executable_format = "vmvx-bytecode-fb",
-//        .executable_data = GetVmvxExecutableData},
-//       {"executables", "events", "indirect"},
+//       "local_task",
+//       {.name = "local_task", .factory = CreateLocalTaskDevice},
+//       {"events", "indirect"},
+//       {{"vmvx", "vmvx-bytecode-fb", GetVmvxExecutableData}},
 //   });
 
 #ifndef IREE_HAL_CTS2_UTIL_REGISTRY_H_
@@ -70,6 +70,21 @@ using DeviceFactory = std::function<iree_status_t(
 // Returns an empty span if the file is not found.
 using ExecutableDataFn =
     iree_const_byte_span_t (*)(iree_string_view_t file_name);
+
+//===----------------------------------------------------------------------===//
+// Executable format
+//===----------------------------------------------------------------------===//
+
+// A pre-compiled executable format available for a backend.
+// Backends declare the formats they support; executable test suites expand
+// parameterizations across all available formats. This keeps non-executable
+// tests (allocator, semaphore, etc.) running once per device while executable
+// tests run once per (device, format) pair.
+struct ExecutableFormat {
+  std::string name;    // Suffix appended to backend name: "vmvx", "llvm_cpu".
+  const char* format;  // Format string: "vmvx-bytecode-fb".
+  ExecutableDataFn data_fn;  // Lookup function for compiled binaries.
+};
 
 //===----------------------------------------------------------------------===//
 // Recording mode
@@ -119,9 +134,10 @@ inline void PrintTo(const BackendInfo& info, std::ostream* os) {
 // Identifies a backend configuration for test instantiation.
 // Extends BackendInfo with tags for filtering which test suites apply.
 struct BackendConfig {
-  const char* name;               // "local_task_vmvx", etc.
+  const char* name;               // "local_task", etc.
   BackendInfo info;               // Factory + capabilities.
-  std::vector<std::string> tags;  // {"executables", "events", "indirect", ...}
+  std::vector<std::string> tags;  // {"events", "indirect", ...}
+  std::vector<ExecutableFormat> executable_formats;  // Available formats.
 };
 
 //===----------------------------------------------------------------------===//
@@ -165,6 +181,14 @@ class CtsRegistry {
 
   // Register a backend configuration. Called by backend factory files.
   static void RegisterBackend(BackendConfig config);
+
+  // Register an executable format for an already-registered (or
+  // not-yet-registered) backend. Formats are stored in a pending list and
+  // merged into their backends at InstantiateAll() time, so static init
+  // ordering between RegisterBackend() and RegisterExecutableFormat() does
+  // not matter.
+  static void RegisterExecutableFormat(const char* backend_name,
+                                       ExecutableFormat format);
 
   //===--------------------------------------------------------------------===//
   // Instantiation (called from main, before RUN_ALL_TESTS)
@@ -320,6 +344,155 @@ inline std::string GetBackendName(
               info.recording_mode =                                           \
                   ::iree::hal::cts::RecordingMode::kIndirect;                 \
               TestClass##_IndirectBackends::Get().push_back(std::move(info)); \
+            },                                                                \
+            [](const char* file, int line) {                                  \
+              if (TestClass##_IndirectBackends::Get().empty()) return;        \
+              ::testing::UnitTest::GetInstance()                              \
+                  ->parameterized_test_registry()                             \
+                  .GetTestSuitePatternHolder<TestClass>(                      \
+                      #TestClass,                                             \
+                      ::testing::internal::CodeLocation(file, line))          \
+                  ->AddTestSuiteInstantiation(                                \
+                      "CTS_Indirect",                                         \
+                      &TestClass##_IndirectBackends::Generator,               \
+                      &::iree::hal::cts::internal::GetBackendName, file,      \
+                      line);                                                  \
+            },                                                                \
+            __FILE__,                                                         \
+            __LINE__,                                                         \
+            {"indirect"},                                                     \
+            {}}),                                                             \
+       true)
+
+// Executable test registration - suite runs once per (device, format) pair.
+//
+// Backends with no executable_formats are silently skipped (the accumulator
+// pushes nothing, and GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST handles
+// the empty suite). The "executables" tag is unnecessary — format availability
+// is structural, not string-based.
+//
+// For each matching backend, the accumulator iterates executable_formats and
+// pushes one BackendInfo per format with name = "backend_format",
+// executable_format and executable_data populated from the ExecutableFormat.
+#define CTS_REGISTER_EXECUTABLE_TEST_SUITE(TestClass)                         \
+  GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestClass);                   \
+  namespace {                                                                 \
+  struct TestClass##_Backends {                                               \
+    static std::vector<::iree::hal::cts::BackendInfo>& Get() {                \
+      static std::vector<::iree::hal::cts::BackendInfo> backends;             \
+      return backends;                                                        \
+    }                                                                         \
+    static ::testing::internal::ParamGenerator<::iree::hal::cts::BackendInfo> \
+    Generator() {                                                             \
+      return ::testing::ValuesIn(Get());                                      \
+    }                                                                         \
+  };                                                                          \
+  }                                                                           \
+  static bool TestClass##_registered_ =                                       \
+      (::iree::hal::cts::CtsRegistry::RegisterSuite(                          \
+           {#TestClass,                                                       \
+            [](const ::iree::hal::cts::BackendConfig& cfg) {                  \
+              for (const auto& fmt : cfg.executable_formats) {                \
+                auto info = cfg.info;                                         \
+                info.name = std::string(cfg.name) + "_" + fmt.name;           \
+                info.executable_format = fmt.format;                          \
+                info.executable_data = fmt.data_fn;                           \
+                TestClass##_Backends::Get().push_back(std::move(info));       \
+              }                                                               \
+            },                                                                \
+            [](const char* file, int line) {                                  \
+              if (TestClass##_Backends::Get().empty()) return;                \
+              ::testing::UnitTest::GetInstance()                              \
+                  ->parameterized_test_registry()                             \
+                  .GetTestSuitePatternHolder<TestClass>(                      \
+                      #TestClass,                                             \
+                      ::testing::internal::CodeLocation(file, line))          \
+                  ->AddTestSuiteInstantiation(                                \
+                      "CTS", &TestClass##_Backends::Generator,                \
+                      &::iree::hal::cts::internal::GetBackendName, file,      \
+                      line);                                                  \
+            },                                                                \
+            __FILE__,                                                         \
+            __LINE__,                                                         \
+            {},                                                               \
+            {}}),                                                             \
+       true)
+
+// Executable command buffer test registration - suite runs once per
+// (device, format, recording_mode) triple.
+//
+// Combines executable format expansion with direct/indirect recording mode
+// expansion. Creates two gtest instantiation sets:
+//   - CTS/TestClass.* with direct-mode BackendInfos for each format
+//   - CTS_Indirect/TestClass.* with indirect-mode BackendInfos for each format
+//     (only for backends with the "indirect" tag)
+#define CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(TestClass)          \
+  GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(TestClass);                   \
+  namespace {                                                                 \
+  struct TestClass##_DirectBackends {                                         \
+    static std::vector<::iree::hal::cts::BackendInfo>& Get() {                \
+      static std::vector<::iree::hal::cts::BackendInfo> backends;             \
+      return backends;                                                        \
+    }                                                                         \
+    static ::testing::internal::ParamGenerator<::iree::hal::cts::BackendInfo> \
+    Generator() {                                                             \
+      return ::testing::ValuesIn(Get());                                      \
+    }                                                                         \
+  };                                                                          \
+  struct TestClass##_IndirectBackends {                                       \
+    static std::vector<::iree::hal::cts::BackendInfo>& Get() {                \
+      static std::vector<::iree::hal::cts::BackendInfo> backends;             \
+      return backends;                                                        \
+    }                                                                         \
+    static ::testing::internal::ParamGenerator<::iree::hal::cts::BackendInfo> \
+    Generator() {                                                             \
+      return ::testing::ValuesIn(Get());                                      \
+    }                                                                         \
+  };                                                                          \
+  }                                                                           \
+  static bool TestClass##_registered_ =                                       \
+      (::iree::hal::cts::CtsRegistry::RegisterSuite(                          \
+           {#TestClass,                                                       \
+            [](const ::iree::hal::cts::BackendConfig& cfg) {                  \
+              for (const auto& fmt : cfg.executable_formats) {                \
+                auto info = cfg.info;                                         \
+                info.name = std::string(cfg.name) + "_" + fmt.name;           \
+                info.executable_format = fmt.format;                          \
+                info.executable_data = fmt.data_fn;                           \
+                info.recording_mode =                                         \
+                    ::iree::hal::cts::RecordingMode::kDirect;                 \
+                TestClass##_DirectBackends::Get().push_back(std::move(info)); \
+              }                                                               \
+            },                                                                \
+            [](const char* file, int line) {                                  \
+              if (TestClass##_DirectBackends::Get().empty()) return;          \
+              ::testing::UnitTest::GetInstance()                              \
+                  ->parameterized_test_registry()                             \
+                  .GetTestSuitePatternHolder<TestClass>(                      \
+                      #TestClass,                                             \
+                      ::testing::internal::CodeLocation(file, line))          \
+                  ->AddTestSuiteInstantiation(                                \
+                      "CTS", &TestClass##_DirectBackends::Generator,          \
+                      &::iree::hal::cts::internal::GetBackendName, file,      \
+                      line);                                                  \
+            },                                                                \
+            __FILE__,                                                         \
+            __LINE__,                                                         \
+            {},                                                               \
+            {}}),                                                             \
+       ::iree::hal::cts::CtsRegistry::RegisterSuite(                          \
+           {#TestClass "_Indirect",                                           \
+            [](const ::iree::hal::cts::BackendConfig& cfg) {                  \
+              for (const auto& fmt : cfg.executable_formats) {                \
+                auto info = cfg.info;                                         \
+                info.name = std::string(cfg.name) + "_" + fmt.name;           \
+                info.executable_format = fmt.format;                          \
+                info.executable_data = fmt.data_fn;                           \
+                info.recording_mode =                                         \
+                    ::iree::hal::cts::RecordingMode::kIndirect;               \
+                TestClass##_IndirectBackends::Get().push_back(                \
+                    std::move(info));                                         \
+              }                                                               \
             },                                                                \
             [](const char* file, int line) {                                  \
               if (TestClass##_IndirectBackends::Get().empty()) return;        \

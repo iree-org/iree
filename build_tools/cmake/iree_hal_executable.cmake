@@ -149,3 +149,102 @@ function(iree_hal_executable)
     )
   endif()
 endfunction()
+
+# iree_hal_executables()
+#
+# Batch form of iree_hal_executable(). Compiles multiple MLIR sources to HAL
+# executables and bundles all outputs into a single iree_c_embed_data()
+# cc_library target.
+#
+# TOC entry names are the source stems with a .bin extension (e.g.,
+# "dispatch.mlir" produces TOC entry "dispatch.bin").
+#
+# Multiple calls in the same directory (for different formats) are safe:
+# each call's compiled outputs use a {NAME}/ subdirectory prefix for the
+# output filename, and FLATTEN on the embedded data strips it from TOC entries.
+#
+# Parameters:
+# NAME: Name of the output iree_c_embed_data cc_library target.
+# SRCS: MLIR source files to compile. Each produces one executable binary.
+# TARGET_DEVICE: Target device for iree-compile.
+# FLAGS: Backend-specific compiler flags.
+# IDENTIFIER: C identifier for generated embed data. Defaults to NAME.
+# COMPILE_TOOL: Compiler tool. Defaults to "iree-compile".
+# PUBLIC: Export under ${PACKAGE}::.
+# TESTONLY: Only build if IREE_BUILD_TESTS=ON.
+function(iree_hal_executables)
+  cmake_parse_arguments(
+    _RULE
+    "PUBLIC;TESTONLY"
+    "NAME;TARGET_DEVICE;IDENTIFIER;COMPILE_TOOL"
+    "SRCS;FLAGS"
+    ${ARGN}
+  )
+
+  if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  if(NOT DEFINED _RULE_TARGET_DEVICE)
+    message(SEND_ERROR "iree_hal_executables requires TARGET_DEVICE")
+  endif()
+
+  if(DEFINED _RULE_IDENTIFIER)
+    set(_IDENTIFIER "${_RULE_IDENTIFIER}")
+  else()
+    set(_IDENTIFIER "${_RULE_NAME}")
+  endif()
+
+  if(_RULE_TESTONLY)
+    set(_TESTONLY_ARG "TESTONLY")
+  endif()
+  if(_RULE_PUBLIC)
+    set(_PUBLIC_ARG "PUBLIC")
+  endif()
+
+  set(_COMPILE_TOOL_ARG "")
+  if(DEFINED _RULE_COMPILE_TOOL)
+    set(_COMPILE_TOOL_ARG "COMPILE_TOOL" "${_RULE_COMPILE_TOOL}")
+  endif()
+
+  # Compile each MLIR source to a HAL executable.
+  set(_BIN_OUTPUTS "")
+  foreach(_SRC ${_RULE_SRCS})
+    # Derive stem from source path: "/path/to/foo.mlir" -> "foo".
+    get_filename_component(_STEM "${_SRC}" NAME_WE)
+
+    # Output files use a {NAME}/ subdirectory prefix for uniqueness across
+    # multiple iree_hal_executables() calls in the same directory.
+    set(_EXECUTABLE_FILE_NAME "${_RULE_NAME}/${_STEM}.bin")
+    set(_RULE_ENTRY_NAME "${_RULE_NAME}_${_STEM}")
+
+    iree_hal_executable(
+      NAME "${_RULE_ENTRY_NAME}"
+      SRC "${_SRC}"
+      TARGET_DEVICE "${_RULE_TARGET_DEVICE}"
+      FLAGS ${_RULE_FLAGS}
+      EXECUTABLE_FILE_NAME "${_EXECUTABLE_FILE_NAME}"
+      ${_COMPILE_TOOL_ARG}
+      ${_TESTONLY_ARG}
+    )
+
+    list(APPEND _BIN_OUTPUTS "${_EXECUTABLE_FILE_NAME}")
+  endforeach()
+
+  # Bundle all compiled executables into a single embedded data library.
+  iree_c_embed_data(
+    NAME
+      "${_RULE_NAME}"
+    IDENTIFIER
+      "${_IDENTIFIER}"
+    SRCS
+      ${_BIN_OUTPUTS}
+    C_FILE_OUTPUT
+      "${_RULE_NAME}.c"
+    H_FILE_OUTPUT
+      "${_RULE_NAME}.h"
+    FLATTEN
+      "${_PUBLIC_ARG}"
+      "${_TESTONLY_ARG}"
+  )
+endfunction()

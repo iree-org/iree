@@ -7,6 +7,7 @@
 # CTS2 test binaries for the local-sync HAL driver.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:iree_hal_executable.bzl", "iree_hal_executables")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -31,7 +32,63 @@ iree_runtime_cc_library(
 )
 
 #===------------------------------------------------------------------------===#
-# Tests
+# Executable Compilation
+#===------------------------------------------------------------------------===#
+
+CTS_TESTDATA = "//runtime/src/iree/hal/cts2/testdata"
+
+CTS_TESTDATA_SRCS = [
+    "%s:command_buffer_dispatch_constants_test.mlir" % CTS_TESTDATA,
+    "%s:command_buffer_dispatch_test.mlir" % CTS_TESTDATA,
+    "%s:executable_cache_test.mlir" % CTS_TESTDATA,
+    "%s:executable_test.mlir" % CTS_TESTDATA,
+]
+
+iree_hal_executables(
+    name = "testdata_vmvx",
+    srcs = CTS_TESTDATA_SRCS,
+    flags = ["--iree-hal-local-target-device-backends=vmvx"],
+    identifier = "iree_cts_testdata_vmvx",
+    target_device = "local",
+)
+
+iree_hal_executables(
+    name = "testdata_llvm_cpu",
+    srcs = CTS_TESTDATA_SRCS,
+    flags = [
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    identifier = "iree_cts_testdata_llvm_cpu",
+    target_device = "local",
+)
+
+# Executable format registrations (separate from backends so that
+# non-executable tests avoid the iree-compile build dependency).
+iree_runtime_cc_library(
+    name = "vmvx_testdata",
+    testonly = True,
+    srcs = ["vmvx_testdata.cc"],
+    deps = [
+        ":testdata_vmvx",
+        "//runtime/src/iree/hal/cts2/util:registry",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "llvm_cpu_testdata",
+    testonly = True,
+    srcs = ["llvm_cpu_testdata.cc"],
+    deps = [
+        ":testdata_llvm_cpu",
+        "//runtime/src/iree/hal/cts2/util:registry",
+    ],
+    alwayslink = True,
+)
+
+#===------------------------------------------------------------------------===#
+# Tests (non-executable)
 #===------------------------------------------------------------------------===#
 
 iree_runtime_cc_test(
@@ -84,6 +141,36 @@ iree_runtime_cc_test(
     deps = [
         ":backends",
         "//runtime/src/iree/hal/cts2/file:all_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Tests (executable-dependent)
+#===------------------------------------------------------------------------===#
+
+iree_runtime_cc_test(
+    name = "executable_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        ":llvm_cpu_testdata",
+        ":vmvx_testdata",
+        "//runtime/src/iree/hal/cts2/core:all_executable_tests",
+        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/testing:gtest",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "dispatch_tests",
+    srcs = ["//runtime/src/iree/hal/cts2/util:test_main.cc"],
+    deps = [
+        ":backends",
+        ":llvm_cpu_testdata",
+        ":vmvx_testdata",
+        "//runtime/src/iree/hal/cts2/command_buffer:all_dispatch_tests",
         "//runtime/src/iree/hal/cts2/util:registry",
         "//runtime/src/iree/testing:gtest",
     ],

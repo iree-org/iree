@@ -58,7 +58,29 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
-# All command buffer tests.
+iree_runtime_cc_library(
+    name = "dispatch_test",
+    testonly = True,
+    srcs = ["dispatch_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "dispatch_constants_test",
+    testonly = True,
+    srcs = ["dispatch_constants_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# All command buffer tests (non-executable).
 iree_runtime_cc_library(
     name = "all_tests",
     testonly = True,
@@ -67,5 +89,15 @@ iree_runtime_cc_library(
         ":copy_buffer_test",
         ":fill_buffer_test",
         ":update_buffer_test",
+    ],
+)
+
+# All executable-dependent command buffer tests.
+iree_runtime_cc_library(
+    name = "all_dispatch_tests",
+    testonly = True,
+    deps = [
+        ":dispatch_constants_test",
+        ":dispatch_test",
     ],
 )

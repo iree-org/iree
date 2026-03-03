@@ -15,10 +15,17 @@ namespace {
 
 // Global storage for registered suites and backends.
 // Protected by a mutex for thread-safe static initialization.
+// Executable format registered before its backend (or separately from it).
+struct PendingFormat {
+  std::string backend_name;
+  ExecutableFormat format;
+};
+
 struct RegistryData {
   std::mutex mutex;
   std::vector<TestSuiteInfo> test_suites;
   std::vector<BackendConfig> backends;
+  std::vector<PendingFormat> pending_formats;
 };
 
 RegistryData& GetRegistryData() {
@@ -42,6 +49,14 @@ void CtsRegistry::RegisterBackend(BackendConfig config) {
   auto& data = GetRegistryData();
   std::lock_guard<std::mutex> lock(data.mutex);
   data.backends.push_back(std::move(config));
+}
+
+void CtsRegistry::RegisterExecutableFormat(const char* backend_name,
+                                           ExecutableFormat format) {
+  auto& data = GetRegistryData();
+  std::lock_guard<std::mutex> lock(data.mutex);
+  data.pending_formats.push_back(
+      {std::string(backend_name), std::move(format)});
 }
 
 //===----------------------------------------------------------------------===//
@@ -73,6 +88,26 @@ bool CtsRegistry::TagsMatch(const BackendConfig& backend,
 void CtsRegistry::InstantiateAll() {
   auto& data = GetRegistryData();
   std::lock_guard<std::mutex> lock(data.mutex);
+
+  // Merge pending executable formats into their backends. This handles the
+  // case where RegisterExecutableFormat() was called before or after the
+  // corresponding RegisterBackend() — static init ordering is unspecified.
+  for (auto& pending : data.pending_formats) {
+    bool found = false;
+    for (auto& backend : data.backends) {
+      if (pending.backend_name == backend.name) {
+        backend.executable_formats.push_back(std::move(pending.format));
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      std::cerr << "CtsRegistry::InstantiateAll: Executable format for '"
+                << pending.backend_name
+                << "' has no matching backend registration.\n";
+    }
+  }
+  data.pending_formats.clear();
 
   if (data.backends.empty() || data.test_suites.empty()) {
     return;

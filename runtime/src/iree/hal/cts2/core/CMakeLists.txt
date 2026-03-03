@@ -51,11 +51,47 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    executable_test
+  SRCS
+    "executable_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_cache_test
+  SRCS
+    "executable_cache_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::driver_test
     ::event_test
     ::semaphore_test
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    all_executable_tests
+  DEPS
+    ::executable_cache_test
+    ::executable_test
   TESTONLY
   PUBLIC
 )

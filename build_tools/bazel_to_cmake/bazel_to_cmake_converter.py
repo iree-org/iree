@@ -1042,6 +1042,39 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
+    def iree_hal_executables(
+        self,
+        name,
+        srcs,
+        target_device,
+        flags=None,
+        identifier=None,
+        compile_tool=None,
+        testonly=None,
+        **kwargs,
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        target_device_block = self._convert_string_arg_block(
+            "TARGET_DEVICE", target_device
+        )
+        identifier_block = self._convert_string_arg_block("IDENTIFIER", identifier)
+        compile_tool_block = self._convert_target_block("COMPILE_TOOL", compile_tool)
+        flags_block = self._convert_string_list_block("FLAGS", flags)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._converter.body += (
+            f"iree_hal_executables(\n"
+            f"{name_block}"
+            f"{srcs_block}"
+            f"{target_device_block}"
+            f"{identifier_block}"
+            f"{compile_tool_block}"
+            f"{flags_block}"
+            f"{testonly_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+
     def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None, includes=None):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         srcs_block = self._convert_srcs_block(srcs)

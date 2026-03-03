@@ -64,12 +64,48 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    dispatch_test
+  SRCS
+    "dispatch_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dispatch_constants_test
+  SRCS
+    "dispatch_constants_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts2::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     all_tests
   DEPS
     ::basic_test
     ::copy_buffer_test
     ::fill_buffer_test
     ::update_buffer_test
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    all_dispatch_tests
+  DEPS
+    ::dispatch_constants_test
+    ::dispatch_test
   TESTONLY
   PUBLIC
 )
