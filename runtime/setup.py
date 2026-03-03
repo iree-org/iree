@@ -601,10 +601,16 @@ setup(
     python_requires=">=3.10",
     ext_modules=(
         [
-            CMakeExtension("iree._runtime_libs._runtime", py_limited_api=_is_abi3_build),
+            CMakeExtension(
+                "iree._runtime_libs._runtime", py_limited_api=_is_abi3_build
+            ),
         ]
         + (
-            [CMakeExtension("iree._runtime_libs_tracy._runtime", py_limited_api=_is_abi3_build)]
+            [
+                CMakeExtension(
+                    "iree._runtime_libs_tracy._runtime", py_limited_api=_is_abi3_build
+                )
+            ]
             if ENABLE_TRACY
             else []
         )
