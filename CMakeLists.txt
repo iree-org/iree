@@ -726,13 +726,6 @@ include(iree_setup_toolchain)
 # Otherwise, for features that just require the interpreter, find that alone.
 #-------------------------------------------------------------------------------
 
-# Build Python bindings with Python Stable ABI (abi3) for Python 3.12+.
-# When enabled, a single extension module can be used across Python 3.12+.
-# nanobind handles the interaction with FREE_THREADED: if the interpreter
-# is free-threaded, STABLE_ABI is ignored and the free-threaded ABI is used.
-# Declared here (before first use) and also cascaded to MLIR below.
-option(IREE_ENABLE_PYTHON_STABLE_ABI "Build Python bindings with Stable ABI (abi3) for Python 3.12+" OFF)
-
 if(IREE_BUILD_PYTHON_BINDINGS)
   # After CMake 3.18, we are able to limit the scope of the search to just
   # Development.Module. Searching for Development will fail in situations where
@@ -746,19 +739,27 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # See: https://reviews.llvm.org/D118148
   # If building Python packages, we have a hard requirement on 3.10+.
   find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
-  # Development.SABIModule is needed for Stable ABI (abi3) builds. CMake 3.26+
-  # provides it; on older CMake it is silently ignored if not found.
-  set(_PYTHON_SABI_COMPONENT "")
-  if(IREE_ENABLE_PYTHON_STABLE_ABI)
-    set(_PYTHON_SABI_COMPONENT Development.SABIModule)
-  endif()
-  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module NumPy ${_PYTHON_SABI_COMPONENT} REQUIRED)
+  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.10 COMPONENTS Interpreter Development.Module NumPy ${_PYTHON_SABI_COMPONENT} REQUIRED)
+  find_package(Python 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
+
+  # Auto-detect IREE_ENABLE_PYTHON_STABLE_ABI: enable for CPython 3.12+ with
+  # GIL. Can be overridden by explicitly setting the cache variable.
+  if(NOT DEFINED CACHE{IREE_ENABLE_PYTHON_STABLE_ABI}
+     AND Python3_VERSION VERSION_GREATER_EQUAL "3.12"
+     AND Python3_INTERPRETER_ID STREQUAL "Python"
+     AND TARGET Python::SABIModule
+     AND NOT Python3_SOABI MATCHES "^cpython-[0-9]+t")
+    set(IREE_ENABLE_PYTHON_STABLE_ABI ON CACHE BOOL
+      "Build Python bindings with Stable ABI (abi3) for Python 3.12+")
+  endif()
+  if(IREE_ENABLE_PYTHON_STABLE_ABI)
+    message(STATUS "IREE Python Stable ABI (abi3) enabled")
+  endif()
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
