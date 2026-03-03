@@ -383,42 +383,55 @@ static Value foldTransferFromStep(OpTy op) {
   return foldTransferIndexVecs(op, foldFromStep);
 }
 
+/// Fold all-true splat mask by dropping the mask operand in-place.
+/// Returns true if the fold was applied.
+template <typename OpTy>
+static bool foldAllTrueSplatMask(OpTy op, DenseElementsAttr maskAttr) {
+  if (!maskAttr || !maskAttr.isSplat() || !maskAttr.getSplatValue<bool>()) {
+    return false;
+  }
+
+  using Adaptor = TransferOpAdaptor<OpTy>;
+
+  Builder b(op.getContext());
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  maps.pop_back();
+  op.setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
+
+  SmallVector<Value> operands;
+  SmallVector<Value> indexVecs(Adaptor::getIndexVecs(op));
+  Adaptor::rebuildOperands(op, operands, indexVecs, /*mask=*/Value());
+  op->setOperands(operands);
+
+  return true;
+}
+
+/// Try all index-vec folds (broadcast, transpose, step). Returns a non-null
+/// Value if any fold was applied.
+template <typename OpTy>
+static Value foldTransferIndexVecOps(OpTy op) {
+  if (auto res = foldTransferFromBroadcast(op)) {
+    return res;
+  }
+  if (auto res = foldTransferFromTranspose(op)) {
+    return res;
+  }
+  if (auto res = foldTransferFromStep(op)) {
+    return res;
+  }
+  return Value();
+}
+
 OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
-  // Fold all-true splat mask by dropping the mask operand. Since every
-  // position is unmasked, the mask indexing map is irrelevant. This runs
-  // before the index vec folds below; the ordering does not matter because
-  // the index vec folds operate independently of the mask.
+  // Fold all-true splat mask before index vec folds. The ordering does not
+  // matter because the index vec folds operate independently of the mask.
   if (auto maskAttr =
           dyn_cast_if_present<DenseElementsAttr>(adaptor.getMask())) {
-    if (maskAttr.isSplat() && maskAttr.getSplatValue<bool>()) {
-      int32_t numOffsets = static_cast<int32_t>(getOffsets().size());
-      int32_t numIndexVecs = static_cast<int32_t>(getIndexVecs().size());
-
-      Builder b(getContext());
-      SmallVector<AffineMap> maps = getIndexingMapsArray();
-      maps.pop_back();
-      setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
-
-      SmallVector<Value> operands;
-      operands.push_back(getBase());
-      llvm::append_range(operands, getOffsets());
-      llvm::append_range(operands, getIndexVecs());
-      operands.push_back(getPadding());
-
-      getProperties().setOperandSegmentSizes(
-          {1, numOffsets, numIndexVecs, 1, 0});
-      (*this)->setOperands(operands);
-
+    if (foldAllTrueSplatMask(*this, maskAttr)) {
       return getResult();
     }
   }
-  if (auto res = foldTransferFromBroadcast(*this)) {
-    return res;
-  }
-  if (auto res = foldTransferFromTranspose(*this)) {
-    return res;
-  }
-  if (auto res = foldTransferFromStep(*this)) {
+  if (auto res = foldTransferIndexVecOps(*this)) {
     return res;
   }
   return OpFoldResult();
@@ -751,41 +764,13 @@ LogicalResult TransferScatterOp::verify() {
 
 LogicalResult TransferScatterOp::fold(FoldAdaptor adaptor,
                                       SmallVectorImpl<OpFoldResult> &results) {
-  // Fold all-true splat mask by dropping the mask operand.
   if (auto maskAttr =
           dyn_cast_if_present<DenseElementsAttr>(adaptor.getMask())) {
-    if (maskAttr.isSplat() && maskAttr.getSplatValue<bool>()) {
-      int32_t numOffsets = static_cast<int32_t>(getOffsets().size());
-      int32_t numIndexVecs = static_cast<int32_t>(getIndexVecs().size());
-
-      Builder b(getContext());
-      SmallVector<AffineMap> maps = getIndexingMapsArray();
-      maps.pop_back();
-      setIndexingMapsAttr(b.getAffineMapArrayAttr(maps));
-
-      SmallVector<Value> operands;
-      operands.push_back(getBase());
-      operands.push_back(getVector());
-      llvm::append_range(operands, getOffsets());
-      llvm::append_range(operands, getIndexVecs());
-
-      getProperties().setOperandSegmentSizes(
-          {1, 1, numOffsets, numIndexVecs, 0});
-      (*this)->setOperands(operands);
-
-      // In-place mutation: leave results empty so the framework keeps the op.
+    if (foldAllTrueSplatMask(*this, maskAttr)) {
       return success();
     }
   }
-  // All broadcast/transpose/step folds mutate the op in-place. Return
-  // success() with empty results to signal in-place update.
-  if (foldTransferFromBroadcast(*this)) {
-    return success();
-  }
-  if (foldTransferFromTranspose(*this)) {
-    return success();
-  }
-  if (foldTransferFromStep(*this)) {
+  if (foldTransferIndexVecOps(*this)) {
     return success();
   }
   return failure();
