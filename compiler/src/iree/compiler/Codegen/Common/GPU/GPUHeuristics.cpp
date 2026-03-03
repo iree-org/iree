@@ -562,7 +562,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
                              MutableArrayRef<int64_t> tileSizes,
                              int64_t &subgroupBudget, int64_t &tileBudget,
                              bool useMin) {
-    int64_t distribute =
+    int64_t (*distribute)(int64_t &, int64_t &) =
         useMin ? distributeTilesUsingMin : distributeTilesUsingGCD;
     for (size_t e = tileCounts.size(), i = e - 1; i < e; --i) {
       subgroupCounts[i] = distribute(tileCounts[i], subgroupBudget);
