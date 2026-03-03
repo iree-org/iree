@@ -162,3 +162,46 @@ func.func @copy_cst() attributes {hal.executable.target = #executable_target_vmv
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @copy_cst
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+
+// -----
+
+// Verify that ops inside already-distributed loops get zero distribution tiles.
+
+#executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @already_distributed() attributes {hal.executable.target = #executable_target_vmvx_bytecode_fb} {
+  %lhs_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>>
+  %rhs_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>>
+  %dst_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %end = arith.constant 4 : index
+  scf.for %iv = %workgroup_id_x to %end step %workgroup_count_x {
+    %remaining = affine.min affine_map<(d0) -> (-d0 + 4, 1)>(%iv)
+    %lhs = iree_tensor_ext.dispatch.tensor.load %lhs_binding, offsets = [%iv], sizes = [%remaining], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
+    %rhs = iree_tensor_ext.dispatch.tensor.load %rhs_binding, offsets = [%iv], sizes = [%remaining], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
+    %init = tensor.empty(%remaining) : tensor<?xf32>
+    %result = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]
+    } ins(%lhs, %rhs : tensor<?xf32>, tensor<?xf32>)
+      outs(%init : tensor<?xf32>) {
+    ^bb0(%a: f32, %b: f32, %c: f32):
+      %mul = arith.mulf %a, %b : f32
+      linalg.yield %mul : f32
+    } -> tensor<?xf32>
+    iree_tensor_ext.dispatch.tensor.store %result, %dst_binding, offsets = [%iv], sizes = [%remaining], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  }
+  return
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//      CHECK: func.func @already_distributed
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
