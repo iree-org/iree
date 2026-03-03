@@ -71,6 +71,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
           uv pip install --system -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+          uv pip install --system -r ./build_tools/github_actions/ci_requirements.txt
 
       - name: Generate compilation database (compile_commands.json)
         run: |

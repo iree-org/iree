@@ -23,7 +23,9 @@ jobs:
         with:
           submodules: true
       - name: Install Python requirements
-        run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+        run: |
+          python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+          python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: Build and test with ASan
         env:
           # Use a modern clang explicitly.

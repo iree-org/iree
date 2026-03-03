@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.21...3.24)
+cmake_minimum_required(VERSION 3.26...3.29)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

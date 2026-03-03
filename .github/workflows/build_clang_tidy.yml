@@ -42,6 +42,8 @@ jobs:
         with:
           submodules: true
 
+      - name: Install Python requirements
+        run: python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: "Setting up CMake"
         run: |
           source ./build_tools/cmake/setup_build.sh
