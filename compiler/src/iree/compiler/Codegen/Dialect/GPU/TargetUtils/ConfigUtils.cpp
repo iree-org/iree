@@ -171,6 +171,7 @@ namespace {
 struct GemmCutoff {
   float smallGemmCutoff = 0.0f;
   float largeGemmCutoff = 0.0f;
+  float veryLargeGemmCutoff = 0.0f;
 };
 } // namespace
 
@@ -180,18 +181,20 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
                                           Type computeType, bool scaled) {
   float smallGemmCutoff = 1.0f;
   float largeGemmCutoff = 1000.0f;
+  float veryLargeGemmCutoff = 7000.0f;
 
   // Use default gemm cutoffs for scaled matmuls for now. Choosing appropriate
   // cutoffs will require tuning and there is still a lot of performance work
   // left to do before any analysis done on tuning data is actionable.
   // See https://github.com/iree-org/iree/issues/22785 for details.
   if (scaled) {
-    return {100.0f, 10000.0f};
+    return {100.0f, 10000.0f, 70000.0f};
   }
   if (!target.getChip()) {
     LDBG() << "Target chip is not specified, using default gemm cutoffs: "
-           << smallGemmCutoff << ", " << largeGemmCutoff;
-    return {smallGemmCutoff, largeGemmCutoff};
+           << smallGemmCutoff << ", " << largeGemmCutoff << ", "
+           << veryLargeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
   }
 
   TargetChipAttr chip = target.getChip();
@@ -225,8 +228,9 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   if (!peakPerfTflopsFound || !memoryBandwidthFound) {
     LDBG() << "Target chip does not have peak performance or memory bandwidth "
               "information, using default gemm cutoffs: "
-           << smallGemmCutoff << ", " << largeGemmCutoff;
-    return {smallGemmCutoff, largeGemmCutoff};
+           << smallGemmCutoff << ", " << largeGemmCutoff << ", "
+           << veryLargeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
   }
 
   // TODO: Attempt to use number of elements loaded per second instead of
@@ -247,9 +251,11 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
   // based on the approach in https://github.com/iree-org/iree/discussions/21506
   smallGemmCutoff = 0.05f * computeMemoryCutoff;
   largeGemmCutoff = 5.0f * computeMemoryCutoff;
+  veryLargeGemmCutoff = 22.0f * computeMemoryCutoff;
   LDBG() << "Target chip small gemm cutoff: " << smallGemmCutoff
-         << ", large gemm cutoff: " << largeGemmCutoff;
-  return {smallGemmCutoff, largeGemmCutoff};
+         << ", large gemm cutoff: " << largeGemmCutoff
+         << ", very large gemm cutoff: " << veryLargeGemmCutoff;
+  return {smallGemmCutoff, largeGemmCutoff, veryLargeGemmCutoff};
 }
 
 static std::optional<GPUMMAHeuristicSeeds>
@@ -276,6 +282,7 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
          /*bestKTileCountPerSubgroup=*/4,
          /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
   case GemmSize::LargeGemm:
+  case GemmSize::VeryLargeGemm:
     if (scaled) {
       return GPUMMAHeuristicSeeds(
           {/*bestSubgroupCountPerWorkgroup=*/8,
@@ -311,6 +318,7 @@ getConvolutionHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth) {
          /*bestKTileCountPerSubgroup=*/4,
          /*bestKElementCountPerSubgroup=*/2 * kCacheLineSizeBits / inBitWidth});
   case GemmSize::LargeGemm:
+  case GemmSize::VeryLargeGemm:
     // Favor more subgroups for convolution to help latency hiding from global
     // loads.
     return GPUMMAHeuristicSeeds(
@@ -414,6 +422,11 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
     problem.gemmSize = GemmSize::SmallGemm;
+  } else if (computeIntensity >= gemmCutoffs.veryLargeGemmCutoff) {
+    // For very large matmuls, prefer low-VGPR-pressure intrinsics (e.g.,
+    // 32x32x16 over 16x16x32) which provide higher compute throughput per
+    // register.
+    problem.gemmSize = GemmSize::VeryLargeGemm;
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
