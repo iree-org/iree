@@ -11,6 +11,15 @@ on:
       package_version:
         description: "Version of the package"
         required: true
+      compiler_package_version:
+        description: "Version of the iree-base-compiler package"
+        required: true
+      runtime_package_version:
+        description: "Version of the iree-base-runtime package"
+        required: true
+      legacy_package_version:
+        description: "Version of the iree-tools-tf and iree-tools-tflite packages"
+        required: true
       build_run_id:
         description: "Run ID for the build_package.yml workflow that triggered this workflow"
         required: true
@@ -41,9 +50,9 @@ jobs:
       - name: Install python packages
         id: install_python_packages
         run: |
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ iree-base-compiler[onnx]
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ iree-base-runtime
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ iree-tools-tflite iree-tools-tf
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ "iree-base-compiler[onnx]==${{ github.event.inputs.compiler_package_version }}"
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ "iree-base-runtime==${{ github.event.inputs.runtime_package_version }}"
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ "iree-tools-tflite==${{ github.event.inputs.legacy_package_version }}" "iree-tools-tf==${{ github.event.inputs.legacy_package_version }}"
       - name: Validate IREE Compiler Package
         id: validate_compiler_package
         run: |
