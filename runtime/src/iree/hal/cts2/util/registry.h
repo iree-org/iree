@@ -98,6 +98,36 @@ enum class RecordingMode {
 };
 
 //===----------------------------------------------------------------------===//
+// Test exclusions and expected failures
+//===----------------------------------------------------------------------===//
+
+// Permanent categorical exclusion. The backend fundamentally cannot support
+// this test (e.g., no file I/O, no indirect command buffers). These entries
+// should never be removed — they document inherent backend limitations.
+//
+// Pattern is matched against "TestClass.TestMethod" using
+// iree_string_view_match_pattern() glob syntax (* and ?).
+struct TestUnsupported {
+  std::string pattern;  // Glob: "TestClass.Method" or "TestClass.*"
+  std::string reason;   // Why this will never work.
+};
+
+// Temporary expected failure. The test should eventually pass but currently
+// doesn't due to incomplete implementation. These shrink over time as the
+// backend matures.
+//
+// Pattern is matched against "TestClass.TestMethod" using
+// iree_string_view_match_pattern() glob syntax (* and ?).
+//
+// In verify mode (IREE_CTS_VERIFY_XFAILS=1), xfail tests run instead of
+// being skipped, and unexpected passes (XPASS) are flagged as test failures
+// so stale entries can be detected and removed.
+struct TestExpectedFailure {
+  std::string pattern;  // Glob: "TestClass.Method" or "TestClass.*"
+  std::string reason;   // What's broken and what the fix requires.
+};
+
+//===----------------------------------------------------------------------===//
 // Backend info (test parameterization type)
 //===----------------------------------------------------------------------===//
 
@@ -110,6 +140,8 @@ struct BackendInfo {
   const char* executable_format = nullptr;     // E.g., "vmvx-bytecode-fb".
   ExecutableDataFn executable_data = nullptr;  // Compiled executable lookup.
   RecordingMode recording_mode = RecordingMode::kDirect;
+  std::vector<TestUnsupported> unsupported_tests;
+  std::vector<TestExpectedFailure> expected_failures;
 };
 
 // Returns human-readable test suffix from BackendInfo.

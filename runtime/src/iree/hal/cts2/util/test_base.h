@@ -19,6 +19,7 @@
 #ifndef IREE_HAL_CTS2_UTIL_TEST_BASE_H_
 #define IREE_HAL_CTS2_UTIL_TEST_BASE_H_
 
+#include <cstdlib>
 #include <string>
 #include <string_view>
 
@@ -37,6 +38,38 @@ class CtsTestBase : public BaseType {
  protected:
   void SetUp() override {
     const BackendInfo& backend = this->GetParam();
+    std::string test_identity = ExtractTestIdentity();
+
+    // Check unsupported tests first (permanent categorical exclusion).
+    for (const auto& entry : backend.unsupported_tests) {
+      iree_string_view_t pattern =
+          iree_make_cstring_view(entry.pattern.c_str());
+      iree_string_view_t value = iree_make_cstring_view(test_identity.c_str());
+      if (iree_string_view_match_pattern(value, pattern)) {
+        GTEST_SKIP() << "Unsupported on '" << backend.name
+                     << "': " << entry.reason;
+        return;
+      }
+    }
+
+    // Check expected failures (temporary xfail).
+    for (const auto& entry : backend.expected_failures) {
+      iree_string_view_t pattern =
+          iree_make_cstring_view(entry.pattern.c_str());
+      iree_string_view_t value = iree_make_cstring_view(test_identity.c_str());
+      if (iree_string_view_match_pattern(value, pattern)) {
+        if (VerifyXfailsEnabled()) {
+          // Verify mode: run the test to detect XPASS.
+          xfail_active_ = true;
+          xfail_identity_ = test_identity;
+          xfail_reason_ = entry.reason;
+          break;
+        }
+        GTEST_SKIP() << "Expected failure (xfail) on '" << backend.name
+                     << "': " << entry.reason;
+        return;
+      }
+    }
 
     iree_hal_driver_t* driver = nullptr;
     iree_hal_device_t* device = nullptr;
@@ -60,6 +93,15 @@ class CtsTestBase : public BaseType {
   }
 
   void TearDown() override {
+    // XPASS detection: if this test was expected to fail but passed, flag it
+    // so the stale xfail entry can be removed.
+    if (xfail_active_ && !this->HasFailure()) {
+      ADD_FAILURE() << "XPASS: '" << xfail_identity_
+                    << "' was expected to fail but passed. Remove the xfail "
+                    << "entry: " << xfail_reason_;
+    }
+    xfail_active_ = false;
+
     if (device_allocator_) {
       iree_hal_allocator_release(device_allocator_);
       device_allocator_ = nullptr;
@@ -140,8 +182,8 @@ class CtsTestBase : public BaseType {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                   IREE_HAL_BUFFER_USAGE_TRANSFER;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
     iree_hal_buffer_t* buffer = nullptr;
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
                                                       buffer_size, &buffer));
@@ -258,6 +300,47 @@ class CtsTestBase : public BaseType {
   iree_hal_device_group_t* device_group_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
   iree_hal_allocator_t* device_allocator_ = nullptr;
+
+ private:
+  // Extracts the canonical test identity "TestClass.TestMethod" from GTest's
+  // parameterized test naming. Strips the CTS/CTS_Indirect prefix from the
+  // suite name and the backend suffix from the test name.
+  //
+  // GTest naming for parameterized tests:
+  //   test_suite_name() = "CTS/DispatchTest"     → "DispatchTest"
+  //   name()            = "DispatchAbs/local_task_vmvx" → "DispatchAbs"
+  //   Result: "DispatchTest.DispatchAbs"
+  std::string ExtractTestIdentity() {
+    const ::testing::TestInfo* test_info =
+        ::testing::UnitTest::GetInstance()->current_test_info();
+    std::string suite_name = test_info->test_suite_name();
+    std::string test_name = test_info->name();
+
+    // Strip prefix: "CTS/DispatchTest" → "DispatchTest"
+    auto slash_pos = suite_name.find('/');
+    if (slash_pos != std::string::npos) {
+      suite_name = suite_name.substr(slash_pos + 1);
+    }
+
+    // Strip suffix: "DispatchAbs/local_task_vmvx" → "DispatchAbs"
+    slash_pos = test_name.find('/');
+    if (slash_pos != std::string::npos) {
+      test_name = test_name.substr(0, slash_pos);
+    }
+
+    return suite_name + "." + test_name;
+  }
+
+  // Returns true if IREE_CTS_VERIFY_XFAILS=1 is set, enabling verify mode
+  // where xfail tests run instead of being skipped and XPASS is flagged.
+  static bool VerifyXfailsEnabled() {
+    const char* value = std::getenv("IREE_CTS_VERIFY_XFAILS");
+    return value && std::string(value) == "1";
+  }
+
+  bool xfail_active_ = false;
+  std::string xfail_identity_;
+  std::string xfail_reason_;
 };
 
 }  // namespace iree::hal::cts
