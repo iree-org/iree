@@ -1,9 +1,3 @@
-# TODO: (#17751) Add the arm_64 tests when the bug resolved. See:
-#   https://github.com/iree-org/iree/actions/runs/10468944505/job/28990909321#step:4:9815
-if(IREE_ARCH STREQUAL "arm_64")
-  return()
-endif()
-
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_cpu_f16_f16_f16_small
