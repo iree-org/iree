@@ -1008,12 +1008,16 @@ class BuildFileFunctions(object):
         flags=None,
         executable_name=None,
         compile_tool=None,
+        linker_tool=None,
         c_identifier=None,
         deps=None,
         testonly=None,
+        **kwargs,
     ):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
-        src_block = self._convert_string_arg_block("SRC", src)
+        src_block = self._convert_string_arg_block(
+            "SRC", self._normalize_label(src)
+        )
         target_device_block = self._convert_string_arg_block(
             "TARGET_DEVICE", target_device
         )

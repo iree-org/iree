@@ -20,7 +20,10 @@ using ::testing::ContainerEq;
 
 class DispatchMultiEntrypointTest : public CtsTestBase<> {
  protected:
-  void PrepareExecutable() {
+  void SetUp() override {
+    CtsTestBase::SetUp();
+    if (HasFatalFailure() || IsSkipped()) return;
+
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
         device_, iree_make_cstring_view("default"),
         iree_loop_inline(&loop_status_), &executable_cache_));
@@ -31,9 +34,8 @@ class DispatchMultiEntrypointTest : public CtsTestBase<> {
         IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
     executable_params.executable_format =
         iree_make_cstring_view(executable_format());
-    executable_params.executable_data = executable_data(
-        iree_make_cstring_view(
-            "command_buffer_dispatch_multi_entrypoint_test.bin"));
+    executable_params.executable_data = executable_data(iree_make_cstring_view(
+        "command_buffer_dispatch_multi_entrypoint_test.bin"));
     executable_params.constant_count = 0;
     executable_params.constants = nullptr;
 
@@ -41,12 +43,13 @@ class DispatchMultiEntrypointTest : public CtsTestBase<> {
         executable_cache_, &executable_params, &executable_));
   }
 
-  void CleanupExecutable() {
+  void TearDown() override {
     iree_hal_executable_release(executable_);
     executable_ = nullptr;
     iree_hal_executable_cache_release(executable_cache_);
     executable_cache_ = nullptr;
     iree_status_ignore(loop_status_);
+    CtsTestBase::TearDown();
   }
 
   iree_status_t loop_status_ = iree_ok_status();
@@ -61,15 +64,12 @@ class DispatchMultiEntrypointTest : public CtsTestBase<> {
 //   output_negate = [-1, -2, -3, -4]
 //   output_double = [2, 4, 6, 8]
 TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
-  ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
-
   // Create shared input buffer: [1, 2, 3, 4].
   iree_hal_buffer_t* input_buffer = nullptr;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(input_data.data(),
-                               input_data.size() * sizeof(uint32_t),
-                               &input_buffer);
+    CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(uint32_t), &input_buffer);
   }
 
   // Create two output buffers (zeroed).
@@ -247,10 +247,8 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
   iree_hal_buffer_release(output_double);
   iree_hal_buffer_release(output_negate);
   iree_hal_buffer_release(input_buffer);
-  CleanupExecutable();
 }
 
-CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(
-    DispatchMultiEntrypointTest);
+CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(DispatchMultiEntrypointTest);
 
 }  // namespace iree::hal::cts

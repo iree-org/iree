@@ -12,7 +12,10 @@ namespace iree::hal::cts {
 
 class DispatchTest : public CtsTestBase<> {
  protected:
-  void PrepareAbsExecutable() {
+  void SetUp() override {
+    CtsTestBase::SetUp();
+    if (HasFatalFailure() || IsSkipped()) return;
+
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
         device_, iree_make_cstring_view("default"),
         iree_loop_inline(&loop_status_), &executable_cache_));
@@ -30,12 +33,13 @@ class DispatchTest : public CtsTestBase<> {
         executable_cache_, &executable_params, &executable_));
   }
 
-  void CleanupExecutable() {
+  void TearDown() override {
     iree_hal_executable_release(executable_);
     executable_ = nullptr;
     iree_hal_executable_cache_release(executable_cache_);
     executable_cache_ = nullptr;
     iree_status_ignore(loop_status_);
+    CtsTestBase::TearDown();
   }
 
   iree_status_t loop_status_ = iree_ok_status();
@@ -47,8 +51,6 @@ class DispatchTest : public CtsTestBase<> {
 // input_buffer  = [-2.5 -2.5 -2.5 -2.5]
 // output_buffer = [-9.0  2.5  2.5 -9.0]
 TEST_P(DispatchTest, DispatchAbs) {
-  PrepareAbsExecutable();
-
   // Create input buffer.
   iree_hal_buffer_t* input_buffer = nullptr;
   CreateFilledDeviceBuffer<float>(4 * sizeof(float), -2.5f, &input_buffer);
@@ -149,7 +151,6 @@ TEST_P(DispatchTest, DispatchAbs) {
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(output_buffer);
   iree_hal_buffer_release(input_buffer);
-  CleanupExecutable();
 }
 
 CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(DispatchTest);

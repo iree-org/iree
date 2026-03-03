@@ -22,7 +22,10 @@ class DispatchMultiWorkgroupTest : public CtsTestBase<> {
  protected:
   static constexpr iree_host_size_t kWorkgroupCount = 32;
 
-  void PrepareExecutable() {
+  void SetUp() override {
+    CtsTestBase::SetUp();
+    if (HasFatalFailure() || IsSkipped()) return;
+
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
         device_, iree_make_cstring_view("default"),
         iree_loop_inline(&loop_status_), &executable_cache_));
@@ -42,12 +45,13 @@ class DispatchMultiWorkgroupTest : public CtsTestBase<> {
         executable_cache_, &executable_params, &executable_));
   }
 
-  void CleanupExecutable() {
+  void TearDown() override {
     iree_hal_executable_release(executable_);
     executable_ = nullptr;
     iree_hal_executable_cache_release(executable_cache_);
     executable_cache_ = nullptr;
     iree_status_ignore(loop_status_);
+    CtsTestBase::TearDown();
   }
 
   iree_status_t loop_status_ = iree_ok_status();
@@ -59,8 +63,6 @@ class DispatchMultiWorkgroupTest : public CtsTestBase<> {
 // workgroup_id to the corresponding output element.
 // Expected output: [0, 1, 2, ..., 31].
 TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
-  ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
-
   iree_hal_buffer_t* output_buffer = nullptr;
   CreateZeroedDeviceBuffer(kWorkgroupCount * sizeof(uint32_t), &output_buffer);
 
@@ -139,10 +141,8 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(output_buffer);
-  CleanupExecutable();
 }
 
-CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(
-    DispatchMultiWorkgroupTest);
+CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(DispatchMultiWorkgroupTest);
 
 }  // namespace iree::hal::cts

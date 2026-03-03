@@ -156,7 +156,7 @@ class CtsTestBase : public BaseType {
   void TearDown() override {
     // XPASS detection: if this test was expected to fail but passed, flag it
     // so the stale xfail entry can be removed.
-    if (xfail_active_ && !this->HasFailure()) {
+    if (xfail_active_ && !this->HasFailure() && !this->IsSkipped()) {
       ADD_FAILURE() << "XPASS: '" << xfail_identity_
                     << "' was expected to fail but passed. Remove the xfail "
                     << "entry: " << xfail_reason_;
@@ -300,6 +300,11 @@ class CtsTestBase : public BaseType {
     return status;
   }
 
+  // NOTE: These helpers use IREE_EXPECT_OK (non-fatal) because IREE_ASSERT_OK
+  // expands to `return;` which is incompatible with non-void return types.
+  // If creation fails, the EXPECT records the failure and the null return
+  // crashes at the call site with a clear backtrace.
+
   iree_hal_command_buffer_t* CreateEmptyCommandBuffer(
       iree_host_size_t binding_capacity = 0) {
     iree_hal_command_buffer_t* command_buffer = nullptr;
@@ -335,14 +340,15 @@ class CtsTestBase : public BaseType {
     iree_allocator_t allocator = iree_allocator_system();
     char* a_string = nullptr;
     iree_host_size_t a_string_length = 0;
-    EXPECT_TRUE(
+    ASSERT_TRUE(
         iree_status_to_string(a, &allocator, &a_string, &a_string_length));
     char* b_string = nullptr;
     iree_host_size_t b_string_length = 0;
-    EXPECT_TRUE(
+    ASSERT_TRUE(
         iree_status_to_string(b, &allocator, &b_string, &b_string_length));
-    EXPECT_TRUE(std::string_view(a_string).find(std::string_view(b_string)) !=
-                std::string_view::npos);
+    EXPECT_NE(std::string_view(a_string, a_string_length)
+                  .find(std::string_view(b_string, b_string_length)),
+              std::string_view::npos);
     iree_allocator_free(allocator, a_string);
     iree_allocator_free(allocator, b_string);
     iree_status_ignore(a);

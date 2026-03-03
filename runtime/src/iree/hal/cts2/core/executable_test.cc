@@ -16,7 +16,7 @@ class ExecutableTest : public CtsTestBase<> {
  protected:
   void SetUp() override {
     CtsTestBase::SetUp();
-    if (::testing::Test::IsSkipped()) return;
+    if (HasFatalFailure() || IsSkipped()) return;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
         device_, iree_make_cstring_view("default"),
@@ -53,9 +53,11 @@ class ExecutableTest : public CtsTestBase<> {
   bool ExportHasParameterInfo(
       iree_hal_executable_export_ordinal_t export_ordinal) {
     iree_hal_executable_export_info_t info;
-    IREE_CHECK_OK(
-        iree_hal_executable_export_info(executable_, export_ordinal, &info));
-    return info.parameter_count != 0;
+    iree_status_t status =
+        iree_hal_executable_export_info(executable_, export_ordinal, &info);
+    bool ok = iree_status_is_ok(status);
+    IREE_EXPECT_OK(status);
+    return ok && info.parameter_count != 0;
   }
 
   iree_status_t loop_status_ = iree_ok_status();

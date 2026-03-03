@@ -41,6 +41,10 @@ function(iree_hal_executable)
     return()
   endif()
 
+  if(NOT DEFINED _RULE_SRC)
+    message(SEND_ERROR "iree_hal_executable requires SRC")
+  endif()
+
   if(NOT DEFINED _RULE_TARGET_DEVICE)
     message(SEND_ERROR "iree_hal_executable requires TARGET_DEVICE")
   endif()

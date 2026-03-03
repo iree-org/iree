@@ -63,8 +63,8 @@ TEST_P(SemaphoreTest, Failure) {
 
   iree_hal_semaphore_fail(semaphore,
                           iree_status_from_code(IREE_STATUS_UNKNOWN));
-  EXPECT_TRUE(
-      iree_status_is_unknown(iree_hal_semaphore_query(semaphore, &value)));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNKNOWN,
+                        iree_hal_semaphore_query(semaphore, &value));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -122,11 +122,12 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
       iree_hal_semaphore_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY, 2ull,
                                 IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
 
-  // Result status is undefined - some backends may return DeadlineExceededError
-  // while others may return success.
-  IREE_IGNORE_ERROR(iree_hal_semaphore_wait(
-      semaphore, 3ull, iree_make_deadline(IREE_TIME_INFINITE_PAST),
-      IREE_HAL_WAIT_FLAG_DEFAULT));
+  // Semaphore is at 2, waiting for 3 with an immediate deadline must fail.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_hal_semaphore_wait(semaphore, 3ull,
+                              iree_make_deadline(IREE_TIME_INFINITE_PAST),
+                              IREE_HAL_WAIT_FLAG_DEFAULT));
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -168,11 +169,13 @@ TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
   iree_hal_semaphore_list_t semaphore_list = {IREE_ARRAYSIZE(semaphore_ptrs),
                                               semaphore_ptrs, payload_values};
 
-  // Result status is undefined - some backends may return DeadlineExceededError
-  // while others may return success.
-  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, semaphore_list,
-      iree_make_deadline(IREE_TIME_INFINITE_PAST), IREE_HAL_WAIT_FLAG_DEFAULT));
+  // semaphore_a is at 0 but needs 1: WAIT_ALL with immediate deadline must
+  // fail.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_hal_device_wait_semaphores(
+                            device_, IREE_HAL_WAIT_MODE_ALL, semaphore_list,
+                            iree_make_deadline(IREE_TIME_INFINITE_PAST),
+                            IREE_HAL_WAIT_FLAG_DEFAULT));
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);
@@ -194,7 +197,8 @@ TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
   iree_hal_semaphore_list_t semaphore_list = {IREE_ARRAYSIZE(semaphore_ptrs),
                                               semaphore_ptrs, payload_values};
 
-  IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
+  // Both semaphores already at their target values: must succeed.
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ALL, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE),
       IREE_HAL_WAIT_FLAG_DEFAULT));
@@ -327,10 +331,11 @@ TEST_P(SemaphoreTest, WaitForFiniteTime) {
     // The semaphore must advance at some point.
     while (true) {
       iree_status_t status = wait_fn(semaphore);
-      // The semaphore either timed out or has advanced.
-      IREE_ASSERT_TRUE(iree_status_is_ok(status) ||
-                       iree_status_is_deadline_exceeded(status));
-      if (iree_status_is_deadline_exceeded(status)) continue;
+      if (iree_status_is_deadline_exceeded(status)) {
+        iree_status_ignore(status);
+        continue;
+      }
+      IREE_ASSERT_OK(status);
       CheckSemaphoreValue(semaphore, 1);
       break;
     }

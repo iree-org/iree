@@ -30,7 +30,23 @@
 #include "iree/hal/cts2/util/test_base.h"
 #include "iree/testing/gtest.h"
 
+#if defined(IREE_PLATFORM_APPLE)
+#include <sys/resource.h>
+#endif  // IREE_PLATFORM_APPLE
+
 int main(int argc, char** argv) {
+#if defined(IREE_PLATFORM_APPLE)
+  // macOS defaults to a soft limit of 256 file descriptors per process, which
+  // is too low for CTS tests that create multiple HAL devices (each device
+  // needs pipe-based wait handles consuming 2 fds per handle). Raise to 4096
+  // to match Linux's typical default.
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < 4096) {
+    rl.rlim_cur = 4096;
+    setrlimit(RLIMIT_NOFILE, &rl);
+  }
+#endif  // IREE_PLATFORM_APPLE
+
   // Instantiate all test suites for all registered backends BEFORE gtest init.
   // This must happen before InitGoogleTest() because gtest caches test
   // enumeration state during initialization.

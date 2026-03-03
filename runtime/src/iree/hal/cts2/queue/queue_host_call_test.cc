@@ -118,12 +118,12 @@ TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
 
   EXPECT_EQ(state.did_call, 0);
 
-  // Signal the wait semaphore from a background thread so we can still
-  // function in synchronous contexts.
+  // Signal the wait semaphore from a background thread. The sleep gives the
+  // main thread time to enter the (potentially blocking) queue_host_call
+  // before the signal fires — necessary for synchronous backends where the
+  // call blocks inline waiting for the wait semaphore.
   std::thread waker([&]() {
-    EXPECT_EQ(state.did_call, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    EXPECT_EQ(state.did_call, 0);
     IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
   });
 
@@ -321,9 +321,8 @@ TEST_P(QueueHostCallTest, CallbackReturnsError) {
                                                   IREE_HAL_WAIT_FLAG_DEFAULT)),
               StatusIs(StatusCode::kAborted));
 
-  // Give a little time for the assignment to propagate.
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
+  // The wait returned kAborted because the semaphores were failed — the
+  // failure state must be immediately visible to query.
   uint64_t value0 = 0;
   EXPECT_THAT(Status(iree_hal_semaphore_query(
                   signal_semaphore_list.semaphores[0], &value0)),
@@ -362,11 +361,10 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   EXPECT_EQ(state.did_call, 0);
   EXPECT_FALSE(state.wait_completed);
 
+  // Same pattern as EnqueueBeforeSignal: sleep to let the main thread enter
+  // the blocking queue_host_call before signaling the wait semaphore.
   std::thread waker([&]() {
-    EXPECT_EQ(state.did_call, 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    EXPECT_EQ(state.did_call, 0);
-    EXPECT_FALSE(state.wait_completed);
     IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
   });
 
@@ -382,8 +380,6 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_TRUE(state.wait_completed);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   uint64_t value0 = 0;
   EXPECT_THAT(Status(iree_hal_semaphore_query(

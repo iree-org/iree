@@ -7,6 +7,7 @@
 #include "iree/hal/cts2/util/registry.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <mutex>
 
@@ -23,6 +24,7 @@ struct PendingFormat {
 
 struct RegistryData {
   std::mutex mutex;
+  bool instantiated = false;
   std::vector<TestSuiteInfo> test_suites;
   std::vector<BackendConfig> backends;
   std::vector<PendingFormat> pending_formats;
@@ -85,13 +87,9 @@ bool CtsRegistry::TagsMatch(const BackendConfig& backend,
   return true;
 }
 
-void CtsRegistry::InstantiateAll() {
-  auto& data = GetRegistryData();
-  std::lock_guard<std::mutex> lock(data.mutex);
-
-  // Merge pending executable formats into their backends. This handles the
-  // case where RegisterExecutableFormat() was called before or after the
-  // corresponding RegisterBackend() — static init ordering is unspecified.
+// Merges pending executable formats into their matching backends.
+// Must be called with data.mutex held.
+static void MergePendingFormats(RegistryData& data) {
   for (auto& pending : data.pending_formats) {
     bool found = false;
     for (auto& backend : data.backends) {
@@ -102,12 +100,29 @@ void CtsRegistry::InstantiateAll() {
       }
     }
     if (!found) {
-      std::cerr << "CtsRegistry::InstantiateAll: Executable format for '"
+      std::cerr << "CtsRegistry: Executable format for '"
                 << pending.backend_name
                 << "' has no matching backend registration.\n";
+      std::abort();
     }
   }
   data.pending_formats.clear();
+}
+
+void CtsRegistry::InstantiateAll() {
+  auto& data = GetRegistryData();
+  std::lock_guard<std::mutex> lock(data.mutex);
+
+  if (data.instantiated) {
+    std::cerr << "CtsRegistry::InstantiateAll called twice.\n";
+    std::abort();
+  }
+  data.instantiated = true;
+
+  // Merge pending executable formats into their backends. This handles the
+  // case where RegisterExecutableFormat() was called before or after the
+  // corresponding RegisterBackend() — static init ordering is unspecified.
+  MergePendingFormats(data);
 
   if (data.backends.empty() || data.test_suites.empty()) {
     return;
@@ -130,6 +145,10 @@ void CtsRegistry::Instantiate(const char* suite_name,
   auto& data = GetRegistryData();
   std::lock_guard<std::mutex> lock(data.mutex);
 
+  // Merge pending executable formats (same as InstantiateAll) so that
+  // formats registered separately from backends are available.
+  MergePendingFormats(data);
+
   // Find the specified suite.
   const TestSuiteInfo* suite = nullptr;
   for (const auto& s : data.test_suites) {
@@ -141,7 +160,7 @@ void CtsRegistry::Instantiate(const char* suite_name,
   if (!suite) {
     std::cerr << "CtsRegistry::Instantiate: Suite '" << suite_name
               << "' not found.\n";
-    return;
+    std::abort();
   }
 
   // Find the specified backend.
@@ -155,14 +174,14 @@ void CtsRegistry::Instantiate(const char* suite_name,
   if (!backend) {
     std::cerr << "CtsRegistry::Instantiate: Backend '" << backend_name
               << "' not found.\n";
-    return;
+    std::abort();
   }
 
   // Check tag compatibility.
   if (!TagsMatch(*backend, suite->required_tags, suite->excluded_tags)) {
     std::cerr << "CtsRegistry::Instantiate: Tags don't match for suite '"
               << suite_name << "' with backend '" << backend_name << "'.\n";
-    return;
+    std::abort();
   }
 
   suite->accumulator(*backend);
