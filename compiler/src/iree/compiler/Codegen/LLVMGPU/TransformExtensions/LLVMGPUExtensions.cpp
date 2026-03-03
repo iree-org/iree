@@ -632,7 +632,7 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   RewritePatternSet endPatterns(ctx);
   vector::WarpExecuteOnLane0LoweringOptions options;
   options.warpAllocationFn = allocateGlobalSharedMemory;
-  options.warpSyncronizationFn = warpSynchronizationFn;
+  options.warpSynchronizationFn = warpSynchronizationFn;
   populateWarpExecuteOnLane0ToScf(target, endPatterns, options,
                                   /*benefit=*/0);
   if (failed(applyPatternsGreedily(target, std::move(endPatterns), config))) {
