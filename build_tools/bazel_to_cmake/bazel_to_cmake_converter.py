@@ -479,7 +479,46 @@ class BuildFileFunctions(object):
         pass
 
     def load(self, *args, **kwargs):
-        pass
+        """Attempts to bind constants from loaded .bzl files.
+
+        Bazel load() imports names from .bzl files into the BUILD file's
+        namespace. The converter can evaluate simple .bzl files that contain
+        only Python-compatible constant assignments (lists, dicts, strings)
+        and bind the requested names. Complex .bzl files with Starlark-
+        specific constructs silently fall back to no-op behavior.
+        """
+        if len(args) < 2:
+            return
+        bzl_label = args[0]
+        names = args[1:]
+
+        # Resolve the .bzl file path from its label.
+        if bzl_label.startswith(":"):
+            abs_path = os.path.join(self._build_dir, bzl_label[1:])
+        elif bzl_label.startswith("//"):
+            # "//path/to/pkg:file.bzl" -> "path/to/pkg/file.bzl"
+            rel = bzl_label[2:].replace(":", "/")
+            abs_path = os.path.join(self._repo_root, rel)
+        else:
+            return  # External repositories — can't resolve.
+
+        if not os.path.isfile(abs_path):
+            return
+
+        try:
+            namespace = {}
+            with open(abs_path) as f:
+                exec(f.read(), namespace)
+            for name in names:
+                if name in namespace and hasattr(self, "_exec_namespace"):
+                    # Only bind names not already provided by converter
+                    # handlers. This avoids overwriting converter methods
+                    # (like enforce_glob) with Starlark implementations that
+                    # reference native.glob() and other unavailable builtins.
+                    if name not in self._exec_namespace:
+                        self._exec_namespace[name] = namespace[name]
+        except Exception:
+            pass  # .bzl uses Starlark features — fall back to no-op.
 
     def package(self, **kwargs):
         pass
@@ -1086,6 +1125,141 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
+    def iree_hal_cts2_testdata(
+        self,
+        format_name,
+        target_device,
+        identifier,
+        backend_name,
+        format_string,
+        testdata,
+        flags=None,
+        flag_values=None,
+        data=None,
+        testonly=None,
+        **kwargs,
+    ):
+        # Resolve {PLACEHOLDER} template variables from flag_values.
+        # Build settings map to CMake variables; file targets (not in the
+        # mapping) have their flags stripped since CMake auto-discovers
+        # platform libraries via findPlatformLibDirectory().
+        if flag_values:
+            file_templates = set()
+            for placeholder, label in flag_values.items():
+                cmake_var = _BUILD_SETTING_CMAKE_VARIABLES.get(label)
+                template = "{" + placeholder + "}"
+                if cmake_var is not None:
+                    cmake_ref = "${" + cmake_var + "}"
+                    format_string = format_string.replace(template, cmake_ref)
+                    if flags:
+                        flags = [f.replace(template, cmake_ref) for f in flags]
+                else:
+                    file_templates.add(template)
+            if flags and file_templates:
+                flags = [
+                    f
+                    for f in flags
+                    if not any(t in f for t in file_templates)
+                ]
+
+        name_block = self._convert_string_arg_block(
+            "FORMAT_NAME", format_name, quote=False
+        )
+        target_device_block = self._convert_string_arg_block(
+            "TARGET_DEVICE", target_device
+        )
+        identifier_block = self._convert_string_arg_block("IDENTIFIER", identifier)
+        backend_name_block = self._convert_string_arg_block(
+            "BACKEND_NAME", backend_name
+        )
+        # Bracket-quote the format string to preserve C expressions like
+        # "embedded-elf-" IREE_ARCH without CMake interpretation.
+        format_string_block = (
+            f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
+        )
+        flags_block = self._convert_string_list_block("FLAGS", flags)
+
+        # Convert Bazel label to CMake directory path.
+        # "//runtime/src/iree/hal/cts2/testdata:executable_srcs"
+        #   -> "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts2/testdata"
+        testdata_dir = testdata.split(":")[0].lstrip("/")
+        testdata_dir_block = (
+            f'  TESTDATA_DIR\n    "${{PROJECT_SOURCE_DIR}}/{testdata_dir}"\n'
+        )
+
+        self._converter.body += (
+            f"iree_hal_cts2_testdata(\n"
+            f"{name_block}"
+            f"{target_device_block}"
+            f"{identifier_block}"
+            f"{backend_name_block}"
+            f"{format_string_block}"
+            f"{testdata_dir_block}"
+            f"{flags_block}"
+            f")\n\n"
+        )
+
+    def iree_hal_cts2_test_suite(
+        self,
+        backends_lib,
+        executable_formats=None,
+        testdata_libs=None,
+        testdata=None,
+        flag_values=None,
+        name="",
+        args=None,
+        tags=None,
+        testonly=None,
+        **kwargs,
+    ):
+        # Expand executable_formats into individual iree_hal_cts2_testdata()
+        # calls. The CMake function takes only flat TESTDATA_LIBS, avoiding
+        # nested dict argument parsing.
+        _testdata_libs = list(testdata_libs or [])
+        if executable_formats:
+            for format_name, config in executable_formats.items():
+                self.iree_hal_cts2_testdata(
+                    format_name=format_name,
+                    target_device=config["target_device"],
+                    identifier=config["identifier"],
+                    backend_name=config["backend_name"],
+                    format_string=config["format_string"],
+                    testdata=testdata,
+                    flag_values=flag_values,
+                    flags=config.get("flags"),
+                )
+                _testdata_libs.append(f":testdata_{format_name}_lib")
+
+        # Use _convert_target_list_block for BACKENDS_LIB so that local
+        # targets like ":backends" preserve their "::" CMake alias form.
+        # (_convert_target_block replaces "::" with "_", which is wrong
+        # for local package-relative references.)
+        backends_block = self._convert_target_list_block(
+            "BACKENDS_LIB", [backends_lib] if backends_lib else None
+        )
+        testdata_libs_block = self._convert_target_list_block(
+            "TESTDATA_LIBS", _testdata_libs if _testdata_libs else None
+        )
+        name_block = (
+            self._convert_string_arg_block("NAME", name, quote=False)
+            if name
+            else ""
+        )
+        args_block = self._convert_string_list_block("ARGS", args)
+        labels_block = self._convert_string_list_block("LABELS", tags)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._converter.body += (
+            f"iree_hal_cts2_test_suite(\n"
+            f"{backends_block}"
+            f"{testdata_libs_block}"
+            f"{name_block}"
+            f"{args_block}"
+            f"{labels_block}"
+            f"{testonly_block}"
+            f")\n\n"
+        )
+
     def iree_flatbuffer_c_library(self, name, srcs, flatcc_args=None, includes=None):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         srcs_block = self._convert_srcs_block(srcs)
@@ -1494,7 +1668,9 @@ def convert_build_file(
         repo_root=repo_root,
     )
 
-    exec(build_file_code, GetDict(build_file_functions))
+    exec_namespace = GetDict(build_file_functions)
+    build_file_functions._exec_namespace = exec_namespace
+    exec(build_file_code, exec_namespace)
     converted_text = converter.convert()
     if not allow_partial_conversion and converter.first_error:
         raise converter.first_error  # pylint: disable=raising-bad-type
