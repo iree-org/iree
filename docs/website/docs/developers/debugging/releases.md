@@ -60,7 +60,7 @@ The default system Python is 2.x, so you must select one of the more modern
 ones:
 
 ```shell
-export PATH=/opt/python/cp39-cp39/bin:$PATH
+export PATH=/opt/python/cp310-cp310/bin:$PATH
 ```
 
 Build core installation:

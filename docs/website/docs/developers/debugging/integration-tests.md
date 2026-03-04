@@ -41,7 +41,7 @@ E.g.,
 [ RUN      ] MobilenetV2Int8Test.test_compile_tflite
 I0401 17:27:04.084272 140182373025024 test_util.py:119] Setting up for IREE
 I0401 17:27:04.085064 140182373025024 binaries.py:218] Invoke IREE Pipeline:
-  /tmp/iree-experimental/iree-experimental.venv/lib/python3.9/site-packages/iree/tools/tflite/iree-import-tflite
+  /tmp/iree-experimental/iree-experimental.venv/lib/python3.11/site-packages/iree/tools/tflite/iree-import-tflite
     /tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
     --mlir-print-debuginfo
     --save-temp-tfl-input=/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
