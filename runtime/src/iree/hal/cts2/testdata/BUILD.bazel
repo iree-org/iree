@@ -1,0 +1,38 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Shared MLIR sources for CTS2 executable and dispatch tests.
+# These are compiled per-backend by each driver's cts/BUILD.bazel using
+# iree_hal_executables() with backend-specific flags.
+#
+# The executable_srcs filegroup is the single source of truth for which
+# MLIR files are included. enforce_glob validates it matches the directory
+# contents — adding or removing an MLIR file without updating this list
+# will fail the build with a helpful message.
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],
+)
+
+filegroup(
+    name = "executable_srcs",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "command_buffer_dispatch_constants_bindings_test.mlir",
+            "command_buffer_dispatch_constants_test.mlir",
+            "command_buffer_dispatch_multi_entrypoint_test.mlir",
+            "command_buffer_dispatch_multi_workgroup_test.mlir",
+            "command_buffer_dispatch_test.mlir",
+            "executable_cache_test.mlir",
+            "executable_test.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+)

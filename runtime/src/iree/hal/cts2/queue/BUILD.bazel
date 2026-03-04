@@ -1,0 +1,47 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Queue operation CTS tests: host calls, semaphore submission orchestration.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+iree_runtime_cc_library(
+    name = "queue_host_call_test",
+    testonly = True,
+    srcs = ["queue_host_call_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
+    name = "semaphore_submission_test",
+    testonly = True,
+    srcs = ["semaphore_submission_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts2/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+# All queue tests.
+iree_runtime_cc_library(
+    name = "all_tests",
+    testonly = True,
+    deps = [
+        ":queue_host_call_test",
+        ":semaphore_submission_test",
+    ],
+)
