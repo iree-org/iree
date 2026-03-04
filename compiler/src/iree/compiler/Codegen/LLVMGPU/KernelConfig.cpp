@@ -969,17 +969,19 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
                                          IREE::GPU::kMMAOperandRhs);
   bool useColMajor = matchLayout(qkOutLayout, pvRhsLayout);
 
-  auto getColMajorIntrinsic =
-      [&](IREE::Codegen::InnerTileDescAttrInterface mmaKind)
-      -> IREE::Codegen::InnerTileDescAttrInterface {
+  auto getIntrinsic =
+      [&](IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+          bool colMajor) -> IREE::Codegen::InnerTileDescAttrInterface {
     if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(mmaKind)) {
       return IREE::GPU::MMAAttr::get(context, mma.getIntrinsic(),
-                                     /*colMajor=*/true);
+                                     /*colMajor=*/colMajor);
     }
     if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind)) {
       return IREE::GPU::VirtualMMAAttr::get(context, vmma.getIntrinsic(),
-                                            /*colMajor=*/true);
+                                            /*colMajor=*/colMajor);
     }
+    // For intrinsics which do not have a known colMajor layout, just return the
+    // original layout.
     return mmaKind;
   };
 
@@ -989,16 +991,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   // Configuring for qk matmul.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
   IREE::GPU::setMmaKind(context, qkConfig,
-                        useColMajor ? getColMajorIntrinsic(qkSchedule.mmaKind)
-                                    : qkSchedule.mmaKind);
+                        getIntrinsic(qkSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
 
   // Configuring for pv matmul.
   IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
   IREE::GPU::setMmaKind(context, pvConfig,
-                        useColMajor ? getColMajorIntrinsic(pvSchedule.mmaKind)
-                                    : pvSchedule.mmaKind);
+                        getIntrinsic(pvSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getK1Dims()));
 
