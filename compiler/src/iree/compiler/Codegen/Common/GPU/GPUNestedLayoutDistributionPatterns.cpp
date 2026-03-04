@@ -1876,7 +1876,7 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
 /// operation, we can perform a vector comparison that will yield a vector of
 /// true/false telling us which indices are inside the original boundary. This
 /// vector of true/false is our mask.
-/// For multi-dimensional vectors, we can peform this per dimension and combine
+/// For multi-dimensional vectors, we can perform this per dimension and combine
 /// the masks through a boolean AND.
 ///
 /// To illustrate this with an example, assume a vector<4x8x...> and mask bounds
@@ -1896,7 +1896,7 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
 ///  [1, 1, 1, 0],
 ///  [1, 1, 1, 0]]
 ///
-/// To get the original shape, we now need to tranpose, giving us:
+/// To get the original shape, we now need to transpose, giving us:
 ///  [[1, 1, 1, 1, 1, 1, 1, 1],
 ///   [1, 1, 1, 1, 1, 1, 1, 1],
 ///   [1, 1, 1, 1, 1, 1, 1, 1],
@@ -1905,7 +1905,7 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
 /// For the second dimension, we do the same, giving us a <8xi1> mask after
 /// comparison, with content [1, 1, 1, 1, 1, 1, 0, 0].
 /// We can broadcast this to the original shape and, as this is already the
-/// trailing dimension of the original layout, we don't need to tranpose. This
+/// trailing dimension of the original layout, we don't need to transpose. This
 /// yields:
 /// [[1, 1, 1, 1, 1, 1, 0, 0],
 ///  [1, 1, 1, 1, 1, 1, 0, 0],
