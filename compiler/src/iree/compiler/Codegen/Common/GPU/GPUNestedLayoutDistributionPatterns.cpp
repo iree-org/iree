@@ -1698,21 +1698,9 @@ struct DistributeBatchOuterToLayoutConversions final
       return rewriter.notifyMatchFailure(toLayoutOp, "non-nested layout");
     }
 
-    // Check if everything other than batch and outer tile matches.
-    if (layoutA.getSubgroupTile() != layoutB.getSubgroupTile()) {
-      return failure();
-    }
-    if (layoutA.getSubgroupStrides() != layoutB.getSubgroupStrides()) {
-      return failure();
-    }
-    if (layoutA.getThreadTile() != layoutB.getThreadTile()) {
-      return failure();
-    }
-    if (layoutA.getThreadStrides() != layoutB.getThreadStrides()) {
-      return failure();
-    }
-    if (layoutA.getElementTile() != layoutB.getElementTile()) {
-      return failure();
+    if (layoutA.needsSharedMemoryForConversion(layoutB)) {
+      return rewriter.notifyMatchFailure(toLayoutOp,
+                                         "conversion requires shared memory");
     }
 
     auto batchTileA = SmallVector<int64_t>(layoutA.getBatchTile());

@@ -610,6 +610,20 @@ NestedLayoutAttr::getRecombinedLayout(ArrayRef<VectorLayoutInterface> layouts,
                                threadStrides);
 }
 
+bool NestedLayoutAttr::needsSharedMemoryForConversion(
+    VectorLayoutInterface targetLayout) const {
+  auto targetNestedLayout =
+      llvm::dyn_cast_if_present<NestedLayoutAttr>(targetLayout);
+  assert(targetNestedLayout &&
+         "expected target layout to also be a nested layout");
+  // Check if everything other than batch and outer tile matches.
+  return getSubgroupTile() != targetNestedLayout.getSubgroupTile() ||
+         getThreadTile() != targetNestedLayout.getThreadTile() ||
+         getElementTile() != targetNestedLayout.getElementTile() ||
+         getSubgroupStrides() != targetNestedLayout.getSubgroupStrides() ||
+         getThreadStrides() != targetNestedLayout.getThreadStrides();
+}
+
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupTile, ArrayRef<int64_t> batchTile,

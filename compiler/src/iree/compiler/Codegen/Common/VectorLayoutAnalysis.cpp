@@ -344,6 +344,11 @@ void LayoutAnalysis::fixupOp(Operation *op) {
 
   // to_layout: result layout -> input gets same layout.
   if (auto toLayout = dyn_cast<ToLayoutOp>(op)) {
+    if (toLayout.getSharedMemoryConversion()) {
+      // The layout input is coming through shared memory, skip
+      // back-propagation.
+      return;
+    }
     VectorLayoutInterface layout = getResolvedLayout(toLayout.getResult());
     setLayoutOrClone(&toLayout.getInputMutable(), layout);
     return;

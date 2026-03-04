@@ -375,16 +375,12 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   // We know that pvMatmul takes result of qkMatmul as it's lhs.
   // If the intrinsic output of pvMatmul can be used as rhs of pvMatmul,
   // we swap operands of both contracts to get output as transposed intrinsic.
-  bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
   IREE::Codegen::InnerTileDescAttrInterface qkIntrinsic =
       getIntrinsic(qkMatmul);
   IREE::Codegen::InnerTileDescAttrInterface pvIntrinsic =
       getIntrinsic(pvMatmul);
-  IREE::GPU::MMASingleSubgroupLayout lhsLayout =
-      IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
-                                         IREE::GPU::kMMAOperandLhs);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
       IREE::GPU::getSingleSubgroupLayout(pvIntrinsic,
                                          IREE::GPU::kMMAOperandRhs);
@@ -402,18 +398,12 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   // TODO: Move this check to KernelConfig and set appropriate attributes
   // in lowering_config for the operation. This allows us to check shared
   // memory usage and decide what kind of pipelining we can do.
-  if (matchLayout(outLayout, lhsLayout)) {
-    reuseIntrinsicOutput = true;
-  } else if (matchLayout(outLayout, rhsLayout)) {
-    reuseIntrinsicOutput = true;
+  if (matchLayout(outLayout, rhsLayout)) {
     transposeIntrinsic = true;
   }
 
   SmallVector<bool> promotedQKOperands = getPromotedOperands(qkMatmul);
   SmallVector<bool> promotedPVOperands = getPromotedOperands(pvMatmul);
-
-  // Do not promote lhs of pvMatmul if we are reusing the intrinsic output.
-  promotedPVOperands[0] = !reuseIntrinsicOutput;
 
   // Transpose the intrinsic if requested. See docs for
   // swapOperandsToTransposeIntrinsic for more information on why this is done.
