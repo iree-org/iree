@@ -19,6 +19,13 @@ import os
 
 import bazel_to_cmake_targets
 
+# Maps Bazel string_flag labels to CMake variable names. Used by
+# flag_values in iree_hal_executable rules and CTS2 macros to resolve
+# {PLACEHOLDER} template variables to ${CMAKE_VARIABLE} references.
+_BUILD_SETTING_CMAKE_VARIABLES = {
+    "//build_tools/bazel:rocm_test_target": "IREE_ROCM_TEST_TARGET_CHIP",
+}
+
 # Maps Bazel platform labels (from both select() conditions and
 # target_compatible_with) to CMake CMAKE_SYSTEM_NAME values.
 _PLATFORM_CMAKE_SYSTEM_NAME = {

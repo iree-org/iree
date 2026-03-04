@@ -71,6 +71,7 @@ use_repo(
 iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
+    "amdgpu_device_libs",
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",

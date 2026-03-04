@@ -429,6 +429,51 @@ helpers for local development.
 
 All three files are loaded automatically by Bazel in this order.
 
+### GPU test targets
+
+GPU tests and samples need a target chip architecture (e.g., `gfx1100` for AMD
+RDNA3). These are exposed as Bazel
+[`string_flag`](https://github.com/bazelbuild/bazel-skylib/blob/main/docs/common_settings_doc.md#string_flag)
+build settings that can be overridden on the command line:
+
+| Flag | Default | CMake equivalent |
+|------|---------|-----------------|
+| `--//build_tools/bazel:rocm_test_target` | `gfx1100` | `IREE_ROCM_TEST_TARGET_CHIP` |
+
+```shell
+# Run AMDGPU CTS tests for a specific chip:
+iree-bazel-test --//build_tools/bazel:rocm_test_target=gfx942 \
+    //runtime/src/iree/hal/drivers/amdgpu/cts/...
+
+# Build test data for a different architecture:
+iree-bazel-build --//build_tools/bazel:rocm_test_target=gfx1201 \
+    //runtime/src/iree/hal/drivers/amdgpu/cts/...
+```
+
+See the [AMDGPU driver README](https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/drivers/amdgpu/README.md)
+for full quick-start instructions.
+
+#### How `flag_values` works in BUILD files
+
+BUILD files reference these flags via template variables in compiler flags and
+format strings. The `flag_values` parameter maps placeholder names to build
+setting labels:
+
+```python
+iree_hal_cts2_testdata(
+    format_name = "amdgpu",
+    flags = ["--iree-rocm-target={ROCM_TARGET}"],
+    flag_values = {"ROCM_TARGET": "//build_tools/bazel:rocm_test_target"},
+    format_string = '"amdgcn-amd-amdhsa--{ROCM_TARGET}"',
+    ...
+)
+```
+
+At analysis time, Bazel reads the `string_flag` value and substitutes it into
+all `{PLACEHOLDER}` occurrences in both `flags` and `format_string`. The
+Bazel-to-CMake converter maps these to CMake variables automatically (e.g.,
+`{ROCM_TARGET}` becomes `${IREE_ROCM_TEST_TARGET_CHIP}`).
+
 ## What's next?
 
 ### Take a Look Around
