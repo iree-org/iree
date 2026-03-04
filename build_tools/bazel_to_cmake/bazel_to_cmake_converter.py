@@ -20,7 +20,7 @@ import os
 import bazel_to_cmake_targets
 
 # Maps Bazel string_flag labels to CMake variable names. Used by
-# flag_values in iree_hal_executable rules and CTS2 macros to resolve
+# flag_values in iree_hal_executable rules and CTS macros to resolve
 # {PLACEHOLDER} template variables to ${CMAKE_VARIABLE} references.
 _BUILD_SETTING_CMAKE_VARIABLES = {
     "//build_tools/bazel:rocm_test_target": "IREE_ROCM_TEST_TARGET_CHIP",
@@ -1061,9 +1061,7 @@ class BuildFileFunctions(object):
         **kwargs,
     ):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
-        src_block = self._convert_string_arg_block(
-            "SRC", self._normalize_label(src)
-        )
+        src_block = self._convert_string_arg_block("SRC", self._normalize_label(src))
         target_device_block = self._convert_string_arg_block(
             "TARGET_DEVICE", target_device
         )
@@ -1125,7 +1123,7 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
-    def iree_hal_cts2_testdata(
+    def iree_hal_cts_testdata(
         self,
         format_name,
         target_device,
@@ -1156,11 +1154,7 @@ class BuildFileFunctions(object):
                 else:
                     file_templates.add(template)
             if flags and file_templates:
-                flags = [
-                    f
-                    for f in flags
-                    if not any(t in f for t in file_templates)
-                ]
+                flags = [f for f in flags if not any(t in f for t in file_templates)]
 
         name_block = self._convert_string_arg_block(
             "FORMAT_NAME", format_name, quote=False
@@ -1174,21 +1168,19 @@ class BuildFileFunctions(object):
         )
         # Bracket-quote the format string to preserve C expressions like
         # "embedded-elf-" IREE_ARCH without CMake interpretation.
-        format_string_block = (
-            f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
-        )
+        format_string_block = f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
         flags_block = self._convert_string_list_block("FLAGS", flags)
 
         # Convert Bazel label to CMake directory path.
-        # "//runtime/src/iree/hal/cts2/testdata:executable_srcs"
-        #   -> "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts2/testdata"
+        # "//runtime/src/iree/hal/cts/testdata:executable_srcs"
+        #   -> "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
         testdata_dir = testdata.split(":")[0].lstrip("/")
         testdata_dir_block = (
             f'  TESTDATA_DIR\n    "${{PROJECT_SOURCE_DIR}}/{testdata_dir}"\n'
         )
 
         self._converter.body += (
-            f"iree_hal_cts2_testdata(\n"
+            f"iree_hal_cts_testdata(\n"
             f"{name_block}"
             f"{target_device_block}"
             f"{identifier_block}"
@@ -1199,7 +1191,7 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def iree_hal_cts2_test_suite(
+    def iree_hal_cts_test_suite(
         self,
         backends_lib,
         executable_formats=None,
@@ -1212,13 +1204,13 @@ class BuildFileFunctions(object):
         testonly=None,
         **kwargs,
     ):
-        # Expand executable_formats into individual iree_hal_cts2_testdata()
+        # Expand executable_formats into individual iree_hal_cts_testdata()
         # calls. The CMake function takes only flat TESTDATA_LIBS, avoiding
         # nested dict argument parsing.
         _testdata_libs = list(testdata_libs or [])
         if executable_formats:
             for format_name, config in executable_formats.items():
-                self.iree_hal_cts2_testdata(
+                self.iree_hal_cts_testdata(
                     format_name=format_name,
                     target_device=config["target_device"],
                     identifier=config["identifier"],
@@ -1241,16 +1233,14 @@ class BuildFileFunctions(object):
             "TESTDATA_LIBS", _testdata_libs if _testdata_libs else None
         )
         name_block = (
-            self._convert_string_arg_block("NAME", name, quote=False)
-            if name
-            else ""
+            self._convert_string_arg_block("NAME", name, quote=False) if name else ""
         )
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
 
         self._converter.body += (
-            f"iree_hal_cts2_test_suite(\n"
+            f"iree_hal_cts_test_suite(\n"
             f"{backends_block}"
             f"{testdata_libs_block}"
             f"{name_block}"

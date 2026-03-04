@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the AMDGPU HAL driver.
+// CTS backend registration for the AMDGPU HAL driver.
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/amdgpu/registration/driver_module.h"
 
 namespace iree::hal::cts {
@@ -49,9 +49,10 @@ static bool amdgpu_registered_ =
          "amdgpu",
          {.name = "amdgpu",
           .factory = CreateAmdgpuDevice,
-          .unsupported_tests = {
-              {"EventTest.*", "AMDGPU does not implement HAL events"},
-          }},
+          .unsupported_tests =
+              {
+                  {"EventTest.*", "AMDGPU does not implement HAL events"},
+              }},
          {"async_queue"},
      }),
      true);

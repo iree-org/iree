@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the CUDA HAL driver.
+// CTS backend registration for the CUDA HAL driver.
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/cuda/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
 static iree_status_t CreateCudaDevice(iree_hal_driver_t** out_driver,
                                       iree_hal_device_t** out_device) {
-  iree_status_t status = iree_hal_cuda_driver_module_register(
-      iree_hal_driver_registry_default());
+  iree_status_t status =
+      iree_hal_cuda_driver_module_register(iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
     iree_status_ignore(status);
     status = iree_ok_status();

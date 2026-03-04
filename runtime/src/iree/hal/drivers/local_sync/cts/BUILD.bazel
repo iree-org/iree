@@ -4,10 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# CTS2 test binaries for the local-sync HAL driver.
+# CTS test binaries for the local-sync HAL driver.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
-load("//build_tools/bazel:iree_hal_cts2_test_suite.bzl", "iree_hal_cts2_test_suite")
+load("//build_tools/bazel:iree_hal_cts_test_suite.bzl", "iree_hal_cts_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -21,13 +21,13 @@ iree_runtime_cc_library(
     srcs = ["backends.cc"],
     deps = [
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/drivers/local_sync/registration",
     ],
     alwayslink = True,
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
     backends_lib = ":backends",
     executable_formats = {
         "llvm_cpu": {
@@ -48,5 +48,5 @@ iree_hal_cts2_test_suite(
             "target_device": "local",
         },
     },
-    testdata = "//runtime/src/iree/hal/cts2/testdata:executable_srcs",
+    testdata = "//runtime/src/iree/hal/cts/testdata:executable_srcs",
 )

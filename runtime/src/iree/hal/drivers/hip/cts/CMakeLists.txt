@@ -21,14 +21,14 @@ iree_cc_library(
     "backends.cc"
   DEPS
     iree::hal
-    iree::hal::cts2::util::registry
+    iree::hal::cts::util::registry
     iree::hal::drivers::hip::registration
   TESTONLY
   ALWAYSLINK
   PUBLIC
 )
 
-iree_hal_cts2_testdata(
+iree_hal_cts_testdata(
   FORMAT_NAME
     hip
   TARGET_DEVICE
@@ -40,12 +40,12 @@ iree_hal_cts2_testdata(
   FORMAT_STRING
     [=["HSACO"]=]
   TESTDATA_DIR
-    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts2/testdata"
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
   FLAGS
     "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
   BACKENDS_LIB
     ::backends
   TESTDATA_LIBS
@@ -59,7 +59,7 @@ iree_hal_cts2_test_suite(
     "requires-gpu-amd"
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
   BACKENDS_LIB
     ::backends
   TESTDATA_LIBS

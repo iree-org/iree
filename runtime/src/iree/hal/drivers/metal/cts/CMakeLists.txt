@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# CTS2 test binaries for the Metal HAL driver (hand-written CMake, no Bazel).
+# CTS test binaries for the Metal HAL driver (hand-written CMake, no Bazel).
 
 iree_cc_library(
   NAME
@@ -13,14 +13,14 @@ iree_cc_library(
     "backends.cc"
   DEPS
     iree::hal
-    iree::hal::cts2::util::registry
+    iree::hal::cts::util::registry
     iree::hal::drivers::metal::registration
   TESTONLY
   ALWAYSLINK
   PUBLIC
 )
 
-iree_hal_cts2_testdata(
+iree_hal_cts_testdata(
   FORMAT_NAME
     metal_spirv
   TARGET_DEVICE
@@ -32,10 +32,10 @@ iree_hal_cts2_testdata(
   FORMAT_STRING
     [=["MTLE"]=]
   TESTDATA_DIR
-    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts2/testdata"
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
   BACKENDS_LIB
     ::backends
   TESTDATA_LIBS

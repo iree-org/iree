@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the Metal HAL driver.
+// CTS backend registration for the Metal HAL driver.
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/metal/registration/driver_module.h"
 
 namespace iree::hal::cts {
 
 static iree_status_t CreateMetalDevice(iree_hal_driver_t** out_driver,
                                        iree_hal_device_t** out_device) {
-  iree_status_t status = iree_hal_metal_driver_module_register(
-      iree_hal_driver_registry_default());
+  iree_status_t status =
+      iree_hal_metal_driver_module_register(iree_hal_driver_registry_default());
   if (iree_status_is_already_exists(status)) {
     iree_status_ignore(status);
     status = iree_ok_status();
@@ -49,13 +49,14 @@ static bool metal_registered_ =
          "metal",
          {.name = "metal",
           .factory = CreateMetalDevice,
-          .unsupported_tests = {
-              {"EventTest.*", "Metal does not implement HAL events"},
-              {"SemaphoreTest.*",
-               "Metal semaphore failure tests disabled pending fix"},
-              {"SemaphoreSubmissionTest.*",
-               "Metal semaphore submission tests disabled pending fix"},
-          }},
+          .unsupported_tests =
+              {
+                  {"EventTest.*", "Metal does not implement HAL events"},
+                  {"SemaphoreTest.*",
+                   "Metal semaphore failure tests disabled pending fix"},
+                  {"SemaphoreSubmissionTest.*",
+                   "Metal semaphore submission tests disabled pending fix"},
+              }},
          {"async_queue"},
      }),
      true);

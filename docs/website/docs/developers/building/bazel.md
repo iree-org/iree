@@ -460,7 +460,7 @@ format strings. The `flag_values` parameter maps placeholder names to build
 setting labels:
 
 ```python
-iree_hal_cts2_testdata(
+iree_hal_cts_testdata(
     format_name = "amdgpu",
     flags = ["--iree-rocm-target={ROCM_TARGET}"],
     flag_values = {"ROCM_TARGET": "//build_tools/bazel:rocm_test_target"},

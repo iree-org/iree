@@ -134,10 +134,14 @@ def _compile_hal_executable(ctx, src, output, flags):
     args.add("--compile-mode=hal-executable")
     args.add("--iree-hal-target-device=" + ctx.attr.target_device)
     args.add("--mlir-print-op-on-diagnostic=false")
-    args.add(ctx.executable._linker_tool,
-             format = "--iree-llvmcpu-embedded-linker-path=%s")
-    args.add(ctx.executable._linker_tool,
-             format = "--iree-llvmcpu-wasm-linker-path=%s")
+    args.add(
+        ctx.executable._linker_tool,
+        format = "--iree-llvmcpu-embedded-linker-path=%s",
+    )
+    args.add(
+        ctx.executable._linker_tool,
+        format = "--iree-llvmcpu-wasm-linker-path=%s",
+    )
     for flag in flags:
         args.add(flag)
     args.add("-o", output)
@@ -267,6 +271,7 @@ def iree_hal_executable(
         **kwargs: Additional attributes (e.g., target_compatible_with)
             passed to the underlying rules.
     """
+
     # Invert flag_values: user writes {"PLACEHOLDER": "//label"} (readable),
     # rule attr is label_keyed_string_dict so needs {"//label": "PLACEHOLDER"}.
     rule_flag_values = {v: k for k, v in flag_values.items()}

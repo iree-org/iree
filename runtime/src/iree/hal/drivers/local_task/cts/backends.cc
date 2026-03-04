@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the local-task HAL driver.
+// CTS backend registration for the local-task HAL driver.
 //
 // Registers a single "local_task" backend that creates a multithreaded
 // task-system-based HAL device using the default driver configuration.
@@ -12,7 +12,7 @@
 // applications create them (via iree_hal_register_all_available_drivers).
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 
 namespace iree::hal::cts {

@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the Vulkan HAL driver.
+// CTS backend registration for the Vulkan HAL driver.
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/vulkan/registration/driver_module.h"
 
 namespace iree::hal::cts {
@@ -49,18 +49,19 @@ static bool vulkan_registered_ =
          "vulkan",
          {.name = "vulkan",
           .factory = CreateVulkanDevice,
-          .unsupported_tests = {
-              {"SemaphoreTest.WaitThenFail",
-               "Vulkan does not support semaphore failure signaling"},
-              {"SemaphoreTest.FailThenWait",
-               "Vulkan does not support semaphore failure signaling"},
-              {"SemaphoreTest.MultiWaitThenFail",
-               "Vulkan does not support semaphore failure signaling"},
-              {"SemaphoreTest.DeviceMultiWaitThenFail",
-               "Vulkan does not support semaphore failure signaling"},
-              {"SemaphoreSubmissionTest.PropagateFailSignal",
-               "Vulkan does not support semaphore failure signaling"},
-          }},
+          .unsupported_tests =
+              {
+                  {"SemaphoreTest.WaitThenFail",
+                   "Vulkan does not support semaphore failure signaling"},
+                  {"SemaphoreTest.FailThenWait",
+                   "Vulkan does not support semaphore failure signaling"},
+                  {"SemaphoreTest.MultiWaitThenFail",
+                   "Vulkan does not support semaphore failure signaling"},
+                  {"SemaphoreTest.DeviceMultiWaitThenFail",
+                   "Vulkan does not support semaphore failure signaling"},
+                  {"SemaphoreSubmissionTest.PropagateFailSignal",
+                   "Vulkan does not support semaphore failure signaling"},
+              }},
          {"async_queue"},
      }),
      true);

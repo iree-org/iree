@@ -4,14 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# CTS2 test binaries for the CUDA HAL driver.
+# CTS test binaries for the CUDA HAL driver.
 # Two variants (graph and stream) share the same compiled test executables.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
 load(
-    "//build_tools/bazel:iree_hal_cts2_test_suite.bzl",
-    "iree_hal_cts2_test_suite",
-    "iree_hal_cts2_testdata",
+    "//build_tools/bazel:iree_hal_cts_test_suite.bzl",
+    "iree_hal_cts_test_suite",
+    "iree_hal_cts_testdata",
 )
 
 package(
@@ -26,23 +26,23 @@ iree_runtime_cc_library(
     srcs = ["backends.cc"],
     deps = [
         "//runtime/src/iree/hal",
-        "//runtime/src/iree/hal/cts2/util:registry",
+        "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/drivers/cuda/registration",
     ],
     alwayslink = True,
 )
 
 # Compile test executables once — shared across graph and stream variants.
-iree_hal_cts2_testdata(
+iree_hal_cts_testdata(
     backend_name = "cuda",
     format_name = "cuda",
     format_string = '"PTXE"',
     identifier = "iree_cts_testdata_cuda",
     target_device = "cuda",
-    testdata = "//runtime/src/iree/hal/cts2/testdata:executable_srcs",
+    testdata = "//runtime/src/iree/hal/cts/testdata:executable_srcs",
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
     name = "graph",
     args = ["--cuda_use_streams=false"],
     backends_lib = ":backends",
@@ -53,7 +53,7 @@ iree_hal_cts2_test_suite(
     testdata_libs = [":testdata_cuda_lib"],
 )
 
-iree_hal_cts2_test_suite(
+iree_hal_cts_test_suite(
     name = "stream",
     args = ["--cuda_use_streams=true"],
     backends_lib = ":backends",

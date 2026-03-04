@@ -1,216 +1,233 @@
-# Copyright 2021 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# iree_hal_cts_test_suite()
+# CTS test suite infrastructure for HAL drivers.
 #
-# Creates a set of tests for a provided Hardware Abstraction Layer (HAL) driver,
-# with one generated test for each test in the Conformance Test Suite (CTS).
+# Two functions:
+#
+# 1. iree_hal_cts_testdata() - Compiles CTS test executables for one format
+#    and creates a testdata registration library. MLIR sources are discovered
+#    via file(GLOB) from the testdata directory.
+#
+# 2. iree_hal_cts_test_suite() - Creates CTS test binaries for a driver,
+#    linking against pre-built testdata libraries from iree_hal_cts_testdata().
+
+# Template for generated testdata registration .cc files.
+set(_IREE_CTS_TESTDATA_TEMPLATE [=[
+// Auto-generated executable format registration for CTS.
+#include "iree/hal/cts/util/registry.h"
+#include "@HEADER_PATH@"
+
+namespace iree::hal::cts {
+
+static iree_const_byte_span_t Get@FORMAT_FUNC_NAME@ExecutableData(
+    iree_string_view_t file_name) {
+  const iree_file_toc_t* toc = @IDENTIFIER@_create();
+  for (size_t i = 0; toc[i].name != nullptr; ++i) {
+    if (iree_string_view_equal(file_name,
+                               iree_make_cstring_view(toc[i].name))) {
+      return iree_make_const_byte_span(
+          reinterpret_cast<const uint8_t*>(toc[i].data), toc[i].size);
+    }
+  }
+  return iree_const_byte_span_empty();
+}
+
+static bool @FORMAT_VAR_NAME@_registered_ =
+    (CtsRegistry::RegisterExecutableFormat(
+         "@BACKEND_NAME@",
+         {"@FORMAT_NAME@", @FORMAT_STRING@, Get@FORMAT_FUNC_NAME@ExecutableData}),
+     true);
+
+}  // namespace iree::hal::cts
+]=])
+
+function(_iree_cts_camel_case INPUT OUTPUT_VAR)
+  string(REPLACE "_" ";" _PARTS "${INPUT}")
+  set(_RESULT "")
+  foreach(_PART ${_PARTS})
+    string(SUBSTRING "${_PART}" 0 1 _FIRST)
+    string(TOUPPER "${_FIRST}" _FIRST)
+    string(SUBSTRING "${_PART}" 1 -1 _REST)
+    string(APPEND _RESULT "${_FIRST}${_REST}")
+  endforeach()
+  set(${OUTPUT_VAR} "${_RESULT}" PARENT_SCOPE)
+endfunction()
+
+# iree_hal_cts_testdata()
+#
+# Compiles CTS test executables for one format and creates a testdata
+# registration library. MLIR sources are discovered via file(GLOB) from
+# the provided TESTDATA_DIR.
+#
+# Creates two targets:
+#   testdata_${FORMAT_NAME}      - iree_hal_executables embedded data
+#   testdata_${FORMAT_NAME}_lib  - registration library (link into tests)
 #
 # Parameters:
-#   DRIVER_NAME: The name of the driver to test. Used for both target names and
-#       for `iree_hal_driver_registry_try_create()` within test code.
-#   VARIANT_SUFFIX: Suffix to add to the test names, separate from the driver
-#       name. Useful when specifying multiple configurations using `ARGS` or
-#       other parameters.
-#   DRIVER_REGISTRATION_HDR: The C #include path for `DRIVER_REGISTRATION_FN`.
-#   DRIVER_REGISTRATION_FN: The C function which registers `DRIVER_NAME`.
-#   COMPILER_TARGET_BACKEND: Optional target backend name used for
-#       executable generation. If this is omitted, or the associated compiler
-#       target is not enabled, tests which use executables will be disabled.
-#   COMPILER_TARGET_DEVICE: Optional target device name to pass to the
-#       `--iree-hal-target-device` option of `iree-compile` used for
-#       executable generation. If omitted the target backend name will be used.
-#   COMPILER_FLAGS: Additional compiler flags.
-#       Example: "--iree-llvmcpu-target-float-abi=hard --iree-llvmcpu-loop-unrolling"
-#   EXECUTABLE_FORMAT: Executable format identifier. Will be interpreted
-#       literally in C++ and may include macros like IREE_ARCH as needed.
-#       Examples:
-#           "\"vmvx-bytecode-fb\"" -> "vmvx-bytecode-fb"
-#           "\"embedded-elf-\" IREE_ARCH" -> "embedded-elf-x86_64"
-#   ARGS: List of command line arguments to pass to test binaries.
-#   DEPS: List of other libraries to link in to the binary targets (typically
-#       the dependency for `DRIVER_REGISTRATION_HDR`).
-#   INCLUDED_TESTS: List of test names to include from the test suite.
-#       Defaults to `IREE_ALL_CTS_TESTS`.
-#   EXCLUDED_TESTS: List of test names to exclude from the test suite for this
-#       driver. Generally set either this _or_ `INCLUDED_TESTS`.
-#   LABELS: Additional labels to forward to `iree_cc_test`. The package path
-#     and "driver=${DRIVER}" are added automatically.
-function(iree_hal_cts_test_suite)
+#   FORMAT_NAME: Short name (e.g., "vmvx", "llvm_cpu", "cuda").
+#   TARGET_DEVICE: Target device for iree-compile (e.g., "local", "cuda").
+#   IDENTIFIER: C identifier for the embedded data (e.g., "iree_cts_testdata_vmvx").
+#   BACKEND_NAME: Backend name for CtsRegistry (e.g., "local_task").
+#   FORMAT_STRING: C expression for the format (e.g., "vmvx-bytecode-fb").
+#   TESTDATA_DIR: Directory containing MLIR test sources.
+#   FLAGS: Additional compiler flags.
+function(iree_hal_cts_testdata)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "FORMAT_NAME;TARGET_DEVICE;IDENTIFIER;BACKEND_NAME;FORMAT_STRING;TESTDATA_DIR"
+    "FLAGS"
+    ${ARGN}
+  )
+
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
+  if(NOT DEFINED _RULE_TESTDATA_DIR)
+    message(SEND_ERROR "iree_hal_cts_testdata requires TESTDATA_DIR")
+  endif()
+
+  # Discover MLIR sources from the testdata directory.
+  file(GLOB _SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS
+    "${_RULE_TESTDATA_DIR}/*.mlir")
+  if(NOT _SRCS)
+    message(FATAL_ERROR "No MLIR files found in ${_RULE_TESTDATA_DIR}")
+  endif()
+
+  set(_TESTDATA_NAME "testdata_${_RULE_FORMAT_NAME}")
+
+  # Compile all MLIR sources to HAL executables and bundle into embedded data.
+  iree_hal_executables(
+    NAME "${_TESTDATA_NAME}"
+    SRCS ${_SRCS}
+    TARGET_DEVICE "${_RULE_TARGET_DEVICE}"
+    FLAGS ${_RULE_FLAGS}
+    IDENTIFIER "${_RULE_IDENTIFIER}"
+    TESTONLY
+    PUBLIC
+  )
+
+  # Generate the registration .cc from template.
+  _iree_cts_camel_case("${_RULE_FORMAT_NAME}" _FUNC_NAME)
+
+  set(HEADER_PATH "${_TESTDATA_NAME}.h")
+  set(FORMAT_FUNC_NAME "${_FUNC_NAME}")
+  set(IDENTIFIER "${_RULE_IDENTIFIER}")
+  set(FORMAT_VAR_NAME "${_RULE_FORMAT_NAME}_format")
+  set(BACKEND_NAME "${_RULE_BACKEND_NAME}")
+  set(FORMAT_NAME "${_RULE_FORMAT_NAME}")
+  set(FORMAT_STRING "${_RULE_FORMAT_STRING}")
+
+  string(CONFIGURE "${_IREE_CTS_TESTDATA_TEMPLATE}" _GENERATED_CC @ONLY)
+  set(_GEN_CC_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_TESTDATA_NAME}.cc")
+  file(GENERATE OUTPUT "${_GEN_CC_FILE}" CONTENT "${_GENERATED_CC}")
+
+  iree_cc_library(
+    NAME "${_TESTDATA_NAME}_lib"
+    SRCS "${_GEN_CC_FILE}"
+    DEPS
+      ::${_TESTDATA_NAME}
+      iree::hal::cts::util::registry
+    TESTONLY
+    ALWAYSLINK
+    PUBLIC
+  )
+endfunction()
+
+# iree_hal_cts_test_suite()
+#
+# Creates CTS test binaries for a HAL driver. Non-executable tests (buffer,
+# command_buffer, core, file, queue) are always created. Executable-dependent
+# tests (dispatch, executable) are created only if TESTDATA_LIBS are provided.
+#
+# Parameters:
+#   BACKENDS_LIB: CMake target for the backends registration library.
+#   TESTDATA_LIBS: Testdata library targets from iree_hal_cts_testdata().
+#   NAME: Optional prefix for test binary names (e.g., "graph", "stream").
+#   ARGS: Runtime arguments passed to all test binaries.
+#   LABELS: Test labels for filtering.
+function(iree_hal_cts_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "DRIVER_NAME;VARIANT_SUFFIX;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;COMPILER_TARGET_DEVICE;EXECUTABLE_FORMAT"
-    "DEPS;ARGS;COMPILER_FLAGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS;"
+    "BACKENDS_LIB;NAME"
+    "TESTDATA_LIBS;ARGS;LABELS"
     ${ARGN}
   )
 
-  list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER_NAME}")
-
-  # Enable executable tests if a compiler target backend capable of producing
-  # executables compatible with the driver is provided and enabled.
-  set(_ENABLE_EXECUTABLE_TESTS OFF)
-  if(DEFINED _RULE_COMPILER_TARGET_BACKEND)
-    string(TOUPPER ${_RULE_COMPILER_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
-    string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
-    if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
-      message(SEND_ERROR "Unknown backend '${_RULE_COMPILER_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
-    endif()
-    if(IREE_HOST_BIN_DIR)
-      # If we're not building the host tools from source under this configuration,
-      # such as when cross compiling, then we can't easily check for which
-      # compiler target backends are enabled. Just assume all are enabled and only
-      # rely on the runtime HAL driver check above for filtering.
-      set(_ENABLE_EXECUTABLE_TESTS ON)
-    else()
-      # We are building the host tools, so check enabled compiler target backends.
-      if(IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
-        set(_ENABLE_EXECUTABLE_TESTS ON)
-      endif()
-    endif()
+  if(NOT IREE_BUILD_TESTS)
+    return()
   endif()
 
-  # Generate testdata if executable tests are enabled.
-  set(_EXECUTABLE_DEPS "")
-  if(_ENABLE_EXECUTABLE_TESTS)
-    set(_EXECUTABLES_TESTDATA_NAME "${_RULE_COMPILER_TARGET_BACKEND}_executables")
-
-    set(_TRANSLATE_FLAGS
-      "--compile-mode=hal-executable"
-      ${_RULE_COMPILER_FLAGS}
-    )
-
-    if(DEFINED _RULE_COMPILER_TARGET_DEVICE)
-      list(APPEND _TRANSLATE_FLAGS "--iree-hal-target-device=${_RULE_COMPILER_TARGET_DEVICE}")
-    else()
-      list(APPEND _TRANSLATE_FLAGS "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}")
-    endif()
-
-    # Skip if already created (multiple suites using the same compiler setting).
-    iree_package_name(_PACKAGE_NAME)
-    if(NOT TARGET ${_PACKAGE_NAME}_${_EXECUTABLES_TESTDATA_NAME}_c)
-      set(_EMBED_DATA_SOURCES "")
-      foreach(_FILE_NAME ${IREE_ALL_CTS_EXECUTABLE_SOURCES})
-        # Note: this is an abuse of naming. We are not building a bytecode
-        # module, but this CMake rule already wraps iree-compile
-        # We should add a new function like `iree_hal_executable()`.
-        iree_bytecode_module(
-          NAME
-            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}_module
-          MODULE_FILE_NAME
-            "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin"
-          SRC
-            "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
-          FLAGS
-            ${_TRANSLATE_FLAGS}
-          PUBLIC
-          TESTONLY
-        )
-        list(APPEND _EMBED_DATA_SOURCES "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin")
-      endforeach()
-
-      iree_c_embed_data(
-        NAME
-          ${_EXECUTABLES_TESTDATA_NAME}_c
-        SRCS
-          ${_EMBED_DATA_SOURCES}
-        C_FILE_OUTPUT
-          "${_EXECUTABLES_TESTDATA_NAME}_c.c"
-        H_FILE_OUTPUT
-          "${_EXECUTABLES_TESTDATA_NAME}_c.h"
-        IDENTIFIER
-          "iree_cts_testdata_executables"
-        STRIP_PREFIX
-          "${_RULE_COMPILER_TARGET_BACKEND}_"
-        FLATTEN
-        PUBLIC
-        TESTONLY
-      )
-
-    endif()
-
-    list(APPEND _EXECUTABLE_DEPS
-      ::${_EXECUTABLES_TESTDATA_NAME}_c
-    )
+  if(NOT DEFINED _RULE_BACKENDS_LIB)
+    message(SEND_ERROR "iree_hal_cts_test_suite requires BACKENDS_LIB")
   endif()
 
-  if(_RULE_INCLUDED_TESTS)
-    set(_INCLUDED_TESTS ${_RULE_INCLUDED_TESTS})
-  else()
-    set(_INCLUDED_TESTS ${IREE_ALL_CTS_TESTS})
+  # Build the name prefix: "name_" if set, "" otherwise.
+  set(_PREFIX "")
+  if(_RULE_NAME)
+    set(_PREFIX "${_RULE_NAME}_")
   endif()
 
-  foreach(_TEST_NAME ${_INCLUDED_TESTS})
-    if("${_TEST_NAME}" IN_LIST _RULE_EXCLUDED_TESTS)
-      continue()
-    endif()
+  set(_COMMON_DEPS
+    ${_RULE_BACKENDS_LIB}
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::testing::gtest
+  )
 
-    # Set vars (and possibly skip) based on if this test uses executables.
-    if("${_TEST_NAME}" IN_LIST IREE_EXECUTABLE_CTS_TESTS)
-      if(NOT _ENABLE_EXECUTABLE_TESTS)
-        continue()
-      endif()
+  set(_TEST_MAIN
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+  )
 
-      set(_TEST_DEPS
-        "${_RULE_DEPS}"
-        "${_EXECUTABLE_DEPS}"
-      )
-      set(IREE_CTS_EXECUTABLE_FORMAT "${_RULE_EXECUTABLE_FORMAT}")
-      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "${_EXECUTABLES_TESTDATA_NAME}_c.h")
-    else()
-      set(_TEST_DEPS "${_RULE_DEPS}" )
-      set(IREE_CTS_EXECUTABLE_FORMAT "")
-      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "")
-    endif()
+  # Build ARGS block for iree_cc_test.
+  set(_ARGS_BLOCK "")
+  if(_RULE_ARGS)
+    set(_ARGS_BLOCK ARGS ${_RULE_ARGS})
+  endif()
 
-    # Note: driver names may contain dashes and other special characters. We
-    # could sanitize for file and target names, but passing through directly
-    # may be more intuitive.
-    if(DEFINED _RULE_VARIANT_SUFFIX)
-      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_RULE_VARIANT_SUFFIX}_${_TEST_NAME}_test")
-    else()
-      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_TEST_NAME}_test")
-    endif()
-    set(_TEST_SOURCE_NAME "${_TEST_TARGET_NAME}.cc")
-    set(_TEST_LIBRARY_DEP "iree::hal::cts::${_TEST_NAME}_test_library")
+  set(_LABELS_BLOCK "")
+  if(_RULE_LABELS)
+    set(_LABELS_BLOCK LABELS ${_RULE_LABELS})
+  endif()
 
-    # Generate the source file for this [test x driver] pair.
-    # TODO(scotttodd): Move to build time instead of configure time?
-    set(IREE_CTS_TEST_FILE_PATH "runtime/src/iree/hal/cts/${_TEST_NAME}_test.h")
-    set(IREE_CTS_DRIVER_REGISTRATION_HDR "${_RULE_DRIVER_REGISTRATION_HDR}")
-    set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
-    set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
-    set(IREE_CTS_TARGET_BACKEND "${_RULE_COMPILER_TARGET_BACKEND}")
-    set(IREE_CTS_TARGET_DEVICE "${_RULE_COMPILER_TARGET_DEVICE}")
-
-    configure_file(
-      "${IREE_ROOT_DIR}/runtime/src/iree/hal/cts/cts_test_template.cc.in"
-      ${_TEST_SOURCE_NAME}
-    )
-
+  # Non-executable test categories.
+  foreach(_CATEGORY buffer command_buffer core file queue)
     iree_cc_test(
-      NAME
-        ${_TEST_TARGET_NAME}
-      ARGS
-        ${_RULE_ARGS}
-      SRCS
-        "${CMAKE_CURRENT_BINARY_DIR}/${_TEST_SOURCE_NAME}"
+      NAME "${_PREFIX}${_CATEGORY}_tests"
+      SRCS "${_TEST_MAIN}"
       DEPS
-        ${_TEST_DEPS}
-        ${_TEST_LIBRARY_DEP}
-        iree::base
-        iree::hal
-        iree::hal::cts::cts_test_base
-        iree::testing::gtest_main
-      LABELS
-        ${_RULE_LABELS}
+        ${_COMMON_DEPS}
+        "iree::hal::cts::${_CATEGORY}::all_tests"
+      ${_ARGS_BLOCK}
+      ${_LABELS_BLOCK}
     )
   endforeach()
+
+  # Executable-dependent test categories.
+  if(_RULE_TESTDATA_LIBS)
+    set(_EXECUTABLE_SUITES
+      "dispatch_tests\;iree::hal::cts::command_buffer::all_dispatch_tests"
+      "executable_tests\;iree::hal::cts::core::all_executable_tests"
+    )
+    foreach(_PAIR ${_EXECUTABLE_SUITES})
+      list(GET _PAIR 0 _SUFFIX)
+      list(GET _PAIR 1 _TEST_LIB)
+      iree_cc_test(
+        NAME "${_PREFIX}${_SUFFIX}"
+        SRCS "${_TEST_MAIN}"
+        DEPS
+          ${_COMMON_DEPS}
+          ${_RULE_TESTDATA_LIBS}
+          ${_TEST_LIB}
+        ${_ARGS_BLOCK}
+        ${_LABELS_BLOCK}
+      )
+    endforeach()
+  endif()
 endfunction()

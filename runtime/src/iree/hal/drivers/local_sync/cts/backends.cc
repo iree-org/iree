@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the local-sync HAL driver.
+// CTS backend registration for the local-sync HAL driver.
 //
 // Registers a single "local_sync" backend that creates a synchronous
 // single-threaded HAL device. All command buffers execute inline during
@@ -12,7 +12,7 @@
 // advancement.
 
 #include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
+#include "iree/hal/cts/util/registry.h"
 #include "iree/hal/drivers/local_sync/registration/driver_module.h"
 
 namespace iree::hal::cts {

@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// CTS2 backend registration for the WebGPU HAL driver.
+// CTS backend registration for the WebGPU HAL driver.
 
-#include "iree/hal/api.h"
-#include "iree/hal/cts2/util/registry.h"
 #include "experimental/webgpu/registration/driver_module.h"
+#include "iree/hal/api.h"
+#include "iree/hal/cts/util/registry.h"
 
 namespace iree::hal::cts {
 
