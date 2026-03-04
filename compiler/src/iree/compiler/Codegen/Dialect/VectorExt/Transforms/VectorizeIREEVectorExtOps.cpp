@@ -419,9 +419,6 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   if (vectorSizes.empty()) {
     vectorSizes = outType.getShape();
   }
-  for (auto size : vectorSizes) {
-    llvm::outs() << size << '\n';
-  }
   int64_t vectorSize = vectorSizes.back();
 
   SmallVector<OpFoldResult> mixedSizes =

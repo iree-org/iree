@@ -236,7 +236,6 @@ void GenericVectorizationPass::runOnOperation() {
         .Case([&](linalg::GenericOp genericOp) {
           if (vectorizeToTransferGather) {
             if (isImplicitGather(genericOp)) {
-              llvm::outs() << "Calling pattern\n";
               (void)IREE::VectorExt::vectorizeImplicitGatherToTransferGather(
                   rewriter, genericOp, vectorSizes);
               return;
