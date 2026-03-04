@@ -18,6 +18,7 @@ string_list_flag(
     build_setting_default = [
         "amdgpu",
         "cuda",
+        "hip",
         "local-sync",
         "local-task",
         "null",
@@ -59,6 +60,14 @@ config_setting(
     },
 )
 
+# HIP requires HIP API headers (from the hip-build-deps submodule).
+config_setting(
+    name = "hip_enabled",
+    flag_values = {
+        ":enabled_drivers": "hip",
+    },
+)
+
 iree_runtime_cc_library(
     name = "drivers",
     srcs = ["init.c"],
@@ -71,6 +80,9 @@ iree_runtime_cc_library(
                "//conditions:default": [],
            }) + select({
                ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
+               "//conditions:default": [],
+           }) + select({
+               ":hip_enabled": ["//runtime/src/iree/hal/drivers/hip/registration"],
                "//conditions:default": [],
            }) +
            select({

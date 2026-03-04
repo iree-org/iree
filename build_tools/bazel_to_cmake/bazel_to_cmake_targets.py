@@ -101,6 +101,10 @@ class TargetConverter:
                 "@stablehlo//:vhlo_ops": [
                     "VhloOps",
                 ],
+                # HIP
+                "@hip_api_headers//:headers": [
+                    "hip_api_headers::headers",
+                ],
                 # NCCL
                 "@nccl//:headers": [
                     "nccl::headers",

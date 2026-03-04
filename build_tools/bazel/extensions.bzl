@@ -75,11 +75,25 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/nccl",
     )
 
+    # HIP API headers
+    new_local_repository(
+        name = "hip_api_headers",
+        build_file = "@iree_core//:build_tools/third_party/hip-api-headers/BUILD.overlay",
+        path = "third_party/hip-build-deps",
+    )
+
     # HSA runtime headers
     new_local_repository(
         name = "hsa_runtime_headers",
         build_file = "@iree_core//:build_tools/third_party/hsa-runtime-headers/BUILD.overlay",
         path = "third_party/hsa-runtime-headers",
+    )
+
+    # RCCL
+    new_local_repository(
+        name = "rccl",
+        build_file = "@iree_core//:build_tools/third_party/rccl/BUILD.overlay",
+        path = "third_party/rccl",
     )
 
     # WebGPU headers
