@@ -20,4 +20,48 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    control_channel
+  HDRS
+    "control_channel.h"
+  SRCS
+    "control_channel.c"
+  DEPS
+    ::frame
+    iree::async
+    iree::base
+    iree::base::internal
+    iree::net::message_endpoint
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    control_channel_test
+  SRCS
+    "control_channel_test.cc"
+  DEPS
+    ::control_channel
+    ::frame
+    iree::async
+    iree::base
+    iree::net::message_endpoint
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_fuzz(
+  NAME
+    control_channel_fuzz
+  SRCS
+    "control_channel_fuzz.cc"
+  DEPS
+    ::control_channel
+    ::frame
+    iree::async
+    iree::base
+    iree::net::message_endpoint
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
