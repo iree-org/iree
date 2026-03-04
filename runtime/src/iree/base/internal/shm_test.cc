@@ -314,6 +314,190 @@ TEST_F(ShmNamedTest, CreateNamedEmptyNameFails) {
                                               options_, 4096, &mapping));
 }
 
+TEST_F(ShmTest, QuerySealsInitiallyNone) {
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+
+  iree_shm_seal_flags_t seals = iree_shm_query_seals(&mapping);
+#if defined(IREE_PLATFORM_LINUX)
+  // Anonymous (memfd) regions get SHRINK|GROW seals during creation.
+  EXPECT_TRUE(seals & IREE_SHM_SEAL_SHRINK);
+  EXPECT_TRUE(seals & IREE_SHM_SEAL_GROW);
+  EXPECT_FALSE(seals & IREE_SHM_SEAL_WRITE);
+  EXPECT_FALSE(seals & IREE_SHM_SEAL_SEAL);
+#else
+  EXPECT_EQ(seals, IREE_SHM_SEAL_NONE);
+#endif
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, QuerySealsNullMapping) {
+  EXPECT_EQ(iree_shm_query_seals(NULL), IREE_SHM_SEAL_NONE);
+}
+
+TEST_F(ShmTest, QuerySealsUnmappedRegion) {
+  iree_shm_mapping_t mapping;
+  memset(&mapping, 0, sizeof(mapping));
+  mapping.handle = IREE_SHM_HANDLE_INVALID;
+  EXPECT_EQ(iree_shm_query_seals(&mapping), IREE_SHM_SEAL_NONE);
+}
+
+TEST_F(ShmTest, SealNoneFlagsSucceeds) {
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  IREE_EXPECT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_NONE));
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, SealNullMappingFails) {
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_shm_seal(NULL, IREE_SHM_SEAL_WRITE));
+}
+
+TEST_F(ShmTest, SealWrite) {
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+
+  // Write data before sealing.
+  memset(mapping.base, 0xAA, mapping.size);
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xAA);
+
+#if defined(IREE_PLATFORM_LINUX)
+  // Linux supports sealing on anonymous (memfd) regions.
+  IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE));
+  iree_shm_seal_flags_t seals = iree_shm_query_seals(&mapping);
+  EXPECT_TRUE(seals & IREE_SHM_SEAL_WRITE);
+  // Data is still readable after sealing.
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xAA);
+#elif defined(IREE_PLATFORM_APPLE)
+  // macOS does not support sealing.
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
+                        iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE));
+#elif defined(IREE_PLATFORM_WINDOWS)
+  // Windows uses VirtualProtect for write sealing.
+  IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE));
+  iree_shm_seal_flags_t seals = iree_shm_query_seals(&mapping);
+  EXPECT_TRUE(seals & IREE_SHM_SEAL_WRITE);
+  // Data is still readable after sealing.
+  EXPECT_EQ(((uint8_t*)mapping.base)[0], 0xAA);
+#endif
+
+  iree_shm_close(&mapping);
+}
+
+TEST_F(ShmTest, SealWriteIdempotent) {
+  // Sealing the same flag twice must succeed (no-op on second call).
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+  memset(mapping.base, 0xBB, mapping.size);
+
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
+  IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE));
+  IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE));
+  EXPECT_TRUE(iree_shm_query_seals(&mapping) & IREE_SHM_SEAL_WRITE);
+#endif
+
+  iree_shm_close(&mapping);
+}
+
+#if defined(IREE_PLATFORM_LINUX)
+TEST_F(ShmTest, SealWriteFailsWithSecondWritableMapping) {
+  // When a second writable mapping exists, F_SEAL_WRITE fails with EBUSY.
+  // Verify the rollback restores the original mapping so it's still usable.
+  iree_shm_mapping_t creator;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  memset(creator.base, 0xDD, creator.size);
+
+  // Open a second writable mapping of the same fd.
+  iree_shm_handle_t dup_handle = IREE_SHM_HANDLE_INVALID;
+  IREE_ASSERT_OK(iree_shm_handle_dup(creator.handle, &dup_handle));
+  iree_shm_mapping_t second;
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(dup_handle, options_, creator.size, &second));
+
+  // Sealing the creator must fail because the second mapping is writable.
+  iree_status_t status = iree_shm_seal(&creator, IREE_SHM_SEAL_WRITE);
+  EXPECT_FALSE(iree_status_is_ok(status));
+  iree_status_ignore(status);
+
+  // The creator mapping must still be valid and readable after rollback.
+  EXPECT_NE(creator.base, nullptr);
+  EXPECT_EQ(((uint8_t*)creator.base)[0], 0xDD);
+  EXPECT_TRUE(iree_shm_handle_is_valid(creator.handle));
+
+  // The write seal must NOT have been applied.
+  EXPECT_FALSE(iree_shm_query_seals(&creator) & IREE_SHM_SEAL_WRITE);
+
+  iree_shm_handle_close(&dup_handle);
+  iree_shm_close(&second);
+  iree_shm_close(&creator);
+}
+
+TEST_F(ShmTest, SealSealPreventsNewSeals) {
+  iree_shm_mapping_t mapping;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &mapping));
+
+  // Apply SEAL_SEAL — no more seals can be added after this.
+  IREE_ASSERT_OK(iree_shm_seal(&mapping, IREE_SHM_SEAL_SEAL));
+  EXPECT_TRUE(iree_shm_query_seals(&mapping) & IREE_SHM_SEAL_SEAL);
+
+  // Attempting to add SEAL_WRITE after SEAL_SEAL must fail.
+  iree_status_t status = iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE);
+  EXPECT_FALSE(iree_status_is_ok(status));
+  iree_status_ignore(status);
+
+  iree_shm_close(&mapping);
+}
+#endif  // IREE_PLATFORM_LINUX
+
+TEST_F(ShmTest, SealWriteVisibleToSecondMapping) {
+  // Seal via the creator, verify the opener sees the sealed data.
+  iree_shm_mapping_t creator;
+  IREE_ASSERT_OK(iree_shm_create(options_, 4096, &creator));
+  memset(creator.base, 0xCC, creator.size);
+
+  iree_shm_handle_t shared_handle = IREE_SHM_HANDLE_INVALID;
+  IREE_ASSERT_OK(iree_shm_handle_dup(creator.handle, &shared_handle));
+
+  iree_shm_mapping_t opener;
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(shared_handle, options_, creator.size, &opener));
+
+#if defined(IREE_PLATFORM_LINUX)
+  // Both mappings must be made read-only for F_SEAL_WRITE to succeed.
+  // Seal via the opener mapping to verify it works from either side.
+  // The creator's mapping is still writable, so we need to seal via the
+  // creator (which will mprotect the creator's mapping, but the kernel also
+  // requires no other writable VMAs — meaning we need to close the opener's
+  // writable mapping first, then seal, then reopen as read-only).
+  //
+  // For simplicity, close the opener, seal via creator, then reopen.
+  iree_shm_close(&opener);
+  IREE_ASSERT_OK(iree_shm_seal(&creator, IREE_SHM_SEAL_WRITE));
+
+  // Reopen — the new mapping inherits the seal; the kernel won't allow
+  // PROT_WRITE since F_SEAL_WRITE is set.
+  IREE_ASSERT_OK(
+      iree_shm_open_handle(shared_handle, options_, creator.size, &opener));
+  // The sealed data is readable through both mappings.
+  EXPECT_EQ(((uint8_t*)creator.base)[0], 0xCC);
+  EXPECT_EQ(((uint8_t*)opener.base)[0], 0xCC);
+  // Both mappings report the seal.
+  EXPECT_TRUE(iree_shm_query_seals(&creator) & IREE_SHM_SEAL_WRITE);
+  EXPECT_TRUE(iree_shm_query_seals(&opener) & IREE_SHM_SEAL_WRITE);
+#elif defined(IREE_PLATFORM_WINDOWS)
+  IREE_ASSERT_OK(iree_shm_seal(&creator, IREE_SHM_SEAL_WRITE));
+  EXPECT_TRUE(iree_shm_query_seals(&creator) & IREE_SHM_SEAL_WRITE);
+  // On Windows, VirtualProtect is per-view — the opener's view is unaffected.
+  EXPECT_EQ(((uint8_t*)opener.base)[0], 0xCC);
+#endif
+
+  iree_shm_handle_close(&shared_handle);
+  iree_shm_close(&opener);
+  iree_shm_close(&creator);
+}
+
 TEST_F(ShmTest, WriteReadCoherence) {
   // Write via one mapping, read via another opened from a dup'd handle.
   iree_shm_mapping_t writer;

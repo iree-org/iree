@@ -21,6 +21,17 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/memory.h"
 
+// Linux fcntl seal constants from linux/fcntl.h. Not always available from
+// userspace libc headers, so we define them directly.
+#if defined(IREE_PLATFORM_LINUX)
+#define IREE_F_ADD_SEALS 1033
+#define IREE_F_GET_SEALS 1034
+#define IREE_F_SEAL_SEAL 0x0001
+#define IREE_F_SEAL_SHRINK 0x0002
+#define IREE_F_SEAL_GROW 0x0004
+#define IREE_F_SEAL_WRITE 0x0008
+#endif  // IREE_PLATFORM_LINUX
+
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -37,10 +48,19 @@ static inline int iree_shm_handle_to_fd(iree_shm_handle_t handle) {
   return (int)(intptr_t)handle.value;
 }
 
-// Maps an fd into the process address space.
+// Maps an fd into the process address space. On Linux, if the fd has
+// F_SEAL_WRITE set, the mapping is created read-only (the kernel rejects
+// writable shared mappings on write-sealed memfds).
 static iree_status_t iree_shm_map_fd(int fd, iree_host_size_t size,
                                      void** out_base) {
-  void* base = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  int prot = PROT_READ | PROT_WRITE;
+#if defined(IREE_PLATFORM_LINUX)
+  int seals = fcntl(fd, IREE_F_GET_SEALS);
+  if (seals != -1 && (seals & IREE_F_SEAL_WRITE)) {
+    prot = PROT_READ;
+  }
+#endif  // IREE_PLATFORM_LINUX
+  void* base = mmap(NULL, size, prot, MAP_SHARED, fd, 0);
   if (IREE_UNLIKELY(base == MAP_FAILED)) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "mmap failed for shared memory region of %" PRIhsz
@@ -102,8 +122,11 @@ static iree_status_t iree_shm_finalize_mapping(
 static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
                                                   int* out_fd) {
   // memfd_create is not wrapped by all libc versions, so use syscall directly.
+  // MFD_ALLOW_SEALING enables the F_SEAL_* API so callers can later seal the
+  // region against writes via iree_shm_seal().
   int fd = (int)syscall(SYS_memfd_create, "iree_shm",
-                        /*MFD_CLOEXEC=*/0x0001U);
+                        /*MFD_CLOEXEC=*/0x0001U |
+                            /*MFD_ALLOW_SEALING=*/0x0002U);
   if (IREE_UNLIKELY(fd == -1)) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "memfd_create failed (%d)", errno);
@@ -116,13 +139,18 @@ static iree_status_t iree_shm_create_anonymous_fd(iree_host_size_t size,
     return status;
   }
 
-  // Seal the memfd to prevent any process from resizing it. Without seals, a
-  // peer holding the fd could ftruncate it smaller, causing SIGBUS when the
-  // mapping accesses memory beyond the new size.
-  // Constants from linux/fcntl.h — not always available from libc headers.
-  fcntl(fd, /*F_ADD_SEALS=*/1033,
-        /*F_SEAL_SHRINK=*/0x0002 | /*F_SEAL_GROW=*/0x0004 |
-            /*F_SEAL_SEAL=*/0x0001);
+  // Seal the memfd against resizing to prevent a peer from ftruncating it
+  // smaller, which would cause SIGBUS when the mapping accesses memory beyond
+  // the new size. We intentionally omit F_SEAL_SEAL so that callers can later
+  // add F_SEAL_WRITE via iree_shm_seal().
+  if (IREE_UNLIKELY(fcntl(fd, IREE_F_ADD_SEALS,
+                          IREE_F_SEAL_SHRINK | IREE_F_SEAL_GROW) == -1)) {
+    iree_status_t status =
+        iree_make_status(iree_status_code_from_errno(errno),
+                         "fcntl(F_ADD_SEALS, SHRINK|GROW) failed (%d)", errno);
+    close(fd);
+    return status;
+  }
 
   *out_fd = fd;
   return iree_ok_status();
@@ -369,5 +397,128 @@ void iree_shm_handle_close(iree_shm_handle_t* handle) {
   close(iree_shm_handle_to_fd(*handle));
   *handle = IREE_SHM_HANDLE_INVALID;
 }
+
+#if defined(IREE_PLATFORM_LINUX)
+
+iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
+                            iree_shm_seal_flags_t flags) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (IREE_UNLIKELY(!mapping || !mapping->base)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot seal a NULL or unmapped region");
+  }
+  if (flags == IREE_SHM_SEAL_NONE) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  int fd = iree_shm_handle_to_fd(mapping->handle);
+
+  // Verify the fd supports sealing. Only memfd-backed regions have the seal
+  // interface; shm_open regions return -1/EINVAL.
+  int current_seals = fcntl(fd, IREE_F_GET_SEALS);
+  if (IREE_UNLIKELY(current_seals == -1)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "sealing not supported for this shared memory region "
+        "(only memfd-backed anonymous regions support seals)");
+  }
+
+  // Convert our flags to kernel seal flags.
+  int kernel_seals = 0;
+  if (flags & IREE_SHM_SEAL_WRITE) kernel_seals |= IREE_F_SEAL_WRITE;
+  if (flags & IREE_SHM_SEAL_SHRINK) kernel_seals |= IREE_F_SEAL_SHRINK;
+  if (flags & IREE_SHM_SEAL_GROW) kernel_seals |= IREE_F_SEAL_GROW;
+  if (flags & IREE_SHM_SEAL_SEAL) kernel_seals |= IREE_F_SEAL_SEAL;
+
+  // F_SEAL_WRITE requires that no shared writable VMAs exist for the file.
+  // munmap our mapping first so the kernel accepts the seal, then remap as
+  // read-only. We cannot use mprotect here because sanitizer interceptors
+  // (ASAN, MSAN) may keep the underlying VMA writable, causing F_ADD_SEALS
+  // to fail with EBUSY.
+  void* old_base = mapping->base;
+  iree_host_size_t old_size = mapping->size;
+  if (flags & IREE_SHM_SEAL_WRITE) {
+    munmap(old_base, old_size);
+    mapping->base = NULL;
+  }
+
+  if (IREE_UNLIKELY(fcntl(fd, IREE_F_ADD_SEALS, kernel_seals) == -1)) {
+    int saved_errno = errno;
+    // Restore the writable mapping. If this fails too, the mapping is lost —
+    // tear it down completely so the caller gets a clean error and a zeroed
+    // struct rather than a half-valid mapping they can't use.
+    if (flags & IREE_SHM_SEAL_WRITE) {
+      void* base =
+          mmap(NULL, old_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+      if (IREE_LIKELY(base != MAP_FAILED)) {
+        mapping->base = base;
+      } else {
+        close(fd);
+        memset(mapping, 0, sizeof(*mapping));
+        mapping->handle = IREE_SHM_HANDLE_INVALID;
+      }
+    }
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(iree_status_code_from_errno(saved_errno),
+                            "fcntl(F_ADD_SEALS) failed (%d)", saved_errno);
+  }
+
+  // Remap as read-only now that the seal is applied. If this fails, the seal
+  // is permanent but we have no mapping — tear down cleanly so the caller
+  // can reopen the region via the handle if needed.
+  if (flags & IREE_SHM_SEAL_WRITE) {
+    void* base = mmap(NULL, old_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (IREE_UNLIKELY(base == MAP_FAILED)) {
+      int saved_errno = errno;
+      close(fd);
+      memset(mapping, 0, sizeof(*mapping));
+      mapping->handle = IREE_SHM_HANDLE_INVALID;
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(iree_status_code_from_errno(saved_errno),
+                              "mmap(PROT_READ) after sealing failed (%d)",
+                              saved_errno);
+    }
+    mapping->base = base;
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_shm_seal_flags_t iree_shm_query_seals(const iree_shm_mapping_t* mapping) {
+  if (!mapping || !mapping->base) return IREE_SHM_SEAL_NONE;
+  int fd = iree_shm_handle_to_fd(mapping->handle);
+  int kernel_seals = fcntl(fd, IREE_F_GET_SEALS);
+  if (kernel_seals == -1) return IREE_SHM_SEAL_NONE;
+  iree_shm_seal_flags_t flags = IREE_SHM_SEAL_NONE;
+  if (kernel_seals & IREE_F_SEAL_WRITE) flags |= IREE_SHM_SEAL_WRITE;
+  if (kernel_seals & IREE_F_SEAL_SHRINK) flags |= IREE_SHM_SEAL_SHRINK;
+  if (kernel_seals & IREE_F_SEAL_GROW) flags |= IREE_SHM_SEAL_GROW;
+  if (kernel_seals & IREE_F_SEAL_SEAL) flags |= IREE_SHM_SEAL_SEAL;
+  return flags;
+}
+
+#elif defined(IREE_PLATFORM_APPLE)
+
+iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
+                            iree_shm_seal_flags_t flags) {
+  if (IREE_UNLIKELY(!mapping || !mapping->base)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot seal a NULL or unmapped region");
+  }
+  if (flags == IREE_SHM_SEAL_NONE) return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "memory sealing is not supported on macOS");
+}
+
+iree_shm_seal_flags_t iree_shm_query_seals(const iree_shm_mapping_t* mapping) {
+  return IREE_SHM_SEAL_NONE;
+}
+
+#endif  // IREE_PLATFORM_LINUX / IREE_PLATFORM_APPLE
 
 #endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_APPLE

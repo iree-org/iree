@@ -291,4 +291,49 @@ void iree_shm_handle_close(iree_shm_handle_t* handle) {
   *handle = IREE_SHM_HANDLE_INVALID;
 }
 
+iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
+                            iree_shm_seal_flags_t flags) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (IREE_UNLIKELY(!mapping || !mapping->base)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot seal a NULL or unmapped region");
+  }
+  if (flags == IREE_SHM_SEAL_NONE) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  // IREE_SHM_SEAL_WRITE: change the view protection to PAGE_READONLY.
+  // IREE_SHM_SEAL_SHRINK/GROW: Windows file mappings are inherently fixed-size.
+  // IREE_SHM_SEAL_SEAL: no mechanism to undo VirtualProtect through the IREE
+  //   API, so this is a no-op.
+  if (flags & IREE_SHM_SEAL_WRITE) {
+    DWORD old_protect = 0;
+    if (IREE_UNLIKELY(!VirtualProtect(mapping->base, mapping->size,
+                                      PAGE_READONLY, &old_protect))) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                              "VirtualProtect(PAGE_READONLY) failed");
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_shm_seal_flags_t iree_shm_query_seals(const iree_shm_mapping_t* mapping) {
+  if (!mapping || !mapping->base) return IREE_SHM_SEAL_NONE;
+  MEMORY_BASIC_INFORMATION memory_info;
+  if (VirtualQuery(mapping->base, &memory_info, sizeof(memory_info)) == 0) {
+    return IREE_SHM_SEAL_NONE;
+  }
+  iree_shm_seal_flags_t flags = IREE_SHM_SEAL_NONE;
+  if (memory_info.Protect == PAGE_READONLY) {
+    flags |= IREE_SHM_SEAL_WRITE;
+  }
+  return flags;
+}
+
 #endif  // IREE_PLATFORM_WINDOWS

@@ -7,7 +7,8 @@
 // Platform-abstracted shared memory primitives.
 //
 // Provides create/open/close for shared memory regions with handle passing
-// support for cross-process sharing. Regions are always mapped read-write.
+// support for cross-process sharing. Regions are mapped read-write unless
+// sealed against writes (see iree_shm_seal).
 //
 // Platform implementations:
 //   Linux:   memfd_create (anonymous) / shm_open (named) + mmap
@@ -20,6 +21,13 @@
 //
 // All sizes are rounded up to the system page size. Use iree_shm_required_size
 // to query the actual allocation size before creating.
+//
+// Memory sealing:
+//   After loading data (e.g. model weights), regions can be sealed to prevent
+//   modification via iree_shm_seal(). Sealing support varies by platform:
+//     Linux:   Full sealing via memfd F_SEAL_* (anonymous regions only).
+//     macOS:   Not supported (returns IREE_STATUS_UNAVAILABLE).
+//     Windows: Write protection via VirtualProtect (defense-in-depth).
 
 #ifndef IREE_BASE_INTERNAL_SHM_H_
 #define IREE_BASE_INTERNAL_SHM_H_
@@ -31,6 +39,29 @@
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+// Bitfield of seal flags controlling shared memory immutability.
+// Seals are additive and permanent — once applied, they cannot be removed.
+typedef uint32_t iree_shm_seal_flags_t;
+
+enum iree_shm_seal_flag_bits_e {
+  IREE_SHM_SEAL_NONE = 0u,
+  // Prevent writes to the region. After sealing, any write attempt will fault.
+  // On Linux this applies F_SEAL_WRITE and remaps the region as PROT_READ.
+  // On Windows this changes the view protection to PAGE_READONLY.
+  IREE_SHM_SEAL_WRITE = 1u << 0,
+  // Prevent shrinking the backing store. Applied automatically on Linux for
+  // anonymous (memfd) regions during creation.
+  IREE_SHM_SEAL_SHRINK = 1u << 1,
+  // Prevent growing the backing store. Applied automatically on Linux for
+  // anonymous (memfd) regions during creation.
+  IREE_SHM_SEAL_GROW = 1u << 2,
+  // Prevent adding new seals. This is a terminal operation — once applied,
+  // no further seals can be added. On Windows this is a no-op since the
+  // only effective seal (WRITE) uses VirtualProtect which is not reversible
+  // through the IREE API.
+  IREE_SHM_SEAL_SEAL = 1u << 3,
+};
 
 // Platform handle for sharing shared memory between processes.
 //
@@ -177,6 +208,42 @@ iree_status_t iree_shm_handle_dup(iree_shm_handle_t source,
 // Safe to call on an invalid handle (no-op). Sets |handle->value| to the
 // invalid sentinel after closing.
 void iree_shm_handle_close(iree_shm_handle_t* handle);
+
+// Applies seals to a shared memory mapping, preventing future modification.
+//
+// Seals are additive and permanent: once a seal is applied it cannot be
+// removed. Applying a seal that is already set is a no-op.
+//
+// The typical usage is to create a region, populate it with data, then seal it:
+//   iree_shm_create(options, size, &mapping);
+//   // ... write model weights into mapping.base ...
+//   iree_shm_seal(&mapping, IREE_SHM_SEAL_WRITE);
+//   // NOTE: mapping.base may have changed — use the updated value.
+//
+// Platform behavior:
+//   Linux:   Applies kernel-level seals via fcntl(F_ADD_SEALS) on the memfd.
+//            Only anonymous (memfd-backed) regions support sealing; named
+//            regions created via shm_open return IREE_STATUS_UNAVAILABLE.
+//            IREE_SHM_SEAL_WRITE remaps the region read-only (base may change).
+//   macOS:   Returns IREE_STATUS_UNAVAILABLE (no kernel sealing support).
+//   Windows: IREE_SHM_SEAL_WRITE changes the view protection to PAGE_READONLY
+//            via VirtualProtect. Other seal flags are inherent (Windows file
+//            mappings are fixed-size) and succeed as no-ops.
+//
+// Returns IREE_STATUS_UNAVAILABLE when the platform or region type does not
+// support sealing. Callers implementing defense-in-depth can check for this
+// and proceed without sealing.
+iree_status_t iree_shm_seal(iree_shm_mapping_t* mapping,
+                            iree_shm_seal_flags_t flags);
+
+// Returns the current seal flags on a shared memory mapping.
+//
+// On Linux this queries the kernel via fcntl(F_GET_SEALS), reflecting seals
+// applied by any process. On Windows this checks the view protection via
+// VirtualQuery. On macOS this always returns IREE_SHM_SEAL_NONE.
+//
+// Returns IREE_SHM_SEAL_NONE for NULL or unmapped regions.
+iree_shm_seal_flags_t iree_shm_query_seals(const iree_shm_mapping_t* mapping);
 
 #ifdef __cplusplus
 }  // extern "C"
