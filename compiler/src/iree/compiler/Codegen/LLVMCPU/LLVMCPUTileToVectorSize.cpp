@@ -175,8 +175,8 @@ void LLVMCPUTileToVectorSizePass::runOnOperation() {
     rewriter.replaceOp(op, tiledResults->replacements);
   }
 
-  RewritePatternSet patterns =
-      linalg::getLinalgTilingCanonicalizationPatterns(context);
+  RewritePatternSet patterns(context);
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
   tensor::populateFoldTensorEmptyPatterns(patterns);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);

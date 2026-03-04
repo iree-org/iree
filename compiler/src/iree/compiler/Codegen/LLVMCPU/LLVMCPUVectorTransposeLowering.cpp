@@ -7,7 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "mlir/Dialect/X86Vector/Transforms.h"
+#include "mlir/Dialect/X86/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -75,12 +75,9 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
       patterns, kNarrowTypeEmulationBenefit);
 
   if (lowerVectorTransposeToAVX2) {
-    auto avx2LoweringOptions =
-        x86vector::avx2::LoweringOptions().setTransposeOptions(
-            x86vector::avx2::TransposeLoweringOptions()
-                .lower4x8xf32()
-                .lower8x8xf32());
-    x86vector::avx2::populateSpecializedTransposeLoweringPatterns(
+    auto avx2LoweringOptions = x86::avx2::LoweringOptions().setTransposeOptions(
+        x86::avx2::TransposeLoweringOptions().lower4x8xf32().lower8x8xf32());
+    x86::avx2::populateSpecializedTransposeLoweringPatterns(
         patterns, avx2LoweringOptions, kSpecializedBenefit);
   }
   (void)applyPatternsGreedily(funcOp, std::move(patterns));

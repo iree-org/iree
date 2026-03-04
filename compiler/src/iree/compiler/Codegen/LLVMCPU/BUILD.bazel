@@ -184,7 +184,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:VectorToSCF",
         "@llvm-project//mlir:VectorTransforms",
-        "@llvm-project//mlir:X86VectorTransforms",
+        "@llvm-project//mlir:X86Transforms",
     ],
 )
 

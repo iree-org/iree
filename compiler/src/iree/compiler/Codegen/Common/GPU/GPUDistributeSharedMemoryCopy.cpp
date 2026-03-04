@@ -451,8 +451,9 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
     debugPrint(funcOp, "After tiling for unaligned case");
 
     // Apply canonicalization patterns.
-    RewritePatternSet threadTilingCanonicalizationPatterns =
-        linalg::getLinalgTilingCanonicalizationPatterns(context);
+    RewritePatternSet threadTilingCanonicalizationPatterns(context);
+    linalg::populateLinalgTilingCanonicalizationPatterns(
+        threadTilingCanonicalizationPatterns);
     populateAffineMinSCFCanonicalizationPattern(
         threadTilingCanonicalizationPatterns);
     if (failed(applyPatternsGreedily(
