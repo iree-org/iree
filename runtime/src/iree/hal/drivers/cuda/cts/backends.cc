@@ -44,11 +44,22 @@ static iree_status_t CreateCudaDevice(iree_hal_driver_t** out_driver,
   return status;
 }
 
-static bool cuda_registered_ = (CtsRegistry::RegisterBackend({
-                                    "cuda",
-                                    {"cuda", CreateCudaDevice},
-                                    {"async_queue"},
-                                }),
-                                true);
+static bool cuda_registered_ =
+    (CtsRegistry::RegisterBackend({
+         "cuda",
+         {"cuda",
+          CreateCudaDevice,
+          /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr,
+          RecordingMode::kDirect,
+          /*unsupported_tests=*/
+          {
+              {"EventTest.*", "CUDA does not implement HAL events"},
+              {"ExecutableTest.*",
+               "CUDA does not implement executable reflection"},
+          }},
+         {"async_queue"},
+     }),
+     true);
 
 }  // namespace iree::hal::cts

@@ -272,8 +272,9 @@ public:
       for (spirv::EntryPointOp spirvEntryPointOp :
            spirvModuleOp.getOps<spirv::EntryPointOp>()) {
         auto it = exportOrdinalMap.find(spirvEntryPointOp.getFn());
-        if (it == exportOrdinalMap.end())
+        if (it == exportOrdinalMap.end()) {
           continue;
+        }
         auto [exportOp, ordinal] = it->second;
         sortedExportOps[ordinal] = exportOp;
         exportOps[ordinal] =

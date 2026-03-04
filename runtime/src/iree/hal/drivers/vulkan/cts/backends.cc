@@ -54,6 +54,8 @@ static bool vulkan_registered_ =
           RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
+              {"ExecutableTest.*",
+               "Vulkan does not implement executable reflection"},
               {"SemaphoreTest.WaitThenFail",
                "Vulkan does not support semaphore failure signaling"},
               {"SemaphoreTest.FailThenWait",

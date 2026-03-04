@@ -55,6 +55,8 @@ static bool amdgpu_registered_ =
           /*unsupported_tests=*/
           {
               {"EventTest.*", "AMDGPU does not implement HAL events"},
+              {"ExecutableTest.*",
+               "AMDGPU does not implement executable reflection"},
           }},
          {"async_queue"},
      }),

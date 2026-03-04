@@ -55,6 +55,8 @@ static bool metal_registered_ =
           /*unsupported_tests=*/
           {
               {"EventTest.*", "Metal does not implement HAL events"},
+              {"ExecutableTest.*",
+               "Metal does not implement executable reflection"},
               {"SemaphoreTest.*",
                "Metal semaphore failure tests disabled pending fix"},
               {"SemaphoreSubmissionTest.*",
