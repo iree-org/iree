@@ -2,6 +2,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-MASK
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{fold-cast-into-contract=true}))" --split-input-file %s | FileCheck %s -check-prefix=CHECK-FOLD
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-GATHER
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-generic-vectorization{enable-vector-masking=true vectorize-to-transfer-gather=true}))" --split-input-file %s | FileCheck %s --check-prefix=CHECK-MASK-GATHER
 
 func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5xf32>) -> tensor<3x5xf32> {
   %result = linalg.matmul ins(%lhs, %rhs: tensor<3x4xf16>, tensor<4x5xf16>) outs(%acc: tensor<3x5xf32>) -> tensor<3x5xf32>
@@ -1017,16 +1018,16 @@ func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg
   } -> tensor<1x1x1x1x16xf32>
   return %0 : tensor<1x1x1x1x16xf32>
 }
-// CHECK-LABEL: func.func @implicit_gather_like_generic_stride_2
-// CHECK-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
-// CHECK-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
-// CHECK-DAG: %[[STEP:.+]] = vector.step : vector<16xindex>
-// CHECK: %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
-// CHECK: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
-// CHECK: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
-// CHECK: return %[[RESULT]]
+// CHECK-GATHER-LABEL: func.func @implicit_gather_like_generic_stride_2
+// CHECK-GATHER-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
+// CHECK-GATHER-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
+// CHECK-GATHER-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-GATHER-DAG: %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
+// CHECK-GATHER-DAG: %[[STEP:.+]] = vector.step : vector<16xindex>
+// CHECK-GATHER: %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
+// CHECK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-GATHER: return %[[RESULT]]
 
 // -----
 
@@ -1043,12 +1044,12 @@ func.func @implicit_gather_dynamic_masked(%arg0: tensor<1x1x?xf32>, %arg1: tenso
   } -> tensor<1x1x1x1x?xf32>
   return %0 : tensor<1x1x1x1x?xf32>
 }
-// CHECK-MASK-LABEL: func.func @implicit_gather_dynamic_masked
-// CHECK-MASK-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
-// CHECK-MASK-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
-// CHECK-MASK-DAG: %[[C4:.+]] = arith.constant 4 : index
-// CHECK-MASK-DAG: %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
-// CHECK-MASK: %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
-// CHECK-MASK: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
-// CHECK-MASK: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
-// CHECK-MASK: return %[[RESULT]]
+// CHECK-MASK-GATHER-LABEL: func.func @implicit_gather_dynamic_masked
+// CHECK-MASK-GATHER-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
+// CHECK-MASK-GATHER-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
+// CHECK-MASK-GATHER-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-MASK-GATHER-DAG: %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
+// CHECK-MASK-GATHER: %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
+// CHECK-MASK-GATHER: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
+// CHECK-MASK-GATHER: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
+// CHECK-MASK-GATHER: return %[[RESULT]]

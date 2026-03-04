@@ -231,7 +231,6 @@ void GenericVectorizationPass::runOnOperation() {
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
-    vectorizeToTransferGather = true;
     // Try to vectorize to transfer_gather, if possible.
     llvm::TypeSwitch<Operation *>(op)
         .Case([&](linalg::GenericOp genericOp) {
