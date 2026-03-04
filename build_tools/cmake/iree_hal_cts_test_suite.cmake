@@ -88,6 +88,11 @@ function(iree_hal_cts_testdata)
     return()
   endif()
 
+  # Compiling testdata requires iree-compile (built or imported).
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
+    return()
+  endif()
+
   if(NOT DEFINED _RULE_TESTDATA_DIR)
     message(SEND_ERROR "iree_hal_cts_testdata requires TESTDATA_DIR")
   endif()
@@ -209,8 +214,23 @@ function(iree_hal_cts_test_suite)
     )
   endforeach()
 
-  # Executable-dependent test categories.
+  # Executable-dependent test categories (require testdata compiled by
+  # iree-compile, which may be unavailable in runtime-only builds).
   if(_RULE_TESTDATA_LIBS)
+    # Verify all testdata targets exist (they won't if the compiler is absent).
+    set(_TESTDATA_AVAILABLE TRUE)
+    iree_package_ns(_TESTDATA_PACKAGE_NS)
+    foreach(_LIB ${_RULE_TESTDATA_LIBS})
+      string(REGEX REPLACE "^::" "${_TESTDATA_PACKAGE_NS}::" _FULL_LIB "${_LIB}")
+      string(REPLACE "::" "_" _TARGET_NAME "${_FULL_LIB}")
+      if(NOT TARGET "${_TARGET_NAME}")
+        set(_TESTDATA_AVAILABLE FALSE)
+        break()
+      endif()
+    endforeach()
+  endif()
+
+  if(_RULE_TESTDATA_LIBS AND _TESTDATA_AVAILABLE)
     set(_EXECUTABLE_SUITES
       "dispatch_tests\;iree::hal::cts::command_buffer::all_dispatch_tests"
       "executable_tests\;iree::hal::cts::core::all_executable_tests"

@@ -28,7 +28,7 @@ iree_hal_cts_testdata(
   FORMAT_NAME
     vulkan_spirv
   TARGET_DEVICE
-    "vulkan-spirv"
+    "vulkan"
   IDENTIFIER
     "iree_cts_testdata_vulkan_spirv"
   BACKEND_NAME

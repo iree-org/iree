@@ -108,7 +108,7 @@ TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
           iree_hal_host_call_context_t* context) {
         auto* state = (state_t*)user_data;
         ++state->did_call;
-        memcpy(state->args, args, sizeof(state->args));
+        for (size_t i = 0; i < 4; ++i) state->args[i].store(args[i]);
         return iree_ok_status();
       },
       &state);
@@ -158,7 +158,7 @@ TEST_P(QueueHostCallTest, NoWaitSemaphores) {
           iree_hal_host_call_context_t* context) {
         auto* state = (state_t*)user_data;
         ++state->did_call;
-        memcpy(state->args, args, sizeof(state->args));
+        for (size_t i = 0; i < 4; ++i) state->args[i].store(args[i]);
         return iree_ok_status();
       },
       &state);

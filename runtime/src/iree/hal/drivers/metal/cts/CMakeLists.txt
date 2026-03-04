@@ -24,7 +24,7 @@ iree_hal_cts_testdata(
   FORMAT_NAME
     metal_spirv
   TARGET_DEVICE
-    "metal-spirv"
+    "metal"
   IDENTIFIER
     "iree_cts_testdata_metal_spirv"
   BACKEND_NAME

@@ -34,7 +34,7 @@ iree_hal_cts_test_suite(
             "backend_name": "vulkan",
             "format_string": '"vulkan-spirv-fb"',
             "identifier": "iree_cts_testdata_vulkan_spirv",
-            "target_device": "vulkan-spirv",
+            "target_device": "vulkan",
         },
     },
     tags = ["driver=vulkan"],
