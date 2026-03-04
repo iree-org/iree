@@ -6361,6 +6361,15 @@ respectively.</p>
 <p>To use IREE's Python bindings, you will first need to install
 <a href="https://www.python.org/downloads/">Python 3</a> and
 <a href="https://pip.pypa.io/en/stable/installing/">pip</a>, as needed.</p>
+<details class="info" open="open">
+<summary>Note - Python version compatibility</summary>
+<p>IREE's release wheels use the
+<a href="https://docs.python.org/3/c-api/stable.html">Python Stable ABI (abi3)</a>.
+The <code>cp312-abi3</code> wheels are compatible with any standard (with GIL)
+Python 3.12+ version. Separate <code>cp310</code> and <code>cp311</code> wheels are provided
+for older supported versions. A free-threaded (<code>cp313t</code>) wheel is also
+available for Python 3.13t (no GIL).</p>
+</details>
 <details class="tip" open="open">
 <summary>Tip - Virtual environments</summary>
 <p>We recommend using virtual environments to manage python packages, such as
