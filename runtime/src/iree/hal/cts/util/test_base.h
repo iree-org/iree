@@ -331,7 +331,6 @@ class CtsTestBase : public BaseType {
     EXPECT_EQ(expected_value, value);
   }
 
-
   iree_hal_driver_t* driver_ = nullptr;
   iree_hal_device_group_t* device_group_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
