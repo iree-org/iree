@@ -292,8 +292,8 @@ getGemmHeuristicSeeds(GemmSize gemmSize, int64_t inBitWidth, bool scaled) {
                inBitWidth});
     }
     return GPUMMAHeuristicSeeds(
-        {/*bestSubgroupCountPerWorkgroup=*/4,
-         /*bestMNTileCountPerSubgroup=*/16,
+        {/*bestSubgroupCountPerWorkgroup=*/8,
+         /*bestMNTileCountPerSubgroup=*/32,
          /*bestKTileCountPerSubgroup=*/2,
          /*bestKElementCountPerSubgroup=*/kCacheLineSizeBits / 2 / inBitWidth});
   default:

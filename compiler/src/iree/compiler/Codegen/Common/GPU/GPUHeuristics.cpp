@@ -680,23 +680,23 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
-static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
-                                      const GPUIntrinsicType &intrinsic,
-                                      std::optional<int64_t> wgpCount,
-                                      int64_t bestSubgroupCountPerWorkgroup,
-                                      int64_t bestMNTileCountPerSubgroup,
-                                      int64_t splitReductionTripCnt) {
+static void adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
+                                   const GPUIntrinsicType &intrinsic,
+                                   std::optional<int64_t> wgpCount,
+                                   int64_t &bestSubgroupCountPerWorkgroup,
+                                   int64_t &bestMNTileCountPerSubgroup,
+                                   int64_t splitReductionTripCnt) {
   if (!wgpCount.has_value()) {
     LDBG() << "WGP count is not available,"
            << "Skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+    return;
   }
 
   if (problem.gemmSize == GemmSize::NotSet ||
       problem.gemmSize == GemmSize::SmallGemm) {
     LDBG() << "Arithmetic intensity is too low, "
            << "skipping adjustment of seeds for workgroup count.";
-    return bestMNTileCountPerSubgroup;
+    return;
   }
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
@@ -721,18 +721,79 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
          << ", WGP count: " << wgpCount;
 
-  while (numWorkgroups < wgpCount) {
-    if (bestMNTileCountPerSubgroup <= 1) {
-      LDBG() << "Cannot decrease tile size further, "
-                "bestMNTileCountPerSubgroup is already 1.";
+  // Compute CU utilization: the fraction of CUs active across all waves.
+  // When workgroup count barely exceeds a multiple of CU count, the last
+  // wave has most CUs idle, wasting GPU throughput. For example, 320
+  // workgroups on 256 CUs gives 2 waves but only 62.5% utilization.
+  // Reduce tile size and subgroup count until utilization is acceptable.
+  constexpr double kMinUtilizationThreshold = 0.80;
+  auto computeUtilization = [&]() -> double {
+    int64_t waves = llvm::divideCeil(numWorkgroups, *wgpCount);
+    if (waves == 0) {
+      return 0.0;
+    }
+    return static_cast<double>(numWorkgroups) / (waves * *wgpCount);
+  };
+
+  // Reduce MN tile count (and subgroup count for LargeGemm) to increase
+  // workgroup count and improve CU utilization. For LargeGemm, seeds are
+  // inflated (e.g., sg=8, MNT=32) so both must be reduced together to
+  // maintain balanced tile shapes and avoid excessive thread overhead.
+  // For MediumGemm, only MNT is reduced to match pre-tuning behavior.
+  // Maintain a minimum subgroup count to ensure enough threads per workgroup
+  // for latency hiding during K-loop iterations.
+  bool isLargeGemm = (problem.gemmSize == GemmSize::LargeGemm);
+  constexpr int64_t kMinSubgroupCount = 2;
+  while (computeUtilization() < kMinUtilizationThreshold) {
+    bool reduced = false;
+    if (bestMNTileCountPerSubgroup > 1) {
+      bestMNTileCountPerSubgroup /= 2;
+      reduced = true;
+    }
+    if (isLargeGemm && bestSubgroupCountPerWorkgroup > kMinSubgroupCount) {
+      bestSubgroupCountPerWorkgroup /= 2;
+      reduced = true;
+    }
+    if (!reduced) {
       break;
     }
-    bestMNTileCountPerSubgroup /= 2;
-    LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
-           << bestMNTileCountPerSubgroup;
+    LDBG() << "Decreasing seeds to bestMNTileCountPerSubgroup="
+           << bestMNTileCountPerSubgroup << ", bestSubgroupCountPerWorkgroup="
+           << bestSubgroupCountPerWorkgroup;
     numWorkgroups = computeWorkgroupCount();
   }
-  return bestMNTileCountPerSubgroup;
+
+  // For large K dimensions, each workgroup iterates over many K tiles.
+  // With inflated subgroup seeds (e.g., sg=8), each subgroup accumulates
+  // many MMA tiles, consuming excessive VGPRs for accumulators and causing
+  // register spilling to scratch memory. Ensure enough workgroups (multiple
+  // waves) to improve latency hiding and reduce per-workgroup pressure.
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  int64_t kIntrinsicSize = ShapedType::getNumElements(intrinsic.kSizes);
+  int64_t kIterations = kSize / kIntrinsicSize;
+  constexpr int64_t kLargeKIterationThreshold = 1024;
+  if (isLargeGemm && kIterations > kLargeKIterationThreshold) {
+    int64_t minWorkgroups = 2 * *wgpCount;
+    while (numWorkgroups < minWorkgroups) {
+      bool reduced = false;
+      if (bestMNTileCountPerSubgroup > 1) {
+        bestMNTileCountPerSubgroup /= 2;
+        reduced = true;
+      }
+      if (bestSubgroupCountPerWorkgroup > 1) {
+        bestSubgroupCountPerWorkgroup /= 2;
+        reduced = true;
+      }
+      if (!reduced) {
+        break;
+      }
+      LDBG() << "Large K (" << kSize
+             << "): decreasing seeds to bestMNTileCountPerSubgroup="
+             << bestMNTileCountPerSubgroup << ", bestSubgroupCountPerWorkgroup="
+             << bestSubgroupCountPerWorkgroup;
+      numWorkgroups = computeWorkgroupCount();
+    }
+  }
 }
 
 FailureOr<GPUMMASchedule> deduceMMASchedule(
@@ -755,9 +816,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     // more than once in a row, and we want to keep the original seeds intact
     // for the next call.
     GPUMMAHeuristicSeeds localSeeds = seeds;
-    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
-        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
-        seeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
+    adjustSeedsForWgpCount(
+        problem, intrinsic, wgpCount, localSeeds.bestSubgroupCountPerWorkgroup,
+        localSeeds.bestMNTileCountPerSubgroup, splitReductionTripCnt);
     GPUMMASchedule schedule =
         getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
