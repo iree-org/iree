@@ -26,6 +26,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    registration_test
+  SRCS
+    "registration_test.cc"
+  DEPS
+    iree::async
+    iree::async::cts::util::registry
+    iree::async::cts::util::socket_test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     shared_pool_test
   SRCS
     "shared_pool_test.cc"
@@ -34,20 +48,6 @@ iree_cc_library(
     iree::async::cts::util::registry
     iree::async::cts::util::test_base
     iree::base::internal::shm
-  TESTONLY
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    registration_test
-  SRCS
-    "registration_test.cc"
-  DEPS
-    iree::async
-    iree::async::cts::util::registry
-    iree::async::cts::util::socket_test_base
   TESTONLY
   ALWAYSLINK
   PUBLIC
