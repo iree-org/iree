@@ -389,3 +389,32 @@ func.func @conv_with_dps_init_producer(
 
 //     CHECK-LABEL: conv_with_dps_init_producer
 //           CHECK: promote_operands = [0, 1, 2]
+
+// -----
+
+// Backward weight conv where M=F=2376 has a prime tile count (149),
+// causing GCD to fail; the min-based distribution override assigns tiles to M.
+#map_bwd_lhs = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5, d2 + d6, d3)>
+#map_bwd_rhs = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
+#map_bwd_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_bwd_weight_igemm(%lhs: tensor<32x27x27x256xf16>, %rhs: tensor<32x25x25x2376xf16>) -> tensor<2376x3x3x256xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2376x3x3x256xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2376x3x3x256xf32>) -> tensor<2376x3x3x256xf32>
+  %result = linalg.generic {indexing_maps = [#map_bwd_lhs, #map_bwd_rhs, #map_bwd_out], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%lhs, %rhs : tensor<32x27x27x256xf16>, tensor<32x25x25x2376xf16>) outs(%fill : tensor<2376x3x3x256xf32>) {
+  ^bb0(%in: f16, %in_1: f16, %out: f32):
+    %0 = arith.extf %in : f16 to f32
+    %1 = arith.extf %in_1 : f16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %2, %out : f32
+    linalg.yield %3 : f32
+  } -> tensor<2376x3x3x256xf32>
+  return %result : tensor<2376x3x3x256xf32>
+}
+
+//     CHECK-LABEL: conv_bwd_weight_igemm
+//           CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//      CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+//      CHECK-SAME:     reduction = [0, 0, 0, 0, 2]
+//      CHECK-SAME:     subgroup = [4, 1, 1, 2, 0]
+//      CHECK-SAME:     workgroup = [64, 1, 1, 128, 0]
