@@ -149,7 +149,7 @@ static iree_status_t iree_hal_task_semaphore_signal(
   iree_slim_mutex_lock(&semaphore->mutex);
 
   if (new_value <= semaphore->current_value) {
-    uint64_t current_value IREE_ATTRIBUTE_UNUSED = semaphore->current_value;
+    uint64_t current_value = semaphore->current_value;
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "semaphore values must be monotonically "
@@ -247,11 +247,12 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
   iree_slim_mutex_lock(&semaphore->mutex);
 
   iree_status_t status = iree_ok_status();
-  if (semaphore->current_value >= minimum_value) {
-    // Fast path: already satisfied.
-  } else if (!iree_status_is_ok(semaphore->failure_status)) {
+  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+      !iree_status_is_ok(semaphore->failure_status)) {
     // Semaphore failed; can't enqueue timepoints (they'll reject immediately).
-    status = iree_status_clone(semaphore->failure_status);
+    status = iree_status_from_code(IREE_STATUS_ABORTED);
+  } else if (semaphore->current_value >= minimum_value) {
+    // Fast path: already satisfied.
   } else {
     // Slow path: acquire a system wait handle and perform a full wait.
     iree_hal_task_semaphore_wait_cmd_t* cmd = NULL;
@@ -383,7 +384,13 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
       iree_hal_task_semaphore_t* semaphore =
           iree_hal_task_semaphore_cast(semaphore_list.semaphores[i]);
       iree_slim_mutex_lock(&semaphore->mutex);
-      if (semaphore->current_value >= semaphore_list.payload_values[i]) {
+      if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+          !iree_status_is_ok(semaphore->failure_status)) {
+        // Semaphore failed; abort the wait immediately.
+        iree_slim_mutex_unlock(&semaphore->mutex);
+        status = iree_status_from_code(IREE_STATUS_ABORTED);
+        break;
+      } else if (semaphore->current_value >= semaphore_list.payload_values[i]) {
         // Fast path: already satisfied.
         // If in ANY wait mode, this is sufficient and we don't actually need
         // to wait. This also skips acquiring timepoints for any remaining
@@ -412,6 +419,25 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
       status = iree_wait_any(wait_set, deadline_ns, /*out_wake_handle=*/NULL);
     } else {
       status = iree_wait_all(wait_set, deadline_ns);
+    }
+  }
+
+  // Post-wait: recheck all semaphores for failures that may have caused the
+  // wake. The wait handles fire for both signal and failure, so a successful
+  // wait return does not guarantee the semaphores are in a healthy state.
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+      iree_hal_task_semaphore_t* semaphore =
+          iree_hal_task_semaphore_cast(semaphore_list.semaphores[i]);
+      iree_slim_mutex_lock(&semaphore->mutex);
+      bool failed =
+          semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+          !iree_status_is_ok(semaphore->failure_status);
+      iree_slim_mutex_unlock(&semaphore->mutex);
+      if (failed) {
+        status = iree_status_from_code(IREE_STATUS_ABORTED);
+        break;
+      }
     }
   }
 
