@@ -931,3 +931,21 @@ func.func @clone_shared_mask_on_layout_conflict(
   vector.transfer_write %bl, %arr[%c0, %c0], %mask {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
   func.return
 }
+
+// -----
+
+// Verify that backward fixup does not crash when transpose and broadcast
+// have no resolved layout (no to_layout anchor). Without null-guards, fixup
+// would call layout.permute() / layout.project() on a null layout.
+
+func.func @fixup_null_layout_transpose_broadcast(
+    %a: vector<16x16xf16>,
+    %b: vector<16xf16>,
+    %arr: memref<16x16xf16>) {
+  %c0 = arith.constant 0 : index
+  %t = vector.transpose %a, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
+  vector.transfer_write %t, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  %bc = vector.broadcast %b : vector<16xf16> to vector<16x16xf16>
+  vector.transfer_write %bc, %arr[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf16>, memref<16x16xf16>
+  func.return
+}
