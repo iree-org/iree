@@ -417,6 +417,8 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
            << ").";
   }
   if (isa<RankedTensorType>(shapeTy)) {
+    // We do not verify layout size for tensors, as we allow the layout size to
+    // exceed the tensor size and handle that through padding/masking.
     return success();
   }
   // Multiply all shapes in the layout.
@@ -424,8 +426,6 @@ LogicalResult NestedLayoutAttr::isValidLayout(ShapedType shapeTy,
     int64_t expectedShape = getSubgroupTile()[i] * getBatchTile()[i] *
                             getOuterTile()[i] * getThreadTile()[i] *
                             getElementTile()[i];
-    // The layout size exceeding the shape is allowed, because it will be
-    // handled through padding/masking.
     if (ShapedType::isStatic(shape[i]) && expectedShape != shape[i]) {
       std::string layoutStr;
       llvm::raw_string_ostream layoutOs(layoutStr);
