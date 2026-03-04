@@ -1087,6 +1087,7 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
 
 typedef struct iree_hal_hip_dispatch_completed_data_t {
   iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
   iree_notification_t notification;
   iree_slim_mutex_t completed_mutex;
   bool completed;
@@ -1098,6 +1099,7 @@ static void iree_hal_hip_dispatch_completed_destroy(
       (iree_hal_hip_dispatch_completed_data_t*)resource;
   iree_slim_mutex_deinitialize(&data->completed_mutex);
   iree_notification_deinitialize(&data->notification);
+  iree_allocator_free(data->host_allocator, data);
 }
 
 static const iree_hal_resource_vtable_t
@@ -1112,11 +1114,11 @@ static iree_status_t iree_hal_hip_dispatch_completed_create(
 
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, sizeof(**out), (void**)out));
-
   iree_slim_mutex_initialize(&(*out)->completed_mutex);
   iree_notification_initialize(&(*out)->notification);
   iree_hal_resource_initialize(&iree_hal_hip_dispatch_completed_data_vtable_t,
                                &(*out)->resource);
+  (*out)->host_allocator = host_allocator;
   return iree_ok_status();
 }
 
@@ -1201,15 +1203,19 @@ static iree_status_t iree_hal_hip_semaphore_callback_data_initialize(
       wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values);
   data->wait_semaphore_list.count = wait_semaphore_list.count;
   data->wait_semaphore_list.semaphores = (iree_hal_semaphore_t**)callback_ptr;
-  memcpy(data->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
-         wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
+  if (wait_semaphore_list.count > 0) {
+    memcpy(data->wait_semaphore_list.semaphores, wait_semaphore_list.semaphores,
+           wait_semaphore_list.count * sizeof(*wait_semaphore_list.semaphores));
+  }
   data->wait_semaphore_list.payload_values =
       (uint64_t*)(callback_ptr + wait_semaphore_list.count *
                                      sizeof(*wait_semaphore_list.semaphores));
-  memcpy(
-      data->wait_semaphore_list.payload_values,
-      wait_semaphore_list.payload_values,
-      wait_semaphore_list.count * sizeof(*wait_semaphore_list.payload_values));
+  if (wait_semaphore_list.count > 0) {
+    memcpy(data->wait_semaphore_list.payload_values,
+           wait_semaphore_list.payload_values,
+           wait_semaphore_list.count *
+               sizeof(*wait_semaphore_list.payload_values));
+  }
   for (iree_host_size_t i = 0; i < wait_semaphore_list.count; ++i) {
     iree_hal_resource_retain(wait_semaphore_list.semaphores[i]);
   }
@@ -1218,16 +1224,21 @@ static iree_status_t iree_hal_hip_semaphore_callback_data_initialize(
   // Copy signal list for later access.
   data->signal_semaphore_list.count = signal_semaphore_list.count;
   data->signal_semaphore_list.semaphores = (iree_hal_semaphore_t**)callback_ptr;
-  memcpy(
-      data->signal_semaphore_list.semaphores, signal_semaphore_list.semaphores,
-      signal_semaphore_list.count * sizeof(*signal_semaphore_list.semaphores));
+  if (signal_semaphore_list.count > 0) {
+    memcpy(data->signal_semaphore_list.semaphores,
+           signal_semaphore_list.semaphores,
+           signal_semaphore_list.count *
+               sizeof(*signal_semaphore_list.semaphores));
+  }
   data->signal_semaphore_list.payload_values =
       (uint64_t*)(callback_ptr + signal_semaphore_list.count *
                                      sizeof(*signal_semaphore_list.semaphores));
-  memcpy(data->signal_semaphore_list.payload_values,
-         signal_semaphore_list.payload_values,
-         signal_semaphore_list.count *
-             sizeof(*signal_semaphore_list.payload_values));
+  if (signal_semaphore_list.count > 0) {
+    memcpy(data->signal_semaphore_list.payload_values,
+           signal_semaphore_list.payload_values,
+           signal_semaphore_list.count *
+               sizeof(*signal_semaphore_list.payload_values));
+  }
   for (iree_host_size_t i = 0; i < signal_semaphore_list.count; ++i) {
     iree_hal_resource_retain(signal_semaphore_list.semaphores[i]);
   }
@@ -2608,8 +2619,10 @@ static iree_status_t iree_hal_hip_device_make_callback_data(
                                      sizeof(*callback_data) +
                                      additional_data_for_base);
     callback_data->binding_table.bindings = binding_element_ptr;
-    memcpy(binding_element_ptr, binding_table.bindings,
-           sizeof(*binding_element_ptr) * binding_table.count);
+    if (binding_table.count > 0) {
+      memcpy(binding_element_ptr, binding_table.bindings,
+             sizeof(*binding_element_ptr) * binding_table.count);
+    }
 
     status = iree_hal_resource_set_insert_strided(
         callback_data->resource_set, binding_table.count,
