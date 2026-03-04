@@ -52,6 +52,8 @@ static bool hip_registered_ =
           .unsupported_tests =
               {
                   {"EventTest.*", "HIP does not implement HAL events"},
+                  {"ExecutableTest.*",
+                   "HIP does not implement executable reflection"},
                   {"CopyBufferTest.*",
                    "Missing hipDrvGraphAddMemcpyNode symbol"},
                   {"UpdateBufferTest.*",
