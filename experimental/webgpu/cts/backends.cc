@@ -44,11 +44,10 @@ static iree_status_t CreateWebgpuDevice(iree_hal_driver_t** out_driver,
   return status;
 }
 
-static bool webgpu_registered_ =
-    (CtsRegistry::RegisterBackend({
-         "webgpu",
-         {"webgpu", CreateWebgpuDevice},
-     }),
-     true);
+static bool webgpu_registered_ = (CtsRegistry::RegisterBackend({
+                                      "webgpu",
+                                      {"webgpu", CreateWebgpuDevice},
+                                  }),
+                                  true);
 
 }  // namespace iree::hal::cts

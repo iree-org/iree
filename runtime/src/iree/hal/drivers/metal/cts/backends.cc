@@ -47,8 +47,11 @@ static iree_status_t CreateMetalDevice(iree_hal_driver_t** out_driver,
 static bool metal_registered_ =
     (CtsRegistry::RegisterBackend({
          "metal",
-         {"metal", CreateMetalDevice, /*executable_format=*/nullptr,
-          /*executable_data=*/nullptr, RecordingMode::kDirect,
+         {"metal",
+          CreateMetalDevice,
+          /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr,
+          RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
               {"EventTest.*", "Metal does not implement HAL events"},

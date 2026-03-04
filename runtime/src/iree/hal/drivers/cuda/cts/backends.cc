@@ -44,12 +44,11 @@ static iree_status_t CreateCudaDevice(iree_hal_driver_t** out_driver,
   return status;
 }
 
-static bool cuda_registered_ =
-    (CtsRegistry::RegisterBackend({
-         "cuda",
-         {"cuda", CreateCudaDevice},
-         {"async_queue"},
-     }),
-     true);
+static bool cuda_registered_ = (CtsRegistry::RegisterBackend({
+                                    "cuda",
+                                    {"cuda", CreateCudaDevice},
+                                    {"async_queue"},
+                                }),
+                                true);
 
 }  // namespace iree::hal::cts

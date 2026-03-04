@@ -56,13 +56,12 @@ static iree_status_t CreateLocalTaskDevice(iree_hal_driver_t** out_driver,
 
 // Registration at static init time. The comma operator evaluates
 // RegisterBackend() for its side effect and yields true for the bool.
-static bool local_task_registered_ =
-    (CtsRegistry::RegisterBackend({
-         "local_task",
-         {"local_task", CreateLocalTaskDevice},
-         {"async_queue", "events", "file_io", "host_calls", "mapping",
-          "indirect"},
-     }),
-     true);
+static bool local_task_registered_ = (CtsRegistry::RegisterBackend({
+                                          "local_task",
+                                          {"local_task", CreateLocalTaskDevice},
+                                          {"async_queue", "events", "file_io",
+                                           "host_calls", "mapping", "indirect"},
+                                      }),
+                                      true);
 
 }  // namespace iree::hal::cts

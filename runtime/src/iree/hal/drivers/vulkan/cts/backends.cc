@@ -47,8 +47,11 @@ static iree_status_t CreateVulkanDevice(iree_hal_driver_t** out_driver,
 static bool vulkan_registered_ =
     (CtsRegistry::RegisterBackend({
          "vulkan",
-         {"vulkan", CreateVulkanDevice, /*executable_format=*/nullptr,
-          /*executable_data=*/nullptr, RecordingMode::kDirect,
+         {"vulkan",
+          CreateVulkanDevice,
+          /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr,
+          RecordingMode::kDirect,
           /*unsupported_tests=*/
           {
               {"SemaphoreTest.WaitThenFail",
