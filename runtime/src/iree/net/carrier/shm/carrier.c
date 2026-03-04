@@ -843,6 +843,20 @@ static iree_status_t iree_net_shm_carrier_send(
 
   iree_slim_mutex_lock(&carrier->tx_lock);
 
+  // Re-check under lock: shutdown() acquires tx_lock before writing the EOS
+  // marker and setting shutdown_initiated, so if we see it set here, the EOS
+  // marker is already in the ring and any data we write would follow it. The
+  // peer stops draining at EOS, so that data would be silently lost.
+  if (IREE_UNLIKELY(iree_atomic_load(&carrier->shutdown_initiated,
+                                     iree_memory_order_acquire))) {
+    iree_slim_mutex_unlock(&carrier->tx_lock);
+    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                          iree_memory_order_release);
+    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "carrier has been shut down for sending");
+  }
+
   uint32_t completion_head =
       iree_atomic_load(&carrier->completions.head, iree_memory_order_relaxed);
   uint32_t completion_tail =

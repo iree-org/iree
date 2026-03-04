@@ -98,6 +98,38 @@ TEST_P(ErrorHandlingTest, SendAfterPeerDeactivateFails) {
   }
 }
 
+// After shutdown, send must not deliver data to the peer. The carrier can
+// reject the send synchronously (FAILED_PRECONDITION) or defer the error to
+// the completion callback. Either way, the server must not see the data.
+TEST_P(ErrorHandlingTest, SendAfterShutdownFails) {
+  std::vector<uint8_t> server_received;
+  RecvCapture server_capture(&server_received);
+
+  ActivateBoth(MakeNullRecvHandler(), server_capture.AsHandler());
+
+  IREE_ASSERT_OK(iree_net_carrier_shutdown(client_));
+
+  const char* msg = "after shutdown";
+  iree_async_span_t span;
+  auto params = MakeSendParams(msg, strlen(msg), &span);
+  iree_status_t status = iree_net_carrier_send(client_, &params);
+  if (!iree_status_is_ok(status)) {
+    // Synchronous rejection (e.g. SHM's EOS marker prevents ring writes).
+    EXPECT_TRUE(iree_status_is_failed_precondition(status));
+    iree_status_ignore(status);
+  } else {
+    // Async carriers (TCP) may accept the submission but fail at completion.
+    // Poll to let the proactor process the failure.
+    PollOnce();
+  }
+
+  // Drain any pending events so the server processes everything available.
+  PollOnce();
+
+  // The server must not have received the post-shutdown data.
+  EXPECT_EQ(server_capture.total_bytes.load(), 0u);
+}
+
 // Multiple rapid sends to error handler should not cause double-free or crash.
 TEST_P(ErrorHandlingTest, RapidSendsToErrorHandler) {
   ErrorRecvContext error_ctx;
