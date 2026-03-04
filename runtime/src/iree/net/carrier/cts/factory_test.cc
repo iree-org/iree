@@ -135,11 +135,10 @@ TEST_P(FactoryTest, MultipleConnections) {
   }
 
   ASSERT_TRUE(PollUntil([&]() {
-    return connect_results[0].fired && connect_results[1].fired &&
+    return accept_ctx.connections.size() >= 3 &&
+           connect_results[0].fired && connect_results[1].fired &&
            connect_results[2].fired;
   })) << "Not all connections completed";
-
-  EXPECT_EQ(accept_ctx.connections.size(), 3u);
   for (int i = 0; i < 3; ++i) {
     EXPECT_EQ(connect_results[i].status_code, IREE_STATUS_OK);
     ASSERT_NE(connect_results[i].connection, nullptr);
