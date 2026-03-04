@@ -358,9 +358,17 @@ typedef struct iree_async_proactor_iocp_t {
   // Detected and allowed capabilities.
   iree_async_proactor_capabilities_t capabilities;
 
+  // Thread-safe freelist of recycled carriers. Carriers are pushed here on
+  // completion dispatch instead of being freed, and popped on the next submit
+  // instead of malloc. This eliminates per-I/O heap allocation in steady state.
+  // The first 8 bytes of a carrier (overlapping OVERLAPPED/placeholder) store
+  // the slist next pointer when the carrier is on the freelist; this is safe
+  // because freelist carriers are not in-flight.
+  iree_atomic_slist_t carrier_freelist;
+
   // Outstanding carrier count for leak detection. Incremented at carrier
-  // allocation, decremented at carrier free. Asserted zero at destroy to catch
-  // callers that destroy the proactor with pending overlapped I/O.
+  // allocation, decremented at carrier release. Asserted zero at destroy to
+  // catch callers that destroy the proactor with pending overlapped I/O.
   iree_atomic_int32_t outstanding_carrier_count;
 } iree_async_proactor_iocp_t;
 
@@ -439,6 +447,12 @@ void iree_async_proactor_iocp_wake(iree_async_proactor_t* base_proactor);
 // Retains operation resources and wakes the poll thread. (proactor.c)
 void iree_async_proactor_iocp_push_pending(iree_async_proactor_iocp_t* proactor,
                                            iree_async_operation_t* operation);
+
+// Returns a carrier to the freelist for reuse. Decrements the outstanding
+// carrier count. The carrier must not be referenced after this call.
+// (proactor_submit.c)
+void iree_async_proactor_iocp_release_carrier(
+    iree_async_proactor_iocp_t* proactor, iree_async_iocp_carrier_t* carrier);
 
 // Cancels a continuation chain by directly invoking callbacks with CANCELLED.
 // Returns the number of callbacks invoked. (proactor_submit.c)

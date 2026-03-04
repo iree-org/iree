@@ -120,17 +120,23 @@ iree_host_size_t iree_async_proactor_iocp_dispatch_linked_continuation(
 // Carrier allocation and submit failure helpers
 //===----------------------------------------------------------------------===//
 
-// Allocates and initializes a carrier for socket I/O. The carrier is zeroed
-// and configured with the given type, completion port, operation, and socket
-// handle. The caller fills in the type-specific data union members.
+// Allocates and initializes a carrier for socket I/O. Pops from the carrier
+// freelist when available, falling back to heap allocation on demand. The
+// carrier is zeroed and configured with the given type, completion port,
+// operation, and socket handle. The caller fills in the type-specific data
+// union members.
 static iree_status_t iree_async_proactor_iocp_allocate_carrier(
     iree_async_proactor_iocp_t* proactor,
     iree_async_iocp_carrier_type_t carrier_type,
     iree_async_operation_t* operation, uintptr_t io_handle,
     iree_async_iocp_carrier_t** out_carrier) {
-  iree_async_iocp_carrier_t* carrier = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      proactor->base.allocator, sizeof(*carrier), (void**)&carrier));
+  iree_async_iocp_carrier_t* carrier =
+      (iree_async_iocp_carrier_t*)iree_atomic_slist_pop(
+          &proactor->carrier_freelist);
+  if (!carrier) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        proactor->base.allocator, sizeof(*carrier), (void**)&carrier));
+  }
   memset(carrier, 0, sizeof(*carrier));
   carrier->type = carrier_type;
   carrier->completion_port = proactor->completion_port;
@@ -142,15 +148,14 @@ static iree_status_t iree_async_proactor_iocp_allocate_carrier(
   return iree_ok_status();
 }
 
-// Releases a carrier that was allocated but never successfully posted to IOCP.
-// Decrements the outstanding_carrier_count and frees the carrier memory.
-// This is the symmetric counterpart to allocate_carrier for error paths where
-// the overlapped I/O call fails synchronously (error != *_IO_PENDING).
-static void iree_async_proactor_iocp_release_carrier(
+// Returns a carrier to the freelist for reuse. Decrements the outstanding
+// carrier count. The carrier must not be referenced after this call.
+void iree_async_proactor_iocp_release_carrier(
     iree_async_proactor_iocp_t* proactor, iree_async_iocp_carrier_t* carrier) {
   iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
                         iree_memory_order_relaxed);
-  iree_allocator_free(proactor->base.allocator, carrier);
+  iree_atomic_slist_push(&proactor->carrier_freelist,
+                         (iree_atomic_slist_entry_t*)carrier);
 }
 
 // Builds a WSABUF array from a span list. Returns the number of buffers.

@@ -298,9 +298,10 @@ iree_status_t iree_async_proactor_create_iocp(
   iree_async_message_pool_initialize(message_pool_capacity, message_entries,
                                      &proactor->message_pool);
 
-  // Initialize MPSC queues.
+  // Initialize MPSC queues and carrier freelist.
   iree_atomic_slist_initialize(&proactor->pending_queue);
   iree_atomic_slist_initialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_initialize(&proactor->carrier_freelist);
 
   // Initialize timer list.
   iree_async_iocp_timer_list_initialize(&proactor->timers);
@@ -602,7 +603,7 @@ static void iree_async_proactor_iocp_destroy(
       iree_async_proactor_iocp_cast(base_proactor);
   iree_allocator_t allocator = proactor->base.allocator;
 
-  // Cancel and free all active event wait carriers.
+  // Cancel and release all active event wait carriers to the freelist.
   while (proactor->active_carriers) {
     iree_async_iocp_carrier_t* carrier = proactor->active_carriers;
     proactor->active_carriers = carrier->next;
@@ -620,16 +621,21 @@ static void iree_async_proactor_iocp_destroy(
                          INVALID_HANDLE_VALUE);
       }
     }
-    iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                          iree_memory_order_relaxed);
-    iree_allocator_free(allocator, carrier);
+    iree_async_proactor_iocp_release_carrier(proactor, carrier);
   }
 
-  // All carriers (EVENT_WAIT, SOCKET_IO, ACCEPT, etc.) should have been freed
-  // by completion dispatch or the active_carriers cleanup above. A non-zero
-  // count means the caller destroyed the proactor with pending overlapped I/O.
+  // All carriers should have been returned to the freelist by completion
+  // dispatch or the active_carriers cleanup above. A non-zero count means the
+  // caller destroyed the proactor with pending overlapped I/O.
   IREE_ASSERT(iree_atomic_load(&proactor->outstanding_carrier_count,
                                iree_memory_order_relaxed) == 0);
+
+  // Drain the carrier freelist and free all recycled carriers.
+  iree_atomic_slist_entry_t* freelist_entry = NULL;
+  while (
+      (freelist_entry = iree_atomic_slist_pop(&proactor->carrier_freelist))) {
+    iree_allocator_free(allocator, freelist_entry);
+  }
 
   // Tear down console signal handling if initialized.
   if (proactor->signal.initialized) {
@@ -661,9 +667,10 @@ static void iree_async_proactor_iocp_destroy(
   // Clean up Winsock (ref-counted, matches WSAStartup in create).
   WSACleanup();
 
-  // Deinitialize MPSC queues.
+  // Deinitialize MPSC queues and carrier freelist.
   iree_atomic_slist_deinitialize(&proactor->pending_queue);
   iree_atomic_slist_deinitialize(&proactor->pending_semaphore_waits);
+  iree_atomic_slist_deinitialize(&proactor->carrier_freelist);
 
   // Deinitialize message pool.
   iree_async_message_pool_deinitialize(&proactor->message_pool);
@@ -797,9 +804,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
               proactor->nt_wait_api.NtCreateWaitCompletionPacket(
                   &wcp_handle, MAXIMUM_ALLOWED, NULL);
           if (!NT_SUCCESS(nt_status)) {
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation,
                 iree_make_status(
@@ -817,9 +822,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
               (PVOID)0, &carrier->overlapped, 0, 0, &already_signaled);
           if (!NT_SUCCESS(nt_status)) {
             CloseHandle(wcp_handle);
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation,
                 iree_make_status(
@@ -845,9 +848,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_pending_queue(
               WT_EXECUTEONLYONCE);
           if (!registered) {
             DWORD error = GetLastError();
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation,
                 iree_make_status(
@@ -1024,9 +1025,7 @@ static iree_host_size_t iree_async_proactor_iocp_drain_event_wait_cancellations(
       }
       iree_async_operation_t* operation = carrier->operation;
       operation->next = NULL;
-      iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                            iree_memory_order_relaxed);
-      iree_allocator_free(proactor->base.allocator, carrier);
+      iree_async_proactor_iocp_release_carrier(proactor, carrier);
       iree_atomic_fetch_sub(&proactor->pending_event_wait_cancellation_count, 1,
                             iree_memory_order_release);
       --cancellation_count;
@@ -1520,9 +1519,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
             CloseHandle(carrier->data.event_wait.wait_handle);
           }
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
 
           // Check CANCELLED flag — cancel() may have been called between the
           // completion being posted to IOCP and this dispatch. The
@@ -1652,9 +1649,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -1836,9 +1831,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -1891,9 +1884,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
           }
 
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &completed_count);
@@ -1974,9 +1965,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
 
           if (!multishot_rearm) {
             operation->next = NULL;
-            iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                  iree_memory_order_relaxed);
-            iree_allocator_free(proactor->base.allocator, carrier);
+            iree_async_proactor_iocp_release_carrier(proactor, carrier);
             iree_async_proactor_iocp_dispatch_completion(
                 proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
                 &completed_count);
@@ -2034,9 +2023,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
           }
 
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation, io_status, IREE_ASYNC_COMPLETION_FLAG_NONE,
               &completed_count);
@@ -2046,9 +2033,7 @@ static iree_status_t iree_async_proactor_iocp_poll(
         default: {
           // Unknown carrier type. Free and dispatch with error.
           operation->next = NULL;
-          iree_atomic_fetch_sub(&proactor->outstanding_carrier_count, 1,
-                                iree_memory_order_relaxed);
-          iree_allocator_free(proactor->base.allocator, carrier);
+          iree_async_proactor_iocp_release_carrier(proactor, carrier);
           iree_async_proactor_iocp_dispatch_completion(
               proactor, operation,
               iree_make_status(IREE_STATUS_INTERNAL,
