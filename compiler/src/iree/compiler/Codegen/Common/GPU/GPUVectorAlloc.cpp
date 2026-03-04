@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
@@ -20,8 +21,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -29,48 +30,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
-
-/// Convert stretching broadcasts (broadcasting a non-unit dim from 1) into
-/// broadcast + transpose so the layout analysis can handle them.
-/// Copied from LLVMGPUVectorDistribute.cpp::RemoveUnitDimStrechingBroadcast.
-struct RemoveStretchingBroadcast final : OpRewritePattern<vector::BroadcastOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
-                                PatternRewriter &rewriter) const override {
-    SetVector<int64_t> stretchedDims = broadcastOp.computeBroadcastedUnitDims();
-    if (stretchedDims.empty()) {
-      return failure();
-    }
-
-    VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
-    VectorType dstTy = broadcastOp.getResultVectorType();
-    int64_t numLeadingBroadcastDims = dstTy.getRank() - srcTy.getRank();
-    SmallVector<int64_t> broadcastedUnitDims;
-    for (auto i : llvm::seq<int64_t>(numLeadingBroadcastDims)) {
-      if (dstTy.getShape()[i] == 1) {
-        broadcastedUnitDims.push_back(i);
-      }
-    }
-    if (stretchedDims.size() > broadcastedUnitDims.size()) {
-      return failure();
-    }
-
-    auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
-    for (auto [stretchedDim, broadcastedUnitDim] :
-         llvm::zip(stretchedDims.getArrayRef(), broadcastedUnitDims)) {
-      std::swap(perm[stretchedDim], perm[broadcastedUnitDim]);
-    }
-    VectorType permutedBroadcastTy = VectorType::get(
-        applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
-    Value permutedBroadcast = vector::BroadcastOp::create(
-        rewriter, broadcastOp.getLoc(), permutedBroadcastTy,
-        broadcastOp.getSource());
-    rewriter.replaceOpWithNewOp<vector::TransposeOp>(broadcastOp,
-                                                     permutedBroadcast, perm);
-    return success();
-  }
-};
 
 // Allocates a tensor to copy the vector into a la bufferization.alloc_tensor.
 // This allocation is always static as vectors are currently always static
@@ -124,9 +83,8 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
     }
   });
 
+  OpBuilder builder(funcOp);
   for (IREE::VectorExt::ToLayoutOp op : opsToPromote) {
-    OpBuilder builder(op);
-
     // HACK: Until proper barrier placement is handled later we have to
     // synchronize explicitly in this pass.
 
@@ -136,9 +94,10 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
     builder.setInsertionPointToStart(op->getBlock());
     gpu::BarrierOp::create(builder, op->getLoc(), gpu::AddressSpace::Workgroup);
 
-    // Promote both of the input operands, excluding the accumulator.
     builder.setInsertionPoint(op);
     OpOperand &operand = op.getInputMutable();
+    // TODO: Since we know the read/write layout for this memory, we can get
+    // optimal swizzling here. Figure out how to do that.
     FailureOr<Value> ret =
         allocateTensorForVector(builder, op->getLoc(), operand.get());
     if (failed(ret)) {
@@ -169,10 +128,8 @@ struct GPUVectorAllocPass final
     // asserts that broadcasts don't stretch.
     {
       RewritePatternSet patterns(funcOp.getContext());
-      patterns.add<RemoveStretchingBroadcast>(funcOp.getContext());
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      populateVectorLayoutCanonicalizations(patterns);
+      walkAndApplyPatterns(funcOp, std::move(patterns));
     }
 
     // Run layout analysis to find additional conflict points.

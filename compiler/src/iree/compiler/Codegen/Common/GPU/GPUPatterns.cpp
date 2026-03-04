@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -205,6 +206,52 @@ static LogicalResult contractOpFilter(Operation *op) {
       linalgOp.getNumParallelLoops() <= 3);
 }
 
+/// Convert stretching broadcasts (broadcasting a non-unit dim from 1) into
+/// broadcast + transpose so the layout analysis can handle them.
+struct RemoveUnitDimStretchingBroadcast final
+    : OpRewritePattern<vector::BroadcastOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
+                                PatternRewriter &rewriter) const override {
+    SetVector<int64_t> stretchedDims = broadcastOp.computeBroadcastedUnitDims();
+    if (stretchedDims.empty()) {
+      return failure();
+    }
+    VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
+    VectorType dstTy = broadcastOp.getResultVectorType();
+    int64_t numLeadingBroadcastDims = dstTy.getRank() - srcTy.getRank();
+    SmallVector<int64_t> broadcastedUnitDims;
+    for (auto i : llvm::seq<int64_t>(numLeadingBroadcastDims)) {
+      if (dstTy.getShape()[i] == 1) {
+        broadcastedUnitDims.push_back(i);
+      }
+    }
+    if (stretchedDims.size() > broadcastedUnitDims.size()) {
+      return failure();
+    }
+    // Build a permutation that swaps the broadcasted unit dims with a leading
+    // unit dim.
+    // Note that the way this permutation is built, makes it involutory, i.e.,
+    // P = P^{-1}.
+    auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
+    // We use zip instead of zip_equal because stretchedDims.size() <=
+    // broadcastedUnitDims.size().
+    for (auto [stretchedDim, broadcastedUnitDim] :
+         llvm::zip(stretchedDims.getArrayRef(), broadcastedUnitDims)) {
+      std::swap(perm[stretchedDim], perm[broadcastedUnitDim]);
+    }
+    VectorType permutedBroadcastTy = VectorType::get(
+        applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
+    Value permutedBroadcast = vector::BroadcastOp::create(
+        rewriter, broadcastOp.getLoc(), permutedBroadcastTy,
+        broadcastOp.getSource());
+    rewriter.replaceOpWithNewOp<vector::TransposeOp>(broadcastOp,
+                                                     permutedBroadcast, perm);
+    return success();
+  }
+};
+
 // A `dealloc` is converted into a call to `free` on the underlying data buffer.
 // The memref descriptor being an SSA value, there is no need to clean it up
 // in any way.
@@ -252,6 +299,10 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()
           .addFilter(contractOpFilter));
+}
+
+void populateVectorLayoutCanonicalizations(RewritePatternSet &patterns) {
+  patterns.add<RemoveUnitDimStretchingBroadcast>(patterns.getContext());
 }
 
 void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns) {

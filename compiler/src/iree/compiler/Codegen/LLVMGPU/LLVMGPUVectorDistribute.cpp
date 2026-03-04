@@ -13,7 +13,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -54,56 +53,10 @@ ContractionVectorLayoutOptions::getDefaultLayout(VectorType type) const {
 
 namespace {
 
-struct RemoveUnitDimStretchingBroadcast final
-    : OpRewritePattern<vector::BroadcastOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
-                                PatternRewriter &rewriter) const override {
-    SetVector<int64_t> stretchedDims = broadcastOp.computeBroadcastedUnitDims();
-    if (stretchedDims.empty()) {
-      return failure();
-    }
-    VectorType srcTy = cast<VectorType>(broadcastOp.getSource().getType());
-    VectorType dstTy = broadcastOp.getResultVectorType();
-    int64_t numLeadingBroadcastDims = dstTy.getRank() - srcTy.getRank();
-    SmallVector<int64_t> broadcastedUnitDims;
-    for (auto i : llvm::seq<int64_t>(numLeadingBroadcastDims)) {
-      if (dstTy.getShape()[i] == 1) {
-        broadcastedUnitDims.push_back(i);
-      }
-    }
-    if (stretchedDims.size() > broadcastedUnitDims.size()) {
-      return rewriter.notifyMatchFailure(
-          broadcastOp,
-          "number of stretched dims is greater than broadcasted unit dims");
-    }
-    // Build a permutation that swaps the broadcasted unit dims with a leading
-    // unit dim.
-    // Note that the way this permutation is built, makes it involutory, i.e.,
-    // P = P^{-1}.
-    auto perm = llvm::to_vector(llvm::seq<int64_t>(dstTy.getRank()));
-    // We use zip instead of zip_equal because stretchedDims.size() <=
-    // broadcastedUnitDims.size().
-    for (auto [stretchedDim, broadcastedUnitDim] :
-         llvm::zip(stretchedDims.getArrayRef(), broadcastedUnitDims)) {
-      std::swap(perm[stretchedDim], perm[broadcastedUnitDim]);
-    }
-    VectorType permutedBroadcastTy = VectorType::get(
-        applyPermutation(dstTy.getShape(), perm), dstTy.getElementType());
-    Value permutedBroadcast = vector::BroadcastOp::create(
-        rewriter, broadcastOp.getLoc(), permutedBroadcastTy,
-        broadcastOp.getSource());
-    rewriter.replaceOpWithNewOp<vector::TransposeOp>(broadcastOp,
-                                                     permutedBroadcast, perm);
-    return success();
-  }
-};
-
 static LogicalResult
 preVectorDistributionNormalizations(mlir::FunctionOpInterface funcOp) {
   RewritePatternSet patterns(funcOp.getContext());
-  patterns.add<RemoveUnitDimStretchingBroadcast>(funcOp.getContext());
+  populateVectorLayoutCanonicalizations(patterns);
   return applyPatternsGreedily(funcOp, std::move(patterns));
 }
 
