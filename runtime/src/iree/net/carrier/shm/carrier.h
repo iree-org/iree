@@ -37,7 +37,7 @@
 //   length == 0: shutdown marker (peer initiated graceful shutdown)
 //   length > 0:  [uint8_t type][type-specific payload]
 //     type 0x00 (INLINE):    data bytes (memcpy'd from scatter-gather spans)
-//     type 0x01 (REFERENCE): region descriptor for zero-copy (future)
+//     type 0x01 (REFERENCE): region descriptor for zero-copy direct_write
 //
 // Capabilities:
 //   - RELIABLE: no drops (shared memory, single producer/consumer per ring).
@@ -153,6 +153,14 @@ typedef struct iree_net_shm_region_header_t {
   uint8_t reserved[52];
 } iree_net_shm_region_header_t;
 
+// Describes a memory region known to the carrier for buffer registration
+// and direct read/write. Both sides of a carrier pair must populate matching
+// region IDs — the region_id in a remote handle is the array index.
+typedef struct iree_net_shm_region_info_t {
+  void* base_ptr;
+  iree_host_size_t size;
+} iree_net_shm_region_info_t;
+
 // Mode bits for SHM carrier behavior. Bitfield for future extension.
 // New modes are added as new bit values — no API churn.
 typedef uint32_t iree_net_shm_carrier_mode_t;
@@ -213,6 +221,14 @@ typedef struct iree_net_shm_carrier_create_params_t {
   // spin-poll when receiving bursts of 64+ entries per wake."
   // Default: 1 (immediate transition to poll mode on first data).
   int32_t poll_mode_threshold;
+
+  // Known SHM regions for buffer registration and direct read/write.
+  // Region 0 is typically the carrier's main SHM region. Both sides of a
+  // carrier pair must populate matching region IDs. When region_count > 0,
+  // the carrier advertises REGISTERED_REGIONS | DIRECT_WRITE | DIRECT_READ
+  // capabilities.
+  const iree_net_shm_region_info_t* regions;
+  iree_host_size_t region_count;
 } iree_net_shm_carrier_create_params_t;
 
 // Creates a single SHM carrier from pre-assembled dependencies.
@@ -221,7 +237,8 @@ typedef struct iree_net_shm_carrier_create_params_t {
 // |params->peer_wake_notification|. It takes ownership of one reference to
 // |params->release_context| (will call release_context_fn during destroy).
 //
-// Capabilities are fixed: RELIABLE | ORDERED | ZERO_COPY_TX.
+// Capabilities: RELIABLE | ORDERED | ZERO_COPY_TX (always), plus
+// REGISTERED_REGIONS | DIRECT_WRITE | DIRECT_READ when regions are provided.
 //
 // |callback| receives send completion notifications (bytes confirmed consumed
 // by the peer). Pass a callback with fn=NULL to skip completion callbacks.
@@ -229,6 +246,16 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
     const iree_net_shm_carrier_create_params_t* params,
     iree_net_carrier_callback_t callback, iree_allocator_t host_allocator,
     iree_net_carrier_t** out_carrier);
+
+// Returns the base pointer and size of a registered region by index.
+// This is an SHM-specific API (not on the base carrier vtable) used by tests
+// and buffer pool creation to discover the SHM layout.
+//
+// Returns IREE_STATUS_OUT_OF_RANGE if |region_id| >= the carrier's region
+// count.
+IREE_API_EXPORT iree_status_t iree_net_shm_carrier_query_region(
+    iree_net_carrier_t* base_carrier, uint32_t region_id,
+    iree_net_shm_region_info_t* out_region_info);
 
 #ifdef __cplusplus
 }  // extern "C"

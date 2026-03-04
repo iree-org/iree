@@ -175,6 +175,27 @@ IREE_API_EXPORT iree_status_t iree_net_shm_shared_wake_register(
 IREE_API_EXPORT void iree_net_shm_shared_wake_unregister(
     iree_net_shm_shared_wake_t* shared_wake, iree_net_shm_carrier_t* carrier);
 
+//===----------------------------------------------------------------------===//
+// Carrier accessors for sleeping list traversal
+//===----------------------------------------------------------------------===//
+// Declared here (not in carrier.h) because these are implementation details
+// of the shared_wake ↔ carrier interaction. The carrier struct is opaque to
+// shared_wake.c; these accessors provide the minimal surface needed for
+// sleeping list traversal without exposing the full carrier layout.
+
+// Returns the next carrier in the sleeping list (NULL if tail).
+iree_net_shm_carrier_t* iree_net_shm_carrier_sleeping_next(
+    iree_net_shm_carrier_t* carrier);
+
+// Sets the next carrier in the sleeping list.
+void iree_net_shm_carrier_set_sleeping_next(iree_net_shm_carrier_t* carrier,
+                                            iree_net_shm_carrier_t* next);
+
+// Performs per-carrier drain logic when woken by the shared wake scan.
+// Returns true if the carrier should remain in the sleeping list, false if
+// it was removed (transitioned to poll mode or stopped).
+bool iree_net_shm_carrier_drain_from_wake(iree_net_shm_carrier_t* carrier);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

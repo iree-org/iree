@@ -219,6 +219,14 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
         (iree_atomic_int32_t*)(opener_base +
                                IREE_NET_SHM_OFFSET_CONSUMER_B_ARMED);
 
+    // Both carriers get both SHM mappings as regions so that buffers from
+    // either mapping can be registered on either carrier.
+    iree_net_shm_region_info_t pair_regions[2];
+    pair_regions[0].base_ptr = pair_context->creator_mapping.base;
+    pair_regions[0].size = pair_context->creator_mapping.size;
+    pair_regions[1].base_ptr = pair_context->opener_mapping.base;
+    pair_regions[1].size = pair_context->opener_mapping.size;
+
     // Create client: TX=Ring B (creator), RX=Ring A (opener).
     // Client's armed flag = consumer_a (from opener); checks consumer_b (from
     // creator).
@@ -233,6 +241,8 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
     client_params.peer_armed = consumer_b_armed;
     client_params.release_context = pair_context;
     client_params.release_context_fn = iree_net_shm_pair_context_release;
+    client_params.regions = pair_regions;
+    client_params.region_count = IREE_ARRAYSIZE(pair_regions);
     status = iree_net_shm_carrier_create(&client_params, callback,
                                          host_allocator, out_client);
 
@@ -255,6 +265,8 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create_pair(
       server_params.peer_armed = consumer_a_armed;
       server_params.release_context = pair_context;
       server_params.release_context_fn = iree_net_shm_pair_context_release;
+      server_params.regions = pair_regions;
+      server_params.region_count = IREE_ARRAYSIZE(pair_regions);
       status = iree_net_shm_carrier_create(&server_params, callback,
                                            host_allocator, out_server);
 

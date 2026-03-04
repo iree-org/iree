@@ -102,6 +102,20 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
+    name = "carrier_test",
+    srcs = ["carrier_test.cc"],
+    deps = [
+        ":shared_wake",
+        ":shm",
+        ":shm_pair",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "handshake_test",
     srcs = ["handshake_test.cc"],
     deps = [

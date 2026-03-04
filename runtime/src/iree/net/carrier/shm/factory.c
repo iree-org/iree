@@ -512,14 +512,13 @@ static const iree_net_listener_vtable_t iree_net_shm_listener_vtable = {
     .query_bound_address = iree_net_shm_listener_query_bound_address,
 };
 
-// Forward declaration (defined in the Factory section below).
-static iree_status_t iree_net_shm_factory_get_or_create_shared_wake(
-    iree_net_shm_factory_t* factory, iree_async_proactor_t* proactor,
-    iree_net_shm_shared_wake_t** out_shared_wake);
-
 //===----------------------------------------------------------------------===//
 // Cross-process listener (Unix domain socket)
 //===----------------------------------------------------------------------===//
+
+static iree_status_t iree_net_shm_factory_get_or_create_shared_wake(
+    iree_net_shm_factory_t* factory, iree_async_proactor_t* proactor,
+    iree_net_shm_shared_wake_t** out_shared_wake);
 
 // State machine for the Unix socket accept loop.
 typedef enum iree_net_shm_unix_listener_state_e {
@@ -553,6 +552,93 @@ typedef struct iree_net_shm_unix_listener_t {
 
 static const iree_net_listener_vtable_t iree_net_shm_unix_listener_vtable;
 
+static void iree_net_shm_unix_listener_accept_complete(
+    void* user_data, iree_async_operation_t* operation, iree_status_t status,
+    iree_async_completion_flags_t flags);
+
+// Handles a successfully accepted socket: duplicates the primitive, runs the
+// server-side handshake, creates a carrier, wraps in a connection, and delivers
+// to the consumer. On failure at any step, reports the error to the consumer.
+static void iree_net_shm_unix_listener_handle_accepted(
+    iree_net_shm_unix_listener_t* listener, iree_async_socket_t* accepted) {
+  // Dup the socket's primitive for the handshake (the handshake closes its
+  // primitive on return; releasing the socket object separately closes the
+  // original fd — so both owners are handled cleanly).
+  iree_async_primitive_t handshake_primitive;
+  iree_status_t status =
+      iree_async_primitive_dup(accepted->primitive, &handshake_primitive);
+  iree_async_socket_release(accepted);
+
+  // Get or create shared_wake for this proactor.
+  iree_net_shm_shared_wake_t* shared_wake = NULL;
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&listener->factory->mutex);
+    status = iree_net_shm_factory_get_or_create_shared_wake(
+        listener->factory, listener->proactor, &shared_wake);
+    iree_slim_mutex_unlock(&listener->factory->mutex);
+    if (!iree_status_is_ok(status)) {
+      iree_async_primitive_close(&handshake_primitive);
+    }
+  }
+
+  // Run the server handshake. Closes the socket primitive on return (both
+  // success and error paths).
+  iree_net_shm_handshake_result_t handshake_result;
+  memset(&handshake_result, 0, sizeof(handshake_result));
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_handshake_server(
+        handshake_primitive, shared_wake, listener->factory->options,
+        listener->proactor, listener->host_allocator, &handshake_result);
+  }
+
+  // Create carrier from handshake result.
+  iree_net_carrier_callback_t no_callback = {0};
+  iree_net_carrier_t* carrier = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_carrier_create(&handshake_result.carrier_params,
+                                         no_callback, listener->host_allocator,
+                                         &carrier);
+    if (!iree_status_is_ok(status)) {
+      iree_net_shm_xproc_context_release(handshake_result.context);
+    }
+  }
+
+  // Wrap in connection and deliver to the consumer.
+  iree_net_connection_t* connection = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_connection_create(
+        listener->proactor, carrier, listener->recv_pool,
+        listener->host_allocator, &connection);
+    if (!iree_status_is_ok(status)) {
+      iree_net_carrier_release(carrier);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    listener->accept.fn(listener->accept.user_data, iree_ok_status(),
+                        connection);
+  } else {
+    listener->accept.fn(listener->accept.user_data, status, NULL);
+  }
+}
+
+// Re-arms the accept operation for single-shot proactors. Multishot proactors
+// deliver IREE_ASYNC_COMPLETION_FLAG_MORE and do not need re-arming.
+static void iree_net_shm_unix_listener_rearm(
+    iree_net_shm_unix_listener_t* listener) {
+  memset(&listener->accept_operation, 0, sizeof(listener->accept_operation));
+  iree_async_operation_initialize(
+      &listener->accept_operation.base, IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT,
+      IREE_ASYNC_OPERATION_FLAG_NONE,
+      iree_net_shm_unix_listener_accept_complete, listener);
+  listener->accept_operation.listen_socket = listener->listen_socket;
+  iree_status_t submit_status = iree_async_proactor_submit_one(
+      listener->proactor, &listener->accept_operation.base);
+  if (!iree_status_is_ok(submit_status)) {
+    listener->accept.fn(listener->accept.user_data, submit_status, NULL);
+  }
+}
+
 // Accept completion callback for the Unix domain socket listener.
 // Runs the server-side handshake on the accepted connection, creates a carrier
 // from the result, wraps it in a connection, and delivers to the consumer.
@@ -584,97 +670,21 @@ static void iree_net_shm_unix_listener_accept_complete(
     return;
   }
 
-  // Accept error: report to consumer and re-arm.
-  if (!iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status)) {
+    iree_net_shm_unix_listener_handle_accepted(listener,
+                                               accept_op->accepted_socket);
+    accept_op->accepted_socket = NULL;
+  } else {
     if (accept_op->accepted_socket) {
       iree_async_socket_release(accept_op->accepted_socket);
       accept_op->accepted_socket = NULL;
     }
     listener->accept.fn(listener->accept.user_data, status, NULL);
-    goto rearm;
   }
 
-  // Got an accepted connection. Dup the socket's primitive for the handshake
-  // (the handshake closes its primitive on return; releasing the socket object
-  // separately closes the original fd — so both owners are handled cleanly).
-  {
-    iree_async_primitive_t handshake_primitive;
-    iree_status_t handshake_status = iree_async_primitive_dup(
-        accept_op->accepted_socket->primitive, &handshake_primitive);
-    iree_async_socket_release(accept_op->accepted_socket);
-    accept_op->accepted_socket = NULL;
-    if (!iree_status_is_ok(handshake_status)) {
-      listener->accept.fn(listener->accept.user_data, handshake_status, NULL);
-      goto rearm;
-    }
-
-    // Get or create shared_wake for this proactor.
-    iree_net_shm_shared_wake_t* shared_wake = NULL;
-    iree_slim_mutex_lock(&listener->factory->mutex);
-    handshake_status = iree_net_shm_factory_get_or_create_shared_wake(
-        listener->factory, listener->proactor, &shared_wake);
-    iree_slim_mutex_unlock(&listener->factory->mutex);
-    if (!iree_status_is_ok(handshake_status)) {
-      iree_async_primitive_close(&handshake_primitive);
-      listener->accept.fn(listener->accept.user_data, handshake_status, NULL);
-      goto rearm;
-    }
-
-    // Run the server handshake. The handshake closes the socket primitive on
-    // return (both success and error paths).
-    iree_net_shm_handshake_result_t handshake_result;
-    memset(&handshake_result, 0, sizeof(handshake_result));
-    handshake_status = iree_net_shm_handshake_server(
-        handshake_primitive, shared_wake, listener->factory->options,
-        listener->proactor, listener->host_allocator, &handshake_result);
-    if (!iree_status_is_ok(handshake_status)) {
-      listener->accept.fn(listener->accept.user_data, handshake_status, NULL);
-      goto rearm;
-    }
-
-    // Create carrier from handshake result.
-    iree_net_carrier_callback_t no_callback = {0};
-    iree_net_carrier_t* carrier = NULL;
-    handshake_status = iree_net_shm_carrier_create(
-        &handshake_result.carrier_params, no_callback, listener->host_allocator,
-        &carrier);
-    if (!iree_status_is_ok(handshake_status)) {
-      iree_net_shm_xproc_context_release(handshake_result.context);
-      listener->accept.fn(listener->accept.user_data, handshake_status, NULL);
-      goto rearm;
-    }
-
-    // Wrap in connection and deliver to the consumer.
-    iree_net_connection_t* connection = NULL;
-    handshake_status = iree_net_shm_connection_create(
-        listener->proactor, carrier, listener->recv_pool,
-        listener->host_allocator, &connection);
-    if (iree_status_is_ok(handshake_status)) {
-      listener->accept.fn(listener->accept.user_data, iree_ok_status(),
-                          connection);
-    } else {
-      iree_net_carrier_release(carrier);
-      listener->accept.fn(listener->accept.user_data, handshake_status, NULL);
-    }
-  }
-
-rearm:
-  // Re-arm for single-shot accept. For multishot, the proactor keeps the
-  // operation active and delivers IREE_ASYNC_COMPLETION_FLAG_MORE on each
-  // completion.
   if (!(flags & IREE_ASYNC_COMPLETION_FLAG_MORE) &&
       listener->state == IREE_NET_SHM_UNIX_LISTENER_STATE_LISTENING) {
-    memset(&listener->accept_operation, 0, sizeof(listener->accept_operation));
-    iree_async_operation_initialize(
-        &listener->accept_operation.base,
-        IREE_ASYNC_OPERATION_TYPE_SOCKET_ACCEPT, IREE_ASYNC_OPERATION_FLAG_NONE,
-        iree_net_shm_unix_listener_accept_complete, listener);
-    listener->accept_operation.listen_socket = listener->listen_socket;
-    iree_status_t submit_status = iree_async_proactor_submit_one(
-        listener->proactor, &listener->accept_operation.base);
-    if (!iree_status_is_ok(submit_status)) {
-      listener->accept.fn(listener->accept.user_data, submit_status, NULL);
-    }
+    iree_net_shm_unix_listener_rearm(listener);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -762,10 +772,15 @@ static iree_status_t iree_net_shm_factory_create_listener_unix(
   }
 
   // Allocate listener with space for the address string (null-terminated).
-  iree_host_size_t total_size =
-      sizeof(iree_net_shm_unix_listener_t) + bind_address.size + 1;
+  iree_host_size_t total_size = 0;
+  status = IREE_STRUCT_LAYOUT(
+      iree_sizeof_struct(iree_net_shm_unix_listener_t), &total_size,
+      IREE_STRUCT_FIELD_FAM(bind_address.size + 1, char));
   iree_net_shm_unix_listener_t* listener = NULL;
-  status = iree_allocator_malloc(host_allocator, total_size, (void**)&listener);
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_allocator_malloc(host_allocator, total_size, (void**)&listener);
+  }
   if (!iree_status_is_ok(status)) {
     iree_async_socket_release(listen_socket);
     IREE_TRACE_ZONE_END(z0);
@@ -798,16 +813,15 @@ static iree_status_t iree_net_shm_factory_create_listener_unix(
   listener->accept_operation.listen_socket = listen_socket;
   status = iree_async_proactor_submit_one(proactor,
                                           &listener->accept_operation.base);
-  if (!iree_status_is_ok(status)) {
+
+  if (iree_status_is_ok(status)) {
+    *out_listener = &listener->base;
+  } else {
     iree_async_socket_release(listen_socket);
     iree_allocator_free(host_allocator, listener);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
   }
-
-  *out_listener = &listener->base;
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -829,6 +843,72 @@ typedef struct iree_net_shm_unix_connect_state_t {
   iree_allocator_t host_allocator;
 } iree_net_shm_unix_connect_state_t;
 
+// Handles the connected socket: duplicates the primitive, runs the client-side
+// handshake, creates a carrier, wraps in a connection, and delivers to the
+// consumer. On failure at any step, reports the error to the consumer.
+static void iree_net_shm_unix_connect_handle_connected(
+    iree_net_shm_unix_connect_state_t* state) {
+  // Dup the connected socket's primitive for the handshake (the handshake
+  // closes its primitive on return; releasing the socket object separately
+  // closes the original fd).
+  iree_async_primitive_t handshake_primitive;
+  iree_status_t status =
+      iree_async_primitive_dup(state->socket->primitive, &handshake_primitive);
+  iree_async_socket_release(state->socket);
+  state->socket = NULL;
+
+  // Get or create shared_wake for this proactor.
+  iree_net_shm_shared_wake_t* shared_wake = NULL;
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&state->factory->mutex);
+    status = iree_net_shm_factory_get_or_create_shared_wake(
+        state->factory, state->proactor, &shared_wake);
+    iree_slim_mutex_unlock(&state->factory->mutex);
+    if (!iree_status_is_ok(status)) {
+      iree_async_primitive_close(&handshake_primitive);
+    }
+  }
+
+  // Run the client handshake. Synchronous but completes in microseconds over
+  // a local Unix domain socket. Closes the socket primitive on return.
+  iree_net_shm_handshake_result_t handshake_result;
+  memset(&handshake_result, 0, sizeof(handshake_result));
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_handshake_client(
+        handshake_primitive, shared_wake, state->proactor,
+        state->host_allocator, &handshake_result);
+  }
+
+  // Create carrier from handshake result.
+  iree_net_carrier_callback_t no_callback = {0};
+  iree_net_carrier_t* carrier = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_carrier_create(&handshake_result.carrier_params,
+                                         no_callback, state->host_allocator,
+                                         &carrier);
+    if (!iree_status_is_ok(status)) {
+      iree_net_shm_xproc_context_release(handshake_result.context);
+    }
+  }
+
+  // Wrap in connection and deliver.
+  iree_net_connection_t* connection = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_net_shm_connection_create(state->proactor, carrier,
+                                            state->recv_pool,
+                                            state->host_allocator, &connection);
+    if (!iree_status_is_ok(status)) {
+      iree_net_carrier_release(carrier);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    state->callback.fn(state->callback.user_data, iree_ok_status(), connection);
+  } else {
+    state->callback.fn(state->callback.user_data, status, NULL);
+  }
+}
+
 // Connect completion callback for cross-process SHM connect. On successful
 // TCP-level connect, runs the client-side handshake, creates a carrier, wraps
 // in a connection, and delivers to the consumer via the callback.
@@ -839,80 +919,10 @@ static void iree_net_shm_unix_connect_complete(
       (iree_net_shm_unix_connect_state_t*)user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (!iree_status_is_ok(status)) {
-    iree_async_socket_release(state->socket);
-    state->callback.fn(state->callback.user_data, status, NULL);
-    iree_allocator_free(state->host_allocator, state);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Dup the connected socket's primitive for the handshake (same ownership
-  // pattern as the accept path — dup for handshake, release socket separately).
-  iree_async_primitive_t handshake_primitive;
-  status =
-      iree_async_primitive_dup(state->socket->primitive, &handshake_primitive);
-  iree_async_socket_release(state->socket);
-  state->socket = NULL;
-  if (!iree_status_is_ok(status)) {
-    state->callback.fn(state->callback.user_data, status, NULL);
-    iree_allocator_free(state->host_allocator, state);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Get or create shared_wake for this proactor.
-  iree_net_shm_shared_wake_t* shared_wake = NULL;
-  iree_slim_mutex_lock(&state->factory->mutex);
-  status = iree_net_shm_factory_get_or_create_shared_wake(
-      state->factory, state->proactor, &shared_wake);
-  iree_slim_mutex_unlock(&state->factory->mutex);
-  if (!iree_status_is_ok(status)) {
-    iree_async_primitive_close(&handshake_primitive);
-    state->callback.fn(state->callback.user_data, status, NULL);
-    iree_allocator_free(state->host_allocator, state);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Run the client handshake. Synchronous but completes in microseconds over
-  // a local Unix domain socket. The handshake closes the socket primitive on
-  // return.
-  iree_net_shm_handshake_result_t handshake_result;
-  memset(&handshake_result, 0, sizeof(handshake_result));
-  status = iree_net_shm_handshake_client(handshake_primitive, shared_wake,
-                                         state->proactor, state->host_allocator,
-                                         &handshake_result);
-  if (!iree_status_is_ok(status)) {
-    state->callback.fn(state->callback.user_data, status, NULL);
-    iree_allocator_free(state->host_allocator, state);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Create carrier from handshake result.
-  iree_net_carrier_callback_t no_callback = {0};
-  iree_net_carrier_t* carrier = NULL;
-  status =
-      iree_net_shm_carrier_create(&handshake_result.carrier_params, no_callback,
-                                  state->host_allocator, &carrier);
-  if (!iree_status_is_ok(status)) {
-    iree_net_shm_xproc_context_release(handshake_result.context);
-    state->callback.fn(state->callback.user_data, status, NULL);
-    iree_allocator_free(state->host_allocator, state);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-  // Wrap in connection and deliver.
-  iree_net_connection_t* connection = NULL;
-  status =
-      iree_net_shm_connection_create(state->proactor, carrier, state->recv_pool,
-                                     state->host_allocator, &connection);
   if (iree_status_is_ok(status)) {
-    state->callback.fn(state->callback.user_data, iree_ok_status(), connection);
+    iree_net_shm_unix_connect_handle_connected(state);
   } else {
-    iree_net_carrier_release(carrier);
+    iree_async_socket_release(state->socket);
     state->callback.fn(state->callback.user_data, status, NULL);
   }
 
@@ -1199,12 +1209,8 @@ static iree_status_t iree_net_shm_factory_connect(
   status = iree_async_proactor_submit_one(proactor, &deferred->nop.base);
   if (!iree_status_is_ok(status)) {
     iree_status_ignore(deferred->error_status);
-    if (deferred->client_connection) {
-      iree_net_connection_release(deferred->client_connection);
-    }
-    if (deferred->server_connection) {
-      iree_net_connection_release(deferred->server_connection);
-    }
+    iree_net_connection_release(deferred->client_connection);
+    iree_net_connection_release(deferred->server_connection);
     iree_allocator_free(factory->host_allocator, deferred);
   }
 

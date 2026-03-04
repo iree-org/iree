@@ -29,11 +29,13 @@ typedef struct iree_net_shm_carrier_t {
   iree_atomic_int32_t shutdown_initiated;
   bool peer_shutdown_received;
 
-  // Opaque ownership context. Released during destroy.
-  // Typically a pair_context for create_pair or a per-carrier resource bundle
-  // for factory-created carriers.
-  void* release_context;
-  void (*release_context_fn)(void* context);
+  // Opaque ownership context released during destroy. Typically a pair_context
+  // for create_pair or a per-carrier resource bundle for factory-created
+  // carriers.
+  struct {
+    void (*fn)(void* context);
+    void* context;
+  } release;
 
   iree_spsc_queue_t tx_queue;
   iree_spsc_queue_t rx_queue;
@@ -109,6 +111,11 @@ typedef struct iree_net_shm_carrier_t {
     // before transitioning from sleep mode to poll mode.
     int32_t mode_threshold;
   } polling;
+
+  // Known SHM regions for buffer registration and direct read/write.
+  // Stored as a FAM at the end of the struct.
+  iree_host_size_t region_count;
+  iree_net_shm_region_info_t regions[];
 } iree_net_shm_carrier_t;
 
 static inline iree_net_shm_carrier_t* iree_net_shm_carrier_cast(
@@ -168,7 +175,6 @@ static void iree_net_shm_carrier_maybe_complete_deactivation(
 // Drain callback (unified RX data + TX completions)
 //===----------------------------------------------------------------------===//
 
-// Forward-declared: progress callback for poll mode.
 static iree_host_size_t iree_net_shm_carrier_progress(void* user_data);
 
 // Default RX drain budget for the notification-based drain callback.
@@ -189,6 +195,61 @@ typedef struct iree_net_shm_drain_rx_result_t {
   int32_t drained_count;
 } iree_net_shm_drain_rx_result_t;
 
+// Dispatches a single received ring entry to the recv handler. Returns true on
+// success (entry was valid and delivered), false if the entry is malformed or
+// out-of-bounds (caller should stop draining).
+static bool iree_net_shm_carrier_dispatch_rx_entry(
+    iree_net_shm_carrier_t* carrier, const void* payload,
+    iree_host_size_t entry_length) {
+  const uint8_t* data = (const uint8_t*)payload;
+  uint8_t entry_type = data[0];
+  const uint8_t* entry_data = data + 1;
+  iree_host_size_t data_length = entry_length - 1;
+
+  if (entry_type == IREE_NET_SHM_ENTRY_TYPE_INLINE) {
+    if (carrier->base.recv_handler.fn) {
+      iree_async_span_t span =
+          iree_async_span_from_ptr((void*)entry_data, data_length);
+      iree_status_t recv_status = carrier->base.recv_handler.fn(
+          carrier->base.recv_handler.user_data, span, NULL);
+      iree_status_ignore(recv_status);
+    }
+    iree_atomic_fetch_add(&carrier->base.bytes_received, (int64_t)data_length,
+                          iree_memory_order_relaxed);
+    return true;
+  }
+
+  if (entry_type == IREE_NET_SHM_ENTRY_TYPE_REFERENCE) {
+    if (data_length != sizeof(iree_net_shm_reference_descriptor_t)) {
+      return false;
+    }
+    const iree_net_shm_reference_descriptor_t* descriptor =
+        (const iree_net_shm_reference_descriptor_t*)entry_data;
+    if (descriptor->region_id >= carrier->region_count ||
+        descriptor->offset + descriptor->length >
+            carrier->regions[descriptor->region_id].size) {
+      return false;
+    }
+    uint8_t* resolved =
+        (uint8_t*)carrier->regions[descriptor->region_id].base_ptr +
+        descriptor->offset;
+    if (carrier->base.recv_handler.fn) {
+      iree_async_span_t span = iree_async_span_from_ptr(
+          resolved, (iree_host_size_t)descriptor->length);
+      iree_status_t recv_status = carrier->base.recv_handler.fn(
+          carrier->base.recv_handler.user_data, span, NULL);
+      iree_status_ignore(recv_status);
+    }
+    iree_atomic_fetch_add(&carrier->base.bytes_received,
+                          (int64_t)descriptor->length,
+                          iree_memory_order_relaxed);
+    return true;
+  }
+
+  // Unknown entry type — cannot safely interpret subsequent entries.
+  return false;
+}
+
 // Drains received entries from the RX ring up to |budget| entries.
 // Returns both the drain status and the count of entries processed.
 static iree_net_shm_drain_rx_result_t iree_net_shm_carrier_drain_rx(
@@ -207,25 +268,9 @@ static iree_net_shm_drain_rx_result_t iree_net_shm_carrier_drain_rx(
       return result;
     }
 
-    const uint8_t* data = (const uint8_t*)payload;
-    uint8_t entry_type = data[0];
-    const uint8_t* entry_data = data + 1;
-    iree_host_size_t data_length = entry_length - 1;
-
-    if (entry_type == IREE_NET_SHM_ENTRY_TYPE_INLINE) {
-      if (carrier->base.recv_handler.fn) {
-        iree_async_span_t span =
-            iree_async_span_from_ptr((void*)entry_data, data_length);
-        iree_status_t recv_status = carrier->base.recv_handler.fn(
-            carrier->base.recv_handler.user_data, span, NULL);
-        iree_status_ignore(recv_status);
-      }
-      iree_atomic_fetch_add(&carrier->base.bytes_received, (int64_t)data_length,
-                            iree_memory_order_relaxed);
-    } else {
-      // Unknown/unimplemented entry type. Consume the entry (its SPSC length
-      // is known) and stop draining — we cannot safely interpret subsequent
-      // entries either.
+    if (!iree_net_shm_carrier_dispatch_rx_entry(carrier, payload,
+                                                entry_length)) {
+      // Malformed or unrecognized entry — consume it and stop.
       iree_spsc_queue_consume(&carrier->rx_queue);
       iree_net_shm_signal_peer(carrier);
       result.status = IREE_NET_SHM_DRAIN_RX_PEER_DONE;
@@ -617,8 +662,8 @@ static void iree_net_shm_carrier_destroy(iree_net_carrier_t* base_carrier) {
 
   iree_async_notification_release(carrier->peer_wake_notification);
   iree_slim_mutex_deinitialize(&carrier->tx_lock);
-  if (carrier->release_context_fn) {
-    carrier->release_context_fn(carrier->release_context);
+  if (carrier->release.fn) {
+    carrier->release.fn(carrier->release.context);
   }
   iree_net_shm_shared_wake_release(carrier->shared_wake);
 
@@ -949,6 +994,205 @@ static iree_status_t iree_net_shm_carrier_shutdown(
 }
 
 //===----------------------------------------------------------------------===//
+// Buffer registration and direct access
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_net_shm_carrier_query_region(
+    iree_net_carrier_t* base_carrier, uint32_t region_id,
+    iree_net_shm_region_info_t* out_region_info) {
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+  if (region_id >= carrier->region_count) {
+    memset(out_region_info, 0, sizeof(*out_region_info));
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "region_id %" PRIu32 " >= region_count %" PRIhsz,
+                            region_id, carrier->region_count);
+  }
+  *out_region_info = carrier->regions[region_id];
+  return iree_ok_status();
+}
+
+static iree_status_t iree_net_shm_carrier_register_buffer(
+    iree_net_carrier_t* base_carrier, iree_async_region_t* region,
+    iree_net_remote_handle_t* out_handle) {
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+  *out_handle = iree_net_remote_handle_null();
+
+  uint8_t* region_base = (uint8_t*)region->base_ptr;
+  iree_host_size_t region_length = region->length;
+
+  for (iree_host_size_t i = 0; i < carrier->region_count; ++i) {
+    uint8_t* shm_base = (uint8_t*)carrier->regions[i].base_ptr;
+    iree_host_size_t shm_size = carrier->regions[i].size;
+    if (region_base >= shm_base &&
+        region_base + region_length <= shm_base + shm_size) {
+      iree_host_size_t offset = (iree_host_size_t)(region_base - shm_base);
+      iree_net_remote_handle_t handle = {{(uint64_t)i, (uint64_t)offset}};
+      *out_handle = handle;
+      return iree_ok_status();
+    }
+  }
+
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "buffer [%p, +%" PRIhsz
+                          ") does not fall within any registered SHM "
+                          "region",
+                          region_base, region_length);
+}
+
+static void iree_net_shm_carrier_unregister_buffer(
+    iree_net_carrier_t* base_carrier, iree_net_remote_handle_t handle) {
+  // SHM regions have no kernel resources to release. Validate the handle to
+  // catch misuse (e.g., double-unregister or handles from a different carrier).
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+  IREE_ASSERT((uint64_t)handle.opaque[0] < carrier->region_count,
+              "unregister_buffer: region_id %" PRIu64 " out of range",
+              handle.opaque[0]);
+  (void)carrier;
+}
+
+// Resolves a remote handle to a local SHM pointer and bounds-checks the
+// requested length. Returns NULL and sets |out_status| on failure.
+static uint8_t* iree_net_shm_resolve_handle(iree_net_shm_carrier_t* carrier,
+                                            iree_net_remote_handle_t handle,
+                                            iree_host_size_t length,
+                                            iree_status_t* out_status) {
+  uint64_t region_id = handle.opaque[0];
+  uint64_t offset = handle.opaque[1];
+  if (IREE_UNLIKELY(region_id >= carrier->region_count)) {
+    *out_status =
+        iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                         "region_id %" PRIu64 " >= region_count %" PRIhsz,
+                         region_id, carrier->region_count);
+    return NULL;
+  }
+  iree_net_shm_region_info_t* region = &carrier->regions[region_id];
+  if (IREE_UNLIKELY(offset + length > region->size)) {
+    *out_status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                   "offset %" PRIu64 " + length %" PRIhsz
+                                   " exceeds region size %" PRIhsz,
+                                   offset, length, region->size);
+    return NULL;
+  }
+  *out_status = iree_ok_status();
+  return (uint8_t*)region->base_ptr + offset;
+}
+
+static iree_status_t iree_net_shm_carrier_direct_write(
+    iree_net_carrier_t* base_carrier,
+    const iree_net_direct_write_params_t* params) {
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+
+  // Resolve and bounds-check the remote handle.
+  iree_status_t status;
+  uint8_t* destination = iree_net_shm_resolve_handle(
+      carrier, params->remote, params->local.length, &status);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) return status;
+
+  // Copy local data to SHM destination.
+  memcpy(destination, iree_async_span_ptr(params->local), params->local.length);
+
+  if (!(params->flags & IREE_NET_DIRECT_WRITE_FLAG_SIGNAL_RECEIVER)) {
+    // Non-signaling write: no ring entry, no completion callback. The write
+    // is synchronous — data is in SHM when we return.
+    return iree_ok_status();
+  }
+
+  // Signaling write: write a REFERENCE entry to the TX ring so the peer's
+  // drain callback discovers the data. Completion fires when the peer
+  // consumes the REFERENCE entry (same consumption-based model as send).
+  iree_host_size_t ring_entry_size =
+      1 + sizeof(iree_net_shm_reference_descriptor_t);
+
+  iree_atomic_fetch_add(&base_carrier->pending_operations, 1,
+                        iree_memory_order_acq_rel);
+
+  iree_net_carrier_state_t state = iree_net_carrier_state(base_carrier);
+  if (state != IREE_NET_CARRIER_STATE_ACTIVE) {
+    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                          iree_memory_order_release);
+    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "carrier must be in ACTIVE state for "
+                            "signaling direct_write");
+  }
+
+  iree_slim_mutex_lock(&carrier->tx_lock);
+
+  uint32_t completion_head =
+      iree_atomic_load(&carrier->completions.head, iree_memory_order_relaxed);
+  uint32_t completion_tail =
+      iree_atomic_load(&carrier->completions.tail, iree_memory_order_acquire);
+  if ((completion_head - completion_tail) >=
+      IREE_NET_SHM_CARRIER_MAX_COMPLETIONS) {
+    iree_slim_mutex_unlock(&carrier->tx_lock);
+    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                          iree_memory_order_release);
+    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "send completion ring full");
+  }
+
+  uint8_t* payload = (uint8_t*)iree_spsc_queue_begin_write(&carrier->tx_queue,
+                                                           ring_entry_size);
+  if (!payload) {
+    iree_slim_mutex_unlock(&carrier->tx_lock);
+    iree_atomic_fetch_sub(&base_carrier->pending_operations, 1,
+                          iree_memory_order_release);
+    iree_net_shm_carrier_maybe_complete_deactivation(carrier);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "TX ring buffer full");
+  }
+
+  payload[0] = IREE_NET_SHM_ENTRY_TYPE_REFERENCE;
+  iree_net_shm_reference_descriptor_t* descriptor =
+      (iree_net_shm_reference_descriptor_t*)(payload + 1);
+  descriptor->region_id = (uint32_t)params->remote.opaque[0];
+  descriptor->reserved = params->immediate;
+  descriptor->offset = params->remote.opaque[1];
+  descriptor->length = params->local.length;
+
+  iree_spsc_queue_commit_write(&carrier->tx_queue, ring_entry_size);
+
+  int64_t commit_position = iree_atomic_load(
+      &carrier->tx_queue.write_position->value, iree_memory_order_relaxed);
+  uint32_t completion_index =
+      completion_head % IREE_NET_SHM_CARRIER_MAX_COMPLETIONS;
+  carrier->completions.entries[completion_index].commit_position =
+      commit_position;
+  carrier->completions.entries[completion_index].bytes_transferred =
+      params->local.length;
+  carrier->completions.entries[completion_index].user_data = params->user_data;
+  iree_atomic_store(&carrier->completions.head, completion_head + 1,
+                    iree_memory_order_release);
+
+  iree_slim_mutex_unlock(&carrier->tx_lock);
+
+  iree_net_shm_signal_peer(carrier);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_net_shm_carrier_direct_read(
+    iree_net_carrier_t* base_carrier,
+    const iree_net_direct_read_params_t* params) {
+  iree_net_shm_carrier_t* carrier = iree_net_shm_carrier_cast(base_carrier);
+
+  // Resolve and bounds-check the remote handle.
+  iree_status_t status;
+  uint8_t* source = iree_net_shm_resolve_handle(carrier, params->remote,
+                                                params->local.length, &status);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) return status;
+
+  // Copy SHM source to local destination. Direct reads are synchronous —
+  // no ring entry, no peer notification, no completion callback.
+  memcpy(iree_async_span_ptr(params->local), source, params->local.length);
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// REFERENCE entry recv handling
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
 // Vtable
 //===----------------------------------------------------------------------===//
 
@@ -960,10 +1204,10 @@ static const iree_net_carrier_vtable_t iree_net_shm_carrier_vtable = {
     .query_send_budget = iree_net_shm_carrier_query_send_budget,
     .send = iree_net_shm_carrier_send,
     .shutdown = iree_net_shm_carrier_shutdown,
-    .direct_write = NULL,
-    .direct_read = NULL,
-    .register_buffer = NULL,
-    .unregister_buffer = NULL,
+    .direct_write = iree_net_shm_carrier_direct_write,
+    .direct_read = iree_net_shm_carrier_direct_read,
+    .register_buffer = iree_net_shm_carrier_register_buffer,
+    .unregister_buffer = iree_net_shm_carrier_unregister_buffer,
 };
 
 //===----------------------------------------------------------------------===//
@@ -983,22 +1227,36 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_carrier = NULL;
 
+  // Compute allocation size with overflow-checked FAM layout.
+  iree_host_size_t total_size = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, IREE_STRUCT_LAYOUT(
+              iree_sizeof_struct(iree_net_shm_carrier_t), &total_size,
+              IREE_STRUCT_FIELD_FAM(params->region_count,
+                                    iree_net_shm_region_info_t)));
+
   iree_net_shm_carrier_t* carrier = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*carrier),
-                                (void**)&carrier));
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&carrier));
 
-  memset(carrier, 0, sizeof(*carrier));
-  iree_net_carrier_initialize(&iree_net_shm_carrier_vtable,
-                              IREE_NET_CARRIER_CAPABILITY_RELIABLE |
-                                  IREE_NET_CARRIER_CAPABILITY_ORDERED |
-                                  IREE_NET_CARRIER_CAPABILITY_ZERO_COPY_TX,
-                              0, SIZE_MAX, callback, host_allocator,
+  memset(carrier, 0, total_size);
+
+  iree_net_carrier_capabilities_t capabilities =
+      IREE_NET_CARRIER_CAPABILITY_RELIABLE |
+      IREE_NET_CARRIER_CAPABILITY_ORDERED |
+      IREE_NET_CARRIER_CAPABILITY_ZERO_COPY_TX;
+  if (params->region_count > 0) {
+    capabilities |= IREE_NET_CARRIER_CAPABILITY_REGISTERED_REGIONS |
+                    IREE_NET_CARRIER_CAPABILITY_DIRECT_WRITE |
+                    IREE_NET_CARRIER_CAPABILITY_DIRECT_READ;
+  }
+  iree_net_carrier_initialize(&iree_net_shm_carrier_vtable, capabilities, 0,
+                              SIZE_MAX, callback, host_allocator,
                               &carrier->base);
 
   carrier->is_client = params->is_client;
-  carrier->release_context = params->release_context;
-  carrier->release_context_fn = params->release_context_fn;
+  carrier->release.fn = params->release_context_fn;
+  carrier->release.context = params->release_context;
   carrier->tx_queue = params->tx_queue;
   carrier->rx_queue = params->rx_queue;
   carrier->shared_wake = params->shared_wake;
@@ -1021,6 +1279,12 @@ IREE_API_EXPORT iree_status_t iree_net_shm_carrier_create(
   carrier->polling.previous_was_full = false;
   carrier->polling.mode_threshold =
       params->poll_mode_threshold > 0 ? params->poll_mode_threshold : 1;
+
+  // Copy region table from params.
+  carrier->region_count = params->region_count;
+  for (iree_host_size_t i = 0; i < params->region_count; ++i) {
+    carrier->regions[i] = params->regions[i];
+  }
 
   *out_carrier = &carrier->base;
   IREE_TRACE_ZONE_END(z0);

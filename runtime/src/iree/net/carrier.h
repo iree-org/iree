@@ -144,6 +144,14 @@ static inline bool iree_net_remote_handle_is_null(
   return handle.opaque[0] == 0 && handle.opaque[1] == 0;
 }
 
+// Returns a new handle with a byte offset added to opaque[1].
+// Used for sub-region addressing within a registered buffer.
+static inline iree_net_remote_handle_t iree_net_remote_handle_offset(
+    iree_net_remote_handle_t handle, uint64_t byte_offset) {
+  handle.opaque[1] += byte_offset;
+  return handle;
+}
+
 //===----------------------------------------------------------------------===//
 // Send/recv parameters
 //===----------------------------------------------------------------------===//

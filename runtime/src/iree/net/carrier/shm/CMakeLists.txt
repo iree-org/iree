@@ -114,6 +114,21 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    carrier_test
+  SRCS
+    "carrier_test.cc"
+  DEPS
+    ::shared_wake
+    ::shm
+    ::shm_pair
+    iree::async::platform
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     handshake_test
   SRCS
     "handshake_test.cc"

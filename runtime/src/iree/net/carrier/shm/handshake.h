@@ -119,6 +119,9 @@ typedef struct iree_net_shm_handshake_result_t {
   // Cross-process context (set as carrier's release_context). Owns the SHM
   // mapping, peer notification proxy, and peer signal primitive.
   iree_net_shm_xproc_context_t* context;
+  // Region 0 info. Stored here so the create_params.regions pointer (which
+  // points to this field) remains valid until the result is consumed.
+  iree_net_shm_region_info_t region;
 } iree_net_shm_handshake_result_t;
 
 // Server side: create SHM region, send OFFER, receive ACCEPT, assemble
