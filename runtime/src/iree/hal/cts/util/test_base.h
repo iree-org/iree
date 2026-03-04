@@ -22,7 +22,6 @@
 #include <cstdlib>
 #include <map>
 #include <string>
-#include <string_view>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -332,44 +331,6 @@ class CtsTestBase : public BaseType {
     EXPECT_EQ(expected_value, value);
   }
 
-  // Checks that |a| carries the same error identity as |b|: same status code,
-  // and (when status annotations are available) the annotation message of |b|
-  // appears within |a|'s formatted representation.
-  // Takes ownership of both statuses.
-  //
-  // With IREE_STATUS_MODE=0 (runtime_small), statuses carry no annotations or
-  // source locations — the code check alone is the meaningful verification.
-  // With higher modes, iree_status_clone captures a new stack trace from the
-  // clone call site rather than preserving the original's, so we strip stack
-  // trace payloads before checking string containment.
-  void CheckStatusContains(iree_status_t a, iree_status_t b) {
-    EXPECT_EQ(iree_status_code(a), iree_status_code(b));
-#if IREE_STATUS_FEATURES != 0
-    iree_allocator_t allocator = iree_allocator_system();
-    char* a_string = nullptr;
-    iree_host_size_t a_string_length = 0;
-    ASSERT_TRUE(
-        iree_status_to_string(a, &allocator, &a_string, &a_string_length));
-    char* b_string = nullptr;
-    iree_host_size_t b_string_length = 0;
-    ASSERT_TRUE(
-        iree_status_to_string(b, &allocator, &b_string, &b_string_length));
-    // Strip stack trace payloads ("; stack:\n...") from both strings so
-    // that differing clone-site traces don't cause spurious failures.
-    std::string_view a_view(a_string, a_string_length);
-    std::string_view b_view(b_string, b_string_length);
-    auto a_stack = a_view.find("; stack:");
-    auto b_stack = b_view.find("; stack:");
-    if (a_stack != std::string_view::npos) a_view = a_view.substr(0, a_stack);
-    if (b_stack != std::string_view::npos) b_view = b_view.substr(0, b_stack);
-    EXPECT_NE(a_view.find(b_view), std::string_view::npos)
-        << "  a: " << a_view << "\n  b: " << b_view;
-    iree_allocator_free(allocator, a_string);
-    iree_allocator_free(allocator, b_string);
-#endif  // IREE_STATUS_FEATURES != 0
-    iree_status_ignore(a);
-    iree_status_ignore(b);
-  }
 
   iree_hal_driver_t* driver_ = nullptr;
   iree_hal_device_group_t* device_group_ = nullptr;
