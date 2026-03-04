@@ -62,7 +62,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
   return mmaIntrinsic;
 }
 
-/// Given two arrays bounds and tile, compute bounds /= tile.
+/// Given two arrays bounds and tile, compute bounds = ceil(bounds / tile).
 ///
 /// If "tile" contains 0, or is smaller than bounds, divide bounds by 1
 /// for those values.
@@ -70,8 +70,7 @@ static IREE::Codegen::InnerTileDescAttrInterface getIntrinsic(Operation *op) {
 /// Returns the actual divisor (without zeros or out of bounds) used to compute
 /// bounds /= divisor.
 FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
-                                           ArrayRef<int64_t> tile,
-                                           bool ceilDiv = false) {
+                                           ArrayRef<int64_t> tile) {
   assert(bounds.size() >= tile.size() &&
          "cannot divide bounds with a different rank");
 
@@ -84,7 +83,7 @@ FailureOr<SmallVector<int64_t>> divideTile(SmallVector<int64_t> &bounds,
   }
 
   for (auto [bound, div] : llvm::zip_equal(bounds, divisor)) {
-    bound = ceilDiv ? llvm::divideCeil(bound, div) : bound / div;
+    bound = llvm::divideCeil(bound, div);
   }
 
   return divisor;
@@ -574,12 +573,8 @@ static LogicalResult setGPULoweringConfigLayout(
   // Use thread tile sizes as the vector width for each thread.
   SmallVector<int64_t> threadTileSizes = config.getStaticTilingLevelSizes(
       llvm::to_underlying(IREE::GPU::TilingLevel::Thread), candidate);
-  // Use ceil division here to make sure that we cover the entire tensor with
-  // the layout. If the tensor size isn't divisible by the chosen tile sizes, we
-  // want to have the vector larger than the tensor and mask out the excess
-  // elements.
   FailureOr<SmallVector<int64_t>> elementTile =
-      divideTile(bounds, threadTileSizes, /*ceilDiv=*/true);
+      divideTile(bounds, threadTileSizes);
   if (failed(elementTile)) {
     candidate->emitError() << "Could not divide bounds over given thread tile";
   }
