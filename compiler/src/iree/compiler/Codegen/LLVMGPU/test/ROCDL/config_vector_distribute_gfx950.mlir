@@ -307,7 +307,5 @@ func.func @attention_check_mma_accs_compatible(%arg0: f32, %arg1: tensor<960x409
   return
 }
 //      CHECK: decomposition_config =
-// CHECK-SAME: attention_pv_matmul
 // CHECK-SAME:   #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>
-// CHECK-SAME: attention_qk_matmul
 // CHECK-SAME:   #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>

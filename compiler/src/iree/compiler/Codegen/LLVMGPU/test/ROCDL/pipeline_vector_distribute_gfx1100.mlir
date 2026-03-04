@@ -134,13 +134,11 @@ hal.executable private @matvec_dispatch_0 {
 // -----
 
 #decomposition_config = {
-  pv_attrs = {attention_pv_matmul,
-              lowering_config = #iree_gpu.lowering_config<{
+  pv_attrs = {lowering_config = #iree_gpu.lowering_config<{
                   mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
                   promote_operands = [1],
                   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 3, 4]]}>},
-  qk_attrs = {attention_qk_matmul,
-             lowering_config = #iree_gpu.lowering_config<{
+  qk_attrs = {lowering_config = #iree_gpu.lowering_config<{
                   mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
                   promote_operands = [0, 1],
                   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]}>}}

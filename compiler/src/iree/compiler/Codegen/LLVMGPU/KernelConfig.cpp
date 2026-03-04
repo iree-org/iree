@@ -954,25 +954,56 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
 
+  // Check if transposing both intrinsics eliminates the layout conflict
+  // between QK output and PV LHS input.
+  auto matchLayout = [](IREE::GPU::MMASingleSubgroupLayout a,
+                        IREE::GPU::MMASingleSubgroupLayout b) -> bool {
+    return (a.element == b.element) && (a.thread == b.thread) &&
+           (a.tstrides == b.tstrides);
+  };
+  IREE::GPU::MMASingleSubgroupLayout qkOutLayout =
+      IREE::GPU::getSingleSubgroupLayout(qkSchedule.mmaKind,
+                                         IREE::GPU::kMMAOperandAcc);
+  IREE::GPU::MMASingleSubgroupLayout pvRhsLayout =
+      IREE::GPU::getSingleSubgroupLayout(pvSchedule.mmaKind,
+                                         IREE::GPU::kMMAOperandRhs);
+  bool useColMajor = matchLayout(qkOutLayout, pvRhsLayout);
+
+  auto getIntrinsic =
+      [&](IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+          bool colMajor) -> IREE::Codegen::InnerTileDescAttrInterface {
+    if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(mmaKind)) {
+      return IREE::GPU::MMAAttr::get(context, mma.getIntrinsic(),
+                                     /*colMajor=*/colMajor);
+    }
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(mmaKind)) {
+      return IREE::GPU::VirtualMMAAttr::get(context, vmma.getIntrinsic(),
+                                            /*colMajor=*/colMajor);
+    }
+    // For intrinsics which do not have a known colMajor layout, just return the
+    // original layout.
+    return mmaKind;
+  };
+
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
 
   // Configuring for qk matmul.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
-  IREE::GPU::setMmaKind(context, qkConfig, qkSchedule.mmaKind);
+  IREE::GPU::setMmaKind(context, qkConfig,
+                        getIntrinsic(qkSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
 
   // Configuring for pv matmul.
   IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
-  IREE::GPU::setMmaKind(context, pvConfig, pvSchedule.mmaKind);
+  IREE::GPU::setMmaKind(context, pvConfig,
+                        getIntrinsic(pvSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getK1Dims()));
 
-  SmallVector<NamedAttribute, 2> qkAttrs = {
-      {"attention_qk_matmul", b.getUnitAttr()}};
-  SmallVector<NamedAttribute, 2> pvAttrs = {
-      {"attention_pv_matmul", b.getUnitAttr()}};
+  SmallVector<NamedAttribute, 2> qkAttrs;
+  SmallVector<NamedAttribute, 2> pvAttrs;
 
   auto qkConfigDict = b.getDictionaryAttr(qkConfig);
   auto pvConfigDict = b.getDictionaryAttr(pvConfig);
