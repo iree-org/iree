@@ -208,12 +208,13 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @subgroup_reduction_masked_tail_thread
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[BOUND:.+]] = arith.constant dense<3> : vector<1x1x1xindex>
 // CHECK: vector.transfer_write
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // The read will be masked, because we have 4 threads doing a subgroup reduce
 // on 3 elements.
-// CHECK: %[[MASK:.+]] = vector.create_mask %[[C1]], %{{.*}} : vector<1x1xi1>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %{{.*}}, %[[BOUND]] : vector<1x1x1xindex>
+// CHECK: %[[MASK:.+]] = vector.shape_cast %[[CMP]] : vector<1x1x1xi1> to vector<1x1xi1>
 // CHECK: vector.transfer_read
 // CHECK-SAME: %[[MASK]]
 // CHECK: gpu.subgroup_reduce

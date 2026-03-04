@@ -32,31 +32,25 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write
-// CHECK: %[[DIM:.+]] = memref.dim %arg0, %c0 : memref<?x128xf16>
-// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
-// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (4, 16) : index, index, index
-// CHECK: %[[LASTIDX:.+]] = arith.subi %[[DIM]], %c1 : index
-// CHECK: %[[PACKED_LASTIDX:.+]]:4 = affine.delinearize_index %[[LASTIDX]] into (2, 16, 4, 2) : index, index, index, index
-
-// CHECK: %[[ETILE_VALID:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %c1] by (16, 2) : index
-// CHECK: %[[ETILE_VALID_BOUND:.+]] = arith.addi %[[ETILE_VALID]], %c1 : index
-// CHECK: %[[DISTR_LASTIDX:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %[[PACKED_LASTIDX]]#3] by (16, 2) : index
-// CHECK: %[[DISTR_BOUND:.+]] = arith.addi %[[DISTR_LASTIDX]], %c1 : index
-// CHECK: %[[POST_THREADS_BOUND:.+]] = affine.linearize_index [%[[PACKED_LASTIDX]]#1, %c0] by (16, 2) : index
-
-// CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
-// CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[PACKED_LASTIDX]]#2 : index
-// CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
-// CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]]#1, %[[PACKED_LASTIDX]]#0 : index
-
-// CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %[[ETILE_VALID_BOUND]], %[[POST_THREADS_BOUND]] : index
-// CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %[[DISTR_BOUND]], %[[SELTREE0]] : index
-// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c32, %c0 : index
-// CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
-// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<2x8xi1>
-
-// CHECK: %[[READ:.+]] = vector.transfer_read %arg0{{.*}}, %[[MASK]] {in_bounds = [true, true]} : memref<?x128xf16>, vector<2x8xf16>
-// CHECK: vector.transfer_write %[[READ]], %arg1{{.*}}, %[[MASK]] {in_bounds = [true, true]} : vector<2x8xf16>, memref<?x128xf16>
+// CHECK-DAG: %[[DIM:.+]] = memref.dim %arg0, %c0 : memref<?x128xf16>
+// CHECK: %[[SID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
+// CHECK: %[[TID:.+]]:3 = affine.delinearize_index %thread_id_x into (4, 16)
+// CHECK: %[[STEP:.+]] = vector.step : vector<2xindex>
+// CHECK: %[[STEP_BC:.+]] = vector.broadcast %[[STEP]] : vector<2xindex> to vector<16x2xindex>
+// CHECK: %[[BASE_IDX:.+]] = arith.addi %{{.+}}, %[[STEP_BC]] : vector<16x2xindex>
+// CHECK: %[[SID_OFF:.+]] = arith.muli %[[SID]]#1, %c128 : index
+// CHECK: %[[SID_OFF_BC:.+]] = vector.broadcast %[[SID_OFF]] : index to vector<16x2xindex>
+// CHECK: %[[IDX0:.+]] = arith.addi %[[BASE_IDX]], %[[SID_OFF_BC]] : vector<16x2xindex>
+// CHECK: %[[TID_OFF:.+]] = arith.muli %[[TID]]#1, %c2 : index
+// CHECK: %[[TID_OFF_BC:.+]] = vector.broadcast %[[TID_OFF]] : index to vector<16x2xindex>
+// CHECK: %[[IDX1:.+]] = arith.addi %[[IDX0]], %[[TID_OFF_BC]] : vector<16x2xindex>
+// CHECK: %[[IDX_VEC:.+]] = vector.shape_cast %[[IDX1]] : vector<16x2xindex> to vector<8x2x2xindex>
+// CHECK: %[[BOUND_BC:.+]] = vector.broadcast %[[DIM]] : index to vector<8x2x2xindex>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[IDX_VEC]], %[[BOUND_BC]] : vector<8x2x2xindex>
+// CHECK: %[[FLAT_MASK:.+]] = vector.shape_cast %{{.+}} : vector<8x1x2x1x2x8xi1> to vector<32x8xi1>
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice %[[FLAT_MASK]] {offsets = [0, 0], sizes = [2, 8]{{.*}}} : vector<32x8xi1> to vector<2x8xi1>
+// CHECK: vector.transfer_read %arg0{{.*}}, %[[SLICE0]] {in_bounds = [true, true]} : memref<?x128xf16>, vector<2x8xf16>
+// CHECK: vector.transfer_write {{.*}}, %arg1{{.*}} {in_bounds = [true, true]} : vector<2x8xf16>, memref<?x128xf16>
 
 // -----
 
@@ -91,14 +85,13 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-
 // CHECK-LABEL: func @masked_read_write_perm
 
 // Here we check the layout enforcement was carried out
 // accounting for permutation
 
-// CHECK: %[[DISTR_MASK:.+]] = vector.create_mask %c8, {{.*}}, %c1 : vector<8x2x1xi1>
-// CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice {{.*}} {offsets = [0, 0, 0], sizes = [8, 2, 1]{{.*}}} : vector<8x8x1xi1> to vector<8x2x1xi1>
+// CHECK: vector.transfer_read %arg0{{.*}} %[[SLICE0]] {in_bounds = [true, true, true]{{.*}}} : memref<128x?x1xf16>, vector<1x2x8xf16>
 
 // -----
 
@@ -135,9 +128,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_perm_minor
-
-// CHECK: %[[DISTR_MASK:.+]] = vector.create_mask %c8, {{.*}} : vector<8x2xi1>
-// CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice {{.*}} {offsets = [0, 0], sizes = [8, 2]{{.*}}} : vector<8x8xi1> to vector<8x2xi1>
+// CHECK: vector.transfer_read %arg0{{.*}} %[[SLICE0]] {in_bounds = [true, true]{{.*}}} : memref<128x?x1xf16>, vector<2x8xf16>
 
 // -----
 
@@ -176,8 +168,12 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @masked_read_write_perm_bcast
 
-// CHECK: %[[DISTR_MASK:.+]] = vector.create_mask {{.*}} : vector<2xi1>
-// CHECK: vector.transfer_read %arg0{{.*}} %[[DISTR_MASK]]
+// CHECK: %[[STEP:.+]] = vector.step : vector<2xindex>
+// CHECK: %[[BOUND_BC:.+]] = vector.broadcast %{{.+}} : index to vector<2x2x2xindex>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %{{.+}}, %[[BOUND_BC]] : vector<2x2x2xindex>
+// CHECK: %[[FLAT_MASK:.+]] = vector.shape_cast %[[CMP]] : vector<2x2x2xi1> to vector<8xi1>
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice %[[FLAT_MASK]] {offsets = [0], sizes = [2]{{.*}}} : vector<8xi1> to vector<2xi1>
+// CHECK: vector.transfer_read %arg0{{.*}} %[[SLICE0]] {in_bounds = [true, true]{{.*}}} : memref<128x?x1xf16>, vector<2x8xf16>
 
 // -----
 
@@ -216,14 +212,15 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_reduce
+// CHECK-DAG: %[[RED_IDENTITY:.+]] = arith.constant dense<0.000000e+00> : vector<2x1x2x1x2x8xf16>
 
-// CHECK: %[[RED_IDENTITY:.+]] = arith.constant dense<0.000000e+00> : vector<2x1x2x1x2x8xf16>
+// CHECK: %[[STEP:.+]] = vector.step : vector<2xindex>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %{{.+}}, %{{.+}} : vector<2x2x2xindex>
+// CHECK: %[[MASK_BCAST:.+]] = vector.broadcast %[[CMP]] : vector<2x2x2xi1> to vector<1x1x8x2x2x2xi1>
+// CHECK: %[[MASK_PACKED:.+]] = vector.transpose %[[MASK_BCAST]], [3, 0, 4, 1, 5, 2] : vector<1x1x8x2x2x2xi1> to vector<2x1x2x1x2x8xi1>
 
-// CHECK: %[[MASK:.+]] = vector.create_mask
-// CHECK: %[[MASK_PCK:.+]] = vector.shape_cast %[[MASK]] : vector<8x8xi1> to vector<2x1x2x1x2x8xi1>
-
-// CHECK: %[[SELECT:.+]] = arith.select %[[MASK_PCK]], {{.*}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
-// CHECK: vector.multi_reduction <add>, %[[SELECT]], {{.*}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16>
+// CHECK: %[[SELECT:.+]] = arith.select %[[MASK_PACKED]], %{{.+}}, %[[RED_IDENTITY]] : vector<2x1x2x1x2x8xi1>, vector<2x1x2x1x2x8xf16>
+// CHECK: vector.multi_reduction <add>, %[[SELECT]], %{{.+}} [0, 2, 4] : vector<2x1x2x1x2x8xf16> to vector<1x1x8xf16>
 
 // -----
 
@@ -292,29 +289,47 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_contract
-
 // CHECK-DAG: %[[RED_IDENTITY_LHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2xf16>
 // CHECK-DAG: %[[RED_IDENTITY_RHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x2x2xf16>
 
-// Note this this transposed to match the second indexing map
-// CHECK-DAG: %[[MASK_LHS:.+]] = vector.create_mask %[[LHSUB:.+]] : vector<2xi1>
-// CHECK-DAG: %[[MASK_OP:.+]] = vector.create_mask %[[OPUB0:.+]], %[[LHSUB]] : vector<2x2xi1>
+//     Step+cmpi patterns produce distributed masks for LHS (reddim) and output (pardim).
+// CHECK: %[[LHS_CMP:.+]] = arith.cmpi slt, %{{.+}}, %{{.+}} : vector<1x1x2xindex>
+// CHECK: %[[OUT_CMP:.+]] = arith.cmpi slt, %{{.+}}, %{{.+}} : vector<1x1x2xindex>
 
-// Note MASK_OP_1D is equivalent to MASK_LHS.
-// Currently, it does not fold away.
-// CHECK-DAG: %[[MASK_OP_1D:.+]] = vector.extract %[[MASK_OP]][0] : vector<2xi1> from vector<2x2xi1>
-// CHECK-DAG: %[[MASK_OP_1D_PACKED:.+]] = vector.shape_cast %[[MASK_OP_1D]] : vector<2xi1> to vector<1x1x2xi1>
-// CHECK-DAG: %[[MASK_OP_PACKED:.+]] = vector.shape_cast %[[MASK_OP]] : vector<2x2xi1> to vector<1x1x1x1x2x2xi1>
-// CHECK-DAG: %[[MASK_OUT:.+]] = vector.create_mask {{.*}} : vector<2xi1>
+//     Broadcast each 1D mask to the full 2D shape.  Because neither is the
+//     trailing dim of its target, each goes through broadcast (permuted) then
+//     transpose back.  CSE deduplicates the broadcasts across the two andi's.
+// CHECK: %[[OUT_BCAST:.+]] = vector.broadcast %[[OUT_CMP]] : vector<1x1x2xi1> to vector<1x1x1x1x2x2xi1>
+// CHECK: %[[OUT_TRANS:.+]] = vector.transpose %[[OUT_BCAST]], [1, 0, 3, 2, 5, 4] : vector<1x1x1x1x2x2xi1> to vector<1x1x1x1x2x2xi1>
+// CHECK: %[[LHS_BCAST:.+]] = vector.broadcast %[[LHS_CMP]] : vector<1x1x2xi1> to vector<1x1x1x1x2x2xi1>
 
-// CHECK-DAG: %[[LHS_READ:.+]] = vector.transfer_read %arg0{{.*}} %[[MASK_LHS]] {in_bounds = [true]} : memref<?xf16>, vector<2xf16>
-// CHECK-DAG: %[[LHS:.+]] = vector.insert_strided_slice %[[LHS_READ]]
-// CHECK-DAG: %[[RHS_READ:.+]] = vector.transfer_read %arg1{{.*}} %[[MASK_OP]] {in_bounds = [true, true]} : memref<?x?xf16>, vector<2x2xf16>
-// CHECK-DAG: %[[RHS:.+]] = vector.insert_strided_slice %[[RHS_READ]]
+//     RHS read mask = pardim (transposed back) & reddim (broadcast).
+// CHECK: %[[RHS_READ_MASK:.+]] = arith.andi %[[OUT_TRANS]], %[[LHS_BCAST]] : vector<1x1x1x1x2x2xi1>
 
-// CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[MASK_OP_1D_PACKED]], %[[LHS]], %[[RED_IDENTITY_LHS]] : vector<1x1x2xi1>, vector<1x1x2xf16>
-// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_PACKED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
+//     Contraction mask = reddim (transposed back) & pardim (broadcast).
+//     Reuses the CSE'd broadcasts (LHS_BCAST, OUT_BCAST).
+// CHECK: %[[LHS_TRANS:.+]] = vector.transpose %[[LHS_BCAST]], [1, 0, 3, 2, 5, 4] : vector<1x1x1x1x2x2xi1> to vector<1x1x1x1x2x2xi1>
+// CHECK: %[[CONTRACT_MASK:.+]] = arith.andi %[[LHS_TRANS]], %[[OUT_BCAST]] : vector<1x1x1x1x2x2xi1>
 
+//     LHS read uses the reddim mask directly.
+// CHECK: %[[LHS_MASK_FLAT:.+]] = vector.shape_cast %[[LHS_CMP]] : vector<1x1x2xi1> to vector<2xi1>
+// CHECK: vector.transfer_read %arg0{{.*}} %[[LHS_MASK_FLAT]] {in_bounds = [true]} : memref<?xf16>, vector<2xf16>
+
+//     RHS read uses the RHS read mask (pardim anded with reddim).
+// CHECK: %[[RHS_READ_MASK_FLAT:.+]] = vector.shape_cast %[[RHS_READ_MASK]] : vector<1x1x1x1x2x2xi1> to vector<2x2xi1>
+// CHECK: vector.transfer_read %arg1{{.*}} %[[RHS_READ_MASK_FLAT]] {in_bounds = [true, true]} : memref<?x?xf16>, vector<2x2xf16>
+
+//     Contraction mask is flattened, transposed, and split into per-operand
+//     select masks for the reduction identity replacement.
+// CHECK: %[[CM_FLAT:.+]] = vector.shape_cast %[[CONTRACT_MASK]] : vector<1x1x1x1x2x2xi1> to vector<2x2xi1>
+// CHECK: %[[CM_TRANS:.+]] = vector.transpose %[[CM_FLAT]], [1, 0] : vector<2x2xi1> to vector<2x2xi1>
+// CHECK: %[[LHS_SEL_MASK:.+]] = vector.extract %[[CM_TRANS]][0] : vector<2xi1> from vector<2x2xi1>
+// CHECK: %[[LHS_SEL_MASK_3D:.+]] = vector.shape_cast %[[LHS_SEL_MASK]] : vector<2xi1> to vector<1x1x2xi1>
+// CHECK: %[[RHS_SEL_MASK:.+]] = vector.shape_cast %[[CM_TRANS]] : vector<2x2xi1> to vector<1x1x1x1x2x2xi1>
+
+//     Select with reduction identity, then contract.
+// CHECK: %[[LHS_SELECT:.+]] = arith.select %[[LHS_SEL_MASK_3D]], %{{.+}}, %[[RED_IDENTITY_LHS]] : vector<1x1x2xi1>, vector<1x1x2xf16>
+// CHECK: %[[RHS_SELECT:.+]] = arith.select %[[RHS_SEL_MASK]], %{{.+}}, %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
 // CHECK: vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]
 
 // -----
@@ -349,19 +364,20 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_unaligned
-// CHECK: %[[VSID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64) : index, index, index
-// CHECK: %[[VTID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16) : index, index, index
-
-// CHECK: %[[EQ_BOUND_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %c8 : index
-// CHECK: %[[LT_BOUND_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %c8 : index
-// CHECK: %[[EQ_BOUND_SID:.+]] = arith.cmpi eq, %[[VSID]]#1, %c0 : index
-// CHECK: %[[LT_BOUND_SID:.+]] = arith.cmpi slt, %[[VSID]]#1, %c0 : index
-
-// CHECK: %[[SELTREE0:.+]] = arith.select %[[LT_BOUND_TID]], %c2, %c0 : index
-// CHECK: %[[SELTREE1:.+]] = arith.select %[[EQ_BOUND_TID]], %c1, %[[SELTREE0]] : index
-// CHECK: %[[SELTREE2:.+]] = arith.select %[[LT_BOUND_SID]], %c8, %c0 : index
-// CHECK: %[[SELTREE3:.+]] = arith.select %[[EQ_BOUND_SID]], %[[SELTREE1]], %[[SELTREE2]] : index
-// CHECK: %[[MASK:.+]] = vector.create_mask %[[SELTREE3]], %c8 : vector<2x8xi1>
+// CHECK-DAG: %[[BOUND:.+]] = arith.constant dense<17> : vector<2x2x2xindex>
+// CHECK: %[[SID:.+]]:3 = affine.delinearize_index %thread_id_x into (2, 64)
+// CHECK: %[[TID:.+]]:3 = affine.delinearize_index %thread_id_x into (16, 16)
+// CHECK: %[[STEP:.+]] = vector.step : vector<2xindex>
+// CHECK: %[[STEP_BC:.+]] = vector.broadcast %[[STEP]] : vector<2xindex> to vector<4x2xindex>
+// CHECK: %[[BASE_IDX:.+]] = arith.addi %{{.+}}, %[[STEP_BC]] : vector<4x2xindex>
+// CHECK: %[[SID_OFF:.+]] = arith.muli %[[SID]]#1, %c128 : index
+// CHECK: %[[SID_OFF_BC:.+]] = vector.broadcast %[[SID_OFF]] : index to vector<4x2xindex>
+// CHECK: %[[IDX0:.+]] = arith.addi %[[BASE_IDX]], %[[SID_OFF_BC]] : vector<4x2xindex>
+// CHECK: %[[TID_OFF:.+]] = arith.muli %[[TID]]#1, %c2 : index
+// CHECK: %[[TID_OFF_BC:.+]] = vector.broadcast %[[TID_OFF]] : index to vector<4x2xindex>
+// CHECK: %[[IDX1:.+]] = arith.addi %[[IDX0]], %[[TID_OFF_BC]] : vector<4x2xindex>
+// CHECK: %[[IDX_VEC:.+]] = vector.shape_cast %[[IDX1]] : vector<4x2xindex> to vector<2x2x2xindex>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[IDX_VEC]], %[[BOUND]] : vector<2x2x2xindex>
 
 // -----
 
@@ -405,18 +421,19 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: @paged_transfer_gather_mask
-// CHECK: %[[MASK0:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: %[[CMASK0:.+]] = vector.shape_cast %[[MASK0]] : vector<1x8xi1> to vector<8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[CMASK0]]
-// CHECK: %[[MASK1:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: %[[CMASK1:.+]] = vector.shape_cast %[[MASK1]] : vector<1x8xi1> to vector<8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[CMASK1]]
-// CHECK: %[[MASK2:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: %[[CMASK2:.+]] = vector.shape_cast %[[MASK2]] : vector<1x8xi1> to vector<8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[CMASK2]]
-// CHECK: %[[MASK3:.+]] = vector.create_mask %{{.+}}, %c7 : vector<1x8xi1>
-// CHECK: %[[CMASK3:.+]] = vector.shape_cast %[[MASK3]] : vector<1x8xi1> to vector<8xi1>
-// CHECK: vector.transfer_read {{.+}} %[[CMASK3]]
+// CHECK-DAG: %[[ROW_BOUND:.+]] = arith.constant dense<7> : vector<4x1x1xindex>
+// CHECK-DAG: %[[COL_BOUND:.+]] = arith.constant dense<7> : vector<1x1x8xindex>
+// CHECK: arith.cmpi slt, %{{.+}}, %[[ROW_BOUND]] : vector<4x1x1xindex>
+// CHECK: arith.cmpi slt, %{{.+}}, %[[COL_BOUND]] : vector<1x1x8xindex>
+// CHECK: %[[MASK_2D:.+]] = arith.andi %{{.+}}, %{{.+}} : vector<4x1x1x1x1x8xi1>
+// CHECK: %[[M0:.+]] = vector.extract %[[MASK_2D]][0, 0, 0, 0, 0] : vector<8xi1>
+// CHECK: vector.transfer_read %arg1{{.*}} %[[M0]] {in_bounds = [true, true]{{.*}}} : memref<4096x512x8xf16>, vector<1x8xf16>
+// CHECK: %[[M1:.+]] = vector.extract %[[MASK_2D]][1, 0, 0, 0, 0] : vector<8xi1>
+// CHECK: vector.transfer_read %arg1{{.*}} %[[M1]] {in_bounds = [true, true]{{.*}}} : memref<4096x512x8xf16>, vector<1x8xf16>
+// CHECK: %[[M2:.+]] = vector.extract %[[MASK_2D]][2, 0, 0, 0, 0] : vector<8xi1>
+// CHECK: vector.transfer_read %arg1{{.*}} %[[M2]] {in_bounds = [true, true]{{.*}}} : memref<4096x512x8xf16>, vector<1x8xf16>
+// CHECK: %[[M3:.+]] = vector.extract %[[MASK_2D]][3, 0, 0, 0, 0] : vector<8xi1>
+// CHECK: vector.transfer_read %arg1{{.*}} %[[M3]] {in_bounds = [true, true]{{.*}}} : memref<4096x512x8xf16>, vector<1x8xf16>
 
 // -----
 
@@ -456,15 +473,11 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_unit_element_tile
-// CHECK-DAG: %[[C7:.+]] = arith.constant 7 : index
-// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG: %[[C59:.+]] = arith.constant 59 : index
-// CHECK: %[[VTID:.+]]:2 = affine.delinearize_index %thread_id_x into (64) : index, index
-
-// CHECK: %[[EQ_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[C59]] : index
-// CHECK: %[[LT_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[C59]] : index
-// CHECK: %[[SELTID0:.+]] = arith.select %[[LT_TID]], %[[C8]], %[[C7]] : index
-// CHECK: %[[BOUND:.+]] = arith.select %[[EQ_TID]], %[[C8]], %[[SELTID0]] : index
+// CHECK-DAG: %[[BOUND:.+]] = arith.constant dense<508> : vector<8x1x1xindex>
+// CHECK: arith.cmpi slt, %{{.+}}, %[[BOUND]] : vector<8x1x1xindex>
+// CHECK: %[[FLAT_MASK:.+]] = vector.shape_cast %{{.+}} : vector<2x1x1x8x1x1xi1> to vector<2x8xi1>
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice %[[FLAT_MASK]] {offsets = [0, 0], sizes = [1, 1]{{.*}}} : vector<2x8xi1> to vector<1x1xi1>
+// CHECK: vector.transfer_read %arg0{{.*}}, %[[SLICE0]] {in_bounds = [true, true]} : memref<2x512xf16>, vector<1x1xf16>
 
 // -----
 
@@ -506,12 +519,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @masked_read_write_partial_element_tile
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
-// CHECK-DAG: %[[C12:.+]] = arith.constant 12 : index
-// CHECK-DAG: %[[C14:.+]] = arith.constant 14 : index
-// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
-// CHECK: %[[VTID:.+]]:2 = affine.delinearize_index %thread_id_x into (4) : index, index
-// CHECK: %[[EQ_TID:.+]] = arith.cmpi eq, %[[VTID]]#1, %[[C2]] : index
-// CHECK: %[[LT_TID:.+]] = arith.cmpi slt, %[[VTID]]#1, %[[C2]] : index
-// CHECK: %[[SELTID0:.+]] = arith.select %[[LT_TID]], %[[C16]], %[[C12]] : index
-// CHECK: %[[BOUND:.+]] = arith.select %[[EQ_TID]], %[[C14]], %[[SELTID0]] : index
+// CHECK-DAG: %[[BOUND:.+]] = arith.constant dense<58> : vector<4x1x4xindex>
+// CHECK: %[[CMP:.+]] = arith.cmpi slt, %{{.+}}, %[[BOUND]] : vector<4x1x4xindex>
+// CHECK: %[[FLAT_MASK:.+]] = vector.shape_cast %[[CMP]] : vector<4x1x4xi1> to vector<16xi1>
+// CHECK: %[[SLICE0:.+]] = vector.extract_strided_slice %[[FLAT_MASK]] {offsets = [0], sizes = [4]{{.*}}} : vector<16xi1> to vector<4xi1>
+// CHECK: vector.transfer_read %arg0{{.*}}, %[[SLICE0]] {in_bounds = [true]} : memref<64xf16>, vector<4xf16>

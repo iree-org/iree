@@ -28,6 +28,7 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -1868,229 +1869,204 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
   int64_t subgroupSize;
 };
 
-SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
-                                               Location loc,
-                                               ValueRange upperBounds,
-                                               NestedLayoutAttr layout,
-                                               ArrayRef<Value> subgroupIndices,
-                                               ArrayRef<Value> threadIndices) {
-  constexpr int64_t subgroupIdx = 0;
-  constexpr int64_t batchIdx = 1;
-  constexpr int64_t outerIdx = 2;
-  constexpr int64_t threadIdx = 3;
-  constexpr int64_t elementIdx = 4;
-  SmallVector<Value> bounds;
-  auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-  auto one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+/// Decomposes create_mask/constant_mask operations into a combination of
+/// vector.step and comparison with the mask bounds.
+/// The idea is simple: The vector.step will contain all indices in the full
+/// range of the vector. By broadcasting the bound specified for the mask
+/// operation, we can perform a vector comparison that will yield a vector of
+/// true/false telling us which indices are inside the original boundary. This
+/// vector of true/false is our mask.
+/// For multi-dimensional vectors, we can peform this per dimension and combine
+/// the masks through a boolean AND.
+///
+/// To illustrate this with an example, assume a vector<4x8x...> and mask bounds
+/// [3, 6] from create_mask/constant_mask.
+/// Let's look at the two dimensions separately first. For the first dimension,
+/// vector.step gives us `[0, 1, 2, 3]`, broadcasting the bound gives us
+/// [3, 3, 3, 3], so the comparison results in `[1, 1, 1, 0]`. At this point,
+/// the mask for the dimension 0 is still `<4xi1>`, but we need it to match the
+/// original vector shape. To that end, we first broadcast it to <8x4xi1>,
+/// because we want to broadcast in the trailing dimension. This gives us:
+/// [[1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0],
+///  [1, 1, 1, 0]]
+///
+/// To get the original shape, we now need to tranpose, giving us:
+///  [[1, 1, 1, 1, 1, 1, 1, 1],
+///   [1, 1, 1, 1, 1, 1, 1, 1],
+///   [1, 1, 1, 1, 1, 1, 1, 1],
+///   [0, 0, 0, 0, 0, 0, 0, 0]]
+///
+/// For the second dimension, we do the same, giving us a <8xi1> mask after
+/// comparison, with content [1, 1, 1, 1, 1, 1, 0, 0].
+/// We can broadcast this to the original shape and, as this is already the
+/// trailing dimension of the original layout, we don't need to tranpose. This
+/// yields:
+/// [[1, 1, 1, 1, 1, 1, 0, 0],
+///  [1, 1, 1, 1, 1, 1, 0, 0],
+///  [1, 1, 1, 1, 1, 1, 0, 0],
+///  [1, 1, 1, 1, 1, 1, 0, 0]]
+///
+/// As a final step, we now AND-combine the two masks, yielding the expected
+/// final result:
+///  [[1, 1, 1, 1, 1, 1, 0, 0],
+///   [1, 1, 1, 1, 1, 1, 0, 0],
+///   [1, 1, 1, 1, 1, 1, 0, 0],
+///   [0, 0, 0, 0, 0, 0, 0, 0]]
+///
+/// This pattern doesn't actually distribute the mask operations. Instead, it
+/// attaches the necessary layout information to the operations created
+/// (vector.step, broadcast, ...). The greedy driver will pick up the newly
+/// created operations and distribute them individually with existing patterns.
+template <typename MaskOpTy>
+struct DistributeMask final : OpDistributionPattern<MaskOpTy> {
+  using OpDistributionPattern<MaskOpTy>::OpDistributionPattern;
 
-  for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
-    SmallVector<int64_t> undistributedShape =
-        layout.getPackedShapeForUndistributedDim(unDistributedDim);
-    std::array<int64_t, 3> distrShape{undistributedShape[batchIdx],
-                                      undistributedShape[outerIdx],
-                                      undistributedShape[elementIdx]};
-    int64_t elementPerThread = ShapedType::getNumElements(distrShape);
-    auto allValid =
-        arith::ConstantIndexOp::create(rewriter, loc, elementPerThread);
-    int64_t elementTileSize = distrShape.back();
-    auto elementTileLastIdx =
-        arith::ConstantIndexOp::create(rewriter, loc, elementTileSize - 1);
+  LogicalResult matchAndRewrite(MaskOpTy maskOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder builder(maskOp.getLoc(), rewriter);
+    VectorValue result = maskOp.getResult();
+    NestedLayoutAttr layout = dyn_cast<NestedLayoutAttr>(signature[result]);
+    if (!layout) {
+      return rewriter.notifyMatchFailure(maskOp,
+                                         "missing nested layout for mask");
+    }
 
-    // A special condition if the pre-distribution bounds match
-    // the mask dimension length, then the distributed bounds
-    // should exhibit the same property.
+    VectorType maskType = maskOp.getType();
+    int64_t rank = maskType.getRank();
 
-    APInt constUpperBound;
-    if (matchPattern(upperBound.getDefiningOp(),
-                     m_ConstantInt(&constUpperBound))) {
-      int64_t undistributedDimLen =
-          ShapedType::getNumElements(undistributedShape);
-      if (constUpperBound.getZExtValue() == undistributedDimLen) {
-        bounds.push_back(allValid);
+    SmallVector<Value> upperBounds = getUpperBounds(builder, maskOp);
+
+    SmallVector<Value> dimMasks;
+    for (int64_t dim = 0; dim < rank; ++dim) {
+      int64_t dimSize = maskType.getDimSize(dim);
+
+      // Get layout just for this dimension.
+      SmallVector<bool> droppedDims(rank, true);
+      droppedDims[dim] = false;
+      auto dimLayout = cast<NestedLayoutAttr>(layout.project(droppedDims));
+
+      // Optimization: if bound is a constant equal to the dim size, all
+      // elements along this dimension are valid and we can skip the step +
+      // comparison.
+      APInt constBound;
+      if (matchPattern(upperBounds[dim], m_ConstantInt(&constBound)) &&
+          constBound.getSExtValue() == dimSize) {
         continue;
       }
-    }
-    auto lastValidIdx = arith::SubIOp::create(rewriter, loc, upperBound, one);
-    auto delineraizedLastValidIdx = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, lastValidIdx, undistributedShape);
-    SmallVector<Value> packedLastValidIdx =
-        delineraizedLastValidIdx.getResults();
+      auto stepType = VectorType::get({dimSize}, builder.getIndexType());
+      auto step = vector::StepOp::create(builder, stepType);
+      this->setSignatureForRedistribution(rewriter, step, {}, {dimLayout});
 
-    // When subgroup id is equal to the subgroup that encounters the bound,
-    // Every [vtid] less than [vtid that encounters last valid element] should
-    // have a all valid element tile
-    auto linearizedLastValidIdxPreThreads =
-        affine::AffineLinearizeIndexOp::create(
-            rewriter, loc,
-            ValueRange{packedLastValidIdx[batchIdx],
-                       packedLastValidIdx[outerIdx], elementTileLastIdx},
-            distrShape);
-    // Bound is defined as lastIdx + 1;
-    auto distrUpperBoundPreThreads = arith::AddIOp::create(
-        rewriter, loc, linearizedLastValidIdxPreThreads, one);
+      auto bcastBound =
+          vector::BroadcastOp::create(builder, stepType, upperBounds[dim]);
+      this->setSignatureForRedistribution(rewriter, bcastBound, {},
+                                          {dimLayout});
 
-    auto linearizedLastValidIdx = affine::AffineLinearizeIndexOp::create(
-        rewriter, loc,
-        ValueRange{packedLastValidIdx[batchIdx], packedLastValidIdx[outerIdx],
-                   packedLastValidIdx[elementIdx]},
-        distrShape);
-    auto distrUpperBound =
-        arith::AddIOp::create(rewriter, loc, linearizedLastValidIdx, one);
+      auto cmp = arith::CmpIOp::create(builder, arith::CmpIPredicate::slt, step,
+                                       bcastBound);
+      this->setSignatureForRedistribution(rewriter, cmp, {dimLayout, dimLayout},
+                                          {dimLayout});
 
-    // For threads past the boundary thread (tid > u3), all iterations in
-    // batches before the boundary batch are still valid. The count of such
-    // elements is linearize(u1, u2, 0).
-    auto distrUpperBoundPostThreads = affine::AffineLinearizeIndexOp::create(
-        rewriter, loc,
-        ValueRange{packedLastValidIdx[batchIdx], packedLastValidIdx[outerIdx],
-                   zero},
-        distrShape);
+      if (rank == 1) {
+        rewriter.replaceOp(maskOp, cmp->getResult(0));
+        return success();
+      }
 
-    // The following code constructs a selection tree
-    // that in effect follows the code:
-    // * upperbound --> delinearize --> u0, u1, u2, u3, u4
-    //
-    // if sg < u0,
-    //   all valid.
-    // elif sg > u0,
-    //   all invalid.
-    // elif sg == u0,
-    //   if tid < u3:
-    //     [u1][u2][max]
-    //   if tid > u3:
-    //     [u1][u2][0]
-    //   if tid == u3:
-    //     [u1][u2][u4]
-
-    // tid == u3
-    auto cmpBoundTidEq = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq,
-        threadIndices[unDistributedDim], packedLastValidIdx[threadIdx]);
-    // tid < u3
-    auto cmpBoundTidSlt = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::slt,
-        threadIndices[unDistributedDim], packedLastValidIdx[threadIdx]);
-    // sg == u0
-    auto cmpBoundSgEq = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::eq,
-        subgroupIndices[unDistributedDim], packedLastValidIdx[subgroupIdx]);
-    // sg < u0
-    auto cmpBoundSgSlt = arith::CmpIOp::create(
-        rewriter, loc, arith::CmpIPredicate::slt,
-        subgroupIndices[unDistributedDim], packedLastValidIdx[subgroupIdx]);
-
-    // selectTid0 = tid < u3 ? [u1][u2][max] : [u1][u2][0]
-    auto selectTid0 = arith::SelectOp::create(rewriter, loc, cmpBoundTidSlt,
-                                              distrUpperBoundPreThreads,
-                                              distrUpperBoundPostThreads);
-    // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
-    auto selectTid1 = arith::SelectOp::create(rewriter, loc, cmpBoundTidEq,
-                                              distrUpperBound, selectTid0);
-    // selectSg0 = sg < u0 ? all valid : all invalid
-    auto selectSg0 =
-        arith::SelectOp::create(rewriter, loc, cmpBoundSgSlt, allValid, zero);
-    // selectSg1 = sg == u0 ? selectTid1 : selectSg0
-    auto selectSg1 = arith::SelectOp::create(rewriter, loc, cmpBoundSgEq,
-                                             selectTid1, selectSg0);
-    bounds.push_back(selectSg1);
-  }
-  return bounds;
-}
-
-struct DistributeCreateMask final
-    : OpDistributionPattern<vector::CreateMaskOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-  DistributeCreateMask(MLIRContext *context, Value threadId,
-                       int64_t subgroupSize)
-      : OpDistributionPattern(context), threadId(threadId),
-        subgroupSize(subgroupSize) {}
-
-  LogicalResult matchAndRewrite(vector::CreateMaskOp maskOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    Location loc = maskOp.getLoc();
-    VectorValue result = maskOp.getResult();
-    NestedLayoutAttr resultLayout =
-        dyn_cast<NestedLayoutAttr>(signature[result]);
-    if (!resultLayout) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "missing nested layout for step op result");
-    }
-    SmallVector<Value> subgroupIndices, threadIndices;
-    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
-                                            resultLayout, subgroupIndices,
-                                            threadIndices))) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "warp or thread tiles have overlapping strides");
+      // Broadcast rank-1 cmp to full mask shape.
+      Value fullMask = broadcastDimMaskToFullShape(builder, rewriter, cmp, dim,
+                                                   maskType, layout, dimLayout);
+      dimMasks.push_back(fullMask);
     }
 
-    SmallVector<Value> distributedBounds = createDistributedMaskBounds(
-        rewriter, loc, maskOp.getOperands(), resultLayout, subgroupIndices,
-        threadIndices);
+    // If all dimensions were skipped (all bounds equal dim sizes), emit
+    // an all-true constant.
+    if (dimMasks.empty()) {
+      auto allTrue = arith::ConstantOp::create(
+          builder, DenseElementsAttr::get(maskType, builder.getBoolAttr(true)));
+      this->setSignatureForRedistribution(rewriter, allTrue, {}, {layout});
+      rewriter.replaceOp(maskOp, allTrue);
+      return success();
+    }
 
-    Type elemType = maskOp.getType().getElementType();
-    auto distrUnpackedType =
-        VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
-    auto distrMask = vector::CreateMaskOp::create(
-        rewriter, loc, distrUnpackedType, distributedBounds);
-    VectorValue interleavedDistrMask =
-        getInterleavedPackedForm(rewriter, distrMask, resultLayout);
-    replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
+    // Combine per-dimension masks with AND.
+    Value combined = dimMasks[0];
+    for (size_t i = 1; i < dimMasks.size(); ++i) {
+      auto andi = arith::AndIOp::create(builder, combined, dimMasks[i]);
+      this->setSignatureForRedistribution(rewriter, andi, {layout, layout},
+                                          {layout});
+      combined = andi->getResult(0);
+    }
+    rewriter.replaceOp(maskOp, combined);
     return success();
   }
-  Value threadId;
-  int64_t subgroupSize;
-};
 
-struct DistributeConstantMask final
-    : OpDistributionPattern<vector::ConstantMaskOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-  DistributeConstantMask(MLIRContext *context, Value threadId,
-                         int64_t subgroupSize)
-      : OpDistributionPattern(context), threadId(threadId),
-        subgroupSize(subgroupSize) {}
-
-  LogicalResult matchAndRewrite(vector::ConstantMaskOp maskOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    Location loc = maskOp.getLoc();
-    VectorValue result = maskOp.getResult();
-    NestedLayoutAttr resultLayout =
-        dyn_cast<NestedLayoutAttr>(signature[result]);
-    if (!resultLayout) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "missing nested layout for step op result");
-    }
-    SmallVector<Value> subgroupIndices, threadIndices;
-    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
-                                            resultLayout, subgroupIndices,
-                                            threadIndices))) {
-      return rewriter.notifyMatchFailure(
-          maskOp, "warp or thread tiles have overlapping strides");
+private:
+  /// Broadcast a rank-1 per-dimension mask to the full mask shape.
+  /// For the trailing dimension, this is a simple rank-extension broadcast.
+  /// For non-trailing dimensions, we broadcast with the target dim at trailing
+  /// position and then transpose it back.
+  Value broadcastDimMaskToFullShape(ImplicitLocOpBuilder &builder,
+                                    PatternRewriter &rewriter, Value dimMask,
+                                    int64_t dim, VectorType maskType,
+                                    NestedLayoutAttr fullLayout,
+                                    NestedLayoutAttr dimLayout) const {
+    int64_t rank = maskType.getRank();
+    if (dim == rank - 1) {
+      // Trailing dim: simple rank-extension broadcast.
+      auto bcast = vector::BroadcastOp::create(builder, maskType, dimMask);
+      this->setSignatureForRedistribution(rewriter, bcast, {dimLayout},
+                                          {fullLayout});
+      return bcast->getResult(0);
     }
 
-    SmallVector<Value> constOperands;
-    for (int64_t size : maskOp.getMaskDimSizes()) {
-      Value index = arith::ConstantIndexOp::create(rewriter, loc, size);
-      constOperands.push_back(index);
+    // Non-trailing dim: broadcast to shape with dim at trailing position,
+    // then transpose back.
+    SmallVector<int64_t> bcastShape;
+    SmallVector<int64_t> permToTrailing;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (i != dim) {
+        bcastShape.push_back(maskType.getDimSize(i));
+        permToTrailing.push_back(i);
+      }
     }
+    bcastShape.push_back(maskType.getDimSize(dim));
+    permToTrailing.push_back(dim);
 
-    SmallVector<Value> distributedBounds =
-        createDistributedMaskBounds(rewriter, loc, constOperands, resultLayout,
-                                    subgroupIndices, threadIndices);
+    auto bcastLayout = fullLayout.permute(permToTrailing);
+    auto bcastType = VectorType::get(bcastShape, builder.getI1Type());
+    auto bcast = vector::BroadcastOp::create(builder, bcastType, dimMask);
+    this->setSignatureForRedistribution(rewriter, bcast, {dimLayout},
+                                        {bcastLayout});
 
-    Type elemType = maskOp.getType().getElementType();
-    auto distrUnpackedType =
-        VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
-    auto distrMask = vector::CreateMaskOp::create(
-        rewriter, loc, distrUnpackedType, distributedBounds);
-    VectorValue interleavedDistrMask =
-        getInterleavedPackedForm(rewriter, distrMask, resultLayout);
-    replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
-    return success();
+    // Transpose: inverse of permToTrailing moves dim back to position.
+    SmallVector<int64_t> invPerm = invertPermutationVector(permToTrailing);
+    auto transposed = vector::TransposeOp::create(builder, bcast, invPerm);
+    this->setSignatureForRedistribution(rewriter, transposed, {bcastLayout},
+                                        {fullLayout});
+    return transposed->getResult(0);
   }
-  Value threadId;
-  int64_t subgroupSize;
+
+  /// Get the upper bounds as Values from either CreateMaskOp or
+  /// ConstantMaskOp.
+  static SmallVector<Value> getUpperBounds(ImplicitLocOpBuilder &builder,
+                                           MaskOpTy maskOp) {
+    if constexpr (std::is_same_v<MaskOpTy, vector::CreateMaskOp>) {
+      return SmallVector<Value>(maskOp.getOperands());
+    } else {
+      SmallVector<Value> bounds;
+      for (int64_t size : maskOp.getMaskDimSizes()) {
+        bounds.push_back(arith::ConstantIndexOp::create(builder, size));
+      }
+      return bounds;
+    }
+  }
 };
 
 struct DistributeShapeCast final : OpDistributionPattern<vector::ShapeCastOp> {
@@ -2247,8 +2223,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeInnerTiled>(patterns.getContext());
   patterns.add<DistributeStep>(patterns.getContext(), threadId, subgroupSize);
-  patterns.add<DistributeCreateMask, DistributeConstantMask>(
-      patterns.getContext(), threadId, subgroupSize);
+  patterns.add<DistributeMask<vector::CreateMaskOp>,
+               DistributeMask<vector::ConstantMaskOp>>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
