@@ -47,18 +47,18 @@ static iree_status_t CreateHipDevice(iree_hal_driver_t** out_driver,
 static bool hip_registered_ =
     (CtsRegistry::RegisterBackend({
          "hip",
-         {.name = "hip",
-          .factory = CreateHipDevice,
-          .unsupported_tests =
-              {
-                  {"EventTest.*", "HIP does not implement HAL events"},
-                  {"ExecutableTest.*",
-                   "HIP does not implement executable reflection"},
-                  {"CopyBufferTest.*",
-                   "Missing hipDrvGraphAddMemcpyNode symbol"},
-                  {"UpdateBufferTest.*",
-                   "Missing hipDrvGraphAddMemcpyNode symbol"},
-              }},
+         {"hip", CreateHipDevice, /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr, RecordingMode::kDirect,
+          /*unsupported_tests=*/
+          {
+              {"EventTest.*", "HIP does not implement HAL events"},
+              {"ExecutableTest.*",
+               "HIP does not implement executable reflection"},
+              {"CopyBufferTest.*",
+               "Missing hipDrvGraphAddMemcpyNode symbol"},
+              {"UpdateBufferTest.*",
+               "Missing hipDrvGraphAddMemcpyNode symbol"},
+          }},
          {"async_queue"},
      }),
      true);

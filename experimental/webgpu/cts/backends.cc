@@ -47,7 +47,7 @@ static iree_status_t CreateWebgpuDevice(iree_hal_driver_t** out_driver,
 static bool webgpu_registered_ =
     (CtsRegistry::RegisterBackend({
          "webgpu",
-         {.name = "webgpu", .factory = CreateWebgpuDevice},
+         {"webgpu", CreateWebgpuDevice},
      }),
      true);
 

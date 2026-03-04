@@ -59,7 +59,7 @@ static iree_status_t CreateLocalTaskDevice(iree_hal_driver_t** out_driver,
 static bool local_task_registered_ =
     (CtsRegistry::RegisterBackend({
          "local_task",
-         {.name = "local_task", .factory = CreateLocalTaskDevice},
+         {"local_task", CreateLocalTaskDevice},
          {"async_queue", "events", "file_io", "host_calls", "mapping",
           "indirect"},
      }),

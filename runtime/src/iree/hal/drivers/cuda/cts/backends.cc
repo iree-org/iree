@@ -47,7 +47,7 @@ static iree_status_t CreateCudaDevice(iree_hal_driver_t** out_driver,
 static bool cuda_registered_ =
     (CtsRegistry::RegisterBackend({
          "cuda",
-         {.name = "cuda", .factory = CreateCudaDevice},
+         {"cuda", CreateCudaDevice},
          {"async_queue"},
      }),
      true);

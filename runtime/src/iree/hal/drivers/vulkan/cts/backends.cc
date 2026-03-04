@@ -47,21 +47,21 @@ static iree_status_t CreateVulkanDevice(iree_hal_driver_t** out_driver,
 static bool vulkan_registered_ =
     (CtsRegistry::RegisterBackend({
          "vulkan",
-         {.name = "vulkan",
-          .factory = CreateVulkanDevice,
-          .unsupported_tests =
-              {
-                  {"SemaphoreTest.WaitThenFail",
-                   "Vulkan does not support semaphore failure signaling"},
-                  {"SemaphoreTest.FailThenWait",
-                   "Vulkan does not support semaphore failure signaling"},
-                  {"SemaphoreTest.MultiWaitThenFail",
-                   "Vulkan does not support semaphore failure signaling"},
-                  {"SemaphoreTest.DeviceMultiWaitThenFail",
-                   "Vulkan does not support semaphore failure signaling"},
-                  {"SemaphoreSubmissionTest.PropagateFailSignal",
-                   "Vulkan does not support semaphore failure signaling"},
-              }},
+         {"vulkan", CreateVulkanDevice, /*executable_format=*/nullptr,
+          /*executable_data=*/nullptr, RecordingMode::kDirect,
+          /*unsupported_tests=*/
+          {
+              {"SemaphoreTest.WaitThenFail",
+               "Vulkan does not support semaphore failure signaling"},
+              {"SemaphoreTest.FailThenWait",
+               "Vulkan does not support semaphore failure signaling"},
+              {"SemaphoreTest.MultiWaitThenFail",
+               "Vulkan does not support semaphore failure signaling"},
+              {"SemaphoreTest.DeviceMultiWaitThenFail",
+               "Vulkan does not support semaphore failure signaling"},
+              {"SemaphoreSubmissionTest.PropagateFailSignal",
+               "Vulkan does not support semaphore failure signaling"},
+          }},
          {"async_queue"},
      }),
      true);

@@ -59,7 +59,7 @@ static iree_status_t CreateLocalSyncDevice(iree_hal_driver_t** out_driver,
 static bool local_sync_registered_ =
     (CtsRegistry::RegisterBackend({
          "local_sync",
-         {.name = "local_sync", .factory = CreateLocalSyncDevice},
+         {"local_sync", CreateLocalSyncDevice},
          {"events", "file_io", "host_calls", "mapping", "indirect"},
      }),
      true);
