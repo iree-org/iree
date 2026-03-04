@@ -19,9 +19,10 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     ArrayRef<int64_t> vectorSizes = {}, ArrayRef<bool> scalableVecDims = {},
     bool vectorizeNDExtract = false);
 
-LogicalResult directVectorizeToGather(RewriterBase &rewriter,
-                                      linalg::GenericOp op,
-                                      ArrayRef<int64_t> vectorSizes = {});
+LogicalResult
+vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
+                                        linalg::GenericOp op,
+                                        ArrayRef<int64_t> vectorSizes = {});
 
 /// Vectorizes iree_linalg_ext.gather to iree_vector_ext.transfer_gather.
 /// Currently, this pattern only works when the index_depth and batch rank of

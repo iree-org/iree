@@ -398,9 +398,10 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   return success();
 }
 
-LogicalResult directVectorizeToGather(RewriterBase &rewriter,
-                                      linalg::GenericOp op,
-                                      ArrayRef<int64_t> vectorSizes) {
+LogicalResult
+vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
+                                        linalg::GenericOp op,
+                                        ArrayRef<int64_t> vectorSizes) {
   Location loc = op.getLoc();
   MLIRContext *ctx = rewriter.getContext();
   rewriter.setInsertionPoint(op);
@@ -416,7 +417,10 @@ LogicalResult directVectorizeToGather(RewriterBase &rewriter,
   int64_t numLoops = op.getNumLoops();
 
   if (vectorSizes.empty()) {
-    return failure();
+    vectorSizes = outType.getShape();
+  }
+  for (auto size : vectorSizes) {
+    llvm::outs() << size << '\n';
   }
   int64_t vectorSize = vectorSizes.back();
 
@@ -461,8 +465,7 @@ LogicalResult directVectorizeToGather(RewriterBase &rewriter,
   AffineMap indexMap = AffineMap::get(
       numLoops, 1, {rewriter.getAffineDimExpr(numLoops - 1)}, ctx);
   AffineMap maskMap = AffineMap::getMultiDimIdentityMap(numLoops, ctx);
-  maskMap =
-      AffineMap::get(numLoops, /*symbolCount=*/1, maskMap.getResults(), ctx);
+  maskMap = AffineMap::get(numLoops, 1, maskMap.getResults(), ctx);
 
   Value f0 =
       arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));

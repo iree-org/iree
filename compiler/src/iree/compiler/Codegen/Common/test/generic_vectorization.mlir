@@ -1001,3 +1001,54 @@ func.func @arg_compare_with_index_base(%input: tensor<4x128xf32>,
 // CHECK:         %[[WRITE_VAL:.+]] = vector.transfer_write %[[RESULT_VAL]], %[[OUT_VAL]]
 // CHECK:         %[[WRITE_IDX:.+]] = vector.transfer_write %[[RESULT_IDX]], %[[OUT_IDX]]
 // CHECK:         return %[[WRITE_VAL]], %[[WRITE_IDX]]
+
+// -----
+
+func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg1: tensor<1x1x1x1x16xf32>) -> tensor<1x1x1x1x16xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%arg0 : tensor<1x1x31xf32>) outs(%arg1 : tensor<1x1x1x1x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<1x1x1x1x16xf32>
+  return %0 : tensor<1x1x1x1x16xf32>
+}
+// CHECK-LABEL: func.func @implicit_gather_like_generic_stride_2
+// CHECK-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x31xf32>
+// CHECK-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x16xf32>
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[DENSE:.+]] = arith.constant dense<2> : vector<16xindex>
+// CHECK-DAG: %[[STEP:.+]] = vector.step : vector<16xindex>
+// CHECK: %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
+// CHECK: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
+// CHECK: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK: return %[[RESULT]]
+
+// -----
+
+func.func @implicit_gather_dynamic_masked(%arg0: tensor<1x1x?xf32>, %arg1: tensor<1x1x1x1x?xf32>) -> tensor<1x1x1x1x?xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4 * 2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+    ],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%arg0 : tensor<1x1x?xf32>) outs(%arg1 : tensor<1x1x1x1x?xf32>) attrs = {lowering_config = #iree_cpu.lowering_config<distribution = [1, 1, 1, 1, 1], vector_common_parallel = [1, 1, 1, 1, 16]>} {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<1x1x1x1x?xf32>
+  return %0 : tensor<1x1x1x1x?xf32>
+}
+// CHECK-MASK-LABEL: func.func @implicit_gather_dynamic_masked
+// CHECK-MASK-SAME: %[[IN:[a-zA-Z0-9]+]]: tensor<1x1x?xf32>
+// CHECK-MASK-SAME: %[[OUT:[a-zA-Z0-9]+]]: tensor<1x1x1x1x?xf32>
+// CHECK-MASK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-MASK-DAG: %[[DIM:.+]] = tensor.dim %[[OUT]], %[[C4]] : tensor<1x1x1x1x?xf32>
+// CHECK-MASK: %[[MASK:.+]] = vector.create_mask {{.+}}, {{.+}}, {{.+}}, {{.+}}, %[[DIM]] : vector<1x1x1x1x16xi1>
+// CHECK-MASK: %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]]{{.*}} %[[MASK]]
+// CHECK-MASK: %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]]{{.*}} %[[MASK]]
+// CHECK-MASK: return %[[RESULT]]
