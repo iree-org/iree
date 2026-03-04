@@ -1037,11 +1037,9 @@ static void insertAsyncCopyBarriers(RewriterBase &rewriter,
                                 std::prev(body->end()), state,
                                 /*multiBuffered=*/true);
 
-  // Epilogue reads from the last iteration's writes.
-  state.needBarrierBeforeRead = true;
-  Block::iterator epilogueStart = std::next(newForOp->getIterator());
-  insertBarriersInRange(rewriter, loc, epilogueStart, parentBlock->end(),
-                        state);
+  // Epilogue: barrier before reads is handled by insertEpilogueAsyncWait
+  // which places wait.asyncmark + barrier in the correct order (after the
+  // wait, ensuring all wavefronts' DMAs have completed before any reads).
 }
 
 /// Find the first operation with shared memory reads in a block range.
@@ -1109,9 +1107,11 @@ static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
 /// Inserts asyncmark and wait.asyncmark in the loop body.
 ///
 /// An asyncmark is placed after the last gather_to_lds to delineate the DMA
-/// group for this iteration. A wait.asyncmark is placed before the first
-/// shared memory read to maximize overlap between the wait and independent
-/// index computation that may precede the read.
+/// group for this iteration. A wait.asyncmark + barrier pair is placed before
+/// the first shared memory read: the wait ensures this wavefront's previous
+/// DMA group has completed, and the barrier synchronizes all wavefronts so
+/// that every wavefront's DMA writes to the shared buffer are visible before
+/// any wavefront reads from it.
 static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
                                        scf::ForOp forOp, int16_t waitCount) {
   Block *body = forOp.getBody();
@@ -1128,10 +1128,12 @@ static void insertLoopBodyAsyncMarkers(RewriterBase &rewriter, Location loc,
     rewriter.setInsertionPoint(&**firstRead);
     ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
                                    rewriter.getI16IntegerAttr(waitCount));
+    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
 }
 
-/// Inserts wait.asyncmark in the epilogue to drain all in-flight DMA groups.
+/// Inserts wait.asyncmark + barrier in the epilogue to drain all in-flight DMA
+/// groups and synchronize all wavefronts before reading from shared memory.
 ///
 /// Placed before the first shared memory read rather than at the epilogue
 /// start to allow independent index computation to overlap with the wait.
@@ -1143,6 +1145,7 @@ static void insertEpilogueAsyncWait(RewriterBase &rewriter, Location loc,
     rewriter.setInsertionPoint(&**firstRead);
     ROCDL::WaitAsyncmarkOp::create(rewriter, loc,
                                    rewriter.getI16IntegerAttr(0));
+    gpu::BarrierOp::create(rewriter, loc, gpu::AddressSpace::Workgroup);
   }
 }
 

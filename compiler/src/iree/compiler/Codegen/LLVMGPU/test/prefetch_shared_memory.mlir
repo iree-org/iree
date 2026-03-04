@@ -438,10 +438,12 @@ func.func @prefetch_gather_to_lds_two_operands(
     // CHECK-COUNT-2: amdgpu.gather_to_lds async
     // CHECK: rocdl.asyncmark
     // CHECK: rocdl.wait.asyncmark 1
+    // CHECK: gpu.barrier
     // CHECK-3STAGE: gpu.barrier
     // CHECK-3STAGE-COUNT-2: amdgpu.gather_to_lds async
     // CHECK-3STAGE: rocdl.asyncmark
     // CHECK-3STAGE: rocdl.wait.asyncmark 2
+    // CHECK-3STAGE: gpu.barrier
     amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
 
@@ -460,14 +462,14 @@ func.func @prefetch_gather_to_lds_two_operands(
     // CHECK-3STAGE: scf.yield
     scf.yield %sum : vector<1xf32>
   }
-  // 2-stage epilogue: wait for all async groups, then compute
-  // CHECK: gpu.barrier
+  // 2-stage epilogue: wait for all async groups, barrier, then compute
   // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
   // CHECK: vector.transfer_read
   // CHECK: arith.mulf
-  // 3-stage epilogue: wait for pending groups, then compute
-  // CHECK-3STAGE: gpu.barrier
+  // 3-stage epilogue: wait for pending groups, barrier, then compute
   // CHECK-3STAGE: rocdl.wait.asyncmark 0
+  // CHECK-3STAGE: gpu.barrier
   // CHECK-3STAGE: vector.transfer_read
   // CHECK-3STAGE: arith.mulf
   // CHECK-3STAGE: vector.transfer_read
@@ -682,15 +684,16 @@ func.func @gather_to_lds_nested_loop_async(
       // CHECK: amdgpu.gather_to_lds async
       // CHECK: rocdl.asyncmark
       // CHECK: rocdl.wait.asyncmark 1
+      // CHECK: gpu.barrier
       amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
       // CHECK: vector.transfer_read
       %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
       %sum = arith.addf %val, %acc : vector<1xf32>
       scf.yield %sum : vector<1xf32>
     }
-    // Epilogue: barrier + wait for all, then read
-    // CHECK: gpu.barrier
+    // Epilogue: wait for all, barrier, then read
     // CHECK: rocdl.wait.asyncmark 0
+    // CHECK: gpu.barrier
     // CHECK: vector.transfer_read
     vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   }
