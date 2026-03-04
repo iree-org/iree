@@ -308,11 +308,11 @@ func.func @matmul_f16_compute_bound(
     %arg0: tensor<16384x16384xf16>,
     %arg1: tensor<16384x16384xf16>,
     %arg2: tensor<16384x16384xf32>) -> tensor<16384x16384xf32> {
-  // CHECK-LABEL: func.func @matmul_f16_compute_bound
-  // CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-  // CHECK:   lowering_config = #iree_gpu.lowering_config
-  // CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<16384x16384xf16>, tensor<16384x16384xf16>)
                       outs(%arg2 : tensor<16384x16384xf32>) -> tensor<16384x16384xf32>
   return %0 : tensor<16384x16384xf32>
 }
+// CHECK-LABEL: func.func @matmul_f16_compute_bound
+// CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// CHECK:   lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
