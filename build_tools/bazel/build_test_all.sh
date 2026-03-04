@@ -46,6 +46,9 @@ fi
 if ! [[ -v IREE_HIP_DISABLE ]]; then
   IREE_HIP_DISABLE=1
 fi
+if ! [[ -v IREE_AMDGPU_DISABLE ]]; then
+  IREE_AMDGPU_DISABLE=1
+fi
 if ! [[ -v IREE_METAL_DISABLE ]]; then
   IREE_METAL_DISABLE=1
 fi
@@ -69,6 +72,7 @@ declare -a test_env_args=(
   --test_env="LD_PRELOAD=libvulkan.so.1"
   --test_env=IREE_CUDA_DISABLE="${IREE_CUDA_DISABLE}"
   --test_env=IREE_HIP_DISABLE="${IREE_HIP_DISABLE}"
+  --test_env=IREE_AMDGPU_DISABLE="${IREE_AMDGPU_DISABLE}"
   --test_env=IREE_METAL_DISABLE="${IREE_METAL_DISABLE}"
   --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
   --test_env=IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE}"
@@ -92,6 +96,9 @@ if (( IREE_CUDA_DISABLE == 1 )); then
 fi
 if (( IREE_HIP_DISABLE == 1 )); then
   default_test_tag_filters+=("-driver=hip")
+fi
+if (( IREE_AMDGPU_DISABLE == 1 )); then
+  default_test_tag_filters+=("-driver=amdgpu")
 fi
 if (( IREE_METAL_DISABLE == 1 )); then
   default_test_tag_filters+=("-driver=metal")
