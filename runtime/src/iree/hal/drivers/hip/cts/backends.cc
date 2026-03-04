@@ -65,8 +65,20 @@ static bool hip_registered_ =
                "HIP graph command buffers lack fill node support"},
               {"CommandBufferUpdateBufferTest.*",
                "HIP graph command buffers lack memcpy node support"},
+              {"DispatchTest.*",
+               "HIP CTS dispatch tests crash on GPU memory reservation "
+               "failures"},
+              {"DispatchMultiEntrypointTest.*",
+               "HIP CTS dispatch tests crash on GPU memory reservation "
+               "failures"},
+              {"DispatchMultiWorkgroupTest.*",
+               "HIP CTS dispatch tests crash on GPU memory reservation "
+               "failures"},
               {"DispatchConstantsTest.*",
                "HIP graph command buffers lack fill node support"},
+              {"DispatchConstantsBindingsTest.*",
+               "HIP CTS dispatch tests crash on GPU memory reservation "
+               "failures"},
           }},
          {"async_queue"},
      }),

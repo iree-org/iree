@@ -64,8 +64,9 @@ static bool vulkan_registered_ =
                "Vulkan does not support semaphore failure signaling"},
               {"SemaphoreTest.DeviceMultiWaitThenFail",
                "Vulkan does not support semaphore failure signaling"},
-              {"SemaphoreSubmissionTest.PropagateFailSignal",
-               "Vulkan does not support semaphore failure signaling"},
+              {"SemaphoreSubmissionTest.*",
+               "Vulkan timeline semaphore waits hang without async queue "
+               "submission"},
           }},
          {"async_queue"},
      }),

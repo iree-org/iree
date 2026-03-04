@@ -321,8 +321,21 @@ TEST_P(QueueHostCallTest, CallbackReturnsError) {
                                                   IREE_HAL_WAIT_FLAG_DEFAULT)),
               StatusIs(StatusCode::kAborted));
 
-  // The wait returned kAborted because the semaphores were failed — the
-  // failure state must be immediately visible to query.
+  // iree_hal_semaphore_list_fail iterates semaphores non-atomically: it fails
+  // each semaphore and triggers its timepoint notifications before moving to
+  // the next. The list wait above returns as soon as the first semaphore is
+  // failed, so we must wait on each semaphore individually to synchronize
+  // with the completion of the full failure iteration before querying state.
+  for (size_t i = 0; i < signal_semaphore_list.semaphores.size(); ++i) {
+    EXPECT_THAT(Status(iree_hal_semaphore_wait(
+                    signal_semaphore_list.semaphores[i],
+                    signal_semaphore_list.payload_values[i],
+                    iree_make_timeout_ms(5000), IREE_HAL_WAIT_FLAG_DEFAULT)),
+                StatusIs(StatusCode::kAborted));
+  }
+
+  // All signal semaphores must now be in failed state with the original
+  // callback error code.
   uint64_t value0 = 0;
   EXPECT_THAT(Status(iree_hal_semaphore_query(
                   signal_semaphore_list.semaphores[0], &value0)),
@@ -380,6 +393,15 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_TRUE(state.wait_completed);
+
+  // See CallbackReturnsError for why per-semaphore waits are needed.
+  for (size_t i = 0; i < signal_semaphore_list.semaphores.size(); ++i) {
+    EXPECT_THAT(Status(iree_hal_semaphore_wait(
+                    signal_semaphore_list.semaphores[i],
+                    signal_semaphore_list.payload_values[i],
+                    iree_make_timeout_ms(5000), IREE_HAL_WAIT_FLAG_DEFAULT)),
+                StatusIs(StatusCode::kAborted));
+  }
 
   uint64_t value0 = 0;
   EXPECT_THAT(Status(iree_hal_semaphore_query(
