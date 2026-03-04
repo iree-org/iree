@@ -6,6 +6,17 @@
 
 #include "iree/net/carrier/shm/shared_wake.h"
 
+#if defined(IREE_PLATFORM_WINDOWS)
+// Windows: Event objects for wake/signal primitives.
+#else
+// POSIX: eventfd (Linux) or pipe (macOS/BSD) for wake/signal primitives.
+#include <fcntl.h>
+#include <unistd.h>
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+#include <sys/eventfd.h>
+#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_ANDROID
+#endif  // IREE_PLATFORM_WINDOWS
+
 // Carrier accessors defined in carrier.c. We use extern declarations rather
 // than including carrier.h to avoid a circular build dependency (carrier.c
 // includes shared_wake.h, and shared_wake.c must not include carrier.h).
@@ -138,6 +149,176 @@ IREE_API_EXPORT iree_status_t iree_net_shm_shared_wake_create(
   return iree_ok_status();
 }
 
+// Creates platform-specific wake/signal primitives for shared mode.
+// On success, both primitives are set and must be closed by the caller on
+// error cleanup. On failure, any partially-created primitives are closed.
+static iree_status_t iree_net_shm_shared_wake_create_primitives(
+    iree_async_primitive_t* out_wake, iree_async_primitive_t* out_signal) {
+  *out_wake = iree_async_primitive_none();
+  *out_signal = iree_async_primitive_none();
+
+#if defined(IREE_PLATFORM_WINDOWS)
+  // Windows: create an auto-reset Event. Same Event is used for both
+  // monitoring (wake) and signaling (SetEvent).
+  HANDLE event = CreateEventW(NULL, /*bManualReset=*/FALSE,
+                              /*bInitialState=*/FALSE, NULL);
+  if (!event) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "CreateEvent failed for shared wake");
+  }
+  *out_wake = iree_async_primitive_from_win32_handle((uintptr_t)event);
+  *out_signal = iree_async_primitive_from_win32_handle((uintptr_t)event);
+  return iree_ok_status();
+
+#elif defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+  // Linux/Android: eventfd (bidirectional, same fd for wake and signal).
+  int efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+  if (efd < 0) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "eventfd creation failed for shared wake");
+  }
+  *out_wake = iree_async_primitive_from_fd(efd);
+  *out_signal = iree_async_primitive_from_fd(efd);
+  return iree_ok_status();
+
+#else
+  // macOS/BSD: pipe. Read end for wake (POLLIN), write end for signal.
+  int pipe_fds[2];
+  if (pipe(pipe_fds) < 0) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "pipe creation failed for shared wake");
+  }
+  for (int i = 0; i < 2; ++i) {
+    int current_flags = fcntl(pipe_fds[i], F_GETFL);
+    if (current_flags >= 0) {
+      fcntl(pipe_fds[i], F_SETFL, current_flags | O_NONBLOCK);
+    }
+    fcntl(pipe_fds[i], F_SETFD, FD_CLOEXEC);
+  }
+  *out_wake = iree_async_primitive_from_fd(pipe_fds[0]);
+  *out_signal = iree_async_primitive_from_fd(pipe_fds[1]);
+  return iree_ok_status();
+#endif
+}
+
+// Closes the owned wake/signal primitives. On Linux/Android the wake and
+// signal primitives are the same eventfd — only close once.
+static void iree_net_shm_shared_wake_close_primitives(
+    iree_async_primitive_t* wake, iree_async_primitive_t* signal) {
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID)
+  // Eventfd: wake == signal (same fd). Close once via wake.
+  iree_async_primitive_close(wake);
+  *signal = iree_async_primitive_none();
+#elif defined(IREE_PLATFORM_WINDOWS)
+  // Windows: wake == signal (same Event HANDLE). Close once via wake.
+  iree_async_primitive_close(wake);
+  *signal = iree_async_primitive_none();
+#else
+  // macOS/BSD: pipe has two independent fds.
+  iree_async_primitive_close(wake);
+  iree_async_primitive_close(signal);
+#endif
+}
+
+IREE_API_EXPORT iree_status_t iree_net_shm_shared_wake_create_shared(
+    iree_async_proactor_t* proactor, iree_allocator_t allocator,
+    iree_net_shm_shared_wake_t** out_shared_wake) {
+  IREE_ASSERT_ARGUMENT(proactor);
+  IREE_ASSERT_ARGUMENT(out_shared_wake);
+  *out_shared_wake = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_net_shm_shared_wake_t* shared_wake = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(*shared_wake),
+                                (void**)&shared_wake));
+  memset(shared_wake, 0, sizeof(*shared_wake));
+  iree_atomic_ref_count_init(&shared_wake->ref_count);
+  shared_wake->proactor = proactor;
+  iree_async_proactor_retain(proactor);
+  shared_wake->allocator = allocator;
+  shared_wake->is_shared = true;
+
+  // Allocate a SHM page for the epoch counter. This is what gets exported
+  // to remote peers so they can create proxy notifications whose epoch_ptr
+  // points at the same physical page (enabling cross-process futex).
+  iree_status_t status =
+      iree_shm_create(iree_shm_options_default(), sizeof(iree_atomic_int32_t),
+                      &shared_wake->epoch_mapping);
+  if (!iree_status_is_ok(status)) {
+    iree_async_proactor_release(proactor);
+    iree_allocator_free(allocator, shared_wake);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  // Create platform wake/signal primitives.
+  status = iree_net_shm_shared_wake_create_primitives(
+      &shared_wake->owned_wake_primitive, &shared_wake->owned_signal_primitive);
+  if (!iree_status_is_ok(status)) {
+    iree_shm_close(&shared_wake->epoch_mapping);
+    iree_async_proactor_release(proactor);
+    iree_allocator_free(allocator, shared_wake);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  // Create a shared notification backed by our SHM epoch and owned primitives.
+  iree_async_notification_shared_options_t notification_options;
+  memset(&notification_options, 0, sizeof(notification_options));
+  notification_options.epoch_address =
+      (iree_atomic_int32_t*)shared_wake->epoch_mapping.base;
+  notification_options.wake_primitive = shared_wake->owned_wake_primitive;
+  notification_options.signal_primitive = shared_wake->owned_signal_primitive;
+  status = iree_async_notification_create_shared(
+      proactor, &notification_options, &shared_wake->notification);
+  if (!iree_status_is_ok(status)) {
+    iree_net_shm_shared_wake_close_primitives(
+        &shared_wake->owned_wake_primitive,
+        &shared_wake->owned_signal_primitive);
+    iree_shm_close(&shared_wake->epoch_mapping);
+    iree_async_proactor_release(proactor);
+    iree_allocator_free(allocator, shared_wake);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
+  *out_shared_wake = shared_wake;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_net_shm_shared_wake_export(iree_net_shm_shared_wake_t* shared_wake,
+                                iree_net_shm_shared_wake_export_t* out_export) {
+  IREE_ASSERT_ARGUMENT(shared_wake);
+  IREE_ASSERT_ARGUMENT(out_export);
+  memset(out_export, 0, sizeof(*out_export));
+
+  if (!shared_wake->is_shared) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot export from a local (non-shared) "
+                            "shared_wake; use create_shared()");
+  }
+
+  // Duplicate the SHM handle for the epoch region.
+  iree_status_t status = iree_shm_handle_dup(shared_wake->epoch_mapping.handle,
+                                             &out_export->epoch_shm_handle);
+  if (!iree_status_is_ok(status)) return status;
+  out_export->epoch_shm_size = shared_wake->epoch_mapping.size;
+
+  // Duplicate the signal primitive. The remote peer writes to this to wake
+  // our proactor's poll loop.
+  status = iree_async_primitive_dup(shared_wake->owned_signal_primitive,
+                                    &out_export->signal_primitive);
+  if (!iree_status_is_ok(status)) {
+    iree_shm_handle_close(&out_export->epoch_shm_handle);
+    return status;
+  }
+
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT void iree_net_shm_shared_wake_retain(
     iree_net_shm_shared_wake_t* shared_wake) {
   if (shared_wake) {
@@ -156,6 +337,14 @@ IREE_API_EXPORT void iree_net_shm_shared_wake_release(
     IREE_ASSERT(!shared_wake->wait_posted,
                 "shared_wake destroyed with NOTIFICATION_WAIT in flight");
     iree_async_notification_release(shared_wake->notification);
+    if (shared_wake->is_shared) {
+      // The shared notification does not own the primitives (SHARED flag).
+      // We own them and must close them here.
+      iree_net_shm_shared_wake_close_primitives(
+          &shared_wake->owned_wake_primitive,
+          &shared_wake->owned_signal_primitive);
+      iree_shm_close(&shared_wake->epoch_mapping);
+    }
     iree_async_proactor_release(shared_wake->proactor);
     iree_allocator_t allocator = shared_wake->allocator;
     iree_allocator_free(allocator, shared_wake);

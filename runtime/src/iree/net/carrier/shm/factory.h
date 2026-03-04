@@ -11,15 +11,18 @@
 // loopback factories, enabling transport-agnostic code to use SHM without
 // special casing.
 //
-// In-process connections use iree_net_shm_carrier_create_pair() to create
-// carrier pairs directly. Cross-process connections will exchange SHM handles
-// and notification primitives over a control channel (Unix socket / named
-// pipe), creating carriers independently on each side. Both paths share the
-// same connection type and endpoint adapter.
+// Addressing:
+//   Named endpoints (e.g., "server", "worker-0"): In-process connections.
+//   Listeners register under a name, connect looks up by name. Uses
+//   iree_net_shm_carrier_create_pair() to create carrier pairs directly.
 //
-// Addressing uses named endpoints (e.g., "server", "worker-0"). Listeners
-// register under a name, and connect looks up listeners by name in the
-// factory's internal table.
+//   Unix domain sockets (e.g., "unix:/tmp/iree.sock"): Cross-process
+//   connections via SHM handshake over a Unix domain socket. Listeners bind
+//   to a socket path, clients connect by path. Each accepted connection runs
+//   a handshake to exchange SHM handles and notification primitives, creating
+//   independent carriers on each side.
+//
+// Both paths share the same connection type and endpoint adapter.
 //
 // All callbacks (connect, accept, endpoint ready, listener stopped) are
 // delivered asynchronously via the proactor, matching the behavioral contract

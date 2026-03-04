@@ -6,7 +6,7 @@
 
 # Shared memory carrier: high-performance IPC via SPSC rings in shared memory.
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -21,6 +21,36 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/async",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:shm",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "xproc_context",
+    hdrs = ["xproc_context.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:shm",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "handshake",
+    srcs = [
+        "handshake.c",
+        "handshake_posix.c",
+        "handshake_win32.c",
+    ],
+    hdrs = ["handshake.h"],
+    deps = [
+        ":shared_wake",
+        ":shm",
+        ":xproc_context",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:shm",
+        "//runtime/src/iree/base/internal:spsc_queue",
     ],
 )
 
@@ -58,6 +88,7 @@ iree_runtime_cc_library(
     srcs = ["factory.c"],
     hdrs = ["factory.h"],
     deps = [
+        ":handshake",
         ":shared_wake",
         ":shm",
         ":shm_pair",
@@ -67,5 +98,19 @@ iree_runtime_cc_library(
         "//runtime/src/iree/net:connection",
         "//runtime/src/iree/net:message_endpoint",
         "//runtime/src/iree/net:transport_factory",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "handshake_test",
+    srcs = ["handshake_test.cc"],
+    deps = [
+        ":handshake",
+        ":shared_wake",
+        ":shm",
+        "//runtime/src/iree/async:platform",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

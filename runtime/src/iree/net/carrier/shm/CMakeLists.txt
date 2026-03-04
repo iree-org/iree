@@ -20,6 +20,39 @@ iree_cc_library(
   DEPS
     iree::async
     iree::base
+    iree::base::internal::shm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    xproc_context
+  HDRS
+    "xproc_context.h"
+  DEPS
+    iree::async
+    iree::base
+    iree::base::internal::shm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    handshake
+  HDRS
+    "handshake.h"
+  SRCS
+    "handshake.c"
+    "handshake_posix.c"
+    "handshake_win32.c"
+  DEPS
+    ::shared_wake
+    ::shm
+    ::xproc_context
+    iree::async
+    iree::base
+    iree::base::internal::shm
+    iree::base::internal::spsc_queue
   PUBLIC
 )
 
@@ -66,6 +99,7 @@ iree_cc_library(
   SRCS
     "factory.c"
   DEPS
+    ::handshake
     ::shared_wake
     ::shm
     ::shm_pair
@@ -76,6 +110,21 @@ iree_cc_library(
     iree::net::message_endpoint
     iree::net::transport_factory
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    handshake_test
+  SRCS
+    "handshake_test.cc"
+  DEPS
+    ::handshake
+    ::shared_wake
+    ::shm
+    iree::async::platform
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
