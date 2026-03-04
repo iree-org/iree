@@ -156,10 +156,6 @@ typedef struct iree_net_shm_region_header_t {
 typedef uint32_t iree_net_shm_carrier_mode_t;
 enum iree_net_shm_carrier_mode_bits_e {
   IREE_NET_SHM_CARRIER_MODE_DEFAULT = 0u,
-  // Reserved for future modes:
-  // IREE_NET_SHM_CARRIER_MODE_POLL_THREAD = 1u << 0,
-  // IREE_NET_SHM_CARRIER_MODE_SQPOLL      = 1u << 1,
-  // IREE_NET_SHM_CARRIER_MODE_FUTEX_WAIT  = 1u << 2,
 };
 
 typedef struct iree_net_shm_carrier_options_t {
