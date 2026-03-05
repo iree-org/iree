@@ -997,7 +997,7 @@ static void computeGroupLinearizedOffsetAndSize(
         {collapsedOffset, adjOffset, groupStrides[j]});
   }
 
-  // Linearized size = sizes[group[retainedStart]] * stride[retainedStart].
+  // Compute the linearized size based on the retained portion of the group.
   AffineExpr d0, d1;
   bindDims(ctx, d0, d1);
   collapsedSize = affine::makeComposedFoldedAffineApply(
@@ -1077,10 +1077,10 @@ fuseCollapseShapeIntoProducerImpl(RewriterBase &rewriter, OpTy producerOp,
     }
   }
 
-  // Get the tied init for this result if it exists.
+  // Get the tied init and setup the sizes in terms of values available to the
+  // producer if present.
   OpOperand *tiedInit = producerOp.getTiedInit(resultIdx);
 
-  // Compute producer dim sizes as OpFoldResult (handles dynamic dims).
   rewriter.setInsertionPoint(producerOp);
   SmallVector<OpFoldResult> producerDimSizes = getProducerResultDimSizes(
       rewriter, producerOp, resultIdx, producerResultType, tiedInit);
