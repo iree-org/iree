@@ -664,6 +664,40 @@ PackMapAttr PackMapAttr::makeIdentity(MLIRContext *ctx,
 }
 
 //===----------------------------------------------------------------------===//
+// PackLayoutAttr — parsing/printing
+//===----------------------------------------------------------------------===//
+
+static ParseResult parsePackLayoutMap(AsmParser &parser, PackMapAttr &map) {
+  Attribute shape, stride;
+  if (failed(parseIntTuple(parser, shape)) || failed(parser.parseColon()) ||
+      failed(parseIntTuple(parser, stride))) {
+    return failure();
+  }
+  map = PackMapAttr::getChecked(
+      [&] { return parser.emitError(parser.getCurrentLocation()); },
+      parser.getContext(), shape, stride);
+  return map ? success() : failure();
+}
+
+static void printPackLayoutMap(AsmPrinter &printer, PackMapAttr map) {
+  printIntTuple(printer, map.getShape());
+  printer << " : ";
+  printIntTuple(printer, map.getStride());
+}
+
+//===----------------------------------------------------------------------===//
+// PackLayoutAttr — mode operations
+//===----------------------------------------------------------------------===//
+
+PackLayoutAttr PackLayoutAttr::permute(ArrayRef<int64_t> perm) {
+  return PackLayoutAttr::get(getContext(), getMap().permute(perm));
+}
+
+PackLayoutAttr PackLayoutAttr::project(ArrayRef<bool> droppedDims) {
+  return PackLayoutAttr::get(getContext(), getMap().project(droppedDims));
+}
+
+//===----------------------------------------------------------------------===//
 // Dialect attribute registration
 //===----------------------------------------------------------------------===//
 

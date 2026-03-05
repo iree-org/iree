@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
+#include "iree/compiler/Codegen/Dialect/Map/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/PCF/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -83,6 +84,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
   registerIREEGPUExternalInterfaces(registry);
+  registerIREEMapExternalInterfaces(registry);
   registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
   registerTensorMaskingOpInterface(registry);

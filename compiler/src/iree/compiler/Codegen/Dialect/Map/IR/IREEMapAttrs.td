@@ -193,4 +193,76 @@ def IREEMap_PackMapAttr : IREEMap_Attr<"PackMap"> {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// PackLayoutAttr
+//===----------------------------------------------------------------------===//
+
+def IREEMap_PackLayoutAttr : IREEMap_Attr<"PackLayout"> {
+  let mnemonic = "pack_layout";
+
+  let summary = [{A layout mapping data coordinates to thread IDs.}];
+
+  let description = [{
+    PackLayout wraps a PackMap that defines a mapping from data coordinates in
+    a shaped tensor/vector to the thread ID responsible for that coordinate.
+    The underlying PackMap is stored in by-mode-coalesced form: each top-level
+    mode is independently coalesced (adjacent leaves with compatible strides
+    are merged), preserving the top-level rank to match the shape of the
+    vector it describes.
+
+    #### Thread mapping semantics
+
+    Leaves with stride > 0 map coordinates to thread IDs. After removing
+    stride-0 (broadcast) leaves, the remaining map must be injective -- no
+    two distinct coordinates may map to the same thread ID. Stride-0 leaves
+    indicate dimensions where every thread holds the same value.
+
+    If the non-broadcast leaves map to only a subset of the thread grid
+    (i.e., the layout's size after filtering broadcasts is smaller than
+    the total number of threads), the layout is implicitly replicated
+    across the remaining threads. Formally, complement(threadGridSize)
+    of the filtered layout gives the replication pattern.
+
+    #### Assembly format
+
+    ```mlir
+    #iree_map.pack_layout<(4, 8) : (8, 1)>
+    ```
+  }];
+
+  let parameters = (ins
+    "PackMapAttr":$map
+  );
+
+  let skipDefaultBuilders = 1;
+
+  let builders = [
+    AttrBuilder<(ins "PackMapAttr":$map), [{
+      return $_get(context, map.coalesceModes());
+    }]>,
+    AttrBuilder<(ins "::mlir::Attribute":$shape, "::mlir::Attribute":$stride), [{
+      auto map = PackMapAttr::get(context, shape, stride);
+      return PackLayoutAttr::get(context, map);
+    }]>
+  ];
+
+  let assemblyFormat = "`<` custom<PackLayoutMap>($map) `>`";
+
+  let extraClassDeclaration = [{
+    // Convenience accessors delegating to the underlying map.
+    int32_t getRank() { return getMap().getRank(); }
+    ::mlir::Attribute getShape() { return getMap().getShape(); }
+    ::mlir::Attribute getStride() { return getMap().getStride(); }
+    ::mlir::Attribute getShapeMode(int32_t i) { return getMap().getShapeMode(i); }
+    ::mlir::Attribute getStrideMode(int32_t i) { return getMap().getStrideMode(i); }
+
+    // Mode operations that return new PackLayoutAttrs.
+    PackLayoutAttr permute(::llvm::ArrayRef<int64_t> perm);
+    PackLayoutAttr project(::llvm::ArrayRef<bool> droppedDims);
+
+    // Coalesce the underlying map (full coalesce, not by-mode).
+    PackMapAttr coalesce() { return getMap().coalesce(); }
+  }];
+}
+
 #endif // IREE_CODEGEN_DIALECT_MAP_IREEMAP_ATTRS
