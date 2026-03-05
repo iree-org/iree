@@ -1,0 +1,55 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_fuzz", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "tiktoken",
+    srcs = ["tiktoken.c"],
+    hdrs = ["tiktoken.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:base64",
+        "//runtime/src/iree/tokenizer",
+        "//runtime/src/iree/tokenizer:byte_level_tables",
+        "//runtime/src/iree/tokenizer:special_tokens",
+        "//runtime/src/iree/tokenizer:types",
+        "//runtime/src/iree/tokenizer/decoder:byte_level",
+        "//runtime/src/iree/tokenizer/model:bpe",
+        "//runtime/src/iree/tokenizer/regex:compile",
+        "//runtime/src/iree/tokenizer/segmenter:split",
+        "//runtime/src/iree/tokenizer/vocab",
+        "//runtime/src/iree/tokenizer/vocab:vocab_builder",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "tiktoken_test",
+    srcs = ["tiktoken_test.cc"],
+    deps = [
+        ":tiktoken",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/tokenizer",
+        "//runtime/src/iree/tokenizer/vocab",
+    ],
+)
+
+iree_runtime_cc_fuzz(
+    name = "tiktoken_fuzz",
+    srcs = ["tiktoken_fuzz.cc"],
+    deps = [
+        ":tiktoken",
+        "//runtime/src/iree/base",
+    ],
+)

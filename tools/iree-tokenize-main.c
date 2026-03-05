@@ -49,6 +49,7 @@
 #include "iree/base/tooling/flags.h"
 #include "iree/io/file_contents.h"
 #include "iree/tokenizer/format/huggingface/tokenizer_json.h"
+#include "iree/tokenizer/format/tiktoken/tiktoken.h"
 #include "iree/tokenizer/tokenizer.h"
 #include "iree/tokenizer/vocab/vocab.h"
 
@@ -68,7 +69,12 @@ IREE_FLAG(bool, json, false,
           "Output JSON format (default: comma-separated IDs).");
 IREE_FLAG(bool, json_string, false,
           "Input is a JSON-encoded string (handles \\uXXXX escapes).");
-IREE_FLAG(string, tokenizer, "", "Path to HuggingFace tokenizer.json file.");
+IREE_FLAG(string, tokenizer, "",
+          "Path to tokenizer file (.json for HuggingFace, .tiktoken for "
+          "OpenAI tiktoken format).");
+IREE_FLAG(string, encoding, "",
+          "Tiktoken encoding name (cl100k_base, o200k_base, r50k_base, "
+          "p50k_base). Required for .tiktoken files; ignored for .json.");
 IREE_FLAG(bool, offsets, false, "Show token-to-byte offset mappings.");
 IREE_FLAG(string, benchmark, "",
           "Benchmark mode: oneshot, batch, stream, or decode.");
@@ -1040,24 +1046,59 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  const char* tokenizer_path = FLAG_tokenizer;
+  iree_string_view_t tokenizer_path = iree_make_cstring_view(FLAG_tokenizer);
 
-  // Load tokenizer.json file.
+  // Load tokenizer file.
   iree_io_file_contents_t* file_contents = NULL;
   iree_status_t status = iree_io_file_contents_map(
-      iree_make_cstring_view(tokenizer_path), IREE_IO_FILE_ACCESS_READ,
-      host_allocator, &file_contents);
+      tokenizer_path, IREE_IO_FILE_ACCESS_READ, host_allocator, &file_contents);
 
-  // Create tokenizer.
+  // Create tokenizer from either HuggingFace JSON or tiktoken format.
   iree_tokenizer_t* tokenizer = NULL;
   if (iree_status_is_ok(status)) {
-    iree_host_size_t json_length =
-        strnlen((const char*)file_contents->const_buffer.data,
-                file_contents->const_buffer.data_length);
-    iree_string_view_t json = iree_make_string_view(
-        (const char*)file_contents->const_buffer.data, json_length);
-    status =
-        iree_tokenizer_from_huggingface_json(json, host_allocator, &tokenizer);
+    iree_string_view_t file_data =
+        iree_make_string_view((const char*)file_contents->const_buffer.data,
+                              file_contents->const_buffer.data_length);
+
+    if (iree_string_view_ends_with(tokenizer_path, IREE_SV(".tiktoken"))) {
+      // Tiktoken format: resolve encoding config from --encoding flag or
+      // infer from filename (e.g., "cl100k_base.tiktoken" -> "cl100k_base").
+      const iree_tokenizer_tiktoken_config_t* config = NULL;
+      iree_string_view_t encoding = iree_make_cstring_view(FLAG_encoding);
+      if (iree_string_view_is_empty(encoding)) {
+        // Extract basename: find last '/' (or '\' on Windows).
+        iree_host_size_t last_sep = iree_string_view_find_last_of(
+            tokenizer_path, IREE_SV("/\\"), IREE_STRING_VIEW_NPOS);
+        encoding = (last_sep != IREE_STRING_VIEW_NPOS)
+                       ? iree_string_view_substr(tokenizer_path, last_sep + 1,
+                                                 IREE_HOST_SIZE_MAX)
+                       : tokenizer_path;
+        iree_string_view_consume_suffix(&encoding, IREE_SV(".tiktoken"));
+      }
+      if (iree_string_view_equal(encoding, IREE_SV("cl100k_base"))) {
+        config = iree_tokenizer_tiktoken_config_cl100k_base();
+      } else if (iree_string_view_equal(encoding, IREE_SV("o200k_base"))) {
+        config = iree_tokenizer_tiktoken_config_o200k_base();
+      } else if (iree_string_view_equal(encoding, IREE_SV("r50k_base"))) {
+        config = iree_tokenizer_tiktoken_config_r50k_base();
+      } else if (iree_string_view_equal(encoding, IREE_SV("p50k_base"))) {
+        config = iree_tokenizer_tiktoken_config_p50k_base();
+      } else {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "unknown tiktoken encoding '%.*s'; use --encoding with one of: "
+            "cl100k_base, o200k_base, r50k_base, p50k_base",
+            (int)encoding.size, encoding.data);
+      }
+      if (iree_status_is_ok(status)) {
+        status = iree_tokenizer_from_tiktoken(file_data, config, host_allocator,
+                                              &tokenizer);
+      }
+    } else {
+      // Default: HuggingFace JSON format.
+      status = iree_tokenizer_from_huggingface_json(file_data, host_allocator,
+                                                    &tokenizer);
+    }
   }
 
   // Validate flag combinations.
