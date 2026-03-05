@@ -74,7 +74,9 @@ namespace mlir::iree_compiler::IREE::GPU {
 //    almost always equal to subgroup size. If not, then it is a strict divisor
 //    of subgroup size and that means that multiple threads get the exact same
 //    data, i.e., there is an implied broadcasting, as will be seen in the
-//    modulo (t % thread [0]) below.
+//    modulo (t % thread [0]) below. Callers may opt to split an element
+//    dimension by this factor to give each broadcast lane distinct data;
+//    see broadcastFactor in populateCanonicalOffsetsSizesAndStrides.
 //
 // Detailed semantics: case of semantic rank 1
 // -------------------------------------------

@@ -908,7 +908,9 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
     SmallVectorImpl<OpFoldResult> &canonicalOffsets,
     SmallVectorImpl<OpFoldResult> &canonicalSizes,
-    SmallVectorImpl<OpFoldResult> &canonicalStrides) {
+    SmallVectorImpl<OpFoldResult> &canonicalStrides,
+    int64_t broadcastFactor = 1) {
+  assert(broadcastFactor >= 1 && "broadcast factor must be at least 1");
   SmallVector<int64_t> rankReducedShape;
 
   for (auto [outer, thread, element] :
@@ -946,6 +948,44 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   SmallVector<Value> hintedSplitLaneId = createTransposeLoadIndexHint(
       builder, loc, splitLaneId.getResults(), vtidBasis);
 
+  // Find the unique element dimension eligible for lane differentiation:
+  // exactly one dimension with element[dim] > 1 and divisible by
+  // broadcastFactor.
+  std::optional<size_t> splitDim;
+  if (broadcastFactor > 1) {
+    for (auto [dimIdx, element] : llvm::enumerate(subgroupLayout.element)) {
+      if (element > 1 && element % broadcastFactor == 0) {
+        if (splitDim) {
+          splitDim = std::nullopt;
+          break;
+        }
+        splitDim = dimIdx;
+      }
+    }
+  }
+
+  // Build broadcastIndex from unused delinearize results. Unused results
+  // (not mapped by dimToVtid) represent broadcast lanes that see duplicate
+  // data. When a splitDim exists, we use the single unused component as an
+  // index in [0, broadcastFactor) to differentiate those lanes.
+  Value broadcastIndex;
+  if (splitDim) {
+    llvm::SmallDenseSet<size_t, 4> usedResults(dimToVtid.begin(),
+                                               dimToVtid.end());
+    // Find the single unused delinearize result representing broadcast lanes.
+    std::optional<size_t> unusedResultIdx;
+    for (size_t i = 1, e = vtidBasis.size(); i <= e; ++i) {
+      if (!usedResults.contains(i)) {
+        assert(!unusedResultIdx && "expected exactly one unused basis entry");
+        unusedResultIdx = i;
+      }
+    }
+    assert(unusedResultIdx && "expected one unused basis entry for broadcast");
+    assert(vtidBasis[*unusedResultIdx - 1] == broadcastFactor &&
+           "unused basis size must equal broadcast factor");
+    broadcastIndex = splitLaneId.getResult(*unusedResultIdx);
+  }
+
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
   // vtid: virtual thread id
@@ -955,11 +995,23 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // Instead of computing those maps, we use one big `delinearize` expression
   // in order to prevent unwanted "simplifications" on affine maps that
   // worsen the generated code quality.
-  for (auto [splitResultIdx, element] :
-       llvm::zip_equal(dimToVtid, subgroupLayout.element)) {
+  //
+  // When broadcastFactor > 1, the splitDim offset also incorporates
+  // broadcastIndex so each broadcast lane gets a disjoint slice instead.
+  for (auto [dimIdx, vtidAndElement] :
+       llvm::enumerate(llvm::zip_equal(dimToVtid, subgroupLayout.element))) {
+    auto [splitResultIdx, element] = vtidAndElement;
     Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
-    if (element != 1) {
+
+    if (splitDim && dimIdx == *splitDim) {
+      // offset = vtid * element + broadcastIndex * perLaneElement.
+      int64_t perLaneElement = element / broadcastFactor;
+      vtid = affine::AffineLinearizeIndexOp::create(
+          builder, loc, ValueRange{vtid, broadcastIndex, cZero},
+          ArrayRef<int64_t>{vtidLen, broadcastFactor, perLaneElement},
+          /*disjoint=*/true);
+    } else if (element != 1) {
       vtid = affine::AffineLinearizeIndexOp::create(
           builder, loc, ValueRange{vtid, cZero},
           ArrayRef<int64_t>{vtidLen, element},
@@ -968,15 +1020,20 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     vtids.push_back(vtid);
   }
 
-  int64_t idx = 0;
-  for (auto [element, outer] :
-       llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer)) {
+  int64_t vtidIdx = 0;
+  for (auto [dimIdx, elementAndOuter] : llvm::enumerate(
+           llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer))) {
+    auto [element, outer] = elementAndOuter;
+    int64_t perLaneElement = element;
+    if (splitDim && dimIdx == *splitDim) {
+      perLaneElement = element / broadcastFactor;
+    }
     if (outer != 1) {
       canonicalSizes.push_back(builder.getIndexAttr(outer));
       canonicalOffsets.push_back(zero);
     }
-    canonicalSizes.push_back(builder.getIndexAttr(element));
-    canonicalOffsets.push_back(vtids[idx++]);
+    canonicalSizes.push_back(builder.getIndexAttr(perLaneElement));
+    canonicalOffsets.push_back(vtids[vtidIdx++]);
   }
   canonicalOffsets.assign(applyPermutation(canonicalOffsets, permutation));
   canonicalSizes.assign(applyPermutation(canonicalSizes, permutation));
