@@ -6588,7 +6588,7 @@ components and use different tooling depending on the needs of that component.</
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;">iree_hal_cts_test_suite</td>
-<td>CMake</td>
+<td>Bazel/CMake</td>
 <td>Host/Device</td>
 </tr>
 <tr>
@@ -6731,8 +6731,8 @@ should generally derive the <code>CMakeLists.txt</code> file from the BUILD file
 <span class="p">)</span>
 </code></pre></div>
 <p>There are other more specific test targets, such as <code>iree_hal_cts_test_suite</code>,
-which are designed to test specific runtime support with template configuration
-and is not supported by Bazel rules.</p>
+which are designed to test HAL driver conformance across all supported
+backends. Supported in both Bazel and CMake.</p>
 <h3 id="code-coverage">Code Coverage<a class="headerlink" href="#code-coverage" title="Permanent link">link</a></h3>
 <p>Use the <a href="../../building/cmake-options/#iree_enable_runtime_coverage">IREE_ENABLE_RUNTIME_COVERAGE</a>
 CMake option to enable code coverage instrumentation and add synthetic targets
