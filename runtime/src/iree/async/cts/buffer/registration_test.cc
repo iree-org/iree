@@ -430,11 +430,13 @@ TEST_P(BufferRegistrationTest, SlabAndDmabufCoexist) {
       dmabuf_entry->region->type == IREE_ASYNC_REGION_TYPE_IOURING) {
     // Slab occupies [base, base+count). Dmabuf occupies a single slot.
     // They must not overlap.
-    uint16_t slab_base = slab_region->handles.iouring.base_buffer_index;
-    uint16_t slab_end =
-        slab_base + static_cast<uint16_t>(slab_region->buffer_count);
-    uint16_t dmabuf_slot =
+    int16_t slab_base = slab_region->handles.iouring.base_buffer_index;
+    ASSERT_GE(slab_base, 0) << "slab should have kernel-registered buffers";
+    int16_t slab_end =
+        slab_base + static_cast<int16_t>(slab_region->buffer_count);
+    int16_t dmabuf_slot =
         dmabuf_entry->region->handles.iouring.base_buffer_index;
+    ASSERT_GE(dmabuf_slot, 0) << "dmabuf should have a kernel-registered slot";
     EXPECT_TRUE(dmabuf_slot < slab_base || dmabuf_slot >= slab_end)
         << "dmabuf slot " << dmabuf_slot << " overlaps slab range ["
         << slab_base << ", " << slab_end << ")";

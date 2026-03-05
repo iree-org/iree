@@ -164,7 +164,7 @@ iree_status_t iree_async_proactor_io_uring_register_buffer(
   region->buffer_size = 0;
   region->buffer_count = 0;                      // Not indexed (use address).
   region->handles.iouring.buffer_group_id = -1;  // Not a provided buffer ring.
-  region->handles.iouring.base_buffer_index = 0;
+  region->handles.iouring.base_buffer_index = -1;  // Not kernel-registered.
 
   // Initialize the entry.
   iree_async_buffer_registration_entry_t* entry = &registration->entry;
@@ -299,7 +299,7 @@ iree_status_t iree_async_proactor_io_uring_register_dmabuf(
     region->buffer_count = 1;
     region->handles.iouring.buffer_group_id = -1;
     region->handles.iouring.base_buffer_index =
-        (uint16_t)registration->buffer_table_slot;
+        (int16_t)registration->buffer_table_slot;
   } else {
     // No kernel registration — mmap-only fallback.
     region->type = IREE_ASYNC_REGION_TYPE_DMABUF;
@@ -535,14 +535,26 @@ static iree_status_t iree_async_io_uring_slab_region_register_fixed_buffers(
         iree_io_uring_sparse_table_release(proactor->buffer_table,
                                            (uint16_t)base_slot,
                                            (uint16_t)buffer_count);
-        status = iree_make_status(iree_status_code_from_errno(saved_errno),
-                                  "IORING_REGISTER_BUFFERS_UPDATE failed (%d)",
-                                  saved_errno);
+        if (saved_errno == ENOMEM) {
+          // Kernel couldn't pin pages — RLIMIT_MEMLOCK is likely too low.
+          // Fall back to copy-based I/O instead of failing hard. The region
+          // will have base_buffer_index = -1 so the send path uses regular
+          // sends instead of SEND_ZC with fixed buffers.
+          IREE_TRACE_MESSAGE(
+              WARNING,
+              "io_uring: RLIMIT_MEMLOCK too low to pin pages for zero-copy "
+              "send; falling back to copy-based I/O (raise with "
+              "'ulimit -l unlimited')");
+        } else {
+          status = iree_make_status(
+              iree_status_code_from_errno(saved_errno),
+              "IORING_REGISTER_BUFFERS_UPDATE failed (%d)", saved_errno);
+        }
+      } else {
+        slab_region->fixed_buffer_base = (uint16_t)base_slot;
+        slab_region->fixed_buffer_count = (uint16_t)buffer_count;
+        slab_region->registered_fixed_buffers = true;
       }
-    }
-    if (iree_status_is_ok(status)) {
-      slab_region->fixed_buffer_base = (uint16_t)base_slot;
-      slab_region->fixed_buffer_count = (uint16_t)buffer_count;
     }
     iree_io_uring_sparse_table_unlock(proactor->buffer_table);
   } else {
@@ -553,22 +565,27 @@ static iree_status_t iree_async_io_uring_slab_region_register_fixed_buffers(
     } while (ret < 0 && errno == EINTR);
     if (ret < 0) {
       int saved_errno = errno;
-      status =
-          iree_make_status(iree_status_code_from_errno(saved_errno),
-                           "IORING_REGISTER_BUFFERS failed (%d)", saved_errno);
+      if (saved_errno == ENOMEM) {
+        IREE_TRACE_MESSAGE(
+            WARNING,
+            "io_uring: RLIMIT_MEMLOCK too low to pin pages for zero-copy "
+            "send; falling back to copy-based I/O (raise with "
+            "'ulimit -l unlimited')");
+      } else {
+        status = iree_make_status(iree_status_code_from_errno(saved_errno),
+                                  "IORING_REGISTER_BUFFERS failed (%d)",
+                                  saved_errno);
+      }
     } else {
       proactor->legacy_registered_buffer_count = (uint16_t)buffer_count;
       slab_region->fixed_buffer_base = 0;
       slab_region->fixed_buffer_count = (uint16_t)buffer_count;
+      slab_region->registered_fixed_buffers = true;
     }
   }
 
   if (iovecs_heap_allocated) {
     iree_allocator_free(slab_region->allocator, iovecs);
-  }
-
-  if (iree_status_is_ok(status)) {
-    slab_region->registered_fixed_buffers = true;
   }
 
   return status;
@@ -763,7 +780,12 @@ iree_status_t iree_async_proactor_io_uring_register_slab(
   region->buffer_size = buffer_size;
   region->buffer_count = (uint32_t)buffer_count;
   region->handles.iouring.buffer_group_id = buffer_group_id;
-  region->handles.iouring.base_buffer_index = slab_region->fixed_buffer_base;
+  // -1 when fixed buffer registration was skipped (ENOMEM/RLIMIT_MEMLOCK):
+  // send path sees this and falls back to copy-based I/O.
+  region->handles.iouring.base_buffer_index =
+      slab_region->registered_fixed_buffers
+          ? (int16_t)slab_region->fixed_buffer_base
+          : (int16_t)-1;
 
   *out_region = region;
   IREE_TRACE_ZONE_END(z0);
