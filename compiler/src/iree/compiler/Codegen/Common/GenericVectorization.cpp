@@ -67,9 +67,14 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           return std::nullopt;
         }
       }
-      // Replace zeros in canonical vector shape to turn it into a valid shape.
-      std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
-      return std::make_pair(*vectorSizes, scalableFlags);
+      // Zero vector sizes are invalid (VectorType requires positive dims).
+      // Bail out to the IR inference path which derives correct sizes from
+      // the tensor shapes after tiling.
+      if (llvm::is_contained(*vectorSizes, 0)) {
+        LDBG() << "Vector sizes contain zeros, fall back to inference";
+      } else {
+        return std::make_pair(*vectorSizes, scalableFlags);
+      }
     }
     LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }
