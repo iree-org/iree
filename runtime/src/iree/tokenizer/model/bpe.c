@@ -355,9 +355,10 @@ static iree_status_t iree_tokenizer_bpe_state_initialize(
            model->cache_capacity * sizeof(iree_tokenizer_bpe_cache_entry_t));
   }
 
-  // Initialize pair validation cache: set all entries to empty (UINT32_MAX).
-  // Token IDs are bounded by vocab_capacity (< UINT32_MAX), so UINT32_MAX
-  // can never match a real token pair.
+  // Initialize pair validation cache: set all entries to empty (0xFF bytes).
+  // token1 = 0xFFFFFFFF can never match a real token ID (bounded by
+  // vocab_capacity), so all entries start as cache misses regardless of the
+  // token2 validity bit.
   if (model->pair_cache_capacity > 0) {
     memset(iree_tokenizer_bpe_state_pair_cache(state, model), 0xFF,
            model->pair_cache_capacity *
