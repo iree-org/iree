@@ -17,17 +17,15 @@ func.func @fuse_collapse_shape_into_generic(%arg0: tensor<8x10xi32>) -> tensor<8
   return %1 : tensor<80xi32>
 }
 
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 10)>
 // CHECK-LABEL: @fuse_collapse_shape_into_generic
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<8x10xi32>
-
-// The constant gets collapsed by canonicalization.
-//       CHECK:  %[[CST:.+]] = arith.constant dense<5> : tensor<40xi32>
+//   CHECK-DAG:  %[[CST:.+]] = arith.constant dense<5> : tensor<40xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1]{{\]}} : tensor<8x10xi32> into tensor<80xi32>
 //       CHECK:  %[[GENERIC:.+]] = pcf.generic scope(#pcf.test_scope)
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index
 //       CHECK:    -> (tensor<80xi32>)
-//       CHECK:    %[[FLAT_OFF:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
+//       CHECK:    %[[FLAT_OFF:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]]] by (8, 10) : index
 //       CHECK:    pcf.write_slice %[[CST]] into %[[REF]][%[[FLAT_OFF]]] [40] [1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -49,16 +47,15 @@ func.func @fuse_collapse_shape_into_loop(%arg0: tensor<8x10xi32>, %n0: index, %n
   return %1 : tensor<80xi32>
 }
 
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 10)>
 // CHECK-LABEL: @fuse_collapse_shape_into_loop
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<8x10xi32>
-
-//       CHECK:  %[[CST:.+]] = arith.constant dense<5> : tensor<40xi32>
+//   CHECK-DAG:  %[[CST:.+]] = arith.constant dense<5> : tensor<40xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1]{{\]}} : tensor<8x10xi32> into tensor<80xi32>
 //       CHECK:  %[[LOOP:.+]] = pcf.loop scope(#pcf.test_scope)
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index
 //       CHECK:    -> (tensor<80xi32>)
-//       CHECK:    %[[FLAT_OFF:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
+//       CHECK:    %[[FLAT_OFF:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]]] by (8, 10) : index
 //       CHECK:    pcf.write_slice %[[CST]] into %[[REF]][%[[FLAT_OFF]]] [40] [1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[LOOP]]
@@ -82,20 +79,18 @@ func.func @fuse_collapse_shape_multiple_write_slices(%arg0: tensor<8x10xi32>) ->
   return %1 : tensor<80xi32>
 }
 
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 10)>
 // CHECK-LABEL: @fuse_collapse_shape_multiple_write_slices
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<8x10xi32>
-
-// Constants are collapsed by canonicalization.
 //   CHECK-DAG:  %[[CST1:.+]] = arith.constant dense<5> : tensor<30xi32>
 //   CHECK-DAG:  %[[CST2:.+]] = arith.constant dense<7> : tensor<50xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1]{{\]}}
 //       CHECK:  %[[GENERIC:.+]] = pcf.generic scope(#pcf.test_scope)
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index
 //       CHECK:    -> (tensor<80xi32>)
-//       CHECK:    %[[OFF0:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
+//       CHECK:    %[[OFF0:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]]] by (8, 10) : index
 //       CHECK:    pcf.write_slice %[[CST1]] into %[[REF]][%[[OFF0]]] [30] [1]
-//       CHECK:    %[[OFF1:.+]] = affine.apply #[[$MAP0]](%[[ID1]])
+//       CHECK:    %[[OFF1:.+]] = affine.linearize_index disjoint [%[[ID1]], %[[C0]]] by (8, 10) : index
 //       CHECK:    pcf.write_slice %[[CST2]] into %[[REF]][%[[OFF1]]] [50] [1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -146,8 +141,7 @@ func.func @fuse_collapse_shape_partial_inner_dim(%arg0: tensor<8x10xi32>,
 }
 
 // Dim 0 is a loop dim (size 4), dim 1 is retained (size 5).
-// Linearized offset: id1 + id0 * 10 + iv * 10.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0 + d1 * 10 + d2 * 10)>
+// Linearized offset via affine.linearize_index with adjusted loop index.
 // CHECK-LABEL: @fuse_collapse_shape_partial_inner_dim
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<8x10xi32>
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9_]+]]: tensor<4x5xi32>
@@ -158,7 +152,8 @@ func.func @fuse_collapse_shape_partial_inner_dim(%arg0: tensor<8x10xi32>,
 //       CHECK:    scf.forall (%[[IV:.+]]) in (4) {
 //       CHECK:      %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[IV]], 0] [1, 5] [1, 1] : tensor<4x5xi32> to tensor<1x5xi32>
 //       CHECK:      %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0, 1]{{\]}} : tensor<1x5xi32> into tensor<5xi32>
-//       CHECK:      %[[OFF:.+]] = affine.apply #[[$MAP0]](%[[ID1]], %[[ID0]], %[[IV]])
+//       CHECK:      %[[ADJ:.+]] = affine.apply
+//       CHECK:      %[[OFF:.+]] = affine.linearize_index disjoint [%[[ADJ]], %[[ID1]]] by (8, 10) : index
 //       CHECK:      pcf.write_slice %[[COLLAPSED]] into %[[REF]][%[[OFF]]] [5] [1]
 //       CHECK:    }
 //       CHECK:    pcf.return
@@ -186,16 +181,16 @@ func.func @fuse_collapse_shape_3d_full_retention(%arg0: tensor<6x4x8xi32>) -> te
   return %1 : tensor<192xi32>
 }
 
-// All 3 dims retained. Linearized offset: id0 * 4 * 8 = id0 * 32.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 32)>
+// All 3 dims retained. Linearized offset via affine.linearize_index.
 // CHECK-LABEL: @fuse_collapse_shape_3d_full_retention
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<6x4x8xi32>
-//       CHECK:  %[[CST:.+]] = arith.constant dense<5> : tensor<64xi32>
+//   CHECK-DAG:  %[[CST:.+]] = arith.constant dense<5> : tensor<64xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1, 2]{{\]}}
 //       CHECK:  pcf.generic
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index
 //   CHECK-NOT:  scf.forall
-//       CHECK:  %[[OFF:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
+//       CHECK:  %[[OFF:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]], %[[C0]]] by (6, 4, 8) : index
 //       CHECK:  pcf.write_slice %[[CST]] into %[[REF]][%[[OFF]]] [64] [1]
 //       CHECK:  pcf.return
 
@@ -222,8 +217,7 @@ func.func @fuse_collapse_shape_3d_two_loop_dims(%arg0: tensor<6x4x8xi32>,
 }
 
 // Dims 0,1 are loop dims (bounds 2,3). Dim 2 retained (size 5).
-// Linearized offset: n0 + id0 * 4*8 + iv0 * 4*8 + id1 * 8 + iv1 * 8.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0 + d1 * 32 + d2 * 32 + d3 * 8 + d4 * 8)>
+// Linearized offset via affine.linearize_index with adjusted loop indices.
 // CHECK-LABEL: @fuse_collapse_shape_3d_two_loop_dims
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<6x4x8xi32>
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9_]+]]: tensor<2x3x5xi32>
@@ -233,7 +227,9 @@ func.func @fuse_collapse_shape_3d_two_loop_dims(%arg0: tensor<6x4x8xi32>,
 //       CHECK:    scf.forall (%[[IV0:.+]], %[[IV1:.+]]) in (2, 3) {
 //       CHECK:      %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[IV0]], %[[IV1]], 0] [1, 1, 5] [1, 1, 1]
 //       CHECK:      %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0, 1, 2]{{\]}} : tensor<1x1x5xi32> into tensor<5xi32>
-//       CHECK:      %[[OFF:.+]] = affine.apply #[[$MAP0]](%[[N0]], %[[ID0]], %[[IV0]], %[[ID1]], %[[IV1]])
+//       CHECK:      affine.apply
+//       CHECK:      affine.apply
+//       CHECK:      %[[OFF:.+]] = affine.linearize_index disjoint [%{{.*}}, %{{.*}}, %[[N0]]] by (6, 4, 8) : index
 //       CHECK:      pcf.write_slice %[[COLLAPSED]] into %[[REF]][%[[OFF]]] [5] [1]
 //       CHECK:    }
 //       CHECK:    pcf.return
@@ -258,19 +254,19 @@ func.func @fuse_collapse_shape_two_groups(%arg0: tensor<6x4x8x5xi32>) -> tensor<
   return %1 : tensor<24x40xi32>
 }
 
-// Group [0,1]: offset id0*4, size 3*4=12. Group [2,3]: offset id1*5, size 2*5=10.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 4)>
-//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0) -> (d0 * 5)>
+// Group [0,1]: linearize_index [id0, 0] by (6, 4), size 12.
+// Group [2,3]: linearize_index [id1, 0] by (8, 5), size 10.
 // CHECK-LABEL: @fuse_collapse_shape_two_groups
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<6x4x8x5xi32>
-//       CHECK:  %[[CST:.+]] = arith.constant dense<5> : tensor<12x10xi32>
+//   CHECK-DAG:  %[[CST:.+]] = arith.constant dense<5> : tensor<12x10xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2, 3]{{\]}}
 //       CHECK:  pcf.generic
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index
 //       CHECK:    -> (tensor<24x40xi32>)
 //   CHECK-NOT:  scf.forall
-//       CHECK:  %[[OFF0:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
-//       CHECK:  %[[OFF1:.+]] = affine.apply #[[$MAP1]](%[[ID1]])
+//       CHECK:  %[[OFF0:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]]] by (6, 4) : index
+//       CHECK:  %[[OFF1:.+]] = affine.linearize_index disjoint [%[[ID1]], %[[C0]]] by (8, 5) : index
 //       CHECK:  pcf.write_slice %[[CST]] into %[[REF]][%[[OFF0]], %[[OFF1]]] [12, 10] [1, 1]
 //       CHECK:  pcf.return
 
@@ -295,21 +291,21 @@ func.func @fuse_collapse_shape_mixed_groups(%arg0: tensor<6x4x8x5xi32>,
 }
 
 // Group [0,1]: dim 0 loops (bound 2), dim 1 retained.
-//   Offset: id1 + id0 * 4 + iv * 4. Size: 3.
-// Group [2,3]: both retained. Offset: n0 * 5. Size: 3*5=15.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0 + d1 * 4 + d2 * 4)>
-//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0) -> (d0 * 5)>
+//   Offset: linearize_index [id0 + iv, id1] by (6, 4). Size: 3.
+// Group [2,3]: both retained. Offset: linearize_index [n0, 0] by (8, 5). Size: 15.
 // CHECK-LABEL: @fuse_collapse_shape_mixed_groups
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<6x4x8x5xi32>
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9_]+]]: tensor<2x3x3x5xi32>
+//   CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1], [2, 3]{{\]}}
 //       CHECK:  pcf.generic
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index, %[[N0:[A-Za-z0-9_]+]]: index
 //       CHECK:    scf.forall (%[[IV:.+]]) in (2) {
 //       CHECK:      %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[IV]], 0, 0, 0] [1, 3, 3, 5] [1, 1, 1, 1]
 //       CHECK:      %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0, 1], [2, 3]{{\]}} : tensor<1x3x3x5xi32> into tensor<3x15xi32>
-//       CHECK:      %[[OFF0:.+]] = affine.apply #[[$MAP0]](%[[ID1]], %[[ID0]], %[[IV]])
-//       CHECK:      %[[OFF1:.+]] = affine.apply #[[$MAP1]](%[[N0]])
+//       CHECK:      %[[ADJ:.+]] = affine.apply
+//       CHECK:      %[[OFF0:.+]] = affine.linearize_index disjoint [%[[ADJ]], %[[ID1]]] by (6, 4) : index
+//       CHECK:      %[[OFF1:.+]] = affine.linearize_index disjoint [%[[N0]], %[[C0]]] by (8, 5) : index
 //       CHECK:      pcf.write_slice %[[COLLAPSED]] into %[[REF]][%[[OFF0]], %[[OFF1]]] [3, 15] [1, 1]
 //       CHECK:    }
 //       CHECK:    pcf.return
@@ -337,16 +333,16 @@ func.func @fuse_collapse_shape_dynamic_producer(%arg0: tensor<?x10xi32>,
 
 // Dynamic producer: dim 0 is dynamic but dim 1 (innermost) is static with
 // full coverage (offset 0, size 10 == shape 10). Both dims retained.
-// Linearized offset: id0 * 10, size: 4 * 10 = 40.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0) -> (d0 * 10)>
+// Linearized offset: linearize_index [id0, 0] by (%dim, 10), size: 40.
 // CHECK-LABEL: @fuse_collapse_shape_dynamic_producer
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<?x10xi32>
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9_]+]]: tensor<4x10xi32>
+//       CHECK:  %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:  %[[INIT:.+]] = tensor.collapse_shape %[[ARG0]] {{\[}}[0, 1]{{\]}} : tensor<?x10xi32> into tensor<?xi32>
 //       CHECK:  pcf.generic
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:[A-Za-z0-9_]+]]: index
 //       CHECK:    -> (tensor<?xi32>)
-//       CHECK:    %[[OFF:.+]] = affine.apply #[[$MAP0]](%[[ID0]])
+//       CHECK:    %[[OFF:.+]] = affine.linearize_index disjoint [%[[ID0]], %[[C0]]] by (%{{.*}}, 10) : index
 //       CHECK:    %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SRC]] {{\[}}[0, 1]{{\]}} : tensor<4x10xi32> into tensor<40xi32>
 //       CHECK:    pcf.write_slice %[[COLLAPSED]] into %[[REF]][%[[OFF]]] [40] [1]
 //   CHECK-NOT:    scf.forall
@@ -374,8 +370,7 @@ func.func @fuse_collapse_shape_dynamic_write(%arg0: tensor<8x10xi32>,
 }
 
 // Dynamic offsets/sizes: dim 0 loops (bound sz0), dim 1 retained (size sz1).
-// Linearized offset: iv * 10 + off0 * 10 + off1.
-//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0)[s0, s1] -> (d0 * 10 + s0 * 10 + s1)>
+// Linearized offset via affine.linearize_index with adjusted loop index.
 // CHECK-LABEL: @fuse_collapse_shape_dynamic_write
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: tensor<8x10xi32>,
 //  CHECK-SAME:   %[[OFF0:[A-Za-z0-9_]+]]: index, %[[OFF1:[A-Za-z0-9_]+]]: index, %[[SZ0:[A-Za-z0-9_]+]]: index, %[[SZ1:[A-Za-z0-9_]+]]: index,
@@ -387,7 +382,8 @@ func.func @fuse_collapse_shape_dynamic_write(%arg0: tensor<8x10xi32>,
 //       CHECK:    scf.forall (%[[IV:.+]]) in (%[[SZ0]]) {
 //       CHECK:      %[[SLICE:.+]] = tensor.extract_slice %[[SRC]][%[[IV]], 0] [1, %[[SZ1]]] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
 //       CHECK:      %[[COLLAPSED:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0, 1]{{\]}} : tensor<1x?xi32> into tensor<?xi32>
-//       CHECK:      %[[LOFF:.+]] = affine.apply #[[$MAP0]](%[[IV]])[%[[OFF0]], %[[OFF1]]]
+//       CHECK:      %[[ADJ:.+]] = affine.apply
+//       CHECK:      %[[LOFF:.+]] = affine.linearize_index disjoint [%[[ADJ]], %[[OFF1]]] by (8, 10) : index
 //       CHECK:      pcf.write_slice %[[COLLAPSED]] into %[[REF]][%[[LOFF]]] [%[[SZ1]]] [1]
 //       CHECK:    }
 //       CHECK:    pcf.return
@@ -397,7 +393,7 @@ func.func @fuse_collapse_shape_dynamic_write(%arg0: tensor<8x10xi32>,
 // Test: 3D static group fully retained (all dims fully cover).
 // write_slice covers [6, 4, 8] at [0, 0, 0] in shape [6, 4, 8].
 // All dims at offset 0 with full size. No loops; single write of 192.
-// Offset is constant 0 (folded away), no affine.apply needed.
+// Offset is constant 0 (folded away by affine.linearize_index folder).
 
 func.func @fuse_collapse_shape_3d_fully_retained(%arg0: tensor<6x4x8xi32>) -> tensor<192xi32> {
   %0 = pcf.generic scope(#pcf.test_scope)
@@ -419,6 +415,6 @@ func.func @fuse_collapse_shape_3d_fully_retained(%arg0: tensor<6x4x8xi32>) -> te
 //       CHECK:  pcf.generic
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[INIT]])
 //   CHECK-NOT:  scf.forall
-//   CHECK-NOT:  affine.apply
+//   CHECK-NOT:  affine.linearize_index
 //       CHECK:  pcf.write_slice %[[CST]] into %[[REF]][0] [192] [1]
 //       CHECK:  pcf.return

@@ -947,12 +947,14 @@ static SmallVector<OpFoldResult> getProducerResultDimSizes(
 ///   Loop dims: d0, ..., d_{k-1} (iterate with scf.forall)
 ///   Retained dims: d_k, ..., d_N (form contiguous chunk)
 ///
-/// Linearized offset = sum_{j=0}^{k} adj_offset_j * stride_j
-///   where adj_offset_j = O_j + i_j (loop dim, j < k)
-///                      = O_j       (first retained dim, j == k)
-///   and stride_j = product of producerDimSizes[group[j+1..N]]
+/// The linearized offset is computed via affine.linearize_index with
+/// multi-index [adj_0, ..., adj_k, 0, ..., 0] and basis
+/// [producerDimSizes[group[0..N]]]:
+///   adj_j = O_j + i_j (loop dim, j < k)
+///         = O_j       (first retained dim, j == k)
+///         = 0         (inner retained dims, j > k)
 ///
-/// Linearized size = sizes[group[k]] * stride_k
+/// Linearized size = sizes[group[k]] * product(producerDimSizes[group[k+1..N]])
 static void computeGroupLinearizedOffsetAndSize(
     RewriterBase &rewriter, Location loc, const ReassociationIndices &group,
     int64_t retainedStart, ArrayRef<OpFoldResult> sliceOffsets,
@@ -961,48 +963,50 @@ static void computeGroupLinearizedOffsetAndSize(
     OpFoldResult &collapsedSize) {
   MLIRContext *ctx = rewriter.getContext();
 
-  // Compute strides within the group (from innermost to outermost).
-  // groupStrides[j] = product of producerDimSizes for group[j+1..N].
-  SmallVector<OpFoldResult> groupStrides(group.size());
-  groupStrides.back() = rewriter.getIndexAttr(1);
-  for (int64_t j = static_cast<int64_t>(group.size()) - 2; j >= 0; --j) {
-    AffineExpr d0, d1;
-    bindDims(ctx, d0, d1);
-    groupStrides[j] = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, d0 * d1,
-        {groupStrides[j + 1], producerDimSizes[group[j + 1]]});
+  // Build multi-index and basis for affine.linearize_index.
+  SmallVector<Value> multiIndex;
+  SmallVector<OpFoldResult> basis;
+  // Pre-create zero constant if needed for inner retained dims.
+  Value zero;
+  if (retainedStart + 1 < static_cast<int64_t>(group.size())) {
+    zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   }
-
-  // Compute linearized offset.
-  collapsedOffset = rewriter.getIndexAttr(0);
   int64_t loopIdx = 0;
-  for (int64_t j = 0; j <= retainedStart; ++j) {
-    OpFoldResult adjOffset;
+  for (int64_t j = 0, e = static_cast<int64_t>(group.size()); j < e; ++j) {
+    basis.push_back(producerDimSizes[group[j]]);
     if (j < retainedStart) {
-      // Loop dim: adj_offset = O_j + i_j.
+      // Loop dim: adjusted offset = sliceOffset + loopIndex.
       AffineExpr e0, e1;
       bindDims(ctx, e0, e1);
-      adjOffset = affine::makeComposedFoldedAffineApply(
+      OpFoldResult idx = affine::makeComposedFoldedAffineApply(
           rewriter, loc, e0 + e1,
           {sliceOffsets[group[j]], groupLoopIndices[loopIdx++]});
+      multiIndex.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, idx));
+    } else if (j == retainedStart) {
+      // First retained dim: offset passes through.
+      multiIndex.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, loc, sliceOffsets[group[j]]));
     } else {
-      // First retained dim: adj_offset = O_j.
-      adjOffset = sliceOffsets[group[j]];
+      // Inner retained dim: zero offset (fully covered).
+      multiIndex.push_back(zero);
     }
-    // offset += adjOffset * stride_j.
-    AffineExpr e0, e1, e2;
-    bindDims(ctx, e0, e1, e2);
-    collapsedOffset = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, e0 + e1 * e2,
-        {collapsedOffset, adjOffset, groupStrides[j]});
   }
 
-  // Compute the linearized size based on the retained portion of the group.
-  AffineExpr d0, d1;
-  bindDims(ctx, d0, d1);
-  collapsedSize = affine::makeComposedFoldedAffineApply(
-      rewriter, loc, d0 * d1,
-      {sliceSizes[group[retainedStart]], groupStrides[retainedStart]});
+  // Linearize the offset using the group's producer dimension sizes as basis.
+  collapsedOffset = affine::AffineLinearizeIndexOp::create(
+                        rewriter, loc, multiIndex, basis, /*disjoint=*/true)
+                        .getResult();
+
+  // Compute the linearized size: sliceSizes[retainedStart] multiplied by the
+  // product of producer dim sizes for all dims after retainedStart.
+  collapsedSize = sliceSizes[group[retainedStart]];
+  for (int64_t j = retainedStart + 1, e = static_cast<int64_t>(group.size());
+       j < e; ++j) {
+    AffineExpr d0, d1;
+    bindDims(ctx, d0, d1);
+    collapsedSize = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, d0 * d1, {collapsedSize, producerDimSizes[group[j]]});
+  }
 }
 
 /// Computes collapsed offsets and sizes for a write_slice given reassociation
